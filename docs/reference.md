@@ -2418,8 +2418,13 @@ duty       a fatigue case's        how the load is applied over the train's life
 
 **Ports.** The train's *open ports* are every stage's ports that the train
 does not fix — the chain's two ends by name, a shaft two stages share once
-under the earlier stage's name, a released ring or a hula's wobble body by
-reference. A case loads any of them. The two ends it does not load are
+under the earlier stage's name, a released ring or a second sun by
+reference. A port is a shaft on an axis nothing carries: a planet orbits, a
+hula's wobble body orbits, and nothing can be attached to either. The ends
+are the convention's — a load names nothing, so a load written at `End`
+stays on one shaft as loads are added beside it. A case loads any port; a
+port that turns and carries nothing is a load with a torque of nought given
+and its speed derived. The two ends it does not load are
 **reacted**: each turns as the motion says and carries whatever torque the
 flow puts on it, and both are reported — the same thing as a shaft the train
 fixes, except that a fixed shaft is ground and reports no speed. Every other
@@ -2446,6 +2451,14 @@ nothing, and cannot be switched on. A given torque is a load whichever way
 it works: one working with its port's speed drives, one working against it
 is driven — a brake, a load stated at the output — and what drives it is
 among the unknowns, a derived load or a reacted end.
+
+**A family is rated.** A train whose motion under its own constraints is a
+family — a differential: a set with its ring released and only its sun
+driven — has no ratio, efficiency or play of its own, since each is read
+under one motion; those figures are absent on the train and on every stage
+whose boundary is a family, and the panel says so once. Its cases are rated
+as any other's: two given speeds and one given torque decide a
+differential's motion and flow, and every stage rates under that.
 
 ```text
 ultimate   judged against  ultimate_allowable      survive it once; no cycles

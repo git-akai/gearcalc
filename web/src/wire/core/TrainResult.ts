@@ -9,21 +9,30 @@ import type { TrainCase } from "./TrainCase";
  */
 export type TrainResult = { 
 /**
- * Product of the stage ratios.
+ * The first stage's input to the last stage's output, signed — `None`
+ * where the train's motion under its own constraints is a **family**
+ * (a differential: a set with its ring released and only its sun
+ * driven), or where the output does not turn. A family is still rated:
+ * each case's loads decide its motion, and every stage rates under
+ * that; what a family has none of is the no-load figures here and on
+ * each stage — a ratio, an efficiency, a play — since each is read
+ * under one motion.
  */
-total_ratio: number, 
+total_ratio: number | null, 
 /**
- * Product of the stage efficiencies, in both drive directions.
+ * Product of the stage efficiencies, in both drive directions — `None`
+ * with the ratio.
  *
  * A train containing a self-locking stage cannot be back-driven at all, and
  * [`Directional::locked`] on this pair says so.
  */
-total_efficiency: Directional<number>, 
+total_efficiency: Directional<number> | null, 
 /**
  * Angular backlash referred to whichever shaft is the output, degrees: the
- * last shaft driving forward, the first driving backward.
+ * last shaft driving forward, the first driving backward. `None` with
+ * the ratio.
  */
-backlash: Directional<Backlash>, 
+backlash: Directional<Backlash> | null, 
 /**
  * Every load case, in the train's order — the ones switched off too,
  * solved at the train level alone so a panel can say whether one

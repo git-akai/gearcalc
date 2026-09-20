@@ -1517,7 +1517,6 @@ mod tests {
                     ..set(Vec::new())
                 };
                 let trains = [
-                    (set(vec![free(0, 3)]), "underdetermined"),
                     (
                         set(vec![
                             ShaftConstraint::held(0, 2),
@@ -1541,8 +1540,7 @@ mod tests {
                     assert!(
                         matches!(
                             e,
-                            TrainError::Underdetermined { .. }
-                                | TrainError::Overdetermined { .. }
+                            TrainError::Overdetermined { .. }
                                 | TrainError::NoSuchShaft { .. }
                                 | TrainError::Overflow
                                 | TrainError::InStage { .. }

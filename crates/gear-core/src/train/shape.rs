@@ -2643,21 +2643,30 @@ pub struct ShaftCase {
     ts(export, export_to = "core/")
 )]
 pub struct ShapeResult {
-    /// Input turns per output turn, signed.
-    pub ratio: f64,
+    /// Input turns per output turn, signed — and `None`, with the three
+    /// figures under it, where the stage's boundary leaves its motion a
+    /// **family**: a set with two of its three members free is a
+    /// differential, and a differential has no ratio, no efficiency and no
+    /// play of its own, since each is read under one motion. What it rates
+    /// is the case's motion, which the train decides; what it reports of
+    /// itself is the geometry alone.
+    pub ratio: Option<f64>,
     /// **The ratio one more tooth on each member would give**, in member
     /// order — the graph's exact answer at `z_i + 1`, which is what a
     /// designer choosing counts wants beside the ratio: where a tooth
-    /// moves it a lot, and where it moves it not at all.
-    pub ratio_per_tooth: Vec<f64>,
-    pub efficiency: Directional<f64>,
+    /// moves it a lot, and where it moves it not at all. `None` with the
+    /// ratio.
+    pub ratio_per_tooth: Option<Vec<f64>>,
+    /// `None` with the ratio.
+    pub efficiency: Option<Directional<f64>>,
     /// **The power crossing the teeth, over the power in**, in each
     /// direction: one on a pair, under one on a set, and many times one
     /// where power circulates ([`super::flow::Flow::circulation`]). Zero
-    /// where the stage does not turn that way.
-    pub circulation: Directional<f64>,
+    /// where the stage does not turn that way; `None` with the ratio.
+    pub circulation: Option<Directional<f64>>,
     /// Play at the output shaft driven forward, at the input driven back.
-    pub backlash: Directional<super::Backlash>,
+    /// `None` with the ratio.
+    pub backlash: Option<Directional<super::Backlash>>,
     pub distances: Vec<DistanceReport>,
     pub overlap: f64,
     /// One per replicated axis, in axis order.
@@ -2703,16 +2712,23 @@ pub fn solve_shape_after(
     let wiring = Constrained::wiring(shape);
     let boundary = boundary.clone();
     let teeth = super::teeth_of(shape.members());
-    let motion = wiring.unit_motion(&teeth, &boundary)?;
-
     let system = wiring.alone(&teeth)?;
-    let speed: Vec<f64> = system
+    let solution = system
         .motion(&boundary.conditions)
-        .map_err(|_| super::WiringError::Unsolvable)?
-        .values
-        .iter()
-        .map(|r| r.to_f64())
-        .collect();
+        .map_err(|_| super::WiringError::Unsolvable)?;
+    // **A boundary that leaves the motion a family** — a differential — is
+    // a stage with no ratio, efficiency or play of its own: each is read
+    // under one motion, and a family has none. Everything that reads the
+    // no-load motion is `None` then; the geometry, the meshes and the cases
+    // — which carry the train's motion — are what they always are.
+    let motion = if solution.is_unique() {
+        Some(wiring.unit_motion(&teeth, &boundary)?)
+    } else {
+        None
+    };
+    let speed: Option<Vec<f64>> = motion
+        .as_ref()
+        .map(|_| solution.values.iter().map(|r| r.to_f64()).collect());
     let held: Vec<Shaft> = boundary.held();
     // A stage driven at two of its ports is one motion and no arrangement
     // to rate under: the second input's torque is nobody's to know.
@@ -2832,6 +2848,7 @@ pub fn solve_shape_after(
             })
             .collect();
         Directional::of(|d| {
+            let speed = speed.as_ref()?;
             let (input, output) = match d {
                 Drive::Forward => (boundary.input, boundary.output),
                 Drive::Backward => (boundary.output, boundary.input),
@@ -2839,7 +2856,7 @@ pub fn solve_shape_after(
             super::flow::solve(
                 speed.len(),
                 &meshes,
-                &speed,
+                speed,
                 &super::flow::Asked::through(
                     speed.len(),
                     input,
@@ -2853,16 +2870,18 @@ pub fn solve_shape_after(
     };
     let moving = flows(&sliding);
     let resting = flows(&at_rest);
-    let Some(forward) = moving.forward.as_ref() else {
+    if speed.is_some() && moving.forward.is_none() {
         return Err(TrainError::NoPowerFlow);
-    };
-    let stage_efficiency = Directional {
-        forward: forward.efficiency,
-        backward: moving.backward.as_ref().map_or(0.0, |b| b.efficiency),
     }
-    .once_moving(&Directional {
-        forward: resting.forward.as_ref().map_or(0.0, |f| f.efficiency),
-        backward: resting.backward.as_ref().map_or(0.0, |b| b.efficiency),
+    let stage_efficiency = moving.forward.as_ref().map(|forward| {
+        Directional {
+            forward: forward.efficiency,
+            backward: moving.backward.as_ref().map_or(0.0, |b| b.efficiency),
+        }
+        .once_moving(&Directional {
+            forward: resting.forward.as_ref().map_or(0.0, |f| f.efficiency),
+            backward: resting.backward.as_ref().map_or(0.0, |b| b.efficiency),
+        })
     });
 
     // **A case's torques are the train's** ([`super::solve_train`]): one
@@ -3198,10 +3217,10 @@ pub fn solve_shape_after(
                 .to_degrees()
         })
     };
-    let backlash = Directional {
+    let backlash = motion.as_ref().map(|_| Directional {
         forward: backlash_at(boundary.output, boundary.input),
         backward: backlash_at(boundary.input, boundary.output),
-    };
+    });
     let member_backlash = |k: usize, side: MeshSide| -> super::Backlash {
         let m = shape.meshes[k];
         let z = f64::from(match side {
@@ -3519,10 +3538,12 @@ pub fn solve_shape_after(
         .unwrap_or(0.0);
 
     let result = ShapeResult {
-        ratio: motion.ratio(),
-        ratio_per_tooth: shape.ratio_per_tooth(&wiring, &teeth, &boundary),
+        ratio: motion.as_ref().map(super::wiring::UnitMotion::ratio),
+        ratio_per_tooth: motion
+            .as_ref()
+            .map(|_| shape.ratio_per_tooth(&wiring, &teeth, &boundary)),
         efficiency: stage_efficiency,
-        circulation: Directional {
+        circulation: motion.as_ref().map(|_| Directional {
             forward: moving
                 .forward
                 .as_ref()
@@ -3531,7 +3552,7 @@ pub fn solve_shape_after(
                 .backward
                 .as_ref()
                 .map_or(0.0, super::flow::Flow::circulation),
-        },
+        }),
         backlash,
         distances,
         overlap,
@@ -3719,12 +3740,19 @@ impl Constrained for Shape {
         }
     }
 
-    /// **Every shaft that is not replicated is a port**, in shaft order — a
-    /// pair's two members, a set's sun, carrier and ring — and what is held
-    /// by convention is the first ring's shaft, where there is a ring.
+    /// **Every shaft on an axis nothing carries is a port**, in shaft order
+    /// — a pair's two members, a set's sun, carrier and ring, a layshaft —
+    /// and what is held by convention is the first ring's shaft, where
+    /// there is a ring. A shaft on a carried axis orbits and nothing can be
+    /// attached to it: a planet, however many of it there are, and a hula's
+    /// wobble body — which, being one planet, used to be listed as a port,
+    /// and a load case that reacted every open port then held it.
     fn ports(&self) -> Ports {
         let ports: Vec<Shaft> = (1..=self.shafts.len())
-            .filter(|&s| !self.replicated(s))
+            .filter(|&s| {
+                self.axis_of_shaft(s)
+                    .is_none_or(|a| self.axes[a].carried_by.is_none())
+            })
             .collect();
         let held: Vec<Shaft> = self
             .members
@@ -4043,7 +4071,11 @@ mod tests {
             .unwrap();
             assert!(r.meshes[0].point.is_some());
             assert_eq!(r.members.len(), 2);
-            assert!(r.ratio < 0.0, "an external pair reverses: {}", r.ratio);
+            assert!(
+                r.ratio.unwrap() < 0.0,
+                "an external pair reverses: {}",
+                r.ratio.unwrap()
+            );
         }
     }
 
@@ -4150,25 +4182,25 @@ mod tests {
         let lib = test_library();
         let pair = Shape::from_pair(&PairStage::default(), PairKind::Spur);
         let r = solve_loads(&pair, &loads(), &lib, super::super::Reversal::default()).unwrap();
-        assert!((r.ratio_per_tooth[1] + 44.0 / 17.0).abs() < 1e-12);
-        assert!((r.ratio_per_tooth[0] + 43.0 / 18.0).abs() < 1e-12);
+        assert!((r.ratio_per_tooth.as_ref().unwrap()[1] + 44.0 / 17.0).abs() < 1e-12);
+        assert!((r.ratio_per_tooth.as_ref().unwrap()[0] + 43.0 / 18.0).abs() < 1e-12);
         assert!(
-            (r.circulation.forward - 1.0).abs() < 1e-12,
+            (r.circulation.unwrap().forward - 1.0).abs() < 1e-12,
             "a pair passes it all once"
         );
         let set = PlanetaryStage::default();
         let r = solve_set(&set, &loads(), &lib).unwrap();
-        assert!((r.ratio - 7.0).abs() < 1e-12);
+        assert!((r.ratio.unwrap() - 7.0).abs() < 1e-12);
         assert!(
-            (r.ratio_per_tooth[0] - (1.0 + 72.0 / 13.0)).abs() < 1e-12,
+            (r.ratio_per_tooth.as_ref().unwrap()[0] - (1.0 + 72.0 / 13.0)).abs() < 1e-12,
             "a sun's tooth"
         );
         assert!(
-            (r.ratio_per_tooth[1] - 7.0).abs() < 1e-12,
+            (r.ratio_per_tooth.as_ref().unwrap()[1] - 7.0).abs() < 1e-12,
             "a planet's tooth moves nothing"
         );
         assert!(
-            (r.ratio_per_tooth[2] - (1.0 + 73.0 / 12.0)).abs() < 1e-12,
+            (r.ratio_per_tooth.as_ref().unwrap()[2] - (1.0 + 73.0 / 12.0)).abs() < 1e-12,
             "a ring's tooth"
         );
         // ...and the power through a set's sun mesh is under the power in,
@@ -4182,7 +4214,7 @@ mod tests {
                 < 1e-9
         );
         assert!(
-            (r.circulation.forward
+            (r.circulation.unwrap().forward
                 - (sun_mesh.power_through.forward + ring_mesh.power_through.forward))
                 .abs()
                 < 1e-12
@@ -4215,20 +4247,20 @@ mod tests {
                 )
                 .unwrap();
                 assert!(
-                    (r.ratio - want.ratio).abs() < 1e-12,
+                    (r.ratio.unwrap() - want.ratio).abs() < 1e-12,
                     "{arrangement:?}: {} vs {}",
-                    r.ratio,
+                    r.ratio.unwrap(),
                     want.ratio
                 );
                 assert!(
-                    r.efficiency.forward > 0.9 && r.efficiency.forward < 1.0,
+                    r.efficiency.unwrap().forward > 0.9 && r.efficiency.unwrap().forward < 1.0,
                     "{arrangement:?}"
                 );
                 assert!(
-                    r.efficiency.backward > 0.9 && r.efficiency.backward < 1.0,
+                    r.efficiency.unwrap().backward > 0.9 && r.efficiency.unwrap().backward < 1.0,
                     "{arrangement:?}"
                 );
-                assert!(r.backlash.forward.nominal > 0.0);
+                assert!(r.backlash.unwrap().forward.nominal > 0.0);
                 checked += 1;
             }
         }
@@ -4442,7 +4474,10 @@ mod tests {
                 "k={k}: a ring with no notch cannot have a bending stress"
             );
             // ...and everything that never needed the notch is still there.
-            assert!(r.ratio.is_finite() && r.ratio != 0.0, "k={k}: no ratio");
+            assert!(
+                r.ratio.unwrap().is_finite() && r.ratio.unwrap() != 0.0,
+                "k={k}: no ratio"
+            );
             assert!(
                 r.members[0].cases[0].bending_stress.is_some(),
                 "k={k}: the sun's own bending went with it"
@@ -4809,9 +4844,9 @@ mod tests {
                 solve_set(&stage, &StageLoads::just(2.0).under(asked), &test_library()).unwrap();
             let _ = output;
             assert!(
-                (r.ratio - ratio).abs() < 1e-12,
+                (r.ratio.unwrap() - ratio).abs() < 1e-12,
                 "{input:?}/{fixed:?}: {}",
-                r.ratio
+                r.ratio.unwrap()
             );
         }
     }
@@ -4834,9 +4869,9 @@ mod tests {
         .unwrap();
         let product = r.meshes[0].efficiency.forward * r.meshes[1].efficiency.forward;
         assert!(
-            (r.efficiency.forward - product).abs() < 1e-12,
+            (r.efficiency.unwrap().forward - product).abs() < 1e-12,
             "{}",
-            r.efficiency.forward
+            r.efficiency.unwrap().forward
         );
     }
 
@@ -4906,13 +4941,13 @@ mod tests {
             let b = solve_set(&stage, &asked(PlanetaryShaft::Carrier), &lib).unwrap();
 
             // `a` outputs at the carrier, `b` at the sun.
-            let at_carrier = a.backlash.forward.nominal;
-            let at_sun = b.backlash.forward.nominal;
+            let at_carrier = a.backlash.unwrap().forward.nominal;
+            let at_sun = b.backlash.unwrap().forward.nominal;
             assert!(at_carrier > 0.0 && at_sun > 0.0);
             assert!(
-                (at_sun - at_carrier * a.ratio).abs() < 1e-9 * at_sun,
+                (at_sun - at_carrier * a.ratio.unwrap()).abs() < 1e-9 * at_sun,
                 "z={s}/{p}/{r}: {at_sun} vs {at_carrier} x {}",
-                a.ratio
+                a.ratio.unwrap()
             );
             // ...and the shaft that turns faster carries the looser play.
             assert!(at_sun > at_carrier);
@@ -4937,10 +4972,10 @@ mod tests {
         };
         let loose = solve_set(&loose, &StageLoads::just(2.0), &lib).unwrap();
         assert!(
-            loose.backlash.forward.nominal > tight.backlash.forward.nominal,
+            loose.backlash.unwrap().forward.nominal > tight.backlash.unwrap().forward.nominal,
             "{} should exceed {}",
-            loose.backlash.forward.nominal,
-            tight.backlash.forward.nominal
+            loose.backlash.unwrap().forward.nominal,
+            tight.backlash.unwrap().forward.nominal
         );
 
         // And the tolerance band holds the nominal. On the ideal ring it is a
@@ -4950,11 +4985,11 @@ mod tests {
         // so a set one tooth off the ideal is what shows the band opening, and
         // it opens on both sides of the nominal since the two meshes' operating
         // angles no longer move together.
-        let b = &tight.backlash.forward;
+        let b = &tight.backlash.unwrap().forward;
         assert!(b.minimum <= b.nominal && b.nominal <= b.maximum);
         let off = stage_of(24, 18, 61, 0.0);
         let off = solve_set(&off, &StageLoads::just(2.0), &lib).unwrap();
-        let b = &off.backlash.forward;
+        let b = &off.backlash.unwrap().forward;
         assert!(
             b.minimum < b.nominal && b.nominal < b.maximum,
             "off the ideal ring the band opens: {} … {} … {}",
@@ -4972,9 +5007,9 @@ mod tests {
         };
         let exact = solve_set(&exact, &StageLoads::just(2.0), &lib).unwrap();
         assert!(
-            exact.backlash.forward.nominal < 1e-12,
+            exact.backlash.unwrap().forward.nominal < 1e-12,
             "zero clearance must give zero play, got {}",
-            exact.backlash.forward.nominal
+            exact.backlash.unwrap().forward.nominal
         );
     }
 
@@ -5216,10 +5251,10 @@ mod tests {
             eta0(&plain)
         );
         assert!(
-            tuned.efficiency.forward > plain.efficiency.forward,
+            tuned.efficiency.unwrap().forward > plain.efficiency.unwrap().forward,
             "the set efficiency {:.6} should beat {:.6}, or power is not monotone in eta0",
-            tuned.efficiency.forward,
-            plain.efficiency.forward
+            tuned.efficiency.unwrap().forward,
+            plain.efficiency.unwrap().forward
         );
         // Both meshes stay continuous by at least the margin asked for.
         for eps in [
@@ -5301,7 +5336,7 @@ mod hula_recorded {
     #[test]
     fn the_harness_hula_is_what_the_corpus_recorded() {
         let r = solve(&hula_18(0.2), StageLoads::at(2.0, 1000.0));
-        close(324.0, r.ratio, 1e-9, "ratio");
+        close(324.0, r.ratio.unwrap(), 1e-9, "ratio");
         let d = &r.distances[0];
         close(0.726_026, d.running, 1e-6, "crank offset, running");
         close(
@@ -5322,11 +5357,11 @@ mod hula_recorded {
         }
         close(
             31.310,
-            r.efficiency.forward * 100.0,
+            r.efficiency.unwrap().forward * 100.0,
             5e-4,
             "forward efficiency, %",
         );
-        close(0.0, r.efficiency.backward, 1e-12, "self-locking");
+        close(0.0, r.efficiency.unwrap().backward, 1e-12, "self-locking");
         close(
             0.9932,
             r.meshes[0].efficiency.forward * r.meshes[1].efficiency.forward,
@@ -5335,13 +5370,13 @@ mod hula_recorded {
         );
         close(
             0.405_565,
-            r.backlash.forward.nominal,
+            r.backlash.unwrap().forward.nominal,
             1e-6,
             "backlash at the output",
         );
         close(
             131.4032,
-            r.backlash.backward.nominal,
+            r.backlash.unwrap().backward.nominal,
             5e-5,
             "backlash at the crank",
         );
@@ -5414,9 +5449,19 @@ mod hula_recorded {
     #[test]
     fn the_shipped_hula_stage_reports_the_figures_the_documents_quote() {
         let r = solve(&HulaStage::default(), StageLoads::at(2.0, 1000.0));
-        close(3721.0 / 16.0, r.ratio, 1e-9, "the reduction");
-        close(81.92, r.efficiency.forward * 100.0, 0.005, "forward, %");
-        close(77.91, r.efficiency.backward * 100.0, 0.005, "backward, %");
+        close(3721.0 / 16.0, r.ratio.unwrap(), 1e-9, "the reduction");
+        close(
+            81.92,
+            r.efficiency.unwrap().forward * 100.0,
+            0.005,
+            "forward, %",
+        );
+        close(
+            77.91,
+            r.efficiency.unwrap().backward * 100.0,
+            0.005,
+            "backward, %",
+        );
     }
 
     /// A case from the output enters at the output at the torque times the
@@ -5435,13 +5480,13 @@ mod hula_recorded {
         let r = solve(&HulaStage::default(), loads);
         let c = &r.cases[2];
         close(
-            0.5 * r.ratio,
+            0.5 * r.ratio.unwrap(),
             c.torques[2].abs(),
             1e-9,
             "the output carries the case",
         );
         close(
-            0.5 * r.efficiency.backward,
+            0.5 * r.efficiency.unwrap().backward,
             c.torques[1].abs(),
             1e-9,
             "the crank delivers it over η_b",

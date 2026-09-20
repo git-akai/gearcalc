@@ -1556,13 +1556,6 @@ pub enum TrainError {
     NoRootSection,
     /// The train has no stages, so there is nothing to accumulate.
     Empty,
-    /// **The train is short of conditions**: with what it holds and drives,
-    /// its shafts have this many more degrees of freedom than one motion.
-    /// The motion is still reported, as a family — a differential's carrier
-    /// at half the sum of its sides is an answer, and a useful one — but a
-    /// rating wants one torque at one speed, so the stages are not rated
-    /// until a shaft is held or driven for each.
-    Underdetermined { short: usize },
     /// **Two conditions cannot both hold**, at this shaft: what it is asked
     /// to do contradicts what the meshes and the other conditions already
     /// decided — a sun driven while its carrier and its ring are both held.
@@ -1672,9 +1665,6 @@ impl crate::note::Explain for TrainError {
             }
             Self::NoRootSection => Note::new(key::ERROR_TRAIN_NO_ROOT_SECTION),
             Self::Empty => Note::new(key::ERROR_TRAIN_EMPTY),
-            Self::Underdetermined { short } => {
-                Note::new(key::ERROR_TRAIN_UNDERDETERMINED).text("short", short.to_string())
-            }
             Self::Overdetermined { at } => located(key::ERROR_TRAIN_OVERDETERMINED, *at),
             Self::NoSuchShaft { at } => located(key::ERROR_TRAIN_NO_SUCH_SHAFT, *at),
             Self::Overflow => Note::new(key::ERROR_TRAIN_OVERFLOW),
@@ -1769,11 +1759,6 @@ impl std::fmt::Display for TrainError {
             Self::UnknownMaterial(n) => write!(f, "no material named {n:?} in the library"),
             Self::NoRootSection => write!(f, "the tooth is too undercut to have a root section"),
             Self::Empty => write!(f, "the geartrain has no stages"),
-            Self::Underdetermined { short } => write!(
-                f,
-                "the train is {short} condition(s) short of one motion: hold or drive \
-                 another shaft, or read the family the graph reports"
-            ),
             Self::Overdetermined { at } => {
                 write!(f, "two conditions cannot both hold at {}", place(*at))
             }
@@ -2666,9 +2651,10 @@ pub enum StageResult {
 }
 
 impl StageResult {
-    /// `z₂/z₁`.
+    /// `z₂/z₁` — `None` where the stage's boundary leaves its motion a
+    /// family, as the three below are ([`shape::ShapeResult::ratio`]).
     #[must_use]
-    pub fn ratio(&self) -> f64 {
+    pub fn ratio(&self) -> Option<f64> {
         match self {
             Self::Shape(r) => r.ratio,
         }
@@ -2680,7 +2666,7 @@ impl StageResult {
     /// the train does not have to know which is which. It takes `.forward` to
     /// propagate torque, and reports the pair.
     #[must_use]
-    pub fn efficiency(&self) -> Directional<f64> {
+    pub fn efficiency(&self) -> Option<Directional<f64>> {
         match self {
             Self::Shape(r) => r.efficiency,
         }
@@ -2692,7 +2678,7 @@ impl StageResult {
     /// at the smaller member, so a pair with different tooth counts genuinely
     /// reports two different numbers.
     #[must_use]
-    pub fn backlash(&self) -> Directional<Backlash> {
+    pub fn backlash(&self) -> Option<Directional<Backlash>> {
         match self {
             Self::Shape(r) => r.backlash,
         }
@@ -2846,7 +2832,9 @@ impl FaceSources {
     /// over every case of a kind that is switched on — the highest case is the
     /// one that sizes the part, however many overlap. A train with no case
     /// asks nothing, and that is the same answer as no source: the width
-    /// stands at its box.
+    /// stands at its box — and so does one whose every case carries nothing,
+    /// a case the train could not solve being a load of nought on every
+    /// mesh, which asks a width of nought and means no width was asked.
     #[must_use]
     pub fn width_for(&self, asks: &[(CaseKind, Widths)], given: f64) -> f64 {
         if !self.any() || asks.is_empty() {
@@ -2865,7 +2853,11 @@ impl FaceSources {
                 }
             }
         }
-        want
+        if want == 0.0 {
+            given
+        } else {
+            want
+        }
     }
 
     /// Whether anything at all is selected.
@@ -4060,16 +4052,25 @@ impl TrainCase {
     ts(export, export_to = "core/")
 )]
 pub struct TrainResult {
-    /// Product of the stage ratios.
-    pub total_ratio: f64,
-    /// Product of the stage efficiencies, in both drive directions.
+    /// The first stage's input to the last stage's output, signed — `None`
+    /// where the train's motion under its own constraints is a **family**
+    /// (a differential: a set with its ring released and only its sun
+    /// driven), or where the output does not turn. A family is still rated:
+    /// each case's loads decide its motion, and every stage rates under
+    /// that; what a family has none of is the no-load figures here and on
+    /// each stage — a ratio, an efficiency, a play — since each is read
+    /// under one motion.
+    pub total_ratio: Option<f64>,
+    /// Product of the stage efficiencies, in both drive directions — `None`
+    /// with the ratio.
     ///
     /// A train containing a self-locking stage cannot be back-driven at all, and
     /// [`Directional::locked`] on this pair says so.
-    pub total_efficiency: Directional<f64>,
+    pub total_efficiency: Option<Directional<f64>>,
     /// Angular backlash referred to whichever shaft is the output, degrees: the
-    /// last shaft driving forward, the first driving backward.
-    pub backlash: Directional<Backlash>,
+    /// last shaft driving forward, the first driving backward. `None` with
+    /// the ratio.
+    pub backlash: Option<Directional<Backlash>>,
     /// Every load case, in the train's order — the ones switched off too,
     /// solved at the train level alone so a panel can say whether one
     /// could be switched on; no stage rates a case that is off.
@@ -4138,14 +4139,12 @@ fn solve_train_under(
     // It needs no geometry — a ratio is tooth counts and a topology — and it is
     // *signed*.
     let motion = train.motion()?;
-    // **A family is not rated.** The motion is still reported — the boundary
-    // sends it beside the refusal — but every stage's rating wants one torque
-    // at one speed, and which one is the designer's to say.
-    if !motion.solution.is_unique() {
-        return Err(TrainError::Underdetermined {
-            short: motion.solution.residual.len(),
-        });
-    }
+    // **A family is rated under its cases and reports no figure of its
+    // own.** A differential's motion is whatever its loads make it, so each
+    // case decides its own and every stage rates under that; the no-load
+    // figures — a ratio, an efficiency, a play — are read under one motion
+    // and a family has none, so they are `None` here and on every stage
+    // whose boundary is a family.
     // **What each stage is asked** — from the train's constraints and
     // couplings — handed to the stage for what no load moves: its ratio, its
     // efficiency both ways, its play.
@@ -4153,9 +4152,7 @@ fn solve_train_under(
         Some(b) => b,
         None => train.boundaries()?,
     };
-    let total_ratio = motion
-        .total
-        .map_or(f64::INFINITY, crate::ratio::Ratio::to_f64);
+    let total_ratio = motion.total.map(crate::ratio::Ratio::to_f64);
 
     // Two passes: the first learns the geometry — each stage's meshes and
     // their efficiencies, which no load can move — and the second rates it.
@@ -4568,12 +4565,13 @@ fn solve_train_under(
     }
     let (stages, _) = solve(&|k| per_stage[k].clone(), Some(&chosen))?;
 
-    let total_efficiency = Directional::of(|d| {
-        stages
-            .iter()
-            .map(|s| *s.efficiency().get(d))
-            .product::<f64>()
-    });
+    // Every stage's, or none: one stage that is a family has no efficiency
+    // to multiply in, and the product with a hole in it is not a figure.
+    let total_efficiency = stages
+        .iter()
+        .map(StageResult::efficiency)
+        .collect::<Option<Vec<_>>>()
+        .map(|each| Directional::of(|d| each.iter().map(|e| *e.get(d)).product::<f64>()));
 
     // Each stage's backlash, referred to whichever shaft is the output.
     //
@@ -4591,35 +4589,58 @@ fn solve_train_under(
     // the two stages between them have 0.0552°, the pair's contribution coming
     // in negative and taking 23.5 % off the answer. It is the same conflation
     // `carry` above records, met on the other reading of a ratio.
-    let refer = |drive: Drive, pick: fn(&Backlash) -> f64| -> f64 {
-        let referral = |s: &StageResult| s.ratio().abs();
+    let refer = |drive: Drive, pick: fn(&Backlash) -> f64| -> Option<f64> {
+        let referral = |s: &StageResult| s.ratio().map(f64::abs);
         stages
             .iter()
             .enumerate()
             .map(|(k, s)| {
-                let stage = pick(s.backlash().get(drive));
+                let stage = pick(s.backlash()?.get(drive));
                 match drive {
                     Drive::Forward => {
-                        let downstream: f64 = stages[k + 1..].iter().map(referral).product();
-                        stage / downstream
+                        let downstream: f64 = stages[k + 1..]
+                            .iter()
+                            .map(referral)
+                            .product::<Option<f64>>()?;
+                        Some(stage / downstream)
                     }
                     Drive::Backward => {
-                        let upstream: f64 = stages[..k].iter().map(referral).product();
-                        stage * upstream
+                        let upstream: f64 =
+                            stages[..k].iter().map(referral).product::<Option<f64>>()?;
+                        Some(stage * upstream)
                     }
                 }
             })
-            .sum()
+            .sum::<Option<f64>>()
+    };
+    let backlash = Directional {
+        forward: (
+            refer(Drive::Forward, |b| b.nominal),
+            refer(Drive::Forward, |b| b.minimum),
+            refer(Drive::Forward, |b| b.maximum),
+        ),
+        backward: (
+            refer(Drive::Backward, |b| b.nominal),
+            refer(Drive::Backward, |b| b.minimum),
+            refer(Drive::Backward, |b| b.maximum),
+        ),
+    };
+    let banded = |(n, lo, hi): (Option<f64>, Option<f64>, Option<f64>)| -> Option<Backlash> {
+        Some(Backlash {
+            nominal: n?,
+            minimum: lo?,
+            maximum: hi?,
+        })
+    };
+    let backlash = match (banded(backlash.forward), banded(backlash.backward)) {
+        (Some(forward), Some(backward)) => Some(Directional { forward, backward }),
+        _ => None,
     };
 
     Ok(TrainResult {
         total_ratio,
         total_efficiency,
-        backlash: Directional::of(|d| Backlash {
-            nominal: refer(d, |b| b.nominal),
-            minimum: refer(d, |b| b.minimum),
-            maximum: refer(d, |b| b.maximum),
-        }),
+        backlash,
         cases,
         stages,
     })
@@ -4764,12 +4785,12 @@ mod tests {
                 // the *size* of the ratio, which is what a referral is —
                 // whether or not the mesh passes it on.
                 let worm = w.members[0].cases[BACK].torque;
-                let want = wheel / w.ratio.abs();
+                let want = wheel / w.ratio.unwrap().abs();
                 assert!(
                     (worm - want).abs() < 1e-9 * applied,
                     "the worm's teeth carry {worm} where {wheel} at the wheel over a \
                      ratio of {} is {want}",
-                    w.ratio,
+                    w.ratio.unwrap(),
                 );
                 // What the worm's *shaft* delivers is that attenuated by the
                 // loss the mesh takes carrying it backward: nought where it
@@ -5712,7 +5733,7 @@ mod tests {
             let case = if back > 0.0 { BACK } else { PEAK };
             (
                 m.cases[case].contact.max_pressure,
-                w.ratio,
+                w.ratio.unwrap(),
                 m.efficiency.forward,
             )
         };
@@ -6108,7 +6129,7 @@ mod tests {
             }
             checked += 1;
             // Torques are in the *size* of the ratio; the sign is the shaft's.
-            let want = spur.ratio.abs();
+            let want = spur.ratio.unwrap().abs();
             assert!(
                 (b / a - want).abs() < 1e-9 * want.abs(),
                 "stage {k}: the two members react {a} and {b}, a ratio of {}, \
@@ -6261,7 +6282,7 @@ mod tests {
             // grown somewhere. It used to compare magnitudes and check
             // the sign only on the epicyclic types, because a pair's ratio was
             // `z₂/z₁` and could not say its output reversed.
-            let want = r.ratio();
+            let want = r.ratio().unwrap();
             assert!(
                 (graph.to_f64() - want).abs() < 1e-12 * want.abs().max(1.0),
                 "{name}: graph {graph} vs stage {want}"
@@ -6475,17 +6496,19 @@ mod tests {
             for (k, stage) in r.stages.iter().enumerate() {
                 let graph = m.ratios[k].expect("every stage here turns").to_f64();
                 assert!(
-                    (graph.abs() - stage.ratio().abs()).abs() < 1e-9 * stage.ratio().abs(),
+                    (graph.abs() - stage.ratio().unwrap().abs()).abs()
+                        < 1e-9 * stage.ratio().unwrap().abs(),
                     "stage {k}: graph {graph} vs {}",
-                    stage.ratio()
+                    stage.ratio().unwrap()
                 );
                 checked += 1;
             }
             let total = m.total.expect("the train turns").to_f64();
             assert!(
-                (total.abs() - r.total_ratio.abs()).abs() < 1e-9 * r.total_ratio.abs(),
+                (total.abs() - r.total_ratio.unwrap().abs()).abs()
+                    < 1e-9 * r.total_ratio.unwrap().abs(),
                 "total: graph {total} vs {}",
-                r.total_ratio
+                r.total_ratio.unwrap()
             );
             // **The product of the stage ratios, which used to be production
             // code and is now the fixture.**
@@ -6497,7 +6520,7 @@ mod tests {
             // the plan means by the old model becoming a test fixture: it is
             // still the independent answer, it is simply no longer the one the
             // tool ships.
-            let ratios: Vec<f64> = r.stages.iter().map(StageResult::ratio).collect();
+            let ratios: Vec<f64> = r.stages.iter().map(|s| s.ratio().unwrap()).collect();
             let boundaries = train.boundaries().unwrap();
             for (k, b) in boundaries.iter().enumerate() {
                 let graph = m.solution.values[m.shaft_of(k, b.input)].to_f64();
@@ -6591,7 +6614,7 @@ mod tests {
         t.stages = vec![reversing(), Stage::spur(PairStage::default())];
         t.constraints = carrier_held(0);
         let r = solve_train(&t, &lib).expect("a reversing stage can be followed");
-        assert!(r.stages[0].ratio() < 0.0, "this set reverses");
+        assert!(r.stages[0].ratio().unwrap() < 0.0, "this set reverses");
         for (k, s) in r.stages.iter().enumerate() {
             for g in s.members() {
                 assert!(
@@ -6607,16 +6630,19 @@ mod tests {
         t.stages = vec![Stage::spur(PairStage::default()), reversing()];
         t.constraints = carrier_held(1);
         let r = solve_train(&t, &lib).expect("...and can follow one");
-        let want = r.stages[0].backlash().forward.nominal / r.stages[1].ratio().abs()
-            + r.stages[1].backlash().forward.nominal;
+        let want = r.stages[0].backlash().unwrap().forward.nominal
+            / r.stages[1].ratio().unwrap().abs()
+            + r.stages[1].backlash().unwrap().forward.nominal;
         assert!(
-            (r.backlash.forward.nominal - want).abs() < 1e-12,
+            (r.backlash.unwrap().forward.nominal - want).abs() < 1e-12,
             "play accumulates: {} vs {want}",
-            r.backlash.forward.nominal
+            r.backlash.unwrap().forward.nominal
         );
         // ...and it is strictly more than the last stage alone, which is what
         // "subtracting" would have taken it below.
-        assert!(r.backlash.forward.nominal > r.stages[1].backlash().forward.nominal);
+        assert!(
+            r.backlash.unwrap().forward.nominal > r.stages[1].backlash().unwrap().forward.nominal
+        );
     }
 
     /// **One shaft, one speed** — a stage's output member and the next stage's
@@ -6723,13 +6749,19 @@ mod tests {
         let one = |stage| {
             let mut t = two_stage();
             t.stages = vec![stage];
-            solve_train(&t, &lib).expect("solves").total_ratio
+            solve_train(&t, &lib).expect("solves").total_ratio.unwrap()
         };
         // One external mesh reverses; two do not.
         assert!(one(Stage::spur(PairStage::default())) < 0.0);
         let mut two = two_stage();
         two.load_cases.clear();
-        assert!(solve_train(&two, &lib).expect("solves").total_ratio > 0.0);
+        assert!(
+            solve_train(&two, &lib)
+                .expect("solves")
+                .total_ratio
+                .unwrap()
+                > 0.0
+        );
         // A worm is an external mesh like any other.
         assert!(one(Stage::worm(PairStage::worm())) < 0.0);
         // ...and an epicyclic set carries the sign its own kinematics gives:
@@ -6765,7 +6797,7 @@ mod tests {
             .collect();
         assert_eq!(held, vec![of(0, carrier)]);
         let r = solve_train(&t, &lib).expect("solves");
-        assert!(r.stages[0].ratio() < 0.0, "carrier held reverses");
+        assert!(r.stages[0].ratio().unwrap() < 0.0, "carrier held reverses");
 
         // --- at the head: driven by the carrier, and the carrier is `Start`.
         t.constraints = vec![ShaftConstraint::driven(0, carrier)];
@@ -6774,7 +6806,7 @@ mod tests {
         assert_eq!((b[0].input, b[0].output), (carrier, sun));
         let r = solve_train(&t, &lib).expect("carrier-driven at the head");
         assert!(
-            r.stages[0].ratio().abs() < 1.0,
+            r.stages[0].ratio().unwrap().abs() < 1.0,
             "a carrier-driven set speeds up"
         );
         assert_eq!(
@@ -6817,7 +6849,7 @@ mod tests {
             "ring held, pair driven"
         );
         let r = solve_train(&t, &lib).expect("solves behind a pair");
-        assert!(r.stages[1].ratio().abs() < 1.0);
+        assert!(r.stages[1].ratio().unwrap().abs() < 1.0);
 
         // ...and asked the other way — driven by the ring, sun held — one
         // line each, and the chain enters at the ring and leaves by the
@@ -6829,7 +6861,7 @@ mod tests {
         let b = t.boundaries().unwrap();
         assert_eq!((b[1].input, b[1].output), (ring, carrier));
         let r = solve_train(&t, &lib).expect("solves ring-in behind a pair");
-        let set_ratio = r.stages[1].ratio();
+        let set_ratio = r.stages[1].ratio().unwrap();
         assert!(
             set_ratio > 1.0 && set_ratio < 2.0,
             "ring in, sun held: {set_ratio}"
@@ -6905,11 +6937,8 @@ mod tests {
     /// and a case short of a speed is left short and says so, rather than
     /// given one it did not state. On a differential — a set with its ring
     /// released, two degrees — two given speeds stand and one torque: three
-    /// loads, nothing reacted, is one statics equation short of three. The
-    /// train's own motion is a family there, which the solve still refuses
-    /// by name (`a_train_one_condition_short_reports_the_family_and_refuses_the_rating`):
-    /// relief is what a case *would* need, whether or not the rating
-    /// follows.
+    /// loads, nothing reacted, is one statics equation short of three, and
+    /// the case solves.
     #[test]
     fn a_case_is_relieved_to_the_trains_mobility() {
         let lib = library();
@@ -6966,11 +6995,12 @@ mod tests {
             constraint: Constraint::Free,
         }];
         assert_eq!(diff.case_mobility().unwrap(), 2);
+        // The released ring is `End` by convention; the carrier by reference.
         diff.load_cases = vec![LoadCase {
             loads: vec![
                 Load::given(Port::Start, 2.0, 3000.0),
                 Load::given(Port::At(ShaftRef::Of { stage: 0, shaft: 3 }), 1.0, -500.0),
-                Load::derived(Port::End),
+                Load::derived(Port::At(ShaftRef::Of { stage: 0, shaft: 2 })),
             ],
             ..LoadCase::ultimate(2.0, 3000.0)
         }];
@@ -6978,10 +7008,8 @@ mod tests {
         let c = &diff.load_cases[0];
         assert!(!c.loads[0].speed.auto && !c.loads[1].speed.auto && c.loads[2].speed.auto);
         assert!(!c.loads[0].torque.auto && c.loads[1].torque.auto && c.loads[2].torque.auto);
-        assert_eq!(
-            solve_train(&diff, &lib).err(),
-            Some(TrainError::Underdetermined { short: 1 })
-        );
+        let r = solve_train(&diff, &lib).unwrap();
+        assert!(r.cases[0].solved, "{:?}", r.cases[0].notes);
     }
 
     /// **A given torque is a load whichever way it works.** A pair with the
@@ -7052,6 +7080,42 @@ mod tests {
             .any(|n| n.is(key::TRAIN_CASE_NOTHING_DRIVES)));
     }
 
+    /// **A train whose every case carries nothing still solves, its
+    /// automatic widths at their boxes.** A differential with one given
+    /// speed per case is one speed short in every case; each says so and
+    /// carries nought on every mesh, and a width asked of a load of nought
+    /// is no width asked — the same answer as a train with no case, rather
+    /// than a face of no width for the contact to refuse.
+    #[test]
+    fn a_train_no_case_of_which_solves_keeps_its_automatic_widths_at_their_boxes() {
+        let lib = library();
+        let mut t = two_stage();
+        t.stages = vec![
+            Stage::spur(PairStage::default()),
+            Stage::planetary(PlanetaryStage::default()),
+        ];
+        t.constraints = vec![ShaftConstraint {
+            at: ShaftRef::Of { stage: 1, shaft: 3 },
+            constraint: Constraint::Free,
+        }];
+        t.load_cases = vec![LoadCase::ultimate(0.1, 30000.0)];
+        for st in &mut t.stages {
+            if let Some(sh) = st.as_shape_mut() {
+                for m in &mut sh.members {
+                    m.gear.face_width = Auto::automatic(7.0);
+                }
+            }
+        }
+        let r = solve_train(&t, &lib).expect("a case carrying nothing refuses nothing");
+        assert!(r.total_ratio.is_none());
+        assert!(!r.cases[0].solved);
+        for s in &r.stages {
+            for g in s.members() {
+                assert_eq!(g.face_width, 7.0);
+            }
+        }
+    }
+
     /// **A load between two stages is one flow across both**, and where it
     /// can be held decides what it does: a load on the sun a pair drives,
     /// with the pair's input reacted and the set's carrier reacted, is a
@@ -7118,7 +7182,7 @@ mod tests {
         assert_eq!(t.port_shaft(&b, Port::Start), at(0, carrier));
         let r = solve_train(&t, &lib).expect("carrier-driven set at the head");
         assert!(
-            r.total_ratio.abs() < 1.0,
+            r.total_ratio.unwrap().abs() < 1.0,
             "a carrier-driven set multiplies speed"
         );
     }
@@ -7157,15 +7221,21 @@ mod tests {
         assert_eq!(ports[2].label, ShaftLabel::Member { member: 2 });
     }
 
-    /// **A train one condition short reports the family and refuses the
-    /// rating**, by name. A set with its ring released and its sun driven has
-    /// one free parameter; every shaft's speed is a particular value plus one
-    /// term per turn of the free shaft, and at every value of that parameter
-    /// the family satisfies Willis — `z_s ω_s + z_r ω_r = (z_s + z_r) ω_c` —
-    /// exactly, with the sun at one turn throughout. The report's terms are
-    /// the same family read as floats.
+    /// **A train one condition short reports the family, has no figure of
+    /// its own, and rates its cases.** A set with its ring released and its
+    /// sun driven — a differential — has one free parameter; every shaft's
+    /// speed is a particular value plus one term per turn of the free shaft,
+    /// and at every value of that parameter the family satisfies Willis —
+    /// `z_s ω_s + z_r ω_r = (z_s + z_r) ω_c` — exactly, with the sun at one
+    /// turn throughout. The report's terms are the same family read as
+    /// floats. The train's ratio, efficiency and play, and the stage's, are
+    /// `None`: each is read under one motion. A case that gives two speeds
+    /// and one torque decides its own motion and is rated — the carrier at
+    /// the tooth-weighted mean of the sun's and the ring's, the ring's derived
+    /// torque what holds the sun's through the set — and a case one speed
+    /// short says so and rates nothing.
     #[test]
-    fn a_train_one_condition_short_reports_the_family_and_refuses_the_rating() {
+    fn a_train_one_condition_short_reports_the_family_and_rates_its_cases() {
         let lib = library();
         let mut t = two_stage();
         t.stages = vec![Stage::planetary(PlanetaryStage::default())];
@@ -7173,10 +7243,54 @@ mod tests {
             at: ShaftRef::Of { stage: 0, shaft: 3 },
             constraint: Constraint::Free,
         }];
-        assert_eq!(
-            solve_train(&t, &lib).err(),
-            Some(TrainError::Underdetermined { short: 1 })
-        );
+        let (sun, carrier, ring) = (1, 2, 3);
+        let at = |shaft| ShaftRef::Of { stage: 0, shaft };
+        // The ring, released, is the chain's `End` by convention — the
+        // next free port in order — so the carrier is loaded by reference.
+        // (A load used to name the output; it does not, since that moved
+        // `End` from one shaft to another as loads were added.)
+        t.load_cases = vec![
+            LoadCase {
+                loads: vec![
+                    Load::given(Port::Start, 2.0, 3000.0),
+                    Load::given(Port::At(at(ring)), 0.0, -600.0),
+                    Load::derived(Port::At(at(carrier))),
+                ],
+                ..LoadCase::ultimate(2.0, 3000.0)
+            },
+            LoadCase {
+                loads: vec![Load::given(Port::Start, 2.0, 3000.0)],
+                ..LoadCase::ultimate(2.0, 3000.0)
+            },
+        ];
+        // The ring's torque is given as nought here and is one too many:
+        // relief turns it derived, and the case is two speeds and one torque.
+        t.relieve_case(0, None, &lib).unwrap();
+        assert!(t.load_cases[0].loads[1].torque.auto);
+        let r = solve_train(&t, &lib).expect("a family is rated under its cases");
+        assert!(r.total_ratio.is_none() && r.total_efficiency.is_none() && r.backlash.is_none());
+        assert!(r.stages[0].ratio().is_none() && r.stages[0].efficiency().is_none());
+        assert!(r.stages[0].backlash().is_none());
+        let zs = f64::from(t.stages[0].members()[0].teeth);
+        let zr = f64::from(t.stages[0].members()[2].teeth);
+        let c = &r.cases[0];
+        assert!(c.solved, "{:?}", c.notes);
+        let w = |shaft| c.shaft(at(shaft)).unwrap().speed.unwrap();
+        assert!(((zs * w(sun) + zr * w(ring)) / (zs + zr) - w(carrier)).abs() < 1e-9);
+        // Statics: the three external torques sum to nought against ground,
+        // and every member is rated at a torque of its own.
+        let tq = |shaft| c.shaft(at(shaft)).unwrap().torque;
+        assert!((tq(sun) - 2.0).abs() < 1e-12);
+        assert!(tq(ring).abs() > 0.0 && tq(carrier).abs() > 0.0);
+        for g in r.stages[0].members() {
+            assert!(g.cases[0].torque.abs() > 0.0, "{:?}", g.cases);
+        }
+        // One speed short: the case says so.
+        assert!(!r.cases[1].solved);
+        assert!(r.cases[1]
+            .notes
+            .iter()
+            .any(|n| n.is(key::TRAIN_CASE_UNDERDETERMINED)));
         let m = t.motion().expect("the motion is a family, not a refusal");
         assert_eq!(m.solution.residual.len(), 1, "{:?}", m.solution);
         let r = t.motion_report().expect("...and it is reported");
@@ -8352,7 +8466,7 @@ mod tests {
         };
 
         for (k, stage) in r.stages.iter().enumerate() {
-            let d = stage.backlash();
+            let d = stage.backlash().unwrap();
             let opens = stage.as_shape().is_none_or(|s| s.layouts.is_empty());
             check(&format!("stage {k} forward"), &d.forward, opens);
             check(&format!("stage {k} backward"), &d.backward, opens);
@@ -8558,7 +8672,7 @@ mod tests {
 
         // 43/17 * 31/13
         let want = (43.0 / 17.0) * (31.0 / 13.0);
-        assert!((r.total_ratio - want).abs() < 1e-12);
+        assert!((r.total_ratio.unwrap() - want).abs() < 1e-12);
         let end = at_port(&r, &two_stage(), PEAK, Port::End);
         assert_eq!(end.role, ShaftRole::Reacted);
         assert!((end.speed.unwrap() - 3000.0 / want).abs() < 1e-9);
@@ -8591,18 +8705,24 @@ mod tests {
     fn backlash_at_the_two_ends_differs_by_exactly_the_total_ratio() {
         let r = solve_train(&two_stage(), &library()).unwrap();
         for (forward, backward) in [
-            (r.backlash.forward.nominal, r.backlash.backward.nominal),
-            (r.backlash.forward.maximum, r.backlash.backward.maximum),
+            (
+                r.backlash.unwrap().forward.nominal,
+                r.backlash.unwrap().backward.nominal,
+            ),
+            (
+                r.backlash.unwrap().forward.maximum,
+                r.backlash.unwrap().backward.maximum,
+            ),
         ] {
             assert!(forward > 0.0);
             assert!(
-                (backward - forward * r.total_ratio).abs() < 1e-9 * backward,
+                (backward - forward * r.total_ratio.unwrap()).abs() < 1e-9 * backward,
                 "{backward} vs {forward} x {}",
-                r.total_ratio
+                r.total_ratio.unwrap()
             );
         }
         // ...and the input end is the looser one, because it turns faster.
-        assert!(r.backlash.backward.nominal > r.backlash.forward.nominal);
+        assert!(r.backlash.unwrap().backward.nominal > r.backlash.unwrap().forward.nominal);
     }
 
     /// A train of parallel-axis stages is as efficient driven either way, and
@@ -8614,12 +8734,13 @@ mod tests {
         // To the last bits: the two directions are two solves of the flow
         // with the driver on the other row, and differ by rounding alone.
         assert!(
-            (r.total_efficiency.forward - r.total_efficiency.backward).abs() < 1e-14,
+            (r.total_efficiency.unwrap().forward - r.total_efficiency.unwrap().backward).abs()
+                < 1e-14,
             "{} vs {}",
-            r.total_efficiency.forward,
-            r.total_efficiency.backward
+            r.total_efficiency.unwrap().forward,
+            r.total_efficiency.unwrap().backward
         );
-        assert!(!r.total_efficiency.locked().backward);
+        assert!(!r.total_efficiency.unwrap().locked().backward);
     }
 
     /// Efficiency must always *reduce* delivered torque. Getting this sign wrong
@@ -8636,14 +8757,14 @@ mod tests {
         let ideal = solve_train(&lossless, &lib).unwrap();
         let real = solve_train(&two_stage(), &lib).unwrap();
 
-        assert!((ideal.total_efficiency.forward - 1.0).abs() < 1e-12);
+        assert!((ideal.total_efficiency.unwrap().forward - 1.0).abs() < 1e-12);
         let (real_out, ideal_out) = (
             at_port(&real, &two_stage(), PEAK, Port::End).torque.abs(),
             at_port(&ideal, &lossless, PEAK, Port::End).torque.abs(),
         );
         assert!(real_out < ideal_out);
         // ...and the shortfall is exactly the product of the stage efficiencies.
-        assert!((real_out - ideal_out * real.total_efficiency.forward).abs() < 1e-9);
+        assert!((real_out - ideal_out * real.total_efficiency.unwrap().forward).abs() < 1e-9);
     }
 
     /// **An automatic profile shift asks about the depth the tooth actually
@@ -8819,10 +8940,20 @@ mod tests {
         let loosen = |k: usize| {
             let mut t = base.clone();
             spur_input(&mut t.stages[k]).distances[0].clearance.manual *= 4.0;
-            solve_train(&t, &lib).unwrap().backlash.forward.nominal
+            solve_train(&t, &lib)
+                .unwrap()
+                .backlash
+                .unwrap()
+                .forward
+                .nominal
         };
 
-        let reference = solve_train(&base, &lib).unwrap().backlash.forward.nominal;
+        let reference = solve_train(&base, &lib)
+            .unwrap()
+            .backlash
+            .unwrap()
+            .forward
+            .nominal;
         let first = loosen(0) - reference;
         let last = loosen(1) - reference;
         assert!(first > 0.0 && last > 0.0);
@@ -8982,7 +9113,7 @@ mod tests {
         // The input gear sees the whole train ratio's worth — **rounded up**,
         // because these are engagements rather than revolutions and a tooth
         // three quarters of the way through one has still been loaded by it.
-        assert_eq!(seq[0], (100.0 * r.total_ratio).ceil());
+        assert_eq!(seq[0], (100.0 * r.total_ratio.unwrap()).ceil());
 
         // The two gears meshing with each other turn at different speeds but
         // share a mesh, so their cycle counts differ by that stage ratio — and
@@ -8999,7 +9130,7 @@ mod tests {
             cycles(&s0.members[1]).bending,
         );
         // Counts are magnitudes; the ratio carries a sign now.
-        let ratio = s0.ratio.abs();
+        let ratio = s0.ratio.unwrap().abs();
         assert!(
             (a / b - ratio).abs() < (1.0 + ratio) / b,
             "{a}/{b} = {} against a stage ratio of {}",
@@ -9016,7 +9147,7 @@ mod tests {
         assert_eq!(cycles(&spur(&r.stages[0]).members[0]).bending, 100.0);
         assert_eq!(
             cycles(&spur(&r.stages[1]).members[1]).bending,
-            (100.0 / r.total_ratio).ceil()
+            (100.0 / r.total_ratio.unwrap()).ceil()
         );
     }
 
@@ -10196,7 +10327,7 @@ mod tests {
 
             // The revolutions each member turns, before anything rounds them.
             // Revolutions are counted, not signed: `|ratio|` throughout.
-            let ratios: Vec<f64> = r.stages.iter().map(|s| s.ratio().abs()).collect();
+            let ratios: Vec<f64> = r.stages.iter().map(|s| s.ratio().unwrap().abs()).collect();
             for (k, s) in r.stages.iter().enumerate() {
                 let upstream: f64 = ratios[..k].iter().product();
                 let speed_in = case.speed() / upstream;
@@ -10526,7 +10657,7 @@ mod tests {
         for s in h.stages.iter().rev() {
             let p = spur(s);
             // A referral is a magnitude; the ratio carries a sign now.
-            let expect = at / p.ratio.abs();
+            let expect = at / p.ratio.unwrap().abs();
             assert!(
                 (p.members[0].cases[BACK].torque.abs() - expect).abs() < 1e-9 * expect,
                 "the load referred to this stage's input is {expect}, not {}",
@@ -10566,7 +10697,8 @@ mod tests {
         // as the case being absent (`a_self_locking_worm_reports_the_load_it_reacts`).
         let teeth: Vec<f64> = worm.members.iter().map(|m| m.cases[BACK].torque).collect();
         assert!(
-            (teeth[1] - 5.0).abs() < 1e-12 && (teeth[0] - 5.0 / worm.ratio.abs()).abs() < 1e-12,
+            (teeth[1] - 5.0).abs() < 1e-12
+                && (teeth[0] - 5.0 / worm.ratio.unwrap().abs()).abs() < 1e-12,
             "the stage that reacts the load carries it on both members' teeth: {teeth:?}"
         );
         assert_eq!(
@@ -10738,7 +10870,7 @@ mod tests {
         );
         let r = solve_train(&train, &lib).expect("solves");
         assert!(
-            r.stages[0].efficiency().locked().forward,
+            r.stages[0].efficiency().unwrap().locked().forward,
             "this fixture is meant to be forward-locked"
         );
         let start = &r.cases[PEAK];
@@ -10789,7 +10921,9 @@ mod tests {
             // the product of the stage ratios could not — a pair reports its
             // own as a magnitude. This train has an odd number of external
             // meshes, so it turns backwards and says so.
-            assert!(r.total_ratio.abs() > 1.0 && r.total_efficiency.forward > 0.0);
+            assert!(
+                r.total_ratio.unwrap().abs() > 1.0 && r.total_efficiency.unwrap().forward > 0.0
+            );
             for s in &r.stages {
                 for g in s.members() {
                     assert!(g.cases.is_empty());

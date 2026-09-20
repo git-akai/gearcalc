@@ -772,44 +772,9 @@
     shaft planet 1  of stage 1 speed -2/3
 
 == planocentric ==
-  total    ratio     -10.000000   efficiency  97.155934 / 97.080449  %   backlash   0.095762 / 0.957619   deg
-  case 1       2.0000 Nm /   3000.00 rpm at start
-    fixed    ground                              -  torque     0.000000
-    load     carrier                    3000.0000 rpm  torque     2.000000
-    fixed    ring                                -  torque   -21.431187
-    reacted  planet                     -300.0000 rpm  torque    19.431187
-  case 2       0.6000 Nm /      0.00 rpm at end  
-    fixed    ground                              -  torque     0.000000
-    reacted  carrier                    0.0000 rpm  torque     0.058248
-    fixed    ring                                -  torque    -0.658248
-    load     planet                     0.0000 rpm  torque     0.600000
-  case 3       2.0000 Nm /   2400.00 rpm at start
-    fixed    ground                              -  torque     0.000000
-    load     carrier                    2400.0000 rpm  torque     2.000000
-    fixed    ring                                -  torque   -21.431187
-    reacted  planet                     -240.0000 rpm  torque    19.431187
-  stage 1  ratio     -10.000000   efficiency  97.155934 / 97.080449  %   backlash   0.095762 / 0.957619   deg
-    power through the teeth  10.715593 / 11.000000    one more tooth on each member: -15.500000 -7.500000
-    shaft carrier   case 1  speed    3000.000000  torque       2.000000
-    shaft carrier   case 2  speed       0.000000  torque       0.058248
-    shaft carrier   case 3  speed    2400.000000  torque       2.000000
-    shaft ring      case 1  speed       0.000000  torque     -21.431187
-    shaft ring      case 2  speed       0.000000  torque      -0.658248
-    shaft ring      case 3  speed       0.000000  torque     -21.431187
-    shaft planet    case 1  speed    -300.000000  torque      19.431187
-    shaft planet    case 2  speed       0.000000  torque       0.600000
-    shaft planet    case 3  speed    -240.000000  torque      19.431187
-    member 1  z 30  
-      case 1  speed    -300.000000  vs frame   -3300.000000  torque      19.482897  cycles -
-      case 2  speed       0.000000  vs frame       0.000000  torque       0.600000  cycles -
-      case 3  speed    -240.000000  vs frame   -2640.000000  torque      19.482897  cycles 1.584000e8 / 1.584000e8
-    member 2  z 33  
-      case 1  speed       0.000000  vs frame   -3000.000000  torque      21.431187  cycles -
-      case 2  speed       0.000000  vs frame       0.000000  torque       0.660000  cycles -
-      case 3  speed       0.000000  vs frame   -2400.000000  torque      21.431187  cycles 1.440000e8 / 1.440000e8
-    mesh 1  efficiency  99.734586 / 99.734586  %  contact ratio   1.7700  shares a factor
-  graph    mobility 2 degree(s), 2 given   total ratio -10
-    stage 1  ratio -10
+  no answer: stage 1: no self-consistent power flow: the arrangement is self-locking, or the shaft named as the input is not the one driving
+  graph    mobility 2 degree(s), 2 given   total ratio 1
+    stage 1  ratio 1
     shaft ground    of the train speed 0
     shaft carrier   of stage 1 speed 1
     shaft ring      of stage 1 speed 0
@@ -964,33 +929,33 @@
     shaft planet 2  of stage 1 speed 1
 
 == ravigneaux-large-sun ==
-  total    ratio      -1.066667   efficiency  91.481430 / 91.818656  %   backlash   0.156564 / 0.167001   deg
-  case 1       2.0000 Nm /   3000.00 rpm at start
+  total    ratio      -0.240000   efficiency  90.611620 / 90.948043  %   backlash   0.695140 / 0.166833   deg
+  case 1       2.0000 Nm /   3000.00 rpm at start  +    0.0000 Nm /      0.00 rpm at 1.2    +    0.0000 Nm /      0.00 rpm at 1.1  
     fixed    ground                              -  torque     0.000000
-    free     sun 1                      -12500.0000 rpm  torque     0.000000
-    reacted  carrier                    -2812.5000 rpm  torque     1.951604
+    load     sun 1                      -12500.0000 rpm  torque     0.000000
+    load     carrier                    -2812.5000 rpm  torque     1.951604
     load     sun 2                      3000.0000 rpm  torque     2.000000
     fixed    ring                                -  torque    -3.951604
     free     planet 1                   5113.6364 rpm  torque     0.000000
     free     planet 2                   -12500.0000 rpm  torque     0.000000
-  case 2       0.6000 Nm /      0.00 rpm at 1.2  
+  case 2       0.6000 Nm /      0.00 rpm at 1.2    +    0.0000 Nm /      0.00 rpm at 1.1  
     fixed    ground                              -  torque     0.000000
-    free     sun 1                      0.0000 rpm  torque    -0.000000
+    load     sun 1                      0.0000 rpm  torque    -0.000000
     load     carrier                    0.0000 rpm  torque     0.600000
     reacted  sun 2                      0.0000 rpm  torque     0.516480
     fixed    ring                                -  torque    -1.116480
     free     planet 1                   0.0000 rpm  torque     0.000000
     free     planet 2                   0.0000 rpm  torque     0.000000
-  case 3       2.0000 Nm /   2400.00 rpm at start
+  case 3       2.0000 Nm /   2400.00 rpm at start  +    0.0000 Nm /      0.00 rpm at 1.2    +    0.0000 Nm /      0.00 rpm at 1.1  
     fixed    ground                              -  torque     0.000000
-    free     sun 1                      -10000.0000 rpm  torque     0.000000
-    reacted  carrier                    -2250.0000 rpm  torque     1.951604
+    load     sun 1                      -10000.0000 rpm  torque     0.000000
+    load     carrier                    -2250.0000 rpm  torque     1.951604
     load     sun 2                      2400.0000 rpm  torque     2.000000
     fixed    ring                                -  torque    -3.951604
     free     planet 1                   4090.9091 rpm  torque     0.000000
     free     planet 2                   -10000.0000 rpm  torque     0.000000
-  stage 1  ratio      -1.066667   efficiency  91.481430 / 91.818656  %   backlash   0.156564 / 0.167001   deg
-    power through the teeth   5.707116 / 5.518598     one more tooth on each member: -1.066667 -1.000000 -1.066667 -1.066667 -1.100000
+  stage 1  ratio      -0.240000   efficiency  90.611620 / 90.948043  %   backlash   0.695140 / 0.166833   deg
+    power through the teeth   5.707116 / 5.475753     one more tooth on each member: -0.250206 -0.225000 -0.240000 -0.240000 -0.244444
     shaft sun 1     case 1  speed  -12500.000000  torque       0.000000
     shaft sun 1     case 2  speed       0.000000  torque      -0.000000
     shaft sun 1     case 3  speed  -10000.000000  torque       0.000000
@@ -1033,8 +998,8 @@
     mesh 2  efficiency  99.257031 / 99.257031  %  contact ratio   1.9395  shares a factor
     mesh 3  efficiency  98.241874 / 98.241874  %  contact ratio   1.5719  shares a factor
     mesh 4  efficiency  98.042652 / 98.042652  %  contact ratio   1.5419  shares a factor
-  graph    mobility 2 degree(s), 2 given   total ratio -16/15
-    stage 1  ratio -16/15
+  graph    mobility 2 degree(s), 2 given   total ratio -6/25
+    stage 1  ratio -6/25
     shaft ground    of the train speed 0
     shaft sun 1     of stage 1 speed -25/6
     shaft carrier   of stage 1 speed -15/16
@@ -1482,7 +1447,56 @@
     shaft planet    of stage 2 speed 1071/4171
 
 == ring-released ==
-  no answer: the train is 1 condition(s) short of one motion: hold or drive another shaft, or read the family the graph reports
+  total    ratio            NaN   efficiency        NaN / NaN        %   backlash        NaN / NaN        deg
+  case 1       2.0000 Nm /   3000.00 rpm at start   (not solved)
+    ! train.case_underdetermined
+    fixed    ground                              -  torque     0.000000
+    load     sun                        0.0000 rpm  torque     0.000000
+    reacted  carrier                    0.0000 rpm  torque     0.000000
+    free     ring                       0.0000 rpm  torque     0.000000
+    free     planet                     0.0000 rpm  torque     0.000000
+  case 2       0.6000 Nm /      0.00 rpm at end     (not solved)
+    ! train.case_underdetermined
+    fixed    ground                              -  torque     0.000000
+    reacted  sun                        0.0000 rpm  torque     0.000000
+    load     carrier                    0.0000 rpm  torque     0.000000
+    free     ring                       0.0000 rpm  torque     0.000000
+    free     planet                     0.0000 rpm  torque     0.000000
+  case 3       2.0000 Nm /   2400.00 rpm at start   (not solved)
+    ! train.case_underdetermined
+    fixed    ground                              -  torque     0.000000
+    load     sun                        0.0000 rpm  torque     0.000000
+    reacted  carrier                    0.0000 rpm  torque     0.000000
+    free     ring                       0.0000 rpm  torque     0.000000
+    free     planet                     0.0000 rpm  torque     0.000000
+  stage 1  ratio            NaN   efficiency        NaN / NaN        %   backlash        NaN / NaN        deg
+    power through the teeth        NaN / NaN          one more tooth on each member: 
+    shaft sun       case 1  speed       0.000000  torque       0.000000
+    shaft sun       case 2  speed       0.000000  torque       0.000000
+    shaft sun       case 3  speed       0.000000  torque       0.000000
+    shaft carrier   case 1  speed       0.000000  torque       0.000000
+    shaft carrier   case 2  speed       0.000000  torque       0.000000
+    shaft carrier   case 3  speed       0.000000  torque       0.000000
+    shaft ring      case 1  speed       0.000000  torque       0.000000
+    shaft ring      case 2  speed       0.000000  torque       0.000000
+    shaft ring      case 3  speed       0.000000  torque       0.000000
+    shaft planet    case 1  speed       0.000000  torque       0.000000
+    shaft planet    case 2  speed       0.000000  torque       0.000000
+    shaft planet    case 3  speed       0.000000  torque       0.000000
+    member 1  z 12  
+      case 1  speed       0.000000  vs frame       0.000000  torque       0.000000  cycles -
+      case 2  speed       0.000000  vs frame       0.000000  torque       0.000000  cycles -
+      case 3  speed       0.000000  vs frame       0.000000  torque       0.000000  cycles -
+    member 2  z 30  
+      case 1  speed       0.000000  vs frame       0.000000  torque       0.000000  cycles -
+      case 2  speed       0.000000  vs frame       0.000000  torque       0.000000  cycles -
+      case 3  speed       0.000000  vs frame       0.000000  torque       0.000000  cycles -
+    member 3  z 72  
+      case 1  speed       0.000000  vs frame       0.000000  torque       0.000000  cycles -
+      case 2  speed       0.000000  vs frame       0.000000  torque       0.000000  cycles -
+      case 3  speed       0.000000  vs frame       0.000000  torque       0.000000  cycles -
+    mesh 1  efficiency  97.838469 / 97.838469  %  contact ratio   1.4369  shares a factor
+    mesh 2  efficiency  99.444980 / 99.444980  %  contact ratio   1.9726  shares a factor
   graph    mobility 2 degree(s), 1 given  free: carrier   total ratio a family
     stage 1  ratio a family
     shaft ground    of the train speed 0

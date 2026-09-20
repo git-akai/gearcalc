@@ -525,7 +525,7 @@ mod tests {
         let r = solved(&PairStage::worm());
         // Negative: a worm is an external mesh, its wheel turns the other way,
         // and a ratio is signed now — it is the graph's rather than `z₂/z₁`.
-        assert!((r.ratio + 40.0).abs() < 1e-12);
+        assert!((r.ratio.unwrap() + 40.0).abs() < 1e-12);
         assert!(r.meshes[0].efficiency.forward > 0.0 && r.meshes[0].efficiency.forward < 1.0);
         assert!(
             r.meshes[0].efficiency.backward < r.meshes[0].efficiency.forward,
@@ -552,7 +552,7 @@ mod tests {
         // negative. The wheel's tooth load used to be quoted delivered, and
         // the shape's rule for every member is the tooth load
         // (`docs/corrections.md`).
-        let tooth_load = 2.0 * r.ratio.abs();
+        let tooth_load = 2.0 * r.ratio.unwrap().abs();
         assert!((r.members[1].cases[0].torque - tooth_load).abs() < 1e-12 * tooth_load);
         let delivered = tooth_load * r.meshes[0].efficiency.forward;
         let at_wheel_shaft = r.cases[0].torques[2].abs();
@@ -1323,7 +1323,7 @@ mod tests {
         let a = solve_crossed(&spur, &StageLoads::just(2.0), &lib).unwrap();
         let b = solve_worm(&as_screw, &StageLoads::just(2.0), &lib).unwrap();
         for (name, x, y) in [
-            ("ratio", a.ratio, b.ratio),
+            ("ratio", a.ratio.unwrap(), b.ratio.unwrap()),
             (
                 "centre distance",
                 a.distances[0].running,
@@ -2008,7 +2008,7 @@ mod tests {
         )
         .unwrap();
         // Negative for the same reason a worm's is: an external mesh reverses.
-        assert!((r.ratio + 23.0 / 17.0).abs() < 1e-12);
+        assert!((r.ratio.unwrap() + 23.0 / 17.0).abs() < 1e-12);
         assert!(r.meshes[0].efficiency.forward > 0.0 && r.meshes[0].efficiency.forward < 1.0);
         assert!(point(&r).cases[0].contact.max_pressure > 0.0);
         assert!(!r.meshes[0].efficiency.locked().backward);

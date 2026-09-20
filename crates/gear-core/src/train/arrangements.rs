@@ -445,20 +445,20 @@ mod tests {
         let shape = worm_and_pair((1, 40), (17, 43));
         let r = solve(&shape, &[], 1, 2);
         assert!(
-            (r.ratio.abs() - 40.0 * 43.0 / 17.0).abs() < 1e-9,
+            (r.ratio.unwrap().abs() - 40.0 * 43.0 / 17.0).abs() < 1e-9,
             "{}",
-            r.ratio
+            r.ratio.unwrap()
         );
         every_distance_closes(&r);
         assert!(r.meshes[0].point.is_some() && r.meshes[1].line.is_some());
         let product = r.meshes[0].efficiency.forward * r.meshes[1].efficiency.forward;
         assert!(
-            (r.efficiency.forward - product).abs() < 1e-9,
+            (r.efficiency.unwrap().forward - product).abs() < 1e-9,
             "{} vs {product}",
-            r.efficiency.forward
+            r.efficiency.unwrap().forward
         );
         assert_eq!(
-            r.efficiency.backward <= 0.0,
+            r.efficiency.unwrap().backward <= 0.0,
             r.meshes[0].efficiency.backward <= 0.0,
             "the stage locks where its worm does"
         );
@@ -479,9 +479,9 @@ mod tests {
             let (on_lay, on_out) = pairs[engaged];
             let want = (43.0 / 17.0) * (f64::from(on_out) / f64::from(on_lay));
             assert!(
-                (r.ratio - want).abs() < 1e-12,
+                (r.ratio.unwrap() - want).abs() < 1e-12,
                 "pair {engaged}: {} vs {want}",
-                r.ratio
+                r.ratio.unwrap()
             );
             every_distance_closes(&r);
             // Four meshes at one distance: the input's, and one per ratio.
@@ -503,7 +503,11 @@ mod tests {
         // Carrier in, first ring held, second ring out: i = z_r2 / (z_r2 − z_r1).
         let shape = wolfrom(18, [60, 61], 3);
         let r = solve(&shape, &[3], 1, 2);
-        assert!((r.ratio - 61.0).abs() < 1e-12, "{}", r.ratio);
+        assert!(
+            (r.ratio.unwrap() - 61.0).abs() < 1e-12,
+            "{}",
+            r.ratio.unwrap()
+        );
         every_distance_closes(&r);
         assert_eq!(r.layouts[0].count, 3);
     }
@@ -521,9 +525,9 @@ mod tests {
         let wc = e1 / (e1 - 1.0);
         let wr2 = wc + e2 * (1.0 - wc);
         assert!(
-            (r.ratio - 1.0 / wr2).abs() < 1e-9,
+            (r.ratio.unwrap() - 1.0 / wr2).abs() < 1e-9,
             "{} vs {}",
-            r.ratio,
+            r.ratio.unwrap(),
             1.0 / wr2
         );
         every_distance_closes(&r);
@@ -537,9 +541,9 @@ mod tests {
             let r = solve(&shape, &[2], 1, 3);
             let want = -f64::from(zr - zp) / f64::from(zp);
             assert!(
-                (1.0 / r.ratio - want).abs() < 1e-12,
+                (1.0 / r.ratio.unwrap() - want).abs() < 1e-12,
                 "{zp}/{zr}: {} vs {}",
-                1.0 / r.ratio,
+                1.0 / r.ratio.unwrap(),
                 want
             );
             every_distance_closes(&r);
@@ -584,7 +588,7 @@ mod tests {
         let far = ring_tip - crate::tooth::Tooth::new(pinion.params).ra + d.running;
         assert!((far - 0.3).abs() < 1e-6 || far > 0.3, "far-side gap {far}");
         assert_eq!(r.meshes[0].tips.map(|t| t.tip_interference), Some(false));
-        assert!((1.0 / r.ratio + 4.0 / 57.0).abs() < 1e-12);
+        assert!((1.0 / r.ratio.unwrap() + 4.0 / 57.0).abs() < 1e-12);
         // ...and a distance the designer states is not sized: it leaves what
         // it leaves, and says so through the mesh's own room.
         shape.distances[0].distance = Auto::fixed(2.0);
@@ -638,9 +642,9 @@ mod tests {
         let shape = meshed_planets(zs, [18, 18], zr, 3);
         let r = solve(&shape, &[3], 1, 2);
         assert!(
-            (r.ratio - (1.0 - f64::from(zr) / f64::from(zs))).abs() < 1e-12,
+            (r.ratio.unwrap() - (1.0 - f64::from(zr) / f64::from(zs))).abs() < 1e-12,
             "{}",
-            r.ratio
+            r.ratio.unwrap()
         );
         every_distance_closes(&r);
         assert_eq!(r.layouts.len(), 2);
@@ -656,25 +660,25 @@ mod tests {
         // the long planet, −z_r/z_s1.
         let r = solve(&shape, &[2], 1, 4);
         assert!(
-            (r.ratio + f64::from(zr) / f64::from(zs1)).abs() < 1e-12,
+            (r.ratio.unwrap() + f64::from(zr) / f64::from(zs1)).abs() < 1e-12,
             "{}",
-            r.ratio
+            r.ratio.unwrap()
         );
         every_distance_closes(&r);
         // Large sun in, carrier held, ring out: through both planets, +z_r/z_s2.
         let r = solve(&shape, &[2], 3, 4);
         assert!(
-            (r.ratio - f64::from(zr) / f64::from(zs2)).abs() < 1e-12,
+            (r.ratio.unwrap() - f64::from(zr) / f64::from(zs2)).abs() < 1e-12,
             "{}",
-            r.ratio
+            r.ratio.unwrap()
         );
         every_distance_closes(&r);
         // Small sun in, ring held, carrier out: 1 + z_r/z_s1.
         let r = solve(&shape, &[4], 1, 2);
         assert!(
-            (r.ratio - (1.0 + f64::from(zr) / f64::from(zs1))).abs() < 1e-12,
+            (r.ratio.unwrap() - (1.0 + f64::from(zr) / f64::from(zs1))).abs() < 1e-12,
             "{}",
-            r.ratio
+            r.ratio.unwrap()
         );
         every_distance_closes(&r);
         assert_eq!(r.distances.len(), 3);

@@ -235,14 +235,18 @@ fn fixtures() -> Vec<(String, Train)> {
             train(vec![shape(ravigneaux())]),
         ));
         // With the large sun driven the small sun and the carrier are both
-        // free, and `end` is the first of them — the small sun, spinning
-        // free. The carrier is the output a designer means, so the loads
-        // name it, which is what a port by reference is for.
+        // free, and `end` is the first of them — the small sun. The carrier
+        // is the output a designer means, so every case loads it by
+        // reference — a derived load where it reacts, the given one where
+        // it drives — and loads the small sun with a torque of nought, which
+        // is how a case says a port turns and carries nothing.
         out.push(("ravigneaux-large-sun".to_string(), {
             let mut t = asked(
                 vec![shape(ravigneaux())],
                 vec![ShaftConstraint::driven(0, 3)],
             );
+            let at = |shaft| Port::At(ShaftRef::Of { stage: 0, shaft });
+            let (small_sun, carrier) = (1, 2);
             t.load_cases = t
                 .load_cases
                 .iter()
@@ -250,9 +254,17 @@ fn fixtures() -> Vec<(String, Train)> {
                     let mut c = c.clone();
                     for l in &mut c.loads {
                         if l.at == Port::End {
-                            l.at = Port::At(ShaftRef::Of { stage: 0, shaft: 2 });
+                            l.at = at(carrier);
                         }
                     }
+                    if !c.loads.iter().any(|l| l.at == at(carrier)) {
+                        c.loads.push(gear_core::train::Load::derived(at(carrier)));
+                    }
+                    c.loads.push(gear_core::train::Load {
+                        at: at(small_sun),
+                        torque: gear_core::params::Auto::fixed(0.0),
+                        speed: gear_core::params::Auto::automatic(0.0),
+                    });
                     c
                 })
                 .collect();
@@ -491,11 +503,11 @@ fn report(name: &str, train: &Train, r: &TrainResult) {
     println!("== {name} ==");
     println!(
         "  total    ratio {:>14.6}   efficiency {:>10.6} / {:<10.6} %   backlash {:>10.6} / {:<10.6} deg",
-        r.total_ratio,
-        100.0 * r.total_efficiency.forward,
-        100.0 * r.total_efficiency.backward,
-        r.backlash.forward.nominal,
-        r.backlash.backward.nominal,
+        crate::or_nan(r.total_ratio),
+        100.0 * crate::ways_or_nan(r.total_efficiency).forward,
+        100.0 * crate::ways_or_nan(r.total_efficiency).backward,
+        crate::play_or_nan(r.backlash).forward.nominal,
+        crate::play_or_nan(r.backlash).backward.nominal,
     );
     // Every shaft of every case: what it is in the case and what it
     // carries — the loads as given or derived, the reactions found.
@@ -535,11 +547,11 @@ fn report(name: &str, train: &Train, r: &TrainResult) {
         println!(
             "  stage {}  ratio {:>14.6}   efficiency {:>10.6} / {:<10.6} %   backlash {:>10.6} / {:<10.6} deg",
             k + 1,
-            s.ratio(),
-            100.0 * s.efficiency().forward,
-            100.0 * s.efficiency().backward,
-            s.backlash().forward.nominal,
-            s.backlash().backward.nominal,
+            crate::or_nan(s.ratio()),
+            100.0 * crate::ways_or_nan(s.efficiency()).forward,
+            100.0 * crate::ways_or_nan(s.efficiency()).backward,
+            crate::play_or_nan(s.backlash()).forward.nominal,
+            crate::play_or_nan(s.backlash()).backward.nominal,
         );
         // What the teeth pass over what comes in, both ways, and what one
         // more tooth on each member would make the ratio — the two figures
@@ -547,11 +559,12 @@ fn report(name: &str, train: &Train, r: &TrainResult) {
         if let Some(shape) = s.as_shape() {
             println!(
                 "    power through the teeth {:>10.6} / {:<10.6}   one more tooth on each member: {}",
-                shape.circulation.forward,
-                shape.circulation.backward,
+                crate::ways_or_nan(shape.circulation).forward,
+                crate::ways_or_nan(shape.circulation).backward,
                 shape
                     .ratio_per_tooth
                     .iter()
+                    .flatten()
                     .map(|r| format!("{r:.6}"))
                     .collect::<Vec<_>>()
                     .join(" ")

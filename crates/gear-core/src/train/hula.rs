@@ -263,11 +263,11 @@ mod tests {
             }
             let r = solve(&s, 1000.0).unwrap();
             assert!(
-                (r.ratio.abs() - reduction).abs() < 1e-9,
+                (r.ratio.unwrap().abs() - reduction).abs() < 1e-9,
                 "z{n}: {}",
-                r.ratio
+                r.ratio.unwrap()
             );
-            let got = (eta0(&r) * 100.0, r.efficiency.forward * 100.0);
+            let got = (eta0(&r) * 100.0, r.efficiency.unwrap().forward * 100.0);
             assert!(
                 (got.0 - meshes).abs() < 0.005 && (got.1 - keeps).abs() < 0.05,
                 "z{n}: the table says {meshes} % / {keeps} %, this gives {:.2} / {:.1}",
@@ -323,11 +323,11 @@ mod tests {
             }
             let r = solve(&s, 1000.0).unwrap_or_else(|e| panic!("{name}: must solve: {e}"));
             assert!(
-                (r.ratio - ratio).abs() < 0.05,
+                (r.ratio.unwrap() - ratio).abs() < 0.05,
                 "{name}: the table says a ratio of {ratio}, this gives {}",
-                r.ratio
+                r.ratio.unwrap()
             );
-            let got = (eta0(&r) * 100.0, r.efficiency.forward * 100.0);
+            let got = (eta0(&r) * 100.0, r.efficiency.unwrap().forward * 100.0);
             assert!(
                 (got.0 - meshes).abs() < 0.005 && (got.1 - keeps).abs() < 0.05,
                 "{name}: the table says {meshes} % / {keeps} %, this gives {:.2} / {:.1}",
@@ -354,7 +354,7 @@ mod tests {
             // reached past its end by the ring's tip, on either mesh.
             let got_fouls = r.meshes.iter().any(|m| m.flank_interference[0]);
             let got_eps = r.meshes[0].line.unwrap().contact_ratios.transverse;
-            let got_keeps = r.efficiency.forward * 100.0;
+            let got_keeps = r.efficiency.unwrap().forward * 100.0;
             assert!(
                 got_fouls == fouls,
                 "h_a {addendum}: the table says fouls={fouls}, this says {got_fouls}"
@@ -390,9 +390,9 @@ mod tests {
             };
             let (on, off) = (build(true), build(false));
             assert!(
-                (on.ratio.abs() - reduction).abs() < 0.05,
+                (on.ratio.unwrap().abs() - reduction).abs() < 0.05,
                 "d {d}: the table says {reduction}, this gives {}",
-                on.ratio
+                on.ratio.unwrap()
             );
             let aw = alpha_w(&on, 0);
             let pk = on.meshes[0].efficiency.forward * 100.0;
@@ -402,8 +402,8 @@ mod tests {
                  this gives {aw:.1}° and {pk:.3} %"
             );
             let (got_best, got_least) = (
-                on.efficiency.forward * 100.0,
-                off.efficiency.forward * 100.0,
+                on.efficiency.unwrap().forward * 100.0,
+                off.efficiency.unwrap().forward * 100.0,
             );
             assert!(
                 (got_best - best).abs() < 0.005 && (got_least - least).abs() < 0.005,
@@ -467,12 +467,12 @@ mod tests {
     #[test]
     fn the_circulating_power_is_the_reductions_worth() {
         let r = solve(&stage(), 1000.0).unwrap();
-        let through = r.circulation.forward;
+        let through = r.circulation.unwrap().forward;
         assert!(through > 100.0, "324 : 1 circulates: {through}× the input");
         // The loss is each mesh's loss on the power crossing it: what the
         // teeth pass, less what comes out, over the input — to the
         // per-mesh accounting the flow keeps, exactly.
-        let lost = 1.0 - r.efficiency.forward;
+        let lost = 1.0 - r.efficiency.unwrap().forward;
         let by_mesh: f64 = r
             .meshes
             .iter()
@@ -498,14 +498,14 @@ mod tests {
         // crank's speed: `η |R − 1|` of the input, give or take the loss's
         // own share.
         for r in [&r, &plain] {
-            let expect = (r.ratio - 1.0).abs() * r.efficiency.forward;
+            let expect = (r.ratio.unwrap() - 1.0).abs() * r.efficiency.unwrap().forward;
             for m in &r.meshes {
                 let got = m.power_through.forward;
                 assert!(
                     (got - expect).abs() / expect < 0.05,
                     "{} : 1 keeping {}: a mesh passes {got}× against about {expect}×",
-                    r.ratio,
-                    r.efficiency.forward
+                    r.ratio.unwrap(),
+                    r.efficiency.unwrap().forward
                 );
             }
         }
@@ -530,11 +530,11 @@ mod tests {
                     gear.teeth = count;
                 }
                 let r = solve(&s, 1000.0).unwrap();
-                let want = stage_efficiency(r.ratio, eta0(&r));
+                let want = stage_efficiency(r.ratio.unwrap(), eta0(&r));
                 assert!(
-                    (r.efficiency.forward - want).abs() < 1e-9,
+                    (r.efficiency.unwrap().forward - want).abs() < 1e-9,
                     "z {n} mu {mu}: solve {} against the relation {want}",
-                    r.efficiency.forward
+                    r.efficiency.unwrap().forward
                 );
             }
         }
@@ -569,14 +569,20 @@ mod tests {
             gear.teeth = count;
         }
         let r = solve(&s, 1000.0).unwrap();
-        assert!((r.ratio - 49.0).abs() < 1e-9, "ratio {}", r.ratio);
         assert!(
-            r.efficiency.forward > 0.89 && r.efficiency.forward < 0.93,
-            "a stage of this reduction with meshes this good keeps {}",
-            r.efficiency.forward
+            (r.ratio.unwrap() - 49.0).abs() < 1e-9,
+            "ratio {}",
+            r.ratio.unwrap()
         );
-        let implied_here = 1.0 - implied(r.efficiency.forward, 49.0);
-        assert!((stage_efficiency(49.0, implied_here) - r.efficiency.forward).abs() < 1e-9);
+        assert!(
+            r.efficiency.unwrap().forward > 0.89 && r.efficiency.unwrap().forward < 0.93,
+            "a stage of this reduction with meshes this good keeps {}",
+            r.efficiency.unwrap().forward
+        );
+        let implied_here = 1.0 - implied(r.efficiency.unwrap().forward, 49.0);
+        assert!(
+            (stage_efficiency(49.0, implied_here) - r.efficiency.unwrap().forward).abs() < 1e-9
+        );
     }
 
     /// **A reduction that does not come from cancellation is efficient**, and
@@ -596,20 +602,28 @@ mod tests {
         };
         for z in [[19, 18, 17, 18], [17, 18, 19, 18]] {
             let r = solve_z(z);
-            assert!(r.ratio.abs() > 300.0, "{z:?} reduces by {}", r.ratio);
             assert!(
-                r.efficiency.forward < 0.35,
+                r.ratio.unwrap().abs() > 300.0,
+                "{z:?} reduces by {}",
+                r.ratio.unwrap()
+            );
+            assert!(
+                r.efficiency.unwrap().forward < 0.35,
                 "{z:?}: {} is too good",
-                r.efficiency.forward
+                r.efficiency.unwrap().forward
             );
         }
         for z in [[19, 18, 18, 17], [17, 18, 18, 19], [18, 17, 19, 18]] {
             let r = solve_z(z);
-            assert!(r.ratio.abs() < 12.0, "{z:?} reduces by {}", r.ratio);
             assert!(
-                r.efficiency.forward > 0.9,
+                r.ratio.unwrap().abs() < 12.0,
+                "{z:?} reduces by {}",
+                r.ratio.unwrap()
+            );
+            assert!(
+                r.efficiency.unwrap().forward > 0.9,
                 "{z:?}: {} is too poor",
-                r.efficiency.forward
+                r.efficiency.unwrap().forward
             );
         }
         let cancelling = eta0(&solve_z([19, 18, 17, 18]));
@@ -632,12 +646,16 @@ mod tests {
             }
             let r = solve(&s, 100.0).unwrap();
             assert!(
-                r.efficiency.forward < last,
+                r.efficiency.unwrap().forward < last,
                 "z {n}: {} did not fall below {last}",
-                r.efficiency.forward
+                r.efficiency.unwrap().forward
             );
-            assert_eq!(r.efficiency.backward, 0.0, "z {n} should be self-locking");
-            last = r.efficiency.forward;
+            assert_eq!(
+                r.efficiency.unwrap().backward,
+                0.0,
+                "z {n} should be self-locking"
+            );
+            last = r.efficiency.unwrap().forward;
         }
         assert!(last < 0.2, "2500:1 should be dear: {last}");
     }
@@ -655,8 +673,8 @@ mod tests {
             }
             let shape = Shape::from(&s);
             let r = solve(&s, 100.0).unwrap();
-            let want = r.ratio.abs();
-            let got = r.backlash.backward.nominal / r.backlash.forward.nominal;
+            let want = r.ratio.unwrap().abs();
+            let got = r.backlash.unwrap().backward.nominal / r.backlash.unwrap().forward.nominal;
             assert!(
                 (got - want).abs() < 1e-9 * want,
                 "{teeth:?}: {got} where the reduction is {want}"
@@ -667,7 +685,7 @@ mod tests {
                 r.meshes[mesh].backlash[usize::from(shape.members[gear].ring.is_some())].nominal
             };
             let want = at(0, 1) * f64::from(teeth[2]) / f64::from(teeth[3]) + at(1, 3);
-            let got = r.backlash.forward.nominal;
+            let got = r.backlash.unwrap().forward.nominal;
             assert!(
                 (got - want).abs() < 1e-9 * want,
                 "{teeth:?}: {got} referred, {want} from the members"

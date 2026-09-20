@@ -567,7 +567,6 @@ been. They are not a backlog.
 | Worm profile drawing and DXF | A crossed pair draws as its two helical gears already |
 | A planetary **set's** drawing | The viewport draws single gears; a set needs the carrier and N planets placed. **Not planned** — nothing depends on it, and the set's numbers are all reported without it |
 | A ring's own bounds for a stage member | The gear card shows a rack's buildable range, which is not a ring's, so it shows nothing there and says so |
-| A **differential** rated | A load case is loads on the train's open ports, solved as one flow across every stage — a take-off between two stages divides by what holds it at each end, and the case says by name where two ends could both hold the same load. What is still refused is a train whose motion is a *family under its own constraints* — a set with its ring released and nothing but its sun driven — because every stage's no-load properties (its ratio, its efficiency both ways, its play) are read under one motion, and a family has none. The case model is ready for it: relief already holds a differential's three loads to two given speeds and one given torque. What is missing is a stage's own properties tolerating a family — reported as unavailable, or read under the case — which is a change to `ShapeResult`'s shape and every reader of `ratio` and `efficiency` |
 | A coupled glass POM grade | Can be added if one is wanted; it must be *coupled*, not filled |
 
 ---

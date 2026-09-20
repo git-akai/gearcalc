@@ -35,6 +35,36 @@ fn worm_stage(starts: u32, wheel_teeth: u32, worm_diameter: f64) -> gear_core::t
     stage
 }
 
+/// **A figure a family has none of, printed as NaN.** A stage whose boundary
+/// leaves its motion a family — a differential — has no ratio, efficiency
+/// or play of its own, and the core says so with `None`; the harness's
+/// views read a number, so the absence prints as `NaN`, which the corpus
+/// records as what it is. Every fixture the harness ships is determined.
+fn or_nan(x: Option<f64>) -> f64 {
+    x.unwrap_or(f64::NAN)
+}
+fn ways_or_nan(
+    x: Option<gear_core::contact::Directional<f64>>,
+) -> gear_core::contact::Directional<f64> {
+    x.unwrap_or(gear_core::contact::Directional {
+        forward: f64::NAN,
+        backward: f64::NAN,
+    })
+}
+fn play_or_nan(
+    x: Option<gear_core::contact::Directional<gear_core::train::Backlash>>,
+) -> gear_core::contact::Directional<gear_core::train::Backlash> {
+    let nan = gear_core::train::Backlash {
+        nominal: f64::NAN,
+        minimum: f64::NAN,
+        maximum: f64::NAN,
+    };
+    x.unwrap_or(gear_core::contact::Directional {
+        forward: nan,
+        backward: nan,
+    })
+}
+
 /// **A stage of two members and one mesh, read as the pair it is** — the
 /// harness's own view of a shape's result, so the commands that build pairs
 /// print them by the names a pair has. Nothing in the core has this shape
@@ -56,7 +86,7 @@ fn pair(r: &gear_core::train::StageResult) -> Option<Pair<'_>> {
     }
     let d = s.distances.first()?;
     Some(Pair {
-        ratio: s.ratio,
+        ratio: or_nan(s.ratio),
         centre_distance: d.running,
         clearance: d.clearance,
         mesh: &s.meshes[0],
@@ -95,8 +125,8 @@ fn set_view(r: &gear_core::train::StageResult) -> Option<SetView<'_>> {
     let d = s.distances.first()?;
     let (n0, n1) = (*d.nominal.first()?, *d.nominal.get(1)?);
     Some(SetView {
-        ratio: s.ratio,
-        efficiency: s.efficiency,
+        ratio: or_nan(s.ratio),
+        efficiency: ways_or_nan(s.efficiency),
         centre_distance: d.running,
         centre_distance_nominal: [n0, n1],
         residual: ((n0 + d.clearance) - (n1 - d.clearance)).abs(),
@@ -169,14 +199,14 @@ fn hula_view<'a>(
         .collect();
     let numerator = z[1] * z[3];
     Some(HulaView {
-        ratio: s.ratio,
+        ratio: or_nan(s.ratio),
         ratio_products: [numerator, numerator - z[0] * z[2]],
         offset_nominal: *d.nominal.first()?,
         offset: d.running,
         binding_mesh: d.sized_by,
-        efficiency: s.efficiency,
+        efficiency: ways_or_nan(s.efficiency),
         fixed_carrier_efficiency: s.meshes.iter().map(|m| m.efficiency.forward).product(),
-        backlash: s.backlash,
+        backlash: play_or_nan(s.backlash),
         cases: s
             .cases
             .iter()
@@ -1129,7 +1159,7 @@ fn hula_band(z0: u32, clearance_in_modules: f64) {
                         continue;
                     }
                     if best.as_ref().is_none_or(|(_, _, _, _, b)| {
-                        r.efficiency().forward > b.efficiency().forward
+                        ways_or_nan(r.efficiency()).forward > ways_or_nan(b.efficiency()).forward
                     }) {
                         best = Some((x, cutter, addendum, as_stage, r));
                     }
@@ -1364,18 +1394,18 @@ fn train_file_report(path: Option<&str>) {
             };
             let (a_end, b_end) = (end(&a, &doc.train), end(&b, &back.train));
             let rows: [(&str, f64, f64); 5] = [
-                ("total ratio", a.total_ratio, b.total_ratio),
+                ("total ratio", or_nan(a.total_ratio), or_nan(b.total_ratio)),
                 ("output speed rpm", a_end.0, b_end.0),
                 ("output torque Nm", a_end.1, b_end.1),
                 (
                     "efficiency forward",
-                    a.total_efficiency.forward,
-                    b.total_efficiency.forward,
+                    ways_or_nan(a.total_efficiency).forward,
+                    ways_or_nan(b.total_efficiency).forward,
                 ),
                 (
                     "backlash out deg",
-                    a.backlash.forward.nominal,
-                    b.backlash.forward.nominal,
+                    play_or_nan(a.backlash).forward.nominal,
+                    play_or_nan(b.backlash).forward.nominal,
                 ),
             ];
             let mut all = true;
@@ -1646,7 +1676,7 @@ fn epicyclic_shifts_report() {
                     n,
                     members[1].profile_shift,
                     members[2].profile_shift,
-                    100.0 * r.efficiency().forward,
+                    100.0 * ways_or_nan(r.efficiency()).forward,
                     members.iter().all(|g| g.clamps.is_empty())
                 );
             }
@@ -1806,18 +1836,19 @@ fn train_report(mode: Option<&str>) {
         }
     };
 
+    let backlash = play_or_nan(r.backlash);
     println!(
         "train  total ratio {:.4}:1   total efficiency {}",
-        r.total_ratio,
-        both_ways(r.total_efficiency)
+        or_nan(r.total_ratio),
+        both_ways(ways_or_nan(r.total_efficiency))
     );
     println!(
         "       backlash at the output shaft  {:.5} deg  (min {:.5}, max {:.5})",
-        r.backlash.forward.nominal, r.backlash.forward.minimum, r.backlash.forward.maximum
+        backlash.forward.nominal, backlash.forward.minimum, backlash.forward.maximum
     );
     println!(
         "       backlash at the input shaft   {:.5} deg  (min {:.5}, max {:.5})",
-        r.backlash.backward.nominal, r.backlash.backward.minimum, r.backlash.backward.maximum
+        backlash.backward.nominal, backlash.backward.minimum, backlash.backward.maximum
     );
     print_train_cases(&train, &r);
 

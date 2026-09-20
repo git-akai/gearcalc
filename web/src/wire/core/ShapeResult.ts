@@ -13,27 +13,39 @@ import type { ShaftCase } from "./ShaftCase";
  */
 export type ShapeResult = { 
 /**
- * Input turns per output turn, signed.
+ * Input turns per output turn, signed — and `None`, with the three
+ * figures under it, where the stage's boundary leaves its motion a
+ * **family**: a set with two of its three members free is a
+ * differential, and a differential has no ratio, no efficiency and no
+ * play of its own, since each is read under one motion. What it rates
+ * is the case's motion, which the train decides; what it reports of
+ * itself is the geometry alone.
  */
-ratio: number, 
+ratio: number | null, 
 /**
  * **The ratio one more tooth on each member would give**, in member
  * order — the graph's exact answer at `z_i + 1`, which is what a
  * designer choosing counts wants beside the ratio: where a tooth
- * moves it a lot, and where it moves it not at all.
+ * moves it a lot, and where it moves it not at all. `None` with the
+ * ratio.
  */
-ratio_per_tooth: Array<number>, efficiency: Directional<number>, 
+ratio_per_tooth: Array<number> | null, 
+/**
+ * `None` with the ratio.
+ */
+efficiency: Directional<number> | null, 
 /**
  * **The power crossing the teeth, over the power in**, in each
  * direction: one on a pair, under one on a set, and many times one
  * where power circulates ([`super::flow::Flow::circulation`]). Zero
- * where the stage does not turn that way.
+ * where the stage does not turn that way; `None` with the ratio.
  */
-circulation: Directional<number>, 
+circulation: Directional<number> | null, 
 /**
  * Play at the output shaft driven forward, at the input driven back.
+ * `None` with the ratio.
  */
-backlash: Directional<Backlash>, distances: Array<DistanceReport>, overlap: number, 
+backlash: Directional<Backlash> | null, distances: Array<DistanceReport>, overlap: number, 
 /**
  * One per replicated axis, in axis order.
  */

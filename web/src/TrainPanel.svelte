@@ -223,19 +223,27 @@
   );
   /** The library the train is rated under, which relief seeds from too. */
   const ratedUnder = () => (library.origin === null ? undefined : library.materials);
+  /** **The shaft a port names**, as the core lists it: a port is a shaft
+   *  under one of two spellings — the chain's end by name, or the shaft by
+   *  reference — and a case's loads are matched to a row by the shaft, not
+   *  the spelling, so a load written either way is found under its row. */
+  const shaftOfPort = (p: Port): string =>
+    portKey({ at: result.motion?.ports.find((o) => portKey(o.port) === portKey(p))?.at ?? (p === "start" || p === "end" ? { kind: "ground" } : p.at) });
   /** The load a case puts on a port, where it does. */
   const loadAt = (c: LoadCase, port: Port): Load | undefined =>
-    c.loads.find((l) => portKey(l.at) === portKey(port));
+    c.loads.find((l) => shaftOfPort(l.at) === shaftOfPort(port));
   /** **A port loaded or released.** Loading adds a load with both figures
    *  derived — relief never invents a given, so the boxes show what the
    *  case comes to, or stand blank until the designer gives one; releasing
    *  takes the load away and the port is reacted again. Either way the
-   *  core relieves what remains. */
-  function setLoaded(i: number, port: Port, on: boolean) {
+   *  core relieves what remains. A load is written at the shaft by
+   *  reference, one spelling for every port. */
+  function setLoaded(i: number, p: OpenPort, on: boolean) {
     const c = tab.train.load_cases[i];
-    const j = c.loads.findIndex((l) => portKey(l.at) === portKey(port));
+    const j = c.loads.findIndex((l) => shaftOfPort(l.at) === shaftOfPort(p.port));
     if (on && j < 0) {
-      c.loads.push({ at: port, torque: { auto: true, manual: 0 }, speed: { auto: true, manual: 0 } });
+      const at: Port = p.at.kind === "ground" ? p.port : { at: p.at };
+      c.loads.push({ at, torque: { auto: true, manual: 0 }, speed: { auto: true, manual: 0 } });
     } else if (!on && j >= 0) {
       c.loads.splice(j, 1);
     } else {
@@ -338,6 +346,16 @@
    *  below takes the same `undefined` and answers the same way, so a readout is
    *  written once and reads either way. */
   const BLANK = "";
+  /** **A box cleared keeps the number it held.** A number input with its
+   *  text deleted binds `null`, which the core refuses as a train — an
+   *  `f64` cannot be nothing — and a load on a named shaft then vanished
+   *  from the card with the motion it was listed under, unfixable but by
+   *  deleting the case. The box may stand blank while the designer types;
+   *  the train keeps its last number until a new one is there. Not a
+   *  default: no number is written here that was not already in the box. */
+  const finite = (set: (v: number) => void) => (v: number | null) => {
+    if (v !== null && Number.isFinite(v)) set(v);
+  };
   const num = (v: number | null | undefined, digits: number) =>
     v == null ? BLANK : v.toFixed(digits);
   const count = (v: number | null | undefined) => (v == null ? BLANK : v.toLocaleString());
@@ -834,7 +852,7 @@
     <h4 class="section-heading">{t("ui.train_ring_cutter")}</h4>
     <label>
       <span>{t("ui.train_cutter_teeth")}</span>
-      <input type="number" step="1" min="1" bind:value={cut.teeth} />
+      <input type="number" step="1" min="1" bind:value={() => cut.teeth, finite((v) => (cut.teeth = v))} />
       <em></em>
       <FieldNote notes={notes(t("ui.gear_note_cutter_teeth"), null)} />
     </label>
@@ -844,7 +862,7 @@
   <h4 class="section-heading" class:later={opts.cutter !== undefined}>{title}</h4>
   <label class:invalid={g && outside(gear.teeth, g.ranges.teeth)}>
     <span>{t(opts.teethLabel ?? "ui.train_tooth_count")}</span>
-    <input type="number" step="1" bind:value={gear.teeth} />
+    <input type="number" step="1" bind:value={() => gear.teeth, finite((v) => (gear.teeth = v))} />
   </label>
   {#if opts.member}
     {@const m = opts.member}
@@ -923,14 +941,14 @@
   {#if gear.no_sharp_tip && opts.cut !== "shaper"}
     <label class="sub">
       <span>{t("ui.train_minimum_tip_width")}</span>
-      <input type="number" step="0.02" bind:value={gear.min_tip_width} />
+      <input type="number" step="0.02" bind:value={() => gear.min_tip_width, finite((v) => (gear.min_tip_width = v))} />
       <em>{t("ui.train_mm")}</em>
     </label>
   {/if}
   {#if opts.cut !== "shaper"}
     <label class:invalid={g && outside(gear.dedendum, g.ranges.dedendum)}>
       <span>{t("ui.train_dedendum")}</span>
-      <input type="number" step="0.05" bind:value={gear.dedendum} />
+      <input type="number" step="0.05" bind:value={() => gear.dedendum, finite((v) => (gear.dedendum = v))} />
       <em>{t("ui.train_m")}</em>
       <!-- The same sentences the gear tab shows. They used to be written out
            here as well, and drifted: this one lost its reason altogether and
@@ -950,7 +968,7 @@
     </label>
     <label class:invalid={g && outside(gear.root_radius, g.ranges.root_radius)}>
       <span>{t("ui.train_root_radius")}</span>
-      <input type="number" step="0.01" bind:value={gear.root_radius} />
+      <input type="number" step="0.01" bind:value={() => gear.root_radius, finite((v) => (gear.root_radius = v))} />
       <em>{t("ui.train_m")}</em>
       <FieldNote notes={
         notes(
@@ -1181,18 +1199,24 @@
 {#snippet shafts(i: number)}
   {@const ports = result.topology[i]?.ports ?? []}
   {#if ports.length > 0}
-    <h4 class="shafts">{t("ui.train_shafts")}</h4>
+    <h4 class="shafts section-heading">{t("ui.train_shafts")}</h4>
+    <!-- **The select shows what the shaft is asked, and the convention is
+         what it shows when the train says nothing.** Choosing the word the
+         convention already means withdraws the train's own statement rather
+         than writing it down, so a stage a designer has not touched carries
+         no constraint — and one they have set back to what it was carries
+         none either. -->
     {#each ports as p (p.shaft)}
       {@const stated = constraintOn(tab.train, i, p.shaft)}
       <label>
         <span>{shaftName(tab.train, result.topology, i, p.label)}</span>
         <select
-          value={stated ?? ""}
-          onchange={(e) => constrain(i, p.shaft, e.currentTarget.value as Constraint | "")}
+          value={stated ?? p.by_convention}
+          onchange={(e) => {
+            const chosen = e.currentTarget.value as Constraint;
+            constrain(i, p.shaft, chosen === p.by_convention ? "" : chosen);
+          }}
         >
-          <option value=""
-            >{t("ui.train_constraint_convention", { what: constraintWord(p.by_convention) })}</option
-          >
           {#each ["held", "driven", "free"] as const as c (c)}
             <option value={c}>{constraintWord(c)}</option>
           {/each}
@@ -1217,7 +1241,7 @@
 )}
   <label>
     <span>{t(key)}</span>
-    <input type="number" {step} bind:value={get, set} />
+    <input type="number" {step} bind:value={get, finite(set)} />
     <em>{unit === "°" ? "°" : unit ? t(unit) : ""}</em>
     {#if note !== undefined}
       <FieldNote notes={notes(note ?? null, null)} />
@@ -1294,9 +1318,11 @@
   constraint?: { label: string; title: string; on: boolean; set: (v: boolean) => void },
   /** As `boundedNumber`'s: a bound that moved the number, in warning colour. */
   warn?: string | null,
+  /** Indented under the row above it, as a load's figures sit under its port. */
+  sub?: boolean,
 )}
   {@const shown = computed === undefined ? a.manual : computed === null ? null : Number(computed.toFixed(4))}
-  <label class="auto" class:constrained={constraint !== undefined}>
+  <label class="auto" class:constrained={constraint !== undefined} class:sub>
     <span class="name">{t(key)}</span>
     <!-- **The box comes first so the label is the box's.** A label activates
          its first labelable descendant, and a `<button>` is one — with the
@@ -1309,7 +1335,7 @@
     {#if a.auto}
       <input type="number" {step} value={shown ?? ""} disabled class="computed" />
     {:else}
-      <input type="number" {step} bind:value={a.manual} />
+      <input type="number" {step} bind:value={() => a.manual, finite((v) => (a.manual = v))} />
     {/if}
     <!-- **Left of the number it qualifies**, because that is what it qualifies.
          On the right it took the cell every other row prints its unit in, so an
@@ -1432,7 +1458,7 @@
   {#if o.enabled}
     <label class="sub">
       <span>{t("ui.train_min_contact_ratio")}</span>
-      <input type="number" step="0.05" bind:value={o.min_contact_ratio} />
+      <input type="number" step="0.05" bind:value={() => o.min_contact_ratio, finite((v) => (o.min_contact_ratio = v))} />
       <em>{t("ui.train_epsilon")}</em>
       <FieldNote notes={notes(t("ui.train_note_min_contact_ratio"), null)} />
     </label>
@@ -1519,31 +1545,38 @@
              external pair reverses; the magnitude decides which way round
              the two numbers are written, so a reduction reads as one
              whichever way it turns. -->
-        {solved === undefined
+        <!-- **A family has no figure of its own** — a differential: the
+             ratio, the efficiency and the play are each read under one
+             motion, and each load case decides its own — so the row says so
+             once and the three stand blank. -->
+        {solved === undefined || solved.total_ratio === null
           ? BLANK
           : Math.abs(solved.total_ratio) >= 1
             ? `${num(solved.total_ratio, 4)} : 1`
             : `1 : ${num(1 / solved.total_ratio, 4)}`}
+        {#if solved && solved.total_ratio === null}
+          <small>{t("ui.train_family_no_figure")}</small>
+        {/if}
       </dd>
       <dt>{t("ui.train_total_efficiency")}</dt>
       <dd>
-        {bothWays(solved?.total_efficiency)}
-        {#if lockedWays(solved?.total_efficiency)}
-          <small class="warn">{lockedWays(solved?.total_efficiency)}</small>
+        {bothWays(solved?.total_efficiency ?? undefined)}
+        {#if lockedWays(solved?.total_efficiency ?? undefined)}
+          <small class="warn">{lockedWays(solved?.total_efficiency ?? undefined)}</small>
         {/if}
       </dd>
       <dt>{t("ui.train_backlash_at_output_shaft")}</dt>
       <dd>
-        {num(solved?.backlash.forward.nominal, 5)}{solved ? "°" : BLANK}
+        {num(solved?.backlash?.forward.nominal, 5)}{solved?.backlash ? "°" : BLANK}
         <small
-          >{range(num(solved?.backlash.forward.minimum, 5), num(solved?.backlash.forward.maximum, 5))}</small
+          >{range(num(solved?.backlash?.forward.minimum, 5), num(solved?.backlash?.forward.maximum, 5))}</small
         >
       </dd>
       <dt>{t("ui.train_backlash_at_input_shaft")}</dt>
       <dd>
-        {num(solved?.backlash.backward.nominal, 5)}{solved ? "°" : BLANK}
+        {num(solved?.backlash?.backward.nominal, 5)}{solved?.backlash ? "°" : BLANK}
         <small
-          >{range(num(solved?.backlash.backward.minimum, 5), num(solved?.backlash.backward.maximum, 5))}</small
+          >{range(num(solved?.backlash?.backward.minimum, 5), num(solved?.backlash?.backward.maximum, 5))}</small
         >
       </dd>
     </dl>
@@ -1661,7 +1694,7 @@
                 {@const act = c.duty.intermittent}
                 <label>
                   <span>{t("ui.train_actuation_range")}</span>
-                  <input type="number" step="1" bind:value={act.range_degrees} />
+                  <input type="number" step="1" bind:value={() => act.range_degrees, finite((v) => (act.range_degrees = v))} />
                   <em>°</em>
                 </label>
                 <label>
@@ -1705,10 +1738,10 @@
               <div class="mode" class:later={c.kind === "fatigue" || p !== openPorts[0]}>
                 <span>{portLabel(p.port)}</span>
                 <div class="segmented">
-                  <button class:on={load !== undefined} onclick={() => setLoaded(i, p.port, true)}>
+                  <button class:on={load !== undefined} onclick={() => setLoaded(i, p, true)}>
                     {t("ui.train_case_load")}
                   </button>
-                  <button class:on={load === undefined} onclick={() => setLoaded(i, p.port, false)}>
+                  <button class:on={load === undefined} onclick={() => setLoaded(i, p, false)}>
                     {t("ui.train_case_reacted")}
                   </button>
                 </div>
@@ -1722,6 +1755,9 @@
                   touched(i, load, "torque"),
                   undefined,
                   "ui.train_nm",
+                  undefined,
+                  undefined,
+                  true,
                 )}
                 {@render autoNumber(
                   "ui.train_speed",
@@ -1731,6 +1767,9 @@
                   touched(i, load, "speed"),
                   undefined,
                   "ui.train_rpm",
+                  undefined,
+                  undefined,
+                  true,
                 )}
               {/if}
             {/each}
@@ -1821,9 +1860,9 @@
             <span class="kind aside">{t("ui.train_planetary")}</span>
           {/if}
           <span class="teeth aside">z {stage.members.map((m) => m.gear.teeth).join(" / ")}</span>
-          {#if sres}
+          {#if sres && sres.ratio !== null}
             <span class="ratio aside">{sres.ratio.toFixed(4)} : 1</span>
-            <span class="eff aside">{pct(sres.efficiency.forward)} %</span>
+            <span class="eff aside">{pct(sres.efficiency?.forward)} %</span>
           {/if}
         </button>
 
@@ -1844,9 +1883,9 @@
                     step="0.1"
                     bind:value={
                       () => stage.members[group[0]]?.module ?? 0,
-                      (v) => {
+                      finite((v) => {
                         for (const j of group) stage.members[j].module = v;
-                      }
+                      })
                     }
                   />
                   <em>{t("ui.train_mm")}</em>
@@ -1866,7 +1905,7 @@
               {#each replicated as k (k)}
                 <label>
                   <span>{replicated.length > 1 ? t("ui.train_planets_on", { axis: axisName(stage, i, k) }) : t("ui.train_planets")}</span>
-                  <input type="number" step="1" min="1" bind:value={stage.axes[k].count} />
+                  <input type="number" step="1" min="1" bind:value={() => stage.axes[k].count, finite((v) => (stage.axes[k].count = v))} />
                   <em></em>
                 </label>
               {/each}
@@ -1899,7 +1938,7 @@
                   <input
                     type="number"
                     step="5"
-                    bind:value={d.angle}
+                    bind:value={() => d.angle, finite((v) => (d.angle = v))}
                     onchange={() => relieveStage(stage, null, figures)}
                   />
                   <em>°</em>
@@ -1953,12 +1992,12 @@
                 )}
                 <label>
                   <span>{t("ui.train_c2c_tolerance_plus")}</span>
-                  <input type="number" step="0.01" bind:value={d.tolerance_plus} />
+                  <input type="number" step="0.01" bind:value={() => d.tolerance_plus, finite((v) => (d.tolerance_plus = v))} />
                   <em>{t("ui.train_mm")}</em>
                 </label>
                 <label>
                   <span>{t("ui.train_c2c_tolerance_minus")}</span>
-                  <input type="number" step="0.01" bind:value={d.tolerance_minus} />
+                  <input type="number" step="0.01" bind:value={() => d.tolerance_minus, finite((v) => (d.tolerance_minus = v))} />
                   <em>{t("ui.train_mm")}</em>
                 </label>
                 <!-- **Exposed where it is relevant, present everywhere.** Every
@@ -2021,12 +2060,15 @@
             <dl class="out">
               <dt>{t("ui.train_ratio")}</dt>
               <dd>
-                {num(sres?.ratio, 4)} : 1
+                {sres?.ratio == null ? BLANK : `${num(sres.ratio, 4)} : 1`}
                 <!-- What one more tooth on each member would make it: the
                      graph's exact answer, so a designer choosing counts sees
-                     where a tooth tells and where it does not. -->
-                {#if sres}
+                     where a tooth tells and where it does not. A stage whose
+                     boundary is a family has neither, and says so once. -->
+                {#if sres?.ratio_per_tooth}
                   <small>{t("ui.train_ratio_per_tooth")}: {sres.ratio_per_tooth.map((r, j) => `${name(j)} ${num(r, 4)}`).join(" · ")}</small>
+                {:else if sres}
+                  <small>{t("ui.train_family_no_figure")}</small>
                 {/if}
               </dd>
               {#if worm && sres}
@@ -2038,9 +2080,9 @@
               {/if}
               <dt>{t("ui.train_efficiency")}</dt>
               <dd>
-                {bothWays(sres?.efficiency)}
-                {#if lockedWays(sres?.efficiency)}
-                  <small class="warn">{lockedWays(sres?.efficiency)}</small>
+                {bothWays(sres?.efficiency ?? undefined)}
+                {#if lockedWays(sres?.efficiency ?? undefined)}
+                  <small class="warn">{lockedWays(sres?.efficiency ?? undefined)}</small>
                 {/if}
               </dd>
               <!-- The power the teeth pass, as a multiple of the power in:
@@ -2048,7 +2090,7 @@
                    the meshes' loss that many times over. -->
               <dt>{t("ui.train_circulation")}</dt>
               <dd>
-                {sres ? t("ui.train_circulation_both", { forward: num(sres.circulation.forward, 2), backward: num(sres.circulation.backward, 2) }) : BLANK}
+                {sres?.circulation ? t("ui.train_circulation_both", { forward: num(sres.circulation.forward, 2), backward: num(sres.circulation.backward, 2) }) : BLANK}
                 <small>{t("ui.train_note_circulation")}</small>
               </dd>
               <!-- The two shafts the same two plays are seen from: driving
@@ -2056,9 +2098,9 @@
                    at the shaft that was the input. -->
               <dt>{t("ui.train_backlash")}</dt>
               <dd>
-                {t("ui.train_backlash_at_output_shaft")}: {num(sres?.backlash.forward.nominal, 5)}{sres ? "°" : BLANK}
-                <small>{range(num(sres?.backlash.forward.minimum, 5), num(sres?.backlash.forward.maximum, 5))}</small>
-                · {t("ui.train_backlash_at_input_shaft")}: {num(sres?.backlash.backward.nominal, 5)}{sres ? "°" : BLANK}
+                {t("ui.train_backlash_at_output_shaft")}: {num(sres?.backlash?.forward.nominal, 5)}{sres?.backlash ? "°" : BLANK}
+                <small>{range(num(sres?.backlash?.forward.minimum, 5), num(sres?.backlash?.forward.maximum, 5))}</small>
+                · {t("ui.train_backlash_at_input_shaft")}: {num(sres?.backlash?.backward.nominal, 5)}{sres?.backlash ? "°" : BLANK}
               </dd>
               <!-- **The shafts that are not gears.** A member's card prints its
                    own speed and torque; a carrier is the one shaft a reader can
@@ -2617,7 +2659,9 @@
   .sub {
     font-size: 0.78rem;
   }
-  .sub span {
+  /* The name alone: an `auto` row's switches are spans too, and sit where
+     their columns put them. */
+  .sub > span:first-child {
     padding-left: 0.8rem;
   }
   /* Four sources now, not two, so the row wraps rather than squeezing them. */
