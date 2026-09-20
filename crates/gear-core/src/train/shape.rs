@@ -2802,12 +2802,13 @@ pub fn solve_shape(
                 speed.len(),
                 &meshes,
                 &speed,
-                &super::flow::Asked {
+                &super::flow::Asked::through(
+                    speed.len(),
                     input,
-                    torque: speed[input].signum(),
+                    speed[input].signum(),
                     output,
-                    reactions: held.clone(),
-                },
+                    &held,
+                ),
             )
         })
     };

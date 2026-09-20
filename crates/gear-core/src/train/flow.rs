@@ -68,17 +68,52 @@ pub struct MeshFlow {
     pub paths: f64,
 }
 
-/// What is asked of the flow: which shaft drives, at what torque, which one
-/// takes the power out, and which carry a reaction nobody names.
+/// What is asked of the flow: **which shafts' external torques are known**,
+/// which are to be found, and — by omission — which carry none.
+///
+/// A load whose torque a designer gave is known; a load whose torque is
+/// derived, a shaft held to ground, and ground itself are unknown; every
+/// other shaft — an idler, a planet, a coupling inside the train — carries
+/// no external torque. One input and one output is the case of one known
+/// and one unknown ([`Asked::through`]); a differential with two inputs is
+/// two known, and the flow is the same solve.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Asked {
-    pub input: Shaft,
-    pub torque: f64,
-    pub output: Shaft,
-    /// Shafts whose torque is a reaction to be found rather than a zero to
-    /// be imposed: the held ones. Every other shaft that is neither the input
-    /// nor the output carries no external torque.
-    pub reactions: Vec<Shaft>,
+    /// Per shaft: `Some(torque)` where it is known, `None` where it is to be
+    /// found. Shafts past the end of the list carry none.
+    pub known: Vec<Option<f64>>,
+    /// Shafts whose torque is to be found: the loads whose torque is
+    /// derived, the held shafts, and ground.
+    pub unknown: Vec<Shaft>,
+}
+
+impl Asked {
+    /// One shaft driving at `torque`, one taking the power out, the rest
+    /// held or carrying nothing.
+    #[must_use]
+    pub fn through(
+        shafts: usize,
+        input: Shaft,
+        torque: f64,
+        output: Shaft,
+        reactions: &[Shaft],
+    ) -> Self {
+        let mut known = vec![None; shafts];
+        for s in 0..shafts {
+            known[s] = (s != GROUND && s != output && !reactions.contains(&s)).then_some(0.0);
+        }
+        known[input] = Some(torque);
+        let unknown = (0..shafts).filter(|&s| known[s].is_none()).collect();
+        Self { known, unknown }
+    }
+
+    fn known_at(&self, s: Shaft) -> Option<f64> {
+        if self.unknown.contains(&s) {
+            None
+        } else {
+            Some(self.known.get(s).copied().flatten().unwrap_or(0.0))
+        }
+    }
 }
 
 /// The flow as it came out.
@@ -96,7 +131,8 @@ pub struct Flow {
     /// output's and each reaction as found, and zero elsewhere. Ground's is
     /// the sum of what meshes against it.
     pub shaft_torques: Vec<f64>,
-    /// `|P_out| / P_in`.
+    /// `|P_out| / P_in` — the power the shafts delivering it take out over
+    /// the power the shafts driving it put in.
     pub efficiency: f64,
     /// **The power crossing each mesh, over the power in** — the driving
     /// side's `|τ (ω − ω_frame)|` per unit of what the input delivers, so
@@ -120,29 +156,25 @@ impl Flow {
 /// A tolerance for "this power is zero", relative to the powers in play.
 const ZERO: f64 = 1e-12;
 
-/// **The power flow**, given every shaft's speed per turn of the input.
+/// **The power flow**, given every shaft's speed.
 ///
-/// `None` where no assignment of directions is self-consistent — an input
-/// that is not the one driving — or where the known torques do not determine
-/// the mesh torques, which is a stage with more free shafts than a rating can
-/// be taken under. A stage that locks in this direction is **not** `None`:
-/// its locked mesh holds, the flow through it stops there, and the
-/// efficiency is nought.
+/// `None` where nothing known drives — no known torque works with its
+/// shaft's speed — where no assignment of directions is self-consistent, or
+/// where the known torques do not determine the mesh torques, which is a
+/// stage with more free shafts than a rating can be taken under. A stage
+/// that locks in this direction is **not** `None`: its locked mesh holds,
+/// the flow through it stops there, and the efficiency is nought.
 #[must_use]
 pub fn solve(shafts: usize, meshes: &[MeshFlow], speed: &[f64], asked: &Asked) -> Option<Flow> {
-    let input_power = asked.torque * speed[asked.input];
+    // What the known torques put in: the loads that work with their shafts.
+    let input_power: f64 = (0..shafts)
+        .filter_map(|s| asked.known_at(s).map(|t| t * speed[s]))
+        .filter(|p| *p > 0.0)
+        .sum();
     if input_power <= 0.0 || !input_power.is_finite() {
         return None;
     }
-    let known = |s: Shaft| -> Option<f64> {
-        if s == GROUND || s == asked.output || asked.reactions.contains(&s) {
-            None
-        } else if s == asked.input {
-            Some(asked.torque)
-        } else {
-            Some(0.0)
-        }
-    };
+    let known = |s: Shaft| -> Option<f64> { asked.known_at(s) };
     let m = meshes.len();
     let mut best: Option<Flow> = None;
     for assignment in 0..(1u32 << m) {
@@ -221,12 +253,20 @@ pub fn solve(shafts: usize, meshes: &[MeshFlow], speed: &[f64], asked: &Asked) -
         if !consistent {
             continue;
         }
-        // ...and the output must absorb what the input delivers.
-        let p_out = shaft_torques[asked.output] * speed[asked.output];
-        if p_out > ZERO * input_power {
+        // ...and the train as a whole must lose power, not make it: what
+        // every shaft puts in, less what every shaft takes out, is the loss,
+        // and a branch that has it negative is the spurious one — an output
+        // delivering power while the input delivers too, with friction
+        // making up the difference. One input and one output reads as "the
+        // output absorbs what the input delivers".
+        let powers: Vec<f64> = (0..shafts).map(|s| shaft_torques[s] * speed[s]).collect();
+        let loss: f64 = powers.iter().sum();
+        if loss < -ZERO * input_power {
             continue;
         }
-        let efficiency = p_out.abs() / input_power;
+        let p_in: f64 = powers.iter().filter(|p| **p > 0.0).sum();
+        let p_out: f64 = powers.iter().filter(|p| **p < 0.0).sum();
+        let efficiency = p_out.abs() / p_in;
         // The power on the **driving** side of each mesh, so a mesh's loss
         // is `(1 − η)` of this, exactly.
         let mesh_powers = (0..m)
@@ -399,12 +439,7 @@ mod tests {
                             5,
                             &set(t, eta_sp, eta_pr, 3.0),
                             &speeds(t, arrangement),
-                            &Asked {
-                                input: shaft(input),
-                                torque: 1.0,
-                                output: shaft(output),
-                                reactions: vec![shaft(fixed)],
-                            },
+                            &Asked::through(5, shaft(input), 1.0, shaft(output), &[shaft(fixed)]),
                         )
                         .expect("...and so does the per-mesh model");
                         assert!(
@@ -448,18 +483,7 @@ mod tests {
             paths: 1.0,
         };
         let speed = [0.0, 1.0, -17.0 / 43.0];
-        let forward = solve(
-            3,
-            &[mesh(0.9)],
-            &speed,
-            &Asked {
-                input: 1,
-                torque: 2.0,
-                output: 2,
-                reactions: vec![],
-            },
-        )
-        .unwrap();
+        let forward = solve(3, &[mesh(0.9)], &speed, &Asked::through(3, 1, 2.0, 2, &[])).unwrap();
         assert!((forward.efficiency - 0.98).abs() < 1e-12);
         assert!((forward.shaft_torques[2] - 2.0 * 43.0 / 17.0 * 0.98).abs() < 1e-12);
         assert_eq!(forward.directions, vec![Drive::Forward]);
@@ -467,12 +491,7 @@ mod tests {
             3,
             &[mesh(0.9)],
             &[0.0, -43.0 / 17.0, 1.0],
-            &Asked {
-                input: 2,
-                torque: 1.0,
-                output: 1,
-                reactions: vec![],
-            },
+            &Asked::through(3, 2, 1.0, 1, &[]),
         )
         .unwrap();
         assert!((back.efficiency - 0.9).abs() < 1e-12);
@@ -485,12 +504,7 @@ mod tests {
             3,
             &[mesh(0.0)],
             &[0.0, -43.0 / 17.0, 1.0],
-            &Asked {
-                input: 2,
-                torque: 1.0,
-                output: 1,
-                reactions: vec![],
-            },
+            &Asked::through(3, 2, 1.0, 1, &[]),
         )
         .unwrap();
         assert_eq!(held.efficiency, 0.0);
@@ -519,12 +533,7 @@ mod tests {
             5,
             &set(t, 0.98, 0.99, 3.0),
             &speeds(t, arrangement),
-            &Asked {
-                input: SUN,
-                torque: 1.0,
-                output: CARRIER,
-                reactions: vec![RING, PLANET],
-            },
+            &Asked::through(5, SUN, 1.0, CARRIER, &[RING, PLANET]),
         )
         .is_none());
     }
