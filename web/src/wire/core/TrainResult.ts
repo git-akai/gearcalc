@@ -25,6 +25,8 @@ total_efficiency: Directional<number>,
  */
 backlash: Directional<Backlash>, 
 /**
- * Every enabled load case, in the train's order.
+ * Every load case, in the train's order — the ones switched off too,
+ * solved at the train level alone so a panel can say whether one
+ * could be switched on; no stage rates a case that is off.
  */
 cases: Array<TrainCase>, stages: Array<StageResult>, };

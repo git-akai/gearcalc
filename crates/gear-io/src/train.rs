@@ -138,6 +138,19 @@
 //!   shaft a stage lists as a port, in the same reference a constraint uses.
 //!   A duty's `at` takes the same three. Nothing an older file wrote
 //!   changed meaning.
+//! - **A load case is a list of loads.** Its `port`, `reacted`, `torque` and
+//!   `speed` are gone, and `loads = [{ at, torque = { auto, manual }, speed =
+//!   { auto, manual } }, ...]` holds one load per open port the case loads,
+//!   `at` spelt as `port` was. A given figure is `auto = false`; an
+//!   automatic one is derived from the others, and the file carries what it
+//!   last came to. The chain's two ends are reacted where the case does not
+//!   load them; every other open port it does not load is free. What a
+//!   pre-existing case meant: `port = "start"`, `reacted = true` is one load
+//!   at `start` with both figures given; `port = "end"`, `reacted = false`
+//!   is a load at `end` with both given and a second at `start` with a
+//!   torque of nought given and its speed automatic. A file that writes the
+//!   old four fields is refused by name, and one that gives more figures
+//!   than the train can honour is relieved on the way in, as a stage is.
 //!
 //! No compatibility shim, deliberately. Accepting both shapes means carrying two
 //! readers for one format and testing both forever, and the thing that would go
@@ -262,6 +275,15 @@ pub fn from_toml(src: &str) -> Result<Imported, TrainError> {
         if relieved.toggles() != stage.toggles() {
             adjusted = true;
             *stage = relieved;
+        }
+    }
+    // ...and every load case the same: a file that gives a speed at each
+    // end of a pair has asked for a contradiction, and the last gives way.
+    // A train whose graph cannot be asked is left as written; the solve
+    // refuses it by name.
+    for case in 0..document.train.load_cases.len() {
+        if let Ok(true) = document.train.relieve_case_toggles(case, None) {
+            adjusted = true;
         }
     }
     Ok(Imported { document, adjusted })
@@ -432,7 +454,7 @@ mod tests {
     fn an_edit_to_the_text_survives_the_read() {
         let text = to_toml(&document())
             .unwrap()
-            .replace("speed = 12000.0", "speed = 3000.0 # slowed down by hand");
+            .replace("manual = 12000.0", "manual = 3000.0 # slowed down by hand");
         let back = from_toml(&text).unwrap().document;
         assert!((back.train.load_cases[0].speed() - 3000.0).abs() < 1e-12);
     }
@@ -551,6 +573,35 @@ mod tests {
         assert!(w.overlap.auto, "a crossed pair's ratio cannot stand given");
         assert!((w.overlap.manual - 1.5).abs() < 1e-12, "the number is kept");
         // ...and a second read of the adjusted document adjusts nothing.
+        assert!(
+            !from_toml(&to_toml(&back.document).unwrap())
+                .unwrap()
+                .adjusted
+        );
+        // A load case the same: a speed given at each end of a pair — one
+        // degree of freedom — is one too many, and the last gives way with
+        // its number kept. (The document above couples its first two stages
+        // only, so its five are four bodies and four degrees.)
+        let mut doc = document();
+        doc.train.stages.truncate(1);
+        doc.train.couplings.clear();
+        doc.train.constraints.clear();
+        doc.train.load_cases.truncate(1);
+        doc.train.load_cases[0]
+            .loads
+            .push(gear_core::train::Load::given(
+                gear_core::train::Port::End,
+                1.0,
+                100.0,
+            ));
+        let back = from_toml(&to_toml(&doc).unwrap()).unwrap();
+        assert!(back.adjusted);
+        let loads = &back.document.train.load_cases[0].loads;
+        assert!(!loads[0].speed.auto && loads[1].speed.auto, "{loads:?}");
+        assert!(
+            (loads[1].speed.manual - 100.0).abs() < 1e-12,
+            "the number is kept"
+        );
         assert!(
             !from_toml(&to_toml(&back.document).unwrap())
                 .unwrap()

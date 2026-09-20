@@ -1,9 +1,24 @@
 train  total ratio 6.0317:1   total efficiency 96.482 % forward / 96.482 % backward
        backlash at the output shaft  0.07432 deg  (min 0.00000, max 0.14903)
        backlash at the input shaft   0.44829 deg  (min 0.00000, max 0.89889)
-       case 1  ultimate 2.000 Nm / 3000 rpm at start, held at the far end   ->   11.639 Nm / 497.4 rpm at end
-       case 2  ultimate 5.000 Nm / 0 rpm at end, held at the far end   ->   0.800 Nm / 0.0 rpm at start
-       case 3  fatigue  2.000 Nm / 3000 rpm at start, held at the far end   ->   11.639 Nm / 497.4 rpm at end   90 deg at end x 600000, reversing
+       case 1  ultimate 2.000 Nm / 3000 rpm at start
+              fixed    ground                              -        9.6390 Nm
+              load     first                     3000.00 rpm        2.0000 Nm
+              free     second                   -1186.05 rpm        0.0000 Nm
+              free     first                    -1186.05 rpm        0.0000 Nm
+              reacted  second                     497.37 rpm      -11.6390 Nm
+       case 2  ultimate 5.000 Nm / 0 rpm at end
+              fixed    ground                              -       -4.2002 Nm
+              reacted  first                        0.00 rpm       -0.7998 Nm
+              free     second                       0.00 rpm        0.0000 Nm
+              free     first                        0.00 rpm        0.0000 Nm
+              load     second                       0.00 rpm        5.0000 Nm
+       case 3  fatigue  2.000 Nm / 3000 rpm at start   90 deg at end x 600000, reversing
+              fixed    ground                              -        9.6390 Nm
+              load     first                     3000.00 rpm        2.0000 Nm
+              free     second                   -1186.05 rpm        0.0000 Nm
+              free     first                    -1186.05 rpm        0.0000 Nm
+              reacted  second                     497.37 rpm      -11.6390 Nm
 
 stage 1  spur  z 17/43  beta 30 deg  ratio -2.5294  a_w 34.6610 mm  coprime
   contact ratio  transverse 1.3205   overlap 0.2674   total 1.5879   <- no full axial overlap
@@ -16,7 +31,7 @@ stage 1  spur  z 17/43  beta 30 deg  ratio -2.5294  a_w 34.6610 mm  coprime
       case 3  T     2.0000 Nm     3000.0 rpm  sigma_F    294.0  sigma_H   1355.9 MPa  cycles 1.200e6 / 6.000e5
   2        0.0000    1.680
       case 1  T     5.0588 Nm    -1186.0 rpm  sigma_F    266.3  sigma_H   1183.9 MPa  cycles -
-      case 2  T     2.0548 Nm       -0.0 rpm  sigma_F    108.1  sigma_H    754.5 MPa  cycles -
+      case 2  T     2.0548 Nm        0.0 rpm  sigma_F    108.1  sigma_H    754.5 MPa  cycles -
       case 3  T     5.0588 Nm    -1186.0 rpm  sigma_F    266.3  sigma_H   1183.9 MPa  cycles 6.000e5 / 3.000e5
   note: axial contact ratio below 1; helical in form but loaded like a spur gear
 
@@ -27,7 +42,7 @@ stage 2  spur  z 13/31  beta 0 deg  ratio -2.3846  a_w 22.2508 mm  coprime
   gear          x     b mm
   1        0.2396    7.178
       case 1  T     4.9806 Nm    -1186.0 rpm  sigma_F    288.0  sigma_H   1632.7 MPa  cycles -
-      case 2  T     2.0968 Nm       -0.0 rpm  sigma_F    121.2  sigma_H   1059.4 MPa  cycles -
+      case 2  T     2.0968 Nm        0.0 rpm  sigma_F    121.2  sigma_H   1059.4 MPa  cycles -
       case 3  T     4.9806 Nm    -1186.0 rpm  sigma_F    288.0  sigma_H   1632.7 MPa  cycles 6.000e5 / 3.000e5
   2        0.0000    7.178
       case 1  T    11.8768 Nm      497.4 rpm  sigma_F    294.0  sigma_H   1479.7 MPa  cycles -

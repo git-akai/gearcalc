@@ -180,7 +180,8 @@ const ZERO: f64 = 1e-12;
 /// Why there is no flow.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Refused {
-    /// No known torque works with its shaft's speed: nothing drives.
+    /// No known torque does any work — every one is nought or on a still
+    /// shaft — so there is no power to follow.
     NothingDrives,
     /// The known torques do not determine the mesh torques — more unknown
     /// reactions than the meshes can tell apart, a load between two shafts
@@ -194,8 +195,8 @@ pub enum Refused {
 
 /// **The power flow**, given every shaft's speed.
 ///
-/// `None` where nothing known drives — no known torque works with its
-/// shaft's speed — where no assignment of directions is self-consistent, or
+/// `None` where no known torque does any work, where no assignment of
+/// directions is self-consistent, or
 /// where the known torques do not determine the mesh torques, which is a
 /// stage with more free shafts than a rating can be taken under. A stage
 /// that locks in this direction is **not** `None`: its locked mesh holds,
@@ -210,10 +211,13 @@ pub fn solve(
     speed: &[f64],
     asked: &Asked,
 ) -> Result<Flow, Refused> {
-    // What the known torques put in: the loads that work with their shafts.
+    // The work the known torques do, either way: the scale a power is
+    // nought against. A known torque that works *against* its shaft is a
+    // load absorbing, and who drives it is one of the unknowns — a derived
+    // load, or a reacted port — so a known driver is not required; a case
+    // with no work known at all has nothing to follow.
     let input_power: f64 = (0..shafts)
-        .filter_map(|s| asked.known_at(s).map(|t| t * speed[s]))
-        .filter(|p| *p > 0.0)
+        .filter_map(|s| asked.known_at(s).map(|t| (t * speed[s]).abs()))
         .sum();
     if input_power <= 0.0 || !input_power.is_finite() {
         return Err(Refused::NothingDrives);
@@ -317,12 +321,14 @@ pub fn solve(
         }
         let p_in: f64 = powers.iter().filter(|p| **p > 0.0).sum();
         let p_out: f64 = powers.iter().filter(|p| **p < 0.0).sum();
+        if p_in <= ZERO * input_power {
+            continue;
+        }
         let efficiency = p_out.abs() / p_in;
-        // The power on the **driving** side of each mesh, so a mesh's loss
-        // is `(1 − η)` of this, exactly.
-        let mesh_powers = (0..m)
-            .map(|k| driving_power(k).abs() / input_power)
-            .collect();
+        // The power on the **driving** side of each mesh, as a fraction of
+        // what the train is given, so a mesh's loss is `(1 − η)` of this,
+        // exactly.
+        let mesh_powers = (0..m).map(|k| driving_power(k).abs() / p_in).collect();
         let flow = Flow {
             mesh_torques: c.iter().zip(meshes).map(|(c, m)| c * m.za).collect(),
             directions,

@@ -91,8 +91,9 @@ reproduces the other.
   property of the shape's flow — linear in the torque through it — rather than
   one assumed of gearing.
 - A load from the far end is a load from the near end with the direction
-  reversed: one walk carries either, and a stage that locks in the direction of
-  travel holds either ([the walk](reference.md#load-cases)).
+  reversed: one flow carries either, each mesh's driver whichever side the
+  power comes from, and a mesh that cannot be driven that way holds either
+  ([load cases](reference.md#load-cases)).
 
 This is not tidiness. **Every surviving `match kind` is a place where two answers
 can silently disagree**, and the corrections log is largely a record of exactly
@@ -1277,42 +1278,45 @@ A load entering at a port is not a sign on the other port's torque. It enters
 at its own end, and the question it raises is not "how big is it" but "what
 holds it".
 
-Walking toward the far port, each stage passes the load on attenuated by its
-efficiency **in the direction of travel** until one cannot be driven that way
-at all. That stage reacts it, and everything beyond it carries none of it —
-which is the whole reason a designer puts a worm in a lifting drive. The same
-walk, the other way, is what a load from the start meets at a crossed pair
-whose helix split cannot drive forward: it used to be pushed through such a
-stage at an efficiency of nought or less and arrive downstream as a torque of
-nothing with no word about why. If the walk reaches the far port with the load
-still turning something, what happens is the case's own **`reacted`**: on, the
-far end holds it — a motor's load delivered to the output, a brake at the
-motor holding an output load through every mesh — and every stage carries what
-the walk gave it; off, nothing reacted it, the train is free to turn under the
-load, and the case is zero at every gear.
+The flow that answers it is the one the stage's efficiency is read from
+(`train::flow`): every mesh's driver is whichever side the power comes across
+it from, its driven side carries the driver's torque under that direction's
+`η`, and a mesh that cannot be driven that way — a self-locking worm from its
+wheel, a crossed pair whose helix split cannot drive forward — **holds**: its
+driver presses the flanks and nothing beyond it sees any, which is the whole
+reason a designer puts a worm in a lifting drive. A crossed pair locked
+forward used to be pushed through at an efficiency of nought or less and
+arrive downstream as a torque of nothing with no word about why. The flow is
+asked with the given torques known and everything else — the derived loads,
+the reacted ends, ground — unknown, and where the given torques contradict
+the statics (a load stated at each end that no mesh can hold between them,
+the ordinary case of a load nothing reacts) the case reaches no number, which
+the interface rule below says must be **said** rather than silently ignored
+— so the case reports it by name and rates nothing.
 
-That last outcome is an input reaching no number, which the interface rule below
-says must be **said** rather than silently ignored — so each case reports which
-stage held the load, or that none did.
+**Why what reacts a load is the designer's and not the model's.** Whether a
+port holds a load is a fact about what is connected there — a brake, a motor
+with holding torque, a free shaft — and nothing in the geometry can know it.
+The train used to decide it by direction: a load from the input was always
+held (the output was assumed to be a load) and a load from the output never
+was (the input was assumed free), which is the ordinary case written down as
+the only case. A case says it now by what it loads: the chain's two ends are
+reacted where the case does not load them, and every other open port — a
+released ring, a layshaft's idler, a hula's wobble body — is free unless it
+is loaded, since a reaction there is a thing a designer attaches and says so
+by loading it. A port loaded with a torque of nought is a port turning and
+carrying nothing, which is how the core is asked whether a stage locks; the
+panel does not offer it, because relief takes a torque given past the statics
+back, and the same question is on the stage card as its backward efficiency.
 
-**Why `reacted` is the designer's and not the model's.** Whether the far end
-holds a load is a fact about what is connected there — a brake, a motor with
-holding torque, a free shaft — and nothing in the geometry can know it. The
-train used to decide it by direction: a load from the input was always held
-(the output was assumed to be a load) and a load from the output never was
-(the input was assumed free), which is the ordinary case written down as the
-only case. It is a switch per load now, defaulting to what the direction used
-to imply.
-
-The graph refactor asked whether the switch could be *derived* — "nothing
+The graph refactor asked whether a reaction could be *derived* — "nothing
 reacts it" as "no torque in the rowspace of the shaft line puts that load on
-that shaft" — and the answer is that the law restates the switch. With the
-far port allowed a torque, the rowspace supplies one; with it allowed none,
-there is none; and whether it is allowed one is exactly what the switch says.
-What *is* derivable is where the reaction lands once it is declared — a
-self-locking stage holding it first, the far port otherwise — and that is
-reported beside the switch on every case. So the switch stays, and the plan's
-promise to derive it is closed here rather than kept.
+that shaft" — and the answer is that the law restates the declaration. With
+a port allowed a torque, the rowspace supplies one; with it allowed none,
+there is none; and whether it is allowed one is exactly what loading it says.
+What *is* derivable is where the reaction lands once the ports are declared
+— a self-locking stage holding it first, the reacted ends otherwise — and
+every shaft's torque is reported per case so it can be read off.
 
 **Why a two-pass solve.** A stage's torque depends on the ratio and efficiency
 of every stage between it and the port, which are not known until those stages

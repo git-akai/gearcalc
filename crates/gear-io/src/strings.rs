@@ -1149,8 +1149,19 @@ mod tests {
             let train = |stages| Train {
                 load_cases: vec![
                     LoadCase::ultimate(2.0, 3000.0),
-                    // A load from the end that nothing is asked to hold.
-                    LoadCase::back_driving(5.0),
+                    // A load from the end that nothing is asked to hold: the
+                    // start a load of nought beside it.
+                    LoadCase {
+                        loads: vec![
+                            gear_core::train::Load::given(gear_core::train::Port::End, 5.0, 0.0),
+                            gear_core::train::Load {
+                                at: gear_core::train::Port::Start,
+                                torque: gear_core::params::Auto::fixed(0.0),
+                                speed: gear_core::params::Auto::automatic(0.0),
+                            },
+                        ],
+                        ..LoadCase::back_driving(5.0)
+                    },
                 ],
                 reversed_bending: false,
                 stages,
@@ -1173,6 +1184,36 @@ mod tests {
                 &lib,
             ) {
                 record(&r.every_note());
+            }
+            // **The three ways a case can fail to be one**: no load at all;
+            // a load whose speed nobody gave, on a train with a degree of
+            // freedom left; and a given torque of nought, the only one given,
+            // so no load does any work and nothing drives.
+            {
+                use gear_core::params::Auto;
+                use gear_core::train::{Load, Port};
+                let mut t = train(vec![Stage::spur(PairStage::default())]);
+                t.load_cases = vec![
+                    LoadCase {
+                        loads: Vec::new(),
+                        ..LoadCase::ultimate(2.0, 3000.0)
+                    },
+                    LoadCase {
+                        loads: vec![Load {
+                            at: Port::Start,
+                            torque: Auto::fixed(2.0),
+                            speed: Auto::automatic(0.0),
+                        }],
+                        ..LoadCase::ultimate(2.0, 3000.0)
+                    },
+                    LoadCase {
+                        loads: vec![Load::given(Port::Start, 0.0, 3000.0)],
+                        ..LoadCase::ultimate(2.0, 3000.0)
+                    },
+                ];
+                if let Ok(r) = gear_core::train::solve_train(&t, &lib) {
+                    record(&r.every_note());
+                }
             }
             // A ratio asked to decide the helix that no helix reaches: three
             // base pitches of overlap on a two-millimetre face.

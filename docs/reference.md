@@ -2233,10 +2233,10 @@ distance when every shift is pinned.
 **Loads.** Motion is solved first, on the tooth counts and topology alone,
 then the flow of power mesh by mesh with each mesh's loss in the direction it
 turns ([efficiency](#efficiency-parallel-axes) reproduces Pennestrì's
-`η₀^w` on every arrangement). A case enters at the stage's input, forward,
-at the torque the train hands it; or at the output, backward, at that torque
-times the ratio — what the train's walk means by referring a load from the
-far side. Every mesh is pressed with its **driver's** force: where the
+`η₀^w` on every arrangement). Under a load case the stage is handed what the
+train's one flow put on its meshes and its shafts ([load
+cases](#load-cases)); a lone stage asked with a torque at its input or its
+output is a one-stage train with that load. Every mesh is pressed with its **driver's** force: where the
 driven member's torque is the one the row states, the flank sees it over
 `η`, in bending as `1/η` and in contact as `1/√η`. A member's reported torque
 per case is the torque **its teeth carry** — its worst mesh's pressing
@@ -2410,13 +2410,42 @@ per enabled case. A case is:
 
 ```text
 kind       ultimate | fatigue      which allowable it is judged against
-enabled    on | off                off takes part in nothing; the inputs stand
-port       start | end | a shaft   where the torque enters
-reacted    on | off                whether the far end holds it
-torque     N·m at the port
-speed      rpm at the port         zero is a load held still
+enabled    on | off                off reaches no rating; the inputs stand
+loads      one per loaded port     each: at (start | end | a shaft),
+                                   torque N·m {auto, manual}, speed rpm {auto, manual}
 duty       a fatigue case's        how the load is applied over the train's life
 ```
+
+**Ports.** The train's *open ports* are every stage's ports that the train
+does not fix — the chain's two ends by name, a shaft two stages share once
+under the earlier stage's name, a released ring or a hula's wobble body by
+reference. A case loads any of them. The two ends it does not load are
+**reacted**: each turns as the motion says and carries whatever torque the
+flow puts on it, and both are reported — the same thing as a shaft the train
+fixes, except that a fixed shaft is ground and reports no speed. Every other
+open port the case does not load is **free**: it turns and carries nothing,
+since a reaction there is a thing a designer attaches and says so by loading
+it. What each shaft is in a case — load, reacted, fixed, free — is reported
+beside its speed and torque, ground first.
+
+**Given and derived.** Each load's torque and speed is given or derived, on
+the same `{auto, manual}` the geometry uses. The train has some mobility `m`
+under what it fixes; exactly `m` of the loads' speeds decide the motion (each
+given speed drives its port at one turn with every other given port still,
+and the family is that scaled and summed), and the torques on the loads and
+the reacted ends together are `m` short of all given — one statics equation
+per degree of freedom — so a pair with one load and one reacted end has one
+torque given, a take-off between two stages two. **Relief** keeps it so after
+every toggle, sparing the figure just touched and turning the others in load
+order from the last, and seeds every derived figure from what the case comes
+to; it never invents a given, and a case short of a speed keeps every torque
+it was given, since there is no motion to hold them to. A case short of a
+speed, one no given torque does any work in, or one whose given torques
+contradict the statics is reported unsolved with a note saying which, rates
+nothing, and cannot be switched on. A given torque is a load whichever way
+it works: one working with its port's speed drives, one working against it
+is driven — a brake, a load stated at the output — and what drives it is
+among the unknowns, a derived load or a reacted end.
 
 ```text
 ultimate   judged against  ultimate_allowable      survive it once; no cycles
@@ -2428,38 +2457,22 @@ can reverse the roots, and nothing else: where a load enters, what holds it and
 how big it is are the same questions for either kind. Cases may overlap or
 exceed one another freely; nothing is clamped against anything.
 
-**Carrying a load.** Direction is derived from the port and never stored, by
-**routing** the load from the shaft it enters at: a stage it enters by the
-input of is crossed forward and one it enters by the output of is crossed
-backward, and the shaft it leaves by is coupled to the next stage or is where
-the route ends. A load from `start` drives the stages forward in order and a
-load from `end` drives them backward in reverse, as they always did; a load
-entering a set by its carrier at the tail of a chain is backward through the
-set and backward through everything before it. Two things are refused by
-name rather than routed: a load on a shaft no load can be put on — ground, a
-held shaft, a planet — and a load on the shaft **two stages share**, which
-could leave by either end. How such a load divides is a statement about what
-holds it at each end, with a loss model that follows power mesh by mesh, and
-this model refers a load along one route with one efficiency per stage; the
-refusal is the boundary of the model and it is stated as one. At each stage
-the load is referred to that stage's first member — a division by the ratio when it arrives from the far
-side, and nothing else — and leaves attenuated by the stage's efficiency **in
-the direction it is travelling**:
-
-```text
-from start   T_k = T arriving          T leaving = T_k · i_k · η_forward,k
-from end     T_k = T arriving / i_k    T leaving = T_k · η_backward,k
-```
-
-The walk stops at the first stage whose efficiency in that direction is `≤ 0`:
-that stage **holds** the load, and every stage beyond it carries none. A
-self-locking worm holds a load from the end; a crossed pair at a steep helix
-split holds one from the start, by the same rule. If the walk reaches the far
-port with load remaining, `reacted` decides: on, the far end holds it and every
-stage carries what the walk gave it; off, **nothing reacted it** — the train
-simply turns under the load and the case is zero at every gear. Each case
-reports the torque delivered at the far port, the stage that held it if one
-did, and a note where it was held by a stage or by nothing.
+**Carrying a load.** A case is solved as **one flow across every stage's
+meshes at once** ([the stage](#the-stage) says how a flow is found): the given torques
+known, the derived loads, the reacted ends, the fixed shafts and ground
+unknown, and the direction of the flow read off the case's speeds — a load
+held still takes its direction from the sign of its torque, so a stall case
+rates as one turning the way it pushes. Each mesh's driver is whichever side
+the flow puts power across it from, its driven side under that direction's
+`η`, so a self-locking worm **holds** a load from its wheel where it stands —
+its driver pressing the flanks, nothing beyond it seeing any — and a load put
+on a shaft two stages share divides by what holds it at each end, the pair
+carrying its part backward and the set its part forward. Two ends that could
+both hold the same load are a division by stiffness this model does not make,
+and the train refuses that case by name (`LoadShared`); a load at a shaft that
+is not an open port — ground, a held shaft, a planet — is refused the same
+way. Every stage is then handed what the flow puts on its meshes and its
+shafts, and rates that.
 
 **Every rating is per case, at that case's torque and in that case's
 direction.** Which way a stage is driven decides how a load distributes through

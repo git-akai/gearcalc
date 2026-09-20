@@ -2,9 +2,9 @@
 
 Where the project stands, what to run, and what is left. **Version 0.3.0** — the
 minor bump is the load cases: a train carries any number of them, each a
-torque at a port judged against one allowable, in place of the five load
-fields it held; every rating crosses the boundary per case, and the geartrain
-document changed shape with no shim. 0.2.0 was the bending model — the notch
+list of loads on the train's open ports judged against one allowable, in
+place of the five load fields it held; every rating crosses the boundary per
+case, and the geartrain document changed shape with no shim. 0.2.0 was the bending model — the notch
 factor, the fillet radius it reads and the parabola's selection rule moved to
 one source, which moved the strength canary.
 
@@ -230,12 +230,17 @@ worth keeping because each was a model change rather than a fix:
    figure. **Backlash did not move**, which is again the two staying in their
    lanes: a coefficient of friction is not a geometry.
 
-Load cases moved neither canary, twice: when the second case arrived, and when
-the pair of them became a list. Both are single-load reports, and a stage asked
-for one torque answers with the figure it always did — which is the check that
-a case was added rather than substituted for the first. The corpus's train
-reports moved only in layout when the list arrived: every member's figures in
-the three cases a train used to hold as fields are what they were.
+Load cases moved neither canary, three times: when the second case arrived,
+when the pair of them became a list, and when a case became a list of loads
+solved as one flow. All are single-load reports, and a stage asked for one
+torque answers with the figure it always did — which is the check that a case
+was added rather than substituted for the first. The corpus's train reports
+moved in layout each time — every shaft's role, speed and torque per case now
+— and in one sign: a reaction is reported as the external torque on its
+shaft, where the walk had printed the mesh's torque on it. Every member's
+figures in the three cases a train used to hold as fields are what they were,
+save the back-driving case's start, which the preset now reacts rather than
+leaving free (below).
 
 ---
 
@@ -254,7 +259,7 @@ location: where a boundary is drawn, and what a directory is not for.
 | `crates/gear-core` | All mathematics. No I/O, no UI, no wasm. `serde` and `ts-rs`, both optional and both about the shape a type takes when it leaves. |
 | `gear-core/src/gear.rs` | `Gear` — the assembly, and the only place a gear is drawn. An ordinary gear is `Δx = 0`. |
 | `gear-core/src/strength.rs` | The bending model: the critical section both kinds of member share, the notch factors and which fillet radius each reads, and the Hertz contact beside it. |
-| `gear-core/src/train/mod.rs` | What every stage shares: the load cases and the walk that carries each toward the far port, `MemberRating` — every mesh a member is in, in every case, and the worst mesh — `Bending`, `MeshReport`, the engagement rule, and the train that strings the stages together. |
+| `gear-core/src/train/mod.rs` | What every stage shares: the load cases, each solved as one flow across every stage with what it puts on each stage's shafts handed down, `MemberRating` — every mesh a member is in, in every case, and the worst mesh — `Bending`, `MeshReport`, the engagement rule, and the train that strings the stages together. |
 | `crates/gear-io` | File formats: DXF export, the TOML material library and geartrain documents, and the string catalogue. |
 | `crates/gear-wasm` | The WebAssembly boundary. JSON in, JSON out. |
 | `crates/gear-cli` | Development harness — drive the mathematics without a browser. |
@@ -562,7 +567,7 @@ been. They are not a backlog.
 | Worm profile drawing and DXF | A crossed pair draws as its two helical gears already |
 | A planetary **set's** drawing | The viewport draws single gears; a set needs the carrier and N planets placed. **Not planned** — nothing depends on it, and the set's numbers are all reported without it |
 | A ring's own bounds for a stage member | The gear card shows a rack's buildable range, which is not a ring's, so it shows nothing there and says so |
-| A load that divides | A load case names any open port — the chain's two ends by name, or any un-held, uncoupled shaft of any stage by reference — and is routed from there to the far end. What is refused, by name, is a load on the shaft **two stages share**: it could leave by either end, and how it divides is the rowspace of the shaft line with a loss model that follows power mesh by mesh, where this one refers a load along one route with one efficiency per stage. A train with mobility above one reports its motion as a family and refuses the *rating* by name; what it does not yet do is rate under a second drive — a set with two inputs has no held shaft for its power flow to be worked out against, and says so. The division is Phase 7's |
+| A **differential** rated | A load case is loads on the train's open ports, solved as one flow across every stage — a take-off between two stages divides by what holds it at each end, and the case says by name where two ends could both hold the same load. What is still refused is a train whose motion is a *family under its own constraints* — a set with its ring released and nothing but its sun driven — because every stage's no-load properties (its ratio, its efficiency both ways, its play) are read under one motion, and a family has none. The case model is ready for it: relief already holds a differential's three loads to two given speeds and one given torque. What is missing is a stage's own properties tolerating a family — reported as unavailable, or read under the case — which is a change to `ShapeResult`'s shape and every reader of `ratio` and `efficiency` |
 | A coupled glass POM grade | Can be added if one is wanted; it must be *coupled*, not filled |
 
 ---

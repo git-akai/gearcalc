@@ -14,6 +14,11 @@
     type ShaftRef,
     type ShaftLabel,
     type LoadCase,
+    type Load,
+    type LoadFreedom,
+    type CaseShaft,
+    type ShaftRole,
+    type OpenPort,
     type GearCase,
     type MeshCase,
     outside,
@@ -36,7 +41,7 @@
     t,
   } from "./core";
   import { developer, trains, library, type TrainTab } from "./state.svelte";
-  import { exportTrain, relieveStage } from "./core";
+  import { exportTrain, relieveStage, relieveCase } from "./core";
   import FieldNote from "./FieldNote.svelte";
   import Switch from "./Switch.svelte";
   import { notes, type Notes } from "./notes";
@@ -193,11 +198,76 @@
       shaft: known ? shaftName(tab.train, result.topology, stage, known) : String(shaft),
     });
   };
-  /** The ports a case's select offers, keyed for the select; a port is set
+  /** The ports a duty's select offers, keyed for the select; a port is set
    *  by looking its key up here, never by parsing the key. */
   const portOptionsNow = $derived(portOptions(result.motion));
   const portByKey = (key: string): Port =>
     portOptionsNow.find((o) => o.key === key)?.port ?? "start";
+  /** **The train's open ports, as the core lists them** — every shaft a
+   *  load can enter by, each with the name the chain gives it. A case is a
+   *  row per one of these: loaded, or reacted. Where the train has no
+   *  motion to list them from, the two ends by name, so a case can still be
+   *  written. */
+  const openPorts = $derived<OpenPort[]>(
+    result.motion?.ports ??
+      (["start", "end"] as const).map((port) => ({
+        port,
+        at: { kind: "ground" },
+        label: { kind: "ground" },
+      })),
+  );
+  /** The library the train is rated under, which relief seeds from too. */
+  const ratedUnder = () => (library.origin === null ? undefined : library.materials);
+  /** The load a case puts on a port, where it does. */
+  const loadAt = (c: LoadCase, port: Port): Load | undefined =>
+    c.loads.find((l) => portKey(l.at) === portKey(port));
+  /** **A port loaded or released.** Loading adds a load with both figures
+   *  derived — relief never invents a given, so the boxes show what the
+   *  case comes to, or stand blank until the designer gives one; releasing
+   *  takes the load away and the port is reacted again. Either way the
+   *  core relieves what remains. */
+  function setLoaded(i: number, port: Port, on: boolean) {
+    const c = tab.train.load_cases[i];
+    const j = c.loads.findIndex((l) => portKey(l.at) === portKey(port));
+    if (on && j < 0) {
+      c.loads.push({ at: port, torque: { auto: true, manual: 0 }, speed: { auto: true, manual: 0 } });
+    } else if (!on && j >= 0) {
+      c.loads.splice(j, 1);
+    } else {
+      return;
+    }
+    relieveCase(tab.train, i, null, ratedUnder());
+  }
+  /** A figure of a load toggled: relief keeps this one and turns another. */
+  const touched = (i: number, load: Load, which: LoadFreedom) => () => {
+    const j = tab.train.load_cases[i].loads.indexOf(load);
+    relieveCase(tab.train, i, j < 0 ? null : { load: j, which }, ratedUnder());
+  };
+  /** What the case comes to at a port: its row of the train-level result,
+   *  which a derived box shows and a blank stands for where the case did
+   *  not solve. */
+  const shaftOf = (cres: { shafts: CaseShaft[]; solved: boolean } | undefined, at: ShaftRef) =>
+    cres?.solved ? cres.shafts.find((s) => portKey({ at: s.at }) === portKey({ at })) : undefined;
+  const roleWord = (r: ShaftRole) =>
+    t(
+      {
+        load: "ui.train_role_load",
+        reacted: "ui.train_role_reacted",
+        fixed: "ui.train_role_fixed",
+        free: "ui.train_role_free",
+      }[r],
+    );
+  /** The heading's summary of a case: each given figure at its port. */
+  const caseSummary = (c: LoadCase): string =>
+    c.loads
+      .map((l) => {
+        const parts: string[] = [];
+        if (!l.torque.auto) parts.push(`${num(l.torque.manual, 3)} ${t("ui.train_nm")}`);
+        if (!l.speed.auto) parts.push(`${num(l.speed.manual, 0)} ${t("ui.train_rpm")}`);
+        return parts.length ? `${parts.join(" · ")} ${t("ui.train_at_port", { port: portLabel(l.at) })}` : "";
+      })
+      .filter((s) => s !== "")
+      .join(" · ");
   /** **Every result names its case**, so a readout that stands for a case looks
    *  its figures up by that index rather than by position: a case switched off
    *  has no result and its row draws blank, and the rows are the train's cases
@@ -1203,7 +1273,10 @@
 {#snippet autoNumber(
   key: string,
   a: Auto<number>,
-  computed: number | undefined,
+  /** What the box shows while automatic: the number the core came to,
+   *  `undefined` to show the held number, or `null` for a blank — a figure
+   *  the core could not come to and the designer has yet to give. */
+  computed: number | undefined | null,
   step: number,
   after?: () => void,
   note?: string | null,
@@ -1217,7 +1290,7 @@
   /** As `boundedNumber`'s: a bound that moved the number, in warning colour. */
   warn?: string | null,
 )}
-  {@const shown = computed === undefined ? a.manual : Number(computed.toFixed(4))}
+  {@const shown = computed === undefined ? a.manual : computed === null ? null : Number(computed.toFixed(4))}
   <label class="auto" class:constrained={constraint !== undefined}>
     <span class="name">{t(key)}</span>
     <!-- **The box comes first so the label is the box's.** A label activates
@@ -1229,7 +1302,7 @@
          the columns were going to have to be named anyway once a row could
          carry two switches. -->
     {#if a.auto}
-      <input type="number" {step} value={shown} disabled class="computed" />
+      <input type="number" {step} value={shown ?? ""} disabled class="computed" />
     {:else}
       <input type="number" {step} bind:value={a.manual} />
     {/if}
@@ -1252,7 +1325,7 @@
           // created with and the stage fell over. Seeded to the digits shown
           // rather than the full value, so what the reader saw is what they
           // now hold; the gear tab's throw and amplitude do the same.
-          if (!v && a.auto) a.manual = shown;
+          if (!v && a.auto && shown !== null) a.manual = shown;
           a.auto = v;
           after?.();
         }}
@@ -1474,8 +1547,10 @@
          module nor a material. Every shaft's speed per turn of what is driven,
          exactly; and where the train is a condition short, the *family*: each
          speed as a value plus so many turns per turn of a shaft the conditions
-         left free, which for a differential is the answer a designer wanted. -->
-    {#if result.motion}
+         left free, which for a differential is the answer a designer wanted.
+         In developer mode only: what each shaft does under a load is on the
+         load case that carries it, and this is the instrument behind it. -->
+    {#if result.motion && developer.enabled}
       {@const m = result.motion}
       <details class="shaftline" open>
         <summary class="section-heading">
@@ -1529,57 +1604,88 @@
 <div class="stages">
   {#each tab.train.load_cases as c, i (i)}
     {@const cres = forCase(solved?.cases, i)}
+    {@const complete = cres?.solved ?? false}
     <section class="stage" class:off={!c.enabled}>
       <div class="casehead">
         <button class="head section-heading" onclick={() => (tab.openCases[i] = !tab.openCases[i])}>
           <span class="caret aside">{tab.openCases[i] ? "▾" : "▸"}</span>
           <strong>{caseName(i)}</strong>
           <span class="kind aside">{kindLabel(c.kind)}</span>
-          <span class="teeth aside"
-            >{num(c.torque, 3)} {t("ui.train_nm")} · {num(c.speed, 0)} {t("ui.train_rpm")} ·
-            {t("ui.train_at_port", { port: portLabel(c.port) })}</span
-          >
-          {#if cres}
-            <span class="eff aside"
-              >{num(cres.delivered_torque, 3)} {t("ui.train_nm")}
-              {t("ui.train_at_port", { port: portLabel(cres.delivered_at) })}</span
-            >
+          <span class="teeth aside">{caseSummary(c)}</span>
+          <!-- **A case the train cannot solve says so where it is closed**:
+               short of a figure, nothing driving it, or nothing holding it —
+               the notes inside say which — and cannot be switched on until it
+               can. A train with no answer at all says nothing here; its
+               failure is on the summary. -->
+          {#if solved && !complete}
+            <span class="eff aside warn">{t("ui.train_case_incomplete")}</span>
           {/if}
         </button>
-        <span class="control">
-          <Switch label={t("ui.train_case_enabled")} on={c.enabled} set={(v) => (c.enabled = v)} />
+        <span class="control" class:locked={solved !== undefined && !complete}>
+          <Switch
+            label={t("ui.train_case_enabled")}
+            on={c.enabled}
+            set={(v) => {
+              if (v && solved !== undefined && !complete) return;
+              c.enabled = v;
+            }}
+          />
         </span>
       </div>
       {#if tab.openCases[i]}
         <div class="body">
-          <div class="grid shared">
-            <!-- The kind decides which allowable the core judges against and
-                 which inputs are put in front of the designer; nothing else
-                 about a case knows which it is. It is chosen when the case is
-                 added and shown on the heading, not switched here. -->
-            <label>
-              <span>{t("ui.train_case_port")}</span>
-              <select value={portKey(c.port)} onchange={(e) => (c.port = portByKey(e.currentTarget.value))}>
-                {#each portOptionsNow as p (p.key)}
-                  <option value={p.key}>{portLabel(p.port)}</option>
-                {/each}
-              </select>
-              <em></em>
-            </label>
-            <!-- Whether the far end holds the load. On, it is carried through
-                 every stage to the far port; off, only a stage that cannot be
-                 driven that way holds it, and a train with no such stage turns
-                 under it and carries none of it. Either way a stage that locks
-                 in the load's direction holds it where it stands. -->
-            {@render switchField(
-              "ui.train_case_reacted",
-              c.reacted,
-              (v) => (c.reacted = v),
-              t(c.reacted ? "ui.train_note_reacted" : "ui.train_note_not_reacted"),
-            )}
-            {@render numberField("ui.train_torque", () => c.torque, (v) => (c.torque = v), 0.01, "ui.train_nm")}
-            {@render numberField("ui.train_speed", () => c.speed, (v) => (c.speed = v), 100, "ui.train_rpm")}
+          <!-- **One row per open port of the train**, each loaded or reacted.
+               A reacted port turns as the motion says and carries whatever
+               the flow puts on it; a loaded one carries a torque and a speed,
+               each given or derived — of the speeds exactly the train's
+               mobility given, of the torques one statics equation fewer than
+               the shafts that carry one, which the core keeps so through
+               relief after every toggle. A derived box shows what the case
+               comes to and stands blank until it can. Which allowable the
+               case is judged against is its kind, chosen when it was added. -->
+          <div class="ports">
+            {#each openPorts as p (portKey(p.port))}
+              {@const load = loadAt(c, p.port)}
+              {@const at = shaftOf(cres, p.at)}
+              <div class="port" class:loaded={load !== undefined}>
+                <div class="portrow">
+                  <span class="name">{portLabel(p.port)}</span>
+                  <div class="segmented">
+                    <button class:on={load !== undefined} onclick={() => setLoaded(i, p.port, true)}>
+                      {t("ui.train_case_load")}
+                    </button>
+                    <button class:on={load === undefined} onclick={() => setLoaded(i, p.port, false)}>
+                      {t("ui.train_case_reacted")}
+                    </button>
+                  </div>
+                </div>
+                {#if load}
+                  <div class="grid shared">
+                    {@render autoNumber(
+                      "ui.train_torque",
+                      load.torque,
+                      load.torque.auto ? (at?.torque ?? null) : undefined,
+                      0.01,
+                      touched(i, load, "torque"),
+                      undefined,
+                      "ui.train_nm",
+                    )}
+                    {@render autoNumber(
+                      "ui.train_speed",
+                      load.speed,
+                      load.speed.auto ? (at?.speed ?? null) : undefined,
+                      100,
+                      touched(i, load, "speed"),
+                      undefined,
+                      "ui.train_rpm",
+                    )}
+                  </div>
+                {/if}
+              </div>
+            {/each}
+          </div>
 
+          <div class="grid shared">
             {#if c.kind === "fatigue"}
               <!-- A fatigue case alone has a duty: an ultimate load is
                    survived once and counts nothing. The sweep is measured at
@@ -1629,24 +1735,30 @@
             {/if}
           </div>
 
-          <!-- What this load comes to at the train level: what reaches the
-               far port after every loss — and, in the notes under it, where a
-               stage held it or that nothing did. The row stands while the
-               train has no answer, as every readout here does. -->
-          <dl class="out">
-            <dt>{t("ui.train_case_delivered")}</dt>
-            <dd>
-              {num(cres?.delivered_torque, 4)} {cres && t("ui.train_nm")}
-              {cres ? "·" : ""}
-              {num(cres?.delivered_speed, 1)} {cres && t("ui.train_rpm")}
-              {#if cres}
-                <small>{t("ui.train_at_port", { port: portLabel(cres.delivered_at) })}</small>
-              {/if}
-            </dd>
-          </dl>
+          <!-- **What this case comes to, shaft by shaft**: every shaft of
+               every stage and the frame, what it is in this case — a load,
+               a reaction, fixed, or free — and what it turns at and carries.
+               A fixed shaft has no speed to report and shows none. The table
+               stands while the train has no answer, as every readout does;
+               the notes under it say why a case did not solve. -->
+          <details class="delivered" open>
+            <summary class="section-heading">{t("ui.train_case_delivered")}</summary>
+            <table class="shaftlist">
+              <tbody>
+                {#each cres?.shafts ?? [] as s (portKey({ at: s.at }))}
+                  <tr class:muted={s.role === "free"}>
+                    <th>{refLabel(s.at, s.label)}</th>
+                    <td class="role">{roleWord(s.role)}</td>
+                    <td class="figure">{s.speed === null ? "—" : `${num(s.speed, 1)} ${t("ui.train_rpm")}`}</td>
+                    <td class="figure">{num(s.torque, 4)} {t("ui.train_nm")}</td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          </details>
           {#if (cres?.notes.length ?? 0) > 0}
             <ul class="notes">
-              {#each cres?.notes ?? [] as n, j (j)}<li>{note(n)}</li>{/each}
+              {#each cres?.notes ?? [] as n, j (j)}<li class="warn">{note(n)}</li>{/each}
             </ul>
           {/if}
           <button class="action danger" onclick={() => removeCase(i)}>{t("ui.train_remove_case")}</button>
@@ -2370,6 +2482,68 @@
   /* A case switched off is still a case: its inputs stand, so it is dimmed
      rather than hidden, and its heading still says what it is. */
   .stage.off > .casehead {
+    opacity: 0.55;
+  }
+  /* A switch the case cannot honour yet: the case is short of what the train
+     needs to solve it, and switching it on would rate nothing. */
+  .control.locked {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  /* **A case's ports**, one row each: the port's name, whether it is loaded
+     or reacted, and — under a loaded one — its two figures in the same grid
+     every other input sits in. */
+  .ports {
+    display: grid;
+    gap: 0.35rem;
+    margin: 0.6rem 0;
+  }
+  .port {
+    padding: 0.35rem 0.5rem;
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+  }
+  .port.loaded {
+    background: var(--hover);
+  }
+  .portrow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    font-size: 0.85rem;
+  }
+  .port .grid.shared {
+    margin-top: 0.4rem;
+  }
+  /* What the case comes to, shaft by shaft: a table, as a member's ratings
+     are, because a reader compares down a column. */
+  .delivered {
+    margin-top: 0.6rem;
+  }
+  table.shaftlist {
+    width: 100%;
+    margin-top: 0.3rem;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  table.shaftlist th {
+    color: var(--muted);
+    font-weight: normal;
+    text-align: left;
+    padding: 0.1rem 0.6rem 0.1rem 0;
+  }
+  table.shaftlist td {
+    padding: 0.1rem 0 0.1rem 0.6rem;
+    text-align: right;
+  }
+  table.shaftlist td.role {
+    color: var(--muted);
+    text-align: left;
+  }
+  table.shaftlist tr.muted {
     opacity: 0.55;
   }
   .caret {

@@ -125,12 +125,26 @@ const out = {
     const t = structuredClone(defaults.train);
     const named = { ...t, stages: [t.stages[0], structuredClone(defaults.planetary_stage)] };
     named.load_cases = t.load_cases.map((c, i) =>
-      i === 0 ? { ...c, port: { at: { kind: "of", stage: 1, shaft: 2 } } } : c,
+      i === 0
+        ? { ...c, loads: c.loads.map((l) => ({ ...l, at: { at: { kind: "of", stage: 1, shaft: 2 } } })) }
+        : c,
     );
     return [
       ["default", JSON.parse(w.solve_train(JSON.stringify({ train: t, library })))],
       ["named", JSON.parse(w.solve_train(JSON.stringify({ train: named, library })))],
     ];
+  }),
+  // **Over-determined on purpose**: the default train's first case given a
+  // second load at its end with both figures given — two speeds on one
+  // degree of freedom — and the end's speed declared the one just touched,
+  // so the answer is the relief (the start's speed derived, seeded from what
+  // the case comes to) rather than a case that needed none.
+  relieve_case: call("relieve_case", () => {
+    const train = structuredClone(defaults.train);
+    const given = (v) => ({ auto: false, manual: v });
+    train.load_cases[0].loads.push({ at: "end", torque: given(1), speed: given(100) });
+    const just = { load: 1, which: "speed" };
+    return JSON.parse(w.relieve_case(JSON.stringify({ train, library, case: 0, just })));
   }),
   export_train: call("export_train", () => w.export_train(JSON.stringify(trainDoc))),
   import_train: call("import_train", () =>

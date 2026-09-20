@@ -51,9 +51,9 @@ pub mod shape;
 mod wiring;
 
 pub use conditions::{
-    Constraint, Coupling, Exact, MotionError, MotionReport, OpenPort, PortSpec, Ports, Route,
-    RouteError, ShaftConstraint, ShaftMotion, ShaftRef, ShaftReport, StageBoundary, StagePorts,
-    Term, TrainMotion,
+    Constraint, Coupling, Exact, MotionError, MotionReport, OpenPort, PortSpec, Ports,
+    ShaftConstraint, ShaftMotion, ShaftRef, ShaftReport, StageBoundary, StagePorts, Term,
+    TrainMotion,
 };
 
 use crate::kinematics::{Condition, Shaft, GROUND};
@@ -3152,19 +3152,22 @@ impl Duty {
 )]
 pub struct LoadCase {
     pub kind: CaseKind,
-    /// A case switched off takes part in nothing — no rating, no sizing, no
-    /// readout — and its inputs stand, so it can be switched back on as it was.
+    /// A case switched off takes part in no rating and no sizing, and its
+    /// inputs stand, so it can be switched back on as it was; what it comes
+    /// to at the train level is still reported ([`TrainCase`]).
     pub enabled: bool,
-    /// **The loads on the train's open ports.** Every open port with no load
-    /// here is *reacted* in this case: it turns as the motion says and
-    /// carries the torque the flow puts on it, and both are reported — a
-    /// reaction the designer cares about, where a shaft the train fixes is
-    /// ground and reports no speed ([`ShaftRole`]). A load carries a torque
-    /// and a speed, each given or derived: the train has some mobility `m`
-    /// under what it fixes, exactly `m` of the loads' speeds decide the
-    /// motion and exactly `m` of their torques the flow, and the rest —
-    /// the derived loads and every reacted port — follow
-    /// ([`Train::relieve_case`] keeps it so).
+    /// **The loads on the train's open ports.** The chain's two ends, where
+    /// the case does not load them, are *reacted*: each turns as the motion
+    /// says and carries the torque the flow puts on it, and both are
+    /// reported — a reaction the designer cares about, where a shaft the
+    /// train fixes is ground and reports no speed ([`ShaftRole`]). Every
+    /// other open port the case does not load is *free* — it turns and
+    /// carries nothing, since a reaction there is a thing a designer
+    /// attaches and says so by loading it. A load carries a torque and a
+    /// speed, each given or derived: the train has some mobility `m` under
+    /// what it fixes, exactly `m` of the loads' speeds decide the motion,
+    /// the torques on the loads and the reacted ends are `m` short of all
+    /// given, and the rest follow ([`Train::relieve_case`] keeps it so).
     pub loads: Vec<Load>,
     /// The duty a fatigue case is spent over. Read by a fatigue case alone —
     /// an ultimate load is survived once and has no cycles to count — and kept
@@ -3239,35 +3242,22 @@ impl LoadCase {
         }
     }
 
-    /// **A load from the far end that nothing holds unless a stage does**: a
-    /// torque at the end, held still, with the start a load of *nought* —
-    /// free to turn and carrying nothing, where a reacted start would hold
-    /// it — so a train that can be back-driven turns under it and reacts
-    /// none of it, and one with a stage that locks holds it there.
+    /// **A load from the far end, held at the start**: a torque at the end,
+    /// held still, with the start reacted — carrying whatever holds it,
+    /// which through a stage that locks is nothing — so every stage
+    /// carries it to the start, cut by each one's loss the backward way.
+    /// The start *free* instead — turning, carrying nothing, so a train
+    /// that can be back-driven turns under the load and reacts none of it
+    /// — is a second load there of a given nought, which relief takes back
+    /// ([`Train::relieve_case`]): a question the core answers and no panel
+    /// asks.
     #[must_use]
     pub fn back_driving(torque: f64) -> Self {
         Self {
             kind: CaseKind::Ultimate,
             enabled: true,
-            loads: vec![
-                Load::given(Port::End, torque, 0.0),
-                Load {
-                    at: Port::Start,
-                    torque: Auto::fixed(0.0),
-                    speed: Auto::automatic(0.0),
-                },
-            ],
-            duty: Duty::default(),
-        }
-    }
-
-    /// The same load, held at the far end: the start reacted rather than a
-    /// load of nought, so every stage carries it to it.
-    #[must_use]
-    pub fn back_driving_held(torque: f64) -> Self {
-        Self {
             loads: vec![Load::given(Port::End, torque, 0.0)],
-            ..Self::back_driving(torque)
+            duty: Duty::default(),
         }
     }
 
@@ -3778,6 +3768,208 @@ impl Train {
     }
 }
 
+/// One of a load's two figures, named so a caller can say which was
+/// just touched.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
+pub enum LoadFreedom {
+    Torque,
+    Speed,
+}
+
+/// One figure of one load of a case: what a panel names when it toggles it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+pub struct CaseFreedom {
+    pub load: usize,
+    pub which: LoadFreedom,
+}
+
+/// Whether a port names this shaft.
+fn self_port_is(boundaries: &[StageBoundary], port: Port, shaft: ShaftRef) -> bool {
+    match port {
+        Port::At(r) => r == shaft,
+        Port::Start => boundaries.first().is_some_and(|b| {
+            shaft
+                == ShaftRef::Of {
+                    stage: 0,
+                    shaft: b.input,
+                }
+        }),
+        Port::End => boundaries.last().is_some_and(|b| {
+            shaft
+                == ShaftRef::Of {
+                    stage: boundaries.len() - 1,
+                    shaft: b.output,
+                }
+        }),
+    }
+}
+
+impl Train {
+    /// **The mobility a case's loads have to decide** — the degrees of
+    /// freedom the train has under what it fixes, with every port free.
+    /// Exactly this many of a case's speeds, and this many of its torques,
+    /// must be given; [`Self::relieve_case`] keeps it so.
+    ///
+    /// # Errors
+    ///
+    /// [`MotionError`] where the train has no graph to ask.
+    pub fn case_mobility(&self) -> Result<usize, MotionError> {
+        let (system, at) = self.system()?;
+        let shafts = system.shafts();
+        let conditions: Vec<Condition> = self
+            .conditions(&at, shafts)?
+            .into_iter()
+            .map(|c| match c {
+                Condition::Drive(_) => Condition::Free,
+                other => other,
+            })
+            .collect();
+        Ok(system
+            .motion_in(&conditions, &[])
+            .map_or(0, |s| s.residual.len()))
+    }
+
+    /// **One load case relieved**: of its loads' speeds exactly the
+    /// train's mobility `m` given and the rest derived; of the torques on
+    /// its loads and its reacted ends together, `m` derived and the rest
+    /// given — one statics equation per degree of freedom, so a pair with
+    /// one load and one reacted end has one torque given, a take-off
+    /// between two stages two, a differential's three ports one. The
+    /// figure just touched is kept and the others turned in load order from
+    /// the last — so a designer who gives a second speed on a pair sees the
+    /// first become derived. A case with fewer given than that is left
+    /// short, and the solve says so; relief never invents a given, and a
+    /// case short of a speed keeps every torque it was given, since there
+    /// is no motion to hold them to.
+    ///
+    /// Every derived figure is then seeded from what the case last came to,
+    /// where it solves, so a box turned derived shows the number rather
+    /// than a stale one. [`Self::relieve_case_toggles`] is the first half
+    /// alone, for a reader with no library to solve under.
+    ///
+    /// # Errors
+    ///
+    /// [`MotionError`] where the train has no graph to ask.
+    pub fn relieve_case(
+        &mut self,
+        case: usize,
+        just: Option<CaseFreedom>,
+        lib: &MaterialLibrary,
+    ) -> Result<(), MotionError> {
+        self.relieve_case_toggles(case, just)?;
+        let boundaries = self.boundaries()?;
+        // Seed what is derived from what it comes to.
+        if let Ok(r) = solve_train(self, lib) {
+            if let Some(solved) = r.cases.iter().find(|x| x.case == case && x.solved) {
+                let ports: Vec<ShaftRef> = self.load_cases[case]
+                    .loads
+                    .iter()
+                    .map(|l| self.port_shaft(&boundaries, l.at))
+                    .collect();
+                let c = &mut self.load_cases[case];
+                for (l, at) in c.loads.iter_mut().zip(ports) {
+                    let Some(s) = solved.shaft(at) else { continue };
+                    if l.torque.auto {
+                        l.torque.manual = (s.torque * 1e4).round() / 1e4;
+                    }
+                    if l.speed.auto {
+                        l.speed.manual = (s.speed.unwrap_or(0.0) * 1e4).round() / 1e4;
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// [`Self::relieve_case`]'s toggles alone — which figures stand given —
+    /// with every number kept; whether any toggle moved.
+    ///
+    /// # Errors
+    ///
+    /// [`MotionError`] where the train has no graph to ask.
+    pub fn relieve_case_toggles(
+        &mut self,
+        case: usize,
+        just: Option<CaseFreedom>,
+    ) -> Result<bool, MotionError> {
+        let m = self.case_mobility()?;
+        let boundaries = self.boundaries()?;
+        let ends: Vec<ShaftRef> = [Port::Start, Port::End]
+            .iter()
+            .map(|&p| self.port_shaft(&boundaries, p))
+            .collect();
+        let Some(c) = self.load_cases.get_mut(case) else {
+            return Ok(false);
+        };
+        let mut moved = false;
+        let loaded_ends = ends
+            .iter()
+            .filter(|&&e| c.loads.iter().any(|l| self_port_is(&boundaries, l.at, e)))
+            .count();
+        let reacted = ends.len() - loaded_ends;
+        // A case short of a speed has no motion, and no statics to hold its
+        // torques to: they are left as given, and the solve says what is
+        // short. Relief takes a figure back only where the case can use
+        // what remains.
+        let speeds_given = c.loads.iter().filter(|l| !l.speed.auto).count();
+        for which in [LoadFreedom::Speed, LoadFreedom::Torque] {
+            // The speeds decide the motion: `m` of them. The torques are
+            // one short of the shafts that carry one, per degree of freedom.
+            let limit = match which {
+                LoadFreedom::Speed => m,
+                LoadFreedom::Torque if speeds_given < m => usize::MAX,
+                LoadFreedom::Torque => (c.loads.len() + reacted).saturating_sub(m),
+            };
+            fn field(l: &mut Load, which: LoadFreedom) -> &mut Auto<f64> {
+                match which {
+                    LoadFreedom::Torque => &mut l.torque,
+                    LoadFreedom::Speed => &mut l.speed,
+                }
+            }
+            let mut given = c
+                .loads
+                .iter()
+                .filter(|l| match which {
+                    LoadFreedom::Torque => !l.torque.auto,
+                    LoadFreedom::Speed => !l.speed.auto,
+                })
+                .count();
+            // Spare the one just touched, then — only if it must — that too.
+            for spare_just in [true, false] {
+                for (i, l) in c.loads.iter_mut().enumerate().rev() {
+                    if given <= limit {
+                        break;
+                    }
+                    let is_just = just == Some(CaseFreedom { load: i, which });
+                    if spare_just && is_just {
+                        continue;
+                    }
+                    let f = field(l, which);
+                    if !f.auto {
+                        f.auto = true;
+                        given -= 1;
+                        moved = true;
+                    }
+                }
+            }
+        }
+        Ok(moved)
+    }
+}
+
 /// What a shaft is in one load case.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -3878,7 +4070,9 @@ pub struct TrainResult {
     /// Angular backlash referred to whichever shaft is the output, degrees: the
     /// last shaft driving forward, the first driving backward.
     pub backlash: Directional<Backlash>,
-    /// Every enabled load case, in the train's order.
+    /// Every load case, in the train's order — the ones switched off too,
+    /// solved at the train level alone so a panel can say whether one
+    /// could be switched on; no stage rates a case that is off.
     pub cases: Vec<TrainCase>,
     pub stages: Vec<StageResult>,
 }
@@ -3897,7 +4091,12 @@ pub struct TrainResult {
 /// torques then decide the flow — one flow across every stage's meshes at
 /// once ([`flow::solve`]), with the given torques known and the derived
 /// loads, the held ports and ground unknown — and each stage is handed
-/// what that flow puts on its meshes and shafts ([`CaseLoad`]).
+/// what that flow puts on its meshes and shafts ([`CaseLoad`]). A given
+/// torque is a load whichever way it works: one that works with its port's
+/// speed drives, one that works against it is driven — a brake, a load the
+/// designer stated at the output — and what drives it is among the
+/// unknowns, a derived load or a reacted end. A case in which no given
+/// torque does any work has nothing to follow and says so.
 ///
 /// A load nothing holds — a torque at the end with the start free and
 /// carrying nothing — has no flow unless a stage locks in that direction:
@@ -4062,10 +4261,13 @@ fn solve_train_under(
         })
         .collect();
 
-    // --- what each stage is loaded by, case by case.
+    // --- what each stage is loaded by, case by case. **Every case is
+    // solved at the train level**, switched off or not, so a panel can say
+    // of a case that is off whether it could be switched on; only a case
+    // that is on reaches a stage's rating.
     let mut cases = Vec::new();
     let mut per_stage: Vec<Vec<CaseLoad>> = vec![Vec::new(); train.stages.len()];
-    for (index, case) in train.enabled_cases() {
+    for (index, case) in train.load_cases.iter().enumerate() {
         let mut notes = Vec::new();
         let loads: Vec<(Shaft, &Load)> = case
             .loads
@@ -4139,6 +4341,9 @@ fn solve_train_under(
                     solved: false,
                     notes,
                 });
+                if !case.enabled {
+                    return;
+                }
                 for (k, w) in wirings.iter().enumerate() {
                     per_stage[k].push(CaseLoad::nothing(
                         index,
@@ -4314,7 +4519,7 @@ fn solve_train_under(
             _ => None,
         });
         // ---- what each stage's meshes put on each of its shafts.
-        for (k, w) in wirings.iter().enumerate() {
+        for (k, w) in wirings.iter().enumerate().filter(|_| case.enabled) {
             let mine = &mesh_of_stage[k];
             let mut torques = vec![0.0; w.shafts.len()];
             for (j, &g) in mine.iter().enumerate() {
@@ -6693,6 +6898,160 @@ mod tests {
         assert!(checked > 40, "{checked} member-cases compared");
     }
 
+    /// **A case's loads decide exactly the train's mobility, and relief
+    /// keeps it so.** On a pair — one degree of freedom — a second given
+    /// speed turns the first derived, the one just touched kept; a load
+    /// added with everything derived is seeded from what the case came to;
+    /// and a case short of a speed is left short and says so, rather than
+    /// given one it did not state. On a differential — a set with its ring
+    /// released, two degrees — two given speeds stand and one torque: three
+    /// loads, nothing reacted, is one statics equation short of three. The
+    /// train's own motion is a family there, which the solve still refuses
+    /// by name (`a_train_one_condition_short_reports_the_family_and_refuses_the_rating`):
+    /// relief is what a case *would* need, whether or not the rating
+    /// follows.
+    #[test]
+    fn a_case_is_relieved_to_the_trains_mobility() {
+        let lib = library();
+        let mut t = two_stage();
+        t.load_cases.truncate(1);
+        assert_eq!(t.case_mobility().unwrap(), 1);
+        // A load at the end with both figures given: two given speeds on
+        // one degree of freedom, and the one just touched is kept.
+        t.load_cases[0]
+            .loads
+            .push(Load::given(Port::End, 1.0, 100.0));
+        t.relieve_case(
+            0,
+            Some(CaseFreedom {
+                load: 1,
+                which: LoadFreedom::Speed,
+            }),
+            &lib,
+        )
+        .unwrap();
+        let c = &t.load_cases[0];
+        // The speed just touched stands and the start's is derived; of the
+        // torques, nothing was touched, so the last load's gives way.
+        assert!(c.loads[0].speed.auto && !c.loads[1].speed.auto);
+        assert!(!c.loads[0].torque.auto && c.loads[1].torque.auto);
+        // ...and the derived figures are what the case comes to: the start
+        // turns at the end's speed times the ratio, and the end carries the
+        // start's torque stepped up through the losses.
+        let r = solve_train(&t, &lib).unwrap();
+        let start = at_port(&r, &t, 0, Port::Start);
+        let end = at_port(&r, &t, 0, Port::End);
+        assert!(start.speed.unwrap().abs() > 100.0);
+        assert!((c.loads[0].speed.manual - start.speed.unwrap()).abs() < 1e-3);
+        assert!((c.loads[1].torque.manual - end.torque).abs() < 1e-3);
+        // Everything derived: nothing drives, and relief invents nothing.
+        let mut short = two_stage();
+        short.load_cases = vec![LoadCase {
+            loads: vec![Load::derived(Port::Start)],
+            ..LoadCase::ultimate(2.0, 3000.0)
+        }];
+        short.relieve_case(0, None, &lib).unwrap();
+        assert!(short.load_cases[0].loads[0].speed.auto);
+        let r = solve_train(&short, &lib).unwrap();
+        assert!(!r.cases[0].solved);
+        assert!(r.cases[0]
+            .notes
+            .iter()
+            .any(|n| n.is(key::TRAIN_CASE_UNDERDETERMINED)));
+        // A differential: a lone set with its ring released has two.
+        let mut diff = two_stage();
+        diff.stages = vec![Stage::planetary(PlanetaryStage::default())];
+        diff.constraints = vec![ShaftConstraint {
+            at: ShaftRef::Of { stage: 0, shaft: 3 },
+            constraint: Constraint::Free,
+        }];
+        assert_eq!(diff.case_mobility().unwrap(), 2);
+        diff.load_cases = vec![LoadCase {
+            loads: vec![
+                Load::given(Port::Start, 2.0, 3000.0),
+                Load::given(Port::At(ShaftRef::Of { stage: 0, shaft: 3 }), 1.0, -500.0),
+                Load::derived(Port::End),
+            ],
+            ..LoadCase::ultimate(2.0, 3000.0)
+        }];
+        diff.relieve_case(0, None, &lib).unwrap();
+        let c = &diff.load_cases[0];
+        assert!(!c.loads[0].speed.auto && !c.loads[1].speed.auto && c.loads[2].speed.auto);
+        assert!(!c.loads[0].torque.auto && c.loads[1].torque.auto && c.loads[2].torque.auto);
+        assert_eq!(
+            solve_train(&diff, &lib).err(),
+            Some(TrainError::Underdetermined { short: 1 })
+        );
+    }
+
+    /// **A given torque is a load whichever way it works.** A pair with the
+    /// start's torque given, the end's speed given and the other two figures
+    /// derived, the start turning *against* its torque: the start absorbs
+    /// what it is given, the end is what drives it, and the end's derived
+    /// torque is the start's stepped through the ratio and *up* by the loss
+    /// — the driver pays it. Reversed, the same case with the start driving
+    /// puts the loss on the end. A case whose only given torque is nought
+    /// does no work and says so rather than dividing by it.
+    #[test]
+    fn a_given_torque_that_works_against_its_port_is_driven_by_what_is_derived() {
+        let lib = library();
+        let mut t = two_stage();
+        t.stages.truncate(1);
+        let ratio = 43.0 / 17.0;
+        let case = |torque: f64, speed: f64| -> (Train, TrainResult) {
+            let mut t = t.clone();
+            t.load_cases = vec![LoadCase {
+                loads: vec![
+                    Load {
+                        at: Port::Start,
+                        torque: Auto::fixed(torque),
+                        speed: Auto::automatic(0.0),
+                    },
+                    Load {
+                        at: Port::End,
+                        torque: Auto::automatic(0.0),
+                        speed: Auto::fixed(speed),
+                    },
+                ],
+                ..LoadCase::ultimate(0.0, 0.0)
+            }];
+            let r = solve_train(&t, &lib).unwrap();
+            (t, r)
+        };
+        let eta = case(0.1, 100.0).1.stages[0].meshes()[0].efficiency.forward;
+        assert!(eta > 0.9 && eta < 1.0);
+        // The pair's ratio is negative: at +100 rpm at the end, the start
+        // turns backward, and a positive torque there works against it.
+        let (t, absorbing) = case(0.1, 100.0);
+        let c = &absorbing.cases[0];
+        assert!(c.solved, "{:?}", c.notes);
+        let start = at_port(&absorbing, &t, 0, Port::Start);
+        let end = at_port(&absorbing, &t, 0, Port::End);
+        assert!(start.speed.unwrap() < 0.0);
+        assert!(
+            (end.torque - 0.1 * ratio / eta).abs() < 1e-9,
+            "{}",
+            end.torque
+        );
+        // The same torque driving: the start turns with it, and the end's
+        // torque is the start's through the ratio *less* the loss.
+        let (t, driving) = case(-0.1, 100.0);
+        let end = at_port(&driving, &t, 0, Port::End);
+        assert!(driving.cases[0].solved);
+        assert!(
+            (end.torque.abs() - 0.1 * ratio * eta).abs() < 1e-9,
+            "{}",
+            end.torque
+        );
+        // Nought given: nothing drives, by name.
+        let (_, nought) = case(0.0, 100.0);
+        assert!(!nought.cases[0].solved);
+        assert!(nought.cases[0]
+            .notes
+            .iter()
+            .any(|n| n.is(key::TRAIN_CASE_NOTHING_DRIVES)));
+    }
+
     /// **A load between two stages is one flow across both**, and where it
     /// can be held decides what it does: a load on the sun a pair drives,
     /// with the pair's input reacted and the set's carrier reacted, is a
@@ -6765,8 +7124,10 @@ mod tests {
     }
 
     /// **The open ports are what a load can enter by**, each with the name
-    /// the chain gives it: a chain's two ends are `Start` and `End`, and a
-    /// released ring — un-held, uncoupled — is a third, by its own reference.
+    /// the chain gives it: a chain's two ends are `Start` and `End`, the
+    /// shaft each coupling joins is one port under the earlier stage's name
+    /// — a take-off between two stages — and a released ring, un-held and
+    /// uncoupled, is another by its own reference.
     #[test]
     fn the_open_ports_are_the_chains_ends_and_whatever_else_is_uncoupled() {
         let at = |stage, shaft| ShaftRef::Of { stage, shaft };
@@ -6774,7 +7135,13 @@ mod tests {
         let ports = t.open_ports(&t.boundaries().unwrap());
         assert_eq!(
             ports.iter().map(|p| (p.port, p.at)).collect::<Vec<_>>(),
-            vec![(Port::Start, at(0, 1)), (Port::End, at(3, 2))]
+            vec![
+                (Port::Start, at(0, 1)),
+                (Port::At(at(0, 2)), at(0, 2)),
+                (Port::At(at(1, 2)), at(1, 2)),
+                (Port::At(at(2, 2)), at(2, 2)),
+                (Port::End, at(3, 2))
+            ]
         );
         let mut t = two_stage();
         t.stages = vec![Stage::planetary(PlanetaryStage::default())];
@@ -8127,9 +8494,19 @@ mod tests {
         operating_speed: f64,
         duty: Duty,
     ) -> Vec<LoadCase> {
+        // The back-driving case with its start *free* — a load of nought —
+        // so a train that can be back-driven reacts none of it; the tests
+        // here are about where a load is held, and the preset's reacted
+        // start is the case that always is.
         vec![
             LoadCase::ultimate(input_torque, input_speed),
-            LoadCase::back_driving(back_driving_torque),
+            LoadCase {
+                loads: vec![
+                    Load::given(Port::End, back_driving_torque, 0.0),
+                    free(Port::Start),
+                ],
+                ..LoadCase::back_driving(back_driving_torque)
+            },
             LoadCase {
                 duty,
                 ..LoadCase::fatigue(operating_torque, operating_speed)
@@ -10142,7 +10519,7 @@ mod tests {
         // and every backward efficiency between it and the end, which is the
         // one walk the forward case takes the other way.
         let mut held = t.clone();
-        held.load_cases[BACK] = LoadCase::back_driving_held(5.0);
+        held.load_cases[BACK] = LoadCase::back_driving(5.0);
         let h = solve_train(&held, &lib).unwrap();
         assert!(h.cases[BACK].notes.is_empty());
         let mut at = 5.0;
@@ -10290,7 +10667,12 @@ mod tests {
             ..LoadCase::ultimate(1.0e6, 1.0)
         });
         let with = solve_train(&crowded, &lib).expect("solves");
-        assert_eq!(with.cases.len(), 3, "a case switched off reports nothing");
+        assert_eq!(
+            with.cases.len(),
+            4,
+            "a case switched off is still solved at the train level"
+        );
+        assert!(with.cases[3].solved && with.cases[3].shaft(ShaftRef::Ground).is_some());
         let near = |x: f64, y: f64| (x - y).abs() <= 1e-9 * x.abs().max(1e-300);
         let mut checked = 0;
         for (a, b) in alone.stages.iter().zip(&with.stages) {
@@ -10317,7 +10699,7 @@ mod tests {
         // the front end joins a result to its input.
         assert_eq!(
             with.cases.iter().map(|c| c.case).collect::<Vec<_>>(),
-            vec![0, 1, 2]
+            vec![0, 1, 2, 3]
         );
     }
 
@@ -10401,7 +10783,7 @@ mod tests {
             }
             train.load_cases = cases;
             let r = solve_train(&train, &lib).expect("a shaft line solves");
-            assert!(r.cases.is_empty());
+            assert_eq!(r.cases.len(), train.load_cases.len());
             // **The magnitude**, because a train's ratio is signed now: it
             // comes off the graph and says whether the output reverses, where
             // the product of the stage ratios could not — a pair reports its

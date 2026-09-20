@@ -17,6 +17,12 @@ import type {
   FreedomGroup,
   CaseKind,
   LoadCase,
+  Load,
+  CaseFreedom,
+  LoadFreedom,
+  CaseShaft,
+  ShaftRole,
+  OpenPort,
   Port,
   Auto,
   Optimisation,
@@ -94,6 +100,12 @@ export type {
   GearCase,
   MeshCase,
   TrainCase,
+  Load,
+  CaseFreedom,
+  LoadFreedom,
+  CaseShaft,
+  ShaftRole,
+  OpenPort,
   Figure,
   Freedom,
   FreedomGroup,
@@ -187,6 +199,7 @@ import init, {
   import_train,
   export_train,
   relieve_stage,
+  relieve_case,
   adopt_member,
 } from "./wasm/gear_wasm.js";
 
@@ -751,6 +764,39 @@ export function relieveStage(stage: Stage, just: Freedom | null, figures: Figure
     return;
   }
   assignLeaves(stage, corrected);
+}
+
+/** **A load case with its over-determined figures relieved**, the same
+ *  relation `relieveStage` keeps on a stage's geometry kept on a case's
+ *  loads: the train has some mobility, exactly that many of the case's
+ *  speeds stand given and the torques one statics equation short of the
+ *  shafts that carry one, and the figure just touched is the one that
+ *  survives. Every figure relief turns derived is seeded by the core from
+ *  what the case comes to, so a box shows the number rather than a stale
+ *  one — this side copies the case back and never learns which is which.
+ *
+ *  Called after every change to a case's loads — a port loaded or released,
+ *  a toggle flipped — with the library the train is rated under, so the
+ *  seeding is the same solve the panel shows. A train that will not cross
+ *  the boundary leaves the case as it stands. */
+export function relieveCase(
+  train: Train,
+  index: number,
+  just: CaseFreedom | null,
+  materials?: MaterialLibrary,
+): void {
+  const c = train.load_cases[index];
+  if (!c) return;
+  let corrected: LoadCase;
+  try {
+    const library = materials ?? defaultLibrary();
+    corrected = JSON.parse(relieve_case(JSON.stringify({ train, library, case: index, just }))) as LoadCase;
+  } catch {
+    return;
+  }
+  // Loads are a list and relief neither adds nor removes one, so each is
+  // the same load before and after; only its toggles and seeded numbers move.
+  corrected.loads.forEach((l, j) => assignLeaves(c.loads[j], l));
 }
 
 /** Write every leaf of `from` that differs into `into`, in place, shape-blind:

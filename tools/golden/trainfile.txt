@@ -1,11 +1,11 @@
-wrote /tmp/gear-cli-train.toml  (577 lines, 9518 bytes)
+wrote /tmp/gear-cli-train.toml  (605 lines, 9929 bytes)
 name   "Elevation drive" -> "Elevation drive"
 stages 3 -> 3
 
   quantity                 exported            re-imported   same
   total ratio               708.235294118    708.235294118   yes
   output speed rpm            4.235880399      4.235880399   yes
-  output torque Nm          841.196877739    841.196877739   yes
+  output torque Nm         -841.196877739   -841.196877739   yes
   efficiency forward          0.593868228      0.593868228   yes
   backlash out deg            0.064023422      0.064023422   yes
 

@@ -52,7 +52,7 @@ use gear_core::train::{
 fn loads() -> Vec<LoadCase> {
     vec![
         LoadCase::ultimate(2.0, 3000.0),
-        LoadCase::back_driving_held(0.6),
+        LoadCase::back_driving(0.6),
         LoadCase {
             duty: Duty::Continuous {
                 runtime_hours: 1000.0,
