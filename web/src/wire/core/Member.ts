@@ -17,9 +17,12 @@ shaft: number, gear: StageGear,
 module: number, 
 /**
  * Tooth-thickness coefficient, `k`: above 1 this gear's teeth thicken.
- * Two gears in mesh sum to 2.
+ * **Given on one member of a mesh and automatic on the other**, which
+ * follows the mesh's rule — the two sum to 2 across an external mesh, a
+ * ring takes its pinion's — and relief keeps it so
+ * ([`Shape::thickness_mods`]). Every member automatic is `k = 1`.
  */
-thickness_mod: number, 
+thickness_mod: Auto<number>, 
 /**
  * **A ring is a gear cut by a pinion cutter.** `Some` makes this member
  * internal, and every mesh it is in an internal one.

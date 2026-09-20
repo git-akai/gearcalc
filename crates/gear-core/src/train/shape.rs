@@ -102,8 +102,11 @@ pub struct Member {
     /// Normal module, mm. Every mesh a member is in shares it.
     pub module: f64,
     /// Tooth-thickness coefficient, `k`: above 1 this gear's teeth thicken.
-    /// Two gears in mesh sum to 2.
-    pub thickness_mod: f64,
+    /// **Given on one member of a mesh and automatic on the other**, which
+    /// follows the mesh's rule — the two sum to 2 across an external mesh, a
+    /// ring takes its pinion's — and relief keeps it so
+    /// ([`Shape::thickness_mods`]). Every member automatic is `k = 1`.
+    pub thickness_mod: Auto<f64>,
     /// **A ring is a gear cut by a pinion cutter.** `Some` makes this member
     /// internal, and every mesh it is in an internal one.
     pub ring: Option<Cutter>,
@@ -288,6 +291,11 @@ impl Shape {
             ));
         }
         let module = self.members[m.a].module;
+        // Two gears in mesh share a normal module, on crossed shafts as on
+        // parallel ones — where `Mesh::new` asks it of the racks.
+        if (self.members[m.b].module - module).abs() > crate::params::compat::SAME_RACK {
+            return Err(TrainError::Mesh(crate::mesh::MeshError::Incompatible));
+        }
         let eff = |i: usize| shifts[i] + self.base_params(i, helix).thickness_shift();
         Screw::new(&ScrewParams {
             normal_module: module,
@@ -720,8 +728,78 @@ impl Shape {
             addendum: m.gear.addendum,
             dedendum: m.gear.dedendum,
             root_radius: m.gear.root_radius,
-            thickness_mod: m.thickness_mod,
+            thickness_mod: self.thickness_mods()[i],
         }
+    }
+
+    /// **Each member's thickness coefficient, the automatic ones following
+    /// the given.** A mesh binds its two: across an external mesh they sum
+    /// to 2, and a ring takes its pinion's — so a given `k` is propagated
+    /// mesh by mesh, as the helix is, until nothing moves, and a member
+    /// nothing reaches is the standard tooth, `k = 1`.
+    #[must_use]
+    pub fn thickness_mods(&self) -> Vec<f64> {
+        let mut out: Vec<Option<f64>> = self
+            .members
+            .iter()
+            .map(|m| (!m.thickness_mod.auto).then_some(m.thickness_mod.manual))
+            .collect();
+        loop {
+            let mut moved = false;
+            for (k, m) in self.meshes.iter().enumerate() {
+                let mate = |x: f64| match self.kind_of(k) {
+                    Some(MeshKind::Internal) => x,
+                    _ => 2.0 - x,
+                };
+                match (out[m.a], out[m.b]) {
+                    (Some(a), None) => {
+                        out[m.b] = Some(mate(a));
+                        moved = true;
+                    }
+                    (None, Some(b)) => {
+                        out[m.a] = Some(mate(b));
+                        moved = true;
+                    }
+                    _ => {}
+                }
+            }
+            if !moved {
+                break;
+            }
+        }
+        out.into_iter().map(|k| k.unwrap_or(1.0)).collect()
+    }
+
+    /// **The members that share a module**: the connected components of the
+    /// mesh graph, in member order — two gears in mesh share a normal module,
+    /// so everything a run of meshes joins does. One group for a pair or a
+    /// set; two for a hula stage or a stepped planet, whose meshes do not
+    /// join. What a panel offers one box for, and writes to every member of.
+    #[must_use]
+    pub fn module_groups(&self) -> Vec<Vec<usize>> {
+        let n = self.members.len();
+        let mut group: Vec<usize> = (0..n).collect();
+        let find = |group: &Vec<usize>, mut i: usize| {
+            while group[i] != i {
+                i = group[i];
+            }
+            i
+        };
+        for m in &self.meshes {
+            let (a, b) = (find(&group, m.a), find(&group, m.b));
+            if a != b {
+                group[a.max(b)] = a.min(b);
+            }
+        }
+        let mut out: Vec<Vec<usize>> = Vec::new();
+        for i in 0..n {
+            let root = find(&group, i);
+            match out.iter_mut().find(|g| find(&group, g[0]) == root) {
+                Some(g) => g.push(i),
+                None => out.push(vec![i]),
+            }
+        }
+        out
     }
 
     /// The parameters a member builds at, at a shift: the addendum held to
@@ -2193,11 +2271,10 @@ fn point_mesh_report(
     p: &PointBuilt,
     face: [f64; 2],
     static_friction: f64,
-    thickness: Option<Note>,
     m: PointMesh,
 ) -> MeshReport {
     let s = &p.screw;
-    let mut notes: Vec<Note> = thickness.into_iter().collect();
+    let mut notes: Vec<Note> = Vec::new();
     // Asked in both directions: a worm that cannot be back-driven is the
     // familiar case and the one the word "self-locking" is for; a crossed
     // pair at a steep helix split cannot be driven *forward*. Same
@@ -3324,22 +3401,6 @@ pub fn solve_shape(
                 member_backlash(k, MeshSide::First),
                 member_backlash(k, MeshSide::Second),
             ];
-            // **A mesh's two thickness coefficients ordinarily sum to 2** —
-            // one member's teeth thickened by what the other's are thinned —
-            // and a pair that does not is a legitimate mesh: the excess
-            // enters the shift sum as an equivalent shift and the
-            // zero-backlash distance moves with it. So it is not refused,
-            // and the mesh says what it did with the difference.
-            let thickness_note = {
-                let sum = shape.members[m.a].thickness_mod + shape.members[m.b].thickness_mod;
-                ((sum - 2.0).abs() > 1e-9).then(|| {
-                    let shift = std::f64::consts::PI * (sum - 2.0)
-                        / (4.0 * shape.pressure_angle.to_radians().tan());
-                    Note::new(key::MESH_THICKNESS_SUM_NOT_TWO)
-                        .number("sum", sum, 3)
-                        .number("shift", shift, 4)
-                })
-            };
             match &bm.contact {
                 BuiltContact::Line(l) => super::line_mesh_report(
                     loads,
@@ -3380,7 +3441,6 @@ pub fn solve_shape(
                             .find(|(kk, _)| *kk == k)
                             .and_then(|(_, b)| b.as_ref().and_then(|b| b.note.clone()))
                             .into_iter()
-                            .chain(thickness_note.clone())
                             .collect(),
                     },
                 ),
@@ -3389,7 +3449,6 @@ pub fn solve_shape(
                     p,
                     face_of(k, &final_width),
                     m.static_friction,
-                    thickness_note,
                     PointMesh {
                         power_through,
                         coprime,
@@ -3467,22 +3526,23 @@ impl Constrained for Shape {
             out.push((Freedom::Clearance(k), &mut d.clearance));
         }
         out.push((Freedom::Overlap, &mut self.overlap));
-        let mut members = self.members.iter_mut();
-        if let Some(m) = members.next() {
-            out.push((Freedom::FirstPitchDiameter, &mut m.pitch_diameter));
-            out.extend(super::member_inputs(std::iter::once(&mut m.gear)));
-        }
-        // ...and every other member's, numbered from one on.
-        for (i, m) in members.enumerate() {
+        for (i, m) in self.members.iter_mut().enumerate() {
+            if i == 0 {
+                out.push((Freedom::FirstPitchDiameter, &mut m.pitch_diameter));
+            }
             let StageGear {
                 profile_shift,
                 helix_angle,
                 face_width,
                 ..
             } = &mut m.gear;
-            out.push((Freedom::Member(i + 1, MemberFreedom::Shift), profile_shift));
-            out.push((Freedom::Member(i + 1, MemberFreedom::Helix), helix_angle));
-            out.push((Freedom::Member(i + 1, MemberFreedom::FaceWidth), face_width));
+            out.push((Freedom::Member(i, MemberFreedom::Shift), profile_shift));
+            out.push((Freedom::Member(i, MemberFreedom::Helix), helix_angle));
+            out.push((Freedom::Member(i, MemberFreedom::FaceWidth), face_width));
+            out.push((
+                Freedom::Member(i, MemberFreedom::ThicknessMod),
+                &mut m.thickness_mod,
+            ));
         }
         out
     }
@@ -3566,6 +3626,20 @@ impl Constrained for Shape {
             });
             groups.push(super::distance_and_clearance(d));
         }
+        // **A mesh's two thickness coefficients are one number said twice**
+        // — the second is the first's mate by the mesh's rule — so at most
+        // one of them is given; the one just touched stays and the other
+        // follows. Both automatic is the standard tooth on both.
+        for m in &self.meshes {
+            groups.push(FreedomGroup {
+                given_at_most: 1,
+                automatic_at_most: 2,
+                order: vec![
+                    vec![Freedom::Member(m.a, MemberFreedom::ThicknessMod)],
+                    vec![Freedom::Member(m.b, MemberFreedom::ThicknessMod)],
+                ],
+            });
+        }
         // On crossed shafts an axial contact ratio is nothing at all, and is
         // turned back automatic.
         if self.distances.iter().any(|d| d.angle != 0.0) {
@@ -3637,7 +3711,7 @@ impl Shape {
     /// Two axes in ground at the pair's shaft angle, one mesh, one distance.
     #[must_use]
     pub fn from_pair(p: &super::PairStage, kind: super::PairKind) -> Self {
-        let member = |i: usize, thickness_mod: f64| Member {
+        let member = |i: usize, thickness_mod: Auto<f64>| Member {
             shaft: i + 1,
             gear: p.gears[i].clone(),
             module: p.module,
@@ -3666,7 +3740,10 @@ impl Shape {
                 },
             ],
             shafts: vec![ShaftOn { axis: 0 }, ShaftOn { axis: 1 }],
-            members: vec![member(0, p.thickness_mod), member(1, 2.0 - p.thickness_mod)],
+            members: vec![
+                member(0, Auto::fixed(p.thickness_mod)),
+                member(1, Auto::automatic(2.0 - p.thickness_mod)),
+            ],
             meshes: vec![MeshInput {
                 a: 0,
                 b: 1,
@@ -3694,15 +3771,17 @@ impl From<&super::PlanetaryStage> for Shape {
     /// the one distance between them. Shafts numbered as the set's own
     /// solver numbered them: sun 1, carrier 2, ring 3, planet 4.
     fn from(s: &super::PlanetaryStage) -> Self {
-        let member =
-            |shaft: Shaft, gear: &StageGear, thickness_mod: f64, ring: Option<Cutter>| Member {
-                shaft,
-                gear: gear.clone(),
-                module: s.module,
-                thickness_mod,
-                ring,
-                pitch_diameter: Auto::automatic(0.0),
-            };
+        let member = |shaft: Shaft,
+                      gear: &StageGear,
+                      thickness_mod: Auto<f64>,
+                      ring: Option<Cutter>| Member {
+            shaft,
+            gear: gear.clone(),
+            module: s.module,
+            thickness_mod,
+            ring,
+            pitch_diameter: Auto::automatic(0.0),
+        };
         Self {
             pressure_angle: s.pressure_angle,
             overlap: s.overlap,
@@ -3726,9 +3805,14 @@ impl From<&super::PlanetaryStage> for Shape {
                 ShaftOn { axis: 1 },
             ],
             members: vec![
-                member(1, &s.sun, s.thickness_mod, None),
-                member(4, &s.planet, 2.0 - s.thickness_mod, None),
-                member(3, &s.ring, 2.0 - s.thickness_mod, Some(s.cutter)),
+                member(1, &s.sun, Auto::fixed(s.thickness_mod), None),
+                member(4, &s.planet, Auto::automatic(2.0 - s.thickness_mod), None),
+                member(
+                    3,
+                    &s.ring,
+                    Auto::automatic(2.0 - s.thickness_mod),
+                    Some(s.cutter),
+                ),
             ],
             meshes: vec![
                 MeshInput {
@@ -3786,7 +3870,12 @@ impl From<&super::HulaStage> for Shape {
                 shaft: shaft_of(i),
                 gear: h.gears[i].clone(),
                 module: h.module[mesh_of(i)],
-                thickness_mod: h.thickness_mod[mesh_of(i)],
+                // The pinion of each pair states it; its ring follows.
+                thickness_mod: if is_ring(i) {
+                    Auto::automatic(h.thickness_mod[mesh_of(i)])
+                } else {
+                    Auto::fixed(h.thickness_mod[mesh_of(i)])
+                },
                 ring: is_ring(i).then_some(h.cutter[mesh_of(i)]),
                 pitch_diameter: Auto::automatic(0.0),
             })
@@ -5002,7 +5091,10 @@ mod tests {
     }
 
     /// The thickness invariants differ between the two meshes and both hold from
-    /// one stored `k`: the external pair sums to two, the internal pair matches.
+    /// one given `k`, whichever member states it: the external pair sums to
+    /// two, the internal pair matches — and the automatic members follow
+    /// whichever one is given, so pinning the ring's instead reaches the sun
+    /// through the planet.
     #[test]
     fn one_thickness_modification_satisfies_both_invariants() {
         for k in [0.9, 1.0, 1.15] {
@@ -5010,17 +5102,24 @@ mod tests {
                 thickness_mod: k,
                 ..stage_of(24, 18, 60, 0.0)
             };
-            let shape = Shape::from(&stage);
-            let (sun, planet, ring) = (
-                shape.members[0].thickness_mod,
-                shape.members[1].thickness_mod,
-                shape.members[2].thickness_mod,
-            );
-            assert!(
-                (sun + planet - 2.0).abs() < 1e-15,
-                "external pair must sum to two"
-            );
-            assert!((planet - ring).abs() < 1e-15, "internal pair must match");
+            let mut shape = Shape::from(&stage);
+            for given in 0..3 {
+                for (i, m) in shape.members.iter_mut().enumerate() {
+                    m.thickness_mod = if i == given {
+                        Auto::fixed(k)
+                    } else {
+                        Auto::automatic(1.0)
+                    };
+                }
+                let ks = shape.thickness_mods();
+                let (sun, planet, ring) = (ks[0], ks[1], ks[2]);
+                assert!(
+                    (sun + planet - 2.0).abs() < 1e-15,
+                    "external pair must sum to two"
+                );
+                assert!((planet - ring).abs() < 1e-15, "internal pair must match");
+                assert!((ks[given] - k).abs() < 1e-15, "the given one is the given");
+            }
             // ...and it still solves.
             assert!(solve_set(&stage, &StageLoads::just(2.0), &test_library()).is_ok());
         }

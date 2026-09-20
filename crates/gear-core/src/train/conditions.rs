@@ -1063,6 +1063,11 @@ pub struct StagePorts {
     /// ([`super::shape::Shape::member_names`]), so a panel names a member
     /// as the harness does without deriving it a second time.
     pub members: Vec<super::shape::MemberName>,
+    /// **The members that share a normal module** — the mesh graph's
+    /// connected components ([`super::shape::Shape::module_groups`]) — so a
+    /// panel offers one box per group and writes it to every member in it,
+    /// rather than one per member with nothing tying them.
+    pub module_groups: Vec<Vec<usize>>,
 }
 
 /// One shaft of the train's motion, for the front end.
@@ -1151,6 +1156,9 @@ impl Train {
                 StagePorts {
                     members: match stage {
                         super::Stage::Shape(s) => s.member_names(),
+                    },
+                    module_groups: match stage {
+                        super::Stage::Shape(s) => s.module_groups(),
                     },
                     ports: stage
                         .ports()

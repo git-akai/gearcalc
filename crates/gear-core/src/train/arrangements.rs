@@ -95,7 +95,7 @@ impl Builder {
                 ..StageGear::default()
             },
             module: self.module,
-            thickness_mod: 1.0,
+            thickness_mod: Auto::automatic(1.0),
             ring,
             pitch_diameter: Auto::automatic(0.0),
         });

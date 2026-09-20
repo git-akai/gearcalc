@@ -2067,7 +2067,7 @@ pub(crate) fn distance_notes(target: Option<f64>, nominal: f64, clearance: f64) 
 /// a clearance, a ratio, a worm's diameter — and one of each per member.
 /// `Member(i, _)` indexes the members in the order [`StageResult::members`]
 /// reports them — a pair's two gears, a set's sun, planet and ring, a hula
-/// stage's four — and is resolved once for every member ([`member_inputs`]), so
+/// stage's four — and is resolved once for every member (`Shape::inputs`), so
 /// a member input that arrives costs one line there and none per preset.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -2115,30 +2115,11 @@ pub enum MemberFreedom {
     Helix,
     /// The face width.
     FaceWidth,
-}
-
-/// **Every constrainable input a run of members has**, by name — the one
-/// place a [`MemberFreedom`] meets the field it names, for every member at once.
-pub(crate) fn member_inputs<'a>(
-    gears: impl IntoIterator<Item = &'a mut StageGear>,
-) -> Vec<(Freedom, &'a mut Auto<f64>)> {
-    gears
-        .into_iter()
-        .enumerate()
-        .flat_map(|(i, g)| {
-            let StageGear {
-                profile_shift,
-                helix_angle,
-                face_width,
-                ..
-            } = g;
-            [
-                (Freedom::Member(i, MemberFreedom::Shift), profile_shift),
-                (Freedom::Member(i, MemberFreedom::Helix), helix_angle),
-                (Freedom::Member(i, MemberFreedom::FaceWidth), face_width),
-            ]
-        })
-        .collect()
+    /// The tooth-thickness coefficient `k` — one per member, with the two
+    /// members of a mesh bound by the mesh's rule (they sum to 2 across an
+    /// external mesh, a ring takes its pinion's), so at most one of a
+    /// mesh's two is given and the other follows.
+    ThicknessMod,
 }
 
 /// **What one input came to**, by the name relief knows it by — the number a
@@ -2372,7 +2353,7 @@ pub(crate) trait Constrained {
     /// The members in the order [`StageResult::members`] reports them.
     fn members(&self) -> Vec<&StageGear>;
     /// Every input relief may turn, by name — the stage's own and, through
-    /// [`member_inputs`], each member's.
+    /// `Shape::inputs`, each member's.
     fn inputs(&mut self) -> Vec<(Freedom, &mut Auto<f64>)>;
     /// The readings of the helix, relief order, least precious first.
     fn readings(&self) -> Vec<Reading>;
@@ -2762,6 +2743,7 @@ impl StageResult {
                 MemberFreedom::Shift => g.profile_shift,
                 MemberFreedom::Helix => g.helix_angle,
                 MemberFreedom::FaceWidth => g.face_width,
+                MemberFreedom::ThicknessMod => g.params.thickness_mod,
             }),
         }
     }
@@ -6700,6 +6682,7 @@ mod tests {
             Freedom::Member(_, MemberFreedom::Shift) => a.manual += 0.05,
             Freedom::Member(_, MemberFreedom::Helix) => a.manual += 2.0,
             Freedom::Member(_, MemberFreedom::FaceWidth) => a.manual += 1.0,
+            Freedom::Member(_, MemberFreedom::ThicknessMod) => a.manual += 0.1,
         };
         let mut checked = 0u32;
         for stage in every_preset() {

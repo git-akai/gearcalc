@@ -117,7 +117,15 @@
 //!   its second shaft, `count` planets, two meshes and one distance; a worm
 //!   is a pair whose distance is at `angle = 90` with `worm = true`. The
 //!   panel writes these from its presets, and a person can write any shape
-//!   the graph admits. The hula stage is still its own kind, for now.
+//!   the graph admits. (The hula stage became a preset of the same shape
+//!   since.)
+//! - **A member's `thickness_mod` is `{ auto, manual }`.** It was a plain
+//!   number per member with nothing tying a mesh's two together; it is
+//!   given on one member of each mesh and automatic on the other, which
+//!   follows the mesh's rule — the two sum to 2 across an external mesh, a
+//!   ring takes its pinion's — and relief keeps at most one of a mesh's two
+//!   given. A file that writes a plain number is refused; one that writes
+//!   both members of a mesh given has one relieved on load.
 //! - **A distance carries `tip_clearance`**, the least far-side tip gap an
 //!   internal mesh on it may run at, mm: an automatic distance is what the
 //!   shifts leave or what the tips need, whichever is larger. Absent means

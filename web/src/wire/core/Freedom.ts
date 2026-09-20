@@ -8,7 +8,7 @@ import type { MemberFreedom } from "./MemberFreedom";
  * a clearance, a ratio, a worm's diameter — and one of each per member.
  * `Member(i, _)` indexes the members in the order [`StageResult::members`]
  * reports them — a pair's two gears, a set's sun, planet and ring, a hula
- * stage's four — and is resolved once for every member ([`member_inputs`]), so
+ * stage's four — and is resolved once for every member (`Shape::inputs`), so
  * a member input that arrives costs one line there and none per preset.
  */
 export type Freedom = { "centre_distance": number } | { "clearance": number } | "first_pitch_diameter" | "overlap" | { "member": [number, MemberFreedom] };

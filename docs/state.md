@@ -674,13 +674,13 @@ whose size is unmeasured is a debt still owed, and is marked as one.
   `N` as well, which is right where the two counts agree and unwritten
   where they do not (the wiring refuses nothing there; the larger count is
   taken).
-- **A mesh's two thickness coefficients are not held to sum to 2.** The shape
-  carries `k` per member, where the stage types carried one per stage and wrote the
-  pair themselves. A pair that does not sum to 2 is a legitimate mesh — the
-  excess enters the shift sum as an equivalent shift and the zero-backlash
-  distance moves with it — so it is not refused: the mesh says the sum and
-  the equivalent shift it became (`mesh.thickness_sum_not_two`), and the
-  card's note says what the ordinary choice is.
+- **A mesh's two thickness coefficients are one number said twice.** The
+  shape carries `k` per member, given on one member of a mesh and automatic
+  on the other, which follows the mesh's rule; a pair that did *not* sum to
+  2 would be a legitimate mesh with the excess entering the shift sum as an
+  equivalent shift, and the model would need to say what that does to
+  backlash and to the tips before it could be offered — so it is not
+  offered, and relief keeps the pair on the rule.
 - **A planet's net shaft torque is reported as zero**, which is what it is —
   a free idler's two meshes balance — and what the set's own solver never printed.
   The torque its teeth carry is on its card, per mesh, as every member's is.

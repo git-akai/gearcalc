@@ -773,14 +773,20 @@
   </label>
   {#if opts.member}
     {@const m = opts.member}
-    {@render numberField("ui.train_normal_module", () => m.module, (v) => (m.module = v), 0.1, "ui.train_mm")}
-    <!-- One coefficient per member rather than one per mesh with a pair
-         hidden behind it: `k` thickens this gear's teeth above 1, and the two
-         in a mesh ordinarily sum to 2, which keeps the mesh at zero backlash
-         at its reference distance — a preset writes them so, and a designer
-         who writes otherwise has asked for a thicker or thinner pair, which
-         the shift sum carries as an equivalent shift. -->
-    {@render numberField("ui.train_tooth_thickness_mod", () => m.thickness_mod, (v) => (m.thickness_mod = v), 0.05, "ui.train_k", t("ui.train_note_thickness_mod"))}
+    <!-- One coefficient per member, given on one member of each mesh and
+         automatic on the other, which follows the mesh's rule — the two sum
+         to 2 across an external mesh, a ring takes its pinion's. Relief keeps
+         at most one of a mesh's two given, so touching this one is what hands
+         the mate over; the automatic box shows what it came to. -->
+    {@render autoNumber(
+      "ui.train_tooth_thickness_mod",
+      m.thickness_mod,
+      g?.params.thickness_mod,
+      0.05,
+      () => opts.relief && relieveStage(opts.relief.stage, { member: [opts.relief.member, "thickness_mod"] }, opts.relief.figures),
+      undefined,
+      "ui.train_k",
+    )}
   {/if}
   {#if opts.pitchDiameter}
     {@render autoNumber(
@@ -1676,6 +1682,7 @@
         {@const epicyclic = stage.axes.some((a) => a.carried_by !== null)}
         {@const replicated = stage.axes.map((a, k) => (a.count > 1 ? k : -1)).filter((k) => k >= 0)}
         {@const name = (j: number) => memberName(tab.train, result.topology, i, j)}
+        {@const moduleGroups = result.topology[i]?.module_groups ?? [stage.members.map((_, j) => j)]}
         {@const carriers = stage.shafts
           .map((_, s) => s + 1)
           .filter((s) => !stage.members.some((m) => m.shaft === s))}
@@ -1699,6 +1706,28 @@
         {#if tab.open[i]}
           <div class="body">
             <div class="grid shared">
+              <!-- **One module box per run of meshes.** Two gears in mesh share
+                   a normal module, so the core reports the members a run of
+                   meshes joins (`module_groups`) — one group on a pair or a
+                   set, two on a hula stage — and each box writes to every
+                   member of its group. Nothing is computed here: the value is
+                   copied to the members the core says must agree. -->
+              {#each moduleGroups as group, gi (gi)}
+                <label>
+                  <span>{moduleGroups.length > 1 ? t("ui.train_normal_module_of", { members: group.map(name).join(" / ") }) : t("ui.train_normal_module")}</span>
+                  <input
+                    type="number"
+                    step="0.1"
+                    bind:value={
+                      () => stage.members[group[0]]?.module ?? 0,
+                      (v) => {
+                        for (const j of group) stage.members[j].module = v;
+                      }
+                    }
+                  />
+                  <em>{t("ui.train_mm")}</em>
+                </label>
+              {/each}
               {@render numberField("ui.train_pressure_angle", () => stage.pressure_angle, (v) => (stage.pressure_angle = v), 0.5, "°")}
               {#if !crossed}
                 {@render overlapField(stage, sres?.overlap, sres?.meshes ?? [])}

@@ -14,4 +14,11 @@ export type StagePorts = { ports: Array<PortSpec>,
  * ([`super::shape::Shape::member_names`]), so a panel names a member
  * as the harness does without deriving it a second time.
  */
-members: Array<MemberName>, };
+members: Array<MemberName>, 
+/**
+ * **The members that share a normal module** — the mesh graph's
+ * connected components ([`super::shape::Shape::module_groups`]) — so a
+ * panel offers one box per group and writes it to every member in it,
+ * rather than one per member with nothing tying them.
+ */
+module_groups: Array<Array<number>>, };
