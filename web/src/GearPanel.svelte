@@ -305,7 +305,7 @@
       <option value="" disabled>{t("ui.gear_from_train")}</option>
       {#each trains.tabs as source, i (source.id)}
         <optgroup label={source.name || t("ui.train_unnamed")}>
-          {#each memberRefs(source.train) as ref (`${ref.stage}:${ref.member}`)}
+          {#each memberRefs(source.train) as ref (ref.number)}
             <option value={`${i}:${ref.stage}:${ref.member}`} disabled={!ref.adoptable}>
               {t("ui.gear_from_train_member", { stage: String(ref.stage + 1), member: ref.label })}
             </option>

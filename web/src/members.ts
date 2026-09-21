@@ -37,15 +37,24 @@ export function memberCount(stage: Stage): number {
   return stage.members.length;
 }
 
-/** **The gear number of one member, within its stage.** A member is named
- *  with its stage wherever the two can be told apart — "Stage 2 · Gear 1"
- *  on a case's row, in the adopt list, on the shaft line — and within its
- *  stage's own card the stage is the card, so the count starts over at
- *  each stage; a body two stages share reads "Stage 1 · Gear 2; Stage 2 ·
- *  Gear 1", which is the two names one shaft has. (It counted across the
- *  stages once, which put a fresh stage's first gear at "Gear 3".) */
-export function gearNumber(_train: Train, _stage: number, member: number): number {
-  return member + 1;
+/** The gear number of one member, counting every member of the stages
+ *  before it — one number per gear across the train, which is what the
+ *  adopt list and the case rows name a gear by. */
+export function gearNumber(train: Train, stage: number, member: number): number {
+  let n = member + 1;
+  for (let i = 0; i < stage; i++) n += memberCount(train.stages[i]);
+  return n;
+}
+
+/** **The name a member goes by in a list** — the adopt list's, and a
+ *  case's rows and delivered table use the same: "Gear 3" on a pair, and
+ *  the role with its number elsewhere, "Sun (5)". */
+export function memberListName(train: Train, topology: StagePorts[], stage: number, member: number): string {
+  const role = roleName(topology, stage, member);
+  const number = String(gearNumber(train, stage, member));
+  return role === null
+    ? t("ui.train_gear_name", { number })
+    : t("ui.train_member_numbered", { name: role, number });
 }
 
 /** Whether a member's axis is carried — turns in a frame that is not the
@@ -135,15 +144,11 @@ export function memberRefs(train: Train, topology: StagePorts[] = memberNames(tr
   train.stages.forEach((stage, i) => {
     for (let j = 0; j < memberCount(stage); j++) {
       const number = gearNumber(train, i, j);
-      const role = roleName(topology, i, j);
       out.push({
         stage: i,
         member: j,
         number,
-        label:
-          role === null
-            ? t("ui.train_gear_name", { number: String(number) })
-            : t("ui.train_member_numbered", { name: role, number: String(number) }),
+        label: memberListName(train, topology, i, j),
         // A worm is a thread with proportions of its own: the first member
         // of the first mesh on a distance marked as a worm drive.
         adoptable: !(isWorm(stage) && stage.meshes[0]?.a === j),
