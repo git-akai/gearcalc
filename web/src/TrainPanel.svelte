@@ -30,6 +30,7 @@
     type Stage,
     type Shape,
     type Member,
+    type StageEdit,
     type Optimisation,
     type Value,
     type GearResult,
@@ -356,6 +357,44 @@
    *  train — its cases are parked on ground with every figure kept, and
    *  the next stage added takes them up conventionally — so a designer
    *  swaps their only stage for another without losing their loads. */
+  /** **A stage edited on its card** — a step, a sun or a ring, an axis, a
+   *  pair added or removed, a member moved to another shaft — by the core's
+   *  rules, which say what else changes: what it renumbers, the cases and
+   *  couplings follow. A refusal is the core's too, and is said under the
+   *  card in the reader's language until the next edit. Graph facts the
+   *  buttons read to disable themselves — the last central on a step, a
+   *  chain's two axes — are layout, and the core is what decides. */
+  let refused = $state<{ stage: number; key: string } | null>(null);
+  function editStage(i: number, edit: StageEdit) {
+    const key = editTrain(tab.train, { stage: { stage: i, edit } });
+    refused = key === null ? null : { stage: i, key };
+  }
+  /** The axis a member turns about, and whether a carrier carries it. */
+  const axisOf = (shape: Shape, j: number) => shape.shafts[shape.members[j].shaft - 1]?.axis;
+  const isPlanetGear = (shape: Shape, j: number) => {
+    const a = axisOf(shape, j);
+    return a !== undefined && shape.axes[a].carried_by !== null;
+  };
+  /** The members a member meshes with. */
+  const mates = (shape: Shape, j: number) =>
+    shape.meshes.filter((m) => m.a === j || m.b === j).map((m) => (m.a === j ? m.b : m.a));
+  /** Whether a central member is the last one meeting some planet gear —
+   *  the one remove the core refuses, so the button says so first. */
+  const lastOnItsStep = (shape: Shape, j: number) =>
+    mates(shape, j).some(
+      (p) => isPlanetGear(shape, p) && mates(shape, p).every((c) => c === j || isPlanetGear(shape, c)),
+    );
+  /** Whether two meshes sit on one distance: their members' axes are
+   *  the same pair. */
+  const sameDistance = (shape: Shape, x: { a: number; b: number }, y: { a: number; b: number }) => {
+    const pair = (m: { a: number; b: number }) => [axisOf(shape, m.a), axisOf(shape, m.b)].sort();
+    const [p, q] = [pair(x), pair(y)];
+    return p[0] === q[0] && p[1] === q[1];
+  };
+  /** The shafts a member may move to: those on its axis, by name. */
+  const shaftsOnAxis = (shape: Shape, j: number) =>
+    shape.shafts.map((s, k) => k + 1).filter((k) => shape.shafts[k - 1].axis === axisOf(shape, j));
+
   function removeStage(i: number) {
     // The constraints, the couplings and the cases name stages by index,
     // and the core moves each with the stage it belongs to.
@@ -872,6 +911,11 @@
      *  leaving this side to subtract. The name says which shaft that is. A
      *  pair's members have none, and the two figures would be one. */
     carrier?: string;
+    /** **The edits this member takes**, on the shape it is member `member`
+     *  of: its shaft, and — on an epicyclic stage — a sun or a ring added to
+     *  a planet gear, a step or a central member removed. Parallel members
+     *  are removed as pairs, from the mesh's block. */
+    edits?: { shape: Shape; stage: number; member: number };
   },
 )}
 {@const own = g?.notes ?? []}
@@ -1200,6 +1244,46 @@
            be what discovers it. -->
       {#each spare as n, i (i)}<li>{note(n)}</li>{/each}
     </ul>
+  {/if}
+
+  {#if opts.edits}
+    <!-- **What this member can become.** Its shaft is a select over the
+         shafts of its axis and a new one — a layshaft's engaged pair is the
+         driven gear moved onto the output, two rings turning together are
+         two members on one shaft. A planet gear takes a sun or a ring, and
+         is a step that can go where it has a fellow; a central member goes
+         unless it is the last its planet gear meets. Nothing is flipped:
+         a ring stays a ring, and a swap is a remove and an add. -->
+    {@const ed = opts.edits}
+    {@const planet = isPlanetGear(ed.shape, ed.member)}
+    {@const onShaft = ed.shape.members.filter((x) => x.shaft === ed.shape.members[ed.member].shaft).length}
+    <label>
+      <span>{t("ui.train_member_shaft")}</span>
+      <select
+        value={String(ed.shape.members[ed.member].shaft)}
+        onchange={(e) => {
+          const v = e.currentTarget.value;
+          editStage(ed.stage, { move_shaft: { member: ed.member, shaft: v === "new" ? null : Number(v) } });
+        }}
+      >
+        {#each shaftsOnAxis(ed.shape, ed.member) as s (s)}
+          <option value={String(s)}>{shaftLabel(ed.stage, s)}</option>
+        {/each}
+        <option value="new">{t("ui.train_new_shaft")}</option>
+      </select>
+      <em></em>
+    </label>
+    {#if ed.shape.axes.some((a) => a.carried_by !== null)}
+      <div class="edits">
+        {#if planet}
+          <button class="action add" onclick={() => editStage(ed.stage, { add_central: { gear: ed.member, ring: false } })}>{t("ui.train_add_sun")}</button>
+          <button class="action add" onclick={() => editStage(ed.stage, { add_central: { gear: ed.member, ring: true } })}>{t("ui.train_add_ring")}</button>
+          <button class="action danger" disabled={onShaft < 2} onclick={() => editStage(ed.stage, { remove_step: { gear: ed.member } })}>{t("ui.train_remove_step")}</button>
+        {:else}
+          <button class="action danger" disabled={lastOnItsStep(ed.shape, ed.member)} onclick={() => editStage(ed.stage, { remove_member: { member: ed.member } })}>{t("ui.train_remove_member")}</button>
+        {/if}
+      </div>
+    {/if}
   {/if}
 </div>
 {/snippet}
@@ -1879,6 +1963,7 @@
         {@const crossed = stage.distances.some((d) => d.angle !== 0)}
         {@const epicyclic = stage.axes.some((a) => a.carried_by !== null)}
         {@const replicated = stage.axes.map((a, k) => (a.count > 1 ? k : -1)).filter((k) => k >= 0)}
+        {@const carriedAxes = stage.axes.map((a, k) => (a.carried_by !== null ? k : -1)).filter((k) => k >= 0)}
         {@const name = (j: number) => memberName(tab.train, result.topology, i, j)}
         {@const moduleGroups = result.topology[i]?.module_groups ?? [stage.members.map((_, j) => j)]}
         {@const carriers = stage.shafts
@@ -1940,9 +2025,9 @@
               <!-- A replicated axis is a set of planets: how many, and how
                    close their tips may come. Asked only where there is one,
                    and once per such axis where there are more. -->
-              {#each replicated as k (k)}
+              {#each carriedAxes as k (k)}
                 <label>
-                  <span>{replicated.length > 1 ? t("ui.train_planets_on", { axis: axisName(stage, i, k) }) : t("ui.train_planets")}</span>
+                  <span>{carriedAxes.length > 1 ? t("ui.train_planets_on", { axis: axisName(stage, i, k) }) : t("ui.train_planets")}</span>
                   <input type="number" step="1" min="1" bind:value={() => stage.axes[k].count, finite((v) => (stage.axes[k].count = v))} />
                   <em></em>
                 </label>
@@ -1950,8 +2035,28 @@
               {#if replicated.length > 0}
                 {@render numberField("ui.train_minimum_planet_clearance", () => stage.min_planet_clearance, (v) => (stage.min_planet_clearance = v), 0.05, "ui.train_mm", t("ui.train_note_planet_clearance"))}
               {/if}
+              <!-- **The structural edits**: a step on each carried axis of an
+                   epicyclic stage; an axis at the end of a parallel chain, and
+                   the last one off again while more than a pair's two are
+                   left. A skew stage has neither: its two axes at an angle
+                   are the whole of it. -->
+              {#if epicyclic}
+                <div class="edits">
+                  {#each carriedAxes as k (k)}
+                    <button class="action add" onclick={() => editStage(i, { add_step: { axis: k } })}>{carriedAxes.length > 1 ? `${t("ui.train_add_step")} · ${axisName(stage, i, k)}` : t("ui.train_add_step")}</button>
+                  {/each}
+                </div>
+              {:else if !crossed && !worm}
+                <div class="edits">
+                  <button class="action add" onclick={() => editStage(i, "add_axis")}>{t("ui.train_add_axis")}</button>
+                  <button class="action danger" disabled={stage.axes.length < 3} onclick={() => editStage(i, "remove_axis")}>{t("ui.train_remove_axis")}</button>
+                </div>
+              {/if}
               {@render shafts(i)}
             </div>
+            {#if refused?.stage === i}
+              <p class="refused">{t(refused.key)}</p>
+            {/if}
 
             <!-- **Each distance between two axes**, with what goes with it: the
                  angle the axes cross at, the distance and the clearance —
@@ -2046,18 +2151,33 @@
                 {#if d.worm}
                   {@render numberField("ui.train_worm_axial_clearance", () => d.axial_clearance, (v) => (d.axial_clearance = v), 0.01, "ui.train_mm")}
                 {/if}
+                <!-- A pair more on a parallel distance: a layshaft's next
+                     ratio, one gear on the shaft the pairs share and the
+                     other on a shaft of its own until it is moved onto the
+                     output. -->
+                {#if !epicyclic && !crossed && !worm}
+                  <div class="edits">
+                    <button class="action add" onclick={() => editStage(i, { add_pair: { distance: k } })}>{t("ui.train_add_pair")}</button>
+                  </div>
+                {/if}
               </div>
             {/each}
 
             <!-- **Each mesh's own inputs**: what its flanks rub with. A set's
                  two meshes may differ, and a pair has one. -->
             {#each stage.meshes as m, k (k)}
+              {@const onDistance = stage.meshes.filter((x) => sameDistance(stage, x, m)).length}
               <h4 class="mesh section-heading">
                 {t("ui.train_mesh_between", { a: name(m.a), b: name(m.b) })}
               </h4>
               <div class="grid shared">
                 {@render numberField("ui.train_sliding_friction", () => m.sliding_friction, (v) => (m.sliding_friction = v), 0.01, "")}
                 {@render numberField("ui.train_static_friction", () => m.static_friction, (v) => (m.static_friction = v), 0.01, "", t("ui.train_note_static_friction"))}
+                {#if !epicyclic && !crossed && !worm}
+                  <div class="edits">
+                    <button class="action danger" disabled={onDistance < 2} onclick={() => editStage(i, { remove_pair: { mesh: k } })}>{t("ui.train_remove_pair")}</button>
+                  </div>
+                {/if}
               </div>
             {/each}
 
@@ -2088,6 +2208,7 @@
                   // A member on a carried axis turns in its carrier's frame,
                   // and that is the speed its teeth wear at.
                   carrier: carried(stage, j) ? t("ui.train_the_carrier") : undefined,
+                  edits: { shape: stage, stage: i, member: j },
                 })}
               {/each}
             </div>
@@ -2712,6 +2833,21 @@
     border: 1px solid var(--rule);
     border-radius: 3px;
     padding: 0.5rem 0.7rem;
+  }
+  /* The structural buttons, wherever a block has them: a row of actions,
+     spaced as the stage and case buttons are, spanning a grid's columns. */
+  .edits {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    margin: 0.3rem 0;
+  }
+  /* The core's reason for refusing an edit, under the stage's shared block. */
+  .refused {
+    color: var(--warn);
+    font-size: 0.8rem;
+    margin: 0.2rem 0 0.4rem;
   }
   /* A second heading in a card opens a second section, so it needs the gap
      between sections above it — the first one is against the card's own top

@@ -97,6 +97,7 @@ import type {
   StageFamily,
   StagePreset,
   StagePresetEntry,
+  StageEdit,
 } from "./wire";
 export type { CaseKind, LoadCase };
 export type {
@@ -187,6 +188,7 @@ export type {
   StageFamily,
   StagePreset,
   StagePresetEntry,
+  StageEdit,
 } from "./wire";
 
 import init, {
@@ -863,18 +865,25 @@ export type TrainEdit =
   | { push_stage: Stage }
   | { remove_stage: number }
   | { add_case: CaseKind }
-  | { duty: { case: number; intermittent: boolean } };
-export function editTrain(train: Train, edit: TrainEdit): void {
+  | { duty: { case: number; intermittent: boolean } }
+  | { stage: { stage: number; edit: StageEdit } };
+/** The train edited by the core's rules, in place. A stage edit the core
+ *  refuses leaves the train as it was and comes back as the catalogue key of
+ *  the reason, for the panel to say; any other failure is a defect on this
+ *  side of the boundary and is swallowed as before. */
+export function editTrain(train: Train, edit: TrainEdit): string | null {
   let edited: Train;
   try {
     edited = JSON.parse(edit_train(JSON.stringify({ train, edit }))) as Train;
-  } catch {
-    return;
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    return message.startsWith("ui.") ? message : null;
   }
   train.stages = edited.stages;
   train.couplings = edited.couplings;
   train.constraints = edited.constraints;
   train.load_cases = edited.load_cases;
+  return null;
 }
 
 // The words live in `strings.svelte.ts` — it has to be a rune module, because

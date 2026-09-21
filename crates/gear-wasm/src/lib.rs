@@ -1504,7 +1504,13 @@ fn relieve_case_impl(input: &str) -> Result<String, String> {
 /// - `{ "add_case": kind }` — a fresh case of that kind between the train's
 ///   two ends ([`Train::fresh_case`]);
 /// - `{ "duty": { "case", "intermittent" } }` — a case's duty switched,
-///   seeded as a fresh case's is ([`Train::set_duty`]).
+///   seeded as a fresh case's is ([`Train::set_duty`]);
+/// - `{ "stage": { "stage", "edit" } }` — one stage edited on its card
+///   ([`gear_core::train::StageEdit`]: a step, a sun or a ring, an axis, a
+///   pair added or removed, a member moved to another shaft), and every
+///   case entry, coupling and hold on that stage repointed by what the
+///   shape renumbered ([`Train::edit_stage`]). A refused edit is an error
+///   and the train is returned unchanged.
 ///
 /// # Errors
 ///
@@ -1531,6 +1537,10 @@ enum TrainEdit {
     Duty {
         case: usize,
         intermittent: bool,
+    },
+    Stage {
+        stage: usize,
+        edit: gear_core::train::StageEdit,
     },
 }
 
@@ -1559,6 +1569,9 @@ fn edit_train_impl(input: &str) -> Result<String, String> {
             train.load_cases.push(case);
         }
         TrainEdit::Duty { case, intermittent } => train.set_duty(case, intermittent),
+        TrainEdit::Stage { stage, edit } => {
+            train.edit_stage(stage, edit).map_err(|e| e.to_string())?
+        }
     }
     serde_json::to_string(&train).map_err(|e| e.to_string())
 }

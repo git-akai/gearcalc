@@ -2184,6 +2184,40 @@ replicated `N` times, two meshes and one distance. `gear-wasm`'s `defaults`
 builds each, and a document names them by writing the shape
 (`kind = "shape"`).
 
+**Families and presets.** A shape *reads as* one of three families, never
+stored: **epicyclic** where an axis is carried, **skew** where a distance is
+at an angle or marked as a worm, **parallel** otherwise — a spur pair is
+the epicyclic family with its carrier held and no ring, and a crossed pair
+turned to nought is a parallel one afterwards. A **preset** is a shape
+pre-assembled at sensible teeth and listed under its family (`StagePreset`:
+spur, idler, layshaft; worm, crossed; planetary, Wolfrom, compound,
+planocentric, meshed planets). Every epicyclic one is a list over
+`arrangements::epicyclic` — the central members and the carrier in shaft
+order, which is the order the conventions read — and none is a kind: a
+worm is on the menu because a worm is not an obvious thing to build from a
+pair, which is what a preset is for.
+
+**Editing a stage** (`StageEdit`, `Train::edit_stage`). A designer permutes
+an arrangement by adding and removing, never by flipping: on an epicyclic
+stage a **step** (one more gear on the planet shaft, with a ring on it), a
+**sun or a ring on a planet gear**, a step or a central member removed; on
+a parallel one an **axis** at the end of the chain (an idler) and a **pair**
+on a distance (a layshaft's next ratio, one gear on the shaft the pairs
+share and the other on a shaft of its own until it is moved onto the
+output); and on any, a member **moved to another shaft** of its axis. A
+sun and a ring differ in more than a flag — a cutter, a shift rule — so a
+swap is a remove and an add, the new member sized by the core to the
+carrier radius its axis already runs at: a count that would repeat one on
+the same planet gear, or on an equal gear of the same shaft, is moved a
+tooth *down*, since a shift can open a mesh past its reference distance by
+`1/cos α` at most and a planocentric's radius is a few teeth. Every add
+appends, so nothing a case or a coupling names moves; every remove
+renumbers, and the train repoints its cases, couplings and constraints by
+what moved, dropping what named a shaft that is gone. The invariants an edit
+keeps — every member in a mesh, every planet gear meeting a central member,
+every distance carrying a mesh, a chain keeping two axes — are refusals
+the panel shows by name, and a refused edit changes nothing.
+
 **Closing the distances.** Each member's shift has one role: given (the
 designer typed it), free (a search chooses it, or it stands at the undercut
 floor), *reaches* a given distance, or *absorbs* an automatic one. A given

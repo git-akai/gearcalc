@@ -43,6 +43,7 @@ use crate::tooth::Tooth;
 pub mod arrangements;
 mod conditions;
 pub mod crossed;
+mod edits;
 pub mod flow;
 mod pair;
 mod planetary;
@@ -57,6 +58,7 @@ pub use conditions::{
 
 use crate::kinematics::{Condition, Shaft, GROUND};
 pub use arrangements::{StageFamily, StagePreset};
+pub use edits::{EditRefused, Renumbered, StageEdit};
 pub(crate) use pair::ShiftAsked;
 pub use pair::{PairKind, PairStage};
 pub use planetary::PlanetaryStage;

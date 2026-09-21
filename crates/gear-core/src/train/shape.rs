@@ -204,12 +204,12 @@ pub struct Shape {
 
 impl Shape {
     /// The wiring shaft a member spins with.
-    fn shaft_of(&self, member: usize) -> Shaft {
+    pub(crate) fn shaft_of(&self, member: usize) -> Shaft {
         self.members[member].shaft
     }
 
     /// The axis a wiring shaft turns about.
-    fn axis_of_shaft(&self, shaft: Shaft) -> Option<usize> {
+    pub(crate) fn axis_of_shaft(&self, shaft: Shaft) -> Option<usize> {
         (shaft != GROUND).then(|| self.shafts[shaft - 1].axis)
     }
 
@@ -250,7 +250,7 @@ impl Shape {
     /// ring, on the side of the ring. A ring on crossed shafts is no mesh
     /// the screw model has: both its flanks are involute helicoids on
     /// cylinders, and a ring's is inside one.
-    fn kind_of(&self, mesh: usize) -> Option<MeshKind> {
+    pub(crate) fn kind_of(&self, mesh: usize) -> Option<MeshKind> {
         let m = self.meshes[mesh];
         match (
             self.members[m.a].ring.is_some(),
@@ -334,7 +334,7 @@ impl Shape {
 
     /// The distance a mesh runs at — the entry for its two axes, either way
     /// round.
-    fn distance_of(&self, mesh: usize) -> Option<usize> {
+    pub(crate) fn distance_of(&self, mesh: usize) -> Option<usize> {
         let m = self.meshes[mesh];
         let (a, b) = (
             self.axis_of_shaft(self.shaft_of(m.a))?,
@@ -346,7 +346,7 @@ impl Shape {
     }
 
     /// The meshes on one distance, in order.
-    fn meshes_on(&self, distance: usize) -> Vec<usize> {
+    pub(crate) fn meshes_on(&self, distance: usize) -> Vec<usize> {
         (0..self.meshes.len())
             .filter(|&m| self.distance_of(m) == Some(distance))
             .collect()

@@ -82,6 +82,7 @@ export type { ShapeResult } from "./core/ShapeResult";
 export type { ShiftRange } from "./core/ShiftRange";
 export type { Sinusoid } from "./core/Sinusoid";
 export type { Stage } from "./core/Stage";
+export type { StageEdit } from "./core/StageEdit";
 export type { StageFamily } from "./core/StageFamily";
 export type { StageGear } from "./core/StageGear";
 export type { StagePorts } from "./core/StagePorts";

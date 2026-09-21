@@ -1295,6 +1295,14 @@ impl Train {
                 other => Some(other),
             }
         };
+        self.repoint(moved);
+    }
+
+    /// **Everything that names a shaft, moved by `moved`** — the
+    /// constraints, the couplings, every case entry and each duty's
+    /// reference — and dropped where the shaft is gone (`None`); a duty
+    /// whose shaft is gone reads at ground.
+    fn repoint(&mut self, moved: impl Fn(ShaftRef) -> Option<ShaftRef>) {
         self.constraints = self
             .constraints
             .iter()
@@ -1325,6 +1333,35 @@ impl Train {
                 *at = moved(*at).unwrap_or(ShaftRef::Ground);
             }
         }
+    }
+
+    /// **A stage edited on its card** ([`super::StageEdit`]): the shape
+    /// takes the edit and says what shaft went where, and everything the
+    /// train wrote on that stage's shafts follows — a coupling, a hold or a
+    /// case entry on a shaft removed goes with it, the way a hold drops
+    /// them. An add moves nothing, since the shape appends.
+    ///
+    /// # Errors
+    ///
+    /// [`super::EditRefused`] where the shape refuses, with nothing changed.
+    pub fn edit_stage(
+        &mut self,
+        k: usize,
+        edit: super::StageEdit,
+    ) -> Result<(), super::EditRefused> {
+        let shape = self
+            .stages
+            .get_mut(k)
+            .and_then(super::Stage::as_shape_mut)
+            .ok_or(super::EditRefused::NoSuchIndex)?;
+        let moved = shape.edit(edit)?;
+        self.repoint(|r| match r {
+            ShaftRef::Of { stage, shaft } if stage == k => {
+                moved.of(shaft).map(|shaft| ShaftRef::Of { stage, shaft })
+            }
+            other => Some(other),
+        });
+        Ok(())
     }
 
     /// **A case's duty switched**, to intermittent or continuous, seeded from

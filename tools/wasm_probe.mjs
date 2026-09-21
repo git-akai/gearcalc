@@ -141,7 +141,26 @@ const out = {
     out.push(["add_case", structuredClone(t)]);
     t = edit(t, { duty: { case: 4, intermittent: false } });
     t = edit(t, { duty: { case: 2, intermittent: true } });
-    out.push(["duty", t]);
+    out.push(["duty", structuredClone(t)]);
+    // **A stage edited on its card**: the set at stage 1 gains a step (a
+    // second planet gear and a ring on it), loses its first ring — which
+    // renumbers the shafts, and the coupling and the case entries at the
+    // set's carrier and ring follow — gains a sun on the new step, and has
+    // its sun moved to a shaft of its own; then a layshaft pushed behind
+    // gains a pair and an idler axis and loses them again.
+    const stage = (k, e) => edit(t, { stage: { stage: k, edit: e } });
+    t = stage(1, { add_step: { axis: 1 } });
+    t = stage(1, { remove_member: { member: 2 } });
+    t = stage(1, { add_central: { gear: 2, ring: false } });
+    t = stage(1, { move_shaft: { member: 0, shaft: null } });
+    out.push(["stage_epicyclic", structuredClone(t)]);
+    t = edit(t, { push_stage: preset("layshaft") });
+    t = stage(2, { add_pair: { distance: 0 } });
+    t = stage(2, { add_axis: null });
+    out.push(["stage_parallel_added", structuredClone(t)]);
+    t = stage(2, "remove_axis");
+    t = stage(2, { remove_pair: { mesh: t.stages[2].meshes.length - 1 } });
+    out.push(["stage_parallel_removed", t]);
     return out;
   }),
   // The default train, and the same train with a set pushed behind its pair
