@@ -1480,18 +1480,21 @@ mod tests {
                         }],
                     )
                 };
-                for port in [ShaftRef::Ground, ShaftRef::Of { stage: 1, shaft: 1 }] {
-                    let out = gear_core::train::solve_train(&at(port), &lib);
-                    assert!(
-                        matches!(
-                            out,
-                            Err(TrainError::LoadPort { case: 0 }
-                                | TrainError::LoadShared { case: 0 })
-                        ),
-                        "a load at {port:?} is refused by name, not solved: {out:?}"
-                    );
-                    if let Err(e) = out {
-                        err(e.note());
+                // A load on ground is refused by name; one on the shared
+                // shaft, held at both ends, is a case that says so.
+                let out = gear_core::train::solve_train(&at(ShaftRef::Ground), &lib);
+                assert!(
+                    matches!(out, Err(TrainError::LoadPort { case: 0 })),
+                    "a load at ground is refused by name, not solved: {out:?}"
+                );
+                if let Err(e) = out {
+                    err(e.note());
+                }
+                if let Ok(r) =
+                    gear_core::train::solve_train(&at(ShaftRef::Of { stage: 1, shaft: 1 }), &lib)
+                {
+                    for n in r.every_note() {
+                        err(n);
                     }
                 }
             }

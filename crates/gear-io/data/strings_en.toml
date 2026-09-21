@@ -150,8 +150,9 @@ low_efficiency = "mesh efficiency {percent} %: most of the input becomes heat, w
 [train]
 load_not_reacted = "nothing holds this load: the train turns under it and carries none of it — react a port, or a stage that locks holds it"
 case_no_load = "no load on any port: mark one or more ports as loads"
-case_underdetermined = "the loads leave the motion undecided: {short} more speed(s) to give, or one fewer port to leave free"
+case_underdetermined = "motion undecided: {short} more speed(s) to give, or one fewer port to leave free"
 case_nothing_drives = "no given torque does any work — every load is nought or on a still port: nothing drives this case"
+load_shared = "held at both ends: how the load divides is a matter of stiffness this model does not state — hold one end only, or let a self-locking stage hold it"
 
 # ---------------------------------------------------------------- the application
 #
@@ -188,7 +189,6 @@ train_unknown_material = "no material named {name} in the library"
 train_no_root_section = "the tooth is too undercut to have a root section"
 train_empty = "the geartrain has no stages"
 train_load_port = "load case {case} enters by a shaft no load can be put on: ground, a held shaft, or one that is not a port"
-train_load_shared = "load case {case} enters between two stages and is held at both ends; how it divides is a matter of stiffness this model does not state, so hold one end only or let a self-locking stage hold it"
 train_overdetermined = "two conditions cannot both hold at stage {stage}, shaft {shaft}: what it is asked to do contradicts what the meshes and the other conditions already decide"
 train_no_such_shaft = "a constraint, coupling or load case names a shaft the train does not have: stage {stage}, shaft {shaft}"
 train_overflow = "the tooth counts along the shaft line multiply past what an exact ratio can hold"
@@ -355,7 +355,7 @@ train_add_ultimate_case = "+ Add ultimate load case"
 train_at_port = "at {port}"
 train_case_delivered = "Delivered"
 train_case_enabled = "Enabled"
-train_case_incomplete = "incomplete: the case cannot be solved as given"
+train_case_incomplete = "load case is incomplete"
 train_case_load = "Load"
 train_case_free = "Free"
 train_case_fixed = "Fixed"

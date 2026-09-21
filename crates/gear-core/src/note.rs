@@ -163,6 +163,8 @@ pub mod key {
     pub const TRAIN_CASE_UNDERDETERMINED: &str = "train.case_underdetermined";
     /// `train.case_nothing_drives`
     pub const TRAIN_CASE_NOTHING_DRIVES: &str = "train.case_nothing_drives";
+    /// `train.load_shared`
+    pub const TRAIN_LOAD_SHARED: &str = "train.load_shared";
 
     // ---- errors --------------------------------------------------- //
     //
@@ -220,7 +222,6 @@ pub mod key {
     /// `error.train_load_port`
     pub const ERROR_TRAIN_LOAD_PORT: &str = "error.train_load_port";
     /// `error.train_load_shared`
-    pub const ERROR_TRAIN_LOAD_SHARED: &str = "error.train_load_shared";
     /// `error.train_tips_unclearable`
     pub const ERROR_TRAIN_TIPS_UNCLEARABLE: &str = "error.train_tips_unclearable";
 
@@ -272,6 +273,7 @@ pub mod key {
         TRAIN_CASE_NO_LOAD,
         TRAIN_CASE_UNDERDETERMINED,
         TRAIN_CASE_NOTHING_DRIVES,
+        TRAIN_LOAD_SHARED,
         TRAIN_LOAD_NOT_REACTED,
         ERROR_MESH_INCOMPATIBLE,
         ERROR_MESH_RING_TOO_SMALL,
@@ -297,7 +299,6 @@ pub mod key {
         ERROR_TRAIN_OVERFLOW,
         ERROR_TRAIN_STAGE_UNDETERMINED,
         ERROR_TRAIN_LOAD_PORT,
-        ERROR_TRAIN_LOAD_SHARED,
         ERROR_TRAIN_TIPS_UNCLEARABLE,
     ];
 }

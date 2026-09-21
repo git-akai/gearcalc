@@ -2440,8 +2440,8 @@ nothing. A port the case does not mention is free. A port the train holds is
 fixed — ground under another name — and no case can say anything of it. A
 shaft two stages share can be a load (an inline take-off, its torque given
 or derived) or free, not a reaction: a second reaction on one chain is a
-division by stiffness this model does not make, and the train refuses it by
-name. A free port beside a given torque nothing else holds is the question
+division by stiffness this model does not make, and the case says so and
+rates nothing. A free port beside a given torque nothing else holds is the question
 whether a stage locks, asked on purpose and answered by name. A fresh case
 is written between the train's two ends — a load at the first, a reaction at
 the second — and a train with no two ends gets a case with nothing on it, for
@@ -2505,9 +2505,9 @@ its driver pressing the flanks, nothing beyond it seeing any — and a load put
 on a shaft two stages share divides by what holds it at each end, the pair
 carrying its part backward and the set its part forward. Two ends that could
 both hold the same load are a division by stiffness this model does not make,
-and the train refuses that case by name (`LoadShared`); a load at a shaft that
-is not an open port — ground, a held shaft, a planet — is refused the same
-way. Every stage is then handed what the flow puts on its meshes and its
+and the case says so by name (`train.load_shared`) and rates nothing; a
+load at a shaft that is not an open port — ground, a held shaft, a planet —
+is refused by name. Every stage is then handed what the flow puts on its meshes and its
 shafts, and rates that.
 
 **Every rating is per case, at that case's torque and in that case's

@@ -1571,13 +1571,6 @@ pub enum TrainError {
     /// shafts that is not a port — a planet's. Zero-based, as the cases are
     /// indexed; the front end numbers from 1.
     LoadPort { case: usize },
-    /// **A load case enters between two stages, and is held at both ends.**
-    /// A load with two ways out goes the way that holds it — a stage that
-    /// locks in that direction, with nothing holding the other end — and
-    /// one that is held at both divides by stiffness, which is a statement
-    /// this model does not make. So it says so rather than choosing an end,
-    /// and the refusal is the boundary of the model, not of the mechanism.
-    LoadShared { case: usize },
     /// **No distance clears the tips of this mesh**: an automatic distance
     /// with an internal mesh on it opened out through the involute domain
     /// and the tips never came clear by what was asked
@@ -1670,9 +1663,6 @@ impl crate::note::Explain for TrainError {
             Self::Overflow => Note::new(key::ERROR_TRAIN_OVERFLOW),
             Self::LoadPort { case } => {
                 Note::new(key::ERROR_TRAIN_LOAD_PORT).text("case", (case + 1).to_string())
-            }
-            Self::LoadShared { case } => {
-                Note::new(key::ERROR_TRAIN_LOAD_SHARED).text("case", (case + 1).to_string())
             }
             // The stage number belongs to the reader rather than to the reason,
             // so the note is the cause's and the number reaches the front end
@@ -1771,12 +1761,6 @@ impl std::fmt::Display for TrainError {
                 f,
                 "load case {}: enters by a shaft no load can be put on — ground, a held \
                  shaft, or one that is not a port",
-                case + 1
-            ),
-            Self::LoadShared { case } => write!(
-                f,
-                "load case {}: enters between two stages and could leave by either end; \
-                 this model refers a load along one route",
                 case + 1
             ),
             Self::InStage { stage, cause } => write!(f, "stage {}: {cause}", stage + 1),
@@ -4476,10 +4460,17 @@ fn solve_train_under(
                 nothing(notes, &mut cases, &mut per_stage);
                 continue;
             }
-            // Two ends that could both hold the same load are a division by
-            // stiffness this model does not make, and the refusal says so.
+            // **Two ends that could both hold the same load** are a division
+            // by stiffness this model does not make: a load with two ways
+            // out goes the way that holds it — a stage that locks in that
+            // direction, with nothing holding the other end — and one held
+            // at both is a question the case says it cannot answer, rather
+            // than an end chosen for the designer. The boundary of the
+            // model, not of the mechanism, and the case's to say.
             Err(flow::Refused::Undetermined) => {
-                return Err(TrainError::LoadShared { case: index });
+                notes.push(Note::new(key::TRAIN_LOAD_SHARED));
+                nothing(notes, &mut cases, &mut per_stage);
+                continue;
             }
             // Nothing holds what drives: the train turns under it.
             Err(flow::Refused::Inconsistent) => {
@@ -7219,10 +7210,12 @@ mod tests {
             ],
             ..template(&t)
         };
-        assert_eq!(
-            solve_train(&shared, &lib).err(),
-            Some(TrainError::LoadShared { case: 1 })
-        );
+        let r = solve_train(&shared, &lib).expect("a shared load is a case's question");
+        assert!(!r.cases[1].solved);
+        assert!(r.cases[1]
+            .notes
+            .iter()
+            .any(|n| n.is(key::TRAIN_LOAD_SHARED)));
         // The start declared free: the carrier alone holds it, through the
         // set — and the pair, with nothing at either end, carries none.
         shared.load_cases[1].loads[1] = Load::declared(start_of(&t), LoadRole::Free);
@@ -10696,10 +10689,12 @@ mod tests {
             Load::declared(start_of(&t), LoadRole::Reacted),
             Load::declared(end_of(&t), LoadRole::Reacted),
         ];
-        assert_eq!(
-            solve_train(&t, &lib).err(),
-            Some(TrainError::LoadShared { case: BACK })
-        );
+        let r = solve_train(&t, &lib).expect("a shared load is a case's question");
+        assert!(!r.cases[BACK].solved);
+        assert!(r.cases[BACK]
+            .notes
+            .iter()
+            .any(|n| n.is(key::TRAIN_LOAD_SHARED)));
     }
 
     /// **A load exists only where it is reacted.**
