@@ -357,14 +357,14 @@ mod tests {
                 ],
                 reversed_bending: false,
                 stages: vec![
-                    Stage::spur(
+                    Stage::pair(
                         PairStage {
                             ..PairStage::default()
                         }
                         .with_additional_helix(15.0),
                     ),
-                    Stage::worm(PairStage::worm()),
-                    Stage::worm(
+                    Stage::pair(PairStage::worm()),
+                    Stage::pair(
                         PairStage {
                             ..PairStage::worm()
                         }

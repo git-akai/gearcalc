@@ -141,7 +141,7 @@ pub mod proportions {
 mod tests {
     use super::super::shape::ShapeResult;
     use super::super::{
-        pair::solve_pair_stage, MeshReport, PairKind, PairStage, StageGear, StageLoads, TrainError,
+        pair::solve_pair_stage, MeshReport, PairStage, StageGear, StageLoads, TrainError,
     };
     use super::*;
     use crate::contact::{Directional, Drive};
@@ -155,22 +155,37 @@ mod tests {
         super::super::test_library()
     }
 
-    /// The old worm entry point, as the tests were written against it.
+    /// The old worm entry point, as the tests were written against it: the
+    /// pair as a worm drive, whatever its own bit says.
     fn solve_worm(
         stage: &PairStage,
         loads: &StageLoads,
         lib: &MaterialLibrary,
     ) -> Result<ShapeResult, TrainError> {
-        solve_pair_stage(stage, PairKind::Worm, loads, lib)
+        solve_pair_stage(
+            &PairStage {
+                worm: true,
+                ..stage.clone()
+            },
+            loads,
+            lib,
+        )
     }
 
-    /// The old crossed-gear entry point, likewise.
+    /// The old crossed-gear entry point, likewise: the pair as two gears.
     fn solve_crossed(
         stage: &PairStage,
         loads: &StageLoads,
         lib: &MaterialLibrary,
     ) -> Result<ShapeResult, TrainError> {
-        solve_pair_stage(stage, PairKind::Spur, loads, lib)
+        solve_pair_stage(
+            &PairStage {
+                worm: false,
+                ..stage.clone()
+            },
+            loads,
+            lib,
+        )
     }
 
     /// Two members of a worm stage with these counts, otherwise at the preset.
@@ -205,7 +220,7 @@ mod tests {
     }
 
     fn solved(stage: &PairStage) -> ShapeResult {
-        solve_pair_stage(stage, PairKind::Worm, &StageLoads::just(2.0), &library()).unwrap()
+        solve_pair_stage(stage, &StageLoads::just(2.0), &library()).unwrap()
     }
 
     /// **The same teeth with their shafts brought parallel**, as an efficiency
@@ -215,7 +230,7 @@ mod tests {
     /// member, read as the split, and no optimiser on the counterpart. It was
     /// a field of every point contact once, solved for every crossed stage a
     /// designer built and read by nothing but this comparison.
-    fn parallel_counterpart(stage: &PairStage, kind: PairKind) -> f64 {
+    fn parallel_counterpart(stage: &PairStage) -> f64 {
         solve_pair_stage(
             &PairStage {
                 shaft_angle: 0.0,
@@ -223,7 +238,6 @@ mod tests {
                 ..stage.clone()
             }
             .with_additional_helix(stage.helix_angles()[0]),
-            kind,
             &StageLoads::just(2.0),
             &library(),
         )
@@ -678,7 +692,7 @@ mod tests {
     /// there would be shipping a convention outside the case it was written
     /// for — and quietly, since the number would look like any other. The same
     /// 17/23 pair at 45° is a worm drive if a designer says it is and a gear
-    /// pair otherwise, and only [`PairKind`] says which: as a gear pair its
+    /// pair otherwise, and only `PairStage::worm` says which: as a gear pair its
     /// automatic face is the width that keeps contact continuous, with no
     /// recommendation beside it.
     #[test]
@@ -1016,7 +1030,7 @@ mod tests {
         let r = solve_crossed(&crossed, &StageLoads::just(2.0), &lib).unwrap();
         point(&r).point.expect("a path");
         assert!(
-            r.meshes[0].efficiency.forward < parallel_counterpart(&crossed, PairKind::Spur),
+            r.meshes[0].efficiency.forward < parallel_counterpart(&crossed),
             "a crossed pair must still lose more than the same teeth parallel"
         );
     }
@@ -1074,7 +1088,7 @@ mod tests {
                 "Σ={sigma}°: the face is cutting the zone, so this is not a \
                  like-for-like comparison"
             );
-            let parallel = parallel_counterpart(&stage(sigma), PairKind::Spur);
+            let parallel = parallel_counterpart(&stage(sigma));
             assert!(
                 r.meshes[0].efficiency.forward < previous,
                 "Σ={sigma}°: turning the shafts further must cost more"
@@ -1095,7 +1109,7 @@ mod tests {
         // the same ordering holds against it: crossing the shafts to a right
         // angle costs a single-start worm most of what it had.
         let worm = solved(&PairStage::worm());
-        let parallel = parallel_counterpart(&PairStage::worm(), PairKind::Worm);
+        let parallel = parallel_counterpart(&PairStage::worm());
         assert!(
             worm.meshes[0].efficiency.forward < parallel,
             "the worm keeps {} against {parallel} with its shafts parallel",
@@ -1429,14 +1443,9 @@ mod tests {
 
         let mut last = f64::INFINITY;
         for clearance in [0.08_f64, 0.04, 0.02, 0.01, 0.005] {
-            let parallel = solve_pair_stage(
-                &stage(0.0, clearance),
-                PairKind::Spur,
-                &StageLoads::just(2.0),
-                &lib,
-            )
-            .expect("a parallel pair")
-            .meshes[0]
+            let parallel = solve_pair_stage(&stage(0.0, clearance), &StageLoads::just(2.0), &lib)
+                .expect("a parallel pair")
+                .meshes[0]
                 .backlash_by_drive()
                 .forward
                 .nominal;
@@ -1488,7 +1497,7 @@ mod tests {
             tolerance_minus: 0.0,
             ..stage(sigma, 0.0)
         };
-        let parallel = solve_pair_stage(&float(0.0), PairKind::Spur, &StageLoads::just(2.0), &lib)
+        let parallel = solve_pair_stage(&float(0.0), &StageLoads::just(2.0), &lib)
             .expect("a parallel pair")
             .meshes[0]
             .backlash_by_drive();
@@ -1519,7 +1528,7 @@ mod tests {
         }
         // ...and on a spur gear the term is nothing, since `β_b = 0`.
         let spur = PairStage { ..float(0.0) }.with_additional_helix(0.0);
-        let play = solve_pair_stage(&spur, PairKind::Spur, &StageLoads::just(2.0), &lib)
+        let play = solve_pair_stage(&spur, &StageLoads::just(2.0), &lib)
             .expect("a spur pair")
             .meshes[0]
             .backlash_by_drive()
@@ -1633,13 +1642,8 @@ mod tests {
         );
 
         // The parallel limit: near, and not on, for the reason above.
-        let parallel = solve_pair_stage(
-            &optimised(crossed(0.0)),
-            PairKind::Spur,
-            &StageLoads::just(2.0),
-            &lib,
-        )
-        .unwrap();
+        let parallel =
+            solve_pair_stage(&optimised(crossed(0.0)), &StageLoads::just(2.0), &lib).unwrap();
         let near = solve_crossed(&optimised(crossed(0.01)), &StageLoads::just(2.0), &lib).unwrap();
         for i in 0..2 {
             assert!(
@@ -1715,14 +1719,9 @@ mod tests {
             .with_additional_helix(20.0)
         };
         let shortfall = |clearance: f64| {
-            let parallel = solve_pair_stage(
-                &stage(0.0, clearance),
-                PairKind::Spur,
-                &StageLoads::just(2.0),
-                &lib,
-            )
-            .expect("a parallel pair")
-            .meshes[0]
+            let parallel = solve_pair_stage(&stage(0.0, clearance), &StageLoads::just(2.0), &lib)
+                .expect("a parallel pair")
+                .meshes[0]
                 .backlash_by_drive()
                 .forward
                 .nominal;
@@ -1826,20 +1825,14 @@ mod tests {
         use crate::train::PairStage;
 
         let lib = super::super::test_library();
-        let reference = solve_pair_stage(
-            &PairStage::default(),
-            PairKind::Spur,
-            &StageLoads::just(2.0),
-            &lib,
-        )
-        .expect("a stage");
+        let reference =
+            solve_pair_stage(&PairStage::default(), &StageLoads::just(2.0), &lib).expect("a stage");
         for statik in [0.0_f64, 0.06, 0.16, 0.5, 0.9] {
             let r = solve_pair_stage(
                 &PairStage {
                     static_friction: statik,
                     ..PairStage::default()
                 },
-                PairKind::Spur,
                 &StageLoads::just(2.0),
                 &lib,
             )

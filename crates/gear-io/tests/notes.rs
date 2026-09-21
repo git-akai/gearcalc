@@ -34,7 +34,7 @@ fn the_sharing_note_quotes_a_number_the_sweep_still_produces() {
             gears: [g.clone(), g],
             ..Default::default()
         };
-        solve_any(&Stage::spur(stage), &StageLoads::just(2.0), &lib)
+        solve_any(&Stage::pair(stage), &StageLoads::just(2.0), &lib)
             .ok()
             .and_then(|r| r.members()[0].cases[0].bending_stress)
     };

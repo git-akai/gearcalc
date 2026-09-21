@@ -33,23 +33,11 @@ pub struct Builder {
 }
 
 impl Builder {
-    /// An empty shape at this module, 20° pressure angle.
+    /// An empty shape at this module, at the shape's own defaults.
     #[must_use]
     pub fn new(module: f64) -> Self {
-        let set = super::PlanetaryStage::default();
         Self {
-            shape: Shape {
-                pressure_angle: set.pressure_angle,
-                overlap: set.overlap,
-                optimisation: set.optimisation,
-                load_sharing: set.load_sharing,
-                min_planet_clearance: set.min_planet_clearance,
-                axes: Vec::new(),
-                shafts: Vec::new(),
-                members: Vec::new(),
-                meshes: Vec::new(),
-                distances: Vec::new(),
-            },
+            shape: Shape::default(),
             module,
         }
     }
@@ -705,7 +693,7 @@ impl StagePreset {
             Self::Spur => Shape::from(&super::PairStage::default()),
             Self::Idler => line(&[17, 25, 43]),
             Self::Layshaft => layshaft((17, 43), &[(19, 41), (31, 29)], 1),
-            Self::Worm => Shape::from_pair(&super::PairStage::worm(), super::PairKind::Worm),
+            Self::Worm => Shape::from(&super::PairStage::worm()),
             Self::Crossed => Shape::from(&super::PairStage {
                 shaft_angle: 90.0,
                 ..super::PairStage::default()

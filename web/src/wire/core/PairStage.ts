@@ -67,6 +67,22 @@ pressure_angle: number,
  */
 shaft_angle: number, 
 /**
+ * **A worm and its wheel**, to a designer — one bit, carried on the
+ * shape as `Distance::worm`, and nothing in the model reads it: a
+ * worm is a helical gear with a few starts at a steep helix, its
+ * wheel a helical gear at the complementary one, and their mesh the
+ * crossed-axis mesh any two such gears have. What the bit decides is
+ * the little that is not geometry: the **automatic face width** where
+ * no rating sizes one — a worm and its wheel take a worm drive's
+ * conventional proportions ([`super::crossed::proportions`]), a
+ * crossed gear pair the width at which contact is just continuous —
+ * and **the words**, *starts*, *worm*, *wheel*, which the shape reads
+ * off the same bit ([`super::shape::Shape::member_names`]). A worm at
+ * a shaft angle of zero is a legal, if strange, helical pair and
+ * solves as one. [`Self::worm`] sets it.
+ */
+worm: boolean, 
+/**
  * **The first member's pitch diameter, mm** — a worm's reading of how
  * big it is, and one of the three readings of the pair's one size freedom
  * with the two members' helix angles ([`StageGear::helix_angle`]).

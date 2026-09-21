@@ -213,6 +213,28 @@ pub struct Shape {
     pub distances: Vec<Distance>,
 }
 
+/// **The empty shape, at the crate's defaults** — 20° pressure angle, an
+/// axial contact ratio asked for automatically at one, no search, no load
+/// sharing, three tenths of a millimetre between neighbouring planets'
+/// tips — which is what the builder starts from and what the pair's and
+/// the set's vocabularies default those same words to, once.
+impl Default for Shape {
+    fn default() -> Self {
+        Self {
+            pressure_angle: 20.0,
+            overlap: Auto::automatic(1.0),
+            optimisation: Optimisation::default(),
+            load_sharing: LoadSharing::None,
+            min_planet_clearance: 0.3,
+            axes: Vec::new(),
+            shafts: Vec::new(),
+            members: Vec::new(),
+            meshes: Vec::new(),
+            distances: Vec::new(),
+        }
+    }
+}
+
 // ------------------------------------------------------------ the shape ---
 
 impl Shape {
@@ -3790,22 +3812,13 @@ impl Constrained for Shape {
 // ---------------------------------------------------- from each preset ---
 
 impl From<&super::PairStage> for Shape {
-    /// A spur or crossed gear pair: [`Shape::from_pair`] without the worm's
-    /// proportions.
-    fn from(p: &super::PairStage) -> Self {
-        Self::from_pair(p, super::PairKind::Spur)
-    }
-}
-
-impl Shape {
     /// **The pair's vocabulary over the line of two**: `arrangements::line`
     /// lays the two axes, the mesh and the distance out, and the pair's
     /// words are written on it — its module and pressure angle, the first
     /// gear's thickness coefficient with the second following, the first
     /// gear's diameter as the size reading, the distance's angle, worm
     /// sizing, clearances and tolerances.
-    #[must_use]
-    pub fn from_pair(p: &super::PairStage, kind: super::PairKind) -> Self {
+    fn from(p: &super::PairStage) -> Self {
         let mut shape = super::arrangements::line(&[p.gears[0].teeth, p.gears[1].teeth]);
         shape.pressure_angle = p.pressure_angle;
         shape.overlap = p.overlap;
@@ -3829,7 +3842,7 @@ impl Shape {
         shape.distances[0] = Distance {
             axes: [0, 1],
             angle: p.shaft_angle,
-            worm: kind == super::PairKind::Worm,
+            worm: p.worm,
             distance: p.centre_distance,
             clearance: p.clearance,
             tip_clearance: 0.0,
@@ -3920,7 +3933,7 @@ mod tests {
 
     use super::*;
     use crate::planetary::{Arrangement, PlanetaryShaft};
-    use crate::train::{test_library, PairKind, PairStage, PlanetaryStage, StageLoad, StageLoads};
+    use crate::train::{test_library, PairStage, PlanetaryStage, StageLoad, StageLoads};
 
     /// Both directions and both case kinds, at a torque and a speed.
     fn loads() -> StageLoads {
@@ -3962,11 +3975,14 @@ mod tests {
     /// shape reports what it reports: a point contact, no bending on the worm.
     #[test]
     fn a_crossed_distance_is_a_point_contact() {
-        for (pair, kind) in [
-            (PairStage::worm(), PairKind::Worm),
-            (PairStage::worm().with_first_helix(45.0), PairKind::Spur),
+        for pair in [
+            PairStage::worm(),
+            PairStage {
+                worm: false,
+                ..PairStage::worm().with_first_helix(45.0)
+            },
         ] {
-            let shape = Shape::from_pair(&pair, kind);
+            let shape = Shape::from(&pair);
             assert!(shape.is_crossed(0) && shape.screw(0).is_ok());
             let r = solve_loads(
                 &shape,
@@ -4086,7 +4102,7 @@ mod tests {
     #[test]
     fn one_more_tooth_moves_the_ratio_as_the_graph_says() {
         let lib = test_library();
-        let pair = Shape::from_pair(&PairStage::default(), PairKind::Spur);
+        let pair = Shape::from(&PairStage::default());
         let r = solve_loads(&pair, &loads(), &lib, super::super::Reversal::default()).unwrap();
         let per = |i: usize| r.ratio_per_tooth.as_ref().unwrap()[i].unwrap();
         assert!((per(1) + 44.0 / 17.0).abs() < 1e-12);
@@ -5429,7 +5445,7 @@ mod member_names {
     //! when its own naming was replaced by this — is the second reader.
 
     use super::super::arrangements as arr;
-    use super::super::{PairKind, PairStage, PlanetaryStage};
+    use super::super::{PairStage, PlanetaryStage};
     use super::{MemberRole, Shape};
 
     fn names(shape: &Shape) -> Vec<String> {
@@ -5451,12 +5467,15 @@ mod member_names {
             s(&["gear", "gear"])
         );
         assert_eq!(
-            names(&Shape::from_pair(&PairStage::worm(), PairKind::Worm)),
+            names(&Shape::from(&PairStage::worm())),
             s(&["worm", "wheel"])
         );
         // The same teeth as a crossed gear pair are gears by number.
         assert_eq!(
-            names(&Shape::from_pair(&PairStage::worm(), PairKind::Spur)),
+            names(&Shape::from(&PairStage {
+                worm: false,
+                ..PairStage::worm()
+            })),
             s(&["gear", "gear"])
         );
         assert_eq!(

@@ -704,13 +704,13 @@ mod tests {
         let solve_spur = |stage: &gear_core::train::PairStage,
                           loads: &gear_core::train::StageLoads,
                           lib: &gear_core::material::MaterialLibrary| {
-            gear_core::train::solve_any(&gear_core::train::Stage::spur(stage.clone()), loads, lib)
+            gear_core::train::solve_any(&gear_core::train::Stage::pair(stage.clone()), loads, lib)
         };
         let solve_crossed = solve_spur;
         let solve_worm = |stage: &gear_core::train::PairStage,
                           loads: &gear_core::train::StageLoads,
                           lib: &gear_core::material::MaterialLibrary| {
-            gear_core::train::solve_any(&gear_core::train::Stage::worm(stage.clone()), loads, lib)
+            gear_core::train::solve_any(&gear_core::train::Stage::pair(stage.clone()), loads, lib)
         };
         for helix in [0.0_f64, 3.0, 20.0] {
             for teeth in [(17_u32, 43_u32), (9, 11)] {
@@ -1169,13 +1169,13 @@ mod tests {
             };
             // A load nothing reacts...
             if let Ok(r) =
-                gear_core::train::solve_train(&train(vec![Stage::spur(PairStage::default())]), &lib)
+                gear_core::train::solve_train(&train(vec![Stage::pair(PairStage::default())]), &lib)
             {
                 record(&r.every_note());
             }
             // ...and the same load against a worm that cannot be back-driven.
             if let Ok(r) = gear_core::train::solve_train(
-                &train(vec![Stage::worm(PairStage {
+                &train(vec![Stage::pair(PairStage {
                     sliding_friction: 0.3,
                     static_friction: 0.3,
                     ..PairStage::worm()
@@ -1191,7 +1191,7 @@ mod tests {
             {
                 use gear_core::params::Auto;
                 use gear_core::train::{Load, LoadRole};
-                let mut t = train(vec![Stage::spur(PairStage::default())]);
+                let mut t = train(vec![Stage::pair(PairStage::default())]);
                 t.load_cases = vec![
                     LoadCase {
                         loads: Vec::new(),
@@ -1397,7 +1397,7 @@ mod tests {
                 let mut st = gear_core::train::PairStage::default();
                 st.gears[1].teeth = 0;
                 let out = gear_core::train::solve_any(
-                    &gear_core::train::Stage::spur(st),
+                    &gear_core::train::Stage::pair(st),
                     &gear_core::train::StageLoads::just(1.0),
                     &lib,
                 );
@@ -1464,8 +1464,8 @@ mod tests {
                 let at = |port| {
                     Train::chained(
                         vec![
-                            Stage::spur(PairStage::default()),
-                            Stage::spur(PairStage::default()),
+                            Stage::pair(PairStage::default()),
+                            Stage::pair(PairStage::default()),
                         ],
                         vec![LoadCase {
                             loads: vec![
@@ -1525,7 +1525,7 @@ mod tests {
                 let wide = Train {
                     stages: (0..6)
                         .map(|k| {
-                            Stage::spur(PairStage {
+                            Stage::pair(PairStage {
                                 gears: [huge(4_000_000_000 + k), huge(4_000_000_001 + k)],
                                 ..PairStage::default()
                             })

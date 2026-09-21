@@ -81,7 +81,7 @@ fn pair(z1: u32, z2: u32, helix: f64) -> Stage {
     if helix != 0.0 {
         s = s.with_first_helix(helix);
     }
-    Stage::spur(s)
+    Stage::pair(s)
 }
 
 /// A set's shaft by name, in its wiring's order: ground, sun, carrier, ring,
@@ -161,7 +161,7 @@ fn fixtures() -> Vec<(String, Train)> {
         // one that can refuse to be driven at all.
         (
             "worm".to_string(),
-            train(vec![Stage::worm(PairStage::worm())]),
+            train(vec![Stage::pair(PairStage::worm())]),
         ),
     ];
     // **All six arrangements**, because which shaft is held is the whole of
@@ -281,7 +281,7 @@ fn fixtures() -> Vec<(String, Train)> {
         train(vec![
             pair(17, 43, 0.0),
             set(),
-            Stage::worm(PairStage::worm()),
+            Stage::pair(PairStage::worm()),
         ]),
     ));
     // **A reversing stage, in front of another and behind one.** An epicyclic

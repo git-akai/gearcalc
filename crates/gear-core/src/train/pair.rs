@@ -9,7 +9,7 @@
 //! [`super::crossed`] as the pair it is. What a worm stage adds is that its
 //! first member states a pitch diameter where a gear states a helix angle, an
 //! axial float, and the conventional proportions a worm and its wheel are
-//! given ([`PairKind`], carried on the shape as `Distance::worm`).
+//! given ([`PairStage::worm`], carried on the shape as `Distance::worm`).
 //!
 //! What stays here besides the preset is what every shape reads through it:
 //! [`ShiftAsked`] — who decides a shift and what it must satisfy, with the
@@ -146,43 +146,6 @@ impl ShiftAsked {
     }
 }
 
-/// **Which pair this is, to a designer** — the layer over [`PairStage`] that
-/// a preset is.
-///
-/// The model underneath is one model: a worm is a helical gear with a few
-/// starts at a steep helix, its wheel a helical gear at the complementary one,
-/// and their mesh the crossed-axis mesh any two such gears have. What the kind
-/// decides is the little that is not geometry:
-///
-/// - **the preset** — `Spur` starts as 17/43 on parallel shafts, `Worm` as a
-///   single start of 7 mm at a right angle to a 40-tooth brass wheel;
-/// - **the automatic face width** where no rating sizes one — a worm and its
-///   wheel take the conventional proportions of a worm drive
-///   ([`super::crossed::proportions`]), a crossed gear pair the width at which
-///   contact is just continuous;
-/// - **the words** — *starts*, *worm*, *wheel* — which the shape reads off
-///   the same flag ([`super::shape::Shape::member_names`]).
-///
-/// Nothing in it is a constraint the model needs: a `Worm` at a shaft angle of
-/// zero is a legal, if strange, helical pair and solves as one. On the shape
-/// it is one bit, `Distance::worm`; this enum exists so a preset is built
-/// by a name rather than a boolean, and nothing in the core reads it — the
-/// two constructors that take it write the bit and are done.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(
-    feature = "typescript",
-    derive(ts_rs::TS),
-    ts(export, export_to = "core/")
-)]
-#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
-pub enum PairKind {
-    /// A spur or helical pair, or a crossed gear pair.
-    Spur,
-    /// A worm and its wheel.
-    Worm,
-}
-
 /// A stage of two gears on shafts at any angle.
 ///
 /// Spur when nothing is angled, helical when the teeth are, a **crossed gear
@@ -246,6 +209,21 @@ pub struct PairStage {
     /// crosses the shafts.
     #[cfg_attr(feature = "serde", serde(default))]
     pub shaft_angle: f64,
+    /// **A worm and its wheel**, to a designer — one bit, carried on the
+    /// shape as `Distance::worm`, and nothing in the model reads it: a
+    /// worm is a helical gear with a few starts at a steep helix, its
+    /// wheel a helical gear at the complementary one, and their mesh the
+    /// crossed-axis mesh any two such gears have. What the bit decides is
+    /// the little that is not geometry: the **automatic face width** where
+    /// no rating sizes one — a worm and its wheel take a worm drive's
+    /// conventional proportions ([`super::crossed::proportions`]), a
+    /// crossed gear pair the width at which contact is just continuous —
+    /// and **the words**, *starts*, *worm*, *wheel*, which the shape reads
+    /// off the same bit ([`super::shape::Shape::member_names`]). A worm at
+    /// a shaft angle of zero is a legal, if strange, helical pair and
+    /// solves as one. [`Self::worm`] sets it.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub worm: bool,
     /// **The first member's pitch diameter, mm** — a worm's reading of how
     /// big it is, and one of the three readings of the pair's one size freedom
     /// with the two members' helix angles ([`StageGear::helix_angle`]).
@@ -329,21 +307,25 @@ pub struct PairStage {
 
 impl Default for PairStage {
     fn default() -> Self {
+        // The words a pair shares with every shape default where the shape
+        // does, once.
+        let shape = super::shape::Shape::default();
         Self {
             module: 1.0,
-            pressure_angle: 20.0,
+            pressure_angle: shape.pressure_angle,
             shaft_angle: 0.0,
+            worm: false,
             pitch_diameter: Auto::automatic(17.0),
-            overlap: Auto::automatic(1.0),
+            overlap: shape.overlap,
             sliding_friction: 0.08,
             static_friction: 0.16,
             thickness_mod: 1.0,
-            optimisation: super::Optimisation::default(),
+            optimisation: shape.optimisation,
             centre_distance: Auto::automatic(0.0),
             clearance: Auto::fixed(0.02),
             tolerance_plus: 0.02,
             tolerance_minus: 0.02,
-            load_sharing: LoadSharing::None,
+            load_sharing: shape.load_sharing,
             axial_clearance: 0.0,
             // Neither member states a helix, so the two share the shaft
             // angle evenly — straight teeth on parallel shafts.
@@ -372,7 +354,7 @@ impl PairStage {
     ///   too and the worm's size absorbs it instead;
     /// - **the face widths are automatic**, and the worm kind resolves them to
     ///   a worm drive's conventional proportions rather than to a rating
-    ///   ([`PairKind`]).
+    ///   ([`Self::worm`], the field).
     #[must_use]
     pub fn worm() -> Self {
         // The helix boxes hold what 7 mm on one start gives — `cos β₁ = m/d₁`,
@@ -381,6 +363,7 @@ impl PairStage {
         let worm_helix = (1.0_f64 / 7.0).acos().to_degrees();
         Self {
             shaft_angle: 90.0,
+            worm: true,
             pitch_diameter: Auto::fixed(7.0),
             axial_clearance: 0.04,
             gears: [
@@ -516,12 +499,11 @@ impl PairStage {
 #[cfg(test)]
 pub(crate) fn solve_pair_stage(
     stage: &PairStage,
-    kind: PairKind,
     loads: &super::StageLoads,
     lib: &crate::material::MaterialLibrary,
 ) -> Result<super::shape::ShapeResult, super::TrainError> {
     super::shape::solve_loads(
-        &super::shape::Shape::from_pair(stage, kind),
+        &super::shape::Shape::from(stage),
         loads,
         lib,
         super::Reversal::default(),

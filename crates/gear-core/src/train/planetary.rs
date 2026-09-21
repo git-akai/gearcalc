@@ -123,23 +123,26 @@ pub struct PlanetaryStage {
 
 impl Default for PlanetaryStage {
     fn default() -> Self {
+        // The words a set shares with every shape default where the shape
+        // does, once.
+        let shape = super::shape::Shape::default();
         Self {
             module: 1.0,
-            pressure_angle: 20.0,
-            overlap: Auto::automatic(1.0),
+            pressure_angle: shape.pressure_angle,
+            overlap: shape.overlap,
             sliding_friction_sun_planet: 0.08,
             static_friction_sun_planet: 0.16,
             sliding_friction_planet_ring: 0.08,
             static_friction_planet_ring: 0.16,
             thickness_mod: 1.0,
-            load_sharing: crate::contact::LoadSharing::None,
+            load_sharing: shape.load_sharing,
             planets: 3,
             centre_distance: Auto::automatic(0.0),
             clearance: Auto::fixed(0.02),
-            optimisation: Optimisation::default(),
+            optimisation: shape.optimisation,
             tolerance_plus: 0.02,
             tolerance_minus: 0.02,
-            min_planet_clearance: 0.3,
+            min_planet_clearance: shape.min_planet_clearance,
             cutter: Cutter::default(),
             // `z_r = z_s + 2 z_p`, the ideal ring, on a sun small enough to
             // need shift — so a fresh set shows what the automatic shift does

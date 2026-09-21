@@ -265,15 +265,10 @@ fn solve_hula(
 /// A pair through the shape, as the commands here build one.
 fn solve_pair(
     stage: &gear_core::train::PairStage,
-    kind: gear_core::train::PairKind,
     loads: &gear_core::train::StageLoads,
     lib: &gear_core::material::MaterialLibrary,
 ) -> Result<gear_core::train::StageResult, gear_core::train::TrainError> {
-    let as_stage = match kind {
-        gear_core::train::PairKind::Spur => gear_core::train::Stage::spur(stage.clone()),
-        gear_core::train::PairKind::Worm => gear_core::train::Stage::worm(stage.clone()),
-    };
-    gear_core::train::solve_any(&as_stage, loads, lib)
+    gear_core::train::solve_any(&gear_core::train::Stage::pair(stage.clone()), loads, lib)
 }
 
 /// The mesh a pair reports, checked to be the point contact these commands
@@ -1313,7 +1308,7 @@ fn train_file_report(path: Option<&str>) {
         name: "Elevation drive".to_string(),
         train: Train::chained(
             vec![
-                Stage::spur(
+                Stage::pair(
                     PairStage {
                         gears: [
                             StageGear {
@@ -1330,7 +1325,7 @@ fn train_file_report(path: Option<&str>) {
                     }
                     .with_additional_helix(15.0),
                 ),
-                Stage::worm(PairStage::worm()),
+                Stage::pair(PairStage::worm()),
                 Stage::planetary(PlanetaryStage::default()),
             ],
             // Both case kinds, both ends, both duties, every role: everything
@@ -1453,7 +1448,7 @@ fn train_file_report(path: Option<&str>) {
 /// that cost.
 fn shifts_report(z1: u32, z2: u32) {
     use gear_core::params::Auto;
-    use gear_core::train::{Optimisation, PairKind, PairStage, StageGear, StageLoads};
+    use gear_core::train::{Optimisation, PairStage, StageGear, StageLoads};
 
     let lib = gear_io::default_library();
     let stage = |on: bool, at: Option<f64>| PairStage {
@@ -1468,9 +1463,8 @@ fn shifts_report(z1: u32, z2: u32) {
         },
         ..PairStage::default()
     };
-    let solved = |on: bool, at: Option<f64>| {
-        solve_pair(&stage(on, at), PairKind::Spur, &StageLoads::just(2.0), &lib)
-    };
+    let solved =
+        |on: bool, at: Option<f64>| solve_pair(&stage(on, at), &StageLoads::just(2.0), &lib);
 
     println!("pair z {z1}/{z2}  module 1  alpha 20 deg  mu 0.06\n");
     println!(
@@ -1719,7 +1713,7 @@ fn train_report(mode: Option<&str>) {
                 ..StageGear::default()
             };
             vec![
-                Stage::spur(
+                Stage::pair(
                     PairStage {
                         load_sharing: gear_core::contact::LoadSharing::LinearRamp,
                         gears: [toggled(17, false, true), toggled(43, true, false)],
@@ -1727,7 +1721,7 @@ fn train_report(mode: Option<&str>) {
                     }
                     .with_additional_helix(30.0),
                 ),
-                Stage::spur(PairStage {
+                Stage::pair(PairStage {
                     load_sharing: gear_core::contact::LoadSharing::LinearRamp,
                     gears: [toggled(13, true, false), toggled(31, false, true)],
                     ..PairStage::default()
@@ -1735,19 +1729,19 @@ fn train_report(mode: Option<&str>) {
             ]
         } else if matches!(mode, Some("mixed" | "held")) {
             vec![
-                Stage::spur(PairStage {
+                Stage::pair(PairStage {
                     gears: [auto_width(17), auto_width(43)],
                     ..PairStage::default()
                 }),
-                Stage::worm(PairStage::worm()),
+                Stage::pair(PairStage::worm()),
             ]
         } else {
             vec![
-                Stage::spur(PairStage {
+                Stage::pair(PairStage {
                     gears: [auto_width(17), auto_width(43)],
                     ..PairStage::default()
                 }),
-                Stage::spur(
+                Stage::pair(
                     PairStage {
                         gears: [auto_width(13), auto_width(31)],
                         ..PairStage::default()
@@ -3083,11 +3077,11 @@ fn worm_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, shaft_angle_de
 
 /// A worm stage end to end: geometry, both directions, contact and backlash.
 fn worm_stage_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, torque: f64) {
-    use gear_core::train::{PairKind, StageLoads};
+    use gear_core::train::StageLoads;
 
     let stage = worm_stage(starts, wheel_teeth, worm_diameter);
     let lib = gear_io::default_library();
-    let solved = match solve_pair(&stage, PairKind::Worm, &StageLoads::just(torque), &lib) {
+    let solved = match solve_pair(&stage, &StageLoads::just(torque), &lib) {
         Ok(r) => r,
         Err(e) => {
             eprintln!("cannot solve that stage: {e}");
@@ -3457,7 +3451,7 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
 /// by tooth count and helix, so `β₁` is what there is to choose. Nothing else
 /// about the pair changes — it is the same screw geometry either way.
 fn crossed_report(z1: u32, z2: u32, shaft_angle: f64) {
-    use gear_core::train::{PairKind, StageLoads};
+    use gear_core::train::StageLoads;
 
     let lib = gear_io::default_library();
     println!(
@@ -3492,7 +3486,7 @@ fn crossed_report(z1: u32, z2: u32, shaft_angle: f64) {
             println!("{beta1:>7.1} {:>7} — no such pair", shaft_angle - beta1);
             continue;
         };
-        match solve_pair(&stage, PairKind::Spur, &StageLoads::just(2.0), &lib) {
+        match solve_pair(&stage, &StageLoads::just(2.0), &lib) {
             Err(e) => println!(
                 "{beta1:>7.1} {:>7.1}  {e}",
                 g.wheel_helix_angle_rad.to_degrees()
@@ -3578,7 +3572,7 @@ fn crossed_report(z1: u32, z2: u32, shaft_angle: f64) {
         ("least shift that clears undercut", &even),
         ("least loss", &free),
     ] {
-        match solve_pair(stage, PairKind::Spur, &StageLoads::just(2.0), &lib).map(|solved| {
+        match solve_pair(stage, &StageLoads::just(2.0), &lib).map(|solved| {
             let r = pair(&solved).expect("a pair");
             (
                 r.gears[0].profile_shift,
