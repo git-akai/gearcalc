@@ -3097,6 +3097,20 @@
       }
      }
     ],
+    "families": [
+     {
+      "family": "parallel",
+      "label": "ui.train_family_parallel"
+     },
+     {
+      "family": "skew",
+      "label": "ui.train_family_skew"
+     },
+     {
+      "family": "epicyclic",
+      "label": "ui.train_family_epicyclic"
+     }
+    ],
     "reverse_loading_coefficient": "0.69999999999999996"
    }
   },

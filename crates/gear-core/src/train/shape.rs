@@ -494,10 +494,7 @@ impl Shape {
     /// stage's two wobble gears — by the order the shape lists them.
     #[must_use]
     pub fn member_names(&self) -> Vec<MemberName> {
-        let carried = |i: usize| {
-            self.axis_of_shaft(self.shaft_of(i))
-                .is_some_and(|a| self.axes[a].carried_by != GROUND)
-        };
+        let carried = |i: usize| self.is_planet_gear(i);
         let role = |i: usize| -> MemberRole {
             for (k, m) in self.meshes.iter().enumerate() {
                 let worm = self

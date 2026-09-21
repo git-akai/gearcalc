@@ -195,7 +195,8 @@ impl Shape {
         }
     }
 
-    fn is_planet_gear(&self, member: usize) -> bool {
+    /// A member on a carried axis: a planet, whatever it meshes with.
+    pub(crate) fn is_planet_gear(&self, member: usize) -> bool {
         self.axis_of_shaft(self.shaft_of(member))
             .is_some_and(|a| self.carried(a))
     }

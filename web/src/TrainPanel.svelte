@@ -2,7 +2,6 @@
   import {
     defaults,
     solveTrain,
-    STAGE_FAMILIES,
     presetsOf,
     type StagePreset,
     type Figure,
@@ -2368,9 +2367,9 @@
     }}
   >
     <option value="" disabled>{t("ui.train_add_stage")}</option>
-    {#each STAGE_FAMILIES as family (family.key)}
+    {#each defaults().families as family (family.family)}
       <optgroup label={t(family.label)}>
-        {#each presetsOf(family.key) as entry (entry.preset)}
+        {#each presetsOf(family.family) as entry (entry.preset)}
           <option value={entry.preset}>{t(entry.label)}</option>
         {/each}
       </optgroup>

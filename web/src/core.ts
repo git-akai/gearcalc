@@ -325,13 +325,8 @@ export const KINDS: KindSpec[] = [
  *  them for the menu's sake: it is a spur stage with its shafts at an angle,
  *  and a worm a distance marked as one, and neither is obvious to build from
  *  a pair — which is the whole reason a preset exists. */
-export const STAGE_FAMILIES: { key: StageFamily; label: string }[] = [
-  { key: "parallel", label: "ui.train_family_parallel" },
-  { key: "skew", label: "ui.train_family_skew" },
-  { key: "epicyclic", label: "ui.train_family_epicyclic" },
-];
-
-/** The presets of one family, in the core's order. */
+/** The presets of one family, in the core's order; the families themselves
+ *  are `defaults().families`, the core's list with the key of each name. */
 export function presetsOf(family: StageFamily): StagePresetEntry[] {
   return defaults().stages.filter((e) => e.family === family);
 }

@@ -111,6 +111,7 @@ export type { PinsOut } from "./wasm/PinsOut";
 export type { RingRequest } from "./wasm/RingRequest";
 export type { RingSummary } from "./wasm/RingSummary";
 export type { SpanOut } from "./wasm/SpanOut";
+export type { StageFamilyEntry } from "./wasm/StageFamilyEntry";
 export type { StagePresetEntry } from "./wasm/StagePresetEntry";
 export type { ToleranceOut } from "./wasm/ToleranceOut";
 export type { TrainFailure } from "./wasm/TrainFailure";

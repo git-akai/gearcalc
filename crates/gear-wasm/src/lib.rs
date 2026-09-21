@@ -1036,6 +1036,9 @@ pub struct Defaults {
     /// (docs/reference.md#crossed-axes), and a worm is a distance marked as
     /// one, and neither is obvious to build from a pair.
     pub stages: Vec<StagePresetEntry>,
+    /// The three families the menu groups them under, in order, each
+    /// with the key of its name — the core's list ([`StageFamily::ALL`]).
+    pub families: Vec<StageFamilyEntry>,
     /// The fraction a reversed root's fatigue bending allowable is taken at.
     ///
     /// Crosses so the control's own note can name it. It is
@@ -1043,6 +1046,18 @@ pub struct Defaults {
     /// and nothing else — a number the interface shows is a number Rust decided,
     /// this one included.
     pub reverse_loading_coefficient: f64,
+}
+
+/// A family as the menu groups by it: which, and called what.
+#[derive(Serialize)]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "wasm/")
+)]
+pub struct StageFamilyEntry {
+    pub family: StageFamily,
+    pub label: String,
 }
 
 /// A preset as the menu takes it: which, under what family, called what,
@@ -1155,6 +1170,13 @@ fn defaults_impl() -> Result<String, String> {
                 family: preset.family(),
                 label: preset.label().to_string(),
                 stage: ui(preset.build()),
+            })
+            .collect(),
+        families: StageFamily::ALL
+            .into_iter()
+            .map(|family| StageFamilyEntry {
+                family,
+                label: family.label().to_string(),
             })
             .collect(),
         reverse_loading_coefficient: gear_core::material::REVERSED_BENDING_FRACTION,

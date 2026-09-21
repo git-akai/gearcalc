@@ -583,6 +583,22 @@ pub enum StageFamily {
     Epicyclic,
 }
 
+impl StageFamily {
+    /// The three, in the menu's order.
+    pub const ALL: [Self; 3] = [Self::Parallel, Self::Skew, Self::Epicyclic];
+
+    /// The catalogue key of the family's name — a `ui.` key, the
+    /// interface's word.
+    #[must_use]
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Parallel => "ui.train_family_parallel",
+            Self::Skew => "ui.train_family_skew",
+            Self::Epicyclic => "ui.train_family_epicyclic",
+        }
+    }
+}
+
 impl Shape {
     /// Which family this shape is, read off it — see [`StageFamily`].
     #[must_use]
