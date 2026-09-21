@@ -41,6 +41,8 @@ const call = (name, f) => {
 };
 
 const defaults = JSON.parse(w.defaults());
+// A preset's starting stage by name, off the list the menu renders from.
+const preset = (name) => structuredClone(defaults.stages.find((e) => e.preset === name).stage);
 const library = JSON.parse(w.default_materials());
 
 // A plain external gear: the tab's own default, with the eccentric throw
@@ -88,32 +90,31 @@ const out = {
   // and the first one is declared as the freedom just touched, which is the one
   // that must survive.
   relieve_stage: call("relieve_stage", () =>
-    ["spur_stage", "worm_stage", "planetary_stage", "hula_stage"].map((k) => {
-      const stage = structuredClone(defaults[k]);
+    defaults.stages.map((e) => {
+      const stage = structuredClone(e.stage);
       const pin = (a) => (a ? { auto: false, manual: 0.1 } : a);
       // A shape keeps its distance on `distances[0]` and its gears under
-      // `members[].gear`; the hula stage still names its four.
-      for (const d of stage.distances ?? []) d.distance = pin(d.distance);
-      for (const m of stage.members ?? []) m.gear.profile_shift = pin(m.gear.profile_shift);
-      for (const g of stage.gears ?? []) g.profile_shift = pin(g.profile_shift);
-      const just = stage.distances ? { centre_distance: 0 } : { member: [0, "shift"] };
-      // ...and a figure for the shift relief turns back given on a hula
-      // stage, so the seeding is exercised too.
+      // `members[].gear`.
+      for (const d of stage.distances) d.distance = pin(d.distance);
+      for (const m of stage.members) m.gear.profile_shift = pin(m.gear.profile_shift);
+      const just = { centre_distance: 0 };
+      // ...and a figure for the shift relief turns back given, so the
+      // seeding is exercised too.
       const figures = [{ freedom: { member: [1, "shift"] }, value: 0.25 }];
-      return [k, JSON.parse(w.relieve_stage(JSON.stringify({ stage, just, figures })))];
+      return [e.preset, JSON.parse(w.relieve_stage(JSON.stringify({ stage, just, figures })))];
     }),
   ),
-  // **One member of each kind adopted**, including a planetary ring so the
-  // cutter travels, and a worm stage's wheel — its worm is refused, which
-  // the entry point's own test holds.
+  // **One member of each preset adopted**, including a planetary ring so
+  // the cutter travels, and a worm stage's wheel — its worm is refused,
+  // which the entry point's own test holds.
   adopt_member: call("adopt_member", () =>
     [
-      ["spur_stage", 1],
-      ["worm_stage", 1],
-      ["planetary_stage", 2],
-      ["hula_stage", 0],
+      ["spur", 1],
+      ["worm", 1],
+      ["planetary", 2],
+      ["wolfrom", 0],
     ].map(([k, member]) => {
-      const train = { ...structuredClone(defaults.train), stages: [defaults[k]] };
+      const train = { ...structuredClone(defaults.train), stages: [preset(k)] };
       return [k, JSON.parse(w.adopt_member(JSON.stringify({ train, materials: library, stage: 0, member })))];
     }),
   ),
@@ -125,7 +126,7 @@ const out = {
   edit_train: call("edit_train", () => {
     const edit = (train, e) => JSON.parse(w.edit_train(JSON.stringify({ train, edit: e })));
     const of = (stage, shaft) => ({ kind: "of", stage, shaft });
-    let t = edit(structuredClone(defaults.train), { push_stage: structuredClone(defaults.planetary_stage) });
+    let t = edit(structuredClone(defaults.train), { push_stage: preset("planetary") });
     const out = [["push_stage", structuredClone(t)]];
     t = edit(t, { hold: of(1, 2) });
     out.push(["hold", structuredClone(t)]);
@@ -148,7 +149,7 @@ const out = {
   solve_train: call("solve_train", () => {
     const t = structuredClone(defaults.train);
     const chained = JSON.parse(
-      w.edit_train(JSON.stringify({ train: t, edit: { push_stage: structuredClone(defaults.planetary_stage) } })),
+      w.edit_train(JSON.stringify({ train: t, edit: { push_stage: preset("planetary") } })),
     );
     return [
       ["default", JSON.parse(w.solve_train(JSON.stringify({ train: t, library })))],

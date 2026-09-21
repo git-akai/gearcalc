@@ -94,6 +94,9 @@ import type {
   ShaftLabel,
   ShaftRef,
   Exact,
+  StageFamily,
+  StagePreset,
+  StagePresetEntry,
 } from "./wire";
 export type { CaseKind, LoadCase };
 export type {
@@ -181,6 +184,9 @@ export type {
   ShaftLabel,
   ShaftRef,
   Exact,
+  StageFamily,
+  StagePreset,
+  StagePresetEntry,
 } from "./wire";
 
 import init, {
@@ -311,57 +317,24 @@ export const KINDS: KindSpec[] = [
 ];
 
 /** **A preset over the one stage shape.** A stage is a `Shape` — axes,
- *  shafts, members, meshes and distances; a spur pair, a worm, a planetary
- *  set and a hula stage are the ways the core fills a shape in, not types of
- *  their own. What this side names is the button, and what the button adds is
- *  whatever `defaults` says the preset is. */
-export type StagePreset = "spur" | "worm" | "planetary" | "hula";
-
-export interface StagePresetSpec {
-  key: StagePreset;
-  /** Catalogue key for the button that adds one. */
-  label: string;
-  /** A fresh stage of this preset, from the core. */
-  fresh: () => Stage;
-  /** Offered only while the developer mode is on — the same knock the gear
-   *  tab's eccentric kind is behind, through the same table shape, so one
-   *  mechanism gates both. */
-  developer?: boolean;
-}
-
-/** The stage presets, as data, for the same reason `KINDS` and `FIELDS` are: the
- *  "add stage" buttons render from this, so a new preset is a row rather than a
- *  hand-written button that has to be remembered.
- *
- *  A **crossed** pair is deliberately not here. It is a pair whose shafts are
- *  at an angle, not a preset of its own, and the core says so. */
-// A default stage arrives **tagged** — Rust's `Stage` is an internally tagged
-// enum with one variant, so the object carries `kind: "shape"`. The panel
-// branches on nothing; what a shape *is* — a pair, a set, a hula stage — it
-// reads off the shape itself (`members.ts`).
-export const STAGE_PRESETS: StagePresetSpec[] = [
-  {
-    key: "spur",
-    label: "ui.train_add_spur_stage",
-    fresh: () => defaults().spur_stage,
-  },
-  {
-    key: "worm",
-    label: "ui.train_add_worm_stage",
-    fresh: () => defaults().worm_stage,
-  },
-  {
-    key: "planetary",
-    label: "ui.train_add_planetary_stage",
-    fresh: () => defaults().planetary_stage,
-  },
-  {
-    key: "hula",
-    label: "ui.train_add_hula_stage",
-    fresh: () => defaults().hula_stage,
-    developer: true,
-  },
+ *  shafts, members, meshes and distances — and a preset is a shape the core
+ *  pre-assembled at sensible teeth, listed under its family: the core's
+ *  `StagePreset::ALL`, crossing in `defaults().stages` with the family and
+ *  the catalogue key of its name, so the menu renders from that list and a
+ *  new preset is a variant there, never a row here. A crossed pair is one of
+ *  them for the menu's sake: it is a spur stage with its shafts at an angle,
+ *  and a worm a distance marked as one, and neither is obvious to build from
+ *  a pair — which is the whole reason a preset exists. */
+export const STAGE_FAMILIES: { key: StageFamily; label: string }[] = [
+  { key: "parallel", label: "ui.train_family_parallel" },
+  { key: "skew", label: "ui.train_family_skew" },
+  { key: "epicyclic", label: "ui.train_family_epicyclic" },
 ];
+
+/** The presets of one family, in the core's order. */
+export function presetsOf(family: StageFamily): StagePresetEntry[] {
+  return defaults().stages.filter((e) => e.family === family);
+}
 
 export interface CaseKindSpec {
   key: CaseKind;

@@ -17,6 +17,7 @@
 use gear_core::jgma;
 use gear_core::metrology::{self, PinCount};
 use gear_core::note::{Explain, Note};
+use gear_core::train::{StageFamily, StagePreset};
 use gear_core::{GearParams, Tooth};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
@@ -1027,17 +1028,14 @@ pub struct Defaults {
     pub gear: GearTabDefaults,
     /// A fresh geartrain, with one spur stage in it.
     pub train: gear_core::train::Train,
-    /// One of each preset, for the "add stage" menu. A crossed gear pair is
-    /// **not** one of them — it is a spur stage with its shafts at an angle
-    /// (docs/reference.md#crossed-axes).
-    pub spur_stage: gear_core::train::Stage,
-    pub worm_stage: gear_core::train::Stage,
-    pub planetary_stage: gear_core::train::Stage,
-    /// The hula stage (docs/reference.md#the-hula-stage). Offered only behind
-    /// the interface's developer mode, which is a decision about what to put in
-    /// front of a reader rather than about the mathematics — so it crosses the
-    /// boundary like the other three and the front end decides who sees it.
-    pub hula_stage: gear_core::train::Stage,
+    /// **One of each preset, for the "add stage" menu**, in the menu's
+    /// order and each under its family — the core's list
+    /// ([`StagePreset::ALL`]), so a preset is a variant there and a row
+    /// here, never a field. A crossed pair is one of them for the menu's
+    /// sake: it is a spur stage with its shafts at an angle
+    /// (docs/reference.md#crossed-axes), and a worm is a distance marked as
+    /// one, and neither is obvious to build from a pair.
+    pub stages: Vec<StagePresetEntry>,
     /// The fraction a reversed root's fatigue bending allowable is taken at.
     ///
     /// Crosses so the control's own note can name it. It is
@@ -1045,6 +1043,22 @@ pub struct Defaults {
     /// and nothing else — a number the interface shows is a number Rust decided,
     /// this one included.
     pub reverse_loading_coefficient: f64,
+}
+
+/// A preset as the menu takes it: which, under what family, called what,
+/// and the stage it starts as.
+#[derive(Serialize)]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "wasm/")
+)]
+pub struct StagePresetEntry {
+    pub preset: StagePreset,
+    pub family: StageFamily,
+    /// The catalogue key of its name.
+    pub label: String,
+    pub stage: gear_core::train::Stage,
 }
 
 /// What a new gear tab holds. The values are the specification's, and the
@@ -1074,7 +1088,7 @@ pub struct GearTabDefaults {
 }
 
 fn defaults_impl() -> Result<String, String> {
-    use gear_core::train::{LoadCase, PairStage, PlanetaryStage, Stage, Train};
+    use gear_core::train::{LoadCase, Stage, Train};
 
     // The tab starts with an automatic face width, where the core's own
     // default is a plain 10 mm. Both are right for their caller: the CLI and
@@ -1083,49 +1097,22 @@ fn defaults_impl() -> Result<String, String> {
     // 5 mm so the field has something to fall back to when the toggle is
     // turned off.
     //
-    // **Every kind the panel offers**, which it was not: the rule reached the
+    // **Every preset the panel offers**, which it was not: the rule reached the
     // parallel pair and the epicyclic set, and a hula stage opened at a *fixed*
     // 10 mm while a worm's members were automatic but seeded at ten. So the same
     // panel answered the same question three ways depending on which stage a
     // designer had picked. Nothing could see it — `defaults()` is the boundary's
-    // own, and no golden case reaches it. See the test below.
+    // own, and no golden case reaches it. See the test below. Now one walk
+    // over every member of every preset's shape, so a preset added to the
+    // core's list is seeded by being on it.
     const UI_SEED: f64 = 5.0;
-    let ui_gear = |g: &gear_core::train::StageGear| gear_core::train::StageGear {
-        face_width: gear_core::params::Auto::automatic(UI_SEED),
-        ..g.clone()
-    };
-    let spur = {
-        let d = PairStage::default();
-        PairStage {
-            gears: [ui_gear(&d.gears[0]), ui_gear(&d.gears[1])],
-            ..d
+    let ui = |mut shape: gear_core::train::shape::Shape| {
+        for m in &mut shape.members {
+            m.gear.face_width = gear_core::params::Auto::automatic(UI_SEED);
         }
+        Stage::Shape(Box::new(shape))
     };
-    let planetary = {
-        let d = PlanetaryStage::default();
-        PlanetaryStage {
-            sun: ui_gear(&d.sun),
-            planet: ui_gear(&d.planet),
-            ring: ui_gear(&d.ring),
-            ..d
-        }
-    };
-    // A worm and its wheel are the same members as a spur pair's now, so the
-    // same question put to them gets the same answer by the same closure.
-    let worm = {
-        let d = PairStage::worm();
-        PairStage {
-            gears: [ui_gear(&d.gears[0]), ui_gear(&d.gears[1])],
-            ..d
-        }
-    };
-    let hula = {
-        let d = gear_core::train::HulaStage::default();
-        gear_core::train::HulaStage {
-            gears: d.gears.each_ref().map(ui_gear),
-            ..d.clone()
-        }
-    };
+    let spur = ui(StagePreset::Spur.build());
 
     let defaults = Defaults {
         gear: GearTabDefaults {
@@ -1153,7 +1140,7 @@ fn defaults_impl() -> Result<String, String> {
                 gear_core::train::ShaftRef::Of { stage: 0, shaft: 2 },
             );
             Train::chained(
-                vec![Stage::spur(spur.clone())],
+                vec![spur],
                 vec![
                     LoadCase::ultimate(input, output, 0.1, 30_000.0),
                     LoadCase::back_driving(input, output, 3.0),
@@ -1161,10 +1148,15 @@ fn defaults_impl() -> Result<String, String> {
                 ],
             )
         },
-        spur_stage: Stage::spur(spur),
-        worm_stage: Stage::worm(worm),
-        planetary_stage: Stage::planetary(planetary),
-        hula_stage: Stage::hula(hula),
+        stages: StagePreset::ALL
+            .into_iter()
+            .map(|preset| StagePresetEntry {
+                preset,
+                family: preset.family(),
+                label: preset.label().to_string(),
+                stage: ui(preset.build()),
+            })
+            .collect(),
         reverse_loading_coefficient: gear_core::material::REVERSED_BENDING_FRACTION,
     };
     serde_json::to_string(&defaults).map_err(|e| format!("could not encode defaults: {e}"))
@@ -1588,6 +1580,27 @@ mod tests {
     /// peak, a load from the far end held still, and a fatigue case — so a
     /// fixture here says which shafts it loads the way a file does, and the
     /// chain's couplings are listed rather than assumed.
+    /// The stage a preset starts as, by the preset's name on the wire.
+    fn preset(d: &serde_json::Value, name: &str) -> serde_json::Value {
+        d["stages"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|e| e["preset"] == name)
+            .unwrap_or_else(|| panic!("no preset {name}"))["stage"]
+            .clone()
+    }
+
+    /// The hula stage, no longer a preset the menu offers; it stays a stage
+    /// the boundary carries until the Wolfrom preset at one planet is shown
+    /// to be it.
+    fn hula_stage() -> serde_json::Value {
+        serde_json::to_value(gear_core::train::Stage::hula(
+            gear_core::train::HulaStage::default(),
+        ))
+        .unwrap()
+    }
+
     fn train_json(
         stages: &[serde_json::Value],
         peak: (f64, f64),
@@ -1651,7 +1664,7 @@ mod tests {
     #[test]
     fn a_gear_tab_and_a_stage_member_bound_the_same_gear_alike() {
         let d: serde_json::Value = serde_json::from_str(&defaults_impl().unwrap()).unwrap();
-        let mut stage = d["spur_stage"].clone();
+        let mut stage = preset(&d, "spur");
         // Whatever the shipped default gear is, asked of both surfaces. Read
         // rather than written down, so this cannot drift from the defaults.
         let teeth = stage["members"][0]["gear"]["teeth"].clone();
@@ -1708,7 +1721,7 @@ mod tests {
         // one a user actually takes, and give it one of every preset.
         let d: serde_json::Value = serde_json::from_str(&defaults_impl().unwrap()).unwrap();
         let crossed = {
-            let mut c = d["spur_stage"].clone();
+            let mut c = preset(&d, "spur");
             c["distances"][0]["angle"] = serde_json::json!(90.0);
             c
         };
@@ -1717,7 +1730,7 @@ mod tests {
         let document = serde_json::json!({
             "name": "Elevation drive",
             "train": train_json(
-                &[d["spur_stage"].clone(), crossed, d["worm_stage"].clone(), d["planetary_stage"].clone()],
+                &[preset(&d, "spur"), crossed, preset(&d, "worm"), preset(&d, "planetary")],
                 (0.25, 12_000.0),
                 0.1,
                 (0.2, 9600.0),
@@ -1825,45 +1838,45 @@ mod tests {
         let d: serde_json::Value = serde_json::from_str(&defaults_impl().unwrap()).unwrap();
         let request = |kind: &str, member: usize| {
             let mut train = d["train"].clone();
-            train["stages"] = serde_json::json!([d[kind]]);
+            train["stages"] = serde_json::json!([preset(&d, kind)]);
             serde_json::json!({ "train": train, "stage": 0, "member": member }).to_string()
         };
         let adopt = |kind: &str, member: usize| -> serde_json::Value {
             serde_json::from_str(&adopt_member_impl(&request(kind, member)).unwrap()).unwrap()
         };
 
-        let ring = adopt("planetary_stage", 2);
+        let ring = adopt("planetary", 2);
         let a = &ring["adopted"];
         assert_eq!(a["internal"], true);
-        assert_eq!(a["cutter"], d["planetary_stage"]["members"][2]["ring"]);
+        assert_eq!(a["cutter"], preset(&d, "planetary")["members"][2]["ring"]);
         assert_eq!(
             a["params"]["teeth"],
-            d["planetary_stage"]["members"][2]["gear"]["teeth"]
+            preset(&d, "planetary")["members"][2]["gear"]["teeth"]
         );
         assert!(ring["failure"].is_null());
 
-        let sun = adopt("planetary_stage", 0);
+        let sun = adopt("planetary", 0);
         assert_eq!(sun["adopted"]["internal"], false);
         assert!(sun["adopted"]["cutter"].is_null());
         // The planet opposes the sun's hand and the ring shares the planet's:
         // the adopted helix carries the member's own sign.
-        let planet = adopt("planetary_stage", 1);
+        let planet = adopt("planetary", 1);
         let (hs, hp) = (
             sun["adopted"]["params"]["helix_angle"].as_f64().unwrap(),
             planet["adopted"]["params"]["helix_angle"].as_f64().unwrap(),
         );
         assert_eq!(hs, -hp);
 
-        let wheel = adopt("worm_stage", 1);
+        let wheel = adopt("worm", 1);
         assert_eq!(wheel["adopted"]["internal"], false);
         assert!(wheel["adopted"]["params"]["helix_angle"].as_f64().unwrap() > 0.0);
-        let worm = adopt_member_impl(&request("worm_stage", 0)).unwrap_err();
+        let worm = adopt_member_impl(&request("worm", 0)).unwrap_err();
         assert!(worm.contains("worm"), "{worm}");
 
         // ...and the gear tab, solving what it adopted, builds it as asked:
         // the stage's own guards already held every dimension, so the tab
         // has nothing to clamp and the pitch diameter is the stage's.
-        let spur = adopt("spur_stage", 0);
+        let spur = adopt("spur", 0);
         let params = &spur["adopted"]["params"];
         let solved: serde_json::Value = serde_json::from_str(
             &solve_gear_impl(&serde_json::json!({ "params": params }).to_string()).unwrap(),
@@ -2274,7 +2287,7 @@ mod tests {
     #[test]
     fn a_planetary_stage_crosses_the_boundary_with_its_own_shape() {
         let d: serde_json::Value = serde_json::from_str(&defaults_impl().unwrap()).unwrap();
-        let mut set = d["planetary_stage"].clone();
+        let mut set = preset(&d, "planetary");
         set["members"][0]["gear"]["teeth"] = 24.into();
         set["members"][1]["gear"]["teeth"] = 18.into();
         set["members"][2]["gear"]["teeth"] = 60.into();
@@ -2394,9 +2407,8 @@ mod tests {
     /// the way the hand-written mirror did (`docs/corrections.md`).
     #[test]
     fn a_hula_stage_crosses_the_boundary_carrying_its_ratings() {
-        let d: serde_json::Value = serde_json::from_str(&defaults_impl().unwrap()).unwrap();
         let train = serde_json::json!({
-            "train": train_json(&[d["hula_stage"].clone()], (2.0, 3000.0), 0.0, (1.0, 3000.0), 1.0)
+            "train": train_json(&[hula_stage()], (2.0, 3000.0), 0.0, (1.0, 3000.0), 1.0)
         });
         let v = solved(&train.to_string());
         let stage = &v["stages"][0];
@@ -2463,11 +2475,11 @@ mod tests {
     #[test]
     fn a_mixed_train_crosses_the_boundary_with_both_shapes_intact() {
         let d: serde_json::Value = serde_json::from_str(&defaults_impl().unwrap()).unwrap();
-        let mut spur = d["spur_stage"].clone();
+        let mut spur = preset(&d, "spur");
         spur["members"][0]["gear"]["teeth"] = 17.into();
         spur["members"][1]["gear"]["teeth"] = 43.into();
         spur["distances"][0]["clearance"] = serde_json::json!({"auto": false, "manual": 0.02});
-        let mut worm = d["worm_stage"].clone();
+        let mut worm = preset(&d, "worm");
         worm["members"][0]["gear"]["teeth"] = 1.into();
         worm["members"][1]["gear"]["teeth"] = 40.into();
         worm["members"][0]["pitch_diameter"] = serde_json::json!({"auto": false, "manual": 7.0});
@@ -2610,6 +2622,9 @@ mod tests {
         "pointed",
         // A material value with nothing to say beyond its number.
         "note",
+        // One tooth more on this member leaves no mechanism, or locks it — a
+        // Wolfrom's rings brought level — and a ratio of infinity is no figure.
+        "ratio_per_tooth",
         // An **external** mesh's tips meet on the line of centres or not at
         // all, so the three ways an internal mesh's teeth can foul are not
         // three answers of `false` there — they are questions that do not
@@ -2739,39 +2754,30 @@ mod tests {
         // asks for, so each gear is rebuilt with an automatic 5 mm — and a walk
         // is what says all of them were.
         let mut seeded = 0;
-        let mut walk = vec![
-            &d["spur_stage"],
-            &d["planetary_stage"],
-            &d["hula_stage"],
-            &d["worm_stage"],
-        ];
-        walk.extend(d["train"]["stages"].as_array().unwrap());
-        for stage in walk {
-            // A shape keeps its gears under `members[].gear`; the hula stage
-            // still names its four.
-            let mut members: Vec<&serde_json::Value> = Vec::new();
-            if let Some(m) = stage["members"].as_array() {
-                members.extend(m.iter().map(|m| &m["gear"]));
-            }
-            for key in ["gears", "sun", "planet", "ring", "worm", "wheel"] {
-                match stage[key].as_array() {
-                    Some(a) => members.extend(a.iter()),
-                    None if stage[key].is_object() => members.push(&stage[key]),
-                    None => {}
-                }
-            }
-            for g in members {
-                if let Some(w) = g.get("face_width") {
-                    assert_eq!(w["auto"], true, "a seeded width is not automatic");
-                    assert_eq!(w["manual"], 5.0, "a seeded width is not 5 mm");
-                    seeded += 1;
-                }
+        let mut walk: Vec<serde_json::Value> = d["stages"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|e| e["stage"].clone())
+            .collect();
+        walk.extend(d["train"]["stages"].as_array().unwrap().iter().cloned());
+        for stage in &walk {
+            for m in stage["members"].as_array().unwrap() {
+                let w = &m["gear"]["face_width"];
+                assert_eq!(w["auto"], true, "a seeded width is not automatic");
+                assert_eq!(w["manual"], 5.0, "a seeded width is not 5 mm");
+                seeded += 1;
             }
         }
-        // Two on a pair, three on a set, four on a hula stage, two on a worm,
-        // and the pair again inside the train — every member of every preset the
-        // panel can open.
-        assert_eq!(seeded, 13, "a member's width went unseeded");
+        // Every member of every preset, and the pair again inside the train:
+        // counted off the list rather than written down, and at least the
+        // ten presets' two apiece.
+        let members: usize = walk
+            .iter()
+            .map(|s| s["members"].as_array().unwrap().len())
+            .sum();
+        assert_eq!(seeded, members, "a member's width went unseeded");
+        assert!(seeded >= 2 * (StagePreset::ALL.len() + 1), "{seeded}");
     }
 
     #[test]
@@ -2780,9 +2786,14 @@ mod tests {
         // covers every layout there is.
         let d: serde_json::Value = serde_json::from_str(&defaults_impl().unwrap()).unwrap();
         let mut stages = d["train"]["stages"].as_array().unwrap().clone();
-        for extra in ["worm_stage", "planetary_stage", "hula_stage"] {
-            stages.push(d[extra].clone());
-        }
+        stages.extend(
+            d["stages"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|e| e["stage"].clone()),
+        );
+        stages.push(hula_stage());
         // ...and the case that started this: a width with nothing to size it.
         let mut bare = stages[0].clone();
         for m in bare["members"].as_array_mut().unwrap() {
@@ -2858,7 +2869,7 @@ mod tests {
         // one you ship with" — with the stage the panel seeds, at the tooth
         // counts of the regression canary.
         let d: serde_json::Value = serde_json::from_str(&defaults_impl().unwrap()).unwrap();
-        let mut spur = d["spur_stage"].clone();
+        let mut spur = preset(&d, "spur");
         spur["members"][0]["gear"]["teeth"] = 17.into();
         spur["members"][1]["gear"]["teeth"] = 43.into();
         spur["distances"][0]["clearance"] = serde_json::json!({"auto": false, "manual": 0.02});

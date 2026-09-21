@@ -2,8 +2,9 @@
   import {
     defaults,
     solveTrain,
-    STAGE_PRESETS,
-    type StagePresetSpec,
+    STAGE_FAMILIES,
+    presetsOf,
+    type StagePreset,
     type Figure,
     CASE_KINDS,
     type CaseKindSpec,
@@ -39,7 +40,7 @@
     note,
     t,
   } from "./core";
-  import { developer, trains, library, type TrainTab } from "./state.svelte";
+  import { trains, library, type TrainTab } from "./state.svelte";
   import { exportTrain, relieveStage, relieveCase, editTrain } from "./core";
   import FieldNote from "./FieldNote.svelte";
   import Switch from "./Switch.svelte";
@@ -339,15 +340,12 @@
   const forCase = <T extends { case: number }>(list: T[] | undefined, i: number) =>
     list?.find((c) => c.case === i);
 
-  /** The presets on offer. A preset the developer mode hides cannot already be in
-   *  a train the reader is looking at — the picker is the only way one arrives
-   *  — so nothing is stranded by the mode being off. */
-  const stagePresets = $derived(STAGE_PRESETS.filter((k) => !k.developer || developer.enabled));
-
   /** A stage pushed and coupled onward by the core, its cases carried to
    *  the new end. */
-  function addStagePreset(preset: StagePresetSpec) {
-    editTrain(tab.train, { push_stage: preset.fresh() });
+  function addStagePreset(preset: StagePreset) {
+    const entry = defaults().stages.find((e) => e.preset === preset);
+    if (!entry) return;
+    editTrain(tab.train, { push_stage: entry.stage });
     tab.open[tab.train.stages.length - 1] = true;
   }
 
@@ -1889,12 +1887,15 @@
         <button class="head section-heading" onclick={() => (tab.open[i] = !tab.open[i])}>
           <span class="caret aside">{tab.open[i] ? "▾" : "▸"}</span>
           <strong>{stageName(i)}</strong>
+          <!-- The chip is the family the shape reads as, and the skew
+               family's two presets by name — a spur pair has no chip, since
+               a plain pair is what a stage is unless it says otherwise. -->
           {#if worm}
             <span class="kind aside">{t("ui.train_worm")}</span>
           {:else if crossed}
             <span class="kind aside">{t("ui.train_crossed")}</span>
           {:else if epicyclic}
-            <span class="kind aside">{t("ui.train_planetary")}</span>
+            <span class="kind aside">{t("ui.train_epicyclic")}</span>
           {/if}
           <span class="teeth aside">z {stage.members.map((m) => m.gear.teeth).join(" / ")}</span>
           {#if sres && sres.ratio !== null}
@@ -2103,7 +2104,7 @@
                      where a tooth tells and where it does not. A stage whose
                      boundary is a family has neither, and says so once. -->
                 {#if sres?.ratio_per_tooth}
-                  <small>{t("ui.train_ratio_per_tooth")}: {sres.ratio_per_tooth.map((r, j) => `${name(j)} ${num(r, 4)}`).join(" · ")}</small>
+                  <small>{t("ui.train_ratio_per_tooth")}: {sres.ratio_per_tooth.map((r, j) => `${name(j)} ${r === null ? t("ui.train_ratio_per_tooth_locked") : num(r, 4)}`).join(" · ")}</small>
                 {:else if sres}
                   <small>{t("ui.train_family_no_figure")}</small>
                 {/if}
@@ -2203,13 +2204,32 @@
     </section>
   {/each}
 
-  <!-- One button a preset, from the table rather than by hand: a preset marked for
-       the developer mode is not offered until the sidebar's title has been
-       knocked on, which is the same gate the gear tab's eccentric kind is
-       behind and the same table shape. -->
-  {#each stagePresets as k (k.key)}
-    <button class="action add" onclick={() => addStagePreset(k)}>{t(k.label)}</button>
-  {/each}
+  <!-- **One menu, three families, the core's presets under each** — the
+       same native select the gear tab adopts a member with: choosing an
+       entry adds it and the control snaps back to its label, so it reads as
+       a button with a menu and holds no state. The families are the three
+       a shape reads as (parallel axes, skew shafts, epicyclic) and the
+       entries are `defaults().stages`, so a preset added to the core's list
+       appears here by being on it. -->
+  <select
+    class="action add"
+    value=""
+    aria-label={t("ui.train_add_stage")}
+    onchange={(e) => {
+      const preset = e.currentTarget.value as StagePreset;
+      e.currentTarget.value = "";
+      addStagePreset(preset);
+    }}
+  >
+    <option value="" disabled>{t("ui.train_add_stage")}</option>
+    {#each STAGE_FAMILIES as family (family.key)}
+      <optgroup label={t(family.label)}>
+        {#each presetsOf(family.key) as entry (entry.preset)}
+          <option value={entry.preset}>{t(entry.label)}</option>
+        {/each}
+      </optgroup>
+    {/each}
+  </select>
 </div>
 
 <style>

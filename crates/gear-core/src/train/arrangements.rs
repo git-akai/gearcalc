@@ -183,32 +183,156 @@ pub fn layshaft(input: (u32, u32), pairs: &[(u32, u32)], engaged: usize) -> Shap
     b.build()
 }
 
+/// **A member on the central axis of an epicyclic stage**, or the carrier —
+/// what sits on the axis the planets go round, in the order it is listed.
+///
+/// The order is the shaft order, and the shaft order is what a stage's
+/// conventions read (`Shape::ports`): the first ring listed is held, the
+/// first shaft not held is the input and the next the output. So a list
+/// is an arrangement *and* the way it is conventionally used, and every
+/// textbook arrangement below is one list with nothing else stated.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Central {
+    /// The carrier, on its own shaft. One per stage.
+    Carrier,
+    /// An external gear meshing the planet gear `on` (an index into the
+    /// planet gears as [`epicyclic`] flattens them, axis by axis).
+    Sun { on: usize, teeth: u32 },
+    /// A ring meshing the planet gear `on`.
+    Ring { on: usize, teeth: u32 },
+}
+
+/// **The one epicyclic stage**: a carrier, `planets` carried axes each
+/// replicated `count` times and each carrying the gears it lists (a step
+/// each, on one shaft), the central members and the carrier in
+/// [`Central`]'s order, and `planet_meshes` between planet gears on
+/// different axes. A simple set, a Wolfrom, a stepped planet, a planocentric,
+/// meshed planets and a Ravigneaux are lists; so is a hula stage, at one
+/// planet with two steps and a ring on each.
+///
+/// Shafts: the centrals in list order (the carrier among them), then one
+/// per carried axis. Members: the centrals in list order, then the planet
+/// gears axis by axis — so the first ring listed is `Ring 1` and the one
+/// held by convention, which is how the textbook reads it.
+///
+/// # Panics
+///
+/// On a list with no carrier, or a central on a planet gear that is not
+/// there — a mistake in a fixture, not an input a designer can write.
+#[must_use]
+pub fn epicyclic(
+    count: u32,
+    planets: &[&[u32]],
+    centrals: &[Central],
+    planet_meshes: &[(usize, usize)],
+) -> Shape {
+    let mut b = Builder::new(1.0);
+    let centre = b.axis();
+    // Every central shaft first, in the order listed; the carrier's number
+    // is what the carried axes are hung from.
+    let shafts: Vec<Shaft> = centrals.iter().map(|_| b.shaft(centre)).collect();
+    let carrier = centrals
+        .iter()
+        .position(|c| *c == Central::Carrier)
+        .map(|i| shafts[i])
+        .expect("an epicyclic stage has a carrier");
+    let axes: Vec<usize> = planets
+        .iter()
+        .map(|_| b.carried_axis(Some(carrier), count))
+        .collect();
+    let planet_shafts: Vec<Shaft> = axes.iter().map(|&a| b.shaft(a)).collect();
+    // Centrals are members before the planets are, so the ordinals a name
+    // carries follow the list.
+    let central_members: Vec<Option<usize>> = centrals
+        .iter()
+        .zip(&shafts)
+        .map(|(c, &shaft)| match *c {
+            Central::Carrier => None,
+            Central::Sun { teeth, .. } => Some(b.gear(shaft, teeth)),
+            Central::Ring { teeth, .. } => Some(b.ring(shaft, teeth)),
+        })
+        .collect();
+    let mut planet_members: Vec<usize> = Vec::new();
+    let mut axis_of_planet: Vec<usize> = Vec::new();
+    for (k, steps) in planets.iter().enumerate() {
+        for &teeth in steps.iter() {
+            planet_members.push(b.gear(planet_shafts[k], teeth));
+            axis_of_planet.push(axes[k]);
+        }
+    }
+    for (c, m) in centrals.iter().zip(&central_members) {
+        if let (Central::Sun { on, .. } | Central::Ring { on, .. }, Some(m)) = (*c, *m) {
+            b.mesh(m, planet_members[on]);
+        }
+    }
+    for &(p, q) in planet_meshes {
+        b.mesh(planet_members[p], planet_members[q]);
+    }
+    for &axis in &axes {
+        b.distance([centre, axis]);
+    }
+    let mut between: Vec<[usize; 2]> = Vec::new();
+    for &(p, q) in planet_meshes {
+        let pair = [axis_of_planet[p], axis_of_planet[q]];
+        if pair[0] != pair[1] && !between.contains(&pair) && !between.contains(&[pair[1], pair[0]])
+        {
+            between.push(pair);
+            b.distance(pair);
+        }
+    }
+    b.build()
+}
+
+/// **A line of gears on parallel axes**, each meshing the next: two are a
+/// pair, three a pair with an idler, and the ratio is the ends' whatever
+/// stands between. Shafts and members in the order given.
+///
+/// # Panics
+///
+/// On fewer than two gears.
+#[must_use]
+pub fn line(teeth: &[u32]) -> Shape {
+    assert!(teeth.len() >= 2, "a line of gears is at least a pair");
+    let mut b = Builder::new(1.0);
+    let members: Vec<usize> = teeth
+        .iter()
+        .map(|&z| {
+            let axis = b.axis();
+            let shaft = b.shaft(axis);
+            b.gear(shaft, z)
+        })
+        .collect();
+    for k in 1..members.len() {
+        b.mesh(members[k - 1], members[k]).distance([k - 1, k]);
+    }
+    b.build()
+}
+
 /// **A Wolfrom (3K) set**: one planet meshing two rings at one carrier
 /// radius, one ring held, the other the output, the carrier the input. No
 /// sun; the ratio is `z_r2 / (z_r2 − z_r1)` at one planet, which is what
 /// makes a difference of a few teeth a large reduction.
 ///
-/// Shafts: carrier 1, second ring 2, first ring 3, planet 4; members: the
-/// planet, the first ring, the second. The first ring listed is the one the
-/// shape holds by convention and the output is the next free port after the
-/// driven one, so the textbook arrangement is the one it takes with nothing
-/// stated.
+/// Carrier, first ring, second ring — the first ring held by convention,
+/// the carrier in and the second ring out with nothing stated.
 #[must_use]
 pub fn wolfrom(planet: u32, rings: [u32; 2], count: u32) -> Shape {
-    let mut b = Builder::new(1.0);
-    let centre = b.axis();
-    let carrier = b.shaft(centre);
-    let orbit = b.carried_axis(Some(carrier), count);
-    let r2 = b.shaft(centre);
-    let r1 = b.shaft(centre);
-    let p = b.shaft(orbit);
-    let planet = b.gear(p, planet);
-    let ring1 = b.ring(r1, rings[0]);
-    let ring2 = b.ring(r2, rings[1]);
-    b.mesh(planet, ring1)
-        .mesh(planet, ring2)
-        .distance([centre, orbit]);
-    b.build()
+    epicyclic(
+        count,
+        &[&[planet]],
+        &[
+            Central::Carrier,
+            Central::Ring {
+                on: 0,
+                teeth: rings[0],
+            },
+            Central::Ring {
+                on: 0,
+                teeth: rings[1],
+            },
+        ],
+        &[],
+    )
 }
 
 /// **A stepped-planet set**: two gears on each planet shaft, the first
@@ -216,31 +340,28 @@ pub fn wolfrom(planet: u32, rings: [u32; 2], count: u32) -> Shape {
 /// compound set at one carrier radius, which the second ring's shift
 /// closes.
 ///
-/// Shafts: sun 1, second ring 2, carrier 3, first ring 4, planet 5; the
-/// first ring is listed first among the rings and so held by convention,
-/// and the second ring is the next free port after the sun, so the
-/// convention gives the compound reduction; a hold on the carrier or a
-/// drive elsewhere gives the others.
+/// Sun, first ring, second ring, carrier: the first ring held by
+/// convention, the sun in and the second ring out — the compound
+/// reduction; a hold on the carrier or a drive elsewhere gives the others.
 #[must_use]
 pub fn stepped(sun: u32, planets: [u32; 2], rings: [u32; 2], count: u32) -> Shape {
-    let mut b = Builder::new(1.0);
-    let centre = b.axis();
-    let s = b.shaft(centre);
-    let r2 = b.shaft(centre);
-    let carrier = b.shaft(centre);
-    let orbit = b.carried_axis(Some(carrier), count);
-    let r1 = b.shaft(centre);
-    let p = b.shaft(orbit);
-    let sun = b.gear(s, sun);
-    let p1 = b.gear(p, planets[0]);
-    let p2 = b.gear(p, planets[1]);
-    let ring1 = b.ring(r1, rings[0]);
-    let ring2 = b.ring(r2, rings[1]);
-    b.mesh(sun, p1)
-        .mesh(p1, ring1)
-        .mesh(p2, ring2)
-        .distance([centre, orbit]);
-    b.build()
+    epicyclic(
+        count,
+        &[&planets],
+        &[
+            Central::Sun { on: 0, teeth: sun },
+            Central::Ring {
+                on: 0,
+                teeth: rings[0],
+            },
+            Central::Ring {
+                on: 1,
+                teeth: rings[1],
+            },
+            Central::Carrier,
+        ],
+        &[],
+    )
 }
 
 /// **A planocentric (cycloid-style involute) reducer**: one planet on an
@@ -248,19 +369,16 @@ pub fn stepped(sun: u32, planets: [u32; 2], rings: [u32; 2], count: u32) -> Shap
 /// the carrier the input, the planet's own rotation the output. The ratio
 /// is `−z_p / (z_r − z_p)`.
 ///
-/// Shafts: carrier 1, ring 2, planet 3.
+/// Carrier, ring, then the planet's own shaft — the output, an orbiting
+/// port.
 #[must_use]
 pub fn planocentric(planet: u32, ring: u32) -> Shape {
-    let mut b = Builder::new(1.0);
-    let centre = b.axis();
-    let carrier = b.shaft(centre);
-    let orbit = b.carried_axis(Some(carrier), 1);
-    let r = b.shaft(centre);
-    let p = b.shaft(orbit);
-    let planet = b.gear(p, planet);
-    let ring = b.ring(r, ring);
-    b.mesh(planet, ring).distance([centre, orbit]);
-    b.build()
+    epicyclic(
+        1,
+        &[&[planet]],
+        &[Central::Carrier, Central::Ring { on: 0, teeth: ring }],
+        &[],
+    )
 }
 
 /// **A set with meshed planets** — the "gutter": a sun meshing planet A,
@@ -268,29 +386,19 @@ pub fn planocentric(planet: u32, ring: u32) -> Shape {
 /// their own carried axes. It reverses the simple set's sense: with the
 /// ring held the carrier turns against the sun, at `1 − z_r/z_s`.
 ///
-/// Shafts: sun 1, carrier 2, ring 3, planet A 4, planet B 5.
+/// Sun, carrier, ring, then planet A's shaft and planet B's.
 #[must_use]
 pub fn meshed_planets(sun: u32, planets: [u32; 2], ring: u32, count: u32) -> Shape {
-    let mut b = Builder::new(1.0);
-    let centre = b.axis();
-    let s = b.shaft(centre);
-    let carrier = b.shaft(centre);
-    let r = b.shaft(centre);
-    let axis_a = b.carried_axis(Some(carrier), count);
-    let axis_b = b.carried_axis(Some(carrier), count);
-    let pa = b.shaft(axis_a);
-    let pb = b.shaft(axis_b);
-    let sun = b.gear(s, sun);
-    let a = b.gear(pa, planets[0]);
-    let z = b.gear(pb, planets[1]);
-    let ring = b.ring(r, ring);
-    b.mesh(sun, a)
-        .mesh(a, z)
-        .mesh(z, ring)
-        .distance([centre, axis_a])
-        .distance([centre, axis_b])
-        .distance([axis_a, axis_b]);
-    b.build()
+    epicyclic(
+        count,
+        &[&[planets[0]], &[planets[1]]],
+        &[
+            Central::Sun { on: 0, teeth: sun },
+            Central::Carrier,
+            Central::Ring { on: 1, teeth: ring },
+        ],
+        &[(0, 1)],
+    )
 }
 
 /// **A Ravigneaux set**: a small sun meshing the long planets, which mesh
@@ -298,34 +406,28 @@ pub fn meshed_planets(sun: u32, planets: [u32; 2], ring: u32, count: u32) -> Sha
 /// ones — two planet axes on one carrier, and the planet–planet mesh a
 /// distance between two carried axes.
 ///
-/// Shafts: small sun 1, carrier 2, large sun 3, ring 4, long planet 5,
-/// short planet 6 — the carrier the output by convention, whichever sun
+/// Small sun, carrier, large sun, ring, then the long planet's shaft and
+/// the short's — the carrier the output by convention, whichever sun
 /// drives and whichever is held.
 #[must_use]
 pub fn ravigneaux(suns: [u32; 2], planets: [u32; 2], ring: u32, count: u32) -> Shape {
-    let mut b = Builder::new(1.0);
-    let centre = b.axis();
-    let s1 = b.shaft(centre);
-    let carrier = b.shaft(centre);
-    let s2 = b.shaft(centre);
-    let r = b.shaft(centre);
-    let long_axis = b.carried_axis(Some(carrier), count);
-    let short_axis = b.carried_axis(Some(carrier), count);
-    let pl = b.shaft(long_axis);
-    let ps = b.shaft(short_axis);
-    let small_sun = b.gear(s1, suns[0]);
-    let large_sun = b.gear(s2, suns[1]);
-    let long = b.gear(pl, planets[0]);
-    let short = b.gear(ps, planets[1]);
-    let ring = b.ring(r, ring);
-    b.mesh(small_sun, long)
-        .mesh(long, ring)
-        .mesh(large_sun, short)
-        .mesh(short, long)
-        .distance([centre, long_axis])
-        .distance([centre, short_axis])
-        .distance([long_axis, short_axis]);
-    b.build()
+    epicyclic(
+        count,
+        &[&[planets[0]], &[planets[1]]],
+        &[
+            Central::Sun {
+                on: 0,
+                teeth: suns[0],
+            },
+            Central::Carrier,
+            Central::Sun {
+                on: 1,
+                teeth: suns[1],
+            },
+            Central::Ring { on: 0, teeth: ring },
+        ],
+        &[(1, 0)],
+    )
 }
 
 /// **A worm feeding a spur pair in one stage**: the worm on its own axis at
@@ -361,6 +463,150 @@ pub fn worm_and_pair(worm: (u32, u32), pair: (u32, u32)) -> Shape {
     b.build()
 }
 
+/// **The three families a shape reads as**, off its graph and never stored:
+/// a carried axis makes it epicyclic; failing that, a distance at an angle
+/// or marked as a worm drive makes it skew; anything else is parallel. A
+/// spur pair is the epicyclic family with its carrier held and no ring —
+/// which is why the family is a reading and not a kind, and why a crossed
+/// pair turned to nought is simply a parallel one afterwards.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
+pub enum StageFamily {
+    Parallel,
+    Skew,
+    Epicyclic,
+}
+
+impl Shape {
+    /// Which family this shape is, read off it — see [`StageFamily`].
+    #[must_use]
+    pub fn family(&self) -> StageFamily {
+        if self.axes.iter().any(|a| a.carried_by.is_some()) {
+            StageFamily::Epicyclic
+        } else if self.distances.iter().any(|d| d.angle != 0.0 || d.worm) {
+            StageFamily::Skew
+        } else {
+            StageFamily::Parallel
+        }
+    }
+}
+
+/// **A preset: a shape pre-assembled at sensible teeth**, offered by name
+/// under its family. None is a kind — every one is a list of what sits
+/// where, and a designer edits it into its neighbours afterwards — but a
+/// worm is not an obvious construction from a pair and a Wolfrom is not one
+/// from a planetary set, so each is a menu entry. The order here is the
+/// menu's.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
+pub enum StagePreset {
+    /// A spur or helical pair ([`super::PairStage`]).
+    Spur,
+    /// A pair with an idler between: the same ratio, the other sense.
+    Idler,
+    /// Two pairs on one distance with a layshaft between, one engaged.
+    Layshaft,
+    /// A worm and its wheel ([`super::PairStage::worm`]).
+    Worm,
+    /// A helical pair on shafts at a right angle: a point contact.
+    Crossed,
+    /// A simple set ([`super::PlanetaryStage`]).
+    Planetary,
+    /// A planet meshing two rings, no sun: the 3K reduction.
+    Wolfrom,
+    /// A stepped planet: sun and first ring on one gear, second ring on
+    /// the other.
+    Compound,
+    /// One planet in one ring, its own turn the output.
+    Planocentric,
+    /// Two planets in mesh between the sun and the ring: the reversing
+    /// set.
+    MeshedPlanets,
+}
+
+impl StagePreset {
+    /// Every preset, in the menu's order.
+    pub const ALL: [Self; 10] = [
+        Self::Spur,
+        Self::Idler,
+        Self::Layshaft,
+        Self::Worm,
+        Self::Crossed,
+        Self::Planetary,
+        Self::Wolfrom,
+        Self::Compound,
+        Self::Planocentric,
+        Self::MeshedPlanets,
+    ];
+
+    /// The family the preset is listed under — the family its shape reads
+    /// as, and the test below holds the two to each other.
+    #[must_use]
+    pub fn family(self) -> StageFamily {
+        match self {
+            Self::Spur | Self::Idler | Self::Layshaft => StageFamily::Parallel,
+            Self::Worm | Self::Crossed => StageFamily::Skew,
+            Self::Planetary
+            | Self::Wolfrom
+            | Self::Compound
+            | Self::Planocentric
+            | Self::MeshedPlanets => StageFamily::Epicyclic,
+        }
+    }
+
+    /// The catalogue key of the preset's name — a `ui.` key, since the
+    /// name is the interface's word and not a note the solve emits.
+    #[must_use]
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Spur => "ui.train_preset_spur",
+            Self::Idler => "ui.train_preset_idler",
+            Self::Layshaft => "ui.train_preset_layshaft",
+            Self::Worm => "ui.train_preset_worm",
+            Self::Crossed => "ui.train_preset_crossed",
+            Self::Planetary => "ui.train_preset_planetary",
+            Self::Wolfrom => "ui.train_preset_wolfrom",
+            Self::Compound => "ui.train_preset_compound",
+            Self::Planocentric => "ui.train_preset_planocentric",
+            Self::MeshedPlanets => "ui.train_preset_meshed_planets",
+        }
+    }
+
+    /// The shape the preset starts as. The two pairs and the simple set
+    /// are their own vocabularies' defaults; the rest are the lists above
+    /// at the counts the suite's textbook checks use.
+    #[must_use]
+    pub fn build(self) -> Shape {
+        match self {
+            Self::Spur => Shape::from(&super::PairStage::default()),
+            Self::Idler => line(&[17, 25, 43]),
+            Self::Layshaft => layshaft((17, 43), &[(19, 41), (31, 29)], 1),
+            Self::Worm => Shape::from_pair(&super::PairStage::worm(), super::PairKind::Worm),
+            Self::Crossed => Shape::from(&super::PairStage {
+                shaft_angle: 90.0,
+                ..super::PairStage::default()
+            }),
+            Self::Planetary => Shape::from(&super::PlanetaryStage::default()),
+            Self::Wolfrom => wolfrom(18, [60, 61], 3),
+            Self::Compound => stepped(24, [18, 17], [60, 59], 3),
+            Self::Planocentric => planocentric(30, 33),
+            Self::MeshedPlanets => meshed_planets(24, [18, 18], 96, 3),
+        }
+    }
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
@@ -370,11 +616,25 @@ mod tests {
     //! the set's kind could not name.
 
     use super::super::shape::{solve_loads, ShapeResult};
-    use super::super::{test_library as library, Reversal, StageBoundary, StageLoads};
+    use super::super::{test_library as library, Constrained, Reversal, StageBoundary, StageLoads};
     use super::*;
 
     fn solve(shape: &Shape, held: &[Shaft], input: Shaft, output: Shaft) -> ShapeResult {
         let boundary = StageBoundary::holding(shape.shafts.len() + 1, held, input, output);
+        under(shape, boundary)
+    }
+
+    /// The arrangement as its list reads: the first ring held, the first
+    /// shaft not held driven, the next the output — what a stage does with
+    /// nothing stated, which is the claim each list's doc makes.
+    fn conventionally(shape: &Shape) -> ShapeResult {
+        under(
+            shape,
+            StageBoundary::conventional(&shape.wiring(), &shape.ports()),
+        )
+    }
+
+    fn under(shape: &Shape, boundary: StageBoundary) -> ShapeResult {
         solve_loads(
             shape,
             &StageLoads::at(2.0, 3000.0).under(boundary),
@@ -502,7 +762,7 @@ mod tests {
     fn a_wolfrom_set_reduces_by_the_ring_difference() {
         // Carrier in, first ring held, second ring out: i = z_r2 / (z_r2 − z_r1).
         let shape = wolfrom(18, [60, 61], 3);
-        let r = solve(&shape, &[3], 1, 2);
+        let r = conventionally(&shape);
         assert!(
             (r.ratio.unwrap() - 61.0).abs() < 1e-12,
             "{}",
@@ -518,7 +778,7 @@ mod tests {
         // planet: ω_r2 − ω_c = (ω_s − ω_c) · (−z_s/z_p1) · (z_p2/z_r2).
         let (zs, zp1, zr1, zp2, zr2) = (24, 18, 60, 17, 59);
         let shape = stepped(zs, [zp1, zp2], [zr1, zr2], 3);
-        let r = solve(&shape, &[4], 1, 2);
+        let r = conventionally(&shape);
         let e1 = -f64::from(zs) / f64::from(zp1) * f64::from(zp1) / f64::from(zr1);
         let e2 = -f64::from(zs) / f64::from(zp1) * f64::from(zp2) / f64::from(zr2);
         // With ring 1 held, ω_c/ω_s = e1/(e1 − 1); then ω_r2 = ω_c + e2(ω_s − ω_c).
@@ -538,7 +798,7 @@ mod tests {
         // Carrier in, ring held, the planet's own turn out.
         for (zp, zr) in [(30, 33), (40, 42)] {
             let shape = planocentric(zp, zr);
-            let r = solve(&shape, &[2], 1, 3);
+            let r = conventionally(&shape);
             let want = -f64::from(zr - zp) / f64::from(zp);
             assert!(
                 (1.0 / r.ratio.unwrap() - want).abs() < 1e-12,
@@ -566,7 +826,7 @@ mod tests {
             m.gear.addendum = 0.7;
             m.gear.dedendum = 1.0;
         }
-        shape.members[1].ring = Some(Cutter {
+        shape.members[0].ring = Some(Cutter {
             teeth: 20,
             addendum: 1.0,
             ..Cutter::default()
@@ -583,8 +843,8 @@ mod tests {
         every_distance_closes(&r);
         // The far-side gap is what was asked, to the solver's tolerance, and
         // the tips do not cross.
-        let (pinion, ring) = (&r.members[0], &r.members[1]);
-        let ring_tip = crate::ring::Ring::cut_by(&ring.params, &shape.members[1].ring.unwrap()).ra;
+        let (ring, pinion) = (&r.members[0], &r.members[1]);
+        let ring_tip = crate::ring::Ring::cut_by(&ring.params, &shape.members[0].ring.unwrap()).ra;
         let far = ring_tip - crate::tooth::Tooth::new(pinion.params).ra + d.running;
         assert!((far - 0.3).abs() < 1e-6 || far > 0.3, "far-side gap {far}");
         assert_eq!(r.meshes[0].tips.map(|t| t.tip_interference), Some(false));
@@ -609,14 +869,14 @@ mod tests {
         for (m, g) in shape
             .members
             .iter_mut()
-            .zip([&hula.gears[1], &hula.gears[0]])
+            .zip([&hula.gears[0], &hula.gears[1]])
         {
             m.gear = StageGear {
                 teeth: m.gear.teeth,
                 ..g.clone()
             };
         }
-        shape.members[1].ring = Some(Cutter {
+        shape.members[0].ring = Some(Cutter {
             teeth: 14,
             ..hula.cutter[0]
         });
@@ -630,7 +890,7 @@ mod tests {
             d.running
         );
         assert!(
-            (r.members[1].profile_shift - 0.4519).abs() < 2e-4,
+            (r.members[0].profile_shift - 0.4519).abs() < 2e-4,
             "the ring's shift"
         );
     }
@@ -640,7 +900,7 @@ mod tests {
         // Sun in, ring held, carrier out: 1 − z_r/z_s, negative.
         let (zs, zr) = (24, 96);
         let shape = meshed_planets(zs, [18, 18], zr, 3);
-        let r = solve(&shape, &[3], 1, 2);
+        let r = conventionally(&shape);
         assert!(
             (r.ratio.unwrap() - (1.0 - f64::from(zr) / f64::from(zs))).abs() < 1e-12,
             "{}",
@@ -687,5 +947,22 @@ mod tests {
         assert_eq!(r.layouts.len(), 2);
         assert_eq!((r.layouts[0].axis, r.layouts[1].axis), (1, 2));
         assert!(r.layouts.iter().all(|l| l.count == 3 && l.clearance > 0.0));
+    }
+
+    /// **Every preset reads as the family it is listed under, and solves
+    /// with nothing stated** — the menu's grouping is the shape's own
+    /// reading, and a preset a designer adds is a stage that answers.
+    #[test]
+    fn every_preset_is_in_its_own_family_and_solves_conventionally() {
+        for preset in StagePreset::ALL {
+            let shape = preset.build();
+            assert_eq!(shape.family(), preset.family(), "{preset:?}");
+            let r = conventionally(&shape);
+            assert!(
+                r.ratio.is_some_and(|x| x.is_finite() && x != 0.0),
+                "{preset:?}"
+            );
+            every_distance_closes(&r);
+        }
     }
 }

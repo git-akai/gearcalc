@@ -515,7 +515,7 @@ fn report(name: &str, train: &Train, r: &TrainResult) {
                     .ratio_per_tooth
                     .iter()
                     .flatten()
-                    .map(|r| format!("{r:.6}"))
+                    .map(|r| r.map_or_else(|| "locked".to_string(), |r| format!("{r:.6}")))
                     .collect::<Vec<_>>()
                     .join(" ")
             );

@@ -1716,24 +1716,26 @@ impl Shape {
     }
 
     /// **The ratio with one more tooth on each member**, off the graph
-    /// alone; the ratio itself where a count cannot change it, or where the
-    /// changed counts are no mechanism.
+    /// alone; `None` where the changed counts are no mechanism, or lock it
+    /// — a Wolfrom's rings brought level stop its output, and a ratio of
+    /// infinity is not a figure a designer can compare. (It used to answer
+    /// the ratio itself for the no-mechanism case, which said a tooth
+    /// changed nothing where in fact it broke everything.)
     fn ratio_per_tooth(
         &self,
         wiring: &Wiring,
         teeth: &[u32],
         boundary: &super::StageBoundary,
-    ) -> Vec<f64> {
-        let base = wiring
-            .unit_motion(teeth, boundary)
-            .map_or(f64::NAN, |m| m.ratio());
+    ) -> Vec<Option<f64>> {
         (0..teeth.len())
             .map(|i| {
                 let mut more = teeth.to_vec();
                 more[i] += 1;
                 wiring
                     .unit_motion(&more, boundary)
-                    .map_or(base, |m| m.ratio())
+                    .ok()
+                    .map(|m| m.ratio())
+                    .filter(|r| r.is_finite())
             })
             .collect()
     }
@@ -2657,8 +2659,9 @@ pub struct ShapeResult {
     /// order — the graph's exact answer at `z_i + 1`, which is what a
     /// designer choosing counts wants beside the ratio: where a tooth
     /// moves it a lot, and where it moves it not at all. `None` with the
-    /// ratio.
-    pub ratio_per_tooth: Option<Vec<f64>>,
+    /// ratio; an entry `None` where that one tooth leaves no mechanism or
+    /// locks it.
+    pub ratio_per_tooth: Option<Vec<Option<f64>>>,
     /// `None` with the ratio.
     pub efficiency: Option<Directional<f64>>,
     /// **The power crossing the teeth, over the power in**, in each
@@ -4186,8 +4189,9 @@ mod tests {
         let lib = test_library();
         let pair = Shape::from_pair(&PairStage::default(), PairKind::Spur);
         let r = solve_loads(&pair, &loads(), &lib, super::super::Reversal::default()).unwrap();
-        assert!((r.ratio_per_tooth.as_ref().unwrap()[1] + 44.0 / 17.0).abs() < 1e-12);
-        assert!((r.ratio_per_tooth.as_ref().unwrap()[0] + 43.0 / 18.0).abs() < 1e-12);
+        let per = |i: usize| r.ratio_per_tooth.as_ref().unwrap()[i].unwrap();
+        assert!((per(1) + 44.0 / 17.0).abs() < 1e-12);
+        assert!((per(0) + 43.0 / 18.0).abs() < 1e-12);
         assert!(
             (r.circulation.unwrap().forward - 1.0).abs() < 1e-12,
             "a pair passes it all once"
@@ -4195,17 +4199,33 @@ mod tests {
         let set = PlanetaryStage::default();
         let r = solve_set(&set, &loads(), &lib).unwrap();
         assert!((r.ratio.unwrap() - 7.0).abs() < 1e-12);
+        let per = |i: usize| r.ratio_per_tooth.as_ref().unwrap()[i].unwrap();
         assert!(
-            (r.ratio_per_tooth.as_ref().unwrap()[0] - (1.0 + 72.0 / 13.0)).abs() < 1e-12,
+            (per(0) - (1.0 + 72.0 / 13.0)).abs() < 1e-12,
             "a sun's tooth"
         );
         assert!(
-            (r.ratio_per_tooth.as_ref().unwrap()[1] - 7.0).abs() < 1e-12,
+            (per(1) - 7.0).abs() < 1e-12,
             "a planet's tooth moves nothing"
         );
         assert!(
-            (r.ratio_per_tooth.as_ref().unwrap()[2] - (1.0 + 73.0 / 12.0)).abs() < 1e-12,
+            (per(2) - (1.0 + 73.0 / 12.0)).abs() < 1e-12,
             "a ring's tooth"
+        );
+        // A tooth that locks the stage is no figure: a Wolfrom's held ring
+        // brought level with its output ring stops the output.
+        let wolfrom = solve_loads(
+            &super::super::arrangements::wolfrom(18, [60, 61], 3),
+            &loads(),
+            &lib,
+            super::super::Reversal::default(),
+        )
+        .unwrap();
+        let per = wolfrom.ratio_per_tooth.as_ref().unwrap();
+        assert_eq!(per[0], None, "ring 1 at 61: locked");
+        assert!(
+            per[1].is_some_and(|x| (x - 31.0).abs() < 1e-9),
+            "ring 2 at 62: 62/2"
         );
         // ...and the power through a set's sun mesh is under the power in,
         // the carrier carrying the rest bodily: with the ring held, the
@@ -5544,11 +5564,11 @@ mod member_names {
         );
         assert_eq!(
             names(&arr::wolfrom(18, [60, 61], 3)),
-            s(&["planet", "ring 1", "ring 2"])
+            s(&["ring 1", "ring 2", "planet"])
         );
         assert_eq!(
             names(&arr::ravigneaux([18, 30], [22, 18], 62, 3)),
-            s(&["sun 1", "sun 2", "planet 1", "planet 2", "ring"])
+            s(&["sun 1", "sun 2", "ring", "planet 1", "planet 2"])
         );
         assert_eq!(
             names(&arr::worm_and_pair((1, 40), (17, 43))),

@@ -57,6 +57,7 @@ pub use conditions::{
 };
 
 use crate::kinematics::{Condition, Shaft, GROUND};
+pub use arrangements::{StageFamily, StagePreset};
 pub use hula::{stage_efficiency, HulaStage};
 pub(crate) use pair::ShiftAsked;
 pub use pair::{PairKind, PairStage};

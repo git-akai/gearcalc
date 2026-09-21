@@ -27,9 +27,10 @@ ratio: number | null,
  * order — the graph's exact answer at `z_i + 1`, which is what a
  * designer choosing counts wants beside the ratio: where a tooth
  * moves it a lot, and where it moves it not at all. `None` with the
- * ratio.
+ * ratio; an entry `None` where that one tooth leaves no mechanism or
+ * locks it.
  */
-ratio_per_tooth: Array<number> | null, 
+ratio_per_tooth: Array<number | null> | null, 
 /**
  * `None` with the ratio.
  */

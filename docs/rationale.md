@@ -2011,12 +2011,21 @@ as the field list beside it: a kind's name, its note and whether it is offered
 are one row rather than three places to keep in step, and the picker renders
 whatever the row says.
 
-**And the same table shape gates the geartrain's presets**, so one knock reaches
-both. A stage preset was three hand-written buttons and four hand-written
-accessors for a default; it is one row each now, carrying the catalogue key, the
-default the core supplies and whether the mode has to be open for it. A crossed
-pair is deliberately not a row: it is a spur stage with its shafts at an angle,
-and the core says so.
+**The geartrain's presets are the core's list, not a table of their own.** A
+stage preset was three hand-written buttons and four hand-written accessors
+for a default, then a row each in a TypeScript table; it is now a variant of
+`StagePreset` in `gear-core`, which knows its family, the catalogue key of its
+name and the shape it starts as, and `defaults()` crosses the whole list under
+its three families — parallel axes, skew shafts, epicyclic — so the "add
+stage" menu renders from the list and a preset added in the core is on the
+menu by being on the list. The families are what a shape *reads as*
+(`Shape::family`), never a stored kind: a spur pair is the epicyclic family
+with its carrier held and no ring, and a crossed pair turned to nought is a
+parallel one afterwards. A crossed pair *is* an entry now, and so is a worm,
+for the menu's sake alone: each is a spur stage with something set on its
+distance, and neither is an obvious thing to build from a pair, which is what
+a preset is for. None is behind the developer knock; the knock keeps the
+eccentric gear only.
 
 ### Additions to the specification's field list
 

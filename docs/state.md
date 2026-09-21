@@ -529,8 +529,11 @@ proof-read before anyone leans on it. Correcting one changes no calculation:
 **Materials, export, UI.** An eight-material library with per-value provenance ·
 DXF with exact arcs for external *and* internal gears, written to the published
 R2000 minimum so a reader that repairs nothing still opens it — confirmed
-importing into SOLIDWORKS · geartrain presets: spur/helical, crossed, worm,
-planetary and **hula**, the last behind the developer knock, all one shape ·
+importing into SOLIDWORKS · geartrain presets under three families: parallel
+axes (spur/helical, idler, layshaft), skew shafts (worm, crossed), epicyclic
+(planetary, Wolfrom, compound, planocentric, meshed planets), all one shape,
+and the hula stage still carried by the boundary until the Wolfrom preset at
+one planet is shown to be it ·
 geartrains
 exported and imported as TOML, inputs only · gear tabs with external and internal
 kinds, and eccentric in the same developer mode.
