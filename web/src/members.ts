@@ -61,7 +61,7 @@ export function memberListName(train: Train, topology: StagePorts[], stage: numb
  *  ground's — which is what makes it a planet. */
 export function carried(shape: Shape, member: number): boolean {
   const axis = shape.axes[shape.shafts[shape.members[member].shaft - 1]?.axis];
-  return axis !== undefined && axis.carried_by !== null;
+  return axis !== undefined && axis.carried_by !== 0;
 }
 
 /** Whether a shape is a worm drive: its first distance says so, as a preset's

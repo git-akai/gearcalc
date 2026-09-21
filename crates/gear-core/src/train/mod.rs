@@ -4814,8 +4814,8 @@ mod tests {
     }
 
     /// The hula arrangement (`arrangements::hula`) at the shipped counts,
-    /// as a stage: members grounded gear, output, the two wobble gears;
-    /// shafts crank 1, grounded 2, output 3, wobble 4.
+    /// as a stage: members the two wobble gears, the grounded gear, the
+    /// output; shafts crank 1, grounded 2, output 3, wobble 4.
     fn hula() -> Stage {
         Stage::Shape(Box::new(hula_shape([65, 61, 57, 61])))
     }
@@ -6286,7 +6286,7 @@ mod tests {
     /// The four presets, for a law about every one of them.
     fn every_preset() -> Vec<Stage> {
         let mut hula = hula_shape([65, 61, 57, 61]);
-        hula.members[0].gear.profile_shift = Auto::automatic(0.0);
+        hula.members[2].gear.profile_shift = Auto::automatic(0.0);
         vec![
             Stage::spur(PairStage::default()),
             Stage::worm(PairStage::worm()),
@@ -6364,7 +6364,7 @@ mod tests {
         }
         for teeth in [[65_u32, 61, 57, 61], [19, 18, 17, 16]] {
             let mut h = hula_shape(teeth);
-            h.members[0].gear.profile_shift = Auto::automatic(0.0);
+            h.members[2].gear.profile_shift = Auto::automatic(0.0);
             out.push(conventional(
                 format!("hula {teeth:?}"),
                 Stage::Shape(Box::new(h)),
@@ -8803,10 +8803,11 @@ mod tests {
             let r = solve_train(&t, &lib).expect("a train that solves");
             let s = r.stages[1].as_shape().expect("a hula stage");
             let at = |g: &GearResult, case: usize| g.cases[case].torque;
-            // The output over the grounded gear: the two central members.
+            // The output over the grounded gear: the two central members,
+            // after the two wobble gears.
             (
-                at(&s.members[1], PEAK) / at(&s.members[0], PEAK),
-                at(&s.members[1], BACK) / at(&s.members[0], BACK),
+                at(&s.members[3], PEAK) / at(&s.members[2], PEAK),
+                at(&s.members[3], BACK) / at(&s.members[2], BACK),
             )
         };
         let (forward, backward) = ratios(0.0);
@@ -9605,10 +9606,11 @@ mod tests {
                     // crank, reported rather than left to be subtracted.
                     assert!((c.speed_against_carrier - (c.speed - crank)).abs() < 1e-9);
                 }
-                // The grounded gear stands still and is engaged once a crank
-                // turn, which is the whole duty's worth of revolutions.
+                // The grounded gear — member 2, after the two wobble gears —
+                // stands still and is engaged once a crank turn, which is the
+                // whole duty's worth of revolutions.
                 assert!(
-                    (cycles(&p.members[0]).bending - turns).abs() <= 1.0,
+                    (cycles(&p.members[2]).bending - turns).abs() <= 1.0,
                     "the grounded gear meets the wobble body once a crank turn"
                 );
             } else {

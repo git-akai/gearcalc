@@ -165,14 +165,12 @@ impl Shape {
     // ----------------------------------------------------------- reading ---
 
     fn carried(&self, axis: usize) -> bool {
-        self.axes[axis].carried_by.is_some()
+        self.axes[axis].carried_by != GROUND
     }
 
     /// The axis a carried axis goes round: its carrier's.
     fn central_axis_of(&self, axis: usize) -> Option<usize> {
-        self.axes[axis]
-            .carried_by
-            .and_then(|c| self.axis_of_shaft(c))
+        self.axis_of_shaft(self.axes[axis].carried_by)
     }
 
     fn members_on_shaft(&self, shaft: Shaft) -> Vec<usize> {
@@ -203,7 +201,7 @@ impl Shape {
     }
 
     fn carries_an_axis(&self, shaft: Shaft) -> bool {
-        self.axes.iter().any(|a| a.carried_by == Some(shaft))
+        self.axes.iter().any(|a| a.carried_by == shaft)
     }
 
     /// **The carrier radius a carried axis runs at**, read off any mesh a
@@ -422,7 +420,7 @@ impl Shape {
             }
         }
         // On a parallel chain the same rule holds for a distance's last mesh.
-        if !self.axes.iter().any(|a| a.carried_by.is_some()) {
+        if !self.axes.iter().any(|a| a.carried_by != GROUND) {
             for k in self.meshes_of_member(member) {
                 if let Some(d) = self.distance_of(k) {
                     if self.meshes_on(d).len() < 2 {
@@ -437,7 +435,7 @@ impl Shape {
     // ----------------------------------------------------------- parallel ---
 
     fn add_axis(&mut self) -> Result<Renumbered, EditRefused> {
-        if self.axes.iter().any(|a| a.carried_by.is_some()) {
+        if self.axes.iter().any(|a| a.carried_by != GROUND) {
             return Err(EditRefused::WrongFamily);
         }
         let last_axis = self.axes.len() - 1;
@@ -446,7 +444,7 @@ impl Shape {
             .find(|&i| self.axis_of_shaft(self.shaft_of(i)) == Some(last_axis))
             .ok_or(EditRefused::NoSuchIndex)?;
         self.axes.push(Axis {
-            carried_by: None,
+            carried_by: GROUND,
             count: 1,
         });
         let axis = self.axes.len() - 1;
@@ -463,7 +461,7 @@ impl Shape {
     }
 
     fn remove_axis(&mut self) -> Result<Renumbered, EditRefused> {
-        if self.axes.iter().any(|a| a.carried_by.is_some()) {
+        if self.axes.iter().any(|a| a.carried_by != GROUND) {
             return Err(EditRefused::WrongFamily);
         }
         if self.axes.len() < 3 {
@@ -638,10 +636,8 @@ impl Shape {
             }
         }
         for a in &mut self.axes {
-            if let Some(c) = &mut a.carried_by {
-                if *c > shaft {
-                    *c -= 1;
-                }
+            if a.carried_by > shaft {
+                a.carried_by -= 1;
             }
         }
         Renumbered(
@@ -704,7 +700,7 @@ mod tests {
 
     /// The edits that apply to a shape, each on its first candidate.
     fn applicable(shape: &Shape) -> Vec<StageEdit> {
-        let carried = (0..shape.axes.len()).find(|&a| shape.axes[a].carried_by.is_some());
+        let carried = (0..shape.axes.len()).find(|&a| shape.axes[a].carried_by != GROUND);
         let mut out = vec![
             StageEdit::MoveShaft {
                 member: 0,
@@ -775,7 +771,8 @@ mod tests {
     #[test]
     fn every_add_undoes() {
         let wolfrom = StagePreset::Wolfrom.build();
-        let planet = wolfrom.members.len() - 1;
+        // Members: planet, ring 1, ring 2.
+        let planet = 0;
         for (add, remove) in [
             (
                 StageEdit::AddCentral {
@@ -833,12 +830,12 @@ mod tests {
         let cases: Vec<(Shape, StageEdit, EditRefused)> = vec![
             (
                 StagePreset::Planocentric.build(),
-                StageEdit::RemoveMember { member: 0 },
+                StageEdit::RemoveMember { member: 1 },
                 EditRefused::LastOnItsStep,
             ),
             (
                 StagePreset::Planocentric.build(),
-                StageEdit::RemoveStep { gear: 1 },
+                StageEdit::RemoveStep { gear: 0 },
                 EditRefused::LastOnItsStep,
             ),
             (
@@ -877,7 +874,7 @@ mod tests {
             (
                 StagePreset::Planocentric.build(),
                 StageEdit::AddCentral {
-                    gear: 1,
+                    gear: 0,
                     ring: false,
                 },
                 EditRefused::NoRoom,
@@ -904,11 +901,11 @@ mod tests {
             ],
             vec![LoadCase::ultimate(at(0, 1), at(1, 2), 1.0, 1000.0)],
         );
-        // The chain couples ring 2 (shaft 3) onward; hold ring 1 (shaft 2)
-        // explicitly too.
+        // The chain couples ring 2 (shaft 3) onward; hold ring 1 (shaft 2,
+        // member 1 after the planet) explicitly too.
         t.hold(at(0, 2));
         assert!(t.couplings.iter().any(|c| c.a == at(0, 3)));
-        t.edit_stage(0, StageEdit::RemoveMember { member: 0 })
+        t.edit_stage(0, StageEdit::RemoveMember { member: 1 })
             .unwrap();
         assert_eq!(t.stages[0].as_shape().unwrap().members.len(), 2);
         assert!(
@@ -927,7 +924,7 @@ mod tests {
         t.edit_stage(
             0,
             StageEdit::AddCentral {
-                gear: 1,
+                gear: 0,
                 ring: false,
             },
         )
@@ -943,14 +940,15 @@ mod tests {
     #[test]
     fn the_hula_is_reached_from_the_wolfrom_by_edits() {
         let mut shape = StagePreset::Wolfrom.build();
-        // Members: ring 1, ring 2, planet. A step: planet 2 and a ring on it.
+        // Members: planet, ring 1, ring 2. A step: planet 2 and a ring on it.
         shape.edit(StageEdit::AddStep { axis: 1 }).unwrap();
         assert_eq!(shape.members.len(), 5);
         // Ring 2 off the first planet: the first step keeps ring 1.
-        shape.edit(StageEdit::RemoveMember { member: 1 }).unwrap();
-        // Now: ring 1 (grounded), planet 1, planet 2, ring on planet 2.
+        shape.edit(StageEdit::RemoveMember { member: 2 }).unwrap();
+        // Now: planet 1, ring 1 (grounded), planet 2, ring on planet 2 —
+        // the hula's 18, 19, 17, 18.
         shape.axes[1].count = 1;
-        for (m, z) in shape.members.iter_mut().zip([19, 18, 17, 18]) {
+        for (m, z) in shape.members.iter_mut().zip([18, 19, 17, 18]) {
             m.gear.teeth = z;
         }
         // Under the hula's arrangement on each: crank driven, grounded ring
@@ -978,7 +976,7 @@ mod tests {
     #[test]
     fn a_planet_between_two_suns_is_a_wolfrom_with_the_sign_flipped() {
         let mut shape = StagePreset::Wolfrom.build();
-        let planet = 2;
+        let planet = 0;
         shape
             .edit(StageEdit::AddCentral {
                 gear: planet,
@@ -991,10 +989,10 @@ mod tests {
                 ring: false,
             })
             .unwrap();
-        // Rings 1 and 2 are members 0 and 1; what is left is the planet
+        // Rings 1 and 2 are members 1 and 2; what is left is the planet
         // and the two suns, 24 and 23 teeth at the Wolfrom's radius.
+        shape.edit(StageEdit::RemoveMember { member: 2 }).unwrap();
         shape.edit(StageEdit::RemoveMember { member: 1 }).unwrap();
-        shape.edit(StageEdit::RemoveMember { member: 0 }).unwrap();
         let (s1, s2) = (
             f64::from(shape.members[1].gear.teeth),
             f64::from(shape.members[2].gear.teeth),

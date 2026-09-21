@@ -2157,7 +2157,7 @@ Every stage is one **shape**: a graph the geometry is hung on, and a solve
 that reads what to do off it rather than off a type.
 
 ```text
-axis       carried_by  a shaft, or none for an axis fixed in the ground
+axis       carried_by  the shaft it is carried round by — ground, 0, for an axis fixed in it
            count       how many copies stand round the carrier — planets
 shaft      axis        the axis it spins about; shaft 0 is the ground
 member     shaft, gear, module, k, ring cutter (none for an external gear),

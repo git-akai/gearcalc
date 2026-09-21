@@ -538,7 +538,8 @@ axes (spur/helical, idler, layshaft), skew shafts (worm, crossed), epicyclic
 (planetary, Wolfrom, compound, planocentric, meshed planets), all one shape,
 the hula an arrangement of the epicyclic family the harness names · a stage
 edited on its card — a step, a sun or a ring, an axis, a pair, a member's
-shaft — by the core's rules, the cases and couplings following ·
+shaft — by the core's rules, the cases and couplings following, the cards
+dealt by step ·
 geartrains
 exported and imported as TOML, inputs only · gear tabs with external and internal
 kinds, and eccentric in the same developer mode.

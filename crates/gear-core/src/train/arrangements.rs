@@ -17,7 +17,7 @@
 
 use super::shape::{Axis, Distance, Member, MeshInput, ShaftOn, Shape};
 use super::StageGear;
-use crate::kinematics::Shaft;
+use crate::kinematics::{Shaft, GROUND};
 use crate::params::Auto;
 use crate::ring::Cutter;
 
@@ -54,13 +54,13 @@ impl Builder {
         }
     }
 
-    /// An axis fixed in ground.
+    /// An axis fixed in ground: carried by ground, once.
     pub fn axis(&mut self) -> usize {
-        self.carried_axis(None, 1)
+        self.carried_axis(GROUND, 1)
     }
 
     /// An axis carried round by `carrier`, `count` times.
-    pub fn carried_axis(&mut self, carrier: Option<Shaft>, count: u32) -> usize {
+    pub fn carried_axis(&mut self, carrier: Shaft, count: u32) -> usize {
         self.shape.axes.push(Axis {
             carried_by: carrier,
             count,
@@ -212,9 +212,11 @@ pub enum Central {
 /// and a ring on each.
 ///
 /// Shafts: the centrals in list order (the carrier among them), then one
-/// per carried axis. Members: the centrals in list order, then the planet
-/// gears axis by axis — so the first ring listed is `Ring 1` and the one
-/// held by convention, which is how the textbook reads it.
+/// per carried axis. Members: the list's order too, **the planet gears
+/// standing where the carrier is listed**, axis by axis — so a simple set
+/// listed sun, carrier, ring reads sun, planet, ring, the first ring listed
+/// is `Ring 1` and the one held by convention, and a Wolfrom listed
+/// carrier, ring, ring reads planet, ring 1, ring 2.
 ///
 /// # Panics
 ///
@@ -239,32 +241,33 @@ pub fn epicyclic(
         .expect("an epicyclic stage has a carrier");
     let axes: Vec<usize> = planets
         .iter()
-        .map(|_| b.carried_axis(Some(carrier), count))
+        .map(|_| b.carried_axis(carrier, count))
         .collect();
     let planet_shafts: Vec<Shaft> = axes.iter().map(|&a| b.shaft(a)).collect();
-    // Centrals are members before the planets are, so the ordinals a name
-    // carries follow the list.
-    let central_members: Vec<Option<usize>> = centrals
-        .iter()
-        .zip(&shafts)
-        .map(|(c, &shaft)| match *c {
-            Central::Carrier => None,
-            Central::Sun { teeth, .. } => Some(b.gear(shaft, teeth)),
-            Central::Ring { teeth, .. } => Some(b.ring(shaft, teeth)),
-        })
-        .collect();
+    // Members in the list's order, the planets at the carrier's place, so
+    // the ordinals a name carries follow the list.
     let mut planet_members: Vec<usize> = Vec::new();
     let mut axis_of_planet: Vec<usize> = Vec::new();
-    for (k, steps) in planets.iter().enumerate() {
-        for &teeth in steps.iter() {
-            let member = if teeth < 0 {
-                b.ring(planet_shafts[k], teeth.unsigned_abs())
-            } else {
-                b.gear(planet_shafts[k], teeth.unsigned_abs())
-            };
-            planet_members.push(member);
-            axis_of_planet.push(axes[k]);
-        }
+    let mut central_members: Vec<Option<usize>> = Vec::new();
+    for (c, &shaft) in centrals.iter().zip(&shafts) {
+        central_members.push(match *c {
+            Central::Carrier => {
+                for (k, steps) in planets.iter().enumerate() {
+                    for &teeth in steps.iter() {
+                        let member = if teeth < 0 {
+                            b.ring(planet_shafts[k], teeth.unsigned_abs())
+                        } else {
+                            b.gear(planet_shafts[k], teeth.unsigned_abs())
+                        };
+                        planet_members.push(member);
+                        axis_of_planet.push(axes[k]);
+                    }
+                }
+                None
+            }
+            Central::Sun { teeth, .. } => Some(b.gear(shaft, teeth)),
+            Central::Ring { teeth, .. } => Some(b.ring(shaft, teeth)),
+        });
     }
     for (c, m) in centrals.iter().zip(&central_members) {
         if let (Central::Sun { on, .. } | Central::Ring { on, .. }, Some(m)) = (*c, *m) {
@@ -331,8 +334,10 @@ fn external(teeth: u32) -> i32 {
 /// meet. Each mesh's module is its own; the pinion of each states the
 /// thickness coefficient and its ring follows.
 ///
-/// Carrier, grounded gear, output, then the wobble body: the grounded gear
-/// held by convention, the crank in, the output out.
+/// Shafts: carrier, grounded gear, output, then the wobble body — the
+/// grounded gear held by convention, the crank in, the output out. Members:
+/// the two wobble gears, then the grounded gear and the output; each mesh
+/// is a wobble gear and the central of the same index.
 #[must_use]
 pub fn hula(teeth: [u32; 4], module: [f64; 2]) -> Shape {
     let pair = |mesh: usize| {
@@ -354,8 +359,6 @@ pub fn hula(teeth: [u32; 4], module: [f64; 2]) -> Shape {
     shape.optimisation.min_contact_ratio = 1.0;
     shape.min_planet_clearance = 0.0;
     shape.distances[0].tip_clearance = 0.3;
-    // Members: the two centrals, then the two wobble gears; each mesh is a
-    // central and the wobble gear of the same index.
     for (i, m) in shape.members.iter_mut().enumerate() {
         let mesh = i % 2;
         m.module = module[mesh];
@@ -556,7 +559,7 @@ impl Shape {
     /// Which family this shape is, read off it — see [`StageFamily`].
     #[must_use]
     pub fn family(&self) -> StageFamily {
-        if self.axes.iter().any(|a| a.carried_by.is_some()) {
+        if self.axes.iter().any(|a| a.carried_by != GROUND) {
             StageFamily::Epicyclic
         } else if self.distances.iter().any(|d| d.angle != 0.0 || d.worm) {
             StageFamily::Skew
@@ -748,7 +751,7 @@ mod tests {
             let sun = 0;
             for (i, m) in shape.members.iter().enumerate() {
                 let axis = shape.shafts[m.shaft - 1].axis;
-                if shape.axes[axis].carried_by.is_none() {
+                if shape.axes[axis].carried_by == GROUND {
                     continue;
                 }
                 // The sun's tooth load — one instance's — read across to
@@ -895,7 +898,7 @@ mod tests {
             m.gear.addendum = 0.7;
             m.gear.dedendum = 1.0;
         }
-        shape.members[0].ring = Some(Cutter {
+        shape.members[1].ring = Some(Cutter {
             teeth: 20,
             addendum: 1.0,
             ..Cutter::default()
@@ -912,8 +915,8 @@ mod tests {
         every_distance_closes(&r);
         // The far-side gap is what was asked, to the solver's tolerance, and
         // the tips do not cross.
-        let (ring, pinion) = (&r.members[0], &r.members[1]);
-        let ring_tip = crate::ring::Ring::cut_by(&ring.params, &shape.members[0].ring.unwrap()).ra;
+        let (pinion, ring) = (&r.members[0], &r.members[1]);
+        let ring_tip = crate::ring::Ring::cut_by(&ring.params, &shape.members[1].ring.unwrap()).ra;
         let far = ring_tip - crate::tooth::Tooth::new(pinion.params).ra + d.running;
         assert!((far - 0.3).abs() < 1e-6 || far > 0.3, "far-side gap {far}");
         assert_eq!(r.meshes[0].tips.map(|t| t.tip_interference), Some(false));
@@ -933,8 +936,9 @@ mod tests {
     /// to the same offset by the shape — two solvers, one bound.
     #[test]
     fn the_shape_sizes_a_distance_where_the_hula_stage_does() {
-        // The hula's proportions: the first mesh of `hula([19, 18, ..])`,
-        // as a planocentric of the same two members.
+        // The hula's proportions: the first mesh of `hula([19, 18, ..])` —
+        // its first wobble gear and its grounded ring — as a planocentric of
+        // the same two members, planet then ring.
         let proportions = hula([19, 18, 17, 18], [1.0, 1.0]);
         let mut shape = planocentric(18, 19);
         for (m, g) in shape
@@ -947,9 +951,9 @@ mod tests {
                 ..g.gear.clone()
             };
         }
-        shape.members[0].ring = Some(Cutter {
+        shape.members[1].ring = Some(Cutter {
             teeth: 14,
-            ..proportions.members[0].ring.unwrap()
+            ..proportions.members[2].ring.unwrap()
         });
         shape.distances[0].tip_clearance = 0.2;
         let r = solve(&shape, &[2], 1, 3);
@@ -961,7 +965,7 @@ mod tests {
             d.running
         );
         assert!(
-            (r.members[0].profile_shift - 0.4519).abs() < 2e-4,
+            (r.members[1].profile_shift - 0.4519).abs() < 2e-4,
             "the ring's shift"
         );
     }
@@ -1309,7 +1313,7 @@ mod hula {
 
         // | d | least loss (Σx, x_ring, x_pinion) | least shift |  — the shift
         // columns of the same table, to the two decimals it prints. The
-        // grounded ring is member 0, its pinion the first wobble gear, 2.
+        // first wobble gear is member 0, the grounded ring it runs in 2.
         for (d, on_shifts, off_shifts) in [
             (2u32, [-0.19_f64, 0.37, 0.18], [-0.20_f64, 0.20, 0.00]),
             (3, [-0.09, 0.51, 0.42], [-0.11, 0.11, 0.00]),
@@ -1318,7 +1322,7 @@ mod hula {
         ] {
             for (optimise, want) in [(true, on_shifts), (false, off_shifts)] {
                 let r = at_d(d, optimise);
-                let (ring, pin) = (r.members[0].profile_shift, r.members[2].profile_shift);
+                let (ring, pin) = (r.members[2].profile_shift, r.members[0].profile_shift);
                 let got = [pin - ring, ring, pin];
                 for (g, w) in got.iter().zip(want) {
                     assert!(
@@ -1540,12 +1544,12 @@ mod hula {
                 "{teeth:?}: {got} where the reduction is {want}"
             );
             // `backlash[0]` is the pinion's, `[1]` the ring's — the mesh was
-            // built with the pinion first. The first wobble gear is member 2,
-            // the output member 1.
+            // built with the pinion first. The first wobble gear is member 0,
+            // the output member 3.
             let at = |mesh: usize, gear: usize| {
                 r.meshes[mesh].backlash[usize::from(shape.members[gear].ring.is_some())].nominal
             };
-            let want = at(0, 2) * f64::from(teeth[2]) / f64::from(teeth[3]) + at(1, 1);
+            let want = at(0, 0) * f64::from(teeth[2]) / f64::from(teeth[3]) + at(1, 3);
             let got = r.backlash.unwrap().forward.nominal;
             assert!(
                 (got - want).abs() < 1e-9 * want,

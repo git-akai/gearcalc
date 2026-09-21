@@ -466,7 +466,7 @@
     reacted  ring 2                     10.3198 rpm  torque  -381.028728
     free     planet 1                   -157.3770 rpm  torque     0.000000
   stage 1  ratio     232.562500   efficiency  81.919641 / 77.908095  %   backlash   0.065428 / 15.216172  deg
-    power through the teeth 379.296745 / 463.460222   one more tooth on each member: -90.756098 49.116883 49.116883 -75.938776
+    power through the teeth 379.296745 / 463.460222   one more tooth on each member: 49.116883 -75.938776 -90.756098 49.116883
     shaft carrier   case 1  speed    3000.000000  torque       2.000000
     shaft carrier   case 2  speed       0.000000  torque      -0.002010
     shaft carrier   case 3  speed    2400.000000  torque       2.000000
@@ -479,22 +479,22 @@
     shaft planet 1  case 1  speed    -196.721311  torque       0.000000
     shaft planet 1  case 2  speed       0.000000  torque       0.000000
     shaft planet 1  case 3  speed    -157.377049  torque       0.000000
-    member 1  z 65  
-      case 1  speed       0.000000  vs frame   -3000.000000  torque     379.203155  cycles -
-      case 2  speed       0.000000  vs frame       0.000000  torque       0.597990  cycles -
-      case 3  speed       0.000000  vs frame   -2400.000000  torque     379.203155  cycles 1.440000e8 / 1.440000e8
-    member 2  z 61  
-      case 1  speed      12.899758  vs frame   -2987.100242  torque     381.028728  cycles -
-      case 2  speed       0.000000  vs frame       0.000000  torque       0.600296  cycles -
-      case 3  speed      10.319807  vs frame   -2389.680193  torque     381.028728  cycles 1.433808e8 / 1.433808e8
-    member 3  z 61  
+    member 1  z 61  
       case 1  speed    -196.721311  vs frame   -3196.721311  torque     355.867576  cycles -
       case 2  speed       0.000000  vs frame       0.000000  torque       0.561191  cycles -
       case 3  speed    -157.377049  vs frame   -2557.377049  torque     355.867576  cycles 1.534426e8 / 1.534426e8
-    member 4  z 57  
+    member 2  z 57  
       case 1  speed    -196.721311  vs frame   -3196.721311  torque     356.043238  cycles -
       case 2  speed       0.000000  vs frame       0.000000  torque       0.560932  cycles -
       case 3  speed    -157.377049  vs frame   -2557.377049  torque     356.043238  cycles 1.534426e8 / 1.534426e8
+    member 3  z 65  
+      case 1  speed       0.000000  vs frame   -3000.000000  torque     379.203155  cycles -
+      case 2  speed       0.000000  vs frame       0.000000  torque       0.597990  cycles -
+      case 3  speed       0.000000  vs frame   -2400.000000  torque     379.203155  cycles 1.440000e8 / 1.440000e8
+    member 4  z 61  
+      case 1  speed      12.899758  vs frame   -2987.100242  torque     381.028728  cycles -
+      case 2  speed       0.000000  vs frame       0.000000  torque       0.600296  cycles -
+      case 3  speed      10.319807  vs frame   -2389.680193  torque     381.028728  cycles 1.433808e8 / 1.433808e8
     mesh 1  efficiency  99.954002 / 99.954002  %  contact ratio   1.3488  coprime
     mesh 2  efficiency  99.950663 / 99.950663  %  contact ratio   1.3499  coprime
   graph    mobility 2 degree(s), 2 given   total ratio 3721/16
@@ -664,7 +664,7 @@
     reacted  ring 2                     39.3443 rpm  torque   -55.334545
     free     planet                     -5600.0000 rpm  torque     0.000000
   stage 1  ratio      61.000000   efficiency  45.356184 / 0.000000   %   backlash   0.048937 / 2.985130   deg
-    power through the teeth  54.142533 / 99.120284    one more tooth on each member: locked 31.000000 61.000000
+    power through the teeth  54.142533 / 99.120284    one more tooth on each member: 61.000000 locked 31.000000
     shaft carrier   case 1  speed    3000.000000  torque       2.000000
     shaft carrier   case 2  speed       0.000000  torque       0.002257
     shaft carrier   case 3  speed    2400.000000  torque       2.000000
@@ -677,18 +677,18 @@
     shaft planet    case 1  speed   -7000.000000  torque       0.000000
     shaft planet    case 2  speed       0.000000  torque      -0.000000
     shaft planet    case 3  speed   -5600.000000  torque       0.000000
-    member 1  z 60  
-      case 1  speed       0.000000  vs frame   -3000.000000  torque      17.952548  cycles -
-      case 2  speed       0.000000  vs frame       0.000000  torque       0.200752  cycles -
-      case 3  speed       0.000000  vs frame   -2400.000000  torque      17.952548  cycles 4.320000e8 / 4.320000e8
-    member 2  z 61  
-      case 1  speed      49.180328  vs frame   -2950.819672  torque      18.444848  cycles -
-      case 2  speed       0.000000  vs frame       0.000000  torque       0.202116  cycles -
-      case 3  speed      39.344262  vs frame   -2360.655738  torque      18.444848  cycles 4.249180e8 / 4.249180e8
-    member 3  z 18  
+    member 1  z 18  
       case 1  speed   -7000.000000  vs frame  -10000.000000  torque       5.442742  cycles -
       case 2  speed       0.000000  vs frame       0.000000  torque       0.060226  cycles -
       case 3  speed   -5600.000000  vs frame   -8000.000000  torque       5.442742  cycles 4.800000e8 / 4.800000e8
+    member 2  z 60  
+      case 1  speed       0.000000  vs frame   -3000.000000  torque      17.952548  cycles -
+      case 2  speed       0.000000  vs frame       0.000000  torque       0.200752  cycles -
+      case 3  speed       0.000000  vs frame   -2400.000000  torque      17.952548  cycles 4.320000e8 / 4.320000e8
+    member 3  z 61  
+      case 1  speed      49.180328  vs frame   -2950.819672  torque      18.444848  cycles -
+      case 2  speed       0.000000  vs frame       0.000000  torque       0.202116  cycles -
+      case 3  speed      39.344262  vs frame   -2360.655738  torque      18.444848  cycles 4.249180e8 / 4.249180e8
     mesh 1  efficiency  99.028738 / 99.028738  %  contact ratio   1.9162  shares a factor
     mesh 2  efficiency  98.953143 / 98.953143  %  contact ratio   2.1215  coprime
   graph    mobility 2 degree(s), 2 given   total ratio 61
@@ -789,7 +789,7 @@
     fixed    ring                                -  torque   -21.431187
     reacted  planet                     -240.0000 rpm  torque    19.431187
   stage 1  ratio     -10.000000   efficiency  97.155934 / 97.080449  %   backlash   0.095762 / 0.957619   deg
-    power through the teeth  10.715593 / 11.000000    one more tooth on each member: -7.500000 -15.500000
+    power through the teeth  10.715593 / 11.000000    one more tooth on each member: -15.500000 -7.500000
     shaft carrier   case 1  speed    3000.000000  torque       2.000000
     shaft carrier   case 2  speed       0.000000  torque       0.058248
     shaft carrier   case 3  speed    2400.000000  torque       2.000000
@@ -799,14 +799,14 @@
     shaft planet    case 1  speed    -300.000000  torque      19.431187
     shaft planet    case 2  speed       0.000000  torque       0.600000
     shaft planet    case 3  speed    -240.000000  torque      19.431187
-    member 1  z 33  
-      case 1  speed       0.000000  vs frame   -3000.000000  torque      21.431187  cycles -
-      case 2  speed       0.000000  vs frame       0.000000  torque       0.660000  cycles -
-      case 3  speed       0.000000  vs frame   -2400.000000  torque      21.431187  cycles 1.440000e8 / 1.440000e8
-    member 2  z 30  
+    member 1  z 30  
       case 1  speed    -300.000000  vs frame   -3300.000000  torque      19.482897  cycles -
       case 2  speed       0.000000  vs frame       0.000000  torque       0.600000  cycles -
       case 3  speed    -240.000000  vs frame   -2640.000000  torque      19.482897  cycles 1.584000e8 / 1.584000e8
+    member 2  z 33  
+      case 1  speed       0.000000  vs frame   -3000.000000  torque      21.431187  cycles -
+      case 2  speed       0.000000  vs frame       0.000000  torque       0.660000  cycles -
+      case 3  speed       0.000000  vs frame   -2400.000000  torque      21.431187  cycles 1.440000e8 / 1.440000e8
     mesh 1  efficiency  99.734586 / 99.734586  %  contact ratio   1.7700  shares a factor
   graph    mobility 2 degree(s), 2 given   total ratio -10
     stage 1  ratio -10
@@ -839,7 +839,7 @@
     free     planet 1                   -5066.6667 rpm  torque     0.000000
     free     planet 2                   3466.6667 rpm  torque     0.000000
   stage 1  ratio      -3.000000   efficiency  93.358179 / 93.466662  %   backlash   0.069648 / 0.208944   deg
-    power through the teeth   3.922025 / 3.879367     one more tooth on each member: -2.840000 -3.041667 -3.000000 -3.000000
+    power through the teeth   3.922025 / 3.879367     one more tooth on each member: -2.840000 -3.000000 -3.000000 -3.041667
     shaft sun       case 1  speed    3000.000000  torque       2.000000
     shaft sun       case 2  speed       0.000000  torque       0.186933
     shaft sun       case 3  speed    2400.000000  torque       2.000000
@@ -859,18 +859,18 @@
       case 1  speed    3000.000000  vs frame    4000.000000  torque       0.666667  cycles -
       case 2  speed       0.000000  vs frame       0.000000  torque       0.063511  cycles -
       case 3  speed    2400.000000  vs frame    3200.000000  torque       0.666667  cycles 5.760000e8 / 5.760000e8
-    member 2  z 96  
-      case 1  speed       0.000000  vs frame    1000.000000  torque       2.561111  cycles -
-      case 2  speed       0.000000  vs frame       0.000000  torque       0.262311  cycles -
-      case 3  speed       0.000000  vs frame     800.000000  torque       2.561111  cycles 1.440000e8 / 1.440000e8
-    member 3  z 18  
+    member 2  z 18  
       case 1  speed   -6333.333333  vs frame   -5333.333333  torque       0.500000  cycles -
       case 2  speed       0.000000  vs frame       0.000000  torque       0.048659  cycles -
       case 3  speed   -5066.666667  vs frame   -4266.666667  torque       0.500000  cycles 2.560000e8 / 2.560000e8
-    member 4  z 18  
+    member 3  z 18  
       case 1  speed    4333.333333  vs frame    5333.333333  torque       0.490551  cycles -
       case 2  speed       0.000000  vs frame       0.000000  torque       0.049183  cycles -
       case 3  speed    3466.666667  vs frame    4266.666667  torque       0.490551  cycles 2.560000e8 / 2.560000e8
+    member 4  z 96  
+      case 1  speed       0.000000  vs frame    1000.000000  torque       2.561111  cycles -
+      case 2  speed       0.000000  vs frame       0.000000  torque       0.262311  cycles -
+      case 3  speed       0.000000  vs frame     800.000000  torque       2.561111  cycles 1.440000e8 / 1.440000e8
     mesh 1  efficiency  98.110213 / 98.110213  %  contact ratio   1.5461  shares a factor
     mesh 2  efficiency  98.934827 / 98.934827  %  contact ratio   1.8312  shares a factor
     mesh 3  efficiency  97.891587 / 97.891587  %  contact ratio   1.5100  shares a factor
@@ -910,7 +910,7 @@
     free     planet 1                   -981.8182 rpm  torque     0.000000
     free     planet 2                   2400.0000 rpm  torque     0.000000
   stage 1  ratio       4.444444   efficiency  97.918525 / 97.905870  %   backlash   0.041706 / 0.185361   deg
-    power through the teeth   1.534831 / 1.553631     one more tooth on each member: 4.263158 4.444444 4.500000 4.444444 4.444444
+    power through the teeth   1.534831 / 1.553631     one more tooth on each member: 4.263158 4.444444 4.444444 4.444444 4.500000
     shaft sun 1     case 1  speed    3000.000000  torque       2.000000
     shaft sun 1     case 2  speed       0.000000  torque      -0.132173
     shaft sun 1     case 3  speed    2400.000000  torque       2.000000
@@ -933,22 +933,22 @@
       case 1  speed    3000.000000  vs frame    2325.000000  torque       0.666667  cycles -
       case 2  speed       0.000000  vs frame       0.000000  torque       0.044937  cycles -
       case 3  speed    2400.000000  vs frame    1860.000000  torque       0.666667  cycles 3.348000e8 / 3.348000e8
-    member 2  z 30  
-      case 1  speed    -720.000000  vs frame   -1395.000000  torque       0.000000  cycles -
-      case 2  speed       0.000000  vs frame       0.000000  torque       0.000000  cycles -
-      case 3  speed    -576.000000  vs frame   -1116.000000  torque       0.000000  cycles 2.008800e8 / 2.008800e8
-    member 3  z 62  
-      case 1  speed       0.000000  vs frame    -675.000000  torque       2.251350  cycles -
-      case 2  speed       0.000000  vs frame       0.000000  torque       0.155942  cycles -
-      case 3  speed       0.000000  vs frame    -540.000000  torque       2.251350  cycles 9.720000e7 / 9.720000e7
-    member 4  z 22  
+    member 2  z 22  
       case 1  speed   -1227.272727  vs frame   -1902.272727  torque       0.814815  cycles -
       case 2  speed       0.000000  vs frame       0.000000  torque       0.055334  cycles -
       case 3  speed    -981.818182  vs frame   -1521.818182  torque       0.814815  cycles 9.130909e7 / 9.130909e7
-    member 5  z 18  
+    member 3  z 18  
       case 1  speed    3000.000000  vs frame    2325.000000  torque       0.000000  cycles -
       case 2  speed       0.000000  vs frame       0.000000  torque       0.000000  cycles -
       case 3  speed    2400.000000  vs frame    1860.000000  torque       0.000000  cycles 1.116000e8 / 1.116000e8
+    member 4  z 30  
+      case 1  speed    -720.000000  vs frame   -1395.000000  torque       0.000000  cycles -
+      case 2  speed       0.000000  vs frame       0.000000  torque       0.000000  cycles -
+      case 3  speed    -576.000000  vs frame   -1116.000000  torque       0.000000  cycles 2.008800e8 / 2.008800e8
+    member 5  z 62  
+      case 1  speed       0.000000  vs frame    -675.000000  torque       2.251350  cycles -
+      case 2  speed       0.000000  vs frame       0.000000  torque       0.155942  cycles -
+      case 3  speed       0.000000  vs frame    -540.000000  torque       2.251350  cycles 9.720000e7 / 9.720000e7
     mesh 1  efficiency  98.042652 / 98.042652  %  contact ratio   1.5419  shares a factor
     mesh 2  efficiency  98.241874 / 98.241874  %  contact ratio   1.5719  shares a factor
     mesh 3  efficiency  99.257031 / 99.257031  %  contact ratio   1.9395  shares a factor
@@ -991,7 +991,7 @@
     free     planet 1                   4090.9091 rpm  torque     0.000000
     free     planet 2                   -10000.0000 rpm  torque     0.000000
   stage 1  ratio      -0.240000   efficiency  90.611620 / 90.948043  %   backlash   0.695140 / 0.166833   deg
-    power through the teeth   5.707116 / 5.475753     one more tooth on each member: -0.250206 -0.225000 -0.244444 -0.240000 -0.240000
+    power through the teeth   5.707116 / 5.475753     one more tooth on each member: -0.250206 -0.240000 -0.240000 -0.225000 -0.244444
     shaft sun 1     case 1  speed  -12500.000000  torque       0.000000
     shaft sun 1     case 2  speed       0.000000  torque      -0.000000
     shaft sun 1     case 3  speed  -10000.000000  torque       0.000000
@@ -1014,22 +1014,22 @@
       case 1  speed  -12500.000000  vs frame   -9687.500000  torque       0.000000  cycles -
       case 2  speed       0.000000  vs frame       0.000000  torque       0.000000  cycles -
       case 3  speed  -10000.000000  vs frame   -7750.000000  torque       0.000000  cycles 1.395000e9 / 1.395000e9
-    member 2  z 30  
-      case 1  speed    3000.000000  vs frame    5812.500000  torque       0.666667  cycles -
-      case 2  speed       0.000000  vs frame       0.000000  torque       0.175241  cycles -
-      case 3  speed    2400.000000  vs frame    4650.000000  torque       0.666667  cycles 8.370000e8 / 8.370000e8
-    member 3  z 62  
-      case 1  speed       0.000000  vs frame    2812.500000  torque       1.327061  cycles -
-      case 2  speed       0.000000  vs frame       0.000000  torque       0.372160  cycles -
-      case 3  speed       0.000000  vs frame    2250.000000  torque       1.327061  cycles 4.050000e8 / 4.050000e8
-    member 4  z 22  
+    member 2  z 22  
       case 1  speed    5113.636364  vs frame    7926.136364  torque       0.480294  cycles -
       case 2  speed       0.000000  vs frame       0.000000  torque       0.132057  cycles -
       case 3  speed    4090.909091  vs frame    6340.909091  torque       0.480294  cycles 3.804545e8 / 3.804545e8
-    member 5  z 18  
+    member 3  z 18  
       case 1  speed  -12500.000000  vs frame   -9687.500000  torque       0.400000  cycles -
       case 2  speed       0.000000  vs frame       0.000000  torque       0.107244  cycles -
       case 3  speed  -10000.000000  vs frame   -7750.000000  torque       0.400000  cycles 4.650000e8 / 4.650000e8
+    member 4  z 30  
+      case 1  speed    3000.000000  vs frame    5812.500000  torque       0.666667  cycles -
+      case 2  speed       0.000000  vs frame       0.000000  torque       0.175241  cycles -
+      case 3  speed    2400.000000  vs frame    4650.000000  torque       0.666667  cycles 8.370000e8 / 8.370000e8
+    member 5  z 62  
+      case 1  speed       0.000000  vs frame    2812.500000  torque       1.327061  cycles -
+      case 2  speed       0.000000  vs frame       0.000000  torque       0.372160  cycles -
+      case 3  speed       0.000000  vs frame    2250.000000  torque       1.327061  cycles 4.050000e8 / 4.050000e8
     mesh 1  efficiency  98.042652 / 98.042652  %  contact ratio   1.5419  shares a factor
     mesh 2  efficiency  98.241874 / 98.241874  %  contact ratio   1.5719  shares a factor
     mesh 3  efficiency  99.257031 / 99.257031  %  contact ratio   1.9395  shares a factor
@@ -1071,7 +1071,7 @@
     free     planet 1                   -327.2727 rpm  torque     0.000000
     free     planet 2                   2400.0000 rpm  torque     0.000000
   stage 1  ratio       2.666667   efficiency  96.521026 / 96.446859  %   backlash   0.104114 / 0.277636   deg
-    power through the teeth   1.838539 / 1.880253     one more tooth on each member: 2.578947 2.722222 2.666667 2.666667 2.666667
+    power through the teeth   1.838539 / 1.880253     one more tooth on each member: 2.578947 2.666667 2.666667 2.722222 2.666667
     shaft sun 1     case 1  speed    3000.000000  torque       2.000000
     shaft sun 1     case 2  speed       0.000000  torque      -0.217005
     shaft sun 1     case 3  speed    2400.000000  torque       2.000000
@@ -1094,22 +1094,22 @@
       case 1  speed    3000.000000  vs frame    1875.000000  torque       0.666667  cycles -
       case 2  speed       0.000000  vs frame       0.000000  torque       0.073779  cycles -
       case 3  speed    2400.000000  vs frame    1500.000000  torque       0.666667  cycles 2.700000e8 / 2.700000e8
-    member 2  z 30  
-      case 1  speed       0.000000  vs frame   -1125.000000  torque       1.068040  cycles -
-      case 2  speed       0.000000  vs frame       0.000000  torque       0.127665  cycles -
-      case 3  speed       0.000000  vs frame    -900.000000  torque       1.068040  cycles 1.620000e8 / 1.620000e8
-    member 3  z 62  
-      case 1  speed     580.645161  vs frame    -544.354839  torque       0.000000  cycles -
-      case 2  speed       0.000000  vs frame       0.000000  torque       0.000000  cycles -
-      case 3  speed     464.516129  vs frame    -435.483871  torque       0.000000  cycles 7.838710e7 / 7.838710e7
-    member 4  z 22  
+    member 2  z 22  
       case 1  speed    -409.090909  vs frame   -1534.090909  torque       0.814815  cycles -
       case 2  speed       0.000000  vs frame       0.000000  torque       0.091975  cycles -
       case 3  speed    -327.272727  vs frame   -1227.272727  torque       0.814815  cycles 7.363636e7 / 7.363636e7
-    member 5  z 18  
+    member 3  z 18  
       case 1  speed    3000.000000  vs frame    1875.000000  torque       0.653618  cycles -
       case 2  speed       0.000000  vs frame       0.000000  torque       0.076599  cycles -
       case 3  speed    2400.000000  vs frame    1500.000000  torque       0.653618  cycles 9.000000e7 / 9.000000e7
+    member 4  z 30  
+      case 1  speed       0.000000  vs frame   -1125.000000  torque       1.068040  cycles -
+      case 2  speed       0.000000  vs frame       0.000000  torque       0.127665  cycles -
+      case 3  speed       0.000000  vs frame    -900.000000  torque       1.068040  cycles 1.620000e8 / 1.620000e8
+    member 5  z 62  
+      case 1  speed     580.645161  vs frame    -544.354839  torque       0.000000  cycles -
+      case 2  speed       0.000000  vs frame       0.000000  torque       0.000000  cycles -
+      case 3  speed     464.516129  vs frame    -435.483871  torque       0.000000  cycles 7.838710e7 / 7.838710e7
     mesh 1  efficiency  98.042652 / 98.042652  %  contact ratio   1.5419  shares a factor
     mesh 2  efficiency  98.241874 / 98.241874  %  contact ratio   1.5719  shares a factor
     mesh 3  efficiency  99.257031 / 99.257031  %  contact ratio   1.9395  shares a factor

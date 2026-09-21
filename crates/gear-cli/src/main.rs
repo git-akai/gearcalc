@@ -157,8 +157,8 @@ fn solve_set(
 /// **A stage of four members on a crank, read as the hula stage it is** —
 /// the grounded gear, the two on the wobble body, the output; two meshes at
 /// one crank offset — for the commands that build one. The list
-/// (`arrangements::hula`) keeps its members as the grounded gear, the
-/// output, then the two wobble gears; this reads them in the hula's own
+/// (`arrangements::hula`) keeps its members as the two wobble gears, then
+/// the grounded gear and the output; this reads them in the hula's own
 /// order, grounded, wobble, wobble, output.
 struct HulaView<'a> {
     ratio: f64,
@@ -230,8 +230,8 @@ fn hula_view<'a>(
 }
 
 /// The list's members in the hula's reading order: grounded, wobble,
-/// wobble, output.
-const HULA_ORDER: [usize; 4] = [0, 2, 3, 1];
+/// wobble, output — the list keeps the two wobble gears first.
+const HULA_ORDER: [usize; 4] = [2, 0, 1, 3];
 
 /// A hula arrangement as these commands build one: the list at its counts
 /// and modules, with the far-side gap asked.
@@ -1670,13 +1670,13 @@ fn epicyclic_shifts_report() {
         stage.optimisation = on;
         match solve_hula(&stage, &StageLoads::at(2.0, 1000.0), &lib) {
             Ok((_, r)) => {
-                // The two wobble gears' shifts: the list's members 2 and 3.
+                // The two wobble gears' shifts: the list's members 0 and 1.
                 let members = r.members();
                 println!(
                     "{:<12} {:>9.4} {:>9.4} {:>10.4} % {:>16}",
                     n,
-                    members[2].profile_shift,
-                    members[3].profile_shift,
+                    members[0].profile_shift,
+                    members[1].profile_shift,
                     100.0 * ways_or_nan(r.efficiency()).forward,
                     members.iter().all(|g| g.clamps.is_empty())
                 );

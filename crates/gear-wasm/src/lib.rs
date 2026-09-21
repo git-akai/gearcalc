@@ -1728,6 +1728,27 @@ mod tests {
     /// ratio, efficiency, backlash and every stage's numbers. A field silently
     /// dropped on the way out reappears as a default, which looks like a value
     /// rather than like a loss — and would move an answer here.
+    /// **A train a browser stored while an axis's carrier was an `Option`
+    /// still loads**: `carried_by: null` reads as ground, and absent reads
+    /// as ground, and both solve to what `0` does.
+    #[test]
+    fn a_stored_train_with_a_null_carrier_still_loads() {
+        let d: serde_json::Value = serde_json::from_str(&defaults_impl().unwrap()).unwrap();
+        let mut stored = d["train"].clone();
+        let want = solved(&serde_json::json!({ "train": stored }).to_string())["paths"][0]["ratio"]
+            .clone();
+        for axis in stored["stages"][0]["axes"].as_array_mut().unwrap() {
+            axis["carried_by"] = serde_json::Value::Null;
+        }
+        let v = solved(&serde_json::json!({ "train": stored }).to_string());
+        assert_eq!(v["paths"][0]["ratio"], want, "null is ground");
+        for axis in stored["stages"][0]["axes"].as_array_mut().unwrap() {
+            axis.as_object_mut().unwrap().remove("carried_by");
+        }
+        let v = solved(&serde_json::json!({ "train": stored }).to_string());
+        assert_eq!(v["paths"][0]["ratio"], want, "absent is ground");
+    }
+
     #[test]
     fn a_geartrain_survives_export_and_import_as_the_same_answers() {
         // Start from the defaults the UI hands out, so the tested path is the
@@ -2450,7 +2471,8 @@ mod tests {
             // ...and an ultimate case counts nothing.
             assert!(rated["cases"][0]["cycles"].is_null(), "gear {i}");
         }
-        assert_eq!(gears[0]["cases"][0]["speed"].as_f64().unwrap(), 0.0);
+        // The grounded gear — member 2, after the two wobble gears — stands.
+        assert_eq!(gears[2]["cases"][0]["speed"].as_f64().unwrap(), 0.0);
 
         // Two meshes, each reporting what any parallel-axis mesh reports,
         // with the room their tips have.

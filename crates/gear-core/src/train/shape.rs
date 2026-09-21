@@ -64,12 +64,25 @@ use crate::tooth::Tooth;
     ts(export, export_to = "core/")
 )]
 pub struct Axis {
-    /// The shaft whose frame this axis stands still in, where it is not
-    /// ground's: a carrier. `None` is an axis fixed in ground.
-    pub carried_by: Option<Shaft>,
+    /// The shaft whose frame this axis stands still in: a carrier, or
+    /// **ground** (shaft 0) for an axis fixed in it — a spur pair's axes
+    /// are carried by ground, which is what makes a pair the epicyclic
+    /// family with its carrier held. Absent in a file, ground — and `null`
+    /// too, which is how a browser's stored train wrote it when this was an
+    /// `Option`, so that state keeps loading.
+    #[cfg_attr(feature = "serde", serde(default, deserialize_with = "ground_if_null"))]
+    pub carried_by: Shaft,
     /// How many times this axis, its shafts and their gears are replicated
     /// about the axis it is carried round — `N` planets. One elsewhere.
     pub count: u32,
+}
+
+/// `carried_by` as a stored train wrote it while it was an `Option`: `null`
+/// reads as ground.
+#[cfg(feature = "serde")]
+fn ground_if_null<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Shaft, D::Error> {
+    let s: Option<Shaft> = serde::Deserialize::deserialize(d)?;
+    Ok(s.unwrap_or(GROUND))
 }
 
 /// A shaft, by the axis it turns about. Shaft `i` here is shaft `i + 1` of
@@ -221,7 +234,8 @@ impl Shape {
         let Some(axis) = self.axis_of_shaft(shaft) else {
             return GROUND;
         };
-        if let Some(c) = self.axes[axis].carried_by {
+        let c = self.axes[axis].carried_by;
+        if c != GROUND {
             return c;
         }
         // A carrier on this axis: the first shaft here that carries an axis.
@@ -230,7 +244,7 @@ impl Shape {
             .enumerate()
             .filter(|(_, s)| s.axis == axis)
             .map(|(i, _)| i + 1)
-            .find(|&s| self.axes.iter().any(|a| a.carried_by == Some(s)))
+            .find(|&s| self.axes.iter().any(|a| a.carried_by == s))
             .unwrap_or(GROUND)
     }
 
@@ -415,7 +429,7 @@ impl Shape {
             // and the rule does not reach it.
             if self
                 .axis_of_shaft(self.shaft_of(central))
-                .is_some_and(|a| self.axes[a].carried_by.is_some())
+                .is_some_and(|a| self.axes[a].carried_by != GROUND)
             {
                 return None;
             }
@@ -460,7 +474,7 @@ impl Shape {
     pub fn member_names(&self) -> Vec<MemberName> {
         let carried = |i: usize| {
             self.axis_of_shaft(self.shaft_of(i))
-                .is_some_and(|a| self.axes[a].carried_by.is_some())
+                .is_some_and(|a| self.axes[a].carried_by != GROUND)
         };
         let role = |i: usize| -> MemberRole {
             for (k, m) in self.meshes.iter().enumerate() {
@@ -512,7 +526,7 @@ impl Shape {
             return ShaftLabel::Ground;
         }
         let carriers: Vec<Shaft> = (1..=self.shafts.len())
-            .filter(|&s| self.axes.iter().any(|a| a.carried_by == Some(s)))
+            .filter(|&s| self.axes.iter().any(|a| a.carried_by == s))
             .collect();
         if let Some(index) = carriers.iter().position(|&c| c == shaft) {
             return ShaftLabel::Carrier { index };
@@ -3298,7 +3312,7 @@ pub fn solve_shape_after(
             // The radius the instances stand at: the distance from the axis
             // the carrier turns about, not whatever mesh comes first — a
             // planet meshing another planet has a distance that is neither.
-            let central = a.carried_by.and_then(|c| shape.axis_of_shaft(c))?;
+            let central = shape.axis_of_shaft(a.carried_by)?;
             let d = shape
                 .distances
                 .iter()
@@ -3784,138 +3798,109 @@ impl From<&super::PairStage> for Shape {
 }
 
 impl Shape {
-    /// Two axes in ground at the pair's shaft angle, one mesh, one distance.
+    /// **The pair's vocabulary over the line of two**: `arrangements::line`
+    /// lays the two axes, the mesh and the distance out, and the pair's
+    /// words are written on it — its module and pressure angle, the first
+    /// gear's thickness coefficient with the second following, the first
+    /// gear's diameter as the size reading, the distance's angle, worm
+    /// sizing, clearances and tolerances.
     #[must_use]
     pub fn from_pair(p: &super::PairStage, kind: super::PairKind) -> Self {
-        let member = |i: usize, thickness_mod: Auto<f64>| Member {
-            shaft: i + 1,
-            gear: p.gears[i].clone(),
-            module: p.module,
-            thickness_mod,
-            ring: None,
-            pitch_diameter: if i == 0 {
-                p.pitch_diameter
+        let mut shape = super::arrangements::line(&[p.gears[0].teeth, p.gears[1].teeth]);
+        shape.pressure_angle = p.pressure_angle;
+        shape.overlap = p.overlap;
+        shape.optimisation = p.optimisation;
+        shape.load_sharing = p.load_sharing;
+        shape.min_planet_clearance = 0.0;
+        for (i, m) in shape.members.iter_mut().enumerate() {
+            m.gear = p.gears[i].clone();
+            m.module = p.module;
+            m.thickness_mod = if i == 0 {
+                Auto::fixed(p.thickness_mod)
             } else {
-                Auto::automatic(0.0)
-            },
-        };
-        Self {
-            pressure_angle: p.pressure_angle,
-            overlap: p.overlap,
-            optimisation: p.optimisation,
-            load_sharing: p.load_sharing,
-            min_planet_clearance: 0.0,
-            axes: vec![
-                Axis {
-                    carried_by: None,
-                    count: 1,
-                },
-                Axis {
-                    carried_by: None,
-                    count: 1,
-                },
-            ],
-            shafts: vec![ShaftOn { axis: 0 }, ShaftOn { axis: 1 }],
-            members: vec![
-                member(0, Auto::fixed(p.thickness_mod)),
-                member(1, Auto::automatic(2.0 - p.thickness_mod)),
-            ],
-            meshes: vec![MeshInput {
-                a: 0,
-                b: 1,
-                sliding_friction: p.sliding_friction,
-                static_friction: p.static_friction,
-            }],
-            distances: vec![Distance {
-                axes: [0, 1],
-                angle: p.shaft_angle,
-                worm: kind == super::PairKind::Worm,
-                distance: p.centre_distance,
-                clearance: p.clearance,
-                tip_clearance: 0.0,
-                tolerance_plus: p.tolerance_plus,
-                tolerance_minus: p.tolerance_minus,
-                axial_clearance: p.axial_clearance,
-            }],
+                Auto::automatic(2.0 - p.thickness_mod)
+            };
+            if i == 0 {
+                m.pitch_diameter = p.pitch_diameter;
+            }
         }
+        shape.meshes[0].sliding_friction = p.sliding_friction;
+        shape.meshes[0].static_friction = p.static_friction;
+        shape.distances[0] = Distance {
+            axes: [0, 1],
+            angle: p.shaft_angle,
+            worm: kind == super::PairKind::Worm,
+            distance: p.centre_distance,
+            clearance: p.clearance,
+            tip_clearance: 0.0,
+            tolerance_plus: p.tolerance_plus,
+            tolerance_minus: p.tolerance_minus,
+            axial_clearance: p.axial_clearance,
+        };
+        shape
     }
 }
 
 impl From<&super::PlanetaryStage> for Shape {
-    /// A central axis with the sun, the carrier and the ring on it, a planet
-    /// axis carried by the carrier and replicated `N` times, two meshes on
-    /// the one distance between them. Shafts numbered as the set's own
-    /// solver numbered them: sun 1, carrier 2, ring 3, planet 4.
+    /// **The set's vocabulary over the epicyclic list** — sun, carrier,
+    /// ring, so the shafts are numbered as the set's own solver numbered
+    /// them (sun 1, carrier 2, ring 3, planet 4) and the members read sun,
+    /// planet, ring — with the set's words written on it: each member's
+    /// gear, the shared module and pressure angle, the sun's thickness
+    /// coefficient with the planet and the ring following, the ring's
+    /// cutter, each mesh's own friction, and the one distance's centre
+    /// distance, clearance and tolerances.
     fn from(s: &super::PlanetaryStage) -> Self {
-        let member = |shaft: Shaft,
-                      gear: &StageGear,
-                      thickness_mod: Auto<f64>,
-                      ring: Option<Cutter>| Member {
-            shaft,
-            gear: gear.clone(),
-            module: s.module,
-            thickness_mod,
-            ring,
-            pitch_diameter: Auto::automatic(0.0),
-        };
-        Self {
-            pressure_angle: s.pressure_angle,
-            overlap: s.overlap,
-            optimisation: s.optimisation,
-            load_sharing: s.load_sharing,
-            min_planet_clearance: s.min_planet_clearance,
-            axes: vec![
-                Axis {
-                    carried_by: None,
-                    count: 1,
+        use super::arrangements::{epicyclic, Central};
+        let mut shape = epicyclic(
+            s.planets.max(1),
+            &[&[i32::try_from(s.planet.teeth).unwrap_or(i32::MAX)]],
+            &[
+                Central::Sun {
+                    on: 0,
+                    teeth: s.sun.teeth,
                 },
-                Axis {
-                    carried_by: Some(2),
-                    count: s.planets.max(1),
+                Central::Carrier,
+                Central::Ring {
+                    on: 0,
+                    teeth: s.ring.teeth,
                 },
             ],
-            shafts: vec![
-                ShaftOn { axis: 0 },
-                ShaftOn { axis: 0 },
-                ShaftOn { axis: 0 },
-                ShaftOn { axis: 1 },
-            ],
-            members: vec![
-                member(1, &s.sun, Auto::fixed(s.thickness_mod), None),
-                member(4, &s.planet, Auto::automatic(2.0 - s.thickness_mod), None),
-                member(
-                    3,
-                    &s.ring,
-                    Auto::automatic(2.0 - s.thickness_mod),
-                    Some(s.cutter),
-                ),
-            ],
-            meshes: vec![
-                MeshInput {
-                    a: 0,
-                    b: 1,
-                    sliding_friction: s.sliding_friction_sun_planet,
-                    static_friction: s.static_friction_sun_planet,
-                },
-                MeshInput {
-                    a: 1,
-                    b: 2,
-                    sliding_friction: s.sliding_friction_planet_ring,
-                    static_friction: s.static_friction_planet_ring,
-                },
-            ],
-            distances: vec![Distance {
-                axes: [0, 1],
-                angle: 0.0,
-                worm: false,
-                distance: s.centre_distance,
-                clearance: s.clearance,
-                tip_clearance: 0.0,
-                tolerance_plus: s.tolerance_plus,
-                tolerance_minus: s.tolerance_minus,
-                axial_clearance: 0.0,
-            }],
+            &[],
+        );
+        shape.pressure_angle = s.pressure_angle;
+        shape.overlap = s.overlap;
+        shape.optimisation = s.optimisation;
+        shape.load_sharing = s.load_sharing;
+        shape.min_planet_clearance = s.min_planet_clearance;
+        for (m, (gear, thickness_mod)) in shape.members.iter_mut().zip([
+            (&s.sun, Auto::fixed(s.thickness_mod)),
+            (&s.planet, Auto::automatic(2.0 - s.thickness_mod)),
+            (&s.ring, Auto::automatic(2.0 - s.thickness_mod)),
+        ]) {
+            m.gear = gear.clone();
+            m.module = s.module;
+            m.thickness_mod = thickness_mod;
+            if m.ring.is_some() {
+                m.ring = Some(s.cutter);
+            }
         }
+        for (m, (sliding, stat)) in shape.meshes.iter_mut().zip([
+            (s.sliding_friction_sun_planet, s.static_friction_sun_planet),
+            (
+                s.sliding_friction_planet_ring,
+                s.static_friction_planet_ring,
+            ),
+        ]) {
+            m.sliding_friction = sliding;
+            m.static_friction = stat;
+        }
+        let d = &mut shape.distances[0];
+        d.distance = s.centre_distance;
+        d.clearance = s.clearance;
+        d.tolerance_plus = s.tolerance_plus;
+        d.tolerance_minus = s.tolerance_minus;
+        shape
     }
 }
 
@@ -4135,10 +4120,11 @@ mod tests {
             super::super::Reversal::default(),
         )
         .unwrap();
+        // Members: the planet, ring 1, ring 2.
         let per = wolfrom.ratio_per_tooth.as_ref().unwrap();
-        assert_eq!(per[0], None, "ring 1 at 61: locked");
+        assert_eq!(per[1], None, "ring 1 at 61: locked");
         assert!(
-            per[1].is_some_and(|x| (x - 31.0).abs() < 1e-9),
+            per[2].is_some_and(|x| (x - 31.0).abs() < 1e-9),
             "ring 2 at 62: 62/2"
         );
         // ...and the power through a set's sun mesh is under the power in,
@@ -5242,12 +5228,13 @@ mod hula_recorded {
     use super::*;
 
     /// The harness's fixture: 19/18/17/18, shapers of 14 and 13 teeth for
-    /// the two rings (the grounded gear and the output), the gap asked.
+    /// the two rings (the grounded gear and the output, members 2 and 3
+    /// after the two wobble gears), the gap asked.
     fn hula_18(clearance: f64) -> Shape {
         let mut shape = hula([19, 18, 17, 18], [1.0, 1.0]);
         shape.distances[0].tip_clearance = clearance;
         for (m, teeth) in [14, 13].into_iter().enumerate() {
-            shape.members[m].ring.as_mut().unwrap().teeth = teeth;
+            shape.members[2 + m].ring.as_mut().unwrap().teeth = teeth;
         }
         shape
     }
@@ -5288,8 +5275,8 @@ mod hula_recorded {
         );
         assert_eq!(d.sized_by, Some(0), "held open by mesh 1");
         // The rings at +0.4519, the pinions at their floor: the members are
-        // the grounded ring, the output ring, then the two wobble pinions.
-        for (i, want) in [(0, 0.4519), (1, 0.4519), (2, 0.0), (3, 0.0)] {
+        // the two wobble pinions, then the grounded ring and the output ring.
+        for (i, want) in [(0, 0.0), (1, 0.0), (2, 0.4519), (3, 0.4519)] {
             close(
                 want,
                 r.members[i].profile_shift,
@@ -5351,36 +5338,36 @@ mod hula_recorded {
         let eta1 = r.meshes[0].efficiency.forward;
         close(
             200.8899 / eta1,
-            r.members[0].cases[0].torque,
+            r.members[2].cases[0].torque,
             5e-4,
             "z19 torque over η₁",
         );
         close(
             190.3167 / eta1,
-            r.members[2].cases[0].torque,
+            r.members[0].cases[0].torque,
             5e-4,
             "z18 torque over η₁",
         );
-        close(191.6182, r.members[3].cases[0].torque, 5e-4, "z17 torque");
+        close(191.6182, r.members[1].cases[0].torque, 5e-4, "z17 torque");
         close(
             202.8899,
-            r.members[1].cases[0].torque,
+            r.members[3].cases[0].torque,
             5e-4,
             "output z18 torque",
         );
         close(
             6663.3 / eta1,
-            r.members[2].cases[0].bending_stress.unwrap(),
+            r.members[0].cases[0].bending_stress.unwrap(),
             0.05,
             "z18 σ_F",
         );
         close(
             7171.7,
-            r.members[3].cases[0].bending_stress.unwrap(),
+            r.members[1].cases[0].bending_stress.unwrap(),
             0.05,
             "z17 σ_F",
         );
-        for i in [0, 1] {
+        for i in [2, 3] {
             assert!(
                 r.members[i].cases[0].bending_stress.is_none(),
                 "no fillet, no rating"
@@ -5478,15 +5465,15 @@ mod member_names {
         );
         assert_eq!(
             names(&arr::hula([65, 61, 57, 61], [1.0, 1.0])),
-            s(&["ring 1", "ring 2", "planet 1", "planet 2"])
+            s(&["planet 1", "planet 2", "ring 1", "ring 2"])
         );
         assert_eq!(
             names(&arr::wolfrom(18, [60, 61], 3)),
-            s(&["ring 1", "ring 2", "planet"])
+            s(&["planet", "ring 1", "ring 2"])
         );
         assert_eq!(
             names(&arr::ravigneaux([18, 30], [22, 18], 62, 3)),
-            s(&["sun 1", "sun 2", "ring", "planet 1", "planet 2"])
+            s(&["sun 1", "planet 1", "planet 2", "sun 2", "ring"])
         );
         assert_eq!(
             names(&arr::worm_and_pair((1, 40), (17, 43))),

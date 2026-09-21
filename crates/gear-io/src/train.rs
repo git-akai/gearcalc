@@ -105,7 +105,8 @@
 //!   `"planetary"` are gone and a file that still says one is refused by
 //!   name; every such stage is `kind = "shape"` now, and says what it is
 //!   made of: `[[train.stages.axes]]` (each `count = N`, and `carried_by =
-//!   <shaft>` where a carrier carries it), `[[train.stages.shafts]]` (each
+//!   <shaft>` where a carrier carries it — ground, 0, where none does,
+//!   and absent means ground), `[[train.stages.shafts]]` (each
 //!   `axis = i`, numbered from one as the constraints number them),
 //!   `[[train.stages.members]]` (each with its `shaft`, `module`,
 //!   `thickness_mod`, its `gear` table, a `ring` table naming the cutter

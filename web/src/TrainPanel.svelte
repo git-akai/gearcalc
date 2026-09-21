@@ -373,7 +373,7 @@
   const axisOf = (shape: Shape, j: number) => shape.shafts[shape.members[j].shaft - 1]?.axis;
   const isPlanetGear = (shape: Shape, j: number) => {
     const a = axisOf(shape, j);
-    return a !== undefined && shape.axes[a].carried_by !== null;
+    return a !== undefined && shape.axes[a].carried_by !== 0;
   };
   /** The members a member meshes with. */
   const mates = (shape: Shape, j: number) =>
@@ -390,6 +390,30 @@
     const pair = (m: { a: number; b: number }) => [axisOf(shape, m.a), axisOf(shape, m.b)].sort();
     const [p, q] = [pair(x), pair(y)];
     return p[0] === q[0] && p[1] === q[1];
+  };
+  /** **The order the cards are dealt in**: on an epicyclic stage, each
+   *  planet gear followed by the central members meshing it — a step and
+   *  what sits on it — so the "+ Sun / + Ring" buttons on a planet gear are
+   *  read beside the members they would add to; a member in a planet–planet
+   *  mesh only is listed after its planet. Anything else keeps the shape's
+   *  order. Layout alone: names and indices are the shape's. */
+  const cardOrder = (shape: Shape): number[] => {
+    if (!shape.axes.some((a) => a.carried_by !== 0)) return shape.members.map((_, j) => j);
+    const dealt = new Set<number>();
+    const out: number[] = [];
+    const deal = (j: number) => {
+      if (!dealt.has(j)) {
+        dealt.add(j);
+        out.push(j);
+      }
+    };
+    shape.members.forEach((_, j) => {
+      if (!isPlanetGear(shape, j)) return;
+      deal(j);
+      for (const c of mates(shape, j)) if (!isPlanetGear(shape, c)) deal(c);
+    });
+    shape.members.forEach((_, j) => deal(j));
+    return out;
   };
   /** The shafts a member may move to: those on its axis, by name. */
   const shaftsOnAxis = (shape: Shape, j: number) =>
@@ -1273,7 +1297,7 @@
       </select>
       <em></em>
     </label>
-    {#if ed.shape.axes.some((a) => a.carried_by !== null)}
+    {#if ed.shape.axes.some((a) => a.carried_by !== 0)}
       <div class="edits">
         {#if planet}
           <button class="action add" onclick={() => editStage(ed.stage, { add_central: { gear: ed.member, ring: false } })}>{t("ui.train_add_sun")}</button>
@@ -1961,9 +1985,9 @@
         {@const sres = res && res.kind === "shape" ? res : null}
         {@const worm = isWorm(stage)}
         {@const crossed = stage.distances.some((d) => d.angle !== 0)}
-        {@const epicyclic = stage.axes.some((a) => a.carried_by !== null)}
+        {@const epicyclic = stage.axes.some((a) => a.carried_by !== 0)}
         {@const replicated = stage.axes.map((a, k) => (a.count > 1 ? k : -1)).filter((k) => k >= 0)}
-        {@const carriedAxes = stage.axes.map((a, k) => (a.carried_by !== null ? k : -1)).filter((k) => k >= 0)}
+        {@const carriedAxes = stage.axes.map((a, k) => (a.carried_by !== 0 ? k : -1)).filter((k) => k >= 0)}
         {@const name = (j: number) => memberName(tab.train, result.topology, i, j)}
         {@const moduleGroups = result.topology[i]?.module_groups ?? [stage.members.map((_, j) => j)]}
         {@const carriers = stage.shafts
@@ -2189,7 +2213,8 @@
                  instead; the absorbing member is an automatic one like any
                  other, box and toggle and all. -->
             <div class="gears">
-              {#each stage.members as m, j (j)}
+              {#each cardOrder(stage) as j (j)}
+                {@const m = stage.members[j]}
                 {@const g = sres?.members[j]}
                 {@const isWormMember = worm && stage.meshes[0]?.a === j}
                 {@render gearCard(name(j), m.gear, g, {

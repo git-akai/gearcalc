@@ -222,11 +222,11 @@
        "min_planet_clearance": 0,
        "axes": [
         {
-         "carried_by": null,
+         "carried_by": 0,
          "count": 1
         },
         {
-         "carried_by": null,
+         "carried_by": 0,
          "count": 1
         }
        ],
@@ -409,11 +409,11 @@
        "min_planet_clearance": 0,
        "axes": [
         {
-         "carried_by": null,
+         "carried_by": 0,
          "count": 1
         },
         {
-         "carried_by": null,
+         "carried_by": 0,
          "count": 1
         }
        ],
@@ -592,15 +592,15 @@
        "min_planet_clearance": "0.29999999999999999",
        "axes": [
         {
-         "carried_by": null,
+         "carried_by": 0,
          "count": 1
         },
         {
-         "carried_by": null,
+         "carried_by": 0,
          "count": 1
         },
         {
-         "carried_by": null,
+         "carried_by": 0,
          "count": 1
         }
        ],
@@ -865,11 +865,11 @@
        "min_planet_clearance": "0.29999999999999999",
        "axes": [
         {
-         "carried_by": null,
+         "carried_by": 0,
          "count": 1
         },
         {
-         "carried_by": null,
+         "carried_by": 0,
          "count": 1
         }
        ],
@@ -1294,11 +1294,11 @@
        "min_planet_clearance": 0,
        "axes": [
         {
-         "carried_by": null,
+         "carried_by": 0,
          "count": 1
         },
         {
-         "carried_by": null,
+         "carried_by": 0,
          "count": 1
         }
        ],
@@ -1477,11 +1477,11 @@
        "min_planet_clearance": 0,
        "axes": [
         {
-         "carried_by": null,
+         "carried_by": 0,
          "count": 1
         },
         {
-         "carried_by": null,
+         "carried_by": 0,
          "count": 1
         }
        ],
@@ -1660,7 +1660,7 @@
        "min_planet_clearance": "0.29999999999999999",
        "axes": [
         {
-         "carried_by": null,
+         "carried_by": 0,
          "count": 1
         },
         {
@@ -1916,7 +1916,7 @@
        "min_planet_clearance": "0.29999999999999999",
        "axes": [
         {
-         "carried_by": null,
+         "carried_by": 0,
          "count": 1
         },
         {
@@ -1939,6 +1939,63 @@
         }
        ],
        "members": [
+        {
+         "shaft": 4,
+         "gear": {
+          "teeth": 18,
+          "profile_shift": {
+           "auto": true,
+           "manual": 0
+          },
+          "no_undercut": true,
+          "working_depth": {
+           "auto": true,
+           "manual": 1
+          },
+          "addendum": 1,
+          "no_sharp_tip": true,
+          "min_tip_width": "0.10000000000000001",
+          "dedendum": "1.2500000000000000",
+          "root_radius": "0.38000000000000000",
+          "helix_angle": {
+           "auto": true,
+           "manual": 0
+          },
+          "face_width": {
+           "auto": true,
+           "manual": 5
+          },
+          "face_sources": {
+           "bending": {
+            "ultimate": true,
+            "fatigue": true
+           },
+           "contact": {
+            "ultimate": false,
+            "fatigue": false
+           }
+          },
+          "rim_thickness": null,
+          "material": "4340 Hardened Steel",
+          "material_overrides": {
+           "density": null,
+           "elastic_modulus": null,
+           "poissons_ratio": null,
+           "ultimate_allowable": null,
+           "fatigue_allowable": null
+          }
+         },
+         "module": 1,
+         "thickness_mod": {
+          "auto": true,
+          "manual": 1
+         },
+         "ring": null,
+         "pitch_diameter": {
+          "auto": true,
+          "manual": 0
+         }
+        },
         {
          "shaft": 2,
          "gear": {
@@ -2060,75 +2117,18 @@
           "auto": true,
           "manual": 0
          }
-        },
-        {
-         "shaft": 4,
-         "gear": {
-          "teeth": 18,
-          "profile_shift": {
-           "auto": true,
-           "manual": 0
-          },
-          "no_undercut": true,
-          "working_depth": {
-           "auto": true,
-           "manual": 1
-          },
-          "addendum": 1,
-          "no_sharp_tip": true,
-          "min_tip_width": "0.10000000000000001",
-          "dedendum": "1.2500000000000000",
-          "root_radius": "0.38000000000000000",
-          "helix_angle": {
-           "auto": true,
-           "manual": 0
-          },
-          "face_width": {
-           "auto": true,
-           "manual": 5
-          },
-          "face_sources": {
-           "bending": {
-            "ultimate": true,
-            "fatigue": true
-           },
-           "contact": {
-            "ultimate": false,
-            "fatigue": false
-           }
-          },
-          "rim_thickness": null,
-          "material": "4340 Hardened Steel",
-          "material_overrides": {
-           "density": null,
-           "elastic_modulus": null,
-           "poissons_ratio": null,
-           "ultimate_allowable": null,
-           "fatigue_allowable": null
-          }
-         },
-         "module": 1,
-         "thickness_mod": {
-          "auto": true,
-          "manual": 1
-         },
-         "ring": null,
-         "pitch_diameter": {
-          "auto": true,
-          "manual": 0
-         }
         }
        ],
        "meshes": [
         {
-         "a": 2,
-         "b": 0,
+         "a": 0,
+         "b": 1,
          "sliding_friction": "0.080000000000000002",
          "static_friction": "0.16000000000000000"
         },
         {
-         "a": 2,
-         "b": 1,
+         "a": 0,
+         "b": 2,
          "sliding_friction": "0.080000000000000002",
          "static_friction": "0.16000000000000000"
         }
@@ -2176,7 +2176,7 @@
        "min_planet_clearance": "0.29999999999999999",
        "axes": [
         {
-         "carried_by": null,
+         "carried_by": 0,
          "count": 1
         },
         {
@@ -2559,7 +2559,7 @@
        "min_planet_clearance": "0.29999999999999999",
        "axes": [
         {
-         "carried_by": null,
+         "carried_by": 0,
          "count": 1
         },
         {
@@ -2579,6 +2579,63 @@
         }
        ],
        "members": [
+        {
+         "shaft": 3,
+         "gear": {
+          "teeth": 30,
+          "profile_shift": {
+           "auto": true,
+           "manual": 0
+          },
+          "no_undercut": true,
+          "working_depth": {
+           "auto": true,
+           "manual": 1
+          },
+          "addendum": 1,
+          "no_sharp_tip": true,
+          "min_tip_width": "0.10000000000000001",
+          "dedendum": "1.2500000000000000",
+          "root_radius": "0.38000000000000000",
+          "helix_angle": {
+           "auto": true,
+           "manual": 0
+          },
+          "face_width": {
+           "auto": true,
+           "manual": 5
+          },
+          "face_sources": {
+           "bending": {
+            "ultimate": true,
+            "fatigue": true
+           },
+           "contact": {
+            "ultimate": false,
+            "fatigue": false
+           }
+          },
+          "rim_thickness": null,
+          "material": "4340 Hardened Steel",
+          "material_overrides": {
+           "density": null,
+           "elastic_modulus": null,
+           "poissons_ratio": null,
+           "ultimate_allowable": null,
+           "fatigue_allowable": null
+          }
+         },
+         "module": 1,
+         "thickness_mod": {
+          "auto": true,
+          "manual": 1
+         },
+         "ring": null,
+         "pitch_diameter": {
+          "auto": true,
+          "manual": 0
+         }
+        },
         {
          "shaft": 2,
          "gear": {
@@ -2639,69 +2696,12 @@
           "auto": true,
           "manual": 0
          }
-        },
-        {
-         "shaft": 3,
-         "gear": {
-          "teeth": 30,
-          "profile_shift": {
-           "auto": true,
-           "manual": 0
-          },
-          "no_undercut": true,
-          "working_depth": {
-           "auto": true,
-           "manual": 1
-          },
-          "addendum": 1,
-          "no_sharp_tip": true,
-          "min_tip_width": "0.10000000000000001",
-          "dedendum": "1.2500000000000000",
-          "root_radius": "0.38000000000000000",
-          "helix_angle": {
-           "auto": true,
-           "manual": 0
-          },
-          "face_width": {
-           "auto": true,
-           "manual": 5
-          },
-          "face_sources": {
-           "bending": {
-            "ultimate": true,
-            "fatigue": true
-           },
-           "contact": {
-            "ultimate": false,
-            "fatigue": false
-           }
-          },
-          "rim_thickness": null,
-          "material": "4340 Hardened Steel",
-          "material_overrides": {
-           "density": null,
-           "elastic_modulus": null,
-           "poissons_ratio": null,
-           "ultimate_allowable": null,
-           "fatigue_allowable": null
-          }
-         },
-         "module": 1,
-         "thickness_mod": {
-          "auto": true,
-          "manual": 1
-         },
-         "ring": null,
-         "pitch_diameter": {
-          "auto": true,
-          "manual": 0
-         }
         }
        ],
        "meshes": [
         {
-         "a": 1,
-         "b": 0,
+         "a": 0,
+         "b": 1,
          "sliding_friction": "0.080000000000000002",
          "static_friction": "0.16000000000000000"
         }
@@ -2749,7 +2749,7 @@
        "min_planet_clearance": "0.29999999999999999",
        "axes": [
         {
-         "carried_by": null,
+         "carried_by": 0,
          "count": 1
         },
         {
@@ -2831,67 +2831,6 @@
           "manual": 1
          },
          "ring": null,
-         "pitch_diameter": {
-          "auto": true,
-          "manual": 0
-         }
-        },
-        {
-         "shaft": 3,
-         "gear": {
-          "teeth": 96,
-          "profile_shift": {
-           "auto": true,
-           "manual": 0
-          },
-          "no_undercut": true,
-          "working_depth": {
-           "auto": true,
-           "manual": 1
-          },
-          "addendum": 1,
-          "no_sharp_tip": true,
-          "min_tip_width": "0.10000000000000001",
-          "dedendum": "1.2500000000000000",
-          "root_radius": "0.38000000000000000",
-          "helix_angle": {
-           "auto": true,
-           "manual": 0
-          },
-          "face_width": {
-           "auto": true,
-           "manual": 5
-          },
-          "face_sources": {
-           "bending": {
-            "ultimate": true,
-            "fatigue": true
-           },
-           "contact": {
-            "ultimate": false,
-            "fatigue": false
-           }
-          },
-          "rim_thickness": null,
-          "material": "4340 Hardened Steel",
-          "material_overrides": {
-           "density": null,
-           "elastic_modulus": null,
-           "poissons_ratio": null,
-           "ultimate_allowable": null,
-           "fatigue_allowable": null
-          }
-         },
-         "module": 1,
-         "thickness_mod": {
-          "auto": true,
-          "manual": 1
-         },
-         "ring": {
-          "teeth": 20,
-          "addendum": "1.2500000000000000",
-          "tip_round": "0.20000000000000001"
-         },
          "pitch_diameter": {
           "auto": true,
           "manual": 0
@@ -3010,17 +2949,72 @@
           "auto": true,
           "manual": 0
          }
+        },
+        {
+         "shaft": 3,
+         "gear": {
+          "teeth": 96,
+          "profile_shift": {
+           "auto": true,
+           "manual": 0
+          },
+          "no_undercut": true,
+          "working_depth": {
+           "auto": true,
+           "manual": 1
+          },
+          "addendum": 1,
+          "no_sharp_tip": true,
+          "min_tip_width": "0.10000000000000001",
+          "dedendum": "1.2500000000000000",
+          "root_radius": "0.38000000000000000",
+          "helix_angle": {
+           "auto": true,
+           "manual": 0
+          },
+          "face_width": {
+           "auto": true,
+           "manual": 5
+          },
+          "face_sources": {
+           "bending": {
+            "ultimate": true,
+            "fatigue": true
+           },
+           "contact": {
+            "ultimate": false,
+            "fatigue": false
+           }
+          },
+          "rim_thickness": null,
+          "material": "4340 Hardened Steel",
+          "material_overrides": {
+           "density": null,
+           "elastic_modulus": null,
+           "poissons_ratio": null,
+           "ultimate_allowable": null,
+           "fatigue_allowable": null
+          }
+         },
+         "module": 1,
+         "thickness_mod": {
+          "auto": true,
+          "manual": 1
+         },
+         "ring": {
+          "teeth": 20,
+          "addendum": "1.2500000000000000",
+          "tip_round": "0.20000000000000001"
+         },
+         "pitch_diameter": {
+          "auto": true,
+          "manual": 0
+         }
         }
        ],
        "meshes": [
         {
          "a": 0,
-         "b": 2,
-         "sliding_friction": "0.080000000000000002",
-         "static_friction": "0.16000000000000000"
-        },
-        {
-         "a": 3,
          "b": 1,
          "sliding_friction": "0.080000000000000002",
          "static_friction": "0.16000000000000000"
@@ -3028,6 +3022,12 @@
         {
          "a": 2,
          "b": 3,
+         "sliding_friction": "0.080000000000000002",
+         "static_friction": "0.16000000000000000"
+        },
+        {
+         "a": 1,
+         "b": 2,
          "sliding_friction": "0.080000000000000002",
          "static_friction": "0.16000000000000000"
         }
@@ -7426,11 +7426,11 @@
       "min_planet_clearance": 0,
       "axes": [
        {
-        "carried_by": null,
+        "carried_by": 0,
         "count": 1
        },
        {
-        "carried_by": null,
+        "carried_by": 0,
         "count": 1
        }
       ],
@@ -7607,15 +7607,15 @@
       "min_planet_clearance": "0.29999999999999999",
       "axes": [
        {
-        "carried_by": null,
+        "carried_by": 0,
         "count": 1
        },
        {
-        "carried_by": null,
+        "carried_by": 0,
         "count": 1
        },
        {
-        "carried_by": null,
+        "carried_by": 0,
         "count": 1
        }
       ],
@@ -7878,11 +7878,11 @@
       "min_planet_clearance": "0.29999999999999999",
       "axes": [
        {
-        "carried_by": null,
+        "carried_by": 0,
         "count": 1
        },
        {
-        "carried_by": null,
+        "carried_by": 0,
         "count": 1
        }
       ],
@@ -8305,11 +8305,11 @@
       "min_planet_clearance": 0,
       "axes": [
        {
-        "carried_by": null,
+        "carried_by": 0,
         "count": 1
        },
        {
-        "carried_by": null,
+        "carried_by": 0,
         "count": 1
        }
       ],
@@ -8486,11 +8486,11 @@
       "min_planet_clearance": 0,
       "axes": [
        {
-        "carried_by": null,
+        "carried_by": 0,
         "count": 1
        },
        {
-        "carried_by": null,
+        "carried_by": 0,
         "count": 1
        }
       ],
@@ -8667,7 +8667,7 @@
       "min_planet_clearance": "0.29999999999999999",
       "axes": [
        {
-        "carried_by": null,
+        "carried_by": 0,
         "count": 1
        },
        {
@@ -8921,7 +8921,7 @@
       "min_planet_clearance": "0.29999999999999999",
       "axes": [
        {
-        "carried_by": null,
+        "carried_by": 0,
         "count": 1
        },
        {
@@ -8944,6 +8944,63 @@
        }
       ],
       "members": [
+       {
+        "shaft": 4,
+        "gear": {
+         "teeth": 18,
+         "profile_shift": {
+          "auto": true,
+          "manual": "0.10000000000000001"
+         },
+         "no_undercut": true,
+         "working_depth": {
+          "auto": true,
+          "manual": 1
+         },
+         "addendum": 1,
+         "no_sharp_tip": true,
+         "min_tip_width": "0.10000000000000001",
+         "dedendum": "1.2500000000000000",
+         "root_radius": "0.38000000000000000",
+         "helix_angle": {
+          "auto": true,
+          "manual": 0
+         },
+         "face_width": {
+          "auto": true,
+          "manual": 5
+         },
+         "face_sources": {
+          "bending": {
+           "ultimate": true,
+           "fatigue": true
+          },
+          "contact": {
+           "ultimate": false,
+           "fatigue": false
+          }
+         },
+         "rim_thickness": null,
+         "material": "4340 Hardened Steel",
+         "material_overrides": {
+          "density": null,
+          "elastic_modulus": null,
+          "poissons_ratio": null,
+          "ultimate_allowable": null,
+          "fatigue_allowable": null
+         }
+        },
+        "module": 1,
+        "thickness_mod": {
+         "auto": true,
+         "manual": 1
+        },
+        "ring": null,
+        "pitch_diameter": {
+         "auto": true,
+         "manual": 0
+        }
+       },
        {
         "shaft": 2,
         "gear": {
@@ -9065,75 +9122,18 @@
          "auto": true,
          "manual": 0
         }
-       },
-       {
-        "shaft": 4,
-        "gear": {
-         "teeth": 18,
-         "profile_shift": {
-          "auto": true,
-          "manual": "0.10000000000000001"
-         },
-         "no_undercut": true,
-         "working_depth": {
-          "auto": true,
-          "manual": 1
-         },
-         "addendum": 1,
-         "no_sharp_tip": true,
-         "min_tip_width": "0.10000000000000001",
-         "dedendum": "1.2500000000000000",
-         "root_radius": "0.38000000000000000",
-         "helix_angle": {
-          "auto": true,
-          "manual": 0
-         },
-         "face_width": {
-          "auto": true,
-          "manual": 5
-         },
-         "face_sources": {
-          "bending": {
-           "ultimate": true,
-           "fatigue": true
-          },
-          "contact": {
-           "ultimate": false,
-           "fatigue": false
-          }
-         },
-         "rim_thickness": null,
-         "material": "4340 Hardened Steel",
-         "material_overrides": {
-          "density": null,
-          "elastic_modulus": null,
-          "poissons_ratio": null,
-          "ultimate_allowable": null,
-          "fatigue_allowable": null
-         }
-        },
-        "module": 1,
-        "thickness_mod": {
-         "auto": true,
-         "manual": 1
-        },
-        "ring": null,
-        "pitch_diameter": {
-         "auto": true,
-         "manual": 0
-        }
        }
       ],
       "meshes": [
        {
-        "a": 2,
-        "b": 0,
+        "a": 0,
+        "b": 1,
         "sliding_friction": "0.080000000000000002",
         "static_friction": "0.16000000000000000"
        },
        {
-        "a": 2,
-        "b": 1,
+        "a": 0,
+        "b": 2,
         "sliding_friction": "0.080000000000000002",
         "static_friction": "0.16000000000000000"
        }
@@ -9179,7 +9179,7 @@
       "min_planet_clearance": "0.29999999999999999",
       "axes": [
        {
-        "carried_by": null,
+        "carried_by": 0,
         "count": 1
        },
        {
@@ -9560,7 +9560,7 @@
       "min_planet_clearance": "0.29999999999999999",
       "axes": [
        {
-        "carried_by": null,
+        "carried_by": 0,
         "count": 1
        },
        {
@@ -9580,6 +9580,63 @@
        }
       ],
       "members": [
+       {
+        "shaft": 3,
+        "gear": {
+         "teeth": 30,
+         "profile_shift": {
+          "auto": false,
+          "manual": "0.10000000000000001"
+         },
+         "no_undercut": true,
+         "working_depth": {
+          "auto": true,
+          "manual": 1
+         },
+         "addendum": 1,
+         "no_sharp_tip": true,
+         "min_tip_width": "0.10000000000000001",
+         "dedendum": "1.2500000000000000",
+         "root_radius": "0.38000000000000000",
+         "helix_angle": {
+          "auto": true,
+          "manual": 0
+         },
+         "face_width": {
+          "auto": true,
+          "manual": 5
+         },
+         "face_sources": {
+          "bending": {
+           "ultimate": true,
+           "fatigue": true
+          },
+          "contact": {
+           "ultimate": false,
+           "fatigue": false
+          }
+         },
+         "rim_thickness": null,
+         "material": "4340 Hardened Steel",
+         "material_overrides": {
+          "density": null,
+          "elastic_modulus": null,
+          "poissons_ratio": null,
+          "ultimate_allowable": null,
+          "fatigue_allowable": null
+         }
+        },
+        "module": 1,
+        "thickness_mod": {
+         "auto": true,
+         "manual": 1
+        },
+        "ring": null,
+        "pitch_diameter": {
+         "auto": true,
+         "manual": 0
+        }
+       },
        {
         "shaft": 2,
         "gear": {
@@ -9640,69 +9697,12 @@
          "auto": true,
          "manual": 0
         }
-       },
-       {
-        "shaft": 3,
-        "gear": {
-         "teeth": 30,
-         "profile_shift": {
-          "auto": false,
-          "manual": "0.10000000000000001"
-         },
-         "no_undercut": true,
-         "working_depth": {
-          "auto": true,
-          "manual": 1
-         },
-         "addendum": 1,
-         "no_sharp_tip": true,
-         "min_tip_width": "0.10000000000000001",
-         "dedendum": "1.2500000000000000",
-         "root_radius": "0.38000000000000000",
-         "helix_angle": {
-          "auto": true,
-          "manual": 0
-         },
-         "face_width": {
-          "auto": true,
-          "manual": 5
-         },
-         "face_sources": {
-          "bending": {
-           "ultimate": true,
-           "fatigue": true
-          },
-          "contact": {
-           "ultimate": false,
-           "fatigue": false
-          }
-         },
-         "rim_thickness": null,
-         "material": "4340 Hardened Steel",
-         "material_overrides": {
-          "density": null,
-          "elastic_modulus": null,
-          "poissons_ratio": null,
-          "ultimate_allowable": null,
-          "fatigue_allowable": null
-         }
-        },
-        "module": 1,
-        "thickness_mod": {
-         "auto": true,
-         "manual": 1
-        },
-        "ring": null,
-        "pitch_diameter": {
-         "auto": true,
-         "manual": 0
-        }
        }
       ],
       "meshes": [
        {
-        "a": 1,
-        "b": 0,
+        "a": 0,
+        "b": 1,
         "sliding_friction": "0.080000000000000002",
         "static_friction": "0.16000000000000000"
        }
@@ -9748,7 +9748,7 @@
       "min_planet_clearance": "0.29999999999999999",
       "axes": [
        {
-        "carried_by": null,
+        "carried_by": 0,
         "count": 1
        },
        {
@@ -9830,67 +9830,6 @@
          "manual": 1
         },
         "ring": null,
-        "pitch_diameter": {
-         "auto": true,
-         "manual": 0
-        }
-       },
-       {
-        "shaft": 3,
-        "gear": {
-         "teeth": 96,
-         "profile_shift": {
-          "auto": false,
-          "manual": "0.10000000000000001"
-         },
-         "no_undercut": true,
-         "working_depth": {
-          "auto": true,
-          "manual": 1
-         },
-         "addendum": 1,
-         "no_sharp_tip": true,
-         "min_tip_width": "0.10000000000000001",
-         "dedendum": "1.2500000000000000",
-         "root_radius": "0.38000000000000000",
-         "helix_angle": {
-          "auto": true,
-          "manual": 0
-         },
-         "face_width": {
-          "auto": true,
-          "manual": 5
-         },
-         "face_sources": {
-          "bending": {
-           "ultimate": true,
-           "fatigue": true
-          },
-          "contact": {
-           "ultimate": false,
-           "fatigue": false
-          }
-         },
-         "rim_thickness": null,
-         "material": "4340 Hardened Steel",
-         "material_overrides": {
-          "density": null,
-          "elastic_modulus": null,
-          "poissons_ratio": null,
-          "ultimate_allowable": null,
-          "fatigue_allowable": null
-         }
-        },
-        "module": 1,
-        "thickness_mod": {
-         "auto": true,
-         "manual": 1
-        },
-        "ring": {
-         "teeth": 20,
-         "addendum": "1.2500000000000000",
-         "tip_round": "0.20000000000000001"
-        },
         "pitch_diameter": {
          "auto": true,
          "manual": 0
@@ -10009,17 +9948,72 @@
          "auto": true,
          "manual": 0
         }
+       },
+       {
+        "shaft": 3,
+        "gear": {
+         "teeth": 96,
+         "profile_shift": {
+          "auto": false,
+          "manual": "0.10000000000000001"
+         },
+         "no_undercut": true,
+         "working_depth": {
+          "auto": true,
+          "manual": 1
+         },
+         "addendum": 1,
+         "no_sharp_tip": true,
+         "min_tip_width": "0.10000000000000001",
+         "dedendum": "1.2500000000000000",
+         "root_radius": "0.38000000000000000",
+         "helix_angle": {
+          "auto": true,
+          "manual": 0
+         },
+         "face_width": {
+          "auto": true,
+          "manual": 5
+         },
+         "face_sources": {
+          "bending": {
+           "ultimate": true,
+           "fatigue": true
+          },
+          "contact": {
+           "ultimate": false,
+           "fatigue": false
+          }
+         },
+         "rim_thickness": null,
+         "material": "4340 Hardened Steel",
+         "material_overrides": {
+          "density": null,
+          "elastic_modulus": null,
+          "poissons_ratio": null,
+          "ultimate_allowable": null,
+          "fatigue_allowable": null
+         }
+        },
+        "module": 1,
+        "thickness_mod": {
+         "auto": true,
+         "manual": 1
+        },
+        "ring": {
+         "teeth": 20,
+         "addendum": "1.2500000000000000",
+         "tip_round": "0.20000000000000001"
+        },
+        "pitch_diameter": {
+         "auto": true,
+         "manual": 0
+        }
        }
       ],
       "meshes": [
        {
         "a": 0,
-        "b": 2,
-        "sliding_friction": "0.080000000000000002",
-        "static_friction": "0.16000000000000000"
-       },
-       {
-        "a": 3,
         "b": 1,
         "sliding_friction": "0.080000000000000002",
         "static_friction": "0.16000000000000000"
@@ -10027,6 +10021,12 @@
        {
         "a": 2,
         "b": 3,
+        "sliding_friction": "0.080000000000000002",
+        "static_friction": "0.16000000000000000"
+       },
+       {
+        "a": 1,
+        "b": 2,
         "sliding_friction": "0.080000000000000002",
         "static_friction": "0.16000000000000000"
        }
@@ -10360,11 +10360,11 @@
         "min_planet_clearance": 0,
         "axes": [
          {
-          "carried_by": null,
+          "carried_by": 0,
           "count": 1
          },
          {
-          "carried_by": null,
+          "carried_by": 0,
           "count": 1
          }
         ],
@@ -10538,7 +10538,7 @@
         "min_planet_clearance": "0.29999999999999999",
         "axes": [
          {
-          "carried_by": null,
+          "carried_by": 0,
           "count": 1
          },
          {
@@ -10916,11 +10916,11 @@
         "min_planet_clearance": 0,
         "axes": [
          {
-          "carried_by": null,
+          "carried_by": 0,
           "count": 1
          },
          {
-          "carried_by": null,
+          "carried_by": 0,
           "count": 1
          }
         ],
@@ -11094,7 +11094,7 @@
         "min_planet_clearance": "0.29999999999999999",
         "axes": [
          {
-          "carried_by": null,
+          "carried_by": 0,
           "count": 1
          },
          {
@@ -11481,11 +11481,11 @@
         "min_planet_clearance": 0,
         "axes": [
          {
-          "carried_by": null,
+          "carried_by": 0,
           "count": 1
          },
          {
-          "carried_by": null,
+          "carried_by": 0,
           "count": 1
          }
         ],
@@ -11659,7 +11659,7 @@
         "min_planet_clearance": "0.29999999999999999",
         "axes": [
          {
-          "carried_by": null,
+          "carried_by": 0,
           "count": 1
          },
          {
@@ -12037,11 +12037,11 @@
         "min_planet_clearance": 0,
         "axes": [
          {
-          "carried_by": null,
+          "carried_by": 0,
           "count": 1
          },
          {
-          "carried_by": null,
+          "carried_by": 0,
           "count": 1
          }
         ],
@@ -12215,7 +12215,7 @@
         "min_planet_clearance": "0.29999999999999999",
         "axes": [
          {
-          "carried_by": null,
+          "carried_by": 0,
           "count": 1
          },
          {
@@ -12605,11 +12605,11 @@
         "min_planet_clearance": 0,
         "axes": [
          {
-          "carried_by": null,
+          "carried_by": 0,
           "count": 1
          },
          {
-          "carried_by": null,
+          "carried_by": 0,
           "count": 1
          }
         ],
@@ -12783,7 +12783,7 @@
         "min_planet_clearance": "0.29999999999999999",
         "axes": [
          {
-          "carried_by": null,
+          "carried_by": 0,
           "count": 1
          },
          {
@@ -13261,11 +13261,11 @@
         "min_planet_clearance": 0,
         "axes": [
          {
-          "carried_by": null,
+          "carried_by": 0,
           "count": 1
          },
          {
-          "carried_by": null,
+          "carried_by": 0,
           "count": 1
          }
         ],
@@ -13439,7 +13439,7 @@
         "min_planet_clearance": "0.29999999999999999",
         "axes": [
          {
-          "carried_by": null,
+          "carried_by": 0,
           "count": 1
          },
          {
@@ -13910,11 +13910,11 @@
         "min_planet_clearance": 0,
         "axes": [
          {
-          "carried_by": null,
+          "carried_by": 0,
           "count": 1
          },
          {
-          "carried_by": null,
+          "carried_by": 0,
           "count": 1
          }
         ],
@@ -14088,7 +14088,7 @@
         "min_planet_clearance": "0.29999999999999999",
         "axes": [
          {
-          "carried_by": null,
+          "carried_by": 0,
           "count": 1
          },
          {
@@ -14559,11 +14559,11 @@
         "min_planet_clearance": 0,
         "axes": [
          {
-          "carried_by": null,
+          "carried_by": 0,
           "count": 1
          },
          {
-          "carried_by": null,
+          "carried_by": 0,
           "count": 1
          }
         ],
@@ -14737,7 +14737,7 @@
         "min_planet_clearance": "0.29999999999999999",
         "axes": [
          {
-          "carried_by": null,
+          "carried_by": 0,
           "count": 1
          },
          {
@@ -15318,11 +15318,11 @@
         "min_planet_clearance": 0,
         "axes": [
          {
-          "carried_by": null,
+          "carried_by": 0,
           "count": 1
          },
          {
-          "carried_by": null,
+          "carried_by": 0,
           "count": 1
          }
         ],
@@ -15496,7 +15496,7 @@
         "min_planet_clearance": "0.29999999999999999",
         "axes": [
          {
-          "carried_by": null,
+          "carried_by": 0,
           "count": 1
          },
          {
@@ -15870,15 +15870,15 @@
         "min_planet_clearance": "0.29999999999999999",
         "axes": [
          {
-          "carried_by": null,
+          "carried_by": 0,
           "count": 1
          },
          {
-          "carried_by": null,
+          "carried_by": 0,
           "count": 1
          },
          {
-          "carried_by": null,
+          "carried_by": 0,
           "count": 1
          }
         ],
@@ -16727,11 +16727,11 @@
         "min_planet_clearance": 0,
         "axes": [
          {
-          "carried_by": null,
+          "carried_by": 0,
           "count": 1
          },
          {
-          "carried_by": null,
+          "carried_by": 0,
           "count": 1
          }
         ],
@@ -16905,7 +16905,7 @@
         "min_planet_clearance": "0.29999999999999999",
         "axes": [
          {
-          "carried_by": null,
+          "carried_by": 0,
           "count": 1
          },
          {
@@ -17279,11 +17279,11 @@
         "min_planet_clearance": "0.29999999999999999",
         "axes": [
          {
-          "carried_by": null,
+          "carried_by": 0,
           "count": 1
          },
          {
-          "carried_by": null,
+          "carried_by": 0,
           "count": 1
          }
         ],
@@ -20934,7 +20934,7 @@
    }
   },
   "export_train": {
-   "ok": "# Geartrain.\n#\n# Inputs only — every ratio, stress, efficiency and backlash is recomputed from\n# these, so nothing here can go stale. Units: mm, degrees, rpm, N·m.\n#\n# Materials are named; the library that defines them is a separate document.\n# Editing this file by hand is expected.\n\nname = \"probe\"\n\n[train]\nreversed_bending = false\ncouplings = []\nconstraints = []\n\n[[train.load_cases]]\nkind = \"ultimate\"\nenabled = true\n\n[[train.load_cases.loads]]\nrole = \"load\"\n\n[train.load_cases.loads.at]\nkind = \"of\"\nstage = 0\nshaft = 1\n\n[train.load_cases.loads.torque]\nauto = false\nmanual = 0.1\n\n[train.load_cases.loads.speed]\nauto = false\nmanual = 30000.0\n\n[[train.load_cases.loads]]\nrole = \"reacted\"\n\n[train.load_cases.loads.at]\nkind = \"of\"\nstage = 0\nshaft = 2\n\n[train.load_cases.loads.torque]\nauto = true\nmanual = 0.0\n\n[train.load_cases.loads.speed]\nauto = true\nmanual = 0.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nactuations = 1000\nreversing = false\n\n[train.load_cases.duty.intermittent.at]\nkind = \"of\"\nstage = 0\nshaft = 2\n\n[[train.load_cases]]\nkind = \"ultimate\"\nenabled = true\n\n[[train.load_cases.loads]]\nrole = \"load\"\n\n[train.load_cases.loads.at]\nkind = \"of\"\nstage = 0\nshaft = 2\n\n[train.load_cases.loads.torque]\nauto = false\nmanual = 3.0\n\n[train.load_cases.loads.speed]\nauto = false\nmanual = 0.0\n\n[[train.load_cases.loads]]\nrole = \"reacted\"\n\n[train.load_cases.loads.at]\nkind = \"of\"\nstage = 0\nshaft = 1\n\n[train.load_cases.loads.torque]\nauto = true\nmanual = 0.0\n\n[train.load_cases.loads.speed]\nauto = true\nmanual = 0.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nactuations = 1000\nreversing = false\n\n[train.load_cases.duty.intermittent.at]\nkind = \"of\"\nstage = 0\nshaft = 2\n\n[[train.load_cases]]\nkind = \"fatigue\"\nenabled = true\n\n[[train.load_cases.loads]]\nrole = \"load\"\n\n[train.load_cases.loads.at]\nkind = \"of\"\nstage = 0\nshaft = 1\n\n[train.load_cases.loads.torque]\nauto = false\nmanual = 0.02\n\n[train.load_cases.loads.speed]\nauto = false\nmanual = 30000.0\n\n[[train.load_cases.loads]]\nrole = \"reacted\"\n\n[train.load_cases.loads.at]\nkind = \"of\"\nstage = 0\nshaft = 2\n\n[train.load_cases.loads.torque]\nauto = true\nmanual = 0.0\n\n[train.load_cases.loads.speed]\nauto = true\nmanual = 0.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nactuations = 1000\nreversing = false\n\n[train.load_cases.duty.intermittent.at]\nkind = \"of\"\nstage = 0\nshaft = 2\n\n[[train.stages]]\nkind = \"shape\"\npressure_angle = 20.0\nload_sharing = \"none\"\nmin_planet_clearance = 0.0\n\n[train.stages.overlap]\nauto = true\nmanual = 1.0\n\n[train.stages.optimisation]\nenabled = false\nmin_contact_ratio = 1.2\n\n[[train.stages.axes]]\ncount = 1\n\n[[train.stages.axes]]\ncount = 1\n\n[[train.stages.shafts]]\naxis = 0\n\n[[train.stages.shafts]]\naxis = 1\n\n[[train.stages.members]]\nshaft = 1\nmodule = 1.0\n\n[train.stages.members.gear]\nteeth = 17\nno_undercut = true\naddendum = 1.0\nno_sharp_tip = true\nmin_tip_width = 0.1\ndedendum = 1.25\nroot_radius = 0.38\nmaterial = \"4340 Hardened Steel\"\n\n[train.stages.members.gear.profile_shift]\nauto = true\nmanual = 0.0\n\n[train.stages.members.gear.working_depth]\nauto = true\nmanual = 1.0\n\n[train.stages.members.gear.helix_angle]\nauto = true\nmanual = 0.0\n\n[train.stages.members.gear.face_width]\nauto = true\nmanual = 5.0\n\n[train.stages.members.gear.face_sources.bending]\nultimate = true\nfatigue = true\n\n[train.stages.members.gear.face_sources.contact]\nultimate = false\nfatigue = false\n\n[train.stages.members.gear.material_overrides]\n\n[train.stages.members.thickness_mod]\nauto = false\nmanual = 1.0\n\n[train.stages.members.pitch_diameter]\nauto = true\nmanual = 17.0\n\n[[train.stages.members]]\nshaft = 2\nmodule = 1.0\n\n[train.stages.members.gear]\nteeth = 43\nno_undercut = true\naddendum = 1.0\nno_sharp_tip = true\nmin_tip_width = 0.1\ndedendum = 1.25\nroot_radius = 0.38\nmaterial = \"4340 Hardened Steel\"\n\n[train.stages.members.gear.profile_shift]\nauto = true\nmanual = 0.0\n\n[train.stages.members.gear.working_depth]\nauto = true\nmanual = 1.0\n\n[train.stages.members.gear.helix_angle]\nauto = true\nmanual = 0.0\n\n[train.stages.members.gear.face_width]\nauto = true\nmanual = 5.0\n\n[train.stages.members.gear.face_sources.bending]\nultimate = true\nfatigue = true\n\n[train.stages.members.gear.face_sources.contact]\nultimate = false\nfatigue = false\n\n[train.stages.members.gear.material_overrides]\n\n[train.stages.members.thickness_mod]\nauto = true\nmanual = 1.0\n\n[train.stages.members.pitch_diameter]\nauto = true\nmanual = 0.0\n\n[[train.stages.meshes]]\na = 0\nb = 1\nsliding_friction = 0.08\nstatic_friction = 0.16\n\n[[train.stages.distances]]\naxes = [\n    0,\n    1,\n]\nangle = 0.0\nworm = false\ntip_clearance = 0.0\ntolerance_plus = 0.02\ntolerance_minus = 0.02\naxial_clearance = 0.0\n\n[train.stages.distances.distance]\nauto = true\nmanual = 0.0\n\n[train.stages.distances.clearance]\nauto = false\nmanual = 0.02\n"
+   "ok": "# Geartrain.\n#\n# Inputs only — every ratio, stress, efficiency and backlash is recomputed from\n# these, so nothing here can go stale. Units: mm, degrees, rpm, N·m.\n#\n# Materials are named; the library that defines them is a separate document.\n# Editing this file by hand is expected.\n\nname = \"probe\"\n\n[train]\nreversed_bending = false\ncouplings = []\nconstraints = []\n\n[[train.load_cases]]\nkind = \"ultimate\"\nenabled = true\n\n[[train.load_cases.loads]]\nrole = \"load\"\n\n[train.load_cases.loads.at]\nkind = \"of\"\nstage = 0\nshaft = 1\n\n[train.load_cases.loads.torque]\nauto = false\nmanual = 0.1\n\n[train.load_cases.loads.speed]\nauto = false\nmanual = 30000.0\n\n[[train.load_cases.loads]]\nrole = \"reacted\"\n\n[train.load_cases.loads.at]\nkind = \"of\"\nstage = 0\nshaft = 2\n\n[train.load_cases.loads.torque]\nauto = true\nmanual = 0.0\n\n[train.load_cases.loads.speed]\nauto = true\nmanual = 0.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nactuations = 1000\nreversing = false\n\n[train.load_cases.duty.intermittent.at]\nkind = \"of\"\nstage = 0\nshaft = 2\n\n[[train.load_cases]]\nkind = \"ultimate\"\nenabled = true\n\n[[train.load_cases.loads]]\nrole = \"load\"\n\n[train.load_cases.loads.at]\nkind = \"of\"\nstage = 0\nshaft = 2\n\n[train.load_cases.loads.torque]\nauto = false\nmanual = 3.0\n\n[train.load_cases.loads.speed]\nauto = false\nmanual = 0.0\n\n[[train.load_cases.loads]]\nrole = \"reacted\"\n\n[train.load_cases.loads.at]\nkind = \"of\"\nstage = 0\nshaft = 1\n\n[train.load_cases.loads.torque]\nauto = true\nmanual = 0.0\n\n[train.load_cases.loads.speed]\nauto = true\nmanual = 0.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nactuations = 1000\nreversing = false\n\n[train.load_cases.duty.intermittent.at]\nkind = \"of\"\nstage = 0\nshaft = 2\n\n[[train.load_cases]]\nkind = \"fatigue\"\nenabled = true\n\n[[train.load_cases.loads]]\nrole = \"load\"\n\n[train.load_cases.loads.at]\nkind = \"of\"\nstage = 0\nshaft = 1\n\n[train.load_cases.loads.torque]\nauto = false\nmanual = 0.02\n\n[train.load_cases.loads.speed]\nauto = false\nmanual = 30000.0\n\n[[train.load_cases.loads]]\nrole = \"reacted\"\n\n[train.load_cases.loads.at]\nkind = \"of\"\nstage = 0\nshaft = 2\n\n[train.load_cases.loads.torque]\nauto = true\nmanual = 0.0\n\n[train.load_cases.loads.speed]\nauto = true\nmanual = 0.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nactuations = 1000\nreversing = false\n\n[train.load_cases.duty.intermittent.at]\nkind = \"of\"\nstage = 0\nshaft = 2\n\n[[train.stages]]\nkind = \"shape\"\npressure_angle = 20.0\nload_sharing = \"none\"\nmin_planet_clearance = 0.0\n\n[train.stages.overlap]\nauto = true\nmanual = 1.0\n\n[train.stages.optimisation]\nenabled = false\nmin_contact_ratio = 1.2\n\n[[train.stages.axes]]\ncarried_by = 0\ncount = 1\n\n[[train.stages.axes]]\ncarried_by = 0\ncount = 1\n\n[[train.stages.shafts]]\naxis = 0\n\n[[train.stages.shafts]]\naxis = 1\n\n[[train.stages.members]]\nshaft = 1\nmodule = 1.0\n\n[train.stages.members.gear]\nteeth = 17\nno_undercut = true\naddendum = 1.0\nno_sharp_tip = true\nmin_tip_width = 0.1\ndedendum = 1.25\nroot_radius = 0.38\nmaterial = \"4340 Hardened Steel\"\n\n[train.stages.members.gear.profile_shift]\nauto = true\nmanual = 0.0\n\n[train.stages.members.gear.working_depth]\nauto = true\nmanual = 1.0\n\n[train.stages.members.gear.helix_angle]\nauto = true\nmanual = 0.0\n\n[train.stages.members.gear.face_width]\nauto = true\nmanual = 5.0\n\n[train.stages.members.gear.face_sources.bending]\nultimate = true\nfatigue = true\n\n[train.stages.members.gear.face_sources.contact]\nultimate = false\nfatigue = false\n\n[train.stages.members.gear.material_overrides]\n\n[train.stages.members.thickness_mod]\nauto = false\nmanual = 1.0\n\n[train.stages.members.pitch_diameter]\nauto = true\nmanual = 17.0\n\n[[train.stages.members]]\nshaft = 2\nmodule = 1.0\n\n[train.stages.members.gear]\nteeth = 43\nno_undercut = true\naddendum = 1.0\nno_sharp_tip = true\nmin_tip_width = 0.1\ndedendum = 1.25\nroot_radius = 0.38\nmaterial = \"4340 Hardened Steel\"\n\n[train.stages.members.gear.profile_shift]\nauto = true\nmanual = 0.0\n\n[train.stages.members.gear.working_depth]\nauto = true\nmanual = 1.0\n\n[train.stages.members.gear.helix_angle]\nauto = true\nmanual = 0.0\n\n[train.stages.members.gear.face_width]\nauto = true\nmanual = 5.0\n\n[train.stages.members.gear.face_sources.bending]\nultimate = true\nfatigue = true\n\n[train.stages.members.gear.face_sources.contact]\nultimate = false\nfatigue = false\n\n[train.stages.members.gear.material_overrides]\n\n[train.stages.members.thickness_mod]\nauto = true\nmanual = 1.0\n\n[train.stages.members.pitch_diameter]\nauto = true\nmanual = 0.0\n\n[[train.stages.meshes]]\na = 0\nb = 1\nsliding_friction = 0.08\nstatic_friction = 0.16\n\n[[train.stages.distances]]\naxes = [\n    0,\n    1,\n]\nangle = 0.0\nworm = false\ntip_clearance = 0.0\ntolerance_plus = 0.02\ntolerance_minus = 0.02\naxial_clearance = 0.0\n\n[train.stages.distances.distance]\nauto = true\nmanual = 0.0\n\n[train.stages.distances.clearance]\nauto = false\nmanual = 0.02\n"
   },
   "import_train": {
    "ok": {
@@ -21110,11 +21110,11 @@
         "min_planet_clearance": 0,
         "axes": [
          {
-          "carried_by": null,
+          "carried_by": 0,
           "count": 1
          },
          {
-          "carried_by": null,
+          "carried_by": 0,
           "count": 1
          }
         ],
