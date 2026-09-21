@@ -1,5 +1,5 @@
 == pair ==
-  total    ratio      -2.529412   efficiency  98.344976 / 98.344976  %   backlash   0.038950 / 0.098522   deg
+  path 1.1   -> 1.2   ratio      -2.529412   efficiency  98.344976 / 98.344976  %   backlash   0.038950 / 0.098522   deg
   case 1       2.0000 Nm /   3000.00 rpm at 1.1    +reacted at 1.2  
     fixed    ground                              -  torque    -6.975099
     load     first                      3000.0000 rpm  torque     2.000000
@@ -36,7 +36,7 @@
     shaft second    of stage 1 speed -17/43
 
 == helical ==
-  total    ratio      -2.529412   efficiency  98.389569 / 98.389569  %   backlash   0.038879 / 0.098341   deg
+  path 1.1   -> 1.2   ratio      -2.529412   efficiency  98.389569 / 98.389569  %   backlash   0.038879 / 0.098341   deg
   case 1       2.0000 Nm /   3000.00 rpm at 1.1    +reacted at 1.2  
     fixed    ground                              -  torque    -6.977355
     load     first                      3000.0000 rpm  torque     2.000000
@@ -73,7 +73,7 @@
     shaft second    of stage 1 speed -17/43
 
 == worm ==
-  total    ratio     -40.000000   efficiency  61.804609 / 0.000000   %   backlash   0.155124 / 6.204966   deg
+  path 1.1   -> 1.2   ratio     -40.000000   efficiency  61.804609 / 0.000000   %   backlash   0.155124 / 6.204966   deg
   case 1       2.0000 Nm /   3000.00 rpm at 1.1    +reacted at 1.2  
     fixed    ground                              -  torque   -51.443687
     load     first                      3000.0000 rpm  torque     2.000000
@@ -110,7 +110,7 @@
     shaft second    of stage 1 speed -1/40
 
 == set-sun-carrier ==
-  total    ratio      -6.000000   efficiency  97.295446 / 97.295446  %   backlash   0.048678 / 0.292068   deg
+  path 1.1   -> 1.3   ratio      -6.000000   efficiency  97.295446 / 97.295446  %   backlash   0.048678 / 0.292068   deg
   case 1       2.0000 Nm /   3000.00 rpm at 1.1    +reacted at 1.3  
     fixed    ground                              -  torque     0.000000
     load     sun                        3000.0000 rpm  torque     2.000000
@@ -166,7 +166,7 @@
     shaft planet    of stage 1 speed -2/5
 
 == set-sun-ring ==
-  total    ratio       7.000000   efficiency  97.681810 / 97.672819  %   backlash   0.041724 / 0.292068   deg
+  path 1.1   -> 1.2   ratio       7.000000   efficiency  97.681810 / 97.672819  %   backlash   0.041724 / 0.292068   deg
   case 1       2.0000 Nm /   3000.00 rpm at 1.1    +reacted at 1.2  
     fixed    ground                              -  torque     0.000000
     load     sun                        3000.0000 rpm  torque     2.000000
@@ -222,7 +222,7 @@
     shaft planet    of stage 1 speed -1/5
 
 == set-carrier-sun ==
-  total    ratio       0.857143   efficiency  99.604466 / 99.613635  %   backlash   0.048678 / 0.041724   deg
+  path 1.2   -> 1.3   ratio       0.857143   efficiency  99.604466 / 99.613635  %   backlash   0.048678 / 0.041724   deg
   case 1       2.0000 Nm /   3000.00 rpm at 1.2    +reacted at 1.3  
     fixed    ground                              -  torque     0.000000
     fixed    sun                                 -  torque    -0.292495
@@ -278,7 +278,7 @@
     shaft planet    of stage 1 speed 7/5
 
 == set-carrier-ring ==
-  total    ratio       0.142857   efficiency  97.672819 / 97.681810  %   backlash   0.292068 / 0.041724   deg
+  path 1.1   -> 1.2   ratio       7.000000   efficiency  97.681810 / 97.672819  %   backlash   0.041724 / 0.292068   deg
   case 1       2.0000 Nm /   3000.00 rpm at 1.2    +reacted at 1.1  
     fixed    ground                              -  torque     0.000000
     reacted  sun                        21000.0000 rpm  torque    -0.279065
@@ -334,7 +334,7 @@
     shaft planet    of stage 1 speed -7/5
 
 == set-ring-sun ==
-  total    ratio       1.166667   efficiency  99.613635 / 99.604466  %   backlash   0.041724 / 0.048678   deg
+  path 1.2   -> 1.3   ratio       0.857143   efficiency  99.604466 / 99.613635  %   backlash   0.048678 / 0.041724   deg
   case 1       2.0000 Nm /   3000.00 rpm at 1.3    +reacted at 1.2  
     fixed    ground                              -  torque     0.000000
     fixed    sun                                 -  torque     0.324318
@@ -390,7 +390,7 @@
     shaft planet    of stage 1 speed 6/5
 
 == set-ring-carrier ==
-  total    ratio      -0.166667   efficiency  97.295446 / 97.295446  %   backlash   0.292068 / 0.048678   deg
+  path 1.1   -> 1.3   ratio      -6.000000   efficiency  97.295446 / 97.295446  %   backlash   0.048678 / 0.292068   deg
   case 1       2.0000 Nm /   3000.00 rpm at 1.3    +reacted at 1.1  
     fixed    ground                              -  torque     0.000000
     reacted  sun                        -18000.0000 rpm  torque     0.324318
@@ -446,7 +446,9 @@
     shaft planet    of stage 1 speed 12/5
 
 == hula ==
-  total    ratio     232.562500   efficiency  81.919641 / 77.908095  %   backlash   0.065428 / 15.216172  deg
+  path 1.1   -> 1.2   ratio     232.562500   efficiency  81.919641 / 77.908095  %   backlash   0.065428 / 15.216172  deg
+  path 1.1   -> 1.4   ratio     -15.250000   efficiency  99.257736 / 99.252529  %   backlash   0.033823 / 0.515802   deg
+  path 1.2   -> 1.4   ratio      -0.065574   efficiency  77.329812 / 81.307315  %   backlash   1.031605 / 0.067646   deg
   case 1       2.0000 Nm /   3000.00 rpm at 1.1    +reacted at 1.2  
     fixed    ground                              -  torque     0.000000
     load     carrier                    3000.0000 rpm  torque     2.000000
@@ -506,7 +508,16 @@
     shaft planet 1  of stage 1 speed -4/61
 
 == layshaft ==
-  total    ratio       2.366224   efficiency  96.998754 / 96.998754  %   backlash   0.099391 / 0.235181   deg
+  path 1.1   -> 1.2   ratio       2.366224   efficiency  96.998754 / 96.998754  %   backlash   0.099391 / 0.235181   deg
+  path 1.1   -> 1.3   ratio      -2.529412   efficiency  98.344976 / 98.344976  %   backlash   0.038950 / 0.098522   deg
+  path 1.1   -> 1.4   ratio       5.458204   efficiency  96.809824 / 96.809824  %   backlash   0.058901 / 0.321491   deg
+  path 1.1   -> 1.5   ratio       1.000000   efficiency  96.717344 / 96.717344  %   backlash   0.197043 / 0.197043   deg
+  path 1.2   -> 1.3   ratio      -1.068966   efficiency  98.631123 / 98.631123  %   backlash   0.054028 / 0.057754   deg
+  path 1.2   -> 1.4   ratio       2.306715   efficiency  97.091503 / 97.091503  %   backlash   0.065888 / 0.151984   deg
+  path 1.2   -> 1.5   ratio       0.422614   efficiency  96.998754 / 96.998754  %   backlash   0.235181 / 0.099391   deg
+  path 1.3   -> 1.4   ratio      -2.157895   efficiency  98.439013 / 98.439013  %   backlash   0.040850 / 0.088151   deg
+  path 1.3   -> 1.5   ratio      -0.395349   efficiency  98.344976 / 98.344976  %   backlash   0.098522 / 0.038950   deg
+  path 1.4   -> 1.5   ratio       0.183210   efficiency  96.809824 / 96.809824  %   backlash   0.321491 / 0.058901   deg
   case 1       2.0000 Nm /   3000.00 rpm at 1.1    +reacted at 1.2  
     fixed    ground                              -  torque     2.590415
     load     member 1                   3000.0000 rpm  torque     2.000000
@@ -591,7 +602,9 @@
     shaft member 8  of stage 1 speed 1
 
 == wormpair ==
-  total    ratio     101.176471   efficiency  60.781728 / 0.000000   %   backlash   0.055440 / 5.609180   deg
+  path 1.1   -> 1.2   ratio     101.176471   efficiency  60.781728 / 0.000000   %   backlash   0.055440 / 5.609180   deg
+  path 1.1   -> 1.3   ratio     -40.000000   efficiency  61.804609 / 0.000000   %   backlash   0.041708 / 1.668317   deg
+  path 1.2   -> 1.3   ratio      -0.395349   efficiency  98.344976 / 98.344976  %   backlash   0.098522 / 0.038950   deg
   case 1       2.0000 Nm /   3000.00 rpm at 1.1    +reacted at 1.2  
     fixed    ground                              -  torque   120.993614
     load     member 1                   3000.0000 rpm  torque     2.000000
@@ -644,7 +657,7 @@
     shaft member 2  of stage 1 speed -1/40
 
 == wolfrom ==
-  total    ratio      61.000000   efficiency  45.356184 / 0.000000   %   backlash   0.048937 / 2.985130   deg
+  path 1.1   -> 1.2   ratio      61.000000   efficiency  45.356184 / 0.000000   %   backlash   0.048937 / 2.985130   deg
   case 1       2.0000 Nm /   3000.00 rpm at 1.1    +reacted at 1.2  
     fixed    ground                              -  torque     0.000000
     load     carrier                    3000.0000 rpm  torque     2.000000
@@ -700,7 +713,9 @@
     shaft planet    of stage 1 speed -7/3
 
 == stepped ==
-  total    ratio      88.500000   efficiency  65.548466 / 48.513978  %   backlash   0.056749 / 5.022252   deg
+  path 1.1   -> 1.2   ratio      88.500000   efficiency  65.548466 / 48.513978  %   backlash   0.056749 / 5.022252   deg
+  path 1.1   -> 1.3   ratio       3.500000   efficiency  97.953392 / 97.936499  %   backlash   0.039720 / 0.139021   deg
+  path 1.2   -> 1.3   ratio       0.039548   efficiency  49.536157 / 66.918016  %   backlash   1.395209 / 0.055178   deg
   case 1       2.0000 Nm /   3000.00 rpm at 1.1    +reacted at 1.2  
     fixed    ground                              -  torque     0.000000
     load     sun                        3000.0000 rpm  torque     2.000000
@@ -772,7 +787,7 @@
     shaft planet 1  of stage 1 speed -2/3
 
 == planocentric ==
-  total    ratio     -10.000000   efficiency  97.155934 / 97.080449  %   backlash   0.095762 / 0.957619   deg
+  path 1.1   -> 1.3   ratio     -10.000000   efficiency  97.155934 / 97.080449  %   backlash   0.095762 / 0.957619   deg
   case 1       2.0000 Nm /   3000.00 rpm at 1.1    +reacted at 1.3  
     fixed    ground                              -  torque     0.000000
     load     carrier                    3000.0000 rpm  torque     2.000000
@@ -816,7 +831,7 @@
     shaft planet    of stage 1 speed -1/10
 
 == meshed-planets ==
-  total    ratio      -3.000000   efficiency  93.358179 / 93.466662  %   backlash   0.069648 / 0.208944   deg
+  path 1.1   -> 1.2   ratio      -3.000000   efficiency  93.358179 / 93.466662  %   backlash   0.069648 / 0.208944   deg
   case 1       2.0000 Nm /   3000.00 rpm at 1.1    +reacted at 1.2  
     fixed    ground                              -  torque     0.000000
     load     sun                        3000.0000 rpm  torque     2.000000
@@ -884,7 +899,9 @@
     shaft planet 2  of stage 1 speed 13/9
 
 == ravigneaux-small-sun ==
-  total    ratio       4.444444   efficiency  97.918525 / 97.905870  %   backlash   0.041706 / 0.185361   deg
+  path 1.1   -> 1.2   ratio       4.444444   efficiency  97.918525 / 97.905870  %   backlash   0.041706 / 0.185361   deg
+  path 1.1   -> 1.3   ratio      -4.166667   efficiency  90.948043 / 90.611620  %   backlash   0.166833 / 0.695140   deg
+  path 1.2   -> 1.3   ratio      -0.937500   efficiency  91.818656 / 91.481430  %   backlash   0.167001 / 0.156564   deg
   case 1       2.0000 Nm /   3000.00 rpm at 1.1    +reacted at 1.2  
     fixed    ground                              -  torque     0.000000
     load     sun 1                      3000.0000 rpm  torque     2.000000
@@ -964,7 +981,9 @@
     shaft planet 2  of stage 1 speed 1
 
 == ravigneaux-large-sun ==
-  total    ratio      -0.240000   efficiency  90.611620 / 90.948043  %   backlash   0.695140 / 0.166833   deg
+  path 1.1   -> 1.2   ratio       4.444444   efficiency  97.918525 / 97.905870  %   backlash   0.041706 / 0.185361   deg
+  path 1.1   -> 1.3   ratio      -4.166667   efficiency  90.948043 / 90.611620  %   backlash   0.166833 / 0.695140   deg
+  path 1.2   -> 1.3   ratio      -0.937500   efficiency  91.818656 / 91.481430  %   backlash   0.167001 / 0.156564   deg
   case 1       2.0000 Nm /   3000.00 rpm at 1.3    +reacted at 1.2    +free at 1.1  
     fixed    ground                              -  torque     0.000000
     free     sun 1                      -12500.0000 rpm  torque     0.000000
@@ -1044,7 +1063,9 @@
     shaft planet 2  of stage 1 speed -25/6
 
 == ravigneaux-ring-free ==
-  total    ratio       2.666667   efficiency  96.521026 / 96.446859  %   backlash   0.104114 / 0.277636   deg
+  path 1.1   -> 1.2   ratio       2.666667   efficiency  96.521026 / 96.446859  %   backlash   0.104114 / 0.277636   deg
+  path 1.1   -> 1.4   ratio       5.166667   efficiency  92.700034 / 92.288601  %   backlash   0.134543 / 0.695140   deg
+  path 1.2   -> 1.4   ratio       1.937500   efficiency  96.041285 / 95.688551  %   backlash   0.080807 / 0.156564   deg
   case 1       2.0000 Nm /   3000.00 rpm at 1.1    +reacted at 1.2  
     fixed    ground                              -  torque     0.000000
     load     sun 1                      3000.0000 rpm  torque     2.000000
@@ -1124,7 +1145,9 @@
     shaft planet 2  of stage 1 speed 1
 
 == chain ==
-  total    ratio       6.031674   efficiency  96.374575 / 96.374575  %   backlash   0.072802 / 0.439117   deg
+  path 1.1   -> 2.2   ratio       6.031674   efficiency  96.374575 / 96.374575  %   backlash   0.072802 / 0.439117   deg
+  path 1.1   -> 1.2   ratio      -2.529412   efficiency  98.344976 / 98.344976  %   backlash   0.038950 / 0.098522   deg
+  path 1.2   -> 2.2   ratio      -2.384615   efficiency  97.996440 / 97.996440  %   backlash   0.056468 / 0.134654   deg
   case 1       2.0000 Nm /   3000.00 rpm at 1.1    +reacted at 2.2  
     fixed    ground                              -  torque     9.626001
     load     first                      3000.0000 rpm  torque     2.000000
@@ -1187,7 +1210,12 @@
     shaft second    of stage 2 speed 221/1333
 
 == mixed ==
-  total    ratio     708.235294   efficiency  59.372692 / 0.000000   %   backlash   0.156306 / 110.701676 deg
+  path 1.1   -> 3.2   ratio     708.235294   efficiency  59.372692 / 0.000000   %   backlash   0.156306 / 110.701676 deg
+  path 1.1   -> 1.2   ratio      -2.529412   efficiency  98.344976 / 98.344976  %   backlash   0.038950 / 0.098522   deg
+  path 1.1   -> 2.2   ratio     -17.705882   efficiency  96.065153 / 96.056311  %   backlash   0.047288 / 0.837281   deg
+  path 1.2   -> 2.2   ratio       7.000000   efficiency  97.681810 / 97.672819  %   backlash   0.041724 / 0.292068   deg
+  path 1.2   -> 3.2   ratio    -280.000000   efficiency  60.371861 / 0.000000   %   backlash   0.156167 / 43.726829  deg
+  path 2.2   -> 3.2   ratio     -40.000000   efficiency  61.804609 / 0.000000   %   backlash   0.155124 / 6.204966   deg
   case 1       2.0000 Nm /   3000.00 rpm at 1.1    +reacted at 3.2  
     fixed    ground                              -  torque   868.039987
     load     first                      3000.0000 rpm  torque     2.000000
@@ -1295,7 +1323,9 @@
     shaft second    of stage 3 speed 17/12040
 
 == set-then-pair ==
-  total    ratio      15.176471   efficiency  95.685183 / 95.685183  %   backlash   0.058195 / 0.883197   deg
+  path 1.1   -> 2.2   ratio      15.176471   efficiency  95.685183 / 95.685183  %   backlash   0.058195 / 0.883197   deg
+  path 1.1   -> 1.3   ratio      -6.000000   efficiency  97.295446 / 97.295446  %   backlash   0.048678 / 0.292068   deg
+  path 1.3   -> 2.2   ratio      -2.529412   efficiency  98.344976 / 98.344976  %   backlash   0.038950 / 0.098522   deg
   case 1       2.0000 Nm /   3000.00 rpm at 1.1    +reacted at 2.2  
     fixed    ground                              -  torque    40.718721
     load     sun                        3000.0000 rpm  torque     2.000000
@@ -1377,7 +1407,9 @@
     shaft second    of stage 2 speed 17/258
 
 == pair-then-set ==
-  total    ratio      15.176471   efficiency  95.685183 / 95.685183  %   backlash   0.055170 / 0.837281   deg
+  path 1.1   -> 2.3   ratio      15.176471   efficiency  95.685183 / 95.685183  %   backlash   0.055170 / 0.837281   deg
+  path 1.1   -> 1.2   ratio      -2.529412   efficiency  98.344976 / 98.344976  %   backlash   0.038950 / 0.098522   deg
+  path 1.2   -> 2.3   ratio      -6.000000   efficiency  97.295446 / 97.295446  %   backlash   0.048678 / 0.292068   deg
   case 1       2.0000 Nm /   3000.00 rpm at 1.1    +reacted at 2.3  
     fixed    ground                              -  torque    -6.975099
     load     first                      3000.0000 rpm  torque     2.000000
@@ -1482,7 +1514,7 @@
     shaft planet    of stage 2 speed 1071/4171
 
 == ring-released ==
-  total    ratio            NaN   efficiency        NaN / NaN        %   backlash        NaN / NaN        deg
+  no path: the train's holds leave its motion a family
   case 1       2.0000 Nm /   3000.00 rpm at 1.1    +reacted at 1.2     (not solved)
     ! train.case_underdetermined
     fixed    ground                              -  torque     0.000000

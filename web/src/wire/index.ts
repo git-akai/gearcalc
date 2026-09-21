@@ -65,6 +65,7 @@ export type { Optimisation } from "./core/Optimisation";
 export type { Overrides } from "./core/Overrides";
 export type { PairKind } from "./core/PairKind";
 export type { PairStage } from "./core/PairStage";
+export type { PathReport } from "./core/PathReport";
 export type { PerToothClamps } from "./core/PerToothClamps";
 export type { PlanetaryStage } from "./core/PlanetaryStage";
 export type { PointContact } from "./core/PointContact";

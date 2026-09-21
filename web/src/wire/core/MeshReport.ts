@@ -109,6 +109,15 @@ cases: Array<MeshCase>,
  */
 backlash: [Backlash, Backlash], 
 /**
+ * **The mesh's play as its row in the kinematics sees it**, radians of
+ * the row — `j |Σz| / a` on a line contact, plus the axial float's — at
+ * its distance's minus, running and plus tolerance in turn. What a
+ * play referred to any shaft of the train is read from
+ * ([`kinematics::System::play`]), so a path's backlash sums every mesh
+ * it crosses and none it does not ([`PathReport`]).
+ */
+row_play: [number, number, number], 
+/**
  * **Whether each member's flank is reached past its usable end** by the
  * other member's tip, in the order the mesh was built.
  *

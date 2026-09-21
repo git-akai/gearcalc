@@ -2293,7 +2293,7 @@ mod tests {
         assert_eq!(stage["kind"], "shape");
 
         // Ring held, sun driving: the classical 1 + z_r/z_s.
-        assert!((v["total_ratio"].as_f64().unwrap() - 3.5).abs() < 1e-12);
+        assert!((v["paths"][0]["ratio"].as_f64().unwrap() - 3.5).abs() < 1e-12);
 
         // Five local shafts, the held one exactly still, and the torques
         // balancing — in the first load case, at its own speed.
@@ -2478,7 +2478,7 @@ mod tests {
 
         let v = solved(&req.to_string());
         let want = (43.0 / 17.0) * 40.0;
-        assert!((v["total_ratio"].as_f64().unwrap() - want).abs() < 1e-9);
+        assert!((v["paths"][0]["ratio"].as_f64().unwrap() - want).abs() < 1e-9);
 
         // Both stages are the one shape, and each says which contact it has
         // by what its mesh carries: the transverse figures on parallel shafts,
@@ -2524,10 +2524,23 @@ mod tests {
         // the train cannot be back-driven at all. It used to read as a positive
         // number because the whole model ran on the sliding coefficient, which
         // is the friction of a motion that never starts.
-        assert_eq!(v["total_efficiency"]["backward"].as_f64().unwrap(), 0.0);
-        assert!(v["total_efficiency"]["forward"].as_f64().unwrap() > 0.0);
-        assert!(v["backlash"]["forward"]["nominal"].as_f64().unwrap() > 0.0);
-        assert!(v["backlash"]["backward"]["nominal"].as_f64().unwrap() > 0.0);
+        assert_eq!(
+            v["paths"][0]["efficiency"]["backward"].as_f64().unwrap(),
+            0.0
+        );
+        assert!(v["paths"][0]["efficiency"]["forward"].as_f64().unwrap() > 0.0);
+        assert!(
+            v["paths"][0]["backlash"]["forward"]["nominal"]
+                .as_f64()
+                .unwrap()
+                > 0.0
+        );
+        assert!(
+            v["paths"][0]["backlash"]["backward"]["nominal"]
+                .as_f64()
+                .unwrap()
+                > 0.0
+        );
         // The sliding speed is each case's own, at that case's speed.
         assert!(mesh["cases"][0]["sliding_velocity"].as_f64().unwrap() > 0.0);
         assert!(worm["members"][1]["cases"][0]["speed"].as_f64().unwrap() > 0.0);
@@ -2857,7 +2870,7 @@ mod tests {
         // **Negative**, because an external pair reverses and a train's ratio
         // says so now: it is read off the graph rather than multiplied out of
         // the stage ratios, and a pair reports its own as a magnitude.
-        assert!((v["total_ratio"].as_f64().unwrap() + 43.0 / 17.0).abs() < 1e-12);
+        assert!((v["paths"][0]["ratio"].as_f64().unwrap() + 43.0 / 17.0).abs() < 1e-12);
         // Every shaft of the case, with what it is: the pair's second member
         // is the reacted end and carries the load stepped up.
         let shafts = v["cases"][0]["shafts"].as_array().unwrap();

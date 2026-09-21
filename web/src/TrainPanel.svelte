@@ -1581,54 +1581,6 @@
   </div>
 
   <div class="summary">
-    <!-- **The rows stand whether or not there is an answer in them.** A
-         readout that vanishes takes its label with it, so the page a designer
-         is editing changes shape at the moment they most need it to hold
-         still; every figure below is blank instead until the train solves.
-         What is here is the shaft line — what no load moves. What each load
-         comes to is on the load case that carries it. -->
-    <dl class="out">
-      <dt>{t("ui.train_total_ratio")}</dt>
-      <dd>
-        <!-- Signed, since a train's ratio is read off the graph and an
-             external pair reverses; the magnitude decides which way round
-             the two numbers are written, so a reduction reads as one
-             whichever way it turns. -->
-        <!-- **A family has no figure of its own** — a differential: the
-             ratio, the efficiency and the play are each read under one
-             motion, and each load case decides its own — so the row says so
-             once and the three stand blank. -->
-        {solved === undefined || solved.total_ratio === null
-          ? BLANK
-          : Math.abs(solved.total_ratio) >= 1
-            ? `${num(solved.total_ratio, 4)} : 1`
-            : `1 : ${num(1 / solved.total_ratio, 4)}`}
-        {#if solved && solved.total_ratio === null && tab.train.stages.length > 0}
-          <small>{t("ui.train_family_no_figure")}</small>
-        {/if}
-      </dd>
-      <dt>{t("ui.train_total_efficiency")}</dt>
-      <dd>
-        {bothWays(solved?.total_efficiency ?? undefined)}
-        {#if lockedWays(solved?.total_efficiency ?? undefined)}
-          <small class="warn">{lockedWays(solved?.total_efficiency ?? undefined)}</small>
-        {/if}
-      </dd>
-      <dt>{t("ui.train_backlash_at_output_shaft")}</dt>
-      <dd>
-        {num(solved?.backlash?.forward.nominal, 5)}{solved?.backlash ? "°" : BLANK}
-        <small
-          >{range(num(solved?.backlash?.forward.minimum, 5), num(solved?.backlash?.forward.maximum, 5))}</small
-        >
-      </dd>
-      <dt>{t("ui.train_backlash_at_input_shaft")}</dt>
-      <dd>
-        {num(solved?.backlash?.backward.nominal, 5)}{solved?.backlash ? "°" : BLANK}
-        <small
-          >{range(num(solved?.backlash?.backward.minimum, 5), num(solved?.backlash?.backward.maximum, 5))}</small
-        >
-      </dd>
-    </dl>
     <!-- Why there is no answer at all — through the catalogue like every other
          message, naming the stage where one is to blame. -->
     {#if failure}
@@ -1639,6 +1591,55 @@
             : `${stageName(failure.stage - 1)}: ${note(failure.note)}`}
         </li>
       </ul>
+    {/if}
+  </div>
+  <div class="paths">
+    <!-- **The train's figures, one row per path** — between every two of
+         its open bodies, the two ends first: the ratio off the one motion,
+         the efficiency both ways off the train's flow, the play at each end
+         driven from the other. The table stands whether or not there is an
+         answer in it, so the page holds still while a designer edits; a
+         train whose holds leave its motion a family has no row and says so
+         once, and each load case decides its own. -->
+    <h4 class="section-heading">{t("ui.train_paths")}</h4>
+    <div class="caselist">
+      <table class="cases">
+        <thead>
+          <tr>
+            <th>{t("ui.train_path_from")}</th>
+            <th>{t("ui.train_path_to")}</th>
+            <th>{t("ui.train_ratio")}</th>
+            <th>{t("ui.train_efficiency")}<small>{t("ui.train_path_forward_backward")}</small></th>
+            <th>{t("ui.train_backlash")}<small>{t("ui.train_path_at_to_at_from")}</small></th>
+          </tr>
+        </thead>
+        <tbody>
+          {#each solved?.paths ?? [] as p (`${portKey(p.from)}>${portKey(p.to)}`)}
+            <tr>
+              <th>{refLabel(p.from)}</th>
+              <th>{refLabel(p.to)}</th>
+              <!-- Signed, since a ratio is read off the graph and an external
+                   pair reverses; the magnitude decides which way round the
+                   two numbers are written, so a reduction reads as one
+                   whichever way it turns. -->
+              <td>{Math.abs(p.ratio) >= 1 ? `${num(p.ratio, 4)} : 1` : `1 : ${num(1 / p.ratio, 4)}`}</td>
+              <td>
+                {pct(p.efficiency.forward)} / {pct(p.efficiency.backward)}
+                {#if lockedWays(p.efficiency)}
+                  <small class="warn">{lockedWays(p.efficiency)}</small>
+                {/if}
+              </td>
+              <td>
+                {num(p.backlash.forward.nominal, 5)}° / {num(p.backlash.backward.nominal, 5)}°
+                <small>{range(num(p.backlash.forward.minimum, 5), num(p.backlash.forward.maximum, 5))} / {range(num(p.backlash.backward.minimum, 5), num(p.backlash.backward.maximum, 5))}</small>
+              </td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    </div>
+    {#if solved && solved.paths.length === 0 && tab.train.stages.length > 0}
+      <p class="notice">{t("ui.train_family_no_figure")}</p>
     {/if}
   </div>
 </section>
@@ -2267,8 +2268,17 @@
     min-width: 0;
   }
   /* No top margin here: it is beside the inputs, not below them. */
-  .train .summary .out {
-    margin-top: 0;
+  /* The paths table takes the whole width under the two halves: a row is
+     five columns of figures, and half a box folds them. */
+  .train .paths {
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+  .train .paths h4 {
+    margin: 0.5rem 0 0;
+  }
+  .train .paths table.cases {
+    margin-top: 0.3rem;
   }
   .grid {
     display: grid;

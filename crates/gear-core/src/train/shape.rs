@@ -2257,6 +2257,7 @@ struct PointMesh {
     /// One contact per load case, in the loads' order.
     contact: Vec<super::ContactPatch>,
     backlash: [super::Backlash; 2],
+    row_play: [f64; 3],
     flank_interference: [bool; 2],
     /// The first member's reference radius, mm — what its pitch line speed
     /// is read at.
@@ -2356,6 +2357,7 @@ fn point_mesh_report(
             })
             .collect(),
         backlash: m.backlash,
+        row_play: m.row_play,
         flank_interference: m.flank_interference,
         // Both members external: the tips meet on the line of action or not
         // at all.
@@ -3456,6 +3458,7 @@ pub fn solve_shape_after(
                 member_backlash(k, MeshSide::First),
                 member_backlash(k, MeshSide::Second),
             ];
+            let row_play = [-1.0, 0.0, 1.0].map(|t| play_of(k, at_band(k, t)));
             match &bm.contact {
                 BuiltContact::Line(l) => super::line_mesh_report(
                     cases,
@@ -3482,6 +3485,7 @@ pub fn solve_shape_after(
                                 .collect()
                         }),
                         backlash,
+                        row_play,
                         flank_interference: l
                             .operating
                             .flank_interference([a.flank_ends(), b.flank_ends()]),
@@ -3511,6 +3515,7 @@ pub fn solve_shape_after(
                         locking_friction: p.locking_friction(face_of(k, &final_width)),
                         contact: rated_point[k].clone().unwrap_or_default(),
                         backlash,
+                        row_play,
                         flank_interference: p.path.as_ref().map_or([true, true], |path| {
                             path.flank_interference(&p.screw, [a.flank_ends(), b.flank_ends()])
                         }),

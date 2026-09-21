@@ -1399,20 +1399,18 @@ fn train_file_report(path: Option<&str>) {
                     .map_or((0.0, 0.0), |s| (s.speed.unwrap_or(0.0), s.torque))
             };
             let (a_end, b_end) = (at_end(&a), at_end(&b));
+            let total = |r: &gear_core::train::TrainResult| -> (f64, f64, f64) {
+                r.total().map_or((f64::NAN, f64::NAN, f64::NAN), |p| {
+                    (p.ratio, p.efficiency.forward, p.backlash.forward.nominal)
+                })
+            };
+            let (ta, tb) = (total(&a), total(&b));
             let rows: [(&str, f64, f64); 5] = [
-                ("total ratio", or_nan(a.total_ratio), or_nan(b.total_ratio)),
+                ("total ratio", ta.0, tb.0),
                 ("output speed rpm", a_end.0, b_end.0),
                 ("output torque Nm", a_end.1, b_end.1),
-                (
-                    "efficiency forward",
-                    ways_or_nan(a.total_efficiency).forward,
-                    ways_or_nan(b.total_efficiency).forward,
-                ),
-                (
-                    "backlash out deg",
-                    play_or_nan(a.backlash).forward.nominal,
-                    play_or_nan(b.backlash).forward.nominal,
-                ),
+                ("efficiency forward", ta.1, tb.1),
+                ("backlash out deg", ta.2, tb.2),
             ];
             let mut all = true;
             for (name, x, y) in rows {
@@ -1847,20 +1845,27 @@ fn train_report(mode: Option<&str>) {
         }
     };
 
-    let backlash = play_or_nan(r.backlash);
-    println!(
-        "train  total ratio {:.4}:1   total efficiency {}",
-        or_nan(r.total_ratio),
-        both_ways(ways_or_nan(r.total_efficiency))
-    );
-    println!(
-        "       backlash at the output shaft  {:.5} deg  (min {:.5}, max {:.5})",
-        backlash.forward.nominal, backlash.forward.minimum, backlash.forward.maximum
-    );
-    println!(
-        "       backlash at the input shaft   {:.5} deg  (min {:.5}, max {:.5})",
-        backlash.backward.nominal, backlash.backward.minimum, backlash.backward.maximum
-    );
+    // Every path the train has, the two ends first — a chain's total.
+    for p in &r.paths {
+        println!(
+            "train  path {} -> {}   ratio {:.4}:1   efficiency {}",
+            kinematics::port(p.from),
+            kinematics::port(p.to),
+            p.ratio,
+            both_ways(p.efficiency)
+        );
+        println!(
+            "       backlash at {:<4} {:.5} deg  (min {:.5}, max {:.5})   at {:<4} {:.5} deg  (min {:.5}, max {:.5})",
+            kinematics::port(p.to),
+            p.backlash.forward.nominal,
+            p.backlash.forward.minimum,
+            p.backlash.forward.maximum,
+            kinematics::port(p.from),
+            p.backlash.backward.nominal,
+            p.backlash.backward.minimum,
+            p.backlash.backward.maximum
+        );
+    }
     print_train_cases(&train, &r);
 
     for (k, s) in r.stages.iter().enumerate() {

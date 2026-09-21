@@ -2346,10 +2346,22 @@ its ratio, its efficiency both ways and its play are read: the shaft coupled
 from an earlier stage is its input, failing that the shaft the first case's
 first load is at, failing that its first open port; the shaft coupled to a
 later stage is its output, failing that the next open port. They decide
-nothing about a load case. The train's own ratio, efficiency and play are
-read between its two **ends** — the first stage's input and the last stage's
-output, where each is open — and are absent where either is not, or the
-motion between them is a family.
+nothing about a load case.
+
+**The train's own figures are per path.** Between every two of its open
+bodies, where its holds leave it one motion, a row: the **ratio** off that
+motion, driven at the one with the other free; the **efficiency** off the
+train's flow at unit load — the first driving, the second holding the load,
+every other body free — and the reverse, so a path that crosses one stage of
+three is that stage's alone, where a product over the stages could not say
+so; and the **play** at the second driven from the first and the reverse,
+each mesh's own play through the kinematics' coefficients
+(`MeshReport::row_play`, `System::play`), so a mesh the path does not cross
+adds nothing. The two conventional ends — the first stage's input and the
+last stage's output, where each is open — are the first row, and are what a
+chain's total was. A train whose holds leave its motion a family has no row:
+a ratio between two ports of a mechanism with two freedoms needs a third
+held, which is the designer's to say.
 
 **Motion needs none of the geometry.** With every constraint in force the train
 is one system — ground shared, each stage's shafts appended, one row per mesh
@@ -2400,13 +2412,17 @@ What stays a **magnitude** is what has no direction to carry: a torque
 referral, an accumulated backlash, a tooth count, a sweep stated in degrees,
 and the speed at which two surfaces rub.
 
-**Backlash accumulates referred to the output shaft**, so the last stage
-dominates — and it accumulates as a **sum of magnitudes**, because two
-independent sources of lost motion add up whichever way their shafts turn:
+**Backlash accumulates referred to the shaft it is read at**, so the last
+stage before it dominates — and it accumulates as a **sum of magnitudes**,
+because two independent sources of lost motion add up whichever way their
+shafts turn. On a chain read at its output that is the classical
 
 ```text
 θ_out,total = Σ_k  j_θ,k / Π_{j>k} |i_j|
 ```
+
+which the coefficients reproduce; on any other path the coefficients are
+what there is.
 
 ### Load cases
 
@@ -2417,7 +2433,7 @@ per enabled case. A case is:
 ```text
 kind       ultimate | fatigue      which allowable it is judged against
 enabled    on | off                off reaches no rating; the inputs stand
-loads      one per loaded port     each: at (start | end | a shaft),
+loads      one per declared port   each: at (a shaft), role (load | reacted | free),
                                    torque N·m {auto, manual}, speed rpm {auto, manual}
 duty       a fatigue case's        how the load is applied over the train's life
 ```

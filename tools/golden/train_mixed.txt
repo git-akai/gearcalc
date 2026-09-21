@@ -1,6 +1,9 @@
-train  total ratio 101.1765:1   total efficiency 60.782 % forward / 0.000 % backward  (cannot be back-driven)
-       backlash at the output shaft  0.15610 deg  (min 0.11342, max 0.19878)
-       backlash at the input shaft   15.79344 deg  (min 11.47505, max 20.11231)
+train  path 1.1 -> 2.2   ratio 101.1765:1   efficiency 60.782 % forward / 0.000 % backward  (cannot be back-driven)
+       backlash at 2.2  0.15610 deg  (min 0.11342, max 0.19878)   at 1.1  15.79344 deg  (min 11.47505, max 20.11231)
+train  path 1.1 -> 1.2   ratio -2.5294:1   efficiency 98.345 % forward / 98.345 % backward
+       backlash at 1.2  0.03895 deg  (min -0.00000, max 0.07809)   at 1.1  0.09852 deg  (min -0.00000, max 0.19753)
+train  path 1.2 -> 2.2   ratio -40.0000:1   efficiency 61.805 % forward / 0.000 % backward  (cannot be back-driven)
+       backlash at 2.2  0.15512 deg  (min 0.11342, max 0.19683)   at 1.2  6.20497 deg  (min 4.53665, max 7.87328)
        case 1  ultimate 2.000 Nm / 3000 rpm at 1.1 + reacted at 2.2
               fixed    ground                              -      120.9936 Nm
               load     first                     3000.00 rpm        2.0000 Nm

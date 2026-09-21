@@ -448,14 +448,22 @@ fn graph(train: &Train) {
 /// One fixture, end to end.
 fn report(name: &str, train: &Train, r: &TrainResult) {
     println!("== {name} ==");
-    println!(
-        "  total    ratio {:>14.6}   efficiency {:>10.6} / {:<10.6} %   backlash {:>10.6} / {:<10.6} deg",
-        crate::or_nan(r.total_ratio),
-        100.0 * crate::ways_or_nan(r.total_efficiency).forward,
-        100.0 * crate::ways_or_nan(r.total_efficiency).backward,
-        crate::play_or_nan(r.backlash).forward.nominal,
-        crate::play_or_nan(r.backlash).backward.nominal,
-    );
+    // Every path: between every two open bodies, the two ends first.
+    for p in &r.paths {
+        println!(
+            "  path {:<5} -> {:<5} ratio {:>14.6}   efficiency {:>10.6} / {:<10.6} %   backlash {:>10.6} / {:<10.6} deg",
+            port(p.from),
+            port(p.to),
+            p.ratio,
+            100.0 * p.efficiency.forward,
+            100.0 * p.efficiency.backward,
+            p.backlash.forward.nominal,
+            p.backlash.backward.nominal,
+        );
+    }
+    if r.paths.is_empty() {
+        println!("  no path: the train's holds leave its motion a family");
+    }
     // Every shaft of every case: what it is in the case and what it
     // carries — the loads as given or derived, the reactions found.
     for c in &r.cases {
