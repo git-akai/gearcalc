@@ -9616,7 +9616,7 @@
        },
        {
         "kind": "ultimate",
-        "enabled": true,
+        "enabled": false,
         "loads": [
          {
           "at": {
@@ -9666,7 +9666,7 @@
        },
        {
         "kind": "fatigue",
-        "enabled": true,
+        "enabled": false,
         "loads": [
          {
           "at": {
@@ -10272,7 +10272,7 @@
        },
        {
         "kind": "ultimate",
-        "enabled": true,
+        "enabled": false,
         "loads": [
          {
           "at": {
@@ -10322,7 +10322,7 @@
        },
        {
         "kind": "fatigue",
-        "enabled": true,
+        "enabled": false,
         "loads": [
          {
           "at": {
@@ -11795,64 +11795,6 @@
            "nominal": "0.83728095683881798",
            "minimum": "0.73875937459991980",
            "maximum": "0.93629199675503538"
-          }
-         }
-        },
-        {
-         "from": {
-          "kind": "of",
-          "stage": 0,
-          "shaft": 1
-         },
-         "to": {
-          "kind": "of",
-          "stage": 0,
-          "shaft": 2
-         },
-         "ratio": "-2.5294117647058827",
-         "efficiency": {
-          "forward": "0.98344976317774946",
-          "backward": "0.98344976317774957"
-         },
-         "backlash": {
-          "forward": {
-           "nominal": "0.038950392978169060",
-           "minimum": 0,
-           "maximum": "0.078094292479929425"
-          },
-          "backward": {
-           "nominal": "0.098521582238898203",
-           "minimum": 0,
-           "maximum": "0.19753262215511561"
-          }
-         }
-        },
-        {
-         "from": {
-          "kind": "of",
-          "stage": 0,
-          "shaft": 2
-         },
-         "to": {
-          "kind": "of",
-          "stage": 1,
-          "shaft": 2
-         },
-         "ratio": 7,
-         "efficiency": {
-          "forward": "0.97681810454630302",
-          "backward": "0.97672819043691805"
-         },
-         "backlash": {
-          "forward": {
-           "nominal": "0.041723951389364244",
-           "minimum": "0.041723951389364244",
-           "maximum": "0.041723951389364244"
-          },
-          "backward": {
-           "nominal": "0.29206765972554971",
-           "minimum": "0.29206765972554971",
-           "maximum": "0.29206765972554971"
           }
          }
         }

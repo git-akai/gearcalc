@@ -1243,9 +1243,10 @@ impl Train {
 
     /// **A fresh case of this kind between the train's two ends**: a
     /// torque at the first, driven at a speed, reacted at the second, the
-    /// duty's sweep measured at the second — the case a panel's button adds.
-    /// A train with no two ends gets a case with no entry, every body free,
-    /// for the designer to write.
+    /// duty's sweep measured at the second — the case a panel's button adds,
+    /// **switched off**, so a case added at its default figures moves no
+    /// rating until the designer has written it and switched it on. A train
+    /// with no two ends gets it parked, for the designer to move.
     #[must_use]
     pub fn fresh_case(&self, kind: super::CaseKind, torque: f64, speed: f64) -> super::LoadCase {
         let ends = self.boundaries().ok().and_then(|b| self.ends(&b));
@@ -1253,10 +1254,12 @@ impl Train {
         // ([`Self::push_stage`]) — or, on a train with stages but no two
         // ends, for the designer to move.
         let (input, output) = ends.unwrap_or((PARKED_IN, PARKED_OUT));
-        match kind {
+        let mut case = match kind {
             super::CaseKind::Ultimate => super::LoadCase::ultimate(input, output, torque, speed),
             super::CaseKind::Fatigue => super::LoadCase::fatigue(input, output, torque, speed),
-        }
+        };
+        case.enabled = false;
+        case
     }
 
     /// **A stage removed**, and everything that named a stage by index

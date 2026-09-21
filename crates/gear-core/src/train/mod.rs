@@ -3710,10 +3710,12 @@ pub fn solve_any_with(
     Ok(r.stages.remove(0))
 }
 
-/// **The train's figures, one row per path** — see [`PathReport`]. Empty
-/// where the train's holds leave its motion a family, since a ratio between
-/// two ports of a mechanism with two freedoms needs a third held, and which
-/// is the designer's to say.
+/// **The train's figures, one row per path** — see [`PathReport`]: the two
+/// conventional ends, then every path an enabled case uses, from each of
+/// its loads to each of its reactions, once each. Empty where the train's
+/// holds leave its motion a family, since a ratio between two ports of a
+/// mechanism with two freedoms needs a third held, and which is the
+/// designer's to say.
 #[allow(clippy::too_many_arguments)]
 fn paths_of(
     train: &Train,
@@ -3732,10 +3734,43 @@ fn paths_of(
             ShaftRef::Of { stage, shaft } => at[stage].of(shaft),
         }
     };
-    // Every open body by its first shaft, in the order the chain runs; the
-    // pair of conventional ends goes first among the rows.
-    let open: Vec<ShaftRef> = train.open_ports(boundaries).iter().map(|p| p.at).collect();
-    let ends = train.ends(boundaries);
+    // **Which paths are worth a row**: the two conventional ends — what a
+    // chain's total was, present whether or not any case loads it — and
+    // then, in case order, every path an enabled case actually uses, from
+    // each of its loads to each of its reactions. Every pair of open bodies
+    // is a path the graph could answer, and on a train of many stages
+    // nearly all of them are ones nobody asked about.
+    let mut wanted: Vec<(ShaftRef, ShaftRef)> = Vec::new();
+    let mut want = |a: ShaftRef, b: ShaftRef| {
+        if a != b
+            && !wanted
+                .iter()
+                .any(|&(x, y)| (x, y) == (a, b) || (x, y) == (b, a))
+        {
+            wanted.push((a, b));
+        }
+    };
+    if let Some((a, b)) = train.ends(boundaries) {
+        want(a, b);
+    }
+    // A body is named by its first shaft, whichever of its shafts a case
+    // wrote its entry at.
+    let bodies = train.bodies(boundaries);
+    let body_of = |r: ShaftRef| -> Option<ShaftRef> {
+        bodies
+            .iter()
+            .find(|b| !b.held && b.shafts.iter().any(|(s, _)| *s == r))
+            .map(|b| b.shafts[0].0)
+    };
+    for case in train.load_cases.iter().filter(|c| c.enabled) {
+        for load in case.loads.iter().filter(|l| l.is_load()) {
+            for reaction in case.loads.iter().filter(|l| l.role == LoadRole::Reacted) {
+                if let (Some(a), Some(b)) = (body_of(load.at), body_of(reaction.at)) {
+                    want(a, b);
+                }
+            }
+        }
+    }
     // One motion, or none: driven at one open body with the rest free, the
     // holds must leave nothing else to decide.
     let motion_from = |from: Shaft| -> Option<Vec<f64>> {
@@ -3791,37 +3826,30 @@ fn paths_of(
         })
     };
     let mut out = Vec::new();
-    for i in 0..open.len() {
-        for j in (i + 1)..open.len() {
-            let (a, b) = (global(open[i]), global(open[j]));
-            let Some(forward) = motion_from(a) else {
-                continue;
-            };
-            let Some(backward) = motion_from(b) else {
-                continue;
-            };
-            if forward[b] == 0.0 || backward[a] == 0.0 {
-                continue;
-            }
-            let row = PathReport {
-                from: open[i],
-                to: open[j],
-                ratio: forward[a] / forward[b],
-                efficiency: Directional {
-                    forward: efficiency(a, b, &forward),
-                    backward: efficiency(b, a, &backward),
-                },
-                backlash: Directional {
-                    forward: backlash_at(b, a),
-                    backward: backlash_at(a, b),
-                },
-            };
-            if ends == Some((row.from, row.to)) {
-                out.insert(0, row);
-            } else {
-                out.push(row);
-            }
+    for (from, to) in wanted {
+        let (a, b) = (global(from), global(to));
+        let Some(forward) = motion_from(a) else {
+            continue;
+        };
+        let Some(backward) = motion_from(b) else {
+            continue;
+        };
+        if forward[b] == 0.0 || backward[a] == 0.0 {
+            continue;
         }
+        out.push(PathReport {
+            from,
+            to,
+            ratio: forward[a] / forward[b],
+            efficiency: Directional {
+                forward: efficiency(a, b, &forward),
+                backward: efficiency(b, a, &backward),
+            },
+            backlash: Directional {
+                forward: backlash_at(b, a),
+                backward: backlash_at(a, b),
+            },
+        });
     }
     out
 }
@@ -4193,13 +4221,14 @@ pub struct PathReport {
     ts(export, export_to = "core/")
 )]
 pub struct TrainResult {
-    /// **The train's own figures, one row per path**: between every two of
-    /// its open bodies, where its holds leave it one motion — the two
-    /// conventional ends first, where it has them, then the rest in the
-    /// order the chain runs. Empty where the motion is a family (a
-    /// differential, an isolated stage), which is still rated: each case's
-    /// loads decide its motion, and every stage rates under that; what a
-    /// family has none of is a figure read under one motion.
+    /// **The train's own figures, one row per path**, where its holds leave
+    /// it one motion: the two conventional ends first, where it has them —
+    /// what a chain's total was, present whether or not a case loads it —
+    /// then every path an enabled case uses, from each of its loads to each
+    /// of its reactions, once each, in case order. Empty where the motion is
+    /// a family (a differential, an isolated stage), which is still rated:
+    /// each case's loads decide its motion, and every stage rates under
+    /// that; what a family has none of is a figure read under one motion.
     pub paths: Vec<PathReport>,
     /// Every load case, in the train's order — the ones switched off too,
     /// solved at the train level alone so a panel can say whether one
@@ -7290,27 +7319,46 @@ mod tests {
         let fresh = t.fresh_case(CaseKind::Fatigue, 1.0, 100.0);
         assert_eq!(fresh.loads[0].at, PARKED_IN);
         assert_eq!(fresh.loads[1].at, PARKED_OUT);
+        assert!(
+            !fresh.enabled,
+            "a fresh case moves no rating until it is switched on"
+        );
     }
 
     /// **A train's figures are per path, and a path crossing one stage is
-    /// that stage's.** Three pairs in a chain have four open bodies and six
-    /// paths, the two ends first; the path from the first gear to the first
-    /// take-off is stage 1 alone — its ratio, its efficiency both ways and
-    /// its play at the take-off — and the path between the two take-offs is
-    /// stage 2 alone, which a product over the list could not say. The
-    /// two-end path is the three stages' product. A differential has no
-    /// path: a ratio between two of its ports needs a third held.
+    /// that stage's.** Three pairs in a chain, loaded end to end, have one
+    /// path, the ends, whatever else their four open bodies could pair; a
+    /// case loading the first take-off from the first gear and one loading
+    /// the second from the first add one each — a case switched off adds
+    /// none, and the same pair asked twice is one row. The path from the
+    /// first gear to the first take-off is stage 1 alone — its ratio, its
+    /// efficiency both ways and its play at the take-off — and the one
+    /// between the take-offs is stage 2 alone, which a product over the
+    /// list could not say. The two-end path is the three stages' product. A
+    /// differential has no path: a ratio between two of its ports needs a
+    /// third held.
     #[test]
     fn a_trains_figures_are_per_path_and_a_one_stage_path_is_that_stage() {
         let lib = library();
-        let t = train_of(vec![
+        let mut t = train_of(vec![
             Stage::spur(PairStage::default()),
             Stage::spur(PairStage::default()),
             Stage::spur(PairStage::default()),
         ]);
-        let r = solve_train(&t, &lib).unwrap();
         let at = |stage, shaft| ShaftRef::Of { stage, shaft };
-        assert_eq!(r.paths.len(), 6);
+        let ends_only = solve_train(&t, &lib).unwrap();
+        assert_eq!(ends_only.paths.len(), 1, "the ends, and nothing unasked");
+        t.load_cases
+            .push(LoadCase::ultimate(at(0, 1), at(0, 2), 1.0, 1000.0));
+        t.load_cases
+            .push(LoadCase::ultimate(at(0, 2), at(1, 2), 1.0, 1000.0));
+        t.load_cases
+            .push(LoadCase::ultimate(at(1, 1), at(2, 1), 1.0, 1000.0));
+        let mut off = LoadCase::ultimate(at(1, 2), at(2, 2), 1.0, 1000.0);
+        off.enabled = false;
+        t.load_cases.push(off);
+        let r = solve_train(&t, &lib).unwrap();
+        assert_eq!(r.paths.len(), 3, "the ends, two asked, one twice, one off");
         assert_eq!((r.paths[0].from, r.paths[0].to), (at(0, 1), at(2, 2)));
         let near = |x: f64, y: f64| (x - y).abs() < 1e-9 * x.abs().max(1e-12);
         let s: Vec<&shape::ShapeResult> = r.stages.iter().map(spur).collect();

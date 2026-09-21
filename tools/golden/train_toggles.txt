@@ -1,9 +1,5 @@
 train  path 1.1 -> 2.2   ratio 6.0317:1   efficiency 96.482 % forward / 96.482 % backward
        backlash at 2.2  0.07432 deg  (min 0.00000, max 0.14903)   at 1.1  0.44829 deg  (min 0.00000, max 0.89889)
-train  path 1.1 -> 1.2   ratio -2.5294:1   efficiency 98.454 % forward / 98.454 % backward
-       backlash at 1.2  0.03886 deg  (min 0.00000, max 0.07785)   at 1.1  0.09830 deg  (min 0.00000, max 0.19691)
-train  path 1.2 -> 2.2   ratio -2.3846:1   efficiency 97.998 % forward / 97.998 % backward
-       backlash at 2.2  0.05803 deg  (min 0.00000, max 0.11638)   at 1.2  0.13837 deg  (min 0.00000, max 0.27753)
        case 1  ultimate 2.000 Nm / 3000 rpm at 1.1 + reacted at 2.2
               fixed    ground                              -        9.6390 Nm
               load     first                     3000.00 rpm        2.0000 Nm

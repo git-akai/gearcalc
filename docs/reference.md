@@ -2348,9 +2348,11 @@ first load is at, failing that its first open port; the shaft coupled to a
 later stage is its output, failing that the next open port. They decide
 nothing about a load case.
 
-**The train's own figures are per path.** Between every two of its open
-bodies, where its holds leave it one motion, a row: the **ratio** off that
-motion, driven at the one with the other free; the **efficiency** off the
+**The train's own figures are per path.** Where its holds leave it one
+motion, a row for each path that is asked about — the two conventional ends,
+and then, in case order, every path an enabled case uses, from each of its
+loads to each of its reactions, once each — between two open bodies, each
+named by its first shaft: the **ratio** off that motion, driven at the one with the other free; the **efficiency** off the
 train's flow at unit load — the first driving, the second holding the load,
 every other body free — and the reverse, so a path that crosses one stage of
 three is that stage's alone, where a product over the stages could not say
@@ -2358,10 +2360,12 @@ so; and the **play** at the second driven from the first and the reverse,
 each mesh's own play through the kinematics' coefficients
 (`MeshReport::row_play`, `System::play`), so a mesh the path does not cross
 adds nothing. The two conventional ends — the first stage's input and the
-last stage's output, where each is open — are the first row, and are what a
-chain's total was. A train whose holds leave its motion a family has no row:
-a ratio between two ports of a mechanism with two freedoms needs a third
-held, which is the designer's to say.
+last stage's output, where each is open — are the first row whether or not
+a case loads them, and are what a chain's total was; every other pair of
+open bodies is a path the graph could answer and nobody asked about, and
+the way to ask is a case. A train whose holds leave its motion a family has
+no row: a ratio between two ports of a mechanism with two freedoms needs a
+third held, which is the designer's to say.
 
 **Motion needs none of the geometry.** With every constraint in force the train
 is one system — ground shared, each stage's shafts appended, one row per mesh
@@ -2468,8 +2472,9 @@ division by stiffness this model does not make, and the case says so and
 rates nothing. A free port beside a given torque nothing else holds is the question
 whether a stage locks, asked on purpose and answered by name. A fresh case
 is written between the train's two ends — a load at the first, a reaction at
-the second — and a train with no two ends gets a case with nothing on it, for
-the designer to write. The two ends it does not load are
+the second — and switched off, so that adding one moves no figure until the
+designer has written it; a train with no two ends gets a case with nothing
+on it, for the designer to write. The two ends it does not load are
 **reacted**: each turns as the motion says and carries whatever torque the
 flow puts on it, and both are reported — the same thing as a shaft the train
 fixes, except that a fixed shaft is ground and reports no speed. Every other
