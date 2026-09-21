@@ -154,7 +154,9 @@ class Workspace {
     for (const tab of this.tabs) if (tab.name === from) tab.name = to;
   }
 
-  get selected(): GearTab {
+  /** The selected tab, or none: the list may be empty, and the main panel
+   *  then offers a new one rather than showing a tab nobody made. */
+  get selected(): GearTab | undefined {
     return this.tabs.find((t) => t.id === this.selectedId) ?? this.tabs[0];
   }
 
@@ -215,15 +217,12 @@ class Workspace {
     this.selectedId = t.id;
   }
 
-  /** Deleting the last tab leaves a fresh default one, not an empty screen. */
+  /** Deleting the last tab leaves none; the main panel offers a new one. */
   remove(id: number) {
     const i = this.tabs.findIndex((t) => t.id === id);
     if (i < 0) return;
     this.tabs.splice(i, 1);
-    if (this.tabs.length === 0) {
-      this.tabs.push(freshTab());
-    }
-    if (!this.tabs.some((t) => t.id === this.selectedId)) {
+    if (this.tabs.length > 0 && !this.tabs.some((t) => t.id === this.selectedId)) {
       this.selectedId = this.tabs[Math.min(i, this.tabs.length - 1)].id;
     }
   }
@@ -296,7 +295,8 @@ class Trains {
   /** Which list the main panel is showing. */
   active = $state<"gear" | "train">("gear");
 
-  get selected(): TrainTab {
+  /** The selected tab, or none — see `Workspace.selected`. */
+  get selected(): TrainTab | undefined {
     return this.tabs.find((t) => t.id === this.selectedId) ?? this.tabs[0];
   }
 
@@ -354,12 +354,12 @@ class Trains {
   }
 
   /** Deleting the last tab leaves a fresh one, as for gears. */
+  /** Deleting the last tab leaves none; the main panel offers a new one. */
   remove(id: number) {
     const i = this.tabs.findIndex((t) => t.id === id);
     if (i < 0) return;
     this.tabs.splice(i, 1);
-    if (this.tabs.length === 0) this.tabs.push(freshTrain());
-    if (!this.tabs.some((t) => t.id === this.selectedId)) {
+    if (this.tabs.length > 0 && !this.tabs.some((t) => t.id === this.selectedId)) {
       this.selectedId = this.tabs[Math.min(i, this.tabs.length - 1)].id;
     }
   }

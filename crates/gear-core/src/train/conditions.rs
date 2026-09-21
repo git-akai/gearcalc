@@ -371,6 +371,15 @@ impl TrainMotion {
     }
 }
 
+/// **Where a case's entries wait while the train has no stages**: the input
+/// side is ground — the one shaft every train has — and the output side is
+/// stage 0's own ground shaft, a reference no stage's port can ever be,
+/// which is what makes it a place rather than a shaft. Both are refused as
+/// ports by name should a file write one on a train with stages.
+pub const PARKED_IN: ShaftRef = ShaftRef::Ground;
+/// See [`PARKED_IN`].
+pub const PARKED_OUT: ShaftRef = ShaftRef::Of { stage: 0, shaft: 0 };
+
 impl Train {
     /// **The chain's couplings, written once**: each stage's conventional
     /// output to the next stage's conventional input. What a train's
@@ -1240,19 +1249,13 @@ impl Train {
     #[must_use]
     pub fn fresh_case(&self, kind: super::CaseKind, torque: f64, speed: f64) -> super::LoadCase {
         let ends = self.boundaries().ok().and_then(|b| self.ends(&b));
-        match ends {
-            Some((input, output)) => match kind {
-                super::CaseKind::Ultimate => {
-                    super::LoadCase::ultimate(input, output, torque, speed)
-                }
-                super::CaseKind::Fatigue => super::LoadCase::fatigue(input, output, torque, speed),
-            },
-            None => super::LoadCase {
-                kind,
-                enabled: true,
-                loads: Vec::new(),
-                duty: super::Duty::intermittent(ShaftRef::Ground),
-            },
+        // No two ends: parked, for the first stage to take up
+        // ([`Self::push_stage`]) — or, on a train with stages but no two
+        // ends, for the designer to move.
+        let (input, output) = ends.unwrap_or((PARKED_IN, PARKED_OUT));
+        match kind {
+            super::CaseKind::Ultimate => super::LoadCase::ultimate(input, output, torque, speed),
+            super::CaseKind::Fatigue => super::LoadCase::fatigue(input, output, torque, speed),
         }
     }
 
@@ -1260,18 +1263,28 @@ impl Train {
     /// moved with the stages it belongs to: the constraints, the couplings
     /// and every case entry on the removed stage go with it, and those on
     /// the stages after it move down. Left alone, holding stage 3's carrier
-    /// held whatever became stage 3.
+    /// held whatever became stage 3. **The last stage removed parks the
+    /// cases** at the two places a train with no stages has ([`PARKED_IN`],
+    /// [`PARKED_OUT`]) — what was at its conventional input at the one, what
+    /// was at its output at the other, every figure kept — and the first
+    /// stage pushed takes them up again ([`Self::push_stage`]), so a designer
+    /// who swaps their only stage for another keeps their loads.
     pub fn remove_stage(&mut self, k: usize) {
         if k >= self.stages.len() {
             return;
         }
+        let parking = (self.stages.len() == 1).then(|| {
+            let ports = self.stages[k].ports();
+            (ports.input(), ports.output())
+        });
         self.stages.remove(k);
         let moved = |r: ShaftRef| -> Option<ShaftRef> {
             match r {
-                ShaftRef::Of { stage, shaft } if stage == k => {
-                    let _ = shaft;
-                    None
-                }
+                ShaftRef::Of { stage, shaft } if stage == k => match parking {
+                    Some((input, _)) if shaft == input => Some(PARKED_IN),
+                    Some((_, output)) if shaft == output => Some(PARKED_OUT),
+                    _ => None,
+                },
                 ShaftRef::Of { stage, shaft } if stage > k => Some(ShaftRef::Of {
                     stage: stage - 1,
                     shaft,
@@ -1352,6 +1365,26 @@ impl Train {
             stage: k,
             shaft: stage.ports().output(),
         };
+        // **The first stage takes up the parked cases** at its conventional
+        // input and output — the conventional use of a stage alone, which
+        // is what a fresh case is written as.
+        if k == 0 {
+            let home = |r: &mut ShaftRef| {
+                if *r == PARKED_IN {
+                    *r = input;
+                } else if *r == PARKED_OUT {
+                    *r = output;
+                }
+            };
+            for case in &mut self.load_cases {
+                for l in &mut case.loads {
+                    home(&mut l.at);
+                }
+                if let super::Duty::Intermittent { at, .. } = &mut case.duty {
+                    home(at);
+                }
+            }
+        }
         let onward = self.boundaries().ok().and_then(|b| {
             let open = self.open_ports(&b);
             // The last stage's open port, where the train has one to give:

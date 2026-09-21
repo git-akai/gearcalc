@@ -220,8 +220,6 @@ pub enum TrainError {
     Parse(toml::de::Error),
     /// The document could not be written back out.
     Serialise(toml::ser::Error),
-    /// The document parsed but describes no stages, so there is no train.
-    NoStages,
 }
 
 impl std::fmt::Display for TrainError {
@@ -229,10 +227,6 @@ impl std::fmt::Display for TrainError {
         match self {
             Self::Parse(e) => write!(f, "geartrain file is not valid: {e}"),
             Self::Serialise(e) => write!(f, "geartrain could not be written: {e}"),
-            Self::NoStages => write!(
-                f,
-                "geartrain file contains no stages, so there is nothing to solve"
-            ),
         }
     }
 }
@@ -273,14 +267,10 @@ pub struct Imported {
 ///
 /// # Errors
 ///
-/// [`TrainError::Parse`] if the document is not a geartrain, or
-/// [`TrainError::NoStages`] if it describes a train with no stages — which
-/// parses happily and then has nothing to solve.
+/// [`TrainError::Parse`] if the document is not a geartrain. A train with no
+/// stages is a train — its cases wait for one — and reads as written.
 pub fn from_toml(src: &str) -> Result<Imported, TrainError> {
     let mut document: TrainDocument = toml::from_str(src).map_err(TrainError::Parse)?;
-    if document.train.stages.is_empty() {
-        return Err(TrainError::NoStages);
-    }
     let mut adjusted = false;
     for stage in &mut document.train.stages {
         let relieved = stage.relieved(None);
@@ -482,14 +472,18 @@ mod tests {
         assert!(back.train.load_cases.is_empty());
     }
 
-    /// A train with no stages parses as TOML and is not a train. Refused here
-    /// rather than downstream, where it would arrive as an empty result.
+    /// A train with no stages is a train, and round-trips as one: a designer
+    /// who removed the last stage and saved keeps the cases.
     #[test]
-    fn a_train_without_stages_is_refused() {
+    fn a_train_without_stages_reads_as_written() {
         let mut doc = document();
         doc.train.stages.clear();
-        let text = toml::to_string_pretty(&doc).unwrap();
-        assert!(matches!(from_toml(&text), Err(TrainError::NoStages)));
+        doc.train.couplings.clear();
+        doc.train.constraints.clear();
+        let text = to_toml(&doc).unwrap();
+        let back = from_toml(&text).unwrap().document;
+        assert!(back.train.stages.is_empty());
+        assert_eq!(back.train.load_cases.len(), doc.train.load_cases.len());
     }
 
     /// **A field the shape no longer has is refused, not dropped.**

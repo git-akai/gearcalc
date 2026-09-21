@@ -53,7 +53,7 @@ mod wiring;
 pub use conditions::{
     Constraint, Coupling, Exact, MotionError, MotionReport, OpenPort, PortSpec, Ports,
     ShaftConstraint, ShaftMotion, ShaftRef, ShaftReport, StageBoundary, StagePorts, Term,
-    TrainBody, TrainMotion,
+    TrainBody, TrainMotion, PARKED_IN, PARKED_OUT,
 };
 
 use crate::kinematics::{Condition, Shaft, GROUND};
@@ -1554,8 +1554,6 @@ pub enum TrainError {
     UnknownMaterial(String),
     /// A tooth so undercut there is no root section left to rate.
     NoRootSection,
-    /// The train has no stages, so there is nothing to accumulate.
-    Empty,
     /// **Two conditions cannot both hold**, at this shaft: what it is asked
     /// to do contradicts what the meshes and the other conditions already
     /// decided — a sun driven while its carrier and its ring are both held.
@@ -1599,7 +1597,11 @@ pub enum TrainError {
 impl From<MotionError> for TrainError {
     fn from(e: MotionError) -> Self {
         match e {
-            MotionError::Empty => Self::Empty,
+            // A train with no stages is solved before its motion is asked;
+            // a motion asked of one anyway names the one shaft it has.
+            MotionError::Empty => Self::NoSuchShaft {
+                at: ShaftRef::Ground,
+            },
             MotionError::Wiring(stage, cause) => Self::InStage {
                 stage,
                 cause: Box::new(Self::Wiring(cause)),
@@ -1657,7 +1659,6 @@ impl crate::note::Explain for TrainError {
                 Note::new(key::ERROR_TRAIN_UNKNOWN_MATERIAL).text("name", n.clone())
             }
             Self::NoRootSection => Note::new(key::ERROR_TRAIN_NO_ROOT_SECTION),
-            Self::Empty => Note::new(key::ERROR_TRAIN_EMPTY),
             Self::Overdetermined { at } => located(key::ERROR_TRAIN_OVERDETERMINED, *at),
             Self::NoSuchShaft { at } => located(key::ERROR_TRAIN_NO_SUCH_SHAFT, *at),
             Self::Overflow => Note::new(key::ERROR_TRAIN_OVERFLOW),
@@ -1748,7 +1749,6 @@ impl std::fmt::Display for TrainError {
             ),
             Self::UnknownMaterial(n) => write!(f, "no material named {n:?} in the library"),
             Self::NoRootSection => write!(f, "the tooth is too undercut to have a root section"),
-            Self::Empty => write!(f, "the geartrain has no stages"),
             Self::Overdetermined { at } => {
                 write!(f, "two conditions cannot both hold at {}", place(*at))
             }
@@ -3741,19 +3741,16 @@ pub struct Train {
     #[cfg_attr(feature = "serde", serde(default))]
     pub reversed_bending: bool,
     pub stages: Vec<Stage>,
-    /// **Which shafts turn as one.** Empty is the chain — each stage's
-    /// conventional output to the next stage's input — which is what every
-    /// train meant before this existed, so the absence is unambiguous and
-    /// defaults rather than refuses. Written out, a train can join any two
-    /// shafts: a coaxial output, a locked clutch, a second stage on a set's
-    /// ring. See [`Coupling`].
+    /// **Which shafts turn as one** — every coupling the train has, written
+    /// out: a chain's, a coaxial output, a locked clutch, a second stage on
+    /// a set's ring. Empty is a train of isolated stages. See [`Coupling`]
+    /// and [`Train::chain`].
     #[cfg_attr(feature = "serde", serde(default))]
     pub couplings: Vec<Coupling>,
-    /// **What is asked of each shaft** — held, driven or free. Empty is each
-    /// stage's convention with the first stage's input driven, for the same
-    /// reason the couplings default. Written out, this is where a planetary
-    /// set's arrangement lives now, and where a second input or a third port
-    /// is one more line. See [`ShaftConstraint`].
+    /// **What is asked of each shaft** — held or free. Empty is each stage's
+    /// convention. Written out, this is where a planetary set's arrangement
+    /// lives, and where a released ring is one more line. See
+    /// [`ShaftConstraint`].
     #[cfg_attr(feature = "serde", serde(default))]
     pub constraints: Vec<ShaftConstraint>,
 }
@@ -4117,8 +4114,28 @@ fn solve_train_under(
     under: Option<Vec<StageBoundary>>,
     lib: &MaterialLibrary,
 ) -> Result<TrainResult, TrainError> {
+    // **A train with no stages is a train**: nothing to rate, no figure of
+    // its own, and every case reported unsolved with nothing to say of it —
+    // the train's own state says why — so a designer who removes the last
+    // stage keeps the cases and sees them wait.
     if train.stages.is_empty() {
-        return Err(TrainError::Empty);
+        return Ok(TrainResult {
+            total_ratio: None,
+            total_efficiency: None,
+            backlash: None,
+            cases: train
+                .load_cases
+                .iter()
+                .enumerate()
+                .map(|(index, _)| TrainCase {
+                    case: index,
+                    shafts: Vec::new(),
+                    solved: false,
+                    notes: Vec::new(),
+                })
+                .collect(),
+            stages: Vec::new(),
+        });
     }
 
     // Whether to correct for a root loaded on both flanks is one switch for the
@@ -7146,6 +7163,50 @@ mod tests {
         let ring = r.cases[0].shaft(at(3)).unwrap();
         assert_eq!(ring.role, ShaftRole::Reacted);
         assert!(ring.torque.abs() > 0.0);
+    }
+
+    /// **The last stage removed parks the cases on ground, and the first
+    /// stage pushed takes them up conventionally.** A pair's three cases,
+    /// the pair removed, keep every figure; a set pushed in its place has
+    /// them sun in, carrier out, the sweep at the carrier — the set's
+    /// conventional use — and solves them.
+    #[test]
+    fn the_cases_survive_the_last_stage_and_take_the_next_one_conventionally() {
+        let lib = library();
+        let mut t = train_of(vec![Stage::spur(PairStage::default())]);
+        t.load_cases.truncate(1);
+        t.load_cases[0].set_torque(0.7);
+        // ...and a back-driving case beside it, its load at the output.
+        let (start, end) = ends_of(&t);
+        t.load_cases.push(LoadCase::back_driving(start, end, 3.0));
+        t.remove_stage(0);
+        assert!(t.stages.is_empty());
+        let r = solve_train(&t, &lib).expect("a train with no stages solves");
+        assert!(!r.cases[0].solved);
+        assert_eq!(t.load_cases[0].loads[0].at, PARKED_IN);
+        assert_eq!(t.load_cases[0].loads[1].at, PARKED_OUT);
+        assert!(
+            (t.load_cases[0].torque() - 0.7).abs() < 1e-12,
+            "the figures are kept"
+        );
+        t.push_stage(Stage::planetary(PlanetaryStage::default()));
+        let at = |shaft| ShaftRef::Of { stage: 0, shaft };
+        let c = &t.load_cases[0];
+        assert_eq!((c.loads[0].at, c.loads[0].role), (at(1), LoadRole::Load));
+        assert_eq!((c.loads[1].at, c.loads[1].role), (at(2), LoadRole::Reacted));
+        assert!(matches!(c.duty, Duty::Intermittent { at: d, .. } if d == at(2)));
+        // The back-driving case is still from the output, held at the input.
+        let b = &t.load_cases[1];
+        assert_eq!((b.loads[0].at, b.loads[0].role), (at(2), LoadRole::Load));
+        assert_eq!((b.loads[1].at, b.loads[1].role), (at(1), LoadRole::Reacted));
+        let r = solve_train(&t, &lib).expect("solves on the set");
+        assert!(r.cases[0].solved, "{:?}", r.cases[0].notes);
+        assert!(r.cases[1].solved, "{:?}", r.cases[1].notes);
+        // ...and a fresh case on a train with no stages is parked the same.
+        t.remove_stage(0);
+        let fresh = t.fresh_case(CaseKind::Fatigue, 1.0, 100.0);
+        assert_eq!(fresh.loads[0].at, PARKED_IN);
+        assert_eq!(fresh.loads[1].at, PARKED_OUT);
     }
 
     /// **The train's bodies are its ports joined by its couplings**: three
@@ -10328,8 +10389,11 @@ mod tests {
         assert!(e.to_string().contains("unobtainium"));
     }
 
+    /// **A train with no stages is a train**: it solves to nothing rated,
+    /// no figure of its own, and every case waiting — so a designer who
+    /// removes the last stage keeps the cases.
     #[test]
-    fn an_empty_train_says_so() {
+    fn an_empty_train_solves_to_nothing() {
         let t = Train {
             load_cases: vec![LoadCase::ultimate(
                 ShaftRef::Ground,
@@ -10342,7 +10406,10 @@ mod tests {
             couplings: Vec::new(),
             constraints: Vec::new(),
         };
-        assert_eq!(solve_train(&t, &library()).unwrap_err(), TrainError::Empty);
+        let r = solve_train(&t, &library()).expect("a train with no stages is a train");
+        assert!(r.stages.is_empty() && r.total_ratio.is_none());
+        assert_eq!(r.cases.len(), 1);
+        assert!(!r.cases[0].solved);
     }
 
     /// **A tooth cycle count is what the browser used to round, and now what the

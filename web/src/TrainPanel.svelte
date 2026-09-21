@@ -319,9 +319,10 @@
         free: "ui.train_role_free",
       }[r],
     );
-  /** The heading's summary of a case: each given figure at its port. */
+  /** The heading's summary of a case: each given figure at its port —
+   *  none while the train has no stages and the entries are parked. */
   const caseSummary = (c: LoadCase): string =>
-    c.loads
+    tab.train.stages.length === 0 ? "" : c.loads
       .filter((l) => l.role === "load")
       .map((l) => {
         const parts: string[] = [];
@@ -353,10 +354,10 @@
 
 
 
-  /** Deleting the last stage leaves a fresh one, as deleting the last gear
-   *  tab or the last geartrain does — a train with no stages is one the core
-   *  refuses, and a button that greys out to prevent that is a rule the
-   *  reader has to infer. */
+  /** Deleting the last stage leaves none. A train with no stages is a
+   *  train — its cases are parked on ground with every figure kept, and
+   *  the next stage added takes them up conventionally — so a designer
+   *  swaps their only stage for another without losing their loads. */
   function removeStage(i: number) {
     // The constraints, the couplings and the cases name stages by index,
     // and the core moves each with the stage it belongs to.
@@ -371,7 +372,6 @@
       if (at < i) tab.open[at] = v;
       else if (at > i) tab.open[at - 1] = v;
     }
-    if (tab.train.stages.length === 0) addStagePreset(STAGE_PRESETS[0]);
   }
 
   /** The candidates for one note slot: a blank to reserve the space, the note
@@ -1603,7 +1603,7 @@
           : Math.abs(solved.total_ratio) >= 1
             ? `${num(solved.total_ratio, 4)} : 1`
             : `1 : ${num(1 / solved.total_ratio, 4)}`}
-        {#if solved && solved.total_ratio === null}
+        {#if solved && solved.total_ratio === null && tab.train.stages.length > 0}
           <small>{t("ui.train_family_no_figure")}</small>
         {/if}
       </dd>
@@ -1857,6 +1857,9 @@
 </div>
 
 <div class="stages">
+  {#if tab.train.stages.length === 0}
+    <p class="notice">{t("ui.train_no_stages")}</p>
+  {/if}
   {#each tab.train.stages as stage, i (i)}
     {@const res = solved?.stages[i] ?? null}
     {@const figures = figuresOf(stage)}

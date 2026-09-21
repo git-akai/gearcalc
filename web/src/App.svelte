@@ -69,14 +69,29 @@
     {:else if !loaded}
       <p class="muted">{t("ui.app_loading_core")}</p>
     {:else}
+      <!-- **A list may be empty**, and the main panel then offers a new
+           one rather than inventing a tab nobody made: the shipped defaults
+           come back on the button, as they always did. -->
       {#if trains.active === "train"}
-        {#key trains.selected.id}
-          <TrainPanel tab={trains.selected} />
-        {/key}
-      {:else}
+        {#if trains.selected}
+          {#key trains.selected.id}
+            <TrainPanel tab={trains.selected} />
+          {/key}
+        {:else}
+          <div class="none">
+            <p class="muted">{t("ui.app_no_geartrain")}</p>
+            <button onclick={() => trains.create()}>{t("ui.sidebar_new_geartrain")}</button>
+          </div>
+        {/if}
+      {:else if workspace.selected}
         {#key workspace.selected.id}
           <GearPanel tab={workspace.selected} />
         {/key}
+      {:else}
+        <div class="none">
+          <p class="muted">{t("ui.app_no_gear")}</p>
+          <button onclick={() => workspace.create()}>{t("ui.sidebar_new_gear")}</button>
+        </div>
       {/if}
     {/if}
   </main>
@@ -110,6 +125,28 @@
   }
   .error {
     color: var(--warn);
+  }
+  /* An empty list's offer: one sentence and the same button the sidebar
+     has, centred where the panel would be. */
+  .none {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.6rem;
+    padding: 1.5rem;
+  }
+  .none button {
+    font: inherit;
+    font-size: 0.85rem;
+    padding: 0.3rem 0.7rem;
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    background: none;
+    color: var(--fg);
+    cursor: pointer;
+  }
+  .none button:hover {
+    background: var(--hover);
   }
   .muted {
     color: var(--muted);

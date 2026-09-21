@@ -209,8 +209,6 @@ pub mod key {
     pub const ERROR_TRAIN_UNKNOWN_MATERIAL: &str = "error.train_unknown_material";
     /// `error.train_no_root_section`
     pub const ERROR_TRAIN_NO_ROOT_SECTION: &str = "error.train_no_root_section";
-    /// `error.train_empty`
-    pub const ERROR_TRAIN_EMPTY: &str = "error.train_empty";
     /// `error.train_overdetermined`
     pub const ERROR_TRAIN_OVERDETERMINED: &str = "error.train_overdetermined";
     /// `error.train_no_such_shaft`
@@ -293,7 +291,6 @@ pub mod key {
         ERROR_TRAIN_WIRING,
         ERROR_TRAIN_UNKNOWN_MATERIAL,
         ERROR_TRAIN_NO_ROOT_SECTION,
-        ERROR_TRAIN_EMPTY,
         ERROR_TRAIN_OVERDETERMINED,
         ERROR_TRAIN_NO_SUCH_SHAFT,
         ERROR_TRAIN_OVERFLOW,

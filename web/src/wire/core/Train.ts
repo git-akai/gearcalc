@@ -26,19 +26,16 @@ load_cases: Array<LoadCase>,
  */
 reversed_bending: boolean, stages: Array<Stage>, 
 /**
- * **Which shafts turn as one.** Empty is the chain — each stage's
- * conventional output to the next stage's input — which is what every
- * train meant before this existed, so the absence is unambiguous and
- * defaults rather than refuses. Written out, a train can join any two
- * shafts: a coaxial output, a locked clutch, a second stage on a set's
- * ring. See [`Coupling`].
+ * **Which shafts turn as one** — every coupling the train has, written
+ * out: a chain's, a coaxial output, a locked clutch, a second stage on
+ * a set's ring. Empty is a train of isolated stages. See [`Coupling`]
+ * and [`Train::chain`].
  */
 couplings: Array<Coupling>, 
 /**
- * **What is asked of each shaft** — held, driven or free. Empty is each
- * stage's convention with the first stage's input driven, for the same
- * reason the couplings default. Written out, this is where a planetary
- * set's arrangement lives now, and where a second input or a third port
- * is one more line. See [`ShaftConstraint`].
+ * **What is asked of each shaft** — held or free. Empty is each stage's
+ * convention. Written out, this is where a planetary set's arrangement
+ * lives, and where a released ring is one more line. See
+ * [`ShaftConstraint`].
  */
 constraints: Array<ShaftConstraint>, };

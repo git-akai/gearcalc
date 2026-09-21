@@ -1259,7 +1259,7 @@ pub fn export_materials(library_json: &str) -> Result<String, JsError> {
 ///
 /// # Errors
 ///
-/// A document that is not a geartrain, or one with no stages.
+/// A document that is not a geartrain.
 #[wasm_bindgen]
 pub fn import_train(toml_text: &str) -> Result<String, JsError> {
     import_train_impl(toml_text).map_err(|e| JsError::new(&e))
@@ -1768,8 +1768,15 @@ mod tests {
                        "stages": [] }
         });
         let text = export_train_impl(&empty.to_string()).unwrap();
-        let e = import_train_impl(&text).unwrap_err();
-        assert!(e.contains("no stages"), "{e}");
+        let back: serde_json::Value =
+            serde_json::from_str(&import_train_impl(&text).unwrap()).unwrap();
+        assert!(
+            back["document"]["train"]["stages"]
+                .as_array()
+                .unwrap()
+                .is_empty(),
+            "a train with no stages reads as written"
+        );
     }
 
     /// **The tool the UI ships with is one that can cut.**
@@ -2908,12 +2915,12 @@ mod tests {
             ],
             "stages":[]}}"#;
         let v: serde_json::Value = serde_json::from_str(&solve_train_impl(bad).unwrap()).unwrap();
-        assert!(v["result"].is_null(), "an empty train has no answer");
-        assert_eq!(v["failure"]["note"]["key"], "error.train_empty");
         assert!(
-            v["failure"]["stage"].is_null(),
-            "an empty train's fault is the train's, not any stage's"
+            v["failure"].is_null() && v["result"]["stages"].as_array().unwrap().is_empty(),
+            "an empty train is a train with nothing rated: {v}"
         );
+        assert_eq!(v["result"]["cases"].as_array().unwrap().len(), 3);
+        assert_eq!(v["result"]["cases"][0]["solved"], false);
 
         // ...and where a stage is to blame, it is named — numbered as the panel
         // numbers them, so the reader is not left counting from zero.

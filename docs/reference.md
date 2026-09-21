@@ -2422,6 +2422,14 @@ loads      one per loaded port     each: at (start | end | a shaft),
 duty       a fatigue case's        how the load is applied over the train's life
 ```
 
+**A train with no stages is a train.** It solves to nothing rated and
+every case unsolved; the last stage removed parks each case's entries at
+the two places such a train has — `PARKED_IN`, ground, and `PARKED_OUT`,
+stage 0's own ground shaft, a reference no port can be — with every figure
+kept, and the first stage pushed takes them up at its conventional input
+and output, the back-driving case still from the output. A fresh case on a
+train with no two ends is parked the same way.
+
 **Ports and bodies.** The train's *open ports* are every stage's ports that
 the train does not fix, each named by its shaft — a shaft two stages share
 once, under the earlier stage's name — and a port is every shaft of a stage
