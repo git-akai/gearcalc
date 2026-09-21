@@ -576,6 +576,8 @@ been. They are not a backlog.
 | A planetary **set's** drawing | The viewport draws single gears; a set needs the carrier and N planets placed. **Not planned** — nothing depends on it, and the set's numbers are all reported without it |
 | A ring's own bounds for a stage member | The gear card shows a rack's buildable range, which is not a ring's, so it shows nothing there and says so |
 | A coupled glass POM grade | Can be added if one is wanted; it must be *coupled*, not filled |
+| **Two carried axes placed round the carrier** | A meshed-planet or Ravigneaux set has three distances — centre to each planet axis and between them — and each closes on its own shifts; nothing checks the three form a triangle, and the planet-clearance layout places one axis's planets without the other's. A preset carries it, the figures it reports are the meshes', and a layout that does not close is a fault this tool does not yet name |
+| **A stepped planet's assembly, timed** | The assembly rule (`Shape::assembly`) takes every planet identical: two gears on one planet shaft at one relative phase. Planets timed individually at manufacture assemble equally spaced at any count, which the rule then under-reports as *no*; the rule's answer is the cheaper build, not the only one |
 
 ---
 

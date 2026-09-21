@@ -968,4 +968,54 @@ mod tests {
             listed.ratio
         );
     }
+
+    /// **A second sun at one carrier radius closes by its shift as a
+    /// second ring does**: two suns on one planet, no ring — the Wolfrom
+    /// with its sign flipped — reached from the Wolfrom preset by two suns
+    /// added and both rings removed, and Willis gives `z_s2 / (z_s2 − z_s1)`
+    /// with the first sun held and the carrier driving, every distance
+    /// closed.
+    #[test]
+    fn a_planet_between_two_suns_is_a_wolfrom_with_the_sign_flipped() {
+        let mut shape = StagePreset::Wolfrom.build();
+        let planet = 2;
+        shape
+            .edit(StageEdit::AddCentral {
+                gear: planet,
+                ring: false,
+            })
+            .unwrap();
+        shape
+            .edit(StageEdit::AddCentral {
+                gear: planet,
+                ring: false,
+            })
+            .unwrap();
+        // Rings 1 and 2 are members 0 and 1; what is left is the planet
+        // and the two suns, 24 and 23 teeth at the Wolfrom's radius.
+        shape.edit(StageEdit::RemoveMember { member: 1 }).unwrap();
+        shape.edit(StageEdit::RemoveMember { member: 0 }).unwrap();
+        let (s1, s2) = (
+            f64::from(shape.members[1].gear.teeth),
+            f64::from(shape.members[2].gear.teeth),
+        );
+        assert!(s1 != s2, "two suns of one count would turn as one");
+        // Shafts: carrier 1, planet 2, sun 1 at 3, sun 2 at 4.
+        let r = under(&shape, StageBoundary::holding(5, &[3], 1, 4));
+        let want = s2 / (s2 - s1);
+        assert!(
+            (r.ratio.unwrap() - want).abs() < 1e-9,
+            "{} against Willis's {want}",
+            r.ratio.unwrap()
+        );
+        for d in &r.distances {
+            for nominal in &d.nominal {
+                assert!(
+                    ((d.running - nominal).abs() - d.clearance.abs()).abs() < 1e-9,
+                    "a sun's mesh not closed: {nominal} at {}",
+                    d.running
+                );
+            }
+        }
+    }
 }
