@@ -1,20 +1,20 @@
 train  total ratio 6.0317:1   total efficiency 96.375 % forward / 96.375 % backward
        backlash at the output shaft  0.07280 deg  (min -0.00000, max 0.14599)
        backlash at the input shaft   0.43912 deg  (min -0.00000, max 0.88059)
-       case 1  ultimate 2.000 Nm / 3000 rpm at start
+       case 1  ultimate 2.000 Nm / 3000 rpm at 1.1 + reacted at 2.2
               fixed    ground                              -        9.6260 Nm
               load     first                     3000.00 rpm        2.0000 Nm
               free     second                   -1186.05 rpm        0.0000 Nm
               free     first                    -1186.05 rpm        0.0000 Nm
               reacted  second                     497.37 rpm      -11.6260 Nm
-       case 2  ultimate 0.000 Nm / 0 rpm at end + ~0.000 Nm / ~0 rpm at start   (not solved)
+       case 2  ultimate 0.000 Nm / 0 rpm at 2.2 + free at 1.1   (not solved)
               note: no given torque does any work — every load is nought or on a still port: nothing drives this case
               fixed    ground                              -        0.0000 Nm
               free     first                        0.00 rpm        0.0000 Nm
               free     second                       0.00 rpm        0.0000 Nm
               free     first                        0.00 rpm        0.0000 Nm
               load     second                       0.00 rpm        0.0000 Nm
-       case 3  fatigue  2.000 Nm / 2400 rpm at start   1000 h
+       case 3  fatigue  2.000 Nm / 2400 rpm at 1.1 + reacted at 2.2   1000 h
               fixed    ground                              -        9.6260 Nm
               load     first                     2400.00 rpm        2.0000 Nm
               free     second                    -948.84 rpm        0.0000 Nm

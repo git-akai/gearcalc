@@ -10,7 +10,6 @@
     portKey,
     portOptions,
     type CaseKind,
-    type Port,
     type ShaftRef,
     type ShaftLabel,
     type LoadCase,
@@ -37,13 +36,11 @@
     type Cutter,
     type MeshReport,
     type LoadSharing,
-    type Constraint,
-    constraintOn,
     note,
     t,
   } from "./core";
   import { developer, trains, library, type TrainTab } from "./state.svelte";
-  import { exportTrain, relieveStage, relieveCase } from "./core";
+  import { exportTrain, relieveStage, relieveCase, editTrain } from "./core";
   import FieldNote from "./FieldNote.svelte";
   import Switch from "./Switch.svelte";
   import { notes, type Notes } from "./notes";
@@ -124,27 +121,51 @@
   const figuresOf = (stage: Stage): Figure[] =>
     result.figures[tab.train.stages.indexOf(stage)] ?? [];
 
-  /** **What the train asks of one shaft**, written as a constraint or, for
-   *  the empty choice, withdrawn so the stage's convention stands again. A
-   *  constraint is a choice and not a number, so it is written here; what
-   *  the choice *does* — a hold on a set releasing the ring it held by
-   *  convention, a drive behind a pair being where the chain enters — is
-   *  the core's rule, read back through the shaft line. */
-  function constrain(stage: number, shaft: number, c: Constraint | "") {
+  /** **What a shaft is**, as one word for the select: held to ground,
+   *  coupled to another shaft (the body it is part of, named by its other
+   *  shafts), or free — nothing attached, which is what a load case loads.
+   *  Read off the train's constraints and bodies; never decided here. */
+  type ShaftState = { kind: "held" } | { kind: "coupled"; to: ShaftRef[] } | { kind: "free" };
+  const shaftState = (stage: number, shaft: number): ShaftState => {
     const at: ShaftRef = { kind: "of", stage, shaft };
-    tab.train.constraints = tab.train.constraints.filter(
-      (x) => !(x.at.kind === "of" && x.at.stage === stage && x.at.shaft === shaft),
-    );
-    if (c !== "") tab.train.constraints.push({ at, constraint: c });
+    const body = bodies.find((b) => b.shafts.some(([s]) => portKey(s) === portKey(at)));
+    if (body?.held) return { kind: "held" };
+    const others = body?.shafts.map(([s]) => s).filter((s) => portKey(s) !== portKey(at)) ?? [];
+    return others.length > 0 ? { kind: "coupled", to: others } : { kind: "free" };
+  };
+  /** The select's value for a state: the coupled partner's key, so one
+   *  coupling reads the same on either shaft. */
+  const stateKey = (s: ShaftState): string =>
+    s.kind === "coupled" ? `coupled:${portKey(s.to[0])}` : s.kind;
+  /** **The select's answer written back through the core**: a hold
+   *  uncouples, a release withdraws every statement, and a coupling to a
+   *  port ties the two — each a rule the core owns (`edit_train`). */
+  function setShaft(stage: number, shaft: number, key: string) {
+    const at: ShaftRef = { kind: "of", stage, shaft };
+    if (key === "held") editTrain(tab.train, { hold: at });
+    else if (key === "free") editTrain(tab.train, { release: at });
+    else if (key.startsWith("coupled:")) {
+      const to = bodies.flatMap((b) => b.shafts.map(([s]) => s)).find((s) => portKey(s) === key.slice(8));
+      if (!to) return;
+      editTrain(tab.train, { release: at });
+      editTrain(tab.train, { couple: { a: at, b: to } });
+    }
   }
-  /** The word for what a shaft is asked, or for what its stage's convention
-   *  asks where the train says nothing. */
-  const constraintWord = (c: Constraint) =>
-    t(
-      { held: "ui.train_constraint_held", driven: "ui.train_constraint_driven", free: "ui.train_constraint_free" }[
-        c
-      ],
-    );
+  /** **Every shaft another shaft could be coupled to**: the shafts of every
+   *  body the train does not hold, on other stages, grouped by stage for the
+   *  select — none where there is no other stage, and the group is empty. */
+  const couplable = (stage: number): { stage: number; shafts: [ShaftRef, ShaftLabel][] }[] => {
+    const out: { stage: number; shafts: [ShaftRef, ShaftLabel][] }[] = [];
+    for (const b of bodies) {
+      if (b.held) continue;
+      for (const [s, label] of b.shafts) {
+        if (s.kind !== "of" || s.stage === stage) continue;
+        const group = out.find((g) => g.stage === s.stage) ?? (out.push({ stage: s.stage, shafts: [] }), out[out.length - 1]);
+        group.shafts.push([s, label]);
+      }
+    }
+    return out.sort((a, b) => a.stage - b.stage);
+  };
 
   /** Which duty a fatigue case is counted over. Switching seeds the other
    *  shape from the core's own defaults — a fresh case's intermittent duty,
@@ -152,18 +173,19 @@
    *  number is written on this side. */
   const dutyMode = (c: LoadCase): "intermittent" | "continuous" =>
     "intermittent" in c.duty ? "intermittent" : "continuous";
-  function setDuty(c: LoadCase, m: "intermittent" | "continuous") {
+  function setDuty(i: number, c: LoadCase, m: "intermittent" | "continuous") {
     if (m === dutyMode(c)) return;
-    c.duty = m === "intermittent" ? defaults().fatigue_case.duty : defaults().continuous_duty;
+    editTrain(tab.train, { duty: { case: i, intermittent: m === "intermittent" } });
   }
 
   /** **The load cases are a list, as the stages are**, added one of each kind
-   *  from the core's own defaults. Unlike the stages, the last one may go: a
-   *  train with no load case is a shaft line and nothing else, every rating
-   *  row stands empty, and the two buttons under the list are how one comes
-   *  back — where a train with no stage is one the core refuses. */
+   *  by the core, between the train's two ends. Unlike the stages, the last
+   *  one may go: a train with no load case is a shaft line and nothing else,
+   *  every rating row stands empty, and the two buttons under the list are
+   *  how one comes back — where a train with no stage is one the core
+   *  refuses. */
   function addCaseOfKind(kind: CaseKindSpec) {
-    tab.train.load_cases.push(kind.fresh());
+    editTrain(tab.train, { add_case: kind.key });
     tab.openCases[tab.train.load_cases.length - 1] = true;
   }
   function removeCase(i: number) {
@@ -180,19 +202,10 @@
    *  port, from the same tables the selects offer them from. */
   const caseName = (i: number) => t("ui.train_case_heading", { number: String(i + 1) });
   const kindLabel = (k: CaseKind) => t(CASE_KINDS.find((x) => x.key === k)?.label ?? k);
-  /** The word for a port: the chain's two ends by name, and a named shaft
-   *  as its stage and the shaft's own name — read off the topology the core
-   *  sent, so a shaft's name is the wiring's and not a guess from its index. */
-  const portLabel = (p: Port): string => {
-    // One convention throughout: a port is named by its shaft — the chain's
-    // ends too, which the core lists beside their names — and by its name
-    // only where the train has no motion to name a shaft from.
-    const open = result.motion?.ports.find((o) => portKey(o.port) === portKey(p));
-    if (open) return refLabel(open.at, open.label);
-    if (p === "start") return t("ui.train_port_start");
-    if (p === "end") return t("ui.train_port_end");
-    return refLabel(p.at);
-  };
+  /** The word for a port: its stage and the shaft's own name — read off the
+   *  topology the core sent, so a shaft's name is the wiring's and not a
+   *  guess from its index. */
+  const portLabel = (p: ShaftRef): string => refLabel(p);
   /** A shaft by reference: its stage and its own name, **as the gear tab's
    *  adopt list names a member** — "Stage 2 Gear 3", "Stage 3 Sun (5)" —
    *  so a shaft is one name wherever a list has it. The label is the
@@ -213,8 +226,8 @@
   /** The ports a duty's select offers, keyed for the select; a port is set
    *  by looking its key up here, never by parsing the key. */
   const portOptionsNow = $derived(portOptions(result.motion));
-  const portByKey = (key: string): Port =>
-    portOptionsNow.find((o) => o.key === key)?.port ?? "start";
+  const portByKey = (key: string): ShaftRef =>
+    portOptionsNow.find((o) => o.key === key)?.port ?? { kind: "ground" };
   /** **The train's bodies, as the core lists them** — every port of every
    *  stage, the shafts the couplings join gathered into one, in the order
    *  the chain runs. A case is a row per body: fixed where the train holds
@@ -223,48 +236,36 @@
   const bodies = $derived<TrainBody[]>(result.motion?.bodies ?? []);
   /** A body's name: every shaft of it, as a shaft is named anywhere. */
   const bodyLabel = (b: TrainBody): string => b.shafts.map(([at, label]) => refLabel(at, label)).join(" · ");
-  /** **What the case declares a body**, or what it is by default where the
-   *  case says nothing: the chain's ends are reacted, every other body is
-   *  free — the core's own rule, read back rather than restated. */
+  /** **What the case declares a body**, or free where it says nothing —
+   *  the core's own rule, read back rather than restated. */
   const roleOf = (c: LoadCase, b: TrainBody): LoadRole | "fixed" => {
     if (b.held) return "fixed";
-    const entry = entryOf(c, b);
-    if (entry) return entry.role;
-    return b.end ? "reacted" : "free";
+    return entryOf(c, b)?.role ?? "free";
   };
-  /** The case's entry for a body, under any of its shafts and either
-   *  spelling of a port. */
+  /** The case's entry for a body, under any of its shafts. */
   const entryOf = (c: LoadCase, b: TrainBody): Load | undefined => {
-    const keys = b.shafts.map(([at]) => portKey({ at }));
-    return c.loads.find((l) => keys.includes(shaftOfPort(l.at)));
+    const keys = b.shafts.map(([at]) => portKey(at));
+    return c.loads.find((l) => keys.includes(portKey(l.at)));
   };
   /** **A body declared a load, reacted or free.** The entry is written at
-   *  the body's port — the chain's end by name, else its first shaft by
-   *  reference — with both figures derived where it is new: relief never
-   *  invents a given, so a load's boxes show what the case comes to, or
-   *  stand blank until the designer gives one. The figures are kept while
-   *  the body is reacted or free, and the core relieves what remains. */
+   *  the body's first shaft, with both figures derived where it is new:
+   *  relief never invents a given, so a load's boxes show what the case
+   *  comes to, or stand blank until the designer gives one. The figures are
+   *  kept while the body is reacted or free, and the core relieves what
+   *  remains. */
   function setRole(i: number, b: TrainBody, role: LoadRole) {
     const c = tab.train.load_cases[i];
     const entry = entryOf(c, b);
     if (entry) {
       if (entry.role === role) return;
       entry.role = role;
-    } else if (b.port) {
-      c.loads.push({ at: b.port, role, torque: { auto: true, manual: 0 }, speed: { auto: true, manual: 0 } });
     } else {
-      return;
+      c.loads.push({ at: b.shafts[0][0], role, torque: { auto: true, manual: 0 }, speed: { auto: true, manual: 0 } });
     }
     relieveCase(tab.train, i, null, ratedUnder());
   }
   /** The library the train is rated under, which relief seeds from too. */
   const ratedUnder = () => (library.origin === null ? undefined : library.materials);
-  /** **The shaft a port names**, as the core lists it: a port is a shaft
-   *  under one of two spellings — the chain's end by name, or the shaft by
-   *  reference — and a case's loads are matched to a row by the shaft, not
-   *  the spelling, so a load written either way is found under its row. */
-  const shaftOfPort = (p: Port): string =>
-    portKey({ at: result.motion?.ports.find((o) => portKey(o.port) === portKey(p))?.at ?? (p === "start" || p === "end" ? { kind: "ground" } : p.at) });
   /** A figure of a load toggled: relief keeps this one and turns another. */
   const touched = (i: number, load: Load, which: LoadFreedom) => () => {
     const j = tab.train.load_cases[i].loads.indexOf(load);
@@ -274,7 +275,7 @@
    *  which a derived box shows and a blank stands for where the case did
    *  not solve. */
   const shaftOf = (cres: { shafts: CaseShaft[]; solved: boolean } | undefined, at: ShaftRef) =>
-    cres?.solved ? cres.shafts.find((s) => portKey({ at: s.at }) === portKey({ at })) : undefined;
+    cres?.solved ? cres.shafts.find((s) => portKey(s.at) === portKey(at)) : undefined;
   /** **What a case comes to, body by body**: the frame first, then every
    *  body in the chain's order — a body two stages share is one row, named
    *  by both its shafts, its figures those of the shaft the case applies
@@ -292,18 +293,18 @@
     const ground = cres.shafts.find((s) => s.at.kind === "ground");
     if (ground) {
       rows.push({ key: "ground", name: refLabel(ground.at, ground.label), role: ground.role, speed: ground.speed, torque: ground.torque });
-      taken.add(portKey({ at: ground.at }));
+      taken.add(portKey(ground.at));
     }
     for (const b of bodies) {
-      const keys = b.shafts.map(([at]) => portKey({ at }));
-      const mine = cres.shafts.filter((s) => keys.includes(portKey({ at: s.at })));
+      const keys = b.shafts.map(([at]) => portKey(at));
+      const mine = cres.shafts.filter((s) => keys.includes(portKey(s.at)));
       if (mine.length === 0) continue;
       const lead = mine.reduce((a, s) => (rank[s.role] < rank[a.role] ? s : a));
       rows.push({ key: keys[0], name: bodyLabel(b), role: lead.role, speed: lead.speed, torque: lead.torque });
       keys.forEach((k) => taken.add(k));
     }
     for (const s of cres.shafts) {
-      const k = portKey({ at: s.at });
+      const k = portKey(s.at);
       if (taken.has(k)) continue;
       rows.push({ key: k, name: refLabel(s.at, s.label), role: s.role, speed: s.speed, torque: s.torque });
     }
@@ -342,8 +343,10 @@
    *  — so nothing is stranded by the mode being off. */
   const stagePresets = $derived(STAGE_PRESETS.filter((k) => !k.developer || developer.enabled));
 
+  /** A stage pushed and coupled onward by the core, its cases carried to
+   *  the new end. */
   function addStagePreset(preset: StagePresetSpec) {
-    tab.train.stages.push(preset.fresh());
+    editTrain(tab.train, { push_stage: preset.fresh() });
     tab.open[tab.train.stages.length - 1] = true;
   }
 
@@ -355,21 +358,9 @@
    *  refuses, and a button that greys out to prevent that is a rule the
    *  reader has to infer. */
   function removeStage(i: number) {
-    tab.train.stages.splice(i, 1);
-    // The constraints and couplings name stages by index: those on the
-    // removed stage go with it, and those after it move down with the
-    // stages they belong to. Left alone, holding stage 3's carrier would
-    // hold whatever became stage 3.
-    const moved = (r: ShaftRef): ShaftRef | null =>
-      r.kind !== "of" ? r : r.stage === i ? null : r.stage > i ? { ...r, stage: r.stage - 1 } : r;
-    tab.train.constraints = tab.train.constraints.flatMap((c) => {
-      const at = moved(c.at);
-      return at ? [{ ...c, at }] : [];
-    });
-    tab.train.couplings = tab.train.couplings.flatMap((c) => {
-      const [a, b] = [moved(c.a), moved(c.b)];
-      return a && b ? [{ a, b }] : [];
-    });
+    // The constraints, the couplings and the cases name stages by index,
+    // and the core moves each with the stage it belongs to.
+    editTrain(tab.train, { remove_stage: i });
     // The expansions are keyed by index, so the ones after the hole move down
     // with the stages they belong to. Left alone, deleting a stage reopens
     // whichever stage inherited its number.
@@ -1249,26 +1240,35 @@
   {@const ports = result.topology[i]?.ports ?? []}
   {#if ports.length > 0}
     <h4 class="shafts section-heading">{t("ui.train_shafts")}</h4>
-    <!-- **The select shows what the shaft is asked, and the convention is
-         what it shows when the train says nothing.** Choosing the word the
-         convention already means withdraws the train's own statement rather
-         than writing it down, so a stage a designer has not touched carries
-         no constraint — and one they have set back to what it was carries
-         none either. -->
+    <!-- **The select shows what the shaft is**: held to ground, coupled to
+         a named shaft of another stage — one coupling reads the same on
+         either of its shafts — or free, with nothing attached, which is what
+         a load case loads. The choices under "coupled" are every shaft of
+         every other stage the train does not hold; with one stage there are
+         none. What each choice does to the rest — a hold uncouples, a
+         coupling turns a case's reaction into a take-off — is the core's
+         rule, written back through it. -->
     {#each ports as p (p.shaft)}
-      {@const stated = constraintOn(tab.train, i, p.shaft)}
+      {@const state = shaftState(i, p.shaft)}
       <label>
         <span>{shaftName(tab.train, result.topology, i, p.label)}</span>
-        <select
-          value={stated ?? p.by_convention}
-          onchange={(e) => {
-            const chosen = e.currentTarget.value as Constraint;
-            constrain(i, p.shaft, chosen === p.by_convention ? "" : chosen);
-          }}
-        >
-          {#each ["held", "driven", "free"] as const as c (c)}
-            <option value={c}>{constraintWord(c)}</option>
-          {/each}
+        <select value={stateKey(state)} onchange={(e) => setShaft(i, p.shaft, e.currentTarget.value)}>
+          <option value="held">{t("ui.train_constraint_held")}</option>
+          <optgroup label={t("ui.train_constraint_coupled")}>
+            {#if state.kind === "coupled"}
+              <option value={stateKey(state)}>
+                {state.to.map((s) => refLabel(s)).join(" · ")}
+              </option>
+            {/if}
+            {#each couplable(i) as group (group.stage)}
+              {#each group.shafts as [s, label] (portKey(s))}
+                {#if state.kind !== "coupled" || !state.to.some((x) => portKey(x) === portKey(s))}
+                  <option value={`coupled:${portKey(s)}`}>{refLabel(s, label)}</option>
+                {/if}
+              {/each}
+            {/each}
+          </optgroup>
+          <option value="free">{t("ui.train_constraint_free")}</option>
         </select>
         <em></em>
       </label>
@@ -1693,10 +1693,10 @@
               <div class="mode">
                 <span>{t("ui.train_actuation")}</span>
                 <div class="segmented">
-                  <button class:on={dutyMode(c) === "intermittent"} onclick={() => setDuty(c, "intermittent")}>
+                  <button class:on={dutyMode(c) === "intermittent"} onclick={() => setDuty(i, c, "intermittent")}>
                     {t("ui.train_intermittent")}
                   </button>
-                  <button class:on={dutyMode(c) === "continuous"} onclick={() => setDuty(c, "continuous")}>
+                  <button class:on={dutyMode(c) === "continuous"} onclick={() => setDuty(i, c, "continuous")}>
                     {t("ui.train_continuous")}
                   </button>
                 </div>
@@ -1749,7 +1749,7 @@
                  division by stiffness the core refuses — so it is a load,
                  an inline take-off, or free. A derived box shows what the
                  case comes to and stands blank until it can. -->
-            {#each bodies as b (portKey({ at: b.shafts[0][0] }))}
+            {#each bodies as b (portKey(b.shafts[0][0]))}
               {@const role = roleOf(c, b)}
               {@const load = role === "load" ? entryOf(c, b) : undefined}
               {@const at = shaftOf(cres, b.shafts[0][0])}

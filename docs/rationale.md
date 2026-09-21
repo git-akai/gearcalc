@@ -1515,18 +1515,19 @@ held than with the carrier held, and the two are not variants of one answer. Thi
 is an **input** the specification omitted, and inventing a default for it would
 be choosing a machine on the user's behalf.
 
-It is the **train's** input now, not the set's: which shaft is held and which
-driven is a constraint on a port, laid over what the stage holds *by
-convention* — the ring, for a set, and the panel says so in the words
-"convention: held" beside every port, so the default is named rather than
-invented. A convention is the weakest statement there is and gives way to any
-statement of its kind about the same stage: holding the carrier releases the
-ring without a word about it. A statement the designer made does not give
-way — two holds on one set lock it, and the train says which condition
-cannot hold rather than quietly dropping one. That asymmetry is the whole of
-"relief over constraints": the machinery that relieves a *number* exists
-because an automatic value has nothing to say for itself, and a constraint a
-designer wrote has.
+It is the **train's** input now, not the set's: which shaft is held is a
+constraint on a port, laid over what the stage holds *by convention* — the
+ring, for a set, and the panel's select shows that hold as the choice it
+is, so the default is named rather than invented. A convention is the
+weakest statement there is and gives way to any statement of its kind about
+the same stage: holding the carrier releases the ring without a word about
+it. A statement the designer made does not give way — two holds on one set
+lock it, and the train says which hold closed it rather than quietly
+dropping one. That asymmetry is the whole of "relief over constraints": the
+machinery that relieves a *number* exists because an automatic value has
+nothing to say for itself, and a constraint a designer wrote has. Which
+shaft is *driven* is no constraint at all: what drives a set is a load on
+one of its open ports, and a load case says so.
 
 ### One stage, one result
 

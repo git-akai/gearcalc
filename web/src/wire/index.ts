@@ -68,7 +68,6 @@ export type { PairStage } from "./core/PairStage";
 export type { PerToothClamps } from "./core/PerToothClamps";
 export type { PlanetaryStage } from "./core/PlanetaryStage";
 export type { PointContact } from "./core/PointContact";
-export type { Port } from "./core/Port";
 export type { PortSpec } from "./core/PortSpec";
 export type { Ranges } from "./core/Ranges";
 export type { ShaftCase } from "./core/ShaftCase";

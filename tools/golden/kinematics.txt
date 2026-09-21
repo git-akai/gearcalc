@@ -1,14 +1,14 @@
 == pair ==
   total    ratio      -2.529412   efficiency  98.344976 / 98.344976  %   backlash   0.038950 / 0.098522   deg
-  case 1       2.0000 Nm /   3000.00 rpm at start
+  case 1       2.0000 Nm /   3000.00 rpm at 1.1    +reacted at 1.2  
     fixed    ground                              -  torque    -6.975099
     load     first                      3000.0000 rpm  torque     2.000000
     reacted  second                     -1186.0465 rpm  torque     4.975099
-  case 2       0.6000 Nm /      0.00 rpm at end  
+  case 2       0.6000 Nm /      0.00 rpm at 1.2    +reacted at 1.1  
     fixed    ground                              -  torque    -0.833283
     reacted  first                      0.0000 rpm  torque     0.233283
     load     second                     0.0000 rpm  torque     0.600000
-  case 3       2.0000 Nm /   2400.00 rpm at start
+  case 3       2.0000 Nm /   2400.00 rpm at 1.1    +reacted at 1.2  
     fixed    ground                              -  torque    -6.975099
     load     first                      2400.0000 rpm  torque     2.000000
     reacted  second                     -948.8372 rpm  torque     4.975099
@@ -37,15 +37,15 @@
 
 == helical ==
   total    ratio      -2.529412   efficiency  98.389569 / 98.389569  %   backlash   0.038879 / 0.098341   deg
-  case 1       2.0000 Nm /   3000.00 rpm at start
+  case 1       2.0000 Nm /   3000.00 rpm at 1.1    +reacted at 1.2  
     fixed    ground                              -  torque    -6.977355
     load     first                      3000.0000 rpm  torque     2.000000
     reacted  second                     -1186.0465 rpm  torque     4.977355
-  case 2       0.6000 Nm /      0.00 rpm at end  
+  case 2       0.6000 Nm /      0.00 rpm at 1.2    +reacted at 1.1  
     fixed    ground                              -  torque    -0.833389
     reacted  first                      0.0000 rpm  torque     0.233389
     load     second                     0.0000 rpm  torque     0.600000
-  case 3       2.0000 Nm /   2400.00 rpm at start
+  case 3       2.0000 Nm /   2400.00 rpm at 1.1    +reacted at 1.2  
     fixed    ground                              -  torque    -6.977355
     load     first                      2400.0000 rpm  torque     2.000000
     reacted  second                     -948.8372 rpm  torque     4.977355
@@ -74,15 +74,15 @@
 
 == worm ==
   total    ratio     -40.000000   efficiency  61.804609 / 0.000000   %   backlash   0.155124 / 6.204966   deg
-  case 1       2.0000 Nm /   3000.00 rpm at start
+  case 1       2.0000 Nm /   3000.00 rpm at 1.1    +reacted at 1.2  
     fixed    ground                              -  torque   -51.443687
     load     first                      3000.0000 rpm  torque     2.000000
     reacted  second                     -75.0000 rpm  torque    49.443687
-  case 2       0.6000 Nm /      0.00 rpm at end  
+  case 2       0.6000 Nm /      0.00 rpm at 1.2    +reacted at 1.1  
     fixed    ground                              -  torque    -0.600000
     reacted  first                      0.0000 rpm  torque     0.000000
     load     second                     0.0000 rpm  torque     0.600000
-  case 3       2.0000 Nm /   2400.00 rpm at start
+  case 3       2.0000 Nm /   2400.00 rpm at 1.1    +reacted at 1.2  
     fixed    ground                              -  torque   -51.443687
     load     first                      2400.0000 rpm  torque     2.000000
     reacted  second                     -60.0000 rpm  torque    49.443687
@@ -111,19 +111,19 @@
 
 == set-sun-carrier ==
   total    ratio      -6.000000   efficiency  97.295446 / 97.295446  %   backlash   0.048678 / 0.292068   deg
-  case 1       2.0000 Nm /   3000.00 rpm at start
+  case 1       2.0000 Nm /   3000.00 rpm at 1.1    +reacted at 1.3  
     fixed    ground                              -  torque     0.000000
     load     sun                        3000.0000 rpm  torque     2.000000
     fixed    carrier                             -  torque   -13.675453
     reacted  ring                       -500.0000 rpm  torque    11.675453
     free     planet                     -1200.0000 rpm  torque     0.000000
-  case 2       0.6000 Nm /      0.00 rpm at end  
+  case 2       0.6000 Nm /      0.00 rpm at 1.3    +reacted at 1.1  
     fixed    ground                              -  torque     0.000000
     reacted  sun                        0.0000 rpm  torque     0.097295
     fixed    carrier                             -  torque    -0.697295
     load     ring                       0.0000 rpm  torque     0.600000
     free     planet                     0.0000 rpm  torque     0.000000
-  case 3       2.0000 Nm /   2400.00 rpm at start
+  case 3       2.0000 Nm /   2400.00 rpm at 1.1    +reacted at 1.3  
     fixed    ground                              -  torque     0.000000
     load     sun                        2400.0000 rpm  torque     2.000000
     fixed    carrier                             -  torque   -13.675453
@@ -167,19 +167,19 @@
 
 == set-sun-ring ==
   total    ratio       7.000000   efficiency  97.681810 / 97.672819  %   backlash   0.041724 / 0.292068   deg
-  case 1       2.0000 Nm /   3000.00 rpm at start
+  case 1       2.0000 Nm /   3000.00 rpm at 1.1    +reacted at 1.2  
     fixed    ground                              -  torque     0.000000
     load     sun                        3000.0000 rpm  torque     2.000000
     reacted  carrier                    428.5714 rpm  torque   -13.675453
     fixed    ring                                -  torque    11.675453
     free     planet                     -600.0000 rpm  torque     0.000000
-  case 2       0.6000 Nm /      0.00 rpm at end  
+  case 2       0.6000 Nm /      0.00 rpm at 1.2    +reacted at 1.1  
     fixed    ground                              -  torque     0.000000
     reacted  sun                        0.0000 rpm  torque    -0.083720
     load     carrier                    0.0000 rpm  torque     0.600000
     fixed    ring                                -  torque    -0.516280
     free     planet                     0.0000 rpm  torque     0.000000
-  case 3       2.0000 Nm /   2400.00 rpm at start
+  case 3       2.0000 Nm /   2400.00 rpm at 1.1    +reacted at 1.2  
     fixed    ground                              -  torque     0.000000
     load     sun                        2400.0000 rpm  torque     2.000000
     reacted  carrier                    342.8571 rpm  torque   -13.675453
@@ -223,19 +223,19 @@
 
 == set-carrier-sun ==
   total    ratio       0.857143   efficiency  99.604466 / 99.613635  %   backlash   0.048678 / 0.041724   deg
-  case 1       2.0000 Nm /   3000.00 rpm at start
+  case 1       2.0000 Nm /   3000.00 rpm at 1.2    +reacted at 1.3  
     fixed    ground                              -  torque     0.000000
     fixed    sun                                 -  torque    -0.292495
     load     carrier                    3000.0000 rpm  torque     2.000000
     reacted  ring                       3500.0000 rpm  torque    -1.707505
     free     planet                     4200.0000 rpm  torque     0.000000
-  case 2       0.6000 Nm /      0.00 rpm at end  
+  case 2       0.6000 Nm /      0.00 rpm at 1.3    +reacted at 1.2  
     fixed    ground                              -  torque     0.000000
     fixed    sun                                 -  torque     0.097295
     reacted  carrier                    0.0000 rpm  torque    -0.697295
     load     ring                       0.0000 rpm  torque     0.600000
     free     planet                     0.0000 rpm  torque     0.000000
-  case 3       2.0000 Nm /   2400.00 rpm at start
+  case 3       2.0000 Nm /   2400.00 rpm at 1.2    +reacted at 1.3  
     fixed    ground                              -  torque     0.000000
     fixed    sun                                 -  torque    -0.292495
     load     carrier                    2400.0000 rpm  torque     2.000000
@@ -279,19 +279,19 @@
 
 == set-carrier-ring ==
   total    ratio       0.142857   efficiency  97.672819 / 97.681810  %   backlash   0.292068 / 0.041724   deg
-  case 1       2.0000 Nm /   3000.00 rpm at start
+  case 1       2.0000 Nm /   3000.00 rpm at 1.2    +reacted at 1.1  
     fixed    ground                              -  torque     0.000000
     reacted  sun                        21000.0000 rpm  torque    -0.279065
     load     carrier                    3000.0000 rpm  torque     2.000000
     fixed    ring                                -  torque    -1.720935
     free     planet                     -4200.0000 rpm  torque     0.000000
-  case 2       0.6000 Nm /      0.00 rpm at end  
+  case 2       0.6000 Nm /      0.00 rpm at 1.1    +reacted at 1.2  
     fixed    ground                              -  torque     0.000000
     load     sun                        0.0000 rpm  torque     0.600000
     reacted  carrier                    0.0000 rpm  torque    -4.102636
     fixed    ring                                -  torque     3.502636
     free     planet                     0.0000 rpm  torque     0.000000
-  case 3       2.0000 Nm /   2400.00 rpm at start
+  case 3       2.0000 Nm /   2400.00 rpm at 1.2    +reacted at 1.1  
     fixed    ground                              -  torque     0.000000
     reacted  sun                        16800.0000 rpm  torque    -0.279065
     load     carrier                    2400.0000 rpm  torque     2.000000
@@ -335,19 +335,19 @@
 
 == set-ring-sun ==
   total    ratio       1.166667   efficiency  99.613635 / 99.604466  %   backlash   0.041724 / 0.048678   deg
-  case 1       2.0000 Nm /   3000.00 rpm at start
+  case 1       2.0000 Nm /   3000.00 rpm at 1.3    +reacted at 1.2  
     fixed    ground                              -  torque     0.000000
     fixed    sun                                 -  torque     0.324318
     reacted  carrier                    2571.4286 rpm  torque    -2.324318
     load     ring                       3000.0000 rpm  torque     2.000000
     free     planet                     3600.0000 rpm  torque     0.000000
-  case 2       0.6000 Nm /      0.00 rpm at end  
+  case 2       0.6000 Nm /      0.00 rpm at 1.2    +reacted at 1.3  
     fixed    ground                              -  torque     0.000000
     fixed    sun                                 -  torque    -0.087748
     load     carrier                    0.0000 rpm  torque     0.600000
     reacted  ring                       0.0000 rpm  torque    -0.512252
     free     planet                     0.0000 rpm  torque     0.000000
-  case 3       2.0000 Nm /   2400.00 rpm at start
+  case 3       2.0000 Nm /   2400.00 rpm at 1.3    +reacted at 1.2  
     fixed    ground                              -  torque     0.000000
     fixed    sun                                 -  torque     0.324318
     reacted  carrier                    2057.1429 rpm  torque    -2.324318
@@ -391,19 +391,19 @@
 
 == set-ring-carrier ==
   total    ratio      -0.166667   efficiency  97.295446 / 97.295446  %   backlash   0.292068 / 0.048678   deg
-  case 1       2.0000 Nm /   3000.00 rpm at start
+  case 1       2.0000 Nm /   3000.00 rpm at 1.3    +reacted at 1.1  
     fixed    ground                              -  torque     0.000000
     reacted  sun                        -18000.0000 rpm  torque     0.324318
     fixed    carrier                             -  torque    -2.324318
     load     ring                       3000.0000 rpm  torque     2.000000
     free     planet                     7200.0000 rpm  torque     0.000000
-  case 2       0.6000 Nm /      0.00 rpm at end  
+  case 2       0.6000 Nm /      0.00 rpm at 1.1    +reacted at 1.3  
     fixed    ground                              -  torque     0.000000
     load     sun                        0.0000 rpm  torque     0.600000
     fixed    carrier                             -  torque    -4.102636
     reacted  ring                       0.0000 rpm  torque     3.502636
     free     planet                     0.0000 rpm  torque     0.000000
-  case 3       2.0000 Nm /   2400.00 rpm at start
+  case 3       2.0000 Nm /   2400.00 rpm at 1.3    +reacted at 1.1  
     fixed    ground                              -  torque     0.000000
     reacted  sun                        -14400.0000 rpm  torque     0.324318
     fixed    carrier                             -  torque    -2.324318
@@ -447,19 +447,19 @@
 
 == hula ==
   total    ratio     232.562500   efficiency  81.919641 / 77.908095  %   backlash   0.065428 / 15.216172  deg
-  case 1       2.0000 Nm /   3000.00 rpm at start
+  case 1       2.0000 Nm /   3000.00 rpm at 1.1    +reacted at 1.2  
     fixed    ground                              -  torque     0.000000
     load     carrier                    3000.0000 rpm  torque     2.000000
     reacted  ring 2                     12.8998 rpm  torque  -381.028728
     fixed    ring 1                              -  torque   379.028728
     free     planet 1                   -196.7213 rpm  torque     0.000000
-  case 2       0.6000 Nm /      0.00 rpm at end  
+  case 2       0.6000 Nm /      0.00 rpm at 1.2    +reacted at 1.1  
     fixed    ground                              -  torque     0.000000
     reacted  carrier                    0.0000 rpm  torque    -0.002010
     load     ring 2                     0.0000 rpm  torque     0.600000
     fixed    ring 1                              -  torque    -0.597990
     free     planet 1                   0.0000 rpm  torque     0.000000
-  case 3       2.0000 Nm /   2400.00 rpm at start
+  case 3       2.0000 Nm /   2400.00 rpm at 1.1    +reacted at 1.2  
     fixed    ground                              -  torque     0.000000
     load     carrier                    2400.0000 rpm  torque     2.000000
     reacted  ring 2                     10.3198 rpm  torque  -381.028728
@@ -507,21 +507,21 @@
 
 == layshaft ==
   total    ratio       2.366224   efficiency  96.998754 / 96.998754  %   backlash   0.099391 / 0.235181   deg
-  case 1       2.0000 Nm /   3000.00 rpm at start
+  case 1       2.0000 Nm /   3000.00 rpm at 1.1    +reacted at 1.2  
     fixed    ground                              -  torque     2.590415
     load     member 1                   3000.0000 rpm  torque     2.000000
     reacted  member 6                   1267.8428 rpm  torque    -4.590415
     free     member 2                   -1186.0465 rpm  torque     0.000000
     free     member 4                   549.6313 rpm  torque     0.000000
     free     member 8                   3000.0000 rpm  torque     0.000000
-  case 2       0.6000 Nm /      0.00 rpm at end  
+  case 2       0.6000 Nm /      0.00 rpm at 1.2    +reacted at 1.1  
     fixed    ground                              -  torque    -0.354042
     reacted  member 1                   0.0000 rpm  torque    -0.245958
     load     member 6                   0.0000 rpm  torque     0.600000
     free     member 2                   0.0000 rpm  torque     0.000000
     free     member 4                   0.0000 rpm  torque     0.000000
     free     member 8                   0.0000 rpm  torque     0.000000
-  case 3       2.0000 Nm /   2400.00 rpm at start
+  case 3       2.0000 Nm /   2400.00 rpm at 1.1    +reacted at 1.2  
     fixed    ground                              -  torque     2.590415
     load     member 1                   2400.0000 rpm  torque     2.000000
     reacted  member 6                   1014.2743 rpm  torque    -4.590415
@@ -592,17 +592,17 @@
 
 == wormpair ==
   total    ratio     101.176471   efficiency  60.781728 / 0.000000   %   backlash   0.055440 / 5.609180   deg
-  case 1       2.0000 Nm /   3000.00 rpm at start
+  case 1       2.0000 Nm /   3000.00 rpm at 1.1    +reacted at 1.2  
     fixed    ground                              -  torque   120.993614
     load     member 1                   3000.0000 rpm  torque     2.000000
     reacted  member 4                   29.6512 rpm  torque  -122.993614
     free     member 2                   -75.0000 rpm  torque     0.000000
-  case 2       0.6000 Nm /      0.00 rpm at end  
+  case 2       0.6000 Nm /      0.00 rpm at 1.2    +reacted at 1.1  
     fixed    ground                              -  torque    -0.600000
     reacted  member 1                   0.0000 rpm  torque     0.000000
     load     member 4                   0.0000 rpm  torque     0.600000
     free     member 2                   0.0000 rpm  torque     0.000000
-  case 3       2.0000 Nm /   2400.00 rpm at start
+  case 3       2.0000 Nm /   2400.00 rpm at 1.1    +reacted at 1.2  
     fixed    ground                              -  torque   120.993614
     load     member 1                   2400.0000 rpm  torque     2.000000
     reacted  member 4                   23.7209 rpm  torque  -122.993614
@@ -645,19 +645,19 @@
 
 == wolfrom ==
   total    ratio      61.000000   efficiency  45.356184 / 0.000000   %   backlash   0.048937 / 2.985130   deg
-  case 1       2.0000 Nm /   3000.00 rpm at start
+  case 1       2.0000 Nm /   3000.00 rpm at 1.1    +reacted at 1.2  
     fixed    ground                              -  torque     0.000000
     load     carrier                    3000.0000 rpm  torque     2.000000
     reacted  ring 2                     49.1803 rpm  torque   -55.334545
     fixed    ring 1                              -  torque    53.334545
     free     planet                     -7000.0000 rpm  torque     0.000000
-  case 2       0.6000 Nm /      0.00 rpm at end  
+  case 2       0.6000 Nm /      0.00 rpm at 1.2    +reacted at 1.1  
     fixed    ground                              -  torque     0.000000
     reacted  carrier                    0.0000 rpm  torque     0.002257
     load     ring 2                     0.0000 rpm  torque     0.600000
     fixed    ring 1                              -  torque    -0.602257
     free     planet                     0.0000 rpm  torque     0.000000
-  case 3       2.0000 Nm /   2400.00 rpm at start
+  case 3       2.0000 Nm /   2400.00 rpm at 1.1    +reacted at 1.2  
     fixed    ground                              -  torque     0.000000
     load     carrier                    2400.0000 rpm  torque     2.000000
     reacted  ring 2                     39.3443 rpm  torque   -55.334545
@@ -701,21 +701,21 @@
 
 == stepped ==
   total    ratio      88.500000   efficiency  65.548466 / 48.513978  %   backlash   0.056749 / 5.022252   deg
-  case 1       2.0000 Nm /   3000.00 rpm at start
+  case 1       2.0000 Nm /   3000.00 rpm at 1.1    +reacted at 1.2  
     fixed    ground                              -  torque     0.000000
     load     sun                        3000.0000 rpm  torque     2.000000
     reacted  ring 2                     33.8983 rpm  torque  -116.020785
     free     carrier                    857.1429 rpm  torque     0.000000
     fixed    ring 1                              -  torque   114.020785
     free     planet 1                   -2000.0000 rpm  torque     0.000000
-  case 2       0.6000 Nm /      0.00 rpm at end  
+  case 2       0.6000 Nm /      0.00 rpm at 1.2    +reacted at 1.1  
     fixed    ground                              -  torque     0.000000
     reacted  sun                        0.0000 rpm  torque    -0.003289
     load     ring 2                     0.0000 rpm  torque     0.600000
     free     carrier                    0.0000 rpm  torque     0.000000
     fixed    ring 1                              -  torque    -0.596711
     free     planet 1                   0.0000 rpm  torque     0.000000
-  case 3       2.0000 Nm /   2400.00 rpm at start
+  case 3       2.0000 Nm /   2400.00 rpm at 1.1    +reacted at 1.2  
     fixed    ground                              -  torque     0.000000
     load     sun                        2400.0000 rpm  torque     2.000000
     reacted  ring 2                     27.1186 rpm  torque  -116.020785
@@ -772,9 +772,44 @@
     shaft planet 1  of stage 1 speed -2/3
 
 == planocentric ==
-  no answer: stage 1: no self-consistent power flow: the arrangement is self-locking, or the shaft named as the input is not the one driving
-  graph    mobility 2 degree(s), 2 given   total ratio 1
-    stage 1  ratio 1
+  total    ratio     -10.000000   efficiency  97.155934 / 97.080449  %   backlash   0.095762 / 0.957619   deg
+  case 1       2.0000 Nm /   3000.00 rpm at 1.1    +reacted at 1.3  
+    fixed    ground                              -  torque     0.000000
+    load     carrier                    3000.0000 rpm  torque     2.000000
+    fixed    ring                                -  torque   -21.431187
+    reacted  planet                     -300.0000 rpm  torque    19.431187
+  case 2       0.6000 Nm /      0.00 rpm at 1.3    +reacted at 1.1  
+    fixed    ground                              -  torque     0.000000
+    reacted  carrier                    0.0000 rpm  torque     0.058248
+    fixed    ring                                -  torque    -0.658248
+    load     planet                     0.0000 rpm  torque     0.600000
+  case 3       2.0000 Nm /   2400.00 rpm at 1.1    +reacted at 1.3  
+    fixed    ground                              -  torque     0.000000
+    load     carrier                    2400.0000 rpm  torque     2.000000
+    fixed    ring                                -  torque   -21.431187
+    reacted  planet                     -240.0000 rpm  torque    19.431187
+  stage 1  ratio     -10.000000   efficiency  97.155934 / 97.080449  %   backlash   0.095762 / 0.957619   deg
+    power through the teeth  10.715593 / 11.000000    one more tooth on each member: -15.500000 -7.500000
+    shaft carrier   case 1  speed    3000.000000  torque       2.000000
+    shaft carrier   case 2  speed       0.000000  torque       0.058248
+    shaft carrier   case 3  speed    2400.000000  torque       2.000000
+    shaft ring      case 1  speed       0.000000  torque     -21.431187
+    shaft ring      case 2  speed       0.000000  torque      -0.658248
+    shaft ring      case 3  speed       0.000000  torque     -21.431187
+    shaft planet    case 1  speed    -300.000000  torque      19.431187
+    shaft planet    case 2  speed       0.000000  torque       0.600000
+    shaft planet    case 3  speed    -240.000000  torque      19.431187
+    member 1  z 30  
+      case 1  speed    -300.000000  vs frame   -3300.000000  torque      19.482897  cycles -
+      case 2  speed       0.000000  vs frame       0.000000  torque       0.600000  cycles -
+      case 3  speed    -240.000000  vs frame   -2640.000000  torque      19.482897  cycles 1.584000e8 / 1.584000e8
+    member 2  z 33  
+      case 1  speed       0.000000  vs frame   -3000.000000  torque      21.431187  cycles -
+      case 2  speed       0.000000  vs frame       0.000000  torque       0.660000  cycles -
+      case 3  speed       0.000000  vs frame   -2400.000000  torque      21.431187  cycles 1.440000e8 / 1.440000e8
+    mesh 1  efficiency  99.734586 / 99.734586  %  contact ratio   1.7700  shares a factor
+  graph    mobility 2 degree(s), 2 given   total ratio -10
+    stage 1  ratio -10
     shaft ground    of the train speed 0
     shaft carrier   of stage 1 speed 1
     shaft ring      of stage 1 speed 0
@@ -782,21 +817,21 @@
 
 == meshed-planets ==
   total    ratio      -3.000000   efficiency  93.358179 / 93.466662  %   backlash   0.069648 / 0.208944   deg
-  case 1       2.0000 Nm /   3000.00 rpm at start
+  case 1       2.0000 Nm /   3000.00 rpm at 1.1    +reacted at 1.2  
     fixed    ground                              -  torque     0.000000
     load     sun                        3000.0000 rpm  torque     2.000000
     reacted  carrier                    -1000.0000 rpm  torque     5.601491
     fixed    ring                                -  torque    -7.601491
     free     planet 1                   -6333.3333 rpm  torque     0.000000
     free     planet 2                   4333.3333 rpm  torque     0.000000
-  case 2       0.6000 Nm /      0.00 rpm at end  
+  case 2       0.6000 Nm /      0.00 rpm at 1.2    +reacted at 1.1  
     fixed    ground                              -  torque     0.000000
     reacted  sun                        0.0000 rpm  torque     0.186933
     load     carrier                    0.0000 rpm  torque     0.600000
     fixed    ring                                -  torque    -0.786933
     free     planet 1                   0.0000 rpm  torque     0.000000
     free     planet 2                   0.0000 rpm  torque     0.000000
-  case 3       2.0000 Nm /   2400.00 rpm at start
+  case 3       2.0000 Nm /   2400.00 rpm at 1.1    +reacted at 1.2  
     fixed    ground                              -  torque     0.000000
     load     sun                        2400.0000 rpm  torque     2.000000
     reacted  carrier                    -800.0000 rpm  torque     5.601491
@@ -850,7 +885,7 @@
 
 == ravigneaux-small-sun ==
   total    ratio       4.444444   efficiency  97.918525 / 97.905870  %   backlash   0.041706 / 0.185361   deg
-  case 1       2.0000 Nm /   3000.00 rpm at start
+  case 1       2.0000 Nm /   3000.00 rpm at 1.1    +reacted at 1.2  
     fixed    ground                              -  torque     0.000000
     load     sun 1                      3000.0000 rpm  torque     2.000000
     reacted  carrier                    675.0000 rpm  torque    -8.703869
@@ -858,7 +893,7 @@
     fixed    ring                                -  torque     6.703869
     free     planet 1                   -1227.2727 rpm  torque     0.000000
     free     planet 2                   3000.0000 rpm  torque     0.000000
-  case 2       0.6000 Nm /      0.00 rpm at end  
+  case 2       0.6000 Nm /      0.00 rpm at 1.2    +reacted at 1.1  
     fixed    ground                              -  torque     0.000000
     reacted  sun 1                      0.0000 rpm  torque    -0.132173
     load     carrier                    0.0000 rpm  torque     0.600000
@@ -866,7 +901,7 @@
     fixed    ring                                -  torque    -0.467827
     free     planet 1                   0.0000 rpm  torque     0.000000
     free     planet 2                   0.0000 rpm  torque     0.000000
-  case 3       2.0000 Nm /   2400.00 rpm at start
+  case 3       2.0000 Nm /   2400.00 rpm at 1.1    +reacted at 1.2  
     fixed    ground                              -  torque     0.000000
     load     sun 1                      2400.0000 rpm  torque     2.000000
     reacted  carrier                    540.0000 rpm  torque    -8.703869
@@ -930,15 +965,15 @@
 
 == ravigneaux-large-sun ==
   total    ratio      -0.240000   efficiency  90.611620 / 90.948043  %   backlash   0.695140 / 0.166833   deg
-  case 1       2.0000 Nm /   3000.00 rpm at start  +    0.0000 Nm /      0.00 rpm at 1.2    +    0.0000 Nm /      0.00 rpm at 1.1  
+  case 1       2.0000 Nm /   3000.00 rpm at 1.3    +reacted at 1.2    +free at 1.1  
     fixed    ground                              -  torque     0.000000
     free     sun 1                      -12500.0000 rpm  torque     0.000000
-    load     carrier                    -2812.5000 rpm  torque     1.951604
+    reacted  carrier                    -2812.5000 rpm  torque     1.951604
     load     sun 2                      3000.0000 rpm  torque     2.000000
     fixed    ring                                -  torque    -3.951604
     free     planet 1                   5113.6364 rpm  torque     0.000000
     free     planet 2                   -12500.0000 rpm  torque     0.000000
-  case 2       0.6000 Nm /      0.00 rpm at 1.2    +    0.0000 Nm /      0.00 rpm at 1.1  
+  case 2       0.6000 Nm /      0.00 rpm at 1.2    +reacted at 1.3    +free at 1.1  
     fixed    ground                              -  torque     0.000000
     free     sun 1                      0.0000 rpm  torque     0.000000
     load     carrier                    0.0000 rpm  torque     0.600000
@@ -946,10 +981,10 @@
     fixed    ring                                -  torque    -1.116480
     free     planet 1                   0.0000 rpm  torque     0.000000
     free     planet 2                   0.0000 rpm  torque     0.000000
-  case 3       2.0000 Nm /   2400.00 rpm at start  +    0.0000 Nm /      0.00 rpm at 1.2    +    0.0000 Nm /      0.00 rpm at 1.1  
+  case 3       2.0000 Nm /   2400.00 rpm at 1.3    +reacted at 1.2    +free at 1.1  
     fixed    ground                              -  torque     0.000000
     free     sun 1                      -10000.0000 rpm  torque     0.000000
-    load     carrier                    -2250.0000 rpm  torque     1.951604
+    reacted  carrier                    -2250.0000 rpm  torque     1.951604
     load     sun 2                      2400.0000 rpm  torque     2.000000
     fixed    ring                                -  torque    -3.951604
     free     planet 1                   4090.9091 rpm  torque     0.000000
@@ -1010,7 +1045,7 @@
 
 == ravigneaux-ring-free ==
   total    ratio       2.666667   efficiency  96.521026 / 96.446859  %   backlash   0.104114 / 0.277636   deg
-  case 1       2.0000 Nm /   3000.00 rpm at start
+  case 1       2.0000 Nm /   3000.00 rpm at 1.1    +reacted at 1.2  
     fixed    ground                              -  torque     0.000000
     load     sun 1                      3000.0000 rpm  torque     2.000000
     reacted  carrier                    1125.0000 rpm  torque    -5.147788
@@ -1018,7 +1053,7 @@
     free     ring                       580.6452 rpm  torque     0.000000
     free     planet 1                   -409.0909 rpm  torque     0.000000
     free     planet 2                   3000.0000 rpm  torque     0.000000
-  case 2       0.6000 Nm /      0.00 rpm at end  
+  case 2       0.6000 Nm /      0.00 rpm at 1.2    +reacted at 1.1  
     fixed    ground                              -  torque     0.000000
     reacted  sun 1                      0.0000 rpm  torque    -0.217005
     load     carrier                    0.0000 rpm  torque     0.600000
@@ -1026,7 +1061,7 @@
     free     ring                       0.0000 rpm  torque     0.000000
     free     planet 1                   0.0000 rpm  torque     0.000000
     free     planet 2                   0.0000 rpm  torque     0.000000
-  case 3       2.0000 Nm /   2400.00 rpm at start
+  case 3       2.0000 Nm /   2400.00 rpm at 1.1    +reacted at 1.2  
     fixed    ground                              -  torque     0.000000
     load     sun 1                      2400.0000 rpm  torque     2.000000
     reacted  carrier                    900.0000 rpm  torque    -5.147788
@@ -1090,19 +1125,19 @@
 
 == chain ==
   total    ratio       6.031674   efficiency  96.374575 / 96.374575  %   backlash   0.072802 / 0.439117   deg
-  case 1       2.0000 Nm /   3000.00 rpm at start
+  case 1       2.0000 Nm /   3000.00 rpm at 1.1    +reacted at 2.2  
     fixed    ground                              -  torque     9.626001
     load     first                      3000.0000 rpm  torque     2.000000
     free     second                     -1186.0465 rpm  torque     0.000000
     free     first                      -1186.0465 rpm  torque     0.000000
     reacted  second                     497.3743 rpm  torque   -11.626001
-  case 2       0.6000 Nm /      0.00 rpm at end  
+  case 2       0.6000 Nm /      0.00 rpm at 2.2    +reacted at 1.1  
     fixed    ground                              -  torque    -0.504132
     reacted  first                      0.0000 rpm  torque    -0.095868
     free     second                     0.0000 rpm  torque     0.000000
     free     first                      0.0000 rpm  torque     0.000000
     load     second                     0.0000 rpm  torque     0.600000
-  case 3       2.0000 Nm /   2400.00 rpm at start
+  case 3       2.0000 Nm /   2400.00 rpm at 1.1    +reacted at 2.2  
     fixed    ground                              -  torque     9.626001
     load     first                      2400.0000 rpm  torque     2.000000
     free     second                     -948.8372 rpm  torque     0.000000
@@ -1153,7 +1188,7 @@
 
 == mixed ==
   total    ratio     708.235294   efficiency  59.372692 / 0.000000   %   backlash   0.156306 / 110.701676 deg
-  case 1       2.0000 Nm /   3000.00 rpm at start
+  case 1       2.0000 Nm /   3000.00 rpm at 1.1    +reacted at 3.2  
     fixed    ground                              -  torque   868.039987
     load     first                      3000.0000 rpm  torque     2.000000
     free     second                     -1186.0465 rpm  torque     0.000000
@@ -1163,7 +1198,7 @@
     free     planet                     237.2093 rpm  torque     0.000000
     free     first                      -169.4352 rpm  torque     0.000000
     reacted  second                     4.2359 rpm  torque  -840.996720
-  case 2       0.6000 Nm /      0.00 rpm at end  
+  case 2       0.6000 Nm /      0.00 rpm at 3.2    +reacted at 1.1  
     fixed    ground                              -  torque    -0.600000
     reacted  first                      0.0000 rpm  torque     0.000000
     free     second                     0.0000 rpm  torque     0.000000
@@ -1173,7 +1208,7 @@
     free     planet                     0.0000 rpm  torque     0.000000
     free     first                      0.0000 rpm  torque     0.000000
     load     second                     0.0000 rpm  torque     0.600000
-  case 3       2.0000 Nm /   2400.00 rpm at start
+  case 3       2.0000 Nm /   2400.00 rpm at 1.1    +reacted at 3.2  
     fixed    ground                              -  torque   868.039987
     load     first                      2400.0000 rpm  torque     2.000000
     free     second                     -948.8372 rpm  torque     0.000000
@@ -1261,7 +1296,7 @@
 
 == set-then-pair ==
   total    ratio      15.176471   efficiency  95.685183 / 95.685183  %   backlash   0.058195 / 0.883197   deg
-  case 1       2.0000 Nm /   3000.00 rpm at start
+  case 1       2.0000 Nm /   3000.00 rpm at 1.1    +reacted at 2.2  
     fixed    ground                              -  torque    40.718721
     load     sun                        3000.0000 rpm  torque     2.000000
     fixed    carrier                             -  torque   -13.675453
@@ -1269,7 +1304,7 @@
     free     planet                     -1200.0000 rpm  torque     0.000000
     free     first                      -500.0000 rpm  torque     0.000000
     reacted  second                     197.6744 rpm  torque   -29.043267
-  case 2       0.6000 Nm /      0.00 rpm at end  
+  case 2       0.6000 Nm /      0.00 rpm at 2.2    +reacted at 1.1  
     fixed    ground                              -  torque    -0.833283
     reacted  sun                        0.0000 rpm  torque    -0.037829
     fixed    carrier                             -  torque     0.271112
@@ -1277,7 +1312,7 @@
     free     planet                     0.0000 rpm  torque     0.000000
     free     first                      0.0000 rpm  torque     0.000000
     load     second                     0.0000 rpm  torque     0.600000
-  case 3       2.0000 Nm /   2400.00 rpm at start
+  case 3       2.0000 Nm /   2400.00 rpm at 1.1    +reacted at 2.2  
     fixed    ground                              -  torque    40.718721
     load     sun                        2400.0000 rpm  torque     2.000000
     fixed    carrier                             -  torque   -13.675453
@@ -1343,7 +1378,7 @@
 
 == pair-then-set ==
   total    ratio      15.176471   efficiency  95.685183 / 95.685183  %   backlash   0.055170 / 0.837281   deg
-  case 1       2.0000 Nm /   3000.00 rpm at start
+  case 1       2.0000 Nm /   3000.00 rpm at 1.1    +reacted at 2.3  
     fixed    ground                              -  torque    -6.975099
     load     first                      3000.0000 rpm  torque     2.000000
     free     second                     -1186.0465 rpm  torque     0.000000
@@ -1351,7 +1386,7 @@
     fixed    carrier                             -  torque    34.018366
     reacted  ring                       197.6744 rpm  torque   -29.043267
     free     planet                     474.4186 rpm  torque     0.000000
-  case 2       0.6000 Nm /      0.00 rpm at end  
+  case 2       0.6000 Nm /      0.00 rpm at 2.3    +reacted at 1.1  
     fixed    ground                              -  torque     0.135124
     reacted  first                      0.0000 rpm  torque    -0.037829
     free     second                     0.0000 rpm  torque     0.000000
@@ -1359,7 +1394,7 @@
     fixed    carrier                             -  torque    -0.697295
     load     ring                       0.0000 rpm  torque     0.600000
     free     planet                     0.0000 rpm  torque     0.000000
-  case 3       2.0000 Nm /   2400.00 rpm at start
+  case 3       2.0000 Nm /   2400.00 rpm at 1.1    +reacted at 2.3  
     fixed    ground                              -  torque    -6.975099
     load     first                      2400.0000 rpm  torque     2.000000
     free     second                     -948.8372 rpm  torque     0.000000
@@ -1448,21 +1483,21 @@
 
 == ring-released ==
   total    ratio            NaN   efficiency        NaN / NaN        %   backlash        NaN / NaN        deg
-  case 1       2.0000 Nm /   3000.00 rpm at start   (not solved)
+  case 1       2.0000 Nm /   3000.00 rpm at 1.1    +reacted at 1.2     (not solved)
     ! train.case_underdetermined
     fixed    ground                              -  torque     0.000000
     load     sun                        0.0000 rpm  torque     0.000000
     reacted  carrier                    0.0000 rpm  torque     0.000000
     free     ring                       0.0000 rpm  torque     0.000000
     free     planet                     0.0000 rpm  torque     0.000000
-  case 2       0.6000 Nm /      0.00 rpm at end     (not solved)
+  case 2       0.6000 Nm /      0.00 rpm at 1.2    +reacted at 1.1     (not solved)
     ! train.case_underdetermined
     fixed    ground                              -  torque     0.000000
     reacted  sun                        0.0000 rpm  torque     0.000000
     load     carrier                    0.0000 rpm  torque     0.000000
     free     ring                       0.0000 rpm  torque     0.000000
     free     planet                     0.0000 rpm  torque     0.000000
-  case 3       2.0000 Nm /   2400.00 rpm at start   (not solved)
+  case 3       2.0000 Nm /   2400.00 rpm at 1.1    +reacted at 1.2     (not solved)
     ! train.case_underdetermined
     fixed    ground                              -  torque     0.000000
     load     sun                        0.0000 rpm  torque     0.000000
@@ -1505,99 +1540,7 @@
     shaft ring      of stage 1 speed -1/6 + 7/6 × ω(carrier)
     shaft planet    of stage 1 speed -2/5 + 7/5 × ω(carrier)
 
-== two-drives ==
-  no answer: stage 1: with what the train holds and drives, this stage has more than one free shaft, and a rating wants one motion to rate under
-  graph    mobility 2 degree(s), 2 given   total ratio 1
-    stage 1  ratio 1
-    shaft ground    of the train speed 0
-    shaft sun       of stage 1 speed 1
-    shaft carrier   of stage 1 speed 1
-    shaft ring      of stage 1 speed 1
-    shaft planet    of stage 1 speed 1
-
 == conflict ==
   no answer: two conditions cannot both hold at stage 1, shaft 3
   graph    no motion: Conflicts(Of { stage: 0, shaft: 3 })
-
-== pair-then-set-named ==
-  total    ratio      15.176471   efficiency  95.685183 / 95.685183  %   backlash   0.055170 / 0.837281   deg
-  case 1       2.0000 Nm /   3000.00 rpm at 1.1  
-    fixed    ground                              -  torque    -6.975099
-    load     first                      3000.0000 rpm  torque     2.000000
-    free     second                     -1186.0465 rpm  torque     0.000000
-    free     sun                        -1186.0465 rpm  torque     0.000000
-    fixed    carrier                             -  torque    34.018366
-    reacted  ring                       197.6744 rpm  torque   -29.043267
-    free     planet                     474.4186 rpm  torque     0.000000
-  case 2       0.6000 Nm /      0.00 rpm at 2.3  
-    fixed    ground                              -  torque     0.135124
-    reacted  first                      0.0000 rpm  torque    -0.037829
-    free     second                     0.0000 rpm  torque     0.000000
-    free     sun                        0.0000 rpm  torque     0.000000
-    fixed    carrier                             -  torque    -0.697295
-    load     ring                       0.0000 rpm  torque     0.600000
-    free     planet                     0.0000 rpm  torque     0.000000
-  case 3       2.0000 Nm /   2400.00 rpm at 1.1  
-    fixed    ground                              -  torque    -6.975099
-    load     first                      2400.0000 rpm  torque     2.000000
-    free     second                     -948.8372 rpm  torque     0.000000
-    free     sun                        -948.8372 rpm  torque     0.000000
-    fixed    carrier                             -  torque    34.018366
-    reacted  ring                       158.1395 rpm  torque   -29.043267
-    free     planet                     379.5349 rpm  torque     0.000000
-  stage 1  ratio      -2.529412   efficiency  98.344976 / 98.344976  %   backlash   0.038950 / 0.098522   deg
-    power through the teeth   1.000000 / 1.000000     one more tooth on each member: -2.388889 -2.588235
-    shaft first     case 1  speed    3000.000000  torque       2.000000
-    shaft first     case 2  speed       0.000000  torque      -0.037829
-    shaft first     case 3  speed    2400.000000  torque       2.000000
-    shaft second    case 1  speed   -1186.046512  torque       4.975099
-    shaft second    case 2  speed       0.000000  torque      -0.097295
-    shaft second    case 3  speed    -948.837209  torque       4.975099
-    member 1  z 17  
-      case 1  speed    3000.000000  vs frame    3000.000000  torque       2.000000  cycles -
-      case 2  speed       0.000000  vs frame       0.000000  torque       0.038466  cycles -
-      case 3  speed    2400.000000  vs frame    2400.000000  torque       2.000000  cycles 1.440000e8 / 1.440000e8
-    member 2  z 43  
-      case 1  speed   -1186.046512  vs frame   -1186.046512  torque       5.058824  cycles -
-      case 2  speed       0.000000  vs frame       0.000000  torque       0.097295  cycles -
-      case 3  speed    -948.837209  vs frame    -948.837209  torque       5.058824  cycles 5.693023e7 / 5.693023e7
-    mesh 1  efficiency  98.344976 / 98.344976  %  contact ratio   1.5993  coprime
-  stage 2  ratio      -6.000000   efficiency  97.295446 / 97.295446  %   backlash   0.048678 / 0.292068   deg
-    power through the teeth   1.978385 / 1.994450     one more tooth on each member: -5.538462 -6.000000 -6.083333
-    shaft sun       case 1  speed   -1186.046512  torque      -4.975099
-    shaft sun       case 2  speed       0.000000  torque       0.097295
-    shaft sun       case 3  speed    -948.837209  torque      -4.975099
-    shaft carrier   case 1  speed       0.000000  torque      34.018366
-    shaft carrier   case 2  speed       0.000000  torque      -0.697295
-    shaft carrier   case 3  speed       0.000000  torque      34.018366
-    shaft ring      case 1  speed     197.674419  torque     -29.043267
-    shaft ring      case 2  speed       0.000000  torque       0.600000
-    shaft ring      case 3  speed     158.139535  torque     -29.043267
-    shaft planet    case 1  speed     474.418605  torque      -0.000000
-    shaft planet    case 2  speed       0.000000  torque       0.000000
-    shaft planet    case 3  speed     379.534884  torque      -0.000000
-    member 1  z 12  
-      case 1  speed   -1186.046512  vs frame   -1186.046512  torque       1.658366  cycles -
-      case 2  speed       0.000000  vs frame       0.000000  torque       0.033148  cycles -
-      case 3  speed    -948.837209  vs frame    -948.837209  torque       1.658366  cycles 1.707907e8 / 1.707907e8
-    member 2  z 30  
-      case 1  speed     474.418605  vs frame     474.418605  torque       4.145916  cycles -
-      case 2  speed       0.000000  vs frame       0.000000  torque       0.083333  cycles -
-      case 3  speed     379.534884  vs frame     379.534884  torque       4.145916  cycles 2.277209e7 / 2.277209e7
-    member 3  z 72  
-      case 1  speed     197.674419  vs frame     197.674419  torque       9.735121  cycles -
-      case 2  speed       0.000000  vs frame       0.000000  torque       0.200000  cycles -
-      case 3  speed     158.139535  vs frame     158.139535  torque       9.735121  cycles 2.846512e7 / 2.846512e7
-    mesh 1  efficiency  97.838469 / 97.838469  %  contact ratio   1.4369  shares a factor
-    mesh 2  efficiency  99.444980 / 99.444980  %  contact ratio   1.9726  shares a factor
-  graph    mobility 2 degree(s), 2 given   total ratio 258/17
-    stage 1  ratio -43/17
-    stage 2  ratio -6
-    shaft ground    of the train speed 0
-    shaft first     of stage 1 speed 1
-    shaft second    of stage 1 speed -17/43
-    shaft sun       of stage 2 speed -17/43
-    shaft carrier   of stage 2 speed 0
-    shaft ring      of stage 2 speed 17/258
-    shaft planet    of stage 2 speed 34/215
 

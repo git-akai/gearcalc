@@ -1294,33 +1294,21 @@ fn hula_sweep(n: u32, clearance: f64, mesh_index: usize) {
 fn train_file_report(path: Option<&str>) {
     use gear_core::params::Auto;
     use gear_core::train::{
-        solve_train, Duty, Load, LoadCase, PairStage, PlanetaryStage, Port, Stage, StageGear, Train,
+        solve_train, Duty, Load, LoadCase, LoadRole, PairStage, PlanetaryStage, ShaftRef, Stage,
+        StageGear, Train,
     };
     use gear_io::TrainDocument;
 
     let lib = gear_io::default_library();
+    // The chain's two ends: the pair's first gear and the set's carrier.
+    let (start, end) = (
+        ShaftRef::Of { stage: 0, shaft: 1 },
+        ShaftRef::Of { stage: 2, shaft: 2 },
+    );
     let doc = TrainDocument {
         name: "Elevation drive".to_string(),
-        train: Train {
-            // Both case kinds, both ports, both duties: everything the document can
-            // carry for a load, so the round trip is asked of all of it.
-            load_cases: vec![
-                LoadCase::ultimate(2.0, 3000.0),
-                LoadCase::back_driving(0.5),
-                LoadCase {
-                    duty: Duty::Continuous {
-                        runtime_hours: 1000.0,
-                    },
-                    ..LoadCase::fatigue(2.0, 2400.0)
-                },
-                LoadCase {
-                    loads: vec![Load::given(Port::End, 0.2, 30.0)],
-                    enabled: false,
-                    ..LoadCase::fatigue(0.2, 30.0)
-                },
-            ],
-            reversed_bending: false,
-            stages: vec![
+        train: Train::chained(
+            vec![
                 Stage::spur(
                     PairStage {
                         gears: [
@@ -1341,9 +1329,28 @@ fn train_file_report(path: Option<&str>) {
                 Stage::worm(PairStage::worm()),
                 Stage::planetary(PlanetaryStage::default()),
             ],
-            couplings: Vec::new(),
-            constraints: Vec::new(),
-        },
+            // Both case kinds, both ends, both duties, every role: everything
+            // the document can carry for a load, so the round trip is asked
+            // of all of it.
+            vec![
+                LoadCase::ultimate(start, end, 2.0, 3000.0),
+                LoadCase::back_driving(start, end, 0.5),
+                LoadCase {
+                    duty: Duty::Continuous {
+                        runtime_hours: 1000.0,
+                    },
+                    ..LoadCase::fatigue(start, end, 2.0, 2400.0)
+                },
+                LoadCase {
+                    loads: vec![
+                        Load::given(end, 0.2, 30.0),
+                        Load::declared(start, LoadRole::Free),
+                    ],
+                    enabled: false,
+                    ..LoadCase::fatigue(start, end, 0.2, 30.0)
+                },
+            ],
+        ),
     };
 
     let text = match gear_io::train::to_toml(&doc) {
@@ -1386,13 +1393,12 @@ fn train_file_report(path: Option<&str>) {
     match (a, b) {
         (Ok(a), Ok(b)) => {
             println!("\n  quantity                 exported            re-imported   same");
-            let end = |r: &gear_core::train::TrainResult, t: &Train| -> (f64, f64) {
-                let b = t.boundaries().expect("boundaries");
+            let at_end = |r: &gear_core::train::TrainResult| -> (f64, f64) {
                 r.cases[0]
-                    .shaft(t.port_shaft(&b, Port::End))
+                    .shaft(end)
                     .map_or((0.0, 0.0), |s| (s.speed.unwrap_or(0.0), s.torque))
             };
-            let (a_end, b_end) = (end(&a, &doc.train), end(&b, &back.train));
+            let (a_end, b_end) = (at_end(&a), at_end(&b));
             let rows: [(&str, f64, f64); 5] = [
                 ("total ratio", or_nan(a.total_ratio), or_nan(b.total_ratio)),
                 ("output speed rpm", a_end.0, b_end.0),
@@ -1687,92 +1693,24 @@ fn epicyclic_shifts_report() {
 
 fn train_report(mode: Option<&str>) {
     use gear_core::params::Auto;
-    use gear_core::train::{solve_train, Duty, LoadCase, PairStage, Port, Stage, StageGear, Train};
+    use gear_core::train::{
+        solve_train, Duty, LoadCase, PairStage, ShaftRef, Stage, StageGear, Train,
+    };
 
     let lib = gear_io::default_library();
+    // Every mode's train is two stages, so its ends are the first stage's
+    // first gear and the second stage's second.
+    let (start, end) = (
+        ShaftRef::Of { stage: 0, shaft: 1 },
+        ShaftRef::Of { stage: 1, shaft: 2 },
+    );
     let auto_width = |teeth: u32| StageGear {
         teeth,
         face_width: Auto::automatic(0.0),
         ..StageGear::default()
     };
-    let train = Train {
-        // **Three trains, because a load from the far end has three regimes**
-        // and the corpus has to walk all of them. `train` reacts none of it;
-        // `train mixed` reacts a load the drive still outweighs; `train held` is
-        // the worm holding more than it is driving, which is what a self-locking
-        // worm is chosen to do and is the only regime in which the case from the
-        // end is the larger one.
-        //
-        // Every train this harness shipped set this to zero, so
-        // `tools/check_golden.sh` recorded a path nothing ever walked: a
-        // self-locking worm's wheel reported 2.2e307 N·m and an epicyclic set's
-        // ring 6 % low, and the corpus could not have shown either. Then the
-        // load it did walk was one the drive outweighed, so the corpus still
-        // could not show a stage rated at `η_forward` of what it was holding
-        // (`docs/corrections.md`).
-        //
-        // **`toggles` reverses the duty**, which is the switch that lets a
-        // reversed root reach a member at all — and holds a load from the end
-        // at the far port, the preset; every other mode declares the start
-        // free beside it, so the load is held only by a stage that locks —
-        // the other thing a case can be asked, and one the core answers by
-        // name.
-        load_cases: vec![
-            LoadCase::ultimate(2.0, 3000.0),
-            {
-                let torque = match mode {
-                    Some("held") => 400.0,
-                    Some("mixed") => 0.6,
-                    Some("toggles") => 5.0,
-                    _ => 0.0,
-                };
-                let mut case = LoadCase::back_driving(torque);
-                if mode != Some("toggles") {
-                    case.loads.push(gear_core::train::Load::declared(
-                        Port::Start,
-                        gear_core::train::LoadRole::Free,
-                    ));
-                }
-                case
-            },
-            LoadCase {
-                duty: if mode == Some("toggles") {
-                    Duty::Intermittent {
-                        range_degrees: 90.0,
-                        at: Port::End,
-                        actuations: 600_000,
-                        reversing: true,
-                    }
-                } else {
-                    Duty::Continuous {
-                        runtime_hours: 1000.0,
-                    }
-                },
-                ..LoadCase::fatigue(
-                    2.0,
-                    if mode == Some("toggles") {
-                        3000.0
-                    } else {
-                        2400.0
-                    },
-                )
-            },
-        ],
-        // **Every optional control, engaged.** The corpus turned three of a
-        // gear's eleven and left the rest at their defaults, so the constants
-        // behind them were outside the change detector: perturbing
-        // `REVERSED_BENDING_FRACTION` or the load-sharing ramp moved **no
-        // recorded output and no test**. That is the fault
-        // `docs/corrections.md` records of a back-driving load and of the
-        // optimiser, met a third time — *an opt-in the harness never switches on
-        // is a path the detector cannot see.*
-        //
-        // The helix is 30° so the **virtual** contact ratio passes 2, which is
-        // where the sharing ramp's own constants finally reach an answer: below
-        // it the governing point is the single-pair boundary, where the share is
-        // exactly one and the ramp is decorative.
-        reversed_bending: mode == Some("toggles"),
-        stages: if mode == Some("toggles") {
+    let mut train = Train::chained(
+        if mode == Some("toggles") {
             let toggled = |teeth: u32, undercut: bool, sharp: bool| StageGear {
                 teeth,
                 no_undercut: undercut,
@@ -1823,9 +1761,83 @@ fn train_report(mode: Option<&str>) {
                 ),
             ]
         },
-        couplings: Vec::new(),
-        constraints: Vec::new(),
-    };
+        // **Three trains, because a load from the far end has three regimes**
+        // and the corpus has to walk all of them. `train` reacts none of it;
+        // `train mixed` reacts a load the drive still outweighs; `train held` is
+        // the worm holding more than it is driving, which is what a self-locking
+        // worm is chosen to do and is the only regime in which the case from the
+        // end is the larger one.
+        //
+        // Every train this harness shipped set this to zero, so
+        // `tools/check_golden.sh` recorded a path nothing ever walked: a
+        // self-locking worm's wheel reported 2.2e307 N·m and an epicyclic set's
+        // ring 6 % low, and the corpus could not have shown either. Then the
+        // load it did walk was one the drive outweighed, so the corpus still
+        // could not show a stage rated at `η_forward` of what it was holding
+        // (`docs/corrections.md`).
+        //
+        // **`toggles` reverses the duty**, which is the switch that lets a
+        // reversed root reach a member at all — and holds a load from the end
+        // at the far port, the preset; every other mode declares the start
+        // free beside it, so the load is held only by a stage that locks —
+        // the other thing a case can be asked, and one the core answers by
+        // name.
+        vec![
+            LoadCase::ultimate(start, end, 2.0, 3000.0),
+            {
+                let torque = match mode {
+                    Some("held") => 400.0,
+                    Some("mixed") => 0.6,
+                    Some("toggles") => 5.0,
+                    _ => 0.0,
+                };
+                let mut case = LoadCase::back_driving(start, end, torque);
+                if mode != Some("toggles") {
+                    case.loads[1] =
+                        gear_core::train::Load::declared(start, gear_core::train::LoadRole::Free);
+                }
+                case
+            },
+            LoadCase {
+                duty: if mode == Some("toggles") {
+                    Duty::Intermittent {
+                        range_degrees: 90.0,
+                        at: end,
+                        actuations: 600_000,
+                        reversing: true,
+                    }
+                } else {
+                    Duty::Continuous {
+                        runtime_hours: 1000.0,
+                    }
+                },
+                ..LoadCase::fatigue(
+                    start,
+                    end,
+                    2.0,
+                    if mode == Some("toggles") {
+                        3000.0
+                    } else {
+                        2400.0
+                    },
+                )
+            },
+        ],
+    );
+    // **Every optional control, engaged.** The corpus turned three of a
+    // gear's eleven and left the rest at their defaults, so the constants
+    // behind them were outside the change detector: perturbing
+    // `REVERSED_BENDING_FRACTION` or the load-sharing ramp moved **no
+    // recorded output and no test**. That is the fault
+    // `docs/corrections.md` records of a back-driving load and of the
+    // optimiser, met a third time — *an opt-in the harness never switches on
+    // is a path the detector cannot see.*
+    //
+    // The helix is 30° so the **virtual** contact ratio passes 2, which is
+    // where the sharing ramp's own constants finally reach an answer: below
+    // it the governing point is the single-pair boundary, where the share is
+    // exactly one and the ramp is decorative.
+    train.reversed_bending = mode == Some("toggles");
 
     let r = match solve_train(&train, &lib) {
         Ok(r) => r,
@@ -1900,14 +1912,18 @@ fn print_train_cases(train: &gear_core::train::Train, r: &gear_core::train::Trai
             input
                 .loads
                 .iter()
-                .map(|l| format!(
-                    "{}{:.3} Nm / {}{:.0} rpm at {}",
-                    if l.torque.auto { "~" } else { "" },
-                    l.torque.manual,
-                    if l.speed.auto { "~" } else { "" },
-                    l.speed.manual,
-                    port(l.at)
-                ))
+                .map(|l| match l.role {
+                    gear_core::train::LoadRole::Load => format!(
+                        "{}{:.3} Nm / {}{:.0} rpm at {}",
+                        if l.torque.auto { "~" } else { "" },
+                        l.torque.manual,
+                        if l.speed.auto { "~" } else { "" },
+                        l.speed.manual,
+                        port(l.at)
+                    ),
+                    gear_core::train::LoadRole::Reacted => format!("reacted at {}", port(l.at)),
+                    gear_core::train::LoadRole::Free => format!("free at {}", port(l.at)),
+                })
                 .collect::<Vec<_>>()
                 .join(" + "),
             if c.solved { "" } else { "   (not solved)" }

@@ -1038,14 +1038,6 @@ pub struct Defaults {
     /// front of a reader rather than about the mathematics — so it crosses the
     /// boundary like the other three and the front end decides who sees it.
     pub hula_stage: gear_core::train::Stage,
-    /// One of each load case kind, for the "add load case" menu — and what a
-    /// train whose last case is removed is left with, as a stage is.
-    pub ultimate_case: gear_core::train::LoadCase,
-    pub fatigue_case: gear_core::train::LoadCase,
-    /// The duty a fatigue case starts with when switched to continuous —
-    /// the intermittent one is the fresh case's own. A number the panel seeds
-    /// is a number Rust decided, this one included.
-    pub continuous_duty: gear_core::train::Duty,
     /// The fraction a reversed root's fatigue bending allowable is taken at.
     ///
     /// Crosses so the control's own note can name it. It is
@@ -1148,34 +1140,31 @@ fn defaults_impl() -> Result<String, String> {
             reference_circles: true,
             eccentric_throw: 0.1,
         },
-        train: Train {
-            // The three loads a fresh train used to hold as fields: a peak at
-            // the start, held at the end; a load from the end, held still,
-            // with the start reacting it — through a stage that locks,
-            // nothing reaches the start; and a fatigue load a fifth of the peak — a running load rather than
-            // the stall the ultimate case is, so a fresh tab shows the two
-            // ratings answering different questions.
-            load_cases: vec![
-                LoadCase::ultimate(0.1, 30_000.0),
-                LoadCase::back_driving(3.0),
-                LoadCase::fatigue(0.02, 30_000.0),
-            ],
-            // Off, like every other correction this crate could apply and does
-            // not: a reversed root is disclosed rather than silently derated.
-            reversed_bending: false,
-            stages: vec![Stage::spur(spur.clone())],
-            couplings: Vec::new(),
-            constraints: Vec::new(),
+        train: {
+            // The three loads a fresh train used to hold as fields, between
+            // the pair's two gears: a peak at the first, reacted at the
+            // second; a load from the second, held still, with the first
+            // reacting it — through a stage that locks, nothing reaches it;
+            // and a fatigue load a fifth of the peak — a running load rather
+            // than the stall the ultimate case is, so a fresh tab shows the
+            // two ratings answering different questions.
+            let (input, output) = (
+                gear_core::train::ShaftRef::Of { stage: 0, shaft: 1 },
+                gear_core::train::ShaftRef::Of { stage: 0, shaft: 2 },
+            );
+            Train::chained(
+                vec![Stage::spur(spur.clone())],
+                vec![
+                    LoadCase::ultimate(input, output, 0.1, 30_000.0),
+                    LoadCase::back_driving(input, output, 3.0),
+                    LoadCase::fatigue(input, output, 0.02, 30_000.0),
+                ],
+            )
         },
         spur_stage: Stage::spur(spur),
         worm_stage: Stage::worm(worm),
         planetary_stage: Stage::planetary(planetary),
         hula_stage: Stage::hula(hula),
-        ultimate_case: LoadCase::ultimate(0.1, 30_000.0),
-        fatigue_case: LoadCase::fatigue(0.02, 30_000.0),
-        continuous_duty: gear_core::train::Duty::Continuous {
-            runtime_hours: 1000.0,
-        },
         reverse_loading_coefficient: gear_core::material::REVERSED_BENDING_FRACTION,
     };
     serde_json::to_string(&defaults).map_err(|e| format!("could not encode defaults: {e}"))
@@ -1502,13 +1491,86 @@ fn relieve_case_impl(input: &str) -> Result<String, String> {
     serde_json::to_string(case).map_err(|e| e.to_string())
 }
 
-/// **A train with one stage told what drives it and what it holds.**
+/// **A train's graph edited by the core's rules.**
 ///
-/// `{ train, stage, driven, held }` JSON in — the train as it stands, the
-/// stage by index, and two of its ports by local shaft — and the train out
-/// with that stage's constraints stated in full and, where the stage is in
-/// the middle of a chain, the chain moved to enter at `driven`.
+/// `{ train, edit }` JSON in — the train as it stands and one edit — and the
+/// train out. The edits are what a shaft's select and the panel's buttons
+/// mean, each a rule the core owns rather than the panel:
 ///
+/// - `{ "couple": { "a", "b" } }` — two shafts tied ([`Train::couple`]): a
+///   reaction a case declared at either becomes an inline take-off;
+/// - `{ "uncouple": at }` — a shaft released from every coupling;
+/// - `{ "hold": at }` — held to ground, and uncoupled, since a held shaft
+///   turns nothing;
+/// - `{ "release": at }` — neither held nor coupled, a hold its stage's
+///   convention puts on it written off;
+/// - `{ "push_stage": stage }` — appended and coupled onward from the last
+///   stage's open output, every case entry there carried to the new
+///   stage's output ([`Train::push_stage`]);
+/// - `{ "remove_stage": k }` — removed, everything naming a stage by index
+///   moved with the stages it belongs to ([`Train::remove_stage`]);
+/// - `{ "add_case": kind }` — a fresh case of that kind between the train's
+///   two ends ([`Train::fresh_case`]);
+/// - `{ "duty": { "case", "intermittent" } }` — a case's duty switched,
+///   seeded as a fresh case's is ([`Train::set_duty`]).
+///
+/// # Errors
+///
+/// A malformed request, which would be a defect on this side of the
+/// boundary.
+#[wasm_bindgen]
+pub fn edit_train(input: &str) -> Result<String, JsError> {
+    edit_train_impl(input).map_err(|e| JsError::new(&e))
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum TrainEdit {
+    Couple {
+        a: gear_core::train::ShaftRef,
+        b: gear_core::train::ShaftRef,
+    },
+    Uncouple(gear_core::train::ShaftRef),
+    Hold(gear_core::train::ShaftRef),
+    Release(gear_core::train::ShaftRef),
+    PushStage(gear_core::train::Stage),
+    RemoveStage(usize),
+    AddCase(gear_core::train::CaseKind),
+    Duty {
+        case: usize,
+        intermittent: bool,
+    },
+}
+
+#[derive(Deserialize)]
+struct EditRequest {
+    train: gear_core::train::Train,
+    edit: TrainEdit,
+}
+
+fn edit_train_impl(input: &str) -> Result<String, String> {
+    let EditRequest { mut train, edit } = serde_json::from_str(input).map_err(|e| e.to_string())?;
+    match edit {
+        TrainEdit::Couple { a, b } => train.couple(a, b),
+        TrainEdit::Uncouple(at) => train.uncouple(at),
+        TrainEdit::Hold(at) => train.hold(at),
+        TrainEdit::Release(at) => train.release(at),
+        TrainEdit::PushStage(stage) => train.push_stage(stage),
+        TrainEdit::RemoveStage(k) => train.remove_stage(k),
+        // The figures a fresh case starts at are the shipped train's.
+        TrainEdit::AddCase(kind) => {
+            let (torque, speed) = match kind {
+                gear_core::train::CaseKind::Ultimate => (0.1, 30_000.0),
+                gear_core::train::CaseKind::Fatigue => (0.02, 30_000.0),
+            };
+            let case = train.fresh_case(kind, torque, speed);
+            train.load_cases.push(case);
+        }
+        TrainEdit::Duty { case, intermittent } => train.set_duty(case, intermittent),
+    }
+    serde_json::to_string(&train).map_err(|e| e.to_string())
+}
+
 /// Version of the core, so the UI can show what it is actually running.
 #[wasm_bindgen]
 #[must_use]
@@ -1520,6 +1582,49 @@ pub fn version() -> String {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    /// **A chain of these stages as JSON**, with the three classic cases
+    /// written between its two ends by the core's own constructors — a
+    /// peak, a load from the far end held still, and a fatigue case — so a
+    /// fixture here says which shafts it loads the way a file does, and the
+    /// chain's couplings are listed rather than assumed.
+    fn train_json(
+        stages: &[serde_json::Value],
+        peak: (f64, f64),
+        back: f64,
+        fatigue: (f64, f64),
+        hours: f64,
+    ) -> serde_json::Value {
+        use gear_core::train::{Duty, LoadCase, Stage, Train};
+        let stages: Vec<Stage> = stages
+            .iter()
+            .map(|v| serde_json::from_value(v.clone()).expect("a stage"))
+            .collect();
+        let mut t = Train::chained(stages, Vec::new());
+        let (start, end) = t
+            .boundaries()
+            .ok()
+            .and_then(|b| t.ends(&b))
+            .expect("a chain fixture has two ends");
+        let continuous = Duty::Continuous {
+            runtime_hours: hours,
+        };
+        t.load_cases = vec![
+            LoadCase {
+                duty: continuous,
+                ..LoadCase::ultimate(start, end, peak.0, peak.1)
+            },
+            LoadCase {
+                duty: continuous,
+                ..LoadCase::back_driving(start, end, back)
+            },
+            LoadCase {
+                duty: continuous,
+                ..LoadCase::fatigue(start, end, fatigue.0, fatigue.1)
+            },
+        ];
+        serde_json::to_value(&t).expect("a train encodes")
+    }
 
     const REQ: &str = r#"{"params":{"module":1.0,"pressure_angle":20.0,"teeth":17,
         "profile_shift":0.2,"helix_angle":0.0,"addendum":1.0,"dedendum":1.25,
@@ -1556,14 +1661,7 @@ mod tests {
             serde_json::json!({"auto": false, "manual": 0.0});
 
         let train = serde_json::json!({
-            "train": {
-                "load_cases": [
-                { "kind": "ultimate", "enabled": true, "loads": [{ "at": "start", "torque": { "auto": false, "manual": 1.0 }, "speed": { "auto": false, "manual": 1000.0 } }], "duty": { "continuous": { "runtime_hours": 1.0 } } },
-                { "kind": "ultimate", "enabled": true, "loads": [{ "at": "end", "torque": { "auto": false, "manual": 0.0 }, "speed": { "auto": false, "manual": 0.0 } }], "duty": { "continuous": { "runtime_hours": 1.0 } } },
-                { "kind": "fatigue", "enabled": true, "loads": [{ "at": "start", "torque": { "auto": false, "manual": 0.0 }, "speed": { "auto": false, "manual": 1000.0 } }], "duty": { "continuous": { "runtime_hours": 1.0 } } }
-            ],
-                "stages": [stage],
-            },
+            "train": train_json(&[stage], (1.0, 1000.0), 0.0, (0.0, 1000.0), 1.0),
             "materials": null
         });
         let solved: serde_json::Value =
@@ -1614,18 +1712,17 @@ mod tests {
             c["distances"][0]["angle"] = serde_json::json!(90.0);
             c
         };
+        // Every preset, and a crossed pair too — which is a spur stage with
+        // its shafts at an angle, not a preset of its own.
         let document = serde_json::json!({
             "name": "Elevation drive",
-            "train": {
-                "load_cases": [
-                { "kind": "ultimate", "enabled": true, "loads": [{ "at": "start", "torque": { "auto": false, "manual": 0.25 }, "speed": { "auto": false, "manual": 12_000.0 } }], "duty": { "continuous": { "runtime_hours": 1000.0 } } },
-                { "kind": "ultimate", "enabled": true, "loads": [{ "at": "end", "torque": { "auto": false, "manual": 0.1 }, "speed": { "auto": false, "manual": 0.0 } }], "duty": { "continuous": { "runtime_hours": 1000.0 } } },
-                { "kind": "fatigue", "enabled": true, "loads": [{ "at": "start", "torque": { "auto": false, "manual": 0.2 }, "speed": { "auto": false, "manual": 9600.0 } }], "duty": { "continuous": { "runtime_hours": 1000.0 } } }
-            ],
-                // Every preset, and a crossed pair too — which is a spur
-                // stage with its shafts at an angle, not a preset of its own.
-                "stages": [d["spur_stage"], crossed, d["worm_stage"], d["planetary_stage"]],
-            }
+            "train": train_json(
+                &[d["spur_stage"].clone(), crossed, d["worm_stage"].clone(), d["planetary_stage"].clone()],
+                (0.25, 12_000.0),
+                0.1,
+                (0.2, 9600.0),
+                1000.0,
+            )
         });
 
         let toml_text = export_train_impl(&document.to_string()).unwrap();
@@ -1664,9 +1761,9 @@ mod tests {
         let empty = serde_json::json!({
             "name": "no stages",
             "train": { "load_cases": [
-                { "kind": "ultimate", "enabled": true, "loads": [{ "at": "start", "torque": { "auto": false, "manual": 1.0 }, "speed": { "auto": false, "manual": 1.0 } }], "duty": { "intermittent": { "range_degrees": 25.0, "at": "end", "actuations": 10, "reversing": false } } },
-                { "kind": "ultimate", "enabled": true, "loads": [{ "at": "end", "torque": { "auto": false, "manual": 0.0 }, "speed": { "auto": false, "manual": 0.0 } }], "duty": { "intermittent": { "range_degrees": 25.0, "at": "end", "actuations": 10, "reversing": false } } },
-                { "kind": "fatigue", "enabled": true, "loads": [{ "at": "start", "torque": { "auto": false, "manual": 1.0 }, "speed": { "auto": false, "manual": 1.0 } }], "duty": { "intermittent": { "range_degrees": 25.0, "at": "end", "actuations": 10, "reversing": false } } }
+                { "kind": "ultimate", "enabled": true, "loads": [{ "at": { "kind": "of", "stage": 0, "shaft": 1 }, "torque": { "auto": false, "manual": 1.0 }, "speed": { "auto": false, "manual": 1.0 } }], "duty": { "intermittent": { "range_degrees": 25.0, "at": { "kind": "of", "stage": 0, "shaft": 2 }, "actuations": 10, "reversing": false } } },
+                { "kind": "ultimate", "enabled": true, "loads": [{ "at": { "kind": "of", "stage": 0, "shaft": 2 }, "torque": { "auto": false, "manual": 0.0 }, "speed": { "auto": false, "manual": 0.0 } }], "duty": { "intermittent": { "range_degrees": 25.0, "at": { "kind": "of", "stage": 0, "shaft": 2 }, "actuations": 10, "reversing": false } } },
+                { "kind": "fatigue", "enabled": true, "loads": [{ "at": { "kind": "of", "stage": 0, "shaft": 1 }, "torque": { "auto": false, "manual": 1.0 }, "speed": { "auto": false, "manual": 1.0 } }], "duty": { "intermittent": { "range_degrees": 25.0, "at": { "kind": "of", "stage": 0, "shaft": 2 }, "actuations": 10, "reversing": false } } }
             ],
                        "stages": [] }
         });
@@ -2175,21 +2272,14 @@ mod tests {
         set["members"][1]["gear"]["teeth"] = 18.into();
         set["members"][2]["gear"]["teeth"] = 60.into();
         set["distances"][0]["clearance"] = serde_json::json!({"auto": false, "manual": 0.02});
-        // **The arrangement is the train's**, as two constraints on the set's
-        // shafts — sun (1) driven, ring (3) held. The set carries none of its
-        // own.
-        let req = serde_json::json!({"train": {
-            "constraints": [
-                { "at": { "kind": "of", "stage": 0, "shaft": 1 }, "constraint": "driven" },
-                { "at": { "kind": "of", "stage": 0, "shaft": 3 }, "constraint": "held" }
-            ],
-            "load_cases": [
-                { "kind": "ultimate", "enabled": true, "loads": [{ "at": "start", "torque": { "auto": false, "manual": 2.0 }, "speed": { "auto": false, "manual": 3000.0 } }], "duty": { "continuous": { "runtime_hours": 1000.0 } } },
-                { "kind": "ultimate", "enabled": true, "loads": [{ "at": "end", "torque": { "auto": false, "manual": 0.0 }, "speed": { "auto": false, "manual": 0.0 } }], "duty": { "continuous": { "runtime_hours": 1000.0 } } },
-                { "kind": "fatigue", "enabled": true, "loads": [{ "at": "start", "torque": { "auto": false, "manual": 1.6 }, "speed": { "auto": false, "manual": 2400.0 } }], "duty": { "continuous": { "runtime_hours": 1000.0 } } }
-            ],
-            "stages": [set]
-        }});
+        // **The arrangement is the train's**: a hold on the set's ring (3),
+        // written in so many words, and the loads between its sun and its
+        // carrier. The set carries none of its own.
+        let mut train = train_json(&[set], (2.0, 3000.0), 0.0, (1.6, 2400.0), 1000.0);
+        train["constraints"] = serde_json::json!([
+            { "at": { "kind": "of", "stage": 0, "shaft": 3 }, "constraint": "held" }
+        ]);
+        let req = serde_json::json!({ "train": train });
 
         let v = solved(&req.to_string());
         let stage = &v["stages"][0];
@@ -2298,14 +2388,9 @@ mod tests {
     #[test]
     fn a_hula_stage_crosses_the_boundary_carrying_its_ratings() {
         let d: serde_json::Value = serde_json::from_str(&defaults_impl().unwrap()).unwrap();
-        let train = serde_json::json!({"train": {
-            "load_cases": [
-                { "kind": "ultimate", "enabled": true, "loads": [{ "at": "start", "torque": { "auto": false, "manual": 2.0 }, "speed": { "auto": false, "manual": 3000.0 } }], "duty": { "continuous": { "runtime_hours": 1.0 } } },
-                { "kind": "ultimate", "enabled": true, "loads": [{ "at": "end", "torque": { "auto": false, "manual": 0.0 }, "speed": { "auto": false, "manual": 0.0 } }], "duty": { "continuous": { "runtime_hours": 1.0 } } },
-                { "kind": "fatigue", "enabled": true, "loads": [{ "at": "start", "torque": { "auto": false, "manual": 1.0 }, "speed": { "auto": false, "manual": 3000.0 } }], "duty": { "continuous": { "runtime_hours": 1.0 } } }
-            ],
-            "stages": [d["hula_stage"]],
-        }});
+        let train = serde_json::json!({
+            "train": train_json(&[d["hula_stage"].clone()], (2.0, 3000.0), 0.0, (1.0, 3000.0), 1.0)
+        });
         let v = solved(&train.to_string());
         let stage = &v["stages"][0];
         assert_eq!(stage["kind"], "shape");
@@ -2380,14 +2465,9 @@ mod tests {
         worm["members"][1]["gear"]["teeth"] = 40.into();
         worm["members"][0]["pitch_diameter"] = serde_json::json!({"auto": false, "manual": 7.0});
         worm["distances"][0]["clearance"] = serde_json::json!({"auto": false, "manual": 0.02});
-        let req = serde_json::json!({"train": {
-            "load_cases": [
-                { "kind": "ultimate", "enabled": true, "loads": [{ "at": "start", "torque": { "auto": false, "manual": 2.0 }, "speed": { "auto": false, "manual": 3000.0 } }], "duty": { "continuous": { "runtime_hours": 1000.0 } } },
-                { "kind": "ultimate", "enabled": true, "loads": [{ "at": "end", "torque": { "auto": false, "manual": 0.0 }, "speed": { "auto": false, "manual": 0.0 } }], "duty": { "continuous": { "runtime_hours": 1000.0 } } },
-                { "kind": "fatigue", "enabled": true, "loads": [{ "at": "start", "torque": { "auto": false, "manual": 1.6 }, "speed": { "auto": false, "manual": 2400.0 } }], "duty": { "continuous": { "runtime_hours": 1000.0 } } }
-            ],
-            "stages": [spur, worm]
-        }});
+        let req = serde_json::json!({
+            "train": train_json(&[spur, worm], (2.0, 3000.0), 0.0, (1.6, 2400.0), 1000.0)
+        });
 
         let v = solved(&req.to_string());
         let want = (43.0 / 17.0) * 40.0;
@@ -2600,30 +2680,37 @@ mod tests {
         assert_eq!(d["gear"]["reference_circles"], true);
 
         // A fresh train: a small motor, and no derating nobody asked for —
-        // the three cases a train used to hold as fields, in that order.
+        // the three cases a train used to hold as fields, in that order,
+        // each between the pair's two gears with the far one declared.
+        let (first, second) = (
+            serde_json::json!({ "kind": "of", "stage": 0, "shaft": 1 }),
+            serde_json::json!({ "kind": "of", "stage": 0, "shaft": 2 }),
+        );
         let cases = d["train"]["load_cases"].as_array().unwrap();
         assert_eq!(cases.len(), 3);
         assert_eq!(cases[0]["kind"], "ultimate");
-        assert_eq!(cases[0]["loads"][0]["at"], "start");
+        assert_eq!(cases[0]["loads"][0]["at"], first);
+        assert_eq!(cases[0]["loads"][0]["role"], "load");
         assert_eq!(cases[0]["loads"][0]["speed"]["manual"], 30_000.0);
         assert_eq!(cases[0]["loads"][0]["torque"]["manual"], 0.1);
-        assert_eq!(cases[0]["loads"].as_array().unwrap().len(), 1);
-        // A load from the end, held still, with the start reacted: one load.
+        assert_eq!(cases[0]["loads"][1]["at"], second);
+        assert_eq!(cases[0]["loads"][1]["role"], "reacted");
+        assert_eq!(cases[0]["loads"].as_array().unwrap().len(), 2);
+        // A load from the second gear, held still, with the first reacted.
         assert_eq!(cases[1]["kind"], "ultimate");
-        assert_eq!(cases[1]["loads"][0]["at"], "end");
+        assert_eq!(cases[1]["loads"][0]["at"], second);
         assert_eq!(cases[1]["loads"][0]["torque"]["manual"], 3.0);
         assert_eq!(cases[1]["loads"][0]["speed"]["manual"], 0.0);
-        assert_eq!(cases[1]["loads"].as_array().unwrap().len(), 1);
+        assert_eq!(cases[1]["loads"][1]["at"], first);
+        assert_eq!(cases[1]["loads"][1]["role"], "reacted");
         assert_eq!(cases[2]["kind"], "fatigue");
         assert_eq!(cases[2]["loads"][0]["torque"]["manual"], 0.02);
-        assert_eq!(cases[2]["duty"]["intermittent"]["at"], "end");
+        assert_eq!(cases[2]["duty"]["intermittent"]["at"], second);
         for c in cases {
             assert_eq!(c["enabled"], true);
         }
-        // ...and the two a picker adds, which are the first and last of them.
-        assert_eq!(d["ultimate_case"], cases[0]);
-        assert_eq!(d["fatigue_case"], cases[2]);
-        assert_eq!(d["continuous_duty"]["continuous"]["runtime_hours"], 1000.0);
+        // ...and a one-stage train has no coupling to list.
+        assert_eq!(d["train"]["couplings"].as_array().unwrap().len(), 0);
         assert_eq!(d["train"]["reversed_bending"], false);
 
         // **The face width a panel seeds, on every gear of every preset it
@@ -2689,14 +2776,9 @@ mod tests {
         stages.push(bare);
 
         for (i, stage) in stages.iter().enumerate() {
-            let train = serde_json::json!({ "train": {
-                "load_cases": [
-                { "kind": "ultimate", "enabled": true, "loads": [{ "at": "start", "torque": { "auto": false, "manual": 2.0 }, "speed": { "auto": false, "manual": 3000.0 } }], "duty": { "continuous": { "runtime_hours": 1.0 } } },
-                { "kind": "ultimate", "enabled": true, "loads": [{ "at": "end", "torque": { "auto": false, "manual": 0.0 }, "speed": { "auto": false, "manual": 0.0 } }], "duty": { "continuous": { "runtime_hours": 1.0 } } },
-                { "kind": "fatigue", "enabled": true, "loads": [{ "at": "start", "torque": { "auto": false, "manual": 1.0 }, "speed": { "auto": false, "manual": 3000.0 } }], "duty": { "continuous": { "runtime_hours": 1.0 } } }
-            ],
-                "stages": [stage],
-            }});
+            let train = serde_json::json!({
+                "train": train_json(std::slice::from_ref(stage), (2.0, 3000.0), 0.0, (1.0, 3000.0), 1.0)
+            });
             let v = solved(&train.to_string());
             let bad = nulls(&v, &format!("stage{i}"));
             assert!(
@@ -2760,14 +2842,9 @@ mod tests {
         spur["members"][0]["gear"]["teeth"] = 17.into();
         spur["members"][1]["gear"]["teeth"] = 43.into();
         spur["distances"][0]["clearance"] = serde_json::json!({"auto": false, "manual": 0.02});
-        let req = serde_json::json!({"train": {
-            "load_cases": [
-                { "kind": "ultimate", "enabled": true, "loads": [{ "at": "start", "torque": { "auto": false, "manual": 2.0 }, "speed": { "auto": false, "manual": 3000.0 } }], "duty": { "continuous": { "runtime_hours": 1000.0 } } },
-                { "kind": "ultimate", "enabled": true, "loads": [{ "at": "end", "torque": { "auto": false, "manual": 0.0 }, "speed": { "auto": false, "manual": 0.0 } }], "duty": { "continuous": { "runtime_hours": 1000.0 } } },
-                { "kind": "fatigue", "enabled": true, "loads": [{ "at": "start", "torque": { "auto": false, "manual": 1.6 }, "speed": { "auto": false, "manual": 2400.0 } }], "duty": { "continuous": { "runtime_hours": 1000.0 } } }
-            ],
-            "stages": [spur]
-        }});
+        let req = serde_json::json!({
+            "train": train_json(&[spur], (2.0, 3000.0), 0.0, (1.6, 2400.0), 1000.0)
+        });
 
         let v = solved(&req.to_string());
         // **Negative**, because an external pair reverses and a train's ratio
@@ -2825,9 +2902,9 @@ mod tests {
     #[test]
     fn a_train_that_cannot_be_solved_says_why() {
         let bad = r#"{"train":{"load_cases": [
-                { "kind": "ultimate", "enabled": true, "loads": [{ "at": "start", "torque": { "auto": false, "manual": 1.0 }, "speed": { "auto": false, "manual": 1.0 } }], "duty": { "intermittent": { "range_degrees": 25.0, "at": "end", "actuations": 1000, "reversing": false } } },
-                { "kind": "ultimate", "enabled": true, "loads": [{ "at": "end", "torque": { "auto": false, "manual": 0.0 }, "speed": { "auto": false, "manual": 0.0 } }], "duty": { "intermittent": { "range_degrees": 25.0, "at": "end", "actuations": 1000, "reversing": false } } },
-                { "kind": "fatigue", "enabled": true, "loads": [{ "at": "start", "torque": { "auto": false, "manual": 1.0 }, "speed": { "auto": false, "manual": 1.0 } }], "duty": { "intermittent": { "range_degrees": 25.0, "at": "end", "actuations": 1000, "reversing": false } } }
+                { "kind": "ultimate", "enabled": true, "loads": [{ "at": { "kind": "of", "stage": 0, "shaft": 1 }, "torque": { "auto": false, "manual": 1.0 }, "speed": { "auto": false, "manual": 1.0 } }], "duty": { "intermittent": { "range_degrees": 25.0, "at": { "kind": "of", "stage": 0, "shaft": 2 }, "actuations": 1000, "reversing": false } } },
+                { "kind": "ultimate", "enabled": true, "loads": [{ "at": { "kind": "of", "stage": 0, "shaft": 2 }, "torque": { "auto": false, "manual": 0.0 }, "speed": { "auto": false, "manual": 0.0 } }], "duty": { "intermittent": { "range_degrees": 25.0, "at": { "kind": "of", "stage": 0, "shaft": 2 }, "actuations": 1000, "reversing": false } } },
+                { "kind": "fatigue", "enabled": true, "loads": [{ "at": { "kind": "of", "stage": 0, "shaft": 1 }, "torque": { "auto": false, "manual": 1.0 }, "speed": { "auto": false, "manual": 1.0 } }], "duty": { "intermittent": { "range_degrees": 25.0, "at": { "kind": "of", "stage": 0, "shaft": 2 }, "actuations": 1000, "reversing": false } } }
             ],
             "stages":[]}}"#;
         let v: serde_json::Value = serde_json::from_str(&solve_train_impl(bad).unwrap()).unwrap();

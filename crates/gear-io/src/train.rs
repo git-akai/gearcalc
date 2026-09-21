@@ -153,9 +153,16 @@
 //!   than the train can honour is relieved on the way in, as a stage is.
 //! - **A load carries a `role`**: `"load"`, `"reacted"` or `"free"`, absent
 //!   meaning `"load"`, so a file written before it reads as it did. A port
-//!   the case does not mention keeps its default — the chain's ends
-//!   reacted, every other port free — and an entry says otherwise, its
+//!   the case does not mention is free, and an entry says otherwise, its
 //!   figures kept while it is not a load.
+//! - **A port is a shaft, and a train lists its couplings.** `"start"` and
+//!   `"end"` are gone: a load's `at` and a duty's `at` are a shaft by
+//!   reference, `{ kind = "of", stage, shaft }`, and a file that writes a
+//!   name is refused. `"driven"` is gone from the constraints — a
+//!   constraint is `"held"` or `"free"`, and what drives is a load. And a
+//!   file lists every coupling it has: a chain that listed none used to be
+//!   coupled by a rule on the way in, and is a train of isolated stages now,
+//!   each its own body, until it says which shaft turns which.
 //!
 //! No compatibility shim, deliberately. Accepting both shapes means carrying two
 //! readers for one format and testing both forever, and the thing that would go
@@ -311,51 +318,50 @@ mod tests {
     use super::*;
     use gear_core::params::Auto;
     use gear_core::train::{
-        Constraint, Coupling, Duty, HulaStage, Load, LoadCase, PairStage, PlanetaryStage, Port,
+        Constraint, Coupling, Duty, HulaStage, Load, LoadCase, LoadRole, PairStage, PlanetaryStage,
         ShaftConstraint, ShaftRef, Stage,
     };
 
     /// One of every preset, so the `kind` tag and every preset's layout are
     /// exercised in both directions and none can quietly stop round-tripping.
     fn document() -> TrainDocument {
+        let (start, end) = (
+            ShaftRef::Of { stage: 0, shaft: 1 },
+            ShaftRef::Of { stage: 4, shaft: 4 },
+        );
         TrainDocument {
             name: "Test train".into(),
             train: Train {
                 // One of every preset at every port, and both duties, so the
                 // tags and the nested tables are exercised in both directions.
                 load_cases: vec![
-                    LoadCase::ultimate(0.25, 12_000.0),
+                    LoadCase::ultimate(start, end, 0.25, 12_000.0),
                     LoadCase {
                         enabled: false,
-                        ..LoadCase::back_driving(0.1)
+                        ..LoadCase::back_driving(start, end, 0.1)
                     },
                     LoadCase {
                         duty: Duty::Continuous {
                             runtime_hours: 1000.0,
                         },
-                        ..LoadCase::fatigue(0.2, 9600.0)
+                        ..LoadCase::fatigue(start, end, 0.2, 9600.0)
                     },
-                    LoadCase {
-                        loads: vec![Load::given(Port::End, 0.05, 100.0)],
-                        ..LoadCase::fatigue(0.05, 100.0)
-                    },
-                    // ...and one written at a shaft by reference — the
-                    // hula stage's output gear, which is also `end` — so the
-                    // third spelling of a port round-trips.
+                    // ...and every role an entry can carry — a load with a
+                    // derived figure, a reaction and a free port — so each
+                    // spelling round-trips.
                     LoadCase {
                         loads: vec![
-                            Load::given(Port::At(ShaftRef::Of { stage: 4, shaft: 4 }), 0.05, 100.0),
-                            // ...and a derived load beside it, so an
-                            // `{ auto, manual }` on a load round-trips too.
-                            Load::derived(Port::Start),
+                            Load::given(end, 0.05, 100.0),
+                            Load::derived(start),
+                            Load::declared(ShaftRef::Of { stage: 3, shaft: 3 }, LoadRole::Free),
                         ],
                         duty: Duty::Intermittent {
                             range_degrees: 90.0,
-                            at: Port::At(ShaftRef::Of { stage: 0, shaft: 1 }),
+                            at: start,
                             actuations: 50,
                             reversing: true,
                         },
-                        ..LoadCase::fatigue(0.05, 100.0)
+                        ..LoadCase::fatigue(start, end, 0.05, 100.0)
                     },
                 ],
                 reversed_bending: false,
@@ -390,7 +396,6 @@ mod tests {
                         at: ShaftRef::Of { stage: 3, shaft: 3 },
                         constraint: Constraint::Free,
                     },
-                    ShaftConstraint::driven(0, 1),
                 ],
             },
         }
@@ -433,13 +438,14 @@ mod tests {
         assert!(text.contains("Inputs only"));
         assert!(text.contains("name = \"Test train\""));
         // One tag a stage, one a load case — and one on each end of a
-        // coupling, on each constraint's shaft, and on each port a load case
-        // names by reference, since a `ShaftRef` says which kind of place it
-        // names.
+        // coupling, on each constraint's shaft, and on every shaft a case
+        // names, at each of its entries and at its duty's sweep, since a
+        // `ShaftRef` says which kind of place it names: the four cases name
+        // 2 + 1, 2 + 1, 2 and 3 + 1.
         assert_eq!(
             text.matches("kind = ").count(),
-            5 + 5 + 2 + 3 + 2,
-            "one tag a stage, a load case, a coupling end, a constraint and a named port:\n{text}"
+            5 + 4 + 2 + 2 + 12,
+            "one tag a stage, a load case, a coupling end, a constraint and a named shaft:\n{text}"
         );
         for kind in ["shape", "ultimate", "fatigue"] {
             assert!(text.contains(&format!("kind = \"{kind}\"")), "no {kind}");
@@ -592,13 +598,12 @@ mod tests {
         doc.train.couplings.clear();
         doc.train.constraints.clear();
         doc.train.load_cases.truncate(1);
-        doc.train.load_cases[0]
-            .loads
-            .push(gear_core::train::Load::given(
-                gear_core::train::Port::End,
-                1.0,
-                100.0,
-            ));
+        // The reaction at the pair's second gear made a load with both
+        // figures given.
+        doc.train.load_cases[0].loads = vec![
+            gear_core::train::Load::given(ShaftRef::Of { stage: 0, shaft: 1 }, 0.25, 12_000.0),
+            gear_core::train::Load::given(ShaftRef::Of { stage: 0, shaft: 2 }, 1.0, 100.0),
+        ];
         let back = from_toml(&to_toml(&doc).unwrap()).unwrap();
         assert!(back.adjusted);
         let loads = &back.document.train.load_cases[0].loads;

@@ -117,32 +117,53 @@ const out = {
       return [k, JSON.parse(w.adopt_member(JSON.stringify({ train, materials: library, stage: 0, member })))];
     }),
   ),
-  // The default train, and the same train with a set behind its pair whose
-  // first load case is written **at the set's carrier** rather than at `end`
-  // — one shaft, two spellings, and the recording holds both so a payload
-  // that reads the named one differently shows here.
+  // **The train's graph edited by the core's rules**, each edit recorded:
+  // a set pushed behind the default pair and coupled onward, its cases
+  // carried to the new end; the set's carrier held, which uncouples it, and
+  // released again; the pair's output coupled to the set's ring instead,
+  // and uncoupled; and a case of each kind added between the ends.
+  edit_train: call("edit_train", () => {
+    const edit = (train, e) => JSON.parse(w.edit_train(JSON.stringify({ train, edit: e })));
+    const of = (stage, shaft) => ({ kind: "of", stage, shaft });
+    let t = edit(structuredClone(defaults.train), { push_stage: structuredClone(defaults.planetary_stage) });
+    const out = [["push_stage", structuredClone(t)]];
+    t = edit(t, { hold: of(1, 2) });
+    out.push(["hold", structuredClone(t)]);
+    t = edit(t, { release: of(1, 2) });
+    out.push(["release", structuredClone(t)]);
+    t = edit(t, { couple: { a: of(0, 2), b: of(1, 3) } });
+    out.push(["couple", structuredClone(t)]);
+    t = edit(t, { uncouple: of(1, 3) });
+    out.push(["uncouple", structuredClone(t)]);
+    t = edit(t, { add_case: "ultimate" });
+    t = edit(t, { add_case: "fatigue" });
+    out.push(["add_case", structuredClone(t)]);
+    t = edit(t, { duty: { case: 4, intermittent: false } });
+    t = edit(t, { duty: { case: 2, intermittent: true } });
+    out.push(["duty", t]);
+    return out;
+  }),
+  // The default train, and the same train with a set pushed behind its pair
+  // by the core — a chain of two, its cases at the set's carrier.
   solve_train: call("solve_train", () => {
     const t = structuredClone(defaults.train);
-    const named = { ...t, stages: [t.stages[0], structuredClone(defaults.planetary_stage)] };
-    named.load_cases = t.load_cases.map((c, i) =>
-      i === 0
-        ? { ...c, loads: c.loads.map((l) => ({ ...l, at: { at: { kind: "of", stage: 1, shaft: 2 } } })) }
-        : c,
+    const chained = JSON.parse(
+      w.edit_train(JSON.stringify({ train: t, edit: { push_stage: structuredClone(defaults.planetary_stage) } })),
     );
     return [
       ["default", JSON.parse(w.solve_train(JSON.stringify({ train: t, library })))],
-      ["named", JSON.parse(w.solve_train(JSON.stringify({ train: named, library })))],
+      ["chained", JSON.parse(w.solve_train(JSON.stringify({ train: chained, library })))],
     ];
   }),
-  // **Over-determined on purpose**: the default train's first case given a
-  // second load at its end with both figures given — two speeds on one
-  // degree of freedom — and the end's speed declared the one just touched,
-  // so the answer is the relief (the start's speed derived, seeded from what
-  // the case comes to) rather than a case that needed none.
+  // **Over-determined on purpose**: the default train's first case with its
+  // reaction at the second gear made a load with both figures given — two
+  // speeds on one degree of freedom — and that speed declared the one just
+  // touched, so the answer is the relief (the first gear's speed derived,
+  // seeded from what the case comes to) rather than a case that needed none.
   relieve_case: call("relieve_case", () => {
     const train = structuredClone(defaults.train);
     const given = (v) => ({ auto: false, manual: v });
-    train.load_cases[0].loads.push({ at: "end", torque: given(1), speed: given(100) });
+    train.load_cases[0].loads[1] = { at: { kind: "of", stage: 0, shaft: 2 }, role: "load", torque: given(1), speed: given(100) };
     const just = { load: 1, which: "speed" };
     return JSON.parse(w.relieve_case(JSON.stringify({ train, library, case: 0, just })));
   }),

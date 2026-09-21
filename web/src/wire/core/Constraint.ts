@@ -10,4 +10,4 @@
  * differential's two inputs turning alike, and the family the solve returns
  * says what the other members do per turn of each.
  */
-export type Constraint = "held" | "driven" | "free";
+export type Constraint = "held" | "free";

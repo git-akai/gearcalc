@@ -1145,27 +1145,30 @@ mod tests {
         // through the geometry — the case has to be live, not merely
         // constructible.
         {
-            use gear_core::train::{LoadCase, PairStage, Stage, Train};
-            let train = |stages| Train {
-                load_cases: vec![
-                    LoadCase::ultimate(2.0, 3000.0),
-                    // A load from the end that nothing is asked to hold: the
-                    // start declared free beside it.
-                    LoadCase {
-                        loads: vec![
-                            gear_core::train::Load::given(gear_core::train::Port::End, 5.0, 0.0),
-                            gear_core::train::Load::declared(
-                                gear_core::train::Port::Start,
-                                gear_core::train::LoadRole::Free,
-                            ),
-                        ],
-                        ..LoadCase::back_driving(5.0)
-                    },
-                ],
-                reversed_bending: false,
-                stages,
-                couplings: Vec::new(),
-                constraints: Vec::new(),
+            use gear_core::train::{LoadCase, PairStage, ShaftRef, Stage, Train};
+            let (start, end) = (
+                ShaftRef::Of { stage: 0, shaft: 1 },
+                ShaftRef::Of { stage: 0, shaft: 2 },
+            );
+            let train = |stages| {
+                Train::chained(
+                    stages,
+                    vec![
+                        LoadCase::ultimate(start, end, 2.0, 3000.0),
+                        // A load from the end that nothing is asked to hold:
+                        // the start declared free beside it.
+                        LoadCase {
+                            loads: vec![
+                                gear_core::train::Load::given(end, 5.0, 0.0),
+                                gear_core::train::Load::declared(
+                                    start,
+                                    gear_core::train::LoadRole::Free,
+                                ),
+                            ],
+                            ..LoadCase::back_driving(start, end, 5.0)
+                        },
+                    ],
+                )
             };
             // A load nothing reacts...
             if let Ok(r) =
@@ -1190,25 +1193,31 @@ mod tests {
             // so no load does any work and nothing drives.
             {
                 use gear_core::params::Auto;
-                use gear_core::train::{Load, Port};
+                use gear_core::train::{Load, LoadRole};
                 let mut t = train(vec![Stage::spur(PairStage::default())]);
                 t.load_cases = vec![
                     LoadCase {
                         loads: Vec::new(),
-                        ..LoadCase::ultimate(2.0, 3000.0)
+                        ..LoadCase::ultimate(start, end, 2.0, 3000.0)
                     },
                     LoadCase {
-                        loads: vec![Load {
-                            at: Port::Start,
-                            role: gear_core::train::LoadRole::Load,
-                            torque: Auto::fixed(2.0),
-                            speed: Auto::automatic(0.0),
-                        }],
-                        ..LoadCase::ultimate(2.0, 3000.0)
+                        loads: vec![
+                            Load {
+                                at: start,
+                                role: LoadRole::Load,
+                                torque: Auto::fixed(2.0),
+                                speed: Auto::automatic(0.0),
+                            },
+                            Load::declared(end, LoadRole::Reacted),
+                        ],
+                        ..LoadCase::ultimate(start, end, 2.0, 3000.0)
                     },
                     LoadCase {
-                        loads: vec![Load::given(Port::Start, 0.0, 3000.0)],
-                        ..LoadCase::ultimate(2.0, 3000.0)
+                        loads: vec![
+                            Load::given(start, 0.0, 3000.0),
+                            Load::declared(end, LoadRole::Reacted),
+                        ],
+                        ..LoadCase::ultimate(start, end, 2.0, 3000.0)
                     },
                 ];
                 if let Ok(r) = gear_core::train::solve_train(&t, &lib) {
@@ -1430,13 +1439,15 @@ mod tests {
             err(TrainError::UnknownMaterial("nothing by that name".into()).note());
             err(TrainError::NoRootSection.note());
             if let Err(e) = gear_core::train::solve_train(
-                &Train {
-                    load_cases: vec![gear_core::train::LoadCase::ultimate(2.0, 3000.0)],
-                    reversed_bending: false,
-                    stages: Vec::new(),
-                    couplings: Vec::new(),
-                    constraints: Vec::new(),
-                },
+                &Train::chained(
+                    Vec::new(),
+                    vec![gear_core::train::LoadCase::ultimate(
+                        gear_core::train::ShaftRef::Ground,
+                        gear_core::train::ShaftRef::Ground,
+                        2.0,
+                        3000.0,
+                    )],
+                ),
                 &lib,
             ) {
                 err(e.note());
@@ -1446,24 +1457,30 @@ mod tests {
             // on a two-pair chain: a load on the held ground, and a load on
             // the shaft the two pairs share.
             {
-                use gear_core::train::{LoadCase, PairStage, Port, ShaftRef, Stage, Train};
-                let at = |port| Train {
-                    load_cases: vec![LoadCase {
-                        loads: vec![gear_core::train::Load::given(port, 2.0, 3000.0)],
-                        ..LoadCase::ultimate(2.0, 3000.0)
-                    }],
-                    reversed_bending: false,
-                    stages: vec![
-                        Stage::spur(PairStage::default()),
-                        Stage::spur(PairStage::default()),
-                    ],
-                    couplings: Vec::new(),
-                    constraints: Vec::new(),
+                use gear_core::train::{
+                    Load, LoadCase, LoadRole, PairStage, ShaftRef, Stage, Train,
                 };
-                for port in [
-                    Port::At(ShaftRef::Ground),
-                    Port::At(ShaftRef::Of { stage: 1, shaft: 1 }),
-                ] {
+                let (start, end) = (
+                    ShaftRef::Of { stage: 0, shaft: 1 },
+                    ShaftRef::Of { stage: 1, shaft: 2 },
+                );
+                let at = |port| {
+                    Train::chained(
+                        vec![
+                            Stage::spur(PairStage::default()),
+                            Stage::spur(PairStage::default()),
+                        ],
+                        vec![LoadCase {
+                            loads: vec![
+                                Load::given(port, 2.0, 3000.0),
+                                Load::declared(start, LoadRole::Reacted),
+                                Load::declared(end, LoadRole::Reacted),
+                            ],
+                            ..LoadCase::ultimate(start, end, 2.0, 3000.0)
+                        }],
+                    )
+                };
+                for port in [ShaftRef::Ground, ShaftRef::Of { stage: 1, shaft: 1 }] {
                     let out = gear_core::train::solve_train(&at(port), &lib);
                     assert!(
                         matches!(
@@ -1480,26 +1497,26 @@ mod tests {
             }
             // **Every way the train's own conditions can fail to give one
             // motion**, each fired from the model on a set whose shafts are
-            // sun 1, carrier 2, ring 3: the ring released with nothing else
-            // held (one short); the carrier and the ring both held (the sun
-            // cannot turn); a constraint on a shaft no stage has; two drives
-            // on the set, which is one motion but no arrangement to rate
-            // under; and a chain whose tooth counts multiply past `i128`.
+            // sun 1, carrier 2, ring 3: the carrier and the ring both held
+            // (the sun cannot turn); a constraint on a shaft no stage has;
+            // and a chain whose tooth counts multiply past `i128`.
             {
                 use gear_core::train::{
-                    Constraint, LoadCase, PairStage, PlanetaryStage, ShaftConstraint, ShaftRef,
-                    Stage, StageGear, Train,
+                    LoadCase, PairStage, PlanetaryStage, ShaftConstraint, ShaftRef, Stage,
+                    StageGear, Train,
                 };
-                let free = |stage, shaft| ShaftConstraint {
-                    at: ShaftRef::Of { stage, shaft },
-                    constraint: Constraint::Free,
-                };
-                let set = |constraints| Train {
-                    load_cases: vec![LoadCase::ultimate(2.0, 3000.0)],
-                    reversed_bending: false,
-                    stages: vec![Stage::planetary(PlanetaryStage::default())],
-                    couplings: Vec::new(),
-                    constraints,
+                let set = |constraints| {
+                    let mut t = Train::chained(
+                        vec![Stage::planetary(PlanetaryStage::default())],
+                        vec![LoadCase::ultimate(
+                            ShaftRef::Of { stage: 0, shaft: 1 },
+                            ShaftRef::Of { stage: 0, shaft: 2 },
+                            2.0,
+                            3000.0,
+                        )],
+                    );
+                    t.constraints = constraints;
+                    t
                 };
                 let huge = |teeth| StageGear {
                     teeth,
@@ -1525,14 +1542,6 @@ mod tests {
                         "overdetermined",
                     ),
                     (set(vec![ShaftConstraint::held(7, 1)]), "no such shaft"),
-                    (
-                        set(vec![
-                            ShaftConstraint::driven(0, 1),
-                            ShaftConstraint::driven(0, 2),
-                            free(0, 3),
-                        ]),
-                        "stage undetermined",
-                    ),
                     (wide, "overflow"),
                 ];
                 for (train, what) in trains {
@@ -1671,7 +1680,20 @@ mod tests {
     ///   solve has already refused as undetermined, and no assignment of
     ///   directions confirming itself, which is the back-driven case the other
     ///   call site already treats as an answer.
-    const UNFIRED: &[&str] = &["clamp.ring_fully_filleted", "error.train_no_power_flow"];
+    /// - `error.train_stage_undetermined` — a stage whose boundary leaves
+    ///   its motion undetermined. A train no longer produces one: a boundary
+    ///   that is a family is a stage with no figures of its own rather than
+    ///   a refusal, and a boundary that contradicts itself is named at the
+    ///   hold that closed it (`Train::boundaries`). What still raises it is
+    ///   `Wiring::unit_motion` asked directly — a lone stage asked for a
+    ///   backward load through `solve_any` with two of its ports free, which
+    ///   the harness can do and no panel can. Live, and kept for the
+    ///   harness.
+    const UNFIRED: &[&str] = &[
+        "clamp.ring_fully_filleted",
+        "error.train_no_power_flow",
+        "error.train_stage_undetermined",
+    ];
 
     #[test]
     fn a_document_that_is_not_a_catalogue_is_refused() {

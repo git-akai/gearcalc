@@ -25,7 +25,6 @@ import type {
   OpenPort,
   TrainBody,
   LoadRole,
-  Port,
   Auto,
   Optimisation,
   Backlash,
@@ -96,7 +95,7 @@ import type {
   ShaftRef,
   Exact,
 } from "./wire";
-export type { CaseKind, LoadCase, Port };
+export type { CaseKind, LoadCase };
 export type {
   Duty,
   GearCase,
@@ -204,6 +203,7 @@ import init, {
   export_train,
   relieve_stage,
   relieve_case,
+  edit_train,
   adopt_member,
 } from "./wasm/gear_wasm.js";
 
@@ -370,45 +370,31 @@ export interface CaseKindSpec {
   label: string;
   /** Catalogue key for the button that adds one. */
   add: string;
-  /** A fresh case of this kind, from the core. */
-  fresh: () => LoadCase;
 }
 
 /** The load case kinds, as data, for the reason the stage presets are: the "add
  *  load case" buttons and the kind select render from this, and a kind decides
  *  which allowable the core judges against and which inputs are put in front
- *  of the designer — nothing else. */
+ *  of the designer — nothing else. A fresh case of a kind is the core's
+ *  ({@link editTrain} with `add_case`), since which shafts it is written
+ *  between is the train's to say. */
 export const CASE_KINDS: CaseKindSpec[] = [
-  {
-    key: "ultimate",
-    label: "ui.train_case_ultimate",
-    add: "ui.train_add_ultimate_case",
-    fresh: () => defaults().ultimate_case,
-  },
-  {
-    key: "fatigue",
-    label: "ui.train_case_fatigue",
-    add: "ui.train_add_fatigue_case",
-    fresh: () => defaults().fatigue_case,
-  },
+  { key: "ultimate", label: "ui.train_case_ultimate", add: "ui.train_add_ultimate_case" },
+  { key: "fatigue", label: "ui.train_case_fatigue", add: "ui.train_add_fatigue_case" },
 ];
 
-/** **A port as a select's value.** A port is a name or a shaft reference,
- *  and a `<select>` binds to strings, so each is keyed by a string that
- *  round-trips through {@link portOptions} — the option list the core sent
- *  — rather than being parsed back. Nothing here decides what a port is. */
-export function portKey(p: Port): string {
-  if (p === "start" || p === "end") return p;
-  return p.at.kind === "ground" ? "at:ground" : `at:${p.at.stage}.${p.at.shaft}`;
+/** **A shaft as a select's value.** A `<select>` binds to strings, so each
+ *  shaft is keyed by a string that round-trips through {@link portOptions}
+ *  — the list the core sent — rather than being parsed back. */
+export function portKey(p: ShaftRef): string {
+  return p.kind === "ground" ? "ground" : `${p.stage}.${p.shaft}`;
 }
 
 /** **Where a load can enter**, in the order the chain runs: the open ports
- *  the core reports with the motion — its two ends by name, and any other
- *  uncoupled, un-held shaft by reference — or, where the train has no motion
- *  to report, the two names alone so a case can still be written. */
-export function portOptions(motion: MotionReport | null): { key: string; port: Port }[] {
-  const ports: Port[] = motion?.ports.map((p) => p.port) ?? ["start", "end"];
-  return ports.map((port) => ({ key: portKey(port), port }));
+ *  the core reports with the motion, or none where the train has no motion
+ *  to report. */
+export function portOptions(motion: MotionReport | null): { key: string; port: ShaftRef }[] {
+  return (motion?.ports ?? []).map((p) => ({ key: portKey(p.at), port: p.at }));
 }
 
 export interface FieldSpec {
@@ -886,6 +872,36 @@ export function constraintOn(train: Train, stage: number, shaft: number): Constr
     (c) => c.at.kind === "of" && c.at.stage === stage && c.at.shaft === shaft,
   );
   return c ? c.constraint : null;
+}
+
+/** **One edit to a train's graph, by the core's rules** — what a shaft's
+ *  select and the panel's buttons mean: a shaft held, released, coupled to
+ *  another or uncoupled, a stage pushed and coupled onward with the cases
+ *  carried to its far port, a fresh case added between the train's ends.
+ *  Each is a rule about what else has to change — a hold uncouples, a
+ *  coupling turns a reaction into a take-off — and the rules are the
+ *  core's, so this side hands the train over and copies the answer back.
+ *  A train that will not cross the boundary is left as it stands. */
+export type TrainEdit =
+  | { couple: { a: ShaftRef; b: ShaftRef } }
+  | { uncouple: ShaftRef }
+  | { hold: ShaftRef }
+  | { release: ShaftRef }
+  | { push_stage: Stage }
+  | { remove_stage: number }
+  | { add_case: CaseKind }
+  | { duty: { case: number; intermittent: boolean } };
+export function editTrain(train: Train, edit: TrainEdit): void {
+  let edited: Train;
+  try {
+    edited = JSON.parse(edit_train(JSON.stringify({ train, edit }))) as Train;
+  } catch {
+    return;
+  }
+  train.stages = edited.stages;
+  train.couplings = edited.couplings;
+  train.constraints = edited.constraints;
+  train.load_cases = edited.load_cases;
 }
 
 // The words live in `strings.svelte.ts` — it has to be a rune module, because

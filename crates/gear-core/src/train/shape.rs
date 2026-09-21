@@ -3740,19 +3740,18 @@ impl Constrained for Shape {
         }
     }
 
-    /// **Every shaft on an axis nothing carries is a port**, in shaft order
-    /// — a pair's two members, a set's sun, carrier and ring, a layshaft —
-    /// and what is held by convention is the first ring's shaft, where
-    /// there is a ring. A shaft on a carried axis orbits and nothing can be
-    /// attached to it: a planet, however many of it there are, and a hula's
-    /// wobble body — which, being one planet, used to be listed as a port,
-    /// and a load case that reacted every open port then held it.
+    /// **Every shaft that is not replicated is a port**, in shaft order — a
+    /// pair's two members, a set's sun, carrier and ring, a layshaft, and a
+    /// single orbiting member: a planocentric reducer's output *is* its
+    /// planet, taken off through an Oldham coupling, and a hula's wobble
+    /// body is the same shaft with four gears on it. (For a while a shaft
+    /// on a carried axis was no port, because a case reacted every open
+    /// port it did not load and so held the wobble body; a case declares
+    /// what it reacts now, and an orbiting port is a port.) What is held by
+    /// convention is the first ring's shaft, where there is a ring.
     fn ports(&self) -> Ports {
         let ports: Vec<Shaft> = (1..=self.shafts.len())
-            .filter(|&s| {
-                self.axis_of_shaft(s)
-                    .is_none_or(|a| self.axes[a].carried_by.is_none())
-            })
+            .filter(|&s| !self.replicated(s))
             .collect();
         let held: Vec<Shaft> = self
             .members

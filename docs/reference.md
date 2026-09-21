@@ -2289,71 +2289,80 @@ textbook arrangement with nothing stated.
 
 ## Trains
 
-Per stage `i = z_out/z_in`; a worm's is `z_wheel/z_starts` and a planetary's
-comes from its own kinematics. Total ratio is the product. A train's **ports**
-are every shaft a load can enter by — each stage's ports that are neither held
-nor coupled to another stage — and a chain names its two ends `start`, the
-first stage's input, and `end`, the last stage's output, *under the
-constraints in force*. A load enters at any of them.
+**A train is a graph**: every stage's shafts, the meshes between them, and
+the **couplings** that tie one stage's shaft to another's. There is no chain
+in the model and no head to it — no first stage that is driven, no last one
+that is the output. What turns is a load case's to say ([Load
+cases](#load-cases)); what the train itself says is which shafts are held
+and which are coupled to which. A train's **ports** are every shaft a load
+can enter by — each stage's ports that are not held — and its **bodies**
+are those ports with the shafts the couplings join gathered into one, a
+pair's output and the next pair's input being one shaft with two names.
 
 ### Constraints and couplings
 
-A train is one shaft line, and what holds it still or turns it is the
-**train's** to say, not a stage's. There is no housing in the model: a shaft is
-fixed to ground, driven from outside, or free to do what the rest decides, and
-ground is one more shaft that happens to be held — the same row in the same
-matrix as any other. A set, which used to carry "sun in, ring fixed" as a
-field, carries none, and the stage answers instead which of its shafts are **ports** — the
-ones a train may address — and which of those it holds *by convention*.
+There is no housing in the model: a shaft is fixed to ground or free to do
+what the rest decides, and ground is one more shaft that happens to be held
+— the same row in the same matrix as any other. A set, which used to carry
+"sun in, ring fixed" as a field, carries none; the stage answers instead
+which of its shafts are **ports** — the ones a train may address — and which
+of those it holds *by convention*.
 
 ```text
-constraint   ShaftRef → held | driven | free      ShaftRef: ground, or stage k's shaft j
-coupling     ShaftRef = ShaftRef                  two shafts that turn as one
+constraint   ShaftRef → held | free       ShaftRef: ground, or stage k's shaft j
+coupling     ShaftRef = ShaftRef          two shafts that turn as one
 ```
 
-**Conventions are laid under, and a statement replaces the convention of its
-kind.** With no constraints, every stage's convention stands: a pair's first
-member drives, a set's ring is held and its sun drives, the first stage of a
-chain is driven and each stage's conventional output is coupled to the next
-stage's conventional input. A constraint on a shaft replaces the convention *on
-that shaft* — `free` on a set's ring releases it and nothing else moves — and a
-`held` or a `driven` anywhere on a stage replaces that stage's conventional
-holds or drive: "hold the carrier" means instead of the ring and "driven by
-the carrier" means instead of the sun, neither as well. A convention is the
-weakest statement there is and gives way to any of the same kind about the
-same stage; what a designer writes twice — two holds, two drives — stands
-twice, which is a locked set or a differential's two inputs.
+**A hold replaces the convention's hold, and only that.** With no
+constraints, every stage's convention stands — a set's ring is held. A
+constraint on a shaft replaces the convention *on that shaft* — `free` on a
+set's ring releases it and nothing else moves — and a `held` anywhere on a
+stage replaces that stage's conventional holds: "hold the carrier" means
+instead of the ring, not as well. What a designer writes twice stands twice
+— two holds on a set lock it, and the train says so at the hold that closed
+it. (There was a third word, *driven*, from when the train was a chain with
+a head. It named where the chain entered and drove nothing behind a
+coupling; what drives is a load on an open port now, and the word is gone.)
 
-**A drive behind a coupling is where the chain enters, not a speed.** `driven`
-on a shaft that an earlier stage is coupled to says which port the load is
-referred to, and its speed is the coupling's; a drive of one turn there as
-well would ask the shaft for two speeds, and did. So the same word arranges a
-set at the head of a chain and behind one, and the panel offers each port one
-choice — held, driven, free, or the convention as the overlay leaves it —
-on every stage alike.
+**Couplings are written, never assumed.** A file lists every coupling it
+has, and a train the panel builds writes each one: adding a stage couples
+its conventional input to the last stage's remaining open output and
+carries every case entry there to the new stage's output (`push_stage`);
+choosing a shaft in another stage's select couples the two, and the same
+coupling reads the same on either shaft; choosing *free* releases a shaft
+from every coupling; choosing *held* holds it and uncouples it, since a held
+shaft turns nothing, and drops every case entry at it. A coupling on a shaft
+a case had declared *reacted* turns that entry into a load with its torque
+derived — an inline take-off, the same physics — since a body two stages
+share cannot be a reaction. A stage nobody couples to is an isolated stage,
+which is legal: the graph has two components, each needs a given speed, and
+every case says so. A set's two gears coupled to each other are a set that
+cannot turn, named at the coupling. (The chain used to be supplied by a rule
+at every solve whenever a file listed no couplings, and rewired itself as
+holds changed; it is a constructor now, `Train::chain`, and nothing more.)
 
-**The chain reads its ends off the constraints.** A stage's input is the first
-of its ports not held, or the one driven; its output the next not held. So
-holding a set's carrier makes its ring the port the next stage couples to, and
-a designer who changes what is held does not also rewire the chain. Where a
-train states its own couplings, they replace the chain entirely. And **a load
-written at a free port is a statement of where power leaves**, where "the
-next not held" is only a preference: a Ravigneaux with its ring held and its
-large sun driven has its small sun and its carrier both free, and a case at
-the carrier makes the carrier the output, the small sun spinning free.
+**A stage's input and output are its own reporting convention.** Which way
+its ratio, its efficiency both ways and its play are read: the shaft coupled
+from an earlier stage is its input, failing that the shaft the first case's
+first load is at, failing that its first open port; the shaft coupled to a
+later stage is its output, failing that the next open port. They decide
+nothing about a load case. The train's own ratio, efficiency and play are
+read between its two **ends** — the first stage's input and the last stage's
+output, where each is open — and are absent where either is not, or the
+motion between them is a family.
 
 **Motion needs none of the geometry.** With every constraint in force the train
 is one system — ground shared, each stage's shafts appended, one row per mesh
 in the frame of its axes, one per coupling — and its solution at one turn of
-whatever is driven is reported as every shaft's exact speed, each stage's ratio,
+its first end is reported as every shaft's exact speed, each stage's ratio,
 the total, and the **mobility**: how many conditions the mechanism needs beyond
 its frame, and how many it has. That is why a train whose centre distances
 cannot be made to agree still reports its ratios: Willis needs tooth counts and
 a topology, and the refusal is the geometry's.
 
 **A train short of conditions reports a family.** A set with its ring released
-and its sun driven has one free parameter, and every shaft's speed is a
-particular value plus a term per turn of a shaft the conditions left free:
+has one free parameter, and every shaft's speed is a particular value plus a
+term per turn of a shaft the conditions left free:
 
 ```text
 ω_ring = −1/6 + 7/6 · ω_carrier        z_s = 12, z_r = 72, sun at one turn
@@ -2362,15 +2371,12 @@ particular value plus a term per turn of a shaft the conditions left free:
 The parameter is a **port** — the first open one the freedom moves — because the
 solver's own choice is whichever column fell last in its elimination, which is
 a planet, and nobody reads a differential per turn of a planet. Re-basing the
-family changes nothing about which motions it contains. The ratings are
-refused, by name: a rating wants one torque at one speed, and which is the
-designer's to say. Each other way the conditions can fail has its own sentence
-too — two that contradict, named at the statement the designer made rather
-than the convention it contradicts, since conditions are absorbed conventions
-first; a shaft the train does not have; a stage whose boundary leaves it more
-than one free shaft, which is a set driven at two of its ports and is one
-motion with no arrangement to rate under; and tooth counts whose product
-outgrows an exact ratio, refused rather than wrapped.
+family changes nothing about which motions it contains. A family has no
+figure of its own and is rated under its cases ([Load cases](#load-cases)).
+Each way the conditions can fail has its own sentence — two holds that lock a
+stage, named at the hold that closed it; a shaft the train does not have; and
+tooth counts whose product outgrows an exact ratio, refused rather than
+wrapped.
 
 **A ratio says two things, and only one of them refers a load.** Its *size* is
 how much a torque is multiplied by across the stage and how much a play is
@@ -2417,28 +2423,29 @@ duty       a fatigue case's        how the load is applied over the train's life
 ```
 
 **Ports and bodies.** The train's *open ports* are every stage's ports that
-the train does not fix — the chain's two ends by name, a shaft two stages
-share once under the earlier stage's name, a released ring or a second sun
-by reference. A port is a shaft on an axis nothing carries: a planet orbits,
-a hula's wobble body orbits, and nothing can be attached to either. The ends
-are the convention's — a load names nothing, so a load written at `End`
-stays on one shaft as loads are added beside it. The train's **bodies** are
-its ports with the shafts the couplings join gathered into one (`bodies`
-on the motion report): a pair's output and the next pair's input are one
-shaft with two names, and a case says one thing of it.
+the train does not fix, each named by its shaft — a shaft two stages share
+once, under the earlier stage's name — and a port is every shaft of a stage
+that is not replicated: a set's sun, carrier and ring, a layshaft, and a
+single orbiting member, since a planocentric reducer's output *is* its planet.
+The train's **bodies** are its ports with the shafts the couplings join
+gathered into one (`bodies` on the motion report): a pair's output and the
+next pair's input are one shaft with two names, and a case says one thing of
+it. A load names a shaft and nothing else — no "start", no "end".
 
 **What a case says of a port.** Each entry carries a `role`: a **load**
 carries a torque and a speed, each given or derived; a **reacted** port is
 held by whatever is attached — it turns as the motion says and carries the
 torque the flow puts on it, both found; a **free** port turns and carries
-nothing. A port the case does not mention has a default: the chain's two
-ends are reacted, every other open port is free. A port the train holds is
+nothing. A port the case does not mention is free. A port the train holds is
 fixed — ground under another name — and no case can say anything of it. A
 shaft two stages share can be a load (an inline take-off, its torque given
 or derived) or free, not a reaction: a second reaction on one chain is a
 division by stiffness this model does not make, and the train refuses it by
 name. A free port beside a given torque nothing else holds is the question
-whether a stage locks, asked on purpose and answered by name. The two ends it does not load are
+whether a stage locks, asked on purpose and answered by name. A fresh case
+is written between the train's two ends — a load at the first, a reaction at
+the second — and a train with no two ends gets a case with nothing on it, for
+the designer to write. The two ends it does not load are
 **reacted**: each turns as the motion says and carries whatever torque the
 flow puts on it, and both are reported — the same thing as a shaft the train
 fixes, except that a fixed shaft is ground and reports no speed. Every other

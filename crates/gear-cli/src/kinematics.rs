@@ -38,26 +38,26 @@
 //! that were per type went with the types.
 
 use gear_core::train::{
-    solve_train, Duty, LoadCase, PairStage, PlanetaryStage, Port, ShaftConstraint, ShaftRef, Stage,
+    solve_train, Duty, LoadCase, PairStage, PlanetaryStage, ShaftConstraint, ShaftRef, Stage,
     StageGear, StageResult, Train, TrainResult,
 };
 
-/// The loads every fixture is rated for: one from each port, held at the far
-/// end, and a fatigue case counted over a continuous duty.
+/// The loads every fixture is rated for, between two shafts: one from each,
+/// reacted at the other, and a fatigue case counted over a continuous duty.
 ///
 /// **Both ports, because torque distributes differently from each.** Which way
 /// a stage is driven decides where `η₀` multiplies in an epicyclic set and
 /// which flank a screw pair presses, so a characterisation taken from one end
 /// records half the model.
-fn loads() -> Vec<LoadCase> {
+fn loads(input: ShaftRef, output: ShaftRef) -> Vec<LoadCase> {
     vec![
-        LoadCase::ultimate(2.0, 3000.0),
-        LoadCase::back_driving(0.6),
+        LoadCase::ultimate(input, output, 2.0, 3000.0),
+        LoadCase::back_driving(input, output, 0.6),
         LoadCase {
             duty: Duty::Continuous {
                 runtime_hours: 1000.0,
             },
-            ..LoadCase::fatigue(2.0, 2400.0)
+            ..LoadCase::fatigue(input, output, 2.0, 2400.0)
         },
     ]
 }
@@ -84,24 +84,34 @@ fn pair(z1: u32, z2: u32, helix: f64) -> Stage {
     Stage::spur(s)
 }
 
-/// **An arrangement as a train's constraints**: which of a set's shafts is
-/// driven and which held, for the set at stage `k`. The set itself carries no
-/// arrangement any more — that is a fact about the train, and this is the
-/// shape a file writes it in.
-fn arranged(k: usize, input: &str, fixed: &str) -> Vec<ShaftConstraint> {
-    // The set's shafts, in its wiring's order: ground, sun, carrier, ring,
-    // planet. One line each: a hold or a drive on a stage replaces the
-    // stage's convention of that kind, so holding the carrier releases the
-    // ring without a word about it.
-    let shaft = |s: &str| match s {
+/// A set's shaft by name, in its wiring's order: ground, sun, carrier, ring,
+/// planet.
+fn member(s: &str) -> usize {
+    match s {
         "sun" => 1,
         "carrier" => 2,
         _ => 3,
+    }
+}
+
+/// **An arrangement as a train states it**: a lone set with one shaft held
+/// — one line, since a hold on a stage replaces the stage's conventional
+/// hold, so holding the carrier releases the ring without a word about it —
+/// and its loads between the other two, the input named first. The set
+/// itself carries no arrangement; what drives it is a load, and nothing
+/// more.
+fn arranged(input: &str, fixed: &str) -> Train {
+    let output = ["sun", "carrier", "ring"]
+        .into_iter()
+        .find(|s| *s != input && *s != fixed)
+        .expect("three shafts, two named");
+    let at = |s: &str| ShaftRef::Of {
+        stage: 0,
+        shaft: member(s),
     };
-    vec![
-        ShaftConstraint::driven(k, shaft(input)),
-        ShaftConstraint::held(k, shaft(fixed)),
-    ]
+    let mut t = Train::chained(vec![set()], loads(at(input), at(output)));
+    t.constraints = vec![ShaftConstraint::held(0, member(fixed))];
+    t
 }
 
 /// A default epicyclic set. What drives it and what holds it is the train's
@@ -130,18 +140,16 @@ fn unclosed() -> Stage {
 /// A table rather than a `match`, for the reason `COMMANDS` is one: a fixture
 /// added with no row is a fixture the corpus cannot record.
 fn fixtures() -> Vec<(String, Train)> {
-    let train = |stages: Vec<Stage>| Train {
-        load_cases: loads(),
-        reversed_bending: false,
-        stages,
-        couplings: Vec::new(),
-        constraints: Vec::new(),
-    };
-    // ...and one told what to hold and drive, which is how every arrangement
-    // but the conventional one is stated now.
-    let asked = |stages: Vec<Stage>, constraints: Vec<ShaftConstraint>| Train {
-        constraints,
-        ..train(stages)
+    // A chain of these stages, loaded between its two ends.
+    let train = |stages: Vec<Stage>| {
+        let mut t = Train::chained(stages, Vec::new());
+        let (input, output) = t
+            .boundaries()
+            .ok()
+            .and_then(|b| t.ends(&b))
+            .expect("a chain fixture has two ends");
+        t.load_cases = loads(input, output);
+        t
     };
     let mut out = vec![
         // The two parallel-axis readings: a spur pair has no axial overlap and
@@ -163,10 +171,7 @@ fn fixtures() -> Vec<(String, Train)> {
     for input in ["sun", "carrier", "ring"] {
         for fixed in ["sun", "carrier", "ring"] {
             if input != fixed {
-                out.push((
-                    format!("set-{input}-{fixed}"),
-                    asked(vec![set()], arranged(0, input, fixed)),
-                ));
+                out.push((format!("set-{input}-{fixed}"), arranged(input, fixed)));
             }
         }
     }
@@ -234,45 +239,33 @@ fn fixtures() -> Vec<(String, Train)> {
             "ravigneaux-small-sun".to_string(),
             train(vec![shape(ravigneaux())]),
         ));
-        // With the large sun driven the small sun and the carrier are both
-        // free, and `end` is the first of them — the small sun. The carrier
-        // is the output a designer means, so every case loads it by
-        // reference — a derived load where it reacts, the given one where
-        // it drives — and declares the small sun free, which
-        // is how a case says a port turns and carries nothing.
+        // Loaded at the large sun with the ring held: the small sun and the
+        // carrier are both free, and the carrier is the output a designer
+        // means — so every case is written between the large sun and the
+        // carrier, and declares the small sun free, which is how a case says
+        // a port turns and carries nothing.
         out.push(("ravigneaux-large-sun".to_string(), {
-            let mut t = asked(
-                vec![shape(ravigneaux())],
-                vec![ShaftConstraint::driven(0, 3)],
-            );
-            let at = |shaft| Port::At(ShaftRef::Of { stage: 0, shaft });
-            let (small_sun, carrier) = (1, 2);
-            t.load_cases = t
-                .load_cases
-                .iter()
-                .map(|c| {
-                    let mut c = c.clone();
-                    for l in &mut c.loads {
-                        if l.at == Port::End {
-                            l.at = at(carrier);
-                        }
-                    }
-                    if !c.loads.iter().any(|l| l.at == at(carrier)) {
-                        c.loads.push(gear_core::train::Load::derived(at(carrier)));
-                    }
-                    c.loads.push(gear_core::train::Load::declared(
-                        at(small_sun),
-                        gear_core::train::LoadRole::Free,
-                    ));
-                    c
-                })
-                .collect();
+            let at = |shaft| ShaftRef::Of { stage: 0, shaft };
+            let (small_sun, carrier, large_sun) = (1, 2, 3);
+            let mut t =
+                Train::chained(vec![shape(ravigneaux())], loads(at(large_sun), at(carrier)));
+            for c in &mut t.load_cases {
+                c.loads.push(gear_core::train::Load::declared(
+                    at(small_sun),
+                    gear_core::train::LoadRole::Free,
+                ));
+            }
             t
         }));
-        out.push((
-            "ravigneaux-ring-free".to_string(),
-            asked(vec![shape(ravigneaux())], vec![ShaftConstraint::held(0, 3)]),
-        ));
+        // The small sun in with the large sun held: the ring runs free,
+        // the carrier is the output, and the hold on the large sun replaces
+        // the convention's hold on the ring.
+        out.push(("ravigneaux-ring-free".to_string(), {
+            let at = |shaft| ShaftRef::Of { stage: 0, shaft };
+            let mut t = Train::chained(vec![shape(ravigneaux())], loads(at(1), at(2)));
+            t.constraints = vec![ShaftConstraint::held(0, 3)];
+            t
+        }));
     }
     // Chains, because the accumulation is the third place the same kinematics
     // is written: two pairs, and a chain with an epicyclic set in the middle of
@@ -295,25 +288,25 @@ fn fixtures() -> Vec<(String, Train)> {
     // into a size were both outside the change detector. A set that could not
     // be followed by anything at all, and a backlash 23.5 % light, are what
     // that cost; these two rows are what keeps them caught.
-    // A set with its carrier held reverses, and in a chain the set at
-    // stage `k` is *driven by the coupling*, so only its held shaft is stated;
-    // the drive belongs to the first stage's input.
-    out.push((
-        "set-then-pair".to_string(),
-        asked(
-            vec![set(), pair(17, 43, 0.0)],
-            arranged(0, "sun", "carrier"),
-        ),
-    ));
-    // The set at stage 1 is driven by the coupling, so only its held shaft
-    // is stated; the ring it releases follows by rule.
-    out.push((
-        "pair-then-set".to_string(),
-        asked(
-            vec![pair(17, 43, 0.0), set()],
-            vec![ShaftConstraint::held(1, 2)],
-        ),
-    ));
+    // A set with its carrier held reverses. Ahead of a pair it is coupled
+    // onward by its ring — the chain's coupling is to the carrier, which the
+    // hold takes back — and loaded at its sun; behind one it is entered by
+    // its sun through the coupling and leaves by the ring.
+    out.push(("set-then-pair".to_string(), {
+        let of = |stage, shaft| ShaftRef::Of { stage, shaft };
+        let mut t = Train::chained(vec![set(), pair(17, 43, 0.0)], Vec::new());
+        t.hold(of(0, 2));
+        t.couple(of(0, 3), of(1, 1));
+        t.load_cases = loads(of(0, 1), of(1, 2));
+        t
+    }));
+    out.push(("pair-then-set".to_string(), {
+        let of = |stage, shaft| ShaftRef::Of { stage, shaft };
+        let mut t = Train::chained(vec![pair(17, 43, 0.0), set()], Vec::new());
+        t.hold(of(1, 2));
+        t.load_cases = loads(of(0, 1), of(1, 3));
+        t
+    }));
     // **A train that does not close, recorded as it currently answers.** A
     // ratio needs tooth counts and topology; neither of these fixtures has
     // anything wrong with its kinematics. The first says what a set with no
@@ -327,65 +320,20 @@ fn fixtures() -> Vec<(String, Train)> {
         "chain-unclosed".to_string(),
         train(vec![pair(17, 43, 0.0), unclosed()]),
     ));
-    // **A train that is one condition short, one that has two drives, and
-    // one that asks two things of a shaft** — recorded for what each answers,
-    // since each used to answer with the wiring sentence. The first is a set
-    // with its ring released: no rating, and a *family* under the line, every
-    // shaft's speed per turn of the free one. The second drives the sun and
-    // the carrier together, which is one motion — the whole set turns as one
-    // — and no arrangement to rate. The third holds the carrier and the ring
-    // both, so the sun cannot turn.
-    let free = |shaft| ShaftConstraint {
-        at: ShaftRef::Of { stage: 0, shaft },
-        constraint: gear_core::train::Constraint::Free,
-    };
-    out.push((
-        "ring-released".to_string(),
-        asked(vec![set()], vec![free(3)]),
-    ));
-    out.push((
-        "two-drives".to_string(),
-        asked(
-            vec![set()],
-            vec![
-                ShaftConstraint::driven(0, 1),
-                ShaftConstraint::driven(0, 2),
-                free(3),
-            ],
-        ),
-    ));
-    out.push((
-        "conflict".to_string(),
-        asked(
-            vec![set()],
-            vec![ShaftConstraint::held(0, 2), ShaftConstraint::held(0, 3)],
-        ),
-    ));
-    // **The same chain with its loads written at shafts by reference** —
-    // the shaft `end` resolves to, which with the carrier held is the set's
-    // *ring*, and the pair's first member for `start`. The fixture above and
-    // this one must print the same figures, and both are recorded so that
-    // the two spellings cannot drift. (A first draft wrote the carrier here
-    // by hand and was refused: the carrier is held. That is the reason the
-    // names exist.)
-    out.push(("pair-then-set-named".to_string(), {
-        let mut t = out
-            .iter()
-            .find(|(name, _)| name == "pair-then-set")
-            .map(|(_, t)| t.clone())
-            .expect("the fixture above");
-        let boundaries = t.boundaries().expect("a chain has boundaries");
-        t.load_cases = t
-            .load_cases
-            .iter()
-            .map(|c| {
-                let mut c = c.clone();
-                for l in &mut c.loads {
-                    l.at = Port::At(t.port_shaft(&boundaries, l.at));
-                }
-                c
-            })
-            .collect();
+    // **A train that is one condition short, and one that asks two things
+    // of a shaft** — recorded for what each answers, since each used to
+    // answer with the wiring sentence. The first is a set with its ring
+    // released: no figure of its own, every case one speed short under the
+    // line, and the ring free. The second holds the carrier and the ring
+    // both, so the sun cannot turn, named at the hold that closed it.
+    out.push(("ring-released".to_string(), {
+        let mut t = arranged("sun", "ring");
+        t.release(ShaftRef::Of { stage: 0, shaft: 3 });
+        t
+    }));
+    out.push(("conflict".to_string(), {
+        let mut t = arranged("sun", "carrier");
+        t.hold(ShaftRef::Of { stage: 0, shaft: 3 });
         t
     }));
     out
@@ -518,12 +466,7 @@ fn report(name: &str, train: &Train, r: &TrainResult) {
             input
                 .loads
                 .iter()
-                .map(|l| format!(
-                    "{:>10.4} Nm / {:>9.2} rpm at {:<5}",
-                    l.torque.manual,
-                    l.speed.manual,
-                    port(l.at)
-                ))
+                .map(entry)
                 .collect::<Vec<_>>()
                 .join("  +"),
             if c.solved { "" } else { "   (not solved)" }
@@ -657,14 +600,27 @@ fn member_role(shape: &gear_core::train::shape::Shape, member: usize) -> String 
     }
 }
 
-/// A port as the harness prints it: the chain's two names as words, and a
-/// named shaft as `stage.shaft`, one-based both ways as the front end counts.
-pub fn port(p: Port) -> String {
+/// One entry of a case as the harness prints it: a load's two figures at
+/// its shaft, or the word a declared port carries.
+pub fn entry(l: &gear_core::train::Load) -> String {
+    match l.role {
+        gear_core::train::LoadRole::Load => format!(
+            "{:>10.4} Nm / {:>9.2} rpm at {:<5}",
+            l.torque.manual,
+            l.speed.manual,
+            port(l.at)
+        ),
+        gear_core::train::LoadRole::Reacted => format!("reacted at {:<5}", port(l.at)),
+        gear_core::train::LoadRole::Free => format!("free at {:<5}", port(l.at)),
+    }
+}
+
+/// A shaft as the harness prints it: `stage.shaft`, one-based both ways as
+/// the front end counts.
+pub fn port(p: ShaftRef) -> String {
     match p {
-        Port::Start => "start".into(),
-        Port::End => "end".into(),
-        Port::At(ShaftRef::Ground) => "ground".into(),
-        Port::At(ShaftRef::Of { stage, shaft }) => format!("{}.{shaft}", stage + 1),
+        ShaftRef::Ground => "ground".into(),
+        ShaftRef::Of { stage, shaft } => format!("{}.{shaft}", stage + 1),
     }
 }
 
