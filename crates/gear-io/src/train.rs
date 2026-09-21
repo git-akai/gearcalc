@@ -308,7 +308,7 @@ mod tests {
     use super::*;
     use gear_core::params::Auto;
     use gear_core::train::{
-        Constraint, Coupling, Duty, HulaStage, Load, LoadCase, LoadRole, PairStage, PlanetaryStage,
+        Constraint, Coupling, Duty, Load, LoadCase, LoadRole, PairStage, PlanetaryStage,
         ShaftConstraint, ShaftRef, Stage,
     };
 
@@ -370,7 +370,10 @@ mod tests {
                         .with_first_helix(45.0),
                     ),
                     Stage::planetary(PlanetaryStage::default()),
-                    Stage::hula(HulaStage::default()),
+                    Stage::Shape(Box::new(gear_core::train::arrangements::hula(
+                        [65, 61, 57, 61],
+                        [1.0, 1.0],
+                    ))),
                 ],
                 // One coupling and one of each constraint, so the tagged
                 // `ShaftRef` and the `Constraint` values are exercised both

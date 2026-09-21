@@ -303,6 +303,30 @@ pub fn power(
     None
 }
 
+/// **What a carrier-driven reduction can reach**, given meshes that keep
+/// `mesh` of what passes through them:
+///
+/// ```text
+/// η = 1 / [ R(1 − η₀) + η₀ ]
+/// ```
+///
+/// The whole power flow collapses to this for the 3K family with the
+/// carrier driving, one central member held and the other the output — a
+/// Wolfrom, a hula stage, a planocentric — and it answers the design
+/// question before anything is drawn: *what would the teeth have to be
+/// worth?* The loss term carries `R`, so a reduction multiplies the mesh
+/// loss before it reaches the output: at `R = 324` a mesh pair losing
+/// 0.85 % keeps 27 % of the input, and it would have to lose under 0.04 %
+/// to keep 90 %. Halve the reduction and the same teeth do far better.
+/// This is why a gearbox of this family is built at a few tens to one and
+/// not a few hundreds, and why the ones that reach both are a different
+/// mechanism. The per-mesh flow is held to it on every count and friction
+/// tried (`train::arrangements`' tests).
+#[must_use]
+pub fn carrier_driven_efficiency(ratio: f64, mesh: f64) -> f64 {
+    1.0 / (ratio.abs() * (1.0 - mesh) + mesh)
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {

@@ -1535,11 +1535,13 @@ A stage is a `Shape` — axes, shafts on them, members on the shafts, meshes
 between members, one distance per pair of axes that mesh — and its result is
 one `ShapeResult`: a `GearResult` per member, a `MeshReport` per mesh, a
 `DistanceReport` per distance, `MemberRating` over the meshes each member is
-in. A spur pair, a worm, a planetary set and a hula stage are **presets**: a
-builder that fills the shape in, the words a designer uses, which inputs a
-panel shows, and the conventional proportions a worm's faces take
-(`Distance::worm`). None of them is a type in the core, and `Stage` has one
-variant.
+in. A spur pair, a worm and a planetary set are **vocabularies** — the words
+a designer uses, which a shape is filled in from — and every menu entry is a
+**preset** (`StagePreset`): a list of what sits where, at sensible teeth,
+under the family the shape reads as; a worm's conventional proportions are
+one thing set on a distance (`Distance::worm`). The hula stage was a
+vocabulary of its own and is a list now, `arrangements::hula`, its corpus
+unmoved. None of them is a type in the core, and `Stage` has one variant.
 
 **It was not built this way, and the reasons it was not are the lessons.**
 Each arrangement was a stage *type* with a result of its own, on the reading

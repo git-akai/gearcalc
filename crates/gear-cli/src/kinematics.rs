@@ -177,7 +177,9 @@ fn fixtures() -> Vec<(String, Train)> {
     }
     out.push((
         "hula".to_string(),
-        train(vec![Stage::hula(gear_core::train::HulaStage::default())]),
+        train(vec![Stage::Shape(Box::new(
+            gear_core::train::arrangements::hula([65, 61, 57, 61], [1.0, 1.0]),
+        ))]),
     ));
     // **The arrangements the shape reaches with no code of their own**
     // (`gear_core::train::arrangements`), each under its textbook boundary,

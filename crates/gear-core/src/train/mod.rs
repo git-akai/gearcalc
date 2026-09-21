@@ -44,7 +44,6 @@ pub mod arrangements;
 mod conditions;
 pub mod crossed;
 pub mod flow;
-mod hula;
 mod pair;
 mod planetary;
 pub mod shape;
@@ -58,7 +57,6 @@ pub use conditions::{
 
 use crate::kinematics::{Condition, Shaft, GROUND};
 pub use arrangements::{StageFamily, StagePreset};
-pub use hula::{stage_efficiency, HulaStage};
 pub(crate) use pair::ShiftAsked;
 pub use pair::{PairKind, PairStage};
 pub use planetary::PlanetaryStage;
@@ -1913,12 +1911,6 @@ impl Stage {
     #[must_use]
     pub fn planetary(p: PlanetaryStage) -> Self {
         Self::Shape(Box::new(shape::Shape::from(&p)))
-    }
-
-    /// A hula stage, as a shape.
-    #[must_use]
-    pub fn hula(h: HulaStage) -> Self {
-        Self::Shape(Box::new(shape::Shape::from(&h)))
     }
 
     /// The shape.
@@ -4819,17 +4811,27 @@ mod tests {
         shape::solve_loads(&shape::Shape::from(stage), loads, lib, Reversal::default())
     }
 
-    /// The hula preset through the shape,
-    /// under its own arrangement — crank driven, grounded gear held, output
-    /// out, which are the shape's shafts 1, 3 and 2.
+    /// The hula arrangement (`arrangements::hula`) at the shipped counts,
+    /// as a stage: members grounded gear, output, the two wobble gears;
+    /// shafts crank 1, grounded 2, output 3, wobble 4.
+    fn hula() -> Stage {
+        Stage::Shape(Box::new(hula_shape([65, 61, 57, 61])))
+    }
+
+    fn hula_shape(teeth: [u32; 4]) -> shape::Shape {
+        arrangements::hula(teeth, [1.0, 1.0])
+    }
+
+    /// A hula shape under its own arrangement — crank driven, grounded gear
+    /// held, output out — whatever its counts make the rings.
     fn solve_hula_stage(
-        stage: &HulaStage,
+        shape: &shape::Shape,
         loads: &StageLoads,
         lib: &MaterialLibrary,
     ) -> Result<shape::ShapeResult, TrainError> {
-        let boundary = StageBoundary::holding(5, &[3], 1, 2);
+        let boundary = StageBoundary::holding(5, &[2], 1, 3);
         shape::solve_loads(
-            &shape::Shape::from(stage),
+            shape,
             &loads.clone().under(boundary),
             lib,
             Reversal::default(),
@@ -5303,17 +5305,11 @@ mod tests {
 
         // --- a hula stage, both of its meshes, at the crank the shape sizes.
         for n in [12_u32, 18, 30] {
-            let mut stage = HulaStage {
-                optimisation: Optimisation {
-                    enabled: true,
-                    ..Optimisation::default()
-                },
-                ..HulaStage::default()
+            let mut shape = hula_shape([n + 1, n, n - 1, n]);
+            shape.optimisation = Optimisation {
+                enabled: true,
+                ..Optimisation::default()
             };
-            for (gear, count) in stage.gears.iter_mut().zip([n + 1, n, n - 1, n]) {
-                gear.teeth = count;
-            }
-            let shape = shape::Shape::from(&stage);
             let Ok(b) = shape.build_at(&shape.shifts_at(&Search::SHIPPED)) else {
                 continue;
             };
@@ -5764,7 +5760,7 @@ mod tests {
                 restage(&mut train, s);
             }
             train.push_stage(Stage::planetary(PlanetaryStage::default()));
-            train.push_stage(Stage::hula(HulaStage::default()));
+            train.push_stage(hula());
 
             let r = solve_train(&train, &lib).expect("a train that solves");
             for (k, stage) in r.stages.iter().enumerate() {
@@ -5987,7 +5983,7 @@ mod tests {
             Stage::spur(PairStage::default()),
             Stage::worm(PairStage::worm()),
             Stage::planetary(PlanetaryStage::default()),
-            Stage::hula(HulaStage::default()),
+            hula(),
         ] {
             let mut train = train_of(vec![stage]);
             train.load_cases[CYCLIC].set_torque(0.0);
@@ -6164,7 +6160,7 @@ mod tests {
                 Stage::planetary(PlanetaryStage::default()),
                 vec![false, true],
             ),
-            (Stage::hula(HulaStage::default()), vec![true, true]),
+            (hula(), vec![true, true]),
             // A worm's one mesh is external too, and it is in the walk now:
             // a point contact answers in the same report as a line.
             (Stage::worm(PairStage::worm()), vec![false]),
@@ -6287,13 +6283,13 @@ mod tests {
 
     /// The four presets, for a law about every one of them.
     fn every_preset() -> Vec<Stage> {
-        let mut hula = HulaStage::default();
-        hula.gears[0].profile_shift = Auto::automatic(0.0);
+        let mut hula = hula_shape([65, 61, 57, 61]);
+        hula.members[0].gear.profile_shift = Auto::automatic(0.0);
         vec![
             Stage::spur(PairStage::default()),
             Stage::worm(PairStage::worm()),
             Stage::planetary(PlanetaryStage::default()),
-            Stage::hula(hula),
+            Stage::Shape(Box::new(hula)),
         ]
     }
 
@@ -6365,12 +6361,12 @@ mod tests {
             }
         }
         for teeth in [[65_u32, 61, 57, 61], [19, 18, 17, 16]] {
-            let mut h = HulaStage::default();
-            h.gears[0].profile_shift = Auto::automatic(0.0);
-            for (g, z) in h.gears.iter_mut().zip(teeth) {
-                g.teeth = z;
-            }
-            out.push(conventional(format!("hula {teeth:?}"), Stage::hula(h)));
+            let mut h = hula_shape(teeth);
+            h.members[0].gear.profile_shift = Auto::automatic(0.0);
+            out.push(conventional(
+                format!("hula {teeth:?}"),
+                Stage::Shape(Box::new(h)),
+            ));
         }
         out
     }
@@ -8148,10 +8144,8 @@ mod tests {
             clearance: Auto::automatic(0.02),
             ..PlanetaryStage::default()
         };
-        let hula = HulaStage {
-            running_clearance: Auto::automatic(0.02),
-            ..HulaStage::default()
-        };
+        let mut hula = hula_shape([65, 61, 57, 61]);
+        hula.distances[0].clearance = Auto::automatic(0.02);
         for just in [
             Some(Freedom::Clearance(0)),
             Some(Freedom::CentreDistance(0)),
@@ -8176,7 +8170,7 @@ mod tests {
                 d.clearance.manual, 0.02,
                 "and the number is left where it was"
             );
-            let relieved = Stage::hula(hula.clone()).relieved(just);
+            let relieved = Stage::Shape(Box::new(hula.clone())).relieved(just);
             let d = relieved.as_shape().unwrap().distances[0];
             assert!(
                 !(d.clearance.auto && d.distance.auto),
@@ -8387,7 +8381,7 @@ mod tests {
             Stage::spur(PairStage::default()),
             Stage::worm(PairStage::worm()),
             Stage::planetary(PlanetaryStage::default()),
-            Stage::hula(HulaStage::default()),
+            hula(),
         ] {
             let Some(group) = stage
                 .freedoms()
@@ -8720,7 +8714,7 @@ mod tests {
             Stage::spur(PairStage::default()),
             Stage::worm(PairStage::worm()),
             Stage::planetary(PlanetaryStage::default()),
-            Stage::hula(HulaStage::default()),
+            hula(),
             Stage::spur(PairStage {
                 shaft_angle: 90.0,
                 ..PairStage::default()
@@ -8793,20 +8787,24 @@ mod tests {
     fn a_back_driven_hula_distributes_torque_by_its_own_solve() {
         let lib = library();
         let ratios = |mu: f64| {
-            let h = HulaStage {
-                sliding_friction: [mu; 2],
-                static_friction: [mu; 2],
-                ..HulaStage::default()
-            };
+            let mut h = hula_shape([65, 61, 57, 61]);
+            for m in &mut h.meshes {
+                m.sliding_friction = mu;
+                m.static_friction = mu;
+            }
             let mut t = two_stage();
             t.load_cases[BACK].set_torque(0.5);
-            restage(&mut t, vec![Stage::worm(PairStage::worm()), Stage::hula(h)]);
+            restage(
+                &mut t,
+                vec![Stage::worm(PairStage::worm()), Stage::Shape(Box::new(h))],
+            );
             let r = solve_train(&t, &lib).expect("a train that solves");
             let s = r.stages[1].as_shape().expect("a hula stage");
             let at = |g: &GearResult, case: usize| g.cases[case].torque;
+            // The output over the grounded gear: the two central members.
             (
-                at(&s.members[3], PEAK) / at(&s.members[0], PEAK),
-                at(&s.members[3], BACK) / at(&s.members[0], BACK),
+                at(&s.members[1], PEAK) / at(&s.members[0], PEAK),
+                at(&s.members[1], BACK) / at(&s.members[0], BACK),
             )
         };
         let (forward, backward) = ratios(0.0);
@@ -9574,7 +9572,7 @@ mod tests {
                     ..PlanetaryStage::default()
                 }),
             ),
-            ("hula", Stage::hula(HulaStage::default())),
+            ("hula", hula()),
         ] {
             let mut train = two_stage();
             train.load_cases[CYCLIC].duty = Duty::Continuous { runtime_hours: 1.0 };
@@ -9590,7 +9588,7 @@ mod tests {
             };
             let StageResult::Shape(p) = &r.stages[0];
             if name == "hula" {
-                // The hula's shafts: ground, crank, output, grounded, wobble.
+                // The hula's shafts: ground, crank, grounded, output, wobble.
                 let crank = p.cases[CYCLIC].speeds[1];
                 for g in &p.members {
                     let c = &g.cases[CYCLIC];
@@ -9757,12 +9755,12 @@ mod tests {
                 ..gear()
             };
         }
-        let mut hula = HulaStage::default();
-        for g in &mut hula.gears {
-            *g = StageGear {
-                teeth: g.teeth,
-                addendum: g.addendum,
-                dedendum: g.dedendum,
+        let mut hula = hula_shape([65, 61, 57, 61]);
+        for m in &mut hula.members {
+            m.gear = StageGear {
+                teeth: m.gear.teeth,
+                addendum: m.gear.addendum,
+                dedendum: m.gear.dedendum,
                 ..gear()
             };
         }
@@ -9870,12 +9868,10 @@ mod tests {
             // the fixture: at 1.1 modules its meshes reach `ε_n ≈ 2.02` and its
             // teeth foul, which the stage reports. The rating path is the one a
             // buildable stage uses, so this is what says the input reaches it.
-            let mut hula = HulaStage {
-                load_sharing: sharing,
-                ..HulaStage::default()
-            };
-            for g in &mut hula.gears {
-                g.addendum = 1.1;
+            let mut hula = hula_shape([65, 61, 57, 61]);
+            hula.load_sharing = sharing;
+            for m in &mut hula.members {
+                m.gear.addendum = 1.1;
             }
 
             let s = solve_spur_stage(&spur, &StageLoads::just(2.0), &lib).unwrap();
@@ -9948,10 +9944,8 @@ mod tests {
         use crate::contact::LoadSharing;
         let lib = library();
         let solve = |sharing| {
-            let stage = HulaStage {
-                load_sharing: sharing,
-                ..HulaStage::default()
-            };
+            let mut stage = hula_shape([65, 61, 57, 61]);
+            stage.load_sharing = sharing;
             solve_hula_stage(&stage, &StageLoads::just(2.0), &lib).unwrap()
         };
         let off = solve(LoadSharing::None);
@@ -10056,10 +10050,8 @@ mod tests {
         // ceiling is a little over twice that rather than five times: the
         // multiplier is for a loaded machine, and twice is what this stage
         // has needed on one.
-        let drive = HulaStage {
-            optimisation: tuned,
-            ..HulaStage::default()
-        };
+        let mut drive = hula_shape([65, 61, 57, 61]);
+        drive.optimisation = tuned;
         each("hula stage's", 60, &|| {
             solve_hula_stage(&drive, &StageLoads::just(2.0), &lib).unwrap();
         });
@@ -10237,14 +10229,11 @@ mod tests {
 
         // The hula stage's rack-generated members are its pinions; its
         // rings are the shaper's and are not asked.
-        let drive = HulaStage {
-            optimisation: Optimisation {
-                enabled: true,
-                ..Optimisation::default()
-            },
-            ..HulaStage::default()
+        let mut shape = hula_shape([65, 61, 57, 61]);
+        shape.optimisation = Optimisation {
+            enabled: true,
+            ..Optimisation::default()
         };
-        let shape = shape::Shape::from(&drive);
         let built = shape
             .build_at(&shape.shifts_at(&crate::auto::Search::SHIPPED))
             .expect("the stage solves");
@@ -11147,7 +11136,7 @@ mod tests {
         let lib = library();
         let mut train = two_stage();
         train.push_stage(Stage::planetary(PlanetaryStage::default()));
-        train.push_stage(Stage::hula(HulaStage::default()));
+        train.push_stage(hula());
         let (start, end) = ends_of(&train);
         train.load_cases = vec![
             LoadCase::ultimate(start, end, 2.0, 3000.0),
@@ -11276,7 +11265,7 @@ mod tests {
             let mut train = two_stage();
             train.push_stage(Stage::worm(PairStage::worm()));
             train.push_stage(Stage::planetary(PlanetaryStage::default()));
-            train.push_stage(Stage::hula(HulaStage::default()));
+            train.push_stage(hula());
             if let Some(s) = train.stages[0].as_shape_mut() {
                 for m in &mut s.members {
                     m.gear.face_width = Auto::automatic(7.0);

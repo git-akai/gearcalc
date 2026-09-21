@@ -1018,13 +1018,10 @@ mod tests {
         // were. Indistinguishable from a search that agreed, until it said so
         // (`docs/corrections.md`; the audit's record F58, F82).
         {
-            let mut hula = gear_core::train::HulaStage::default();
+            let mut hula = gear_core::train::arrangements::hula([18, 19, 19, 20], [1.0, 1.0]);
             hula.optimisation.enabled = true;
-            for (g, z) in hula.gears.iter_mut().zip([18u32, 19, 19, 20]) {
-                g.teeth = z;
-            }
             if let Ok(r) = gear_core::train::solve_any(
-                &gear_core::train::Stage::hula(hula),
+                &gear_core::train::Stage::Shape(Box::new(hula)),
                 &gear_core::train::StageLoads::just(2.0),
                 &lib,
             ) {

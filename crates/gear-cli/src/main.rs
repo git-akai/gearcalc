@@ -156,7 +156,10 @@ fn solve_set(
 
 /// **A stage of four members on a crank, read as the hula stage it is** —
 /// the grounded gear, the two on the wobble body, the output; two meshes at
-/// one crank offset — for the commands that build one.
+/// one crank offset — for the commands that build one. The list
+/// (`arrangements::hula`) keeps its members as the grounded gear, the
+/// output, then the two wobble gears; this reads them in the hula's own
+/// order, grounded, wobble, wobble, output.
 struct HulaView<'a> {
     ratio: f64,
     /// `z₂z₄` and `D = z₂z₄ − z₁z₃`, the two products the reduction is
@@ -173,7 +176,7 @@ struct HulaView<'a> {
     fixed_carrier_efficiency: f64,
     backlash: gear_core::contact::Directional<gear_core::train::Backlash>,
     /// Speeds and torques per case on the grounded gear's shaft, the crank
-    /// and the output — the shape's shafts 3, 1 and 2.
+    /// and the output — the shape's shafts 2, 1 and 3.
     cases: Vec<(usize, [f64; 3], [f64; 3])>,
     /// Each member with whether it is a ring, in the stage's order.
     gears: Vec<(&'a gear_core::train::GearResult, bool)>,
@@ -192,10 +195,9 @@ fn hula_view<'a>(
         return None;
     }
     let d = s.distances.first()?;
-    let z: Vec<i64> = shape
-        .members
+    let z: Vec<i64> = HULA_ORDER
         .iter()
-        .map(|m| i64::from(m.gear.teeth))
+        .map(|&i| i64::from(shape.members[i].gear.teeth))
         .collect();
     let numerator = z[1] * z[3];
     Some(HulaView {
@@ -213,32 +215,49 @@ fn hula_view<'a>(
             .map(|c| {
                 (
                     c.case,
-                    [c.speeds[3], c.speeds[1], c.speeds[2]],
-                    [c.torques[3], c.torques[1], c.torques[2]],
+                    [c.speeds[2], c.speeds[1], c.speeds[3]],
+                    [c.torques[2], c.torques[1], c.torques[3]],
                 )
             })
             .collect(),
-        gears: s
-            .members
+        gears: HULA_ORDER
             .iter()
-            .zip(&shape.members)
-            .map(|(g, m)| (g, m.ring.is_some()))
+            .map(|&i| (&s.members[i], shape.members[i].ring.is_some()))
             .collect(),
         meshes: &s.meshes,
         notes: &s.notes,
     })
 }
 
+/// The list's members in the hula's reading order: grounded, wobble,
+/// wobble, output.
+const HULA_ORDER: [usize; 4] = [0, 2, 3, 1];
+
+/// A hula arrangement as these commands build one: the list at its counts
+/// and modules, with the far-side gap asked.
+fn hula_stage(teeth: [u32; 4], module: [f64; 2], gap: f64) -> gear_core::train::shape::Shape {
+    let mut shape = gear_core::train::arrangements::hula(teeth, module);
+    shape.distances[0].tip_clearance = gap;
+    shape
+}
+
+/// The shaper's teeth on the ring of a mesh, which the list keeps second.
+fn ring_cutter_teeth(shape: &gear_core::train::shape::Shape, mesh: usize) -> u32 {
+    shape.members[shape.meshes[mesh].b]
+        .ring
+        .map_or(0, |c| c.teeth)
+}
+
 /// A hula stage through the shape under its own arrangement — crank driven,
 /// grounded gear held, output out — whatever its counts make the rings.
 fn solve_hula(
-    stage: &gear_core::train::HulaStage,
+    shape: &gear_core::train::shape::Shape,
     loads: &gear_core::train::StageLoads,
     lib: &gear_core::material::MaterialLibrary,
 ) -> Result<(gear_core::train::Stage, gear_core::train::StageResult), gear_core::train::TrainError>
 {
-    let as_stage = gear_core::train::Stage::hula(stage.clone());
-    let boundary = gear_core::train::StageBoundary::holding(5, &[3], 1, 2);
+    let as_stage = gear_core::train::Stage::Shape(Box::new(shape.clone()));
+    let boundary = gear_core::train::StageBoundary::holding(5, &[2], 1, 3);
     let r = gear_core::train::solve_any(&as_stage, &loads.clone().under(boundary), lib)?;
     Ok((as_stage, r))
 }
@@ -671,28 +690,24 @@ fn main() {
 /// would be a second answer to the same question — which is how the two start
 /// disagreeing.
 fn hula_report(n: u32, clearance: f64, m_outer: f64, m_inner: f64, cutter_teeth: Option<u32>) {
-    use gear_core::train::{HulaStage, StageLoads};
+    use gear_core::train::StageLoads;
 
     let lib = gear_io::default_library();
     let teeth = [n + 1, n, n - 1, n];
-    let mut stage = HulaStage {
-        module: [m_outer, m_inner],
-        clearance,
-        ..HulaStage::default()
-    };
-    for (gear, count) in stage.gears.iter_mut().zip(teeth) {
-        gear.teeth = count;
-    }
+    let mut stage = hula_stage(teeth, [m_outer, m_inner], clearance);
     // **A shaper has to be smaller than the ring it cuts**, and this command
     // builds rings far smaller than the ones the stage ships with: `hula 18`
     // asks for a 19-tooth ring, which the stocked default would not fit inside.
     // So the default stands where it fits and gives way to five teeth under the
     // ring where it does not — the sizing the comment here has always claimed
     // and never did, since the count it worked out was discarded unused.
-    for (mesh, cutter) in stage.cutter.iter_mut().enumerate() {
-        let ring = teeth[mesh * 2].max(teeth[mesh * 2 + 1]);
-        let stocked = cutter.teeth;
-        cutter.teeth = cutter_teeth.unwrap_or_else(|| stocked.min(ring.saturating_sub(5)).max(4));
+    for m in &mut stage.members {
+        if let Some(cutter) = &mut m.ring {
+            let ring = m.gear.teeth;
+            let stocked = cutter.teeth;
+            cutter.teeth =
+                cutter_teeth.unwrap_or_else(|| stocked.min(ring.saturating_sub(5)).max(4));
+        }
     }
 
     let (as_stage, solved) = match solve_hula(&stage, &StageLoads::at(2.0, 1000.0), &lib) {
@@ -762,7 +777,7 @@ fn hula_report(n: u32, clearance: f64, m_outer: f64, m_inner: f64, cutter_teeth:
                 .collect::<Vec<_>>()
                 .join("  "),
             transverse(mesh).operating_pressure_angle,
-            stage.cutter[index].teeth
+            ring_cutter_teeth(&stage, index)
         );
         println!(
             "    far-side gap {:.4} mm   contact ratio {:.4}",
@@ -1087,7 +1102,7 @@ fn roll_pair(ring: &gear_core::ring::Ring, pinion: &gear_core::Gear, a: f64, tit
 /// out — the useful statement is which bound stops it, and that is what these
 /// rows are.
 fn hula_band(z0: u32, clearance_in_modules: f64) {
-    use gear_core::train::{HulaStage, StageLoads};
+    use gear_core::train::StageLoads;
 
     let lib = gear_io::default_library();
 
@@ -1117,30 +1132,21 @@ fn hula_band(z0: u32, clearance_in_modules: f64) {
                 }
                 for i in -30..=40 {
                     let x = f64::from(i) * 0.05;
-                    let mut stage = HulaStage {
-                        module: [module; 2],
-                        clearance: clearance_in_modules * module,
-                        running_clearance: gear_core::params::Auto::fixed(0.02 * module),
-                        tolerance_plus: 0.02 * module,
-                        tolerance_minus: 0.02 * module,
-                        ..HulaStage::default()
-                    };
-                    for (gear, count) in stage.gears.iter_mut().zip(teeth) {
-                        gear.teeth = count;
-                        gear.addendum = addendum;
-                    }
+                    let mut stage = hula_stage(teeth, [module; 2], clearance_in_modules * module);
+                    stage.distances[0].clearance = gear_core::params::Auto::fixed(0.02 * module);
+                    stage.distances[0].tolerance_plus = 0.02 * module;
+                    stage.distances[0].tolerance_minus = 0.02 * module;
                     // **The ring's shift is the one given**, and the pinion's
                     // follows to the crank the tips size — the member the
                     // kind took as given when it was handed both, and what a
                     // shape reads off the toggles: a mesh with both members
                     // given reaches nothing.
-                    for mesh in 0..2 {
-                        let (a, b) = (mesh * 2, mesh * 2 + 1);
-                        let ring = if teeth[a] > teeth[b] { a } else { b };
-                        stage.gears[ring].profile_shift = gear_core::params::Auto::fixed(x);
-                    }
-                    for c in &mut stage.cutter {
-                        c.teeth = cutter;
+                    for m in &mut stage.members {
+                        m.gear.addendum = addendum;
+                        if let Some(c) = &mut m.ring {
+                            c.teeth = cutter;
+                            m.gear.profile_shift = gear_core::params::Auto::fixed(x);
+                        }
                     }
                     let Ok((as_stage, r)) = solve_hula(&stage, &StageLoads::at(2.0, 1000.0), &lib)
                     else {
@@ -1228,17 +1234,11 @@ fn mesh_sweep(z_ring: u32, z_pinion: u32, ring_addendum: f64, pinion_addendum: f
 /// a pair before that bound was applied would be measuring one nobody builds.
 fn hula_sweep(n: u32, clearance: f64, mesh_index: usize) {
     use gear_core::ring::Ring;
-    use gear_core::train::{HulaStage, StageLoads};
+    use gear_core::train::StageLoads;
 
     let lib = gear_io::default_library();
     let teeth = [n + 1, n, n - 1, n];
-    let mut stage = HulaStage {
-        clearance,
-        ..HulaStage::default()
-    };
-    for (gear, count) in stage.gears.iter_mut().zip(teeth) {
-        gear.teeth = count;
-    }
+    let stage = hula_stage(teeth, [1.0, 1.0], clearance);
     let (as_stage, solved) = match solve_hula(&stage, &StageLoads::at(2.0, 1000.0), &lib) {
         Ok(r) => r,
         Err(e) => {
@@ -1252,16 +1252,20 @@ fn hula_sweep(n: u32, clearance: f64, mesh_index: usize) {
     };
     let (a, b) = (mesh_index * 2, mesh_index * 2 + 1);
     let (ring_i, pinion_i) = if result.gears[a].1 { (a, b) } else { (b, a) };
+    let member = |i: usize| &stage.members[HULA_ORDER[i]];
     let params = |i: usize| GearParams {
-        module: stage.module[mesh_index],
+        module: member(i).module,
         teeth: result.gears[i].0.params.teeth,
         profile_shift: result.gears[i].0.profile_shift,
-        addendum: stage.gears[i].addendum,
-        dedendum: stage.gears[i].dedendum,
-        thickness_mod: stage.thickness_mod[mesh_index],
+        addendum: member(i).gear.addendum,
+        dedendum: member(i).gear.dedendum,
+        thickness_mod: member(i).thickness_mod.manual,
         ..GearParams::default()
     };
-    let ring = Ring::cut_by(&params(ring_i), &stage.cutter[mesh_index]);
+    let ring = Ring::cut_by(
+        &params(ring_i),
+        &member(ring_i).ring.expect("the ring of the pair"),
+    );
     let pinion = gear_core::Gear::new(params(pinion_i));
     let m = &result.meshes[mesh_index];
     roll_pair(
@@ -1573,7 +1577,7 @@ fn shifts_report(z1: u32, z2: u32) {
 /// for — 26 of 30 sets swept came back with a ring the cutter had to alter.
 fn epicyclic_shifts_report() {
     use gear_core::params::Auto;
-    use gear_core::train::{solve_any, HulaStage, Optimisation, PlanetaryStage, Stage, StageLoads};
+    use gear_core::train::{solve_any, Optimisation, PlanetaryStage, Stage, StageLoads};
 
     let lib = gear_io::default_library();
     let on = Optimisation {
@@ -1595,15 +1599,12 @@ fn epicyclic_shifts_report() {
     );
     for d in [1u32, 3, 6] {
         let n = 18 * d;
-        let mut hula = gear_core::train::HulaStage {
-            module: [1.0 / f64::from(d); 2],
-            clearance: 0.30 / f64::from(d),
-            ..gear_core::train::HulaStage::default()
-        };
+        let mut hula = hula_stage(
+            [n, n + d, n + d, n + 2 * d],
+            [1.0 / f64::from(d); 2],
+            0.30 / f64::from(d),
+        );
         hula.optimisation = on;
-        for (g, z) in hula.gears.iter_mut().zip([n, n + d, n + d, n + 2 * d]) {
-            g.teeth = z;
-        }
         match solve_hula(&hula, &StageLoads::at(2.0, 1000.0), &lib) {
             Err(e) => println!("{d:<12} {e}"),
             Ok((as_stage, r)) => {
@@ -1665,21 +1666,17 @@ fn epicyclic_shifts_report() {
         "N", "x mesh 1", "x mesh 2", "eta fwd", "cut as asked"
     );
     for n in [12u32, 18, 30] {
-        let mut stage = HulaStage {
-            optimisation: on,
-            ..HulaStage::default()
-        };
-        for (gear, count) in stage.gears.iter_mut().zip([n + 1, n, n - 1, n]) {
-            gear.teeth = count;
-        }
+        let mut stage = hula_stage([n + 1, n, n - 1, n], [1.0, 1.0], 0.3);
+        stage.optimisation = on;
         match solve_hula(&stage, &StageLoads::at(2.0, 1000.0), &lib) {
             Ok((_, r)) => {
+                // The two wobble gears' shifts: the list's members 2 and 3.
                 let members = r.members();
                 println!(
                     "{:<12} {:>9.4} {:>9.4} {:>10.4} % {:>16}",
                     n,
-                    members[1].profile_shift,
                     members[2].profile_shift,
+                    members[3].profile_shift,
                     100.0 * ways_or_nan(r.efficiency()).forward,
                     members.iter().all(|g| g.clamps.is_empty())
                 );

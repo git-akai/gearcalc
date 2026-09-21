@@ -40,7 +40,6 @@ export type { FreedomGroup } from "./core/FreedomGroup";
 export type { GearCase } from "./core/GearCase";
 export type { GearParams } from "./core/GearParams";
 export type { GearResult } from "./core/GearResult";
-export type { HulaStage } from "./core/HulaStage";
 export type { LayoutReport } from "./core/LayoutReport";
 export type { LineContact } from "./core/LineContact";
 export type { Load } from "./core/Load";

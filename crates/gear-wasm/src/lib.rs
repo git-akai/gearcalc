@@ -1591,13 +1591,13 @@ mod tests {
             .clone()
     }
 
-    /// The hula stage, no longer a preset the menu offers; it stays a stage
-    /// the boundary carries until the Wolfrom preset at one planet is shown
-    /// to be it.
+    /// The hula arrangement — a stepped Wolfrom at one planet — which no
+    /// preset offers and the boundary still has to carry, since a file may
+    /// hold one and the epicyclic controls can build one.
     fn hula_stage() -> serde_json::Value {
-        serde_json::to_value(gear_core::train::Stage::hula(
-            gear_core::train::HulaStage::default(),
-        ))
+        serde_json::to_value(gear_core::train::Stage::Shape(Box::new(
+            gear_core::train::arrangements::hula([65, 61, 57, 61], [1.0, 1.0]),
+        )))
         .unwrap()
     }
 

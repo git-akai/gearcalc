@@ -296,9 +296,13 @@ already flags. `tools/iso_6336_3_stack.py` multiplies the set out
 ([rationale](rationale.md#the-helix-factors-are-a-pair-and-this-tool-can-take-neither)).
 
 **One stage shape.** Every stage is one `Shape` — axes, the shafts on
-them, members, meshes, distances — and a spur pair, a crossed pair, a worm,
-a planetary set and a hula stage are *presets* over it: what `defaults`
-fills in, a vocabulary, and which inputs the panel puts forward. There is no
+them, members, meshes, distances — and every menu entry (`StagePreset`:
+a spur pair, an idler, a layshaft; a worm, a crossed pair; a planetary set,
+a Wolfrom, a compound set, a planocentric, meshed planets) is a *preset*
+over it: a list in `arrangements.rs` at sensible teeth, which `defaults`
+crosses under the family the shape reads as. The hula stage is the
+arrangement `arrangements::hula`, a stepped Wolfrom at one planet, and no
+preset. There is no
 type in the core to branch on; `Stage` has one variant and keeps its tag.
 What a stage is, the solve reads off the shape — a mesh is internal because a member has a cutter, a set is an axis
 carried by a shaft and replicated, a worm is a distance marked as one — and
@@ -469,8 +473,8 @@ building a gear per trial; and
 inspection data — span and over-pins — as the range it takes around the
 revolution, verified against a caliper reading off the drawn teeth.
 
-**Trains.** Spur/helical, worm, planetary and hula stages in one
-train — the last behind the developer knock, as the eccentric gear is; torque,
+**Trains.** Every preset of the three families in one train — the
+developer knock keeps the eccentric gear alone; torque,
 backlash and cycle accumulation; efficiency and backlash in **both** drive
 directions. Contact is `max(elliptical, line)` on **both** mesh kinds now — a
 crossed pair's ellipse lengthens as its shafts come parallel, so the line its
@@ -532,8 +536,7 @@ R2000 minimum so a reader that repairs nothing still opens it — confirmed
 importing into SOLIDWORKS · geartrain presets under three families: parallel
 axes (spur/helical, idler, layshaft), skew shafts (worm, crossed), epicyclic
 (planetary, Wolfrom, compound, planocentric, meshed planets), all one shape,
-and the hula stage still carried by the boundary until the Wolfrom preset at
-one planet is shown to be it ·
+the hula an arrangement of the epicyclic family the harness names ·
 geartrains
 exported and imported as TOML, inputs only · gear tabs with external and internal
 kinds, and eccentric in the same developer mode.

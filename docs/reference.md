@@ -1811,15 +1811,20 @@ eccentric, so **both pairs are separated by the same distance**, the crank's
 offset, and that shared number is what makes the arrangement one mechanism
 rather than two independent meshes.
 
-**It is a preset of [the stage](#the-stage)**, as every arrangement is: a central
-axis carrying the grounded gear, the crank and the output; a wobble axis the
-crank carries, with both wobble gears on one shaft; two internal meshes on
-the one distance between the axes, which the tips size where it is
-automatic. Everything below — the offset from the gap and the tips, the
-shifts that reach it, the circulating power, the play at either shaft — the
-shape solves as it solves any arrangement, and `hula_recorded` in
-`train/shape.rs` holds it to the figures its own solver recorded, to the digits
-the corpus printed, before it retired. What is this arrangement's own is the
+**It is an arrangement of [the stage](#the-stage)**, and no preset of its
+own: a stepped Wolfrom at one planet — a central axis carrying the grounded
+gear, the crank and the output; a wobble axis the crank carries, with both
+wobble gears on one shaft; two internal meshes on the one distance between
+the axes, which the tips size where it is automatic. `arrangements::hula` is
+the list (`epicyclic`, one planet, two steps, a central member on each) at
+the proportions the family runs at, the harness builds it from that list,
+and the menu reaches it from the Wolfrom preset with a step added. Everything
+below — the offset from the gap and the tips, the shifts that reach it, the
+circulating power, the play at either shaft — the shape solves as it solves
+any arrangement, and `hula_recorded` in `train/shape.rs` holds it to the
+figures its own solver recorded, to the digits the corpus printed, before it
+retired; the three hula corpus files did not move by a byte when the preset
+went and the list took its place. What is this arrangement's own is the
 algebra here, which is how those figures are read.
 
 ```text

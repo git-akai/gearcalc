@@ -3919,92 +3919,6 @@ impl From<&super::PlanetaryStage> for Shape {
     }
 }
 
-impl From<&super::HulaStage> for Shape {
-    /// **The hula stage as a shape**: a central axis with the grounded gear,
-    /// the crank and the output on it, a wobble axis carried by the crank
-    /// with the two wobble gears on one shaft, two internal meshes on the
-    /// one distance — the crank offset — which the tips size where it is
-    /// automatic. Which member of each pair is the ring is a tooth count,
-    /// the larger; the pinion's `k` is the ring's too, as the hula's own
-    /// solver had it.
-    /// Shafts: crank 1, output 2, grounded 3, wobble 4 — the driven one
-    /// first, the output next, the grounded gear's ring the first ring
-    /// listed and so the one held by convention.
-    fn from(h: &super::HulaStage) -> Self {
-        let mesh_of = |i: usize| i / 2;
-        let is_ring = |i: usize| {
-            let (a, b) = (mesh_of(i) * 2, mesh_of(i) * 2 + 1);
-            h.gears[i].teeth > h.gears[if i == a { b } else { a }].teeth
-        };
-        let shaft_of = |i: usize| match i {
-            0 => 3,
-            3 => 2,
-            _ => 4,
-        };
-        let members: Vec<Member> = (0..4)
-            .map(|i| Member {
-                shaft: shaft_of(i),
-                gear: h.gears[i].clone(),
-                module: h.module[mesh_of(i)],
-                // The pinion of each pair states it; its ring follows.
-                thickness_mod: if is_ring(i) {
-                    Auto::automatic(h.thickness_mod[mesh_of(i)])
-                } else {
-                    Auto::fixed(h.thickness_mod[mesh_of(i)])
-                },
-                ring: is_ring(i).then_some(h.cutter[mesh_of(i)]),
-                pitch_diameter: Auto::automatic(0.0),
-            })
-            .collect();
-        let mesh = |m: usize| {
-            let (a, b) = (m * 2, m * 2 + 1);
-            let (pinion, ring) = if is_ring(a) { (b, a) } else { (a, b) };
-            MeshInput {
-                a: pinion,
-                b: ring,
-                sliding_friction: h.sliding_friction[m],
-                static_friction: h.static_friction[m],
-            }
-        };
-        Self {
-            pressure_angle: h.pressure_angle,
-            overlap: h.overlap,
-            optimisation: h.optimisation,
-            load_sharing: h.load_sharing,
-            min_planet_clearance: 0.0,
-            axes: vec![
-                Axis {
-                    carried_by: None,
-                    count: 1,
-                },
-                Axis {
-                    carried_by: Some(1),
-                    count: 1,
-                },
-            ],
-            shafts: vec![
-                ShaftOn { axis: 0 },
-                ShaftOn { axis: 0 },
-                ShaftOn { axis: 0 },
-                ShaftOn { axis: 1 },
-            ],
-            members,
-            meshes: vec![mesh(0), mesh(1)],
-            distances: vec![Distance {
-                axes: [0, 1],
-                angle: 0.0,
-                worm: false,
-                distance: h.offset,
-                clearance: h.running_clearance,
-                tip_clearance: h.clearance,
-                tolerance_plus: h.tolerance_plus,
-                tolerance_minus: h.tolerance_minus,
-                axial_clearance: 0.0,
-            }],
-        }
-    }
-}
-
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
@@ -5323,29 +5237,32 @@ mod hula_recorded {
     //! `gear-cli hula 18 0.2` and what `docs/reference.md#the-hula-stage`
     //! quotes for the shipped stage, to the digits they print.
 
-    use super::super::{test_library, HulaStage, Reversal, StageLoads};
+    use super::super::arrangements::hula;
+    use super::super::{test_library, Reversal, StageLoads};
     use super::*;
 
-    fn hula_18(clearance: f64) -> HulaStage {
-        let mut stage = HulaStage {
-            clearance,
-            ..HulaStage::default()
-        };
-        for (g, z) in stage.gears.iter_mut().zip([19, 18, 17, 18]) {
-            g.teeth = z;
+    /// The harness's fixture: 19/18/17/18, shapers of 14 and 13 teeth for
+    /// the two rings (the grounded gear and the output), the gap asked.
+    fn hula_18(clearance: f64) -> Shape {
+        let mut shape = hula([19, 18, 17, 18], [1.0, 1.0]);
+        shape.distances[0].tip_clearance = clearance;
+        for (m, teeth) in [14, 13].into_iter().enumerate() {
+            shape.members[m].ring.as_mut().unwrap().teeth = teeth;
         }
-        for (m, c) in stage.cutter.iter_mut().enumerate() {
-            c.teeth = [14, 13][m];
-        }
-        stage
+        shape
+    }
+
+    /// The shipped stage, 65/61/57/61.
+    fn shipped() -> Shape {
+        hula([65, 61, 57, 61], [1.0, 1.0])
     }
 
     /// The hula's own boundary: crank driven, grounded gear held, output
-    /// out — shafts 1, 3 and 2 of the shape.
-    fn solve(stage: &HulaStage, loads: StageLoads) -> ShapeResult {
-        let boundary = super::super::StageBoundary::holding(5, &[3], 1, 2);
+    /// out — shafts 1, 2 and 3 of the shape.
+    fn solve(shape: &Shape, loads: StageLoads) -> ShapeResult {
+        let boundary = super::super::StageBoundary::holding(5, &[2], 1, 3);
         solve_loads(
-            &Shape::from(stage),
+            shape,
             &loads.under(boundary),
             &test_library(),
             Reversal::default(),
@@ -5370,8 +5287,9 @@ mod hula_recorded {
             "crank offset at zero backlash",
         );
         assert_eq!(d.sized_by, Some(0), "held open by mesh 1");
-        // The rings at +0.4519, the pinions at their floor.
-        for (i, want) in [(0, 0.4519), (1, 0.0), (2, 0.0), (3, 0.4519)] {
+        // The rings at +0.4519, the pinions at their floor: the members are
+        // the grounded ring, the output ring, then the two wobble pinions.
+        for (i, want) in [(0, 0.4519), (1, 0.4519), (2, 0.0), (3, 0.0)] {
             close(
                 want,
                 r.members[i].profile_shift,
@@ -5439,30 +5357,30 @@ mod hula_recorded {
         );
         close(
             190.3167 / eta1,
-            r.members[1].cases[0].torque,
+            r.members[2].cases[0].torque,
             5e-4,
             "z18 torque over η₁",
         );
-        close(191.6182, r.members[2].cases[0].torque, 5e-4, "z17 torque");
+        close(191.6182, r.members[3].cases[0].torque, 5e-4, "z17 torque");
         close(
             202.8899,
-            r.members[3].cases[0].torque,
+            r.members[1].cases[0].torque,
             5e-4,
             "output z18 torque",
         );
         close(
             6663.3 / eta1,
-            r.members[1].cases[0].bending_stress.unwrap(),
+            r.members[2].cases[0].bending_stress.unwrap(),
             0.05,
             "z18 σ_F",
         );
         close(
             7171.7,
-            r.members[2].cases[0].bending_stress.unwrap(),
+            r.members[3].cases[0].bending_stress.unwrap(),
             0.05,
             "z17 σ_F",
         );
-        for i in [0, 3] {
+        for i in [0, 1] {
             assert!(
                 r.members[i].cases[0].bending_stress.is_none(),
                 "no fillet, no rating"
@@ -5472,7 +5390,7 @@ mod hula_recorded {
 
     #[test]
     fn the_shipped_hula_stage_reports_the_figures_the_documents_quote() {
-        let r = solve(&HulaStage::default(), StageLoads::at(2.0, 1000.0));
+        let r = solve(&shipped(), StageLoads::at(2.0, 1000.0));
         close(3721.0 / 16.0, r.ratio.unwrap(), 1e-9, "the reduction");
         close(
             81.92,
@@ -5501,11 +5419,11 @@ mod hula_recorded {
             speed: 0.0,
             turns: None,
         });
-        let r = solve(&HulaStage::default(), loads);
+        let r = solve(&shipped(), loads);
         let c = &r.cases[2];
         close(
             0.5 * r.ratio.unwrap(),
-            c.torques[2].abs(),
+            c.torques[3].abs(),
             1e-9,
             "the output carries the case",
         );
@@ -5524,7 +5442,7 @@ mod member_names {
     //! when its own naming was replaced by this — is the second reader.
 
     use super::super::arrangements as arr;
-    use super::super::{HulaStage, PairKind, PairStage, PlanetaryStage};
+    use super::super::{PairKind, PairStage, PlanetaryStage};
     use super::{MemberRole, Shape};
 
     fn names(shape: &Shape) -> Vec<String> {
@@ -5559,8 +5477,8 @@ mod member_names {
             s(&["sun", "planet", "ring"])
         );
         assert_eq!(
-            names(&Shape::from(&HulaStage::default())),
-            s(&["ring 1", "planet 1", "planet 2", "ring 2"])
+            names(&arr::hula([65, 61, 57, 61], [1.0, 1.0])),
+            s(&["ring 1", "ring 2", "planet 1", "planet 2"])
         );
         assert_eq!(
             names(&arr::wolfrom(18, [60, 61], 3)),
