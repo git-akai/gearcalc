@@ -18,7 +18,7 @@
 //! gear meets a central member, every distance carries a mesh, and a
 //! carrier's shaft is never removed.
 
-use super::shape::{Axis, Distance, Member, MeshInput, ShaftOn, Shape};
+use super::shape::{Member, Shape};
 use super::StageGear;
 use crate::kinematics::{Shaft, GROUND};
 use crate::params::Auto;
@@ -225,52 +225,6 @@ impl Shape {
         })
     }
 
-    /// The friction the stage's meshes run with — the first mesh's, or the
-    /// set's where there is none.
-    fn friction(&self) -> (f64, f64) {
-        self.meshes
-            .first()
-            .map_or((0.08, 0.16), |m| (m.sliding_friction, m.static_friction))
-    }
-
-    fn push_shaft(&mut self, axis: usize) -> Shaft {
-        self.shafts.push(ShaftOn { axis });
-        self.shafts.len()
-    }
-
-    fn push_mesh(&mut self, a: usize, b: usize) {
-        // A ring goes second, as the mesh's kind is read.
-        let (a, b) = if self.members[a].ring.is_some() {
-            (b, a)
-        } else {
-            (a, b)
-        };
-        let (sliding_friction, static_friction) = self.friction();
-        self.meshes.push(MeshInput {
-            a,
-            b,
-            sliding_friction,
-            static_friction,
-        });
-    }
-
-    /// A distance between two axes, automatic, at the first distance's
-    /// clearances and tolerances where there is one.
-    fn push_distance(&mut self, axes: [usize; 2]) {
-        let like = self.distances.first().copied();
-        self.distances.push(Distance {
-            axes,
-            angle: 0.0,
-            worm: false,
-            distance: Auto::automatic(0.0),
-            clearance: like.map_or(Auto::fixed(0.02), |d| d.clearance),
-            tip_clearance: like.map_or(0.0, |d| d.tip_clearance),
-            tolerance_plus: like.map_or(0.02, |d| d.tolerance_plus),
-            tolerance_minus: like.map_or(0.02, |d| d.tolerance_minus),
-            axial_clearance: 0.0,
-        });
-    }
-
     // ---------------------------------------------------------- epicyclic ---
 
     fn add_step(&mut self, axis: usize) -> Result<Renumbered, EditRefused> {
@@ -443,11 +397,7 @@ impl Shape {
             .rev()
             .find(|&i| self.axis_of_shaft(self.shaft_of(i)) == Some(last_axis))
             .ok_or(EditRefused::NoSuchIndex)?;
-        self.axes.push(Axis {
-            carried_by: GROUND,
-            count: 1,
-        });
-        let axis = self.axes.len() - 1;
+        let axis = self.push_axis(GROUND, 1);
         let shaft = self.push_shaft(axis);
         self.members.push(Member {
             shaft,
@@ -456,7 +406,7 @@ impl Shape {
         });
         let new = self.members.len() - 1;
         self.push_mesh(last, new);
-        self.push_distance([last_axis, axis]);
+        self.push_distance([last_axis, axis], 0.0);
         Ok(Renumbered::identity(self.shafts.len()))
     }
 

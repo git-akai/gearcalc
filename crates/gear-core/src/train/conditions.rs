@@ -891,6 +891,10 @@ pub struct StagePorts {
     /// panel offers one box per group and writes it to every member in it,
     /// rather than one per member with nothing tying them.
     pub module_groups: Vec<Vec<usize>>,
+    /// **The family the shape reads as** ([`super::shape::Shape::family`]),
+    /// which decides the card's structural buttons and its chip — the
+    /// core's reading, so the panel does not derive it a second time.
+    pub family: super::StageFamily,
 }
 
 /// One shaft of the train's motion, for the front end.
@@ -1005,6 +1009,9 @@ impl Train {
                     },
                     module_groups: match stage {
                         super::Stage::Shape(s) => s.module_groups(),
+                    },
+                    family: match stage {
+                        super::Stage::Shape(s) => s.family(),
                     },
                     ports: stage
                         .ports()

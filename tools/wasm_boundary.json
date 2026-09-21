@@ -18530,7 +18530,8 @@
           0,
           1
          ]
-        ]
+        ],
+        "family": "parallel"
        }
       ],
       "motion": {
@@ -20581,7 +20582,8 @@
           0,
           1
          ]
-        ]
+        ],
+        "family": "parallel"
        },
        {
         "ports": [
@@ -20630,7 +20632,8 @@
           1,
           2
          ]
-        ]
+        ],
+        "family": "epicyclic"
        }
       ],
       "motion": {

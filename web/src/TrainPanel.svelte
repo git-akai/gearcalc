@@ -369,12 +369,10 @@
     const key = editTrain(tab.train, { stage: { stage: i, edit } });
     refused = key === null ? null : { stage: i, key };
   }
-  /** The axis a member turns about, and whether a carrier carries it. */
+  /** The axis a member turns about; whether a carrier carries it is
+   *  `members.ts`'s `carried`, the one reading the gear tab shares. */
   const axisOf = (shape: Shape, j: number) => shape.shafts[shape.members[j].shaft - 1]?.axis;
-  const isPlanetGear = (shape: Shape, j: number) => {
-    const a = axisOf(shape, j);
-    return a !== undefined && shape.axes[a].carried_by !== 0;
-  };
+  const isPlanetGear = carried;
   /** The members a member meshes with. */
   const mates = (shape: Shape, j: number) =>
     shape.meshes.filter((m) => m.a === j || m.b === j).map((m) => (m.a === j ? m.b : m.a));
@@ -1985,7 +1983,9 @@
         {@const sres = res && res.kind === "shape" ? res : null}
         {@const worm = isWorm(stage)}
         {@const crossed = stage.distances.some((d) => d.angle !== 0)}
-        {@const epicyclic = stage.axes.some((a) => a.carried_by !== 0)}
+        {@const family = result.topology[i]?.family ?? "parallel"}
+        {@const epicyclic = family === "epicyclic"}
+        {@const parallel = family === "parallel"}
         {@const replicated = stage.axes.map((a, k) => (a.count > 1 ? k : -1)).filter((k) => k >= 0)}
         {@const carriedAxes = stage.axes.map((a, k) => (a.carried_by !== 0 ? k : -1)).filter((k) => k >= 0)}
         {@const name = (j: number) => memberName(tab.train, result.topology, i, j)}
@@ -2070,7 +2070,7 @@
                     <button class="action add" onclick={() => editStage(i, { add_step: { axis: k } })}>{carriedAxes.length > 1 ? `${t("ui.train_add_step")} · ${axisName(stage, i, k)}` : t("ui.train_add_step")}</button>
                   {/each}
                 </div>
-              {:else if !crossed && !worm}
+              {:else if parallel}
                 <div class="edits">
                   <button class="action add" onclick={() => editStage(i, "add_axis")}>{t("ui.train_add_axis")}</button>
                   <button class="action danger" disabled={stage.axes.length < 3} onclick={() => editStage(i, "remove_axis")}>{t("ui.train_remove_axis")}</button>
@@ -2179,7 +2179,7 @@
                      ratio, one gear on the shaft the pairs share and the
                      other on a shaft of its own until it is moved onto the
                      output. -->
-                {#if !epicyclic && !crossed && !worm}
+                {#if parallel}
                   <div class="edits">
                     <button class="action add" onclick={() => editStage(i, { add_pair: { distance: k } })}>{t("ui.train_add_pair")}</button>
                   </div>
@@ -2197,7 +2197,7 @@
               <div class="grid shared">
                 {@render numberField("ui.train_sliding_friction", () => m.sliding_friction, (v) => (m.sliding_friction = v), 0.01, "")}
                 {@render numberField("ui.train_static_friction", () => m.static_friction, (v) => (m.static_friction = v), 0.01, "", t("ui.train_note_static_friction"))}
-                {#if !epicyclic && !crossed && !worm}
+                {#if parallel}
                   <div class="edits">
                     <button class="action danger" disabled={onDistance < 2} onclick={() => editStage(i, { remove_pair: { mesh: k } })}>{t("ui.train_remove_pair")}</button>
                   </div>

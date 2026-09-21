@@ -61,22 +61,17 @@ impl Builder {
 
     /// An axis carried round by `carrier`, `count` times.
     pub fn carried_axis(&mut self, carrier: Shaft, count: u32) -> usize {
-        self.shape.axes.push(Axis {
-            carried_by: carrier,
-            count,
-        });
-        self.shape.axes.len() - 1
+        self.shape.push_axis(carrier, count)
     }
 
     /// A shaft on an axis, numbered as the wiring numbers it.
     pub fn shaft(&mut self, axis: usize) -> Shaft {
-        self.shape.shafts.push(ShaftOn { axis });
-        self.shape.shafts.len()
+        self.shape.push_shaft(axis)
     }
 
     /// An external gear on a shaft; the member's index.
     pub fn gear(&mut self, shaft: Shaft, teeth: u32) -> usize {
-        self.member(shaft, teeth, None)
+        self.shape.push_member(shaft, teeth, self.module, None)
     }
 
     /// A ring on a shaft, cut by the shipped cutter, its shift automatic
@@ -84,38 +79,14 @@ impl Builder {
     /// is closed by its shift, which a ring given at zero could not do; the
     /// member's index.
     pub fn ring(&mut self, shaft: Shaft, teeth: u32) -> usize {
-        self.member(shaft, teeth, Some(Cutter::default()))
-    }
-
-    fn member(&mut self, shaft: Shaft, teeth: u32, ring: Option<Cutter>) -> usize {
-        self.shape.members.push(Member {
-            shaft,
-            gear: StageGear {
-                teeth,
-                ..StageGear::default()
-            },
-            module: self.module,
-            thickness_mod: Auto::automatic(1.0),
-            ring,
-            pitch_diameter: Auto::automatic(0.0),
-        });
-        self.shape.members.len() - 1
+        self.shape
+            .push_member(shaft, teeth, self.module, Some(Cutter::default()))
     }
 
     /// Two members in mesh. On an internal mesh the ring goes second, as
     /// [`MeshInput`] has it.
     pub fn mesh(&mut self, a: usize, b: usize) -> &mut Self {
-        let (a, b) = if self.shape.members[a].ring.is_some() {
-            (b, a)
-        } else {
-            (a, b)
-        };
-        self.shape.meshes.push(MeshInput {
-            a,
-            b,
-            sliding_friction: FRICTION.0,
-            static_friction: FRICTION.1,
-        });
+        self.shape.push_mesh(a, b);
         self
     }
 
@@ -127,17 +98,7 @@ impl Builder {
     /// An automatic distance between two axes at a shaft angle, degrees —
     /// the point contact of crossed shafts where the angle is not nought.
     pub fn crossed(&mut self, axes: [usize; 2], angle: f64) -> &mut Self {
-        self.shape.distances.push(Distance {
-            axes,
-            angle,
-            worm: false,
-            distance: Auto::automatic(0.0),
-            clearance: Auto::fixed(0.02),
-            tip_clearance: 0.0,
-            tolerance_plus: 0.02,
-            tolerance_minus: 0.02,
-            axial_clearance: 0.0,
-        });
+        self.shape.push_distance(axes, angle);
         self
     }
 
@@ -315,6 +276,85 @@ pub fn line(teeth: &[u32]) -> Shape {
         b.mesh(members[k - 1], members[k]).distance([k - 1, k]);
     }
     b.build()
+}
+
+/// **Growing a shape a piece at a time** — what [`Builder`] does to a new
+/// one and the card's edits (`train/edits.rs`) do to one that exists, so
+/// the two add a shaft, a member, a mesh or a distance by one rule. Every
+/// push appends and hands back the index the wiring gives the piece.
+impl Shape {
+    pub(crate) fn push_axis(&mut self, carried_by: Shaft, count: u32) -> usize {
+        self.axes.push(Axis { carried_by, count });
+        self.axes.len() - 1
+    }
+
+    pub(crate) fn push_shaft(&mut self, axis: usize) -> Shaft {
+        self.shafts.push(ShaftOn { axis });
+        self.shafts.len()
+    }
+
+    /// A member at the crate's default tooth, its thickness coefficient
+    /// and shift automatic; a ring where a cutter is given.
+    pub(crate) fn push_member(
+        &mut self,
+        shaft: Shaft,
+        teeth: u32,
+        module: f64,
+        ring: Option<Cutter>,
+    ) -> usize {
+        self.members.push(Member {
+            shaft,
+            gear: StageGear {
+                teeth,
+                ..StageGear::default()
+            },
+            module,
+            thickness_mod: Auto::automatic(1.0),
+            ring,
+            pitch_diameter: Auto::automatic(0.0),
+        });
+        self.members.len() - 1
+    }
+
+    /// Two members in mesh, the ring second as the mesh's kind is read,
+    /// at the friction the shape's meshes already run with — the first
+    /// mesh's, or the set's where there is none.
+    pub(crate) fn push_mesh(&mut self, a: usize, b: usize) {
+        let (a, b) = if self.members[a].ring.is_some() {
+            (b, a)
+        } else {
+            (a, b)
+        };
+        let (sliding_friction, static_friction) = self
+            .meshes
+            .first()
+            .map_or(FRICTION, |m| (m.sliding_friction, m.static_friction));
+        self.meshes.push(MeshInput {
+            a,
+            b,
+            sliding_friction,
+            static_friction,
+        });
+    }
+
+    /// An automatic distance between two axes at a shaft angle, degrees,
+    /// at the clearance, tip gap and tolerances the shape's distances
+    /// already carry — the first's, or the shipped 0.02 mm where there is
+    /// none.
+    pub(crate) fn push_distance(&mut self, axes: [usize; 2], angle: f64) {
+        let like = self.distances.first().copied();
+        self.distances.push(Distance {
+            axes,
+            angle,
+            worm: false,
+            distance: Auto::automatic(0.0),
+            clearance: like.map_or(Auto::fixed(0.02), |d| d.clearance),
+            tip_clearance: like.map_or(0.0, |d| d.tip_clearance),
+            tolerance_plus: like.map_or(0.02, |d| d.tolerance_plus),
+            tolerance_minus: like.map_or(0.02, |d| d.tolerance_minus),
+            axial_clearance: 0.0,
+        });
+    }
 }
 
 /// A planet gear's count as [`epicyclic`] takes it: external, so positive.
