@@ -312,7 +312,7 @@ impl Default for PairStage {
         let shape = super::shape::Shape::default();
         Self {
             module: 1.0,
-            pressure_angle: shape.pressure_angle,
+            pressure_angle: crate::params::GearParams::default().pressure_angle,
             shaft_angle: 0.0,
             worm: false,
             pitch_diameter: Auto::automatic(17.0),

@@ -2174,8 +2174,9 @@ that reads what to do off it rather than off a type.
 axis       carried_by  the shaft it is carried round by — ground, 0, for an axis fixed in it
            count       how many copies stand round the carrier — planets
 shaft      axis        the axis it spins about; shaft 0 is the ground
-member     shaft, gear, module, k, ring cutter (none for an external gear),
-           pitch diameter (a helix reading — a worm's way of stating its size)
+member     shaft, gear, module, pressure angle, k, ring cutter (none for an
+           external gear), pitch diameter (a helix reading — a worm's way of
+           stating its size)
 mesh       a, b, sliding and static friction
 distance   two axes, the angle between them, worm (a sizing convention),
            distance, clearance, tip clearance, tolerance ±, axial clearance
@@ -2183,7 +2184,12 @@ distance   two axes, the angle between them, worm (a sizing convention),
 
 Everything else is derived, and the derivations are the definitions. A mesh
 is **internal** exactly when one of its members has a cutter, and its sign is
-the mesh kind's. A mesh's **frame** is the carrier common to its two axes.
+the mesh kind's. Its two members share a module and a pressure angle — a
+tooth is cut at one of each — so the members a run of meshes joins share
+them, and those runs are the **mesh groups** (`Shape::mesh_groups`), a
+layer read off the graph and never stored: one on a pair or a set, two on a
+stepped planet, three on a layshaft, each with a module and a pressure angle
+of its own, which the panel offers one box for and writes to every member. A mesh's **frame** is the carrier common to its two axes.
 The **wiring** is the members' shafts and the meshes' frames, and it feeds
 `kinematics.rs` as any other. The **ports** are the shafts not replicated;
 the shaft held by convention is the first ring's, the input the first port

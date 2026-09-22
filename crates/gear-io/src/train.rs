@@ -164,6 +164,12 @@
 //!   file lists every coupling it has: a chain that listed none used to be
 //!   coupled by a rule on the way in, and is a train of isolated stages now,
 //!   each its own body, until it says which shaft turns which.
+//! - **The pressure angle moved onto the members.** A stage's
+//!   `pressure_angle` is gone and a file that still writes one is refused;
+//!   every member carries `pressure_angle` beside its `module`, and two
+//!   members in mesh must agree, as they must on the module — so a stage
+//!   whose meshes do not all join, a layshaft's pairs, may run at two. A
+//!   member that omits it is at 20°, which is what every older file meant.
 //!
 //! No compatibility shim, deliberately. Accepting both shapes means carrying two
 //! readers for one format and testing both forever, and the thing that would go

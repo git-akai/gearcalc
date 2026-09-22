@@ -11,11 +11,7 @@ import type { ShaftOn } from "./ShaftOn";
 /**
  * The stage.
  */
-export type Shape = { 
-/**
- * Normal pressure angle, degrees. Shared by every member.
- */
-pressure_angle: number, overlap: Auto<number>, optimisation: Optimisation, load_sharing: LoadSharing, 
+export type Shape = { overlap: Auto<number>, optimisation: Optimisation, load_sharing: LoadSharing, 
 /**
  * Tip-to-tip clearance between neighbouring instances of a replicated
  * axis's gears, mm — asked only where an axis is replicated.

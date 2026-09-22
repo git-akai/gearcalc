@@ -77,6 +77,12 @@ pub struct Axis {
     pub count: u32,
 }
 
+/// The crate's pressure angle, for a member a file does not give one:
+/// [`GearParams`]'s, said once.
+fn default_pressure_angle() -> f64 {
+    GearParams::default().pressure_angle
+}
+
 /// `carried_by` as a stored train wrote it while it was an `Option`: `null`
 /// reads as ground.
 #[cfg(feature = "serde")]
@@ -114,6 +120,12 @@ pub struct Member {
     pub gear: StageGear,
     /// Normal module, mm. Every mesh a member is in shares it.
     pub module: f64,
+    /// Normal pressure angle, degrees. Every mesh a member is in shares
+    /// it, as the module — a tooth is cut at one angle — so the members a
+    /// run of meshes joins ([`Shape::mesh_groups`]) have one, and two
+    /// groups of one stage may differ. Absent in a file, 20°.
+    #[cfg_attr(feature = "serde", serde(default = "default_pressure_angle"))]
+    pub pressure_angle: f64,
     /// Tooth-thickness coefficient, `k`: above 1 this gear's teeth thicken.
     /// **Given on one member of a mesh and automatic on the other**, which
     /// follows the mesh's rule — the two sum to 2 across an external mesh, a
@@ -198,8 +210,6 @@ pub struct Distance {
     ts(export, export_to = "core/")
 )]
 pub struct Shape {
-    /// Normal pressure angle, degrees. Shared by every member.
-    pub pressure_angle: f64,
     pub overlap: Auto<f64>,
     pub optimisation: Optimisation,
     pub load_sharing: LoadSharing,
@@ -221,7 +231,6 @@ pub struct Shape {
 impl Default for Shape {
     fn default() -> Self {
         Self {
-            pressure_angle: 20.0,
             overlap: Auto::automatic(1.0),
             optimisation: Optimisation::default(),
             load_sharing: LoadSharing::None,
@@ -329,13 +338,19 @@ impl Shape {
         let module = self.members[m.a].module;
         // Two gears in mesh share a normal module, on crossed shafts as on
         // parallel ones — where `Mesh::new` asks it of the racks.
-        if (self.members[m.b].module - module).abs() > crate::params::compat::SAME_RACK {
+        // ...and a pressure angle, which `Mesh::new` asks of a line contact's
+        // racks and this asks here.
+        let pressure_angle = self.members[m.a].pressure_angle;
+        if (self.members[m.b].module - module).abs() > crate::params::compat::SAME_RACK
+            || (self.members[m.b].pressure_angle - pressure_angle).abs()
+                > crate::params::compat::SAME_RACK
+        {
             return Err(TrainError::Mesh(crate::mesh::MeshError::Incompatible));
         }
         let eff = |i: usize| shifts[i] + self.base_params(i, helix).thickness_shift();
         Screw::new(&ScrewParams {
             normal_module: module,
-            normal_pressure_angle_rad: self.pressure_angle.to_radians(),
+            normal_pressure_angle_rad: pressure_angle.to_radians(),
             shaft_angle_rad: self.shaft_angle_of(mesh).to_radians(),
             starts: self.members[m.a].gear.teeth,
             wheel_teeth: self.members[m.b].gear.teeth,
@@ -798,7 +813,7 @@ impl Shape {
             angular_shift: 0.0,
             index_offset: 0.0,
             module: m.module,
-            pressure_angle: self.pressure_angle,
+            pressure_angle: m.pressure_angle,
             teeth: m.gear.teeth,
             helix_angle: helix[i],
             profile_shift: m.gear.profile_shift.manual,
@@ -847,13 +862,15 @@ impl Shape {
         out.into_iter().map(|k| k.unwrap_or(1.0)).collect()
     }
 
-    /// **The members that share a module**: the connected components of the
-    /// mesh graph, in member order — two gears in mesh share a normal module,
-    /// so everything a run of meshes joins does. One group for a pair or a
-    /// set; two for a hula stage or a stepped planet, whose meshes do not
-    /// join. What a panel offers one box for, and writes to every member of.
+    /// **The mesh groups**: the connected components of the mesh graph, in
+    /// member order — two gears in mesh share a normal module and a pressure
+    /// angle, so everything a run of meshes joins does. One group for a pair
+    /// or a set; two for a hula stage or a stepped planet, whose meshes do
+    /// not join; three for a layshaft's three pairs. A **layer over the
+    /// graph**, read off it and never stored: what a panel offers one box
+    /// for and writes to every member of, and what it deals the cards by.
     #[must_use]
-    pub fn module_groups(&self) -> Vec<Vec<usize>> {
+    pub fn mesh_groups(&self) -> Vec<Vec<usize>> {
         let n = self.members.len();
         let mut group: Vec<usize> = (0..n).collect();
         let find = |group: &Vec<usize>, mut i: usize| {
@@ -916,13 +933,14 @@ impl Shape {
             .collect()
     }
 
-    /// The basic rack a mesh is cut with: both members' module, the stage's
-    /// pressure angle, the mesh's helix.
+    /// The basic rack a mesh is cut with: both members' module and
+    /// pressure angle (the first's, the second agreeing or the mesh
+    /// refused), the mesh's helix.
     fn rack_of(&self, mesh: usize, helix: &[f64]) -> BasicRack {
         let m = self.meshes[mesh];
         BasicRack::new(
             self.members[m.a].module,
-            self.pressure_angle,
+            self.members[m.a].pressure_angle,
             helix[m.a].abs(),
         )
     }
@@ -3220,12 +3238,10 @@ pub fn solve_shape_after(
         match &bm.contact {
             BuiltContact::Line(l) => {
                 let rack = shape.rack_of(k, &helix);
-                let bb = crate::plane::base_helix_angle(
-                    helix[m.a].to_radians(),
-                    shape.pressure_angle.to_radians(),
-                );
+                let alpha_n = shape.members[m.a].pressure_angle.to_radians();
+                let bb = crate::plane::base_helix_angle(helix[m.a].to_radians(), alpha_n);
                 let slide = axial * bb.sin().abs();
-                let p_bn = std::f64::consts::PI * rack.mn * shape.pressure_angle.to_radians().cos();
+                let p_bn = std::f64::consts::PI * rack.mn * alpha_n.cos();
                 // The row's play: `Δ = j |Σz| / a`, plus the axial float's.
                 l.design.backlash(a).unwrap_or(0.0) * shape.tooth_sum(k).abs() / a
                     + 2.0 * std::f64::consts::PI * slide / p_bn
@@ -3867,7 +3883,6 @@ impl From<&super::PairStage> for Shape {
     /// sizing, clearances and tolerances.
     fn from(p: &super::PairStage) -> Self {
         let mut shape = super::arrangements::line(&[p.gears[0].teeth, p.gears[1].teeth]);
-        shape.pressure_angle = p.pressure_angle;
         shape.overlap = p.overlap;
         shape.optimisation = p.optimisation;
         shape.load_sharing = p.load_sharing;
@@ -3875,6 +3890,7 @@ impl From<&super::PairStage> for Shape {
         for (i, m) in shape.members.iter_mut().enumerate() {
             m.gear = p.gears[i].clone();
             m.module = p.module;
+            m.pressure_angle = p.pressure_angle;
             m.thickness_mod = if i == 0 {
                 Auto::fixed(p.thickness_mod)
             } else {
@@ -3928,7 +3944,6 @@ impl From<&super::PlanetaryStage> for Shape {
             ],
             &[],
         );
-        shape.pressure_angle = s.pressure_angle;
         shape.overlap = s.overlap;
         shape.optimisation = s.optimisation;
         shape.load_sharing = s.load_sharing;
@@ -3940,6 +3955,7 @@ impl From<&super::PlanetaryStage> for Shape {
         ]) {
             m.gear = gear.clone();
             m.module = s.module;
+            m.pressure_angle = s.pressure_angle;
             m.thickness_mod = thickness_mod;
             if m.ring.is_some() {
                 m.ring = Some(s.cutter);
@@ -5280,6 +5296,64 @@ mod tests {
         stage.ring.profile_shift = Auto::fixed(0.25);
         let r = solve_set(&stage, &StageLoads::just(2.0), &test_library()).expect("solves");
         assert!((r.members[2].profile_shift - 0.25).abs() < 1e-9);
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod pressure_angle {
+    //! **A pressure angle is a member's, shared across a mesh** — as the
+    //! module is — so two mesh groups of one stage may run at two angles,
+    //! and two members in mesh at two are refused.
+
+    use super::super::arrangements::{layshaft, StagePreset};
+    use super::super::{
+        test_library, Constrained, Reversal, StageBoundary, StageLoads, TrainError,
+    };
+    use super::*;
+
+    fn solve(shape: &Shape) -> Result<ShapeResult, TrainError> {
+        solve_loads(
+            shape,
+            &StageLoads::at(2.0, 3000.0)
+                .under(StageBoundary::conventional(&shape.wiring(), &shape.ports())),
+            &test_library(),
+            Reversal::default(),
+        )
+    }
+
+    /// A layshaft's second pair at 25° runs at 25° and its first at 20°,
+    /// each mesh reporting its own operating angle above its own reference.
+    #[test]
+    fn two_mesh_groups_of_one_stage_run_at_two_pressure_angles() {
+        let mut shape = layshaft((17, 43), &[(19, 41)], 0);
+        for j in [2, 3] {
+            shape.members[j].pressure_angle = 25.0;
+        }
+        let r = solve(&shape).unwrap();
+        let alpha = |k: usize| r.meshes[k].line.unwrap().operating_pressure_angle;
+        assert!(alpha(0) >= 20.0 && alpha(0) < 22.0, "{}", alpha(0));
+        assert!(alpha(1) >= 25.0 && alpha(1) < 27.0, "{}", alpha(1));
+        assert_eq!(r.members[2].params.pressure_angle, 25.0);
+        assert_eq!(r.members[0].params.pressure_angle, 20.0);
+    }
+
+    /// Two members in one mesh at two angles cannot mesh, and the stage
+    /// says so — on a line contact through the mesh, on a point contact
+    /// through the screw.
+    #[test]
+    fn two_members_in_mesh_at_two_pressure_angles_are_refused() {
+        for preset in [StagePreset::Spur, StagePreset::Worm] {
+            let mut shape = preset.build();
+            shape.members[1].pressure_angle = 25.0;
+            assert!(
+                matches!(
+                    solve(&shape),
+                    Err(TrainError::Mesh(crate::mesh::MeshError::Incompatible))
+                ),
+                "{preset:?}"
+            );
+        }
     }
 }
 

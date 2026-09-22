@@ -347,6 +347,9 @@ impl Shape {
                 ..self.members[gear].gear.clone()
             },
             module,
+            // The gear it meets sets its module and pressure angle: they
+            // mesh.
+            pressure_angle: self.members[gear].pressure_angle,
             thickness_mod: Auto::automatic(1.0),
             ring: cutter,
             pitch_diameter: Auto::automatic(0.0),

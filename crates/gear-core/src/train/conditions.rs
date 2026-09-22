@@ -886,11 +886,12 @@ pub struct StagePorts {
     /// ([`super::shape::Shape::member_names`]), so a panel names a member
     /// as the harness does without deriving it a second time.
     pub members: Vec<super::shape::MemberName>,
-    /// **The members that share a normal module** — the mesh graph's
-    /// connected components ([`super::shape::Shape::module_groups`]) — so a
-    /// panel offers one box per group and writes it to every member in it,
-    /// rather than one per member with nothing tying them.
-    pub module_groups: Vec<Vec<usize>>,
+    /// **The mesh groups** — the mesh graph's connected components
+    /// ([`super::shape::Shape::mesh_groups`]), the members a run of meshes
+    /// joins — so a panel offers one module and one pressure angle per
+    /// group and writes them to every member in it, and deals the cards a
+    /// group to a row.
+    pub mesh_groups: Vec<Vec<usize>>,
     /// **The family the shape reads as** ([`super::shape::Shape::family`]),
     /// which decides the card's structural buttons and its chip — the
     /// core's reading, so the panel does not derive it a second time.
@@ -1007,8 +1008,8 @@ impl Train {
                     members: match stage {
                         super::Stage::Shape(s) => s.member_names(),
                     },
-                    module_groups: match stage {
-                        super::Stage::Shape(s) => s.module_groups(),
+                    mesh_groups: match stage {
+                        super::Stage::Shape(s) => s.mesh_groups(),
                     },
                     family: match stage {
                         super::Stage::Shape(s) => s.family(),

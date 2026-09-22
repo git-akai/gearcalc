@@ -17,12 +17,13 @@ export type StagePorts = { ports: Array<PortSpec>,
  */
 members: Array<MemberName>, 
 /**
- * **The members that share a normal module** — the mesh graph's
- * connected components ([`super::shape::Shape::module_groups`]) — so a
- * panel offers one box per group and writes it to every member in it,
- * rather than one per member with nothing tying them.
+ * **The mesh groups** — the mesh graph's connected components
+ * ([`super::shape::Shape::mesh_groups`]), the members a run of meshes
+ * joins — so a panel offers one module and one pressure angle per
+ * group and writes them to every member in it, and deals the cards a
+ * group to a row.
  */
-module_groups: Array<Array<number>>, 
+mesh_groups: Array<Array<number>>, 
 /**
  * **The family the shape reads as** ([`super::shape::Shape::family`]),
  * which decides the card's structural buttons and its chip — the

@@ -282,7 +282,9 @@ impl Shape {
     }
 
     /// A member at the crate's default tooth, its thickness coefficient
-    /// and shift automatic; a ring where a cutter is given.
+    /// and shift automatic, at the pressure angle the shape's members
+    /// already run at — the first's, or the crate's where there is none;
+    /// a ring where a cutter is given.
     pub(crate) fn push_member(
         &mut self,
         shaft: Shaft,
@@ -290,6 +292,10 @@ impl Shape {
         module: f64,
         ring: Option<Cutter>,
     ) -> usize {
+        let pressure_angle = self.members.first().map_or_else(
+            || crate::params::GearParams::default().pressure_angle,
+            |m| m.pressure_angle,
+        );
         self.members.push(Member {
             shaft,
             gear: StageGear {
@@ -297,6 +303,7 @@ impl Shape {
                 ..StageGear::default()
             },
             module,
+            pressure_angle,
             thickness_mod: Auto::automatic(1.0),
             ring,
             pitch_diameter: Auto::automatic(0.0),

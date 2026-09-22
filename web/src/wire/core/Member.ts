@@ -16,6 +16,13 @@ shaft: number, gear: StageGear,
  */
 module: number, 
 /**
+ * Normal pressure angle, degrees. Every mesh a member is in shares
+ * it, as the module — a tooth is cut at one angle — so the members a
+ * run of meshes joins ([`Shape::mesh_groups`]) have one, and two
+ * groups of one stage may differ. Absent in a file, 20°.
+ */
+pressure_angle: number, 
+/**
  * Tooth-thickness coefficient, `k`: above 1 this gear's teeth thicken.
  * **Given on one member of a mesh and automatic on the other**, which
  * follows the mesh's rule — the two sum to 2 across an external mesh, a

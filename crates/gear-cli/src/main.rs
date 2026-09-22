@@ -719,7 +719,7 @@ fn hula_report(n: u32, clearance: f64, m_outer: f64, m_inner: f64, cutter_teeth:
 
     println!(
         "hula  z {}/{}/{}/{}  module {m_outer}/{m_inner}  alpha {} deg  clearance {clearance} mm",
-        teeth[0], teeth[1], teeth[2], teeth[3], stage.pressure_angle
+        teeth[0], teeth[1], teeth[2], teeth[3], stage.members[0].pressure_angle
     );
     println!(
         "  ratio {} / {} = {:+.4}   crank offset {:.6} mm (running {:.6}){}",

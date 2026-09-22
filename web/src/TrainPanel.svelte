@@ -1352,6 +1352,10 @@
   {@const ports = result.topology[i]?.ports ?? []}
   {#if ports.length > 0}
     <h4 class="shafts section-heading">{t("ui.train_shafts")}</h4>
+    <!-- Two words for two things, said once: a shaft is what turns and is
+         held, coupled or loaded; an axis is the line it turns about, which
+         a set's sun, carrier and ring share. -->
+    <small class="edit-note">{t("ui.train_note_shafts")}</small>
     <!-- **The select shows what the shaft is**: held to ground, coupled to
          a named shaft of another stage — one coupling reads the same on
          either of its shafts — or free, with nothing attached, which is what
@@ -1997,7 +2001,7 @@
         {@const replicated = stage.axes.map((a, k) => (a.count > 1 ? k : -1)).filter((k) => k >= 0)}
         {@const carriedAxes = stage.axes.map((a, k) => (a.carried_by !== 0 ? k : -1)).filter((k) => k >= 0)}
         {@const name = (j: number) => memberName(tab.train, result.topology, i, j)}
-        {@const moduleGroups = result.topology[i]?.module_groups ?? [stage.members.map((_, j) => j)]}
+        {@const meshGroups = result.topology[i]?.mesh_groups ?? [stage.members.map((_, j) => j)]}
         {@const carriers = stage.shafts
           .map((_, s) => s + 1)
           .filter((s) => !stage.members.some((m) => m.shaft === s))}
@@ -2024,29 +2028,6 @@
         {#if tab.open[i]}
           <div class="body">
             <div class="grid shared">
-              <!-- **One module box per run of meshes.** Two gears in mesh share
-                   a normal module, so the core reports the members a run of
-                   meshes joins (`module_groups`) — one group on a pair or a
-                   set, two on a hula stage — and each box writes to every
-                   member of its group. Nothing is computed here: the value is
-                   copied to the members the core says must agree. -->
-              {#each moduleGroups as group, gi (gi)}
-                <label>
-                  <span>{moduleGroups.length > 1 ? t("ui.train_normal_module_of", { members: group.map(name).join(" / ") }) : t("ui.train_normal_module")}</span>
-                  <input
-                    type="number"
-                    step="0.1"
-                    bind:value={
-                      () => stage.members[group[0]]?.module ?? 0,
-                      finite((v) => {
-                        for (const j of group) stage.members[j].module = v;
-                      })
-                    }
-                  />
-                  <em>{t("ui.train_mm")}</em>
-                </label>
-              {/each}
-              {@render numberField("ui.train_pressure_angle", () => stage.pressure_angle, (v) => (stage.pressure_angle = v), 0.5, "°")}
               {#if !crossed}
                 {@render overlapField(stage, sres?.overlap, sres?.meshes ?? [])}
                 {@render loadSharing(stage)}
@@ -2124,7 +2105,7 @@
                   <em>°</em>
                   <FieldNote notes={
                     notes(
-                      d.angle === 0 ? t("ui.train_note_shafts_parallel") : t("ui.train_note_shafts_crossed"),
+                      d.angle === 0 ? t("ui.train_note_axes_parallel") : t("ui.train_note_axes_crossed"),
                       null,
                     )
                   } />
@@ -2201,22 +2182,68 @@
               </div>
             {/each}
 
-            <!-- **Each mesh's own inputs**: what its flanks rub with. A set's
-                 two meshes may differ, and a pair has one. -->
-            {#each stage.meshes as m, k (k)}
-              {@const onDistance = stage.meshes.filter((x) => sameDistance(stage, x, m)).length}
+            <!-- **Each mesh group, with its meshes under it.** The members a
+                 run of meshes joins share a normal module and a pressure
+                 angle — two gears in mesh do, so everything the run joins
+                 does — and the core reports the groups (`mesh_groups`, a
+                 layer read off the graph): one on a pair or a set, two on a
+                 stepped planet, three on a layshaft. One box each per group,
+                 written to every member of it; nothing is computed here, the
+                 value is copied to the members the core says must agree.
+                 Then each of the group's meshes' own inputs: what its flanks
+                 rub with, which a set's two meshes may differ in. -->
+            {#each meshGroups as group, gi (gi)}
+              {@const inGroup = (m: { a: number; b: number }) => group.includes(m.a) && group.includes(m.b)}
               <h4 class="mesh section-heading">
-                {t("ui.train_mesh_between", { a: name(m.a), b: name(m.b) })}
+                {t(meshGroups.length > 1 ? "ui.train_mesh_group" : "ui.train_mesh_group_only", { members: group.map(name).join(" / ") })}
               </h4>
               <div class="grid shared">
-                {@render numberField("ui.train_sliding_friction", () => m.sliding_friction, (v) => (m.sliding_friction = v), 0.01, "")}
-                {@render numberField("ui.train_static_friction", () => m.static_friction, (v) => (m.static_friction = v), 0.01, "", t("ui.train_note_static_friction"))}
-                {#if parallel}
-                  <div class="edits">
-                    <button class="action danger" disabled={onDistance < 2} onclick={() => editStage(i, { remove_pair: { mesh: k } })}>{t("ui.train_remove_pair")}</button>
+                <label>
+                  <span>{t("ui.train_normal_module")}</span>
+                  <input
+                    type="number"
+                    step="0.1"
+                    bind:value={
+                      () => stage.members[group[0]]?.module ?? 0,
+                      finite((v) => {
+                        for (const j of group) stage.members[j].module = v;
+                      })
+                    }
+                  />
+                  <em>{t("ui.train_mm")}</em>
+                </label>
+                <label>
+                  <span>{t("ui.train_pressure_angle")}</span>
+                  <input
+                    type="number"
+                    step="0.5"
+                    bind:value={
+                      () => stage.members[group[0]]?.pressure_angle ?? 0,
+                      finite((v) => {
+                        for (const j of group) stage.members[j].pressure_angle = v;
+                      })
+                    }
+                  />
+                  <em>°</em>
+                </label>
+              </div>
+              {#each stage.meshes as m, k (k)}
+                {#if inGroup(m)}
+                  {@const onDistance = stage.meshes.filter((x) => sameDistance(stage, x, m)).length}
+                  <h4 class="mesh section-heading later">
+                    {t("ui.train_mesh_between", { a: name(m.a), b: name(m.b) })}
+                  </h4>
+                  <div class="grid shared">
+                    {@render numberField("ui.train_sliding_friction", () => m.sliding_friction, (v) => (m.sliding_friction = v), 0.01, "")}
+                    {@render numberField("ui.train_static_friction", () => m.static_friction, (v) => (m.static_friction = v), 0.01, "", t("ui.train_note_static_friction"))}
+                    {#if parallel}
+                      <div class="edits">
+                        <button class="action danger" disabled={onDistance < 2} onclick={() => editStage(i, { remove_pair: { mesh: k } })}>{t("ui.train_remove_pair")}</button>
+                      </div>
+                    {/if}
                   </div>
                 {/if}
-              </div>
+              {/each}
             {/each}
 
             <!-- **One card per member**, in the shape's order. Which of the
@@ -2227,12 +2254,12 @@
                  instead; the absorbing member is an automatic one like any
                  other, box and toggle and all. -->
             <!-- **One row of cards per mesh group**: the members a run of
-                 meshes joins (`module_groups`, the mesh graph's components)
+                 meshes joins (`mesh_groups`, the mesh graph's components)
                  share a grid of their own, so a row never mixes gears of
                  unrelated meshes — a layshaft's pairs two to a row, a set's
                  three — and each grid reflows on its own as the window
                  narrows. Within a group the cards are dealt by step. -->
-            {#each cardGroups(stage, moduleGroups) as group, gi (gi)}
+            {#each cardGroups(stage, meshGroups) as group, gi (gi)}
             <div class="gears">
               {#each group as j (j)}
                 {@const m = stage.members[j]}
