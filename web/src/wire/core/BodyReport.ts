@@ -13,6 +13,18 @@ export type BodyReport = { body: number,
  */
 ends: Array<BodyEnd>, 
 /**
+ * **A body a train may be addressed at**: one some stage has as a
+ * port, which is every body but a replicated one — a planet orbits
+ * and nothing can be attached to it.
+ */
+port: boolean, 
+/**
+ * **Held by the train** — ground under another name — so no case can
+ * say anything of it. A port and held is a body the picker does not
+ * offer; a port and not held is what a load can enter by.
+ */
+held: boolean, 
+/**
  * Turns per turn of what is driven — the whole answer where it is one
  * answer, and the particular part of it where it is a family.
  */

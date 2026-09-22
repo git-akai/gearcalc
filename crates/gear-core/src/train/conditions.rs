@@ -756,36 +756,16 @@ impl Train {
 
 // ---------------------------------------------- where a load can enter ---
 
-/// A body a load can enter the train by, with the name of its first end.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-#[cfg_attr(
-    feature = "typescript",
-    derive(ts_rs::TS),
-    ts(export, export_to = "core/")
-)]
-pub struct OpenPort {
-    pub body: usize,
-    /// The first stage the body is listed on, and what it is there.
-    pub stage: usize,
-    pub label: BodyLabel,
-}
-
 impl Train {
     /// **Every body a load can enter by**: every body the train does not
     /// hold that some stage has as a port, in the order the chain runs.
     /// What a picker offers, and what [`super::solve_train`] admits a load
     /// at.
     #[must_use]
-    pub fn open_ports(&self, boundaries: &[StageBoundary]) -> Vec<OpenPort> {
+    pub fn open_ports(&self, boundaries: &[StageBoundary]) -> Vec<PortBody> {
         self.bodies(boundaries)
             .into_iter()
             .filter(|b| !b.held)
-            .map(|b| OpenPort {
-                body: b.body,
-                stage: b.ends[0].0,
-                label: b.ends[0].1,
-            })
             .collect()
     }
 
@@ -913,6 +893,14 @@ pub struct BodyReport {
     /// Every stage it is listed on, and what it is there — a slot that is
     /// no port too, a planet's.
     pub ends: Vec<BodyEnd>,
+    /// **A body a train may be addressed at**: one some stage has as a
+    /// port, which is every body but a replicated one — a planet orbits
+    /// and nothing can be attached to it.
+    pub port: bool,
+    /// **Held by the train** — ground under another name — so no case can
+    /// say anything of it. A port and held is a body the picker does not
+    /// offer; a port and not held is what a load can enter by.
+    pub held: bool,
     /// Turns per turn of what is driven — the whole answer where it is one
     /// answer, and the particular part of it where it is a family.
     pub speed: Exact,
@@ -956,8 +944,11 @@ pub struct MotionReport {
     /// Bodies no mesh touches — named, not counted. Ground is the frame and
     /// is not listed.
     pub untouched: Vec<usize>,
-    /// Every body, ground first.
-    pub speeds: Vec<BodyReport>,
+    /// **Every body, ground first** — its ends, whether a case may address
+    /// it, whether the train holds it, and what it turns at. One list: the
+    /// ports are the ones flagged, and what a load may enter by is a port
+    /// the train does not hold.
+    pub bodies: Vec<BodyReport>,
     /// One per stage, input over output. `None` where the output does not
     /// turn.
     pub ratios: Vec<Option<Exact>>,
@@ -972,26 +963,16 @@ pub struct MotionReport {
     /// said. Not a fault — a ring held and also fixed by its stage is a
     /// designer being explicit — but worth a reader's knowing.
     pub redundant: Vec<usize>,
-    /// Every body a load can enter by, named — what a load case's picker
-    /// offers, in the order the chain runs.
-    pub ports: Vec<OpenPort>,
-    /// **The train's bodies** that some stage has as a port, with every
-    /// end each has — what a load case has a row for.
-    pub bodies: Vec<TrainBody>,
 }
 
-/// **One body of the train** as a case sees it: a port, on one stage or
-/// several — a pair's output and the next pair's input are one body with
-/// two ends, and a case says one thing of it. Fixed where the train holds
-/// it, and otherwise a load, a reaction or free.
+/// **One body a train may be addressed at**: a port, on one stage or
+/// several — a pair's output and the next set's sun are one body with two
+/// ends, and a case says one thing of it.
+///
+/// The core's own answer, which [`BodyReport`] carries to the front end
+/// beside the body's speed rather than in a list of its own.
 #[derive(Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-#[cfg_attr(
-    feature = "typescript",
-    derive(ts_rs::TS),
-    ts(export, export_to = "core/")
-)]
-pub struct TrainBody {
+pub struct PortBody {
     pub body: usize,
     /// Every stage it is a port of, in stage order, with its name there.
     pub ends: Vec<(usize, BodyLabel)>,
@@ -1067,6 +1048,7 @@ impl Train {
             .count()
             + usize::from(self.ends(&boundaries).is_some());
         let free: Vec<usize> = m.solution.residual.iter().map(|r| r.at).collect();
+        let ports = self.bodies(&boundaries);
         let ends = |body: usize| -> Vec<BodyEnd> {
             if body == GROUND {
                 return vec![];
@@ -1089,13 +1071,15 @@ impl Train {
                 .copied()
                 .filter(|&i| i != GROUND)
                 .collect(),
-            speeds: m
+            bodies: m
                 .speeds
                 .iter()
                 .enumerate()
                 .map(|(i, s)| BodyReport {
                     body: i,
                     ends: ends(i),
+                    port: ports.iter().any(|p| p.body == i),
+                    held: ports.iter().any(|p| p.body == i && p.held),
                     speed: (*s).into(),
                     terms: m
                         .solution
@@ -1114,16 +1098,14 @@ impl Train {
             total: m.total.map(Exact::from),
             free,
             redundant: m.solution.redundant.clone(),
-            ports: self.open_ports(&boundaries),
-            bodies: self.bodies(&boundaries),
         })
     }
 
     /// **Every body some stage has as a port** — see [`TrainBody`] — in
     /// body order, each with its ends.
     #[must_use]
-    pub fn bodies(&self, boundaries: &[StageBoundary]) -> Vec<TrainBody> {
-        let mut out: Vec<TrainBody> = Vec::new();
+    pub fn bodies(&self, boundaries: &[StageBoundary]) -> Vec<PortBody> {
+        let mut out: Vec<PortBody> = Vec::new();
         for (k, stage) in self.stages.iter().enumerate() {
             let w = stage.wiring();
             let Some(b) = boundaries.get(k) else { break };
@@ -1134,7 +1116,7 @@ impl Train {
                     x.ends.push((k, w.slots[slot]));
                     x.held |= held;
                 } else {
-                    out.push(TrainBody {
+                    out.push(PortBody {
                         body,
                         ends: vec![(k, w.slots[slot])],
                         held,

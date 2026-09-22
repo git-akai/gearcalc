@@ -51,8 +51,8 @@ pub mod shape;
 mod wiring;
 
 pub use conditions::{
-    BodyConstraint, BodyEnd, BodyReport, Constraint, Exact, MotionError, MotionReport, OpenPort,
-    PortSpec, Ports, StageBoundary, StagePorts, Term, TrainBody, TrainMotion,
+    BodyConstraint, BodyEnd, BodyReport, Constraint, Exact, MotionError, MotionReport, PortBody,
+    PortSpec, Ports, StageBoundary, StagePorts, Term, TrainMotion,
 };
 
 use crate::kinematics::{Body, Condition, GROUND};
@@ -7236,7 +7236,10 @@ mod tests {
         let b = t.boundaries().unwrap();
         let ports = t.open_ports(&b);
         assert_eq!(
-            ports.iter().map(|p| (p.body, p.stage)).collect::<Vec<_>>(),
+            ports
+                .iter()
+                .map(|p| (p.body, p.ends[0].0))
+                .collect::<Vec<_>>(),
             vec![
                 (at(0, 1), 0),
                 (at(0, 2), 0),
@@ -7259,7 +7262,7 @@ mod tests {
             ports.iter().map(|p| p.body).collect::<Vec<_>>(),
             vec![1, 2, 3]
         );
-        assert_eq!(ports[2].label, BodyLabel::Member { member: 2 });
+        assert_eq!(ports[2].ends[0].1, BodyLabel::Member { member: 2 });
         assert_eq!(
             t.ends(&b),
             Some((1, 2)),
@@ -7367,7 +7370,7 @@ mod tests {
             assert_eq!(lhs, rhs, "Willis at p = {p}");
             // ...and the report is the same family, read as floats.
             for shaft in [sun, carrier, ring] {
-                let s = &r.speeds[t.port(0, shaft)];
+                let s = &r.bodies[t.port(0, shaft)];
                 let read = s.speed.value
                     + s.terms
                         .iter()

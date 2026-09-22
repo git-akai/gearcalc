@@ -18373,10 +18373,12 @@
        "mobility": 1,
        "constrained": 1,
        "untouched": [],
-       "speeds": [
+       "bodies": [
         {
          "body": 0,
          "ends": [],
+         "port": false,
+         "held": false,
          "speed": {
           "value": 0,
           "text": "0"
@@ -18394,6 +18396,8 @@
            }
           }
          ],
+         "port": true,
+         "held": false,
          "speed": {
           "value": 1,
           "text": "1"
@@ -18411,6 +18415,8 @@
            }
           }
          ],
+         "port": true,
+         "held": false,
          "speed": {
           "value": "-0.39534883720930231",
           "text": "-17/43"
@@ -18429,53 +18435,7 @@
         "text": "-43/17"
        },
        "free": [],
-       "redundant": [],
-       "ports": [
-        {
-         "body": 1,
-         "stage": 0,
-         "label": {
-          "kind": "member",
-          "member": 0
-         }
-        },
-        {
-         "body": 2,
-         "stage": 0,
-         "label": {
-          "kind": "member",
-          "member": 1
-         }
-        }
-       ],
-       "bodies": [
-        {
-         "body": 1,
-         "ends": [
-          [
-           0,
-           {
-            "kind": "member",
-            "member": 0
-           }
-          ]
-         ],
-         "held": false
-        },
-        {
-         "body": 2,
-         "ends": [
-          [
-           0,
-           {
-            "kind": "member",
-            "member": 1
-           }
-          ]
-         ],
-         "held": false
-        }
-       ]
+       "redundant": []
       }
      }
     ],
@@ -20393,10 +20353,12 @@
        "mobility": 2,
        "constrained": 2,
        "untouched": [],
-       "speeds": [
+       "bodies": [
         {
          "body": 0,
          "ends": [],
+         "port": false,
+         "held": false,
          "speed": {
           "value": 0,
           "text": "0"
@@ -20414,6 +20376,8 @@
            }
           }
          ],
+         "port": true,
+         "held": false,
          "speed": {
           "value": 1,
           "text": "1"
@@ -20438,6 +20402,8 @@
            }
           }
          ],
+         "port": true,
+         "held": false,
          "speed": {
           "value": "-0.39534883720930231",
           "text": "-17/43"
@@ -20455,6 +20421,8 @@
            }
           }
          ],
+         "port": true,
+         "held": false,
          "speed": {
           "value": "-0.056478405315614620",
           "text": "-17/301"
@@ -20472,6 +20440,8 @@
            }
           }
          ],
+         "port": true,
+         "held": true,
          "speed": {
           "value": 0,
           "text": "0"
@@ -20489,6 +20459,8 @@
            }
           }
          ],
+         "port": false,
+         "held": false,
          "speed": {
           "value": "0.079069767441860464",
           "text": "17/215"
@@ -20511,94 +20483,7 @@
         "text": "-301/17"
        },
        "free": [],
-       "redundant": [],
-       "ports": [
-        {
-         "body": 1,
-         "stage": 0,
-         "label": {
-          "kind": "member",
-          "member": 0
-         }
-        },
-        {
-         "body": 2,
-         "stage": 0,
-         "label": {
-          "kind": "member",
-          "member": 1
-         }
-        },
-        {
-         "body": 3,
-         "stage": 1,
-         "label": {
-          "kind": "carrier",
-          "index": 0
-         }
-        }
-       ],
-       "bodies": [
-        {
-         "body": 1,
-         "ends": [
-          [
-           0,
-           {
-            "kind": "member",
-            "member": 0
-           }
-          ]
-         ],
-         "held": false
-        },
-        {
-         "body": 2,
-         "ends": [
-          [
-           0,
-           {
-            "kind": "member",
-            "member": 1
-           }
-          ],
-          [
-           1,
-           {
-            "kind": "member",
-            "member": 0
-           }
-          ]
-         ],
-         "held": false
-        },
-        {
-         "body": 3,
-         "ends": [
-          [
-           1,
-           {
-            "kind": "carrier",
-            "index": 0
-           }
-          ]
-         ],
-         "held": false
-        },
-        {
-         "body": 4,
-         "ends": [
-          [
-           1,
-           {
-            "kind": "member",
-            "member": 2
-           }
-          ]
-         ],
-         "held": true
-        }
-       ]
+       "redundant": []
       }
      }
     ]

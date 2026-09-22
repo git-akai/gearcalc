@@ -2530,14 +2530,19 @@ kept, and the first stage pushed takes them up at its conventional input
 and output, the back-driving case still from the output. A fresh case on a
 train with no two ends is parked the same way, at two bodies of its own.
 
-**Ports and bodies.** The train's *open ports* are every body some stage
-has as a port that the train does not fix, once, under the earliest
-stage's name — and a port is every slot of a stage that is not replicated:
-a set's sun, carrier and ring, a layshaft, and a single orbiting member,
-since a planocentric reducer's output *is* its planet. The train's
-**bodies** on the motion report are those, each with its ends — the stages
-it is listed on and what it is there — and a case says one thing of each.
-A load names a body and nothing else — no "start", no "end".
+**Ports and bodies.** A **port** is every slot of a stage that is not
+replicated — a set's sun, carrier and ring, a layshaft, and a single
+orbiting member, since a planocentric reducer's output *is* its planet —
+and the train's *open ports* are the port bodies it does not fix. Both are
+readings of **one list**: the motion report's `bodies` is every body of the
+train, ground first, each with its ends (the stages it is listed on and
+what it is there), whether a case may address it (`port`), whether the
+train holds it (`held`), and what it turns at. A picker offers the ports
+that are not held; a case has a row per port; a planet is in the list with
+`port` false, since it has a speed and nothing can be attached to it. (It
+was three lists — the speeds, the port bodies, the open ports — keyed by
+the same number, two of them prefixes of the third.) A load names a body
+and nothing else — no "start", no "end".
 
 **A body, to the panel, is its number.** The panel numbers nothing of its
 own: a body is "Body 2" wherever it is named, with its ends in parentheses

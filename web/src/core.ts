@@ -22,8 +22,7 @@ import type {
   LoadFreedom,
   CaseBody,
   BodyRole,
-  OpenPort,
-  TrainBody,
+  BodyReport,
   LoadRole,
   Auto,
   Optimisation,
@@ -104,8 +103,7 @@ export type {
   LoadFreedom,
   CaseBody,
   BodyRole,
-  OpenPort,
-  TrainBody,
+  BodyReport,
   LoadRole,
   Figure,
   Freedom,
@@ -341,12 +339,12 @@ export const CASE_KINDS: CaseKindSpec[] = [
   { key: "fatigue", label: "ui.train_case_fatigue", add: "ui.train_add_fatigue_case" },
 ];
 
-/** **Where a load can enter**, in the order the chain runs: the open ports
- *  the core reports with the motion — each a body, by number — or none
- *  where the train has no motion to report. A `<select>` binds to strings,
- *  so a body's number is its key. */
-export function portOptions(motion: MotionReport | null): OpenPort[] {
-  return motion?.ports ?? [];
+/** **Where a load can enter**, in the order the chain runs: every body the
+ *  core reports that a case may address and the train does not hold — one
+ *  list of bodies, read rather than a second one sent. A `<select>` binds
+ *  to strings, so a body's number is its key. */
+export function portOptions(motion: MotionReport | null): BodyReport[] {
+  return (motion?.bodies ?? []).filter((b) => b.port && !b.held);
 }
 
 export interface FieldSpec {
