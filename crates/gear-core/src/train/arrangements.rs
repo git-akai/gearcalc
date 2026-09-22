@@ -15,7 +15,7 @@
 //! numbered as the wiring numbers them, ground being 0, so the numbers a
 //! builder hands back are the ones a train's constraints address.
 
-use super::shape::{Axis, Distance, Member, MeshInput, ShaftOn, Shape};
+use super::shape::{default_min_clearance, Axis, Distance, Member, MeshInput, ShaftOn, Shape};
 use super::StageGear;
 use crate::kinematics::{Shaft, GROUND};
 use crate::params::Auto;
@@ -272,7 +272,11 @@ pub fn line(teeth: &[u32]) -> Shape {
 /// push appends and hands back the index the wiring gives the piece.
 impl Shape {
     pub(crate) fn push_axis(&mut self, carried_by: Shaft, count: u32) -> usize {
-        self.axes.push(Axis { carried_by, count });
+        self.axes.push(Axis {
+            carried_by,
+            count,
+            min_clearance: default_min_clearance(),
+        });
         self.axes.len() - 1
     }
 
@@ -393,7 +397,6 @@ pub fn hula(teeth: [u32; 4], module: [f64; 2]) -> Shape {
     let (c1, w1) = pair(1);
     let mut shape = epicyclic(1, &[&[w0, w1]], &[Central::Carrier, c0, c1], &[]);
     shape.optimisation.min_contact_ratio = 1.0;
-    shape.min_planet_clearance = 0.0;
     shape.distances[0].tip_clearance = 0.3;
     for (i, m) in shape.members.iter_mut().enumerate() {
         let mesh = i % 2;

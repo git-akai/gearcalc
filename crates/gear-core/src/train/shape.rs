@@ -55,7 +55,7 @@ use crate::tooth::Tooth;
 
 /// An axis gears turn about: fixed in ground, or carried round another axis
 /// by a shaft — a planet's, riding the carrier.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
 #[cfg_attr(
@@ -75,6 +75,18 @@ pub struct Axis {
     /// How many times this axis, its shafts and their gears are replicated
     /// about the axis it is carried round — `N` planets. One elsewhere.
     pub count: u32,
+    /// Tip-to-tip clearance between neighbouring instances of this axis's
+    /// gears, mm — asked only where the axis is replicated, and each
+    /// replicated axis's own (a Ravigneaux's short planets need not clear
+    /// by what its long ones do). Absent in a file, 0.3 mm.
+    #[cfg_attr(feature = "serde", serde(default = "default_min_clearance"))]
+    pub min_clearance: f64,
+}
+
+/// The tip-to-tip clearance a replicated axis a file does not give one is
+/// held to.
+pub(crate) fn default_min_clearance() -> f64 {
+    0.3
 }
 
 /// The crate's pressure angle, for a member a file does not give one:
@@ -225,9 +237,6 @@ pub struct Distance {
 pub struct Shape {
     pub optimisation: Optimisation,
     pub load_sharing: LoadSharing,
-    /// Tip-to-tip clearance between neighbouring instances of a replicated
-    /// axis's gears, mm — asked only where an axis is replicated.
-    pub min_planet_clearance: f64,
     pub axes: Vec<Axis>,
     pub shafts: Vec<ShaftOn>,
     pub members: Vec<Member>,
@@ -245,7 +254,6 @@ impl Default for Shape {
         Self {
             optimisation: Optimisation::default(),
             load_sharing: LoadSharing::None,
-            min_planet_clearance: 0.3,
             axes: Vec::new(),
             shafts: Vec::new(),
             members: Vec::new(),
@@ -3454,7 +3462,7 @@ pub fn solve_shape_after(
                 equal_spacing,
                 simultaneous_meshing,
                 clearance,
-                clearance_ok: clearance >= shape.min_planet_clearance,
+                clearance_ok: clearance >= a.min_clearance,
             })
         })
         .collect();
@@ -3467,7 +3475,7 @@ pub fn solve_shape_after(
             notes.push(
                 Note::new(key::STAGE_PLANET_CLEARANCE_BELOW_MINIMUM)
                     .number("gap", l.clearance, 3)
-                    .number("minimum", shape.min_planet_clearance, 3),
+                    .number("minimum", shape.axes[l.axis].min_clearance, 3),
             );
         }
     }
@@ -3953,7 +3961,6 @@ impl From<&super::PairStage> for Shape {
         let mut shape = super::arrangements::line(&[p.gears[0].teeth, p.gears[1].teeth]);
         shape.optimisation = p.optimisation;
         shape.load_sharing = p.load_sharing;
-        shape.min_planet_clearance = 0.0;
         for (i, m) in shape.members.iter_mut().enumerate() {
             m.gear = p.gears[i].clone();
             m.module = p.module;
@@ -4014,7 +4021,7 @@ impl From<&super::PlanetaryStage> for Shape {
         );
         shape.optimisation = s.optimisation;
         shape.load_sharing = s.load_sharing;
-        shape.min_planet_clearance = s.min_planet_clearance;
+        shape.axes[1].min_clearance = s.min_planet_clearance;
         for (m, (gear, thickness_mod)) in shape.members.iter_mut().zip([
             (&s.sun, Auto::fixed(s.thickness_mod)),
             (&s.planet, Auto::automatic(2.0 - s.thickness_mod)),

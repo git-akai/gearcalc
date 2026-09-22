@@ -1403,9 +1403,11 @@
   /** A note under the field, already rendered. Omitted draws none at all, which
    *  is different from drawing an empty one: the row keeps its height. */
   note?: string | null,
+  /** What the label's key names, where it names something. */
+  args?: Record<string, string>,
 )}
   <label>
-    <span>{t(key)}</span>
+    <span>{t(key, args)}</span>
     <input type="number" {step} bind:value={get, finite(set)} />
     <em>{unit === "°" ? "°" : unit ? t(unit) : ""}</em>
     {#if note !== undefined}
@@ -2060,9 +2062,11 @@
                   <em></em>
                 </label>
               {/each}
-              {#if replicated.length > 0}
-                {@render numberField("ui.train_minimum_planet_clearance", () => stage.min_planet_clearance, (v) => (stage.min_planet_clearance = v), 0.05, "ui.train_mm", t("ui.train_note_planet_clearance"))}
-              {/if}
+              <!-- The tip-to-tip room each replicated axis's planets keep:
+                   the axis's own, one box per such axis. -->
+              {#each replicated as k (k)}
+                {@render numberField(replicated.length > 1 ? "ui.train_minimum_planet_clearance_on" : "ui.train_minimum_planet_clearance", () => stage.axes[k].min_clearance, (v) => (stage.axes[k].min_clearance = v), 0.05, "ui.train_mm", t("ui.train_note_planet_clearance"), { axis: axisName(stage, i, k) })}
+              {/each}
               <!-- **The structural edits**: a step on each carried axis of an
                    epicyclic stage; an axis at the end of a parallel chain, and
                    the last one off again while more than a pair's two are

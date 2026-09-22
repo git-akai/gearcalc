@@ -142,7 +142,7 @@ impl Default for PlanetaryStage {
             optimisation: shape.optimisation,
             tolerance_plus: 0.02,
             tolerance_minus: 0.02,
-            min_planet_clearance: shape.min_planet_clearance,
+            min_planet_clearance: 0.3,
             cutter: Cutter::default(),
             // `z_r = z_s + 2 z_p`, the ideal ring, on a sun small enough to
             // need shift — so a fresh set shows what the automatic shift does

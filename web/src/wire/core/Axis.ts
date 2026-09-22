@@ -18,4 +18,11 @@ carried_by: number,
  * How many times this axis, its shafts and their gears are replicated
  * about the axis it is carried round — `N` planets. One elsewhere.
  */
-count: number, };
+count: number, 
+/**
+ * Tip-to-tip clearance between neighbouring instances of this axis's
+ * gears, mm — asked only where the axis is replicated, and each
+ * replicated axis's own (a Ravigneaux's short planets need not clear
+ * by what its long ones do). Absent in a file, 0.3 mm.
+ */
+min_clearance: number, };

@@ -177,6 +177,12 @@
 //!   reads the group's first as the size reading and each mesh's as a floor
 //!   under its own automatic widths. A mesh that omits it is `{ auto =
 //!   true, manual = 1.0 }`, which is what every older file meant.
+//! - **The planet clearance moved onto the axes.** A stage's
+//!   `min_planet_clearance` is gone and a file that still writes one is
+//!   refused; every axis carries `min_clearance`, read where the axis is
+//!   replicated, so a Ravigneaux's two planet axes are each held to their
+//!   own. An axis that omits it is at 0.3 mm, which is what every older
+//!   file meant.
 //!
 //! No compatibility shim, deliberately. Accepting both shapes means carrying two
 //! readers for one format and testing both forever, and the thing that would go

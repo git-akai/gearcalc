@@ -10,9 +10,4 @@ import type { ShaftOn } from "./ShaftOn";
 /**
  * The stage.
  */
-export type Shape = { optimisation: Optimisation, load_sharing: LoadSharing, 
-/**
- * Tip-to-tip clearance between neighbouring instances of a replicated
- * axis's gears, mm — asked only where an axis is replicated.
- */
-min_planet_clearance: number, axes: Array<Axis>, shafts: Array<ShaftOn>, members: Array<Member>, meshes: Array<MeshInput>, distances: Array<Distance>, };
+export type Shape = { optimisation: Optimisation, load_sharing: LoadSharing, axes: Array<Axis>, shafts: Array<ShaftOn>, members: Array<Member>, meshes: Array<MeshInput>, distances: Array<Distance>, };
