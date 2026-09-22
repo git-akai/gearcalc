@@ -210,20 +210,18 @@
       {
        "kind": "shape",
        "optimisation": {
-        "enabled": false,
-        "min_contact_ratio": "1.2000000000000000"
+        "enabled": false
        },
        "load_sharing": "none",
+       "min_planet_clearance": "0.29999999999999999",
        "axes": [
         {
          "carried_by": 0,
-         "count": 1,
-         "min_clearance": "0.29999999999999999"
+         "count": 1
         },
         {
          "carried_by": 0,
-         "count": 1,
-         "min_clearance": "0.29999999999999999"
+         "count": 1
         }
        ],
        "shafts": [
@@ -361,7 +359,8 @@
          "overlap": {
           "auto": true,
           "manual": 1
-         }
+         },
+         "min_contact_ratio": "1.2000000000000000"
         }
        ],
        "distances": [
@@ -399,20 +398,18 @@
       "stage": {
        "kind": "shape",
        "optimisation": {
-        "enabled": false,
-        "min_contact_ratio": "1.2000000000000000"
+        "enabled": false
        },
        "load_sharing": "none",
+       "min_planet_clearance": "0.29999999999999999",
        "axes": [
         {
          "carried_by": 0,
-         "count": 1,
-         "min_clearance": "0.29999999999999999"
+         "count": 1
         },
         {
          "carried_by": 0,
-         "count": 1,
-         "min_clearance": "0.29999999999999999"
+         "count": 1
         }
        ],
        "shafts": [
@@ -550,7 +547,8 @@
          "overlap": {
           "auto": true,
           "manual": 1
-         }
+         },
+         "min_contact_ratio": "1.2000000000000000"
         }
        ],
        "distances": [
@@ -584,25 +582,22 @@
       "stage": {
        "kind": "shape",
        "optimisation": {
-        "enabled": false,
-        "min_contact_ratio": "1.2000000000000000"
+        "enabled": false
        },
        "load_sharing": "none",
+       "min_planet_clearance": "0.29999999999999999",
        "axes": [
         {
          "carried_by": 0,
-         "count": 1,
-         "min_clearance": "0.29999999999999999"
+         "count": 1
         },
         {
          "carried_by": 0,
-         "count": 1,
-         "min_clearance": "0.29999999999999999"
+         "count": 1
         },
         {
          "carried_by": 0,
-         "count": 1,
-         "min_clearance": "0.29999999999999999"
+         "count": 1
         }
        ],
        "shafts": [
@@ -801,7 +796,8 @@
          "overlap": {
           "auto": true,
           "manual": 1
-         }
+         },
+         "min_contact_ratio": "1.2000000000000000"
         },
         {
          "a": 1,
@@ -811,7 +807,8 @@
          "overlap": {
           "auto": true,
           "manual": 1
-         }
+         },
+         "min_contact_ratio": "1.2000000000000000"
         }
        ],
        "distances": [
@@ -865,20 +862,18 @@
       "stage": {
        "kind": "shape",
        "optimisation": {
-        "enabled": false,
-        "min_contact_ratio": "1.2000000000000000"
+        "enabled": false
        },
        "load_sharing": "none",
+       "min_planet_clearance": "0.29999999999999999",
        "axes": [
         {
          "carried_by": 0,
-         "count": 1,
-         "min_clearance": "0.29999999999999999"
+         "count": 1
         },
         {
          "carried_by": 0,
-         "count": 1,
-         "min_clearance": "0.29999999999999999"
+         "count": 1
         }
        ],
        "shafts": [
@@ -1254,7 +1249,8 @@
          "overlap": {
           "auto": true,
           "manual": 1
-         }
+         },
+         "min_contact_ratio": "1.2000000000000000"
         },
         {
          "a": 2,
@@ -1264,7 +1260,8 @@
          "overlap": {
           "auto": true,
           "manual": 1
-         }
+         },
+         "min_contact_ratio": "1.2000000000000000"
         },
         {
          "a": 4,
@@ -1274,7 +1271,8 @@
          "overlap": {
           "auto": true,
           "manual": 1
-         }
+         },
+         "min_contact_ratio": "1.2000000000000000"
         }
        ],
        "distances": [
@@ -1308,20 +1306,18 @@
       "stage": {
        "kind": "shape",
        "optimisation": {
-        "enabled": false,
-        "min_contact_ratio": "1.2000000000000000"
+        "enabled": false
        },
        "load_sharing": "none",
+       "min_planet_clearance": "0.29999999999999999",
        "axes": [
         {
          "carried_by": 0,
-         "count": 1,
-         "min_clearance": "0.29999999999999999"
+         "count": 1
         },
         {
          "carried_by": 0,
-         "count": 1,
-         "min_clearance": "0.29999999999999999"
+         "count": 1
         }
        ],
        "shafts": [
@@ -1459,7 +1455,8 @@
          "overlap": {
           "auto": true,
           "manual": 1
-         }
+         },
+         "min_contact_ratio": "1.2000000000000000"
         }
        ],
        "distances": [
@@ -1493,20 +1490,18 @@
       "stage": {
        "kind": "shape",
        "optimisation": {
-        "enabled": false,
-        "min_contact_ratio": "1.2000000000000000"
+        "enabled": false
        },
        "load_sharing": "none",
+       "min_planet_clearance": "0.29999999999999999",
        "axes": [
         {
          "carried_by": 0,
-         "count": 1,
-         "min_clearance": "0.29999999999999999"
+         "count": 1
         },
         {
          "carried_by": 0,
-         "count": 1,
-         "min_clearance": "0.29999999999999999"
+         "count": 1
         }
        ],
        "shafts": [
@@ -1644,7 +1639,8 @@
          "overlap": {
           "auto": true,
           "manual": 1
-         }
+         },
+         "min_contact_ratio": "1.2000000000000000"
         }
        ],
        "distances": [
@@ -1678,20 +1674,18 @@
       "stage": {
        "kind": "shape",
        "optimisation": {
-        "enabled": false,
-        "min_contact_ratio": "1.2000000000000000"
+        "enabled": false
        },
        "load_sharing": "none",
+       "min_planet_clearance": "0.29999999999999999",
        "axes": [
         {
          "carried_by": 0,
-         "count": 1,
-         "min_clearance": "0.29999999999999999"
+         "count": 1
         },
         {
          "carried_by": 2,
-         "count": 3,
-         "min_clearance": "0.29999999999999999"
+         "count": 3
         }
        ],
        "shafts": [
@@ -1897,7 +1891,8 @@
          "overlap": {
           "auto": true,
           "manual": 1
-         }
+         },
+         "min_contact_ratio": "1.2000000000000000"
         },
         {
          "a": 1,
@@ -1907,7 +1902,8 @@
          "overlap": {
           "auto": true,
           "manual": 1
-         }
+         },
+         "min_contact_ratio": "1.2000000000000000"
         }
        ],
        "distances": [
@@ -1941,20 +1937,18 @@
       "stage": {
        "kind": "shape",
        "optimisation": {
-        "enabled": false,
-        "min_contact_ratio": "1.2000000000000000"
+        "enabled": false
        },
        "load_sharing": "none",
+       "min_planet_clearance": "0.29999999999999999",
        "axes": [
         {
          "carried_by": 0,
-         "count": 1,
-         "min_clearance": "0.29999999999999999"
+         "count": 1
         },
         {
          "carried_by": 1,
-         "count": 3,
-         "min_clearance": "0.29999999999999999"
+         "count": 3
         }
        ],
        "shafts": [
@@ -2164,7 +2158,8 @@
          "overlap": {
           "auto": true,
           "manual": 1
-         }
+         },
+         "min_contact_ratio": "1.2000000000000000"
         },
         {
          "a": 0,
@@ -2174,7 +2169,8 @@
          "overlap": {
           "auto": true,
           "manual": 1
-         }
+         },
+         "min_contact_ratio": "1.2000000000000000"
         }
        ],
        "distances": [
@@ -2208,20 +2204,18 @@
       "stage": {
        "kind": "shape",
        "optimisation": {
-        "enabled": false,
-        "min_contact_ratio": "1.2000000000000000"
+        "enabled": false
        },
        "load_sharing": "none",
+       "min_planet_clearance": "0.29999999999999999",
        "axes": [
         {
          "carried_by": 0,
-         "count": 1,
-         "min_clearance": "0.29999999999999999"
+         "count": 1
         },
         {
          "carried_by": 4,
-         "count": 3,
-         "min_clearance": "0.29999999999999999"
+         "count": 3
         }
        ],
        "shafts": [
@@ -2550,7 +2544,8 @@
          "overlap": {
           "auto": true,
           "manual": 1
-         }
+         },
+         "min_contact_ratio": "1.2000000000000000"
         },
         {
          "a": 3,
@@ -2560,7 +2555,8 @@
          "overlap": {
           "auto": true,
           "manual": 1
-         }
+         },
+         "min_contact_ratio": "1.2000000000000000"
         },
         {
          "a": 4,
@@ -2570,7 +2566,8 @@
          "overlap": {
           "auto": true,
           "manual": 1
-         }
+         },
+         "min_contact_ratio": "1.2000000000000000"
         }
        ],
        "distances": [
@@ -2604,20 +2601,18 @@
       "stage": {
        "kind": "shape",
        "optimisation": {
-        "enabled": false,
-        "min_contact_ratio": "1.2000000000000000"
+        "enabled": false
        },
        "load_sharing": "none",
+       "min_planet_clearance": "0.29999999999999999",
        "axes": [
         {
          "carried_by": 0,
-         "count": 1,
-         "min_clearance": "0.29999999999999999"
+         "count": 1
         },
         {
          "carried_by": 1,
-         "count": 1,
-         "min_clearance": "0.29999999999999999"
+         "count": 1
         }
        ],
        "shafts": [
@@ -2762,7 +2757,8 @@
          "overlap": {
           "auto": true,
           "manual": 1
-         }
+         },
+         "min_contact_ratio": "1.2000000000000000"
         }
        ],
        "distances": [
@@ -2796,25 +2792,22 @@
       "stage": {
        "kind": "shape",
        "optimisation": {
-        "enabled": false,
-        "min_contact_ratio": "1.2000000000000000"
+        "enabled": false
        },
        "load_sharing": "none",
+       "min_planet_clearance": "0.29999999999999999",
        "axes": [
         {
          "carried_by": 0,
-         "count": 1,
-         "min_clearance": "0.29999999999999999"
+         "count": 1
         },
         {
          "carried_by": 2,
-         "count": 3,
-         "min_clearance": "0.29999999999999999"
+         "count": 3
         },
         {
          "carried_by": 2,
-         "count": 3,
-         "min_clearance": "0.29999999999999999"
+         "count": 3
         }
        ],
        "shafts": [
@@ -3081,7 +3074,8 @@
          "overlap": {
           "auto": true,
           "manual": 1
-         }
+         },
+         "min_contact_ratio": "1.2000000000000000"
         },
         {
          "a": 2,
@@ -3091,7 +3085,8 @@
          "overlap": {
           "auto": true,
           "manual": 1
-         }
+         },
+         "min_contact_ratio": "1.2000000000000000"
         },
         {
          "a": 1,
@@ -3101,7 +3096,8 @@
          "overlap": {
           "auto": true,
           "manual": 1
-         }
+         },
+         "min_contact_ratio": "1.2000000000000000"
         }
        ],
        "distances": [
@@ -3228,23 +3224,23 @@
    "ok": [
     [
      "en",
-     487
+     490
     ],
     [
      "de",
-     487
+     490
     ],
     [
      "pt",
-     487
+     490
     ],
     [
      "zh-Hans",
-     487
+     490
     ],
     [
      "zh-Hant",
-     487
+     490
     ]
    ]
   },
@@ -7500,20 +7496,18 @@
      {
       "kind": "shape",
       "optimisation": {
-       "enabled": false,
-       "min_contact_ratio": "1.2000000000000000"
+       "enabled": false
       },
       "load_sharing": "none",
+      "min_planet_clearance": "0.29999999999999999",
       "axes": [
        {
         "carried_by": 0,
-        "count": 1,
-        "min_clearance": "0.29999999999999999"
+        "count": 1
        },
        {
         "carried_by": 0,
-        "count": 1,
-        "min_clearance": "0.29999999999999999"
+        "count": 1
        }
       ],
       "shafts": [
@@ -7651,7 +7645,8 @@
         "overlap": {
          "auto": true,
          "manual": 1
-        }
+        },
+        "min_contact_ratio": "1.2000000000000000"
        }
       ],
       "distances": [
@@ -7683,25 +7678,22 @@
      {
       "kind": "shape",
       "optimisation": {
-       "enabled": false,
-       "min_contact_ratio": "1.2000000000000000"
+       "enabled": false
       },
       "load_sharing": "none",
+      "min_planet_clearance": "0.29999999999999999",
       "axes": [
        {
         "carried_by": 0,
-        "count": 1,
-        "min_clearance": "0.29999999999999999"
+        "count": 1
        },
        {
         "carried_by": 0,
-        "count": 1,
-        "min_clearance": "0.29999999999999999"
+        "count": 1
        },
        {
         "carried_by": 0,
-        "count": 1,
-        "min_clearance": "0.29999999999999999"
+        "count": 1
        }
       ],
       "shafts": [
@@ -7900,7 +7892,8 @@
         "overlap": {
          "auto": true,
          "manual": 1
-        }
+        },
+        "min_contact_ratio": "1.2000000000000000"
        },
        {
         "a": 1,
@@ -7910,7 +7903,8 @@
         "overlap": {
          "auto": true,
          "manual": 1
-        }
+        },
+        "min_contact_ratio": "1.2000000000000000"
        }
       ],
       "distances": [
@@ -7962,20 +7956,18 @@
      {
       "kind": "shape",
       "optimisation": {
-       "enabled": false,
-       "min_contact_ratio": "1.2000000000000000"
+       "enabled": false
       },
       "load_sharing": "none",
+      "min_planet_clearance": "0.29999999999999999",
       "axes": [
        {
         "carried_by": 0,
-        "count": 1,
-        "min_clearance": "0.29999999999999999"
+        "count": 1
        },
        {
         "carried_by": 0,
-        "count": 1,
-        "min_clearance": "0.29999999999999999"
+        "count": 1
        }
       ],
       "shafts": [
@@ -8351,7 +8343,8 @@
         "overlap": {
          "auto": true,
          "manual": 1
-        }
+        },
+        "min_contact_ratio": "1.2000000000000000"
        },
        {
         "a": 2,
@@ -8361,7 +8354,8 @@
         "overlap": {
          "auto": true,
          "manual": 1
-        }
+        },
+        "min_contact_ratio": "1.2000000000000000"
        },
        {
         "a": 4,
@@ -8371,7 +8365,8 @@
         "overlap": {
          "auto": true,
          "manual": 1
-        }
+        },
+        "min_contact_ratio": "1.2000000000000000"
        }
       ],
       "distances": [
@@ -8403,20 +8398,18 @@
      {
       "kind": "shape",
       "optimisation": {
-       "enabled": false,
-       "min_contact_ratio": "1.2000000000000000"
+       "enabled": false
       },
       "load_sharing": "none",
+      "min_planet_clearance": "0.29999999999999999",
       "axes": [
        {
         "carried_by": 0,
-        "count": 1,
-        "min_clearance": "0.29999999999999999"
+        "count": 1
        },
        {
         "carried_by": 0,
-        "count": 1,
-        "min_clearance": "0.29999999999999999"
+        "count": 1
        }
       ],
       "shafts": [
@@ -8554,7 +8547,8 @@
         "overlap": {
          "auto": true,
          "manual": 1
-        }
+        },
+        "min_contact_ratio": "1.2000000000000000"
        }
       ],
       "distances": [
@@ -8586,20 +8580,18 @@
      {
       "kind": "shape",
       "optimisation": {
-       "enabled": false,
-       "min_contact_ratio": "1.2000000000000000"
+       "enabled": false
       },
       "load_sharing": "none",
+      "min_planet_clearance": "0.29999999999999999",
       "axes": [
        {
         "carried_by": 0,
-        "count": 1,
-        "min_clearance": "0.29999999999999999"
+        "count": 1
        },
        {
         "carried_by": 0,
-        "count": 1,
-        "min_clearance": "0.29999999999999999"
+        "count": 1
        }
       ],
       "shafts": [
@@ -8737,7 +8729,8 @@
         "overlap": {
          "auto": true,
          "manual": 1
-        }
+        },
+        "min_contact_ratio": "1.2000000000000000"
        }
       ],
       "distances": [
@@ -8769,20 +8762,18 @@
      {
       "kind": "shape",
       "optimisation": {
-       "enabled": false,
-       "min_contact_ratio": "1.2000000000000000"
+       "enabled": false
       },
       "load_sharing": "none",
+      "min_planet_clearance": "0.29999999999999999",
       "axes": [
        {
         "carried_by": 0,
-        "count": 1,
-        "min_clearance": "0.29999999999999999"
+        "count": 1
        },
        {
         "carried_by": 2,
-        "count": 3,
-        "min_clearance": "0.29999999999999999"
+        "count": 3
        }
       ],
       "shafts": [
@@ -8988,7 +8979,8 @@
         "overlap": {
          "auto": true,
          "manual": 1
-        }
+        },
+        "min_contact_ratio": "1.2000000000000000"
        },
        {
         "a": 1,
@@ -8998,7 +8990,8 @@
         "overlap": {
          "auto": true,
          "manual": 1
-        }
+        },
+        "min_contact_ratio": "1.2000000000000000"
        }
       ],
       "distances": [
@@ -9030,20 +9023,18 @@
      {
       "kind": "shape",
       "optimisation": {
-       "enabled": false,
-       "min_contact_ratio": "1.2000000000000000"
+       "enabled": false
       },
       "load_sharing": "none",
+      "min_planet_clearance": "0.29999999999999999",
       "axes": [
        {
         "carried_by": 0,
-        "count": 1,
-        "min_clearance": "0.29999999999999999"
+        "count": 1
        },
        {
         "carried_by": 1,
-        "count": 3,
-        "min_clearance": "0.29999999999999999"
+        "count": 3
        }
       ],
       "shafts": [
@@ -9253,7 +9244,8 @@
         "overlap": {
          "auto": true,
          "manual": 1
-        }
+        },
+        "min_contact_ratio": "1.2000000000000000"
        },
        {
         "a": 0,
@@ -9263,7 +9255,8 @@
         "overlap": {
          "auto": true,
          "manual": 1
-        }
+        },
+        "min_contact_ratio": "1.2000000000000000"
        }
       ],
       "distances": [
@@ -9295,20 +9288,18 @@
      {
       "kind": "shape",
       "optimisation": {
-       "enabled": false,
-       "min_contact_ratio": "1.2000000000000000"
+       "enabled": false
       },
       "load_sharing": "none",
+      "min_planet_clearance": "0.29999999999999999",
       "axes": [
        {
         "carried_by": 0,
-        "count": 1,
-        "min_clearance": "0.29999999999999999"
+        "count": 1
        },
        {
         "carried_by": 4,
-        "count": 3,
-        "min_clearance": "0.29999999999999999"
+        "count": 3
        }
       ],
       "shafts": [
@@ -9637,7 +9628,8 @@
         "overlap": {
          "auto": true,
          "manual": 1
-        }
+        },
+        "min_contact_ratio": "1.2000000000000000"
        },
        {
         "a": 3,
@@ -9647,7 +9639,8 @@
         "overlap": {
          "auto": true,
          "manual": 1
-        }
+        },
+        "min_contact_ratio": "1.2000000000000000"
        },
        {
         "a": 4,
@@ -9657,7 +9650,8 @@
         "overlap": {
          "auto": true,
          "manual": 1
-        }
+        },
+        "min_contact_ratio": "1.2000000000000000"
        }
       ],
       "distances": [
@@ -9689,20 +9683,18 @@
      {
       "kind": "shape",
       "optimisation": {
-       "enabled": false,
-       "min_contact_ratio": "1.2000000000000000"
+       "enabled": false
       },
       "load_sharing": "none",
+      "min_planet_clearance": "0.29999999999999999",
       "axes": [
        {
         "carried_by": 0,
-        "count": 1,
-        "min_clearance": "0.29999999999999999"
+        "count": 1
        },
        {
         "carried_by": 1,
-        "count": 1,
-        "min_clearance": "0.29999999999999999"
+        "count": 1
        }
       ],
       "shafts": [
@@ -9847,7 +9839,8 @@
         "overlap": {
          "auto": true,
          "manual": 1
-        }
+        },
+        "min_contact_ratio": "1.2000000000000000"
        }
       ],
       "distances": [
@@ -9879,25 +9872,22 @@
      {
       "kind": "shape",
       "optimisation": {
-       "enabled": false,
-       "min_contact_ratio": "1.2000000000000000"
+       "enabled": false
       },
       "load_sharing": "none",
+      "min_planet_clearance": "0.29999999999999999",
       "axes": [
        {
         "carried_by": 0,
-        "count": 1,
-        "min_clearance": "0.29999999999999999"
+        "count": 1
        },
        {
         "carried_by": 2,
-        "count": 3,
-        "min_clearance": "0.29999999999999999"
+        "count": 3
        },
        {
         "carried_by": 2,
-        "count": 3,
-        "min_clearance": "0.29999999999999999"
+        "count": 3
        }
       ],
       "shafts": [
@@ -10164,7 +10154,8 @@
         "overlap": {
          "auto": true,
          "manual": 1
-        }
+        },
+        "min_contact_ratio": "1.2000000000000000"
        },
        {
         "a": 2,
@@ -10174,7 +10165,8 @@
         "overlap": {
          "auto": true,
          "manual": 1
-        }
+        },
+        "min_contact_ratio": "1.2000000000000000"
        },
        {
         "a": 1,
@@ -10184,7 +10176,8 @@
         "overlap": {
          "auto": true,
          "manual": 1
-        }
+        },
+        "min_contact_ratio": "1.2000000000000000"
        }
       ],
       "distances": [
@@ -10504,20 +10497,18 @@
        {
         "kind": "shape",
         "optimisation": {
-         "enabled": false,
-         "min_contact_ratio": "1.2000000000000000"
+         "enabled": false
         },
         "load_sharing": "none",
+        "min_planet_clearance": "0.29999999999999999",
         "axes": [
          {
           "carried_by": 0,
-          "count": 1,
-          "min_clearance": "0.29999999999999999"
+          "count": 1
          },
          {
           "carried_by": 0,
-          "count": 1,
-          "min_clearance": "0.29999999999999999"
+          "count": 1
          }
         ],
         "shafts": [
@@ -10655,7 +10646,8 @@
           "overlap": {
            "auto": true,
            "manual": 1
-          }
+          },
+          "min_contact_ratio": "1.2000000000000000"
          }
         ],
         "distances": [
@@ -10684,20 +10676,18 @@
        {
         "kind": "shape",
         "optimisation": {
-         "enabled": false,
-         "min_contact_ratio": "1.2000000000000000"
+         "enabled": false
         },
         "load_sharing": "none",
+        "min_planet_clearance": "0.29999999999999999",
         "axes": [
          {
           "carried_by": 0,
-          "count": 1,
-          "min_clearance": "0.29999999999999999"
+          "count": 1
          },
          {
           "carried_by": 2,
-          "count": 3,
-          "min_clearance": "0.29999999999999999"
+          "count": 3
          }
         ],
         "shafts": [
@@ -10903,7 +10893,8 @@
           "overlap": {
            "auto": true,
            "manual": 1
-          }
+          },
+          "min_contact_ratio": "1.2000000000000000"
          },
          {
           "a": 1,
@@ -10913,7 +10904,8 @@
           "overlap": {
            "auto": true,
            "manual": 1
-          }
+          },
+          "min_contact_ratio": "1.2000000000000000"
          }
         ],
         "distances": [
@@ -11069,20 +11061,18 @@
        {
         "kind": "shape",
         "optimisation": {
-         "enabled": false,
-         "min_contact_ratio": "1.2000000000000000"
+         "enabled": false
         },
         "load_sharing": "none",
+        "min_planet_clearance": "0.29999999999999999",
         "axes": [
          {
           "carried_by": 0,
-          "count": 1,
-          "min_clearance": "0.29999999999999999"
+          "count": 1
          },
          {
           "carried_by": 0,
-          "count": 1,
-          "min_clearance": "0.29999999999999999"
+          "count": 1
          }
         ],
         "shafts": [
@@ -11220,7 +11210,8 @@
           "overlap": {
            "auto": true,
            "manual": 1
-          }
+          },
+          "min_contact_ratio": "1.2000000000000000"
          }
         ],
         "distances": [
@@ -11249,20 +11240,18 @@
        {
         "kind": "shape",
         "optimisation": {
-         "enabled": false,
-         "min_contact_ratio": "1.2000000000000000"
+         "enabled": false
         },
         "load_sharing": "none",
+        "min_planet_clearance": "0.29999999999999999",
         "axes": [
          {
           "carried_by": 0,
-          "count": 1,
-          "min_clearance": "0.29999999999999999"
+          "count": 1
          },
          {
           "carried_by": 2,
-          "count": 3,
-          "min_clearance": "0.29999999999999999"
+          "count": 3
          }
         ],
         "shafts": [
@@ -11468,7 +11457,8 @@
           "overlap": {
            "auto": true,
            "manual": 1
-          }
+          },
+          "min_contact_ratio": "1.2000000000000000"
          },
          {
           "a": 1,
@@ -11478,7 +11468,8 @@
           "overlap": {
            "auto": true,
            "manual": 1
-          }
+          },
+          "min_contact_ratio": "1.2000000000000000"
          }
         ],
         "distances": [
@@ -11643,20 +11634,18 @@
        {
         "kind": "shape",
         "optimisation": {
-         "enabled": false,
-         "min_contact_ratio": "1.2000000000000000"
+         "enabled": false
         },
         "load_sharing": "none",
+        "min_planet_clearance": "0.29999999999999999",
         "axes": [
          {
           "carried_by": 0,
-          "count": 1,
-          "min_clearance": "0.29999999999999999"
+          "count": 1
          },
          {
           "carried_by": 0,
-          "count": 1,
-          "min_clearance": "0.29999999999999999"
+          "count": 1
          }
         ],
         "shafts": [
@@ -11794,7 +11783,8 @@
           "overlap": {
            "auto": true,
            "manual": 1
-          }
+          },
+          "min_contact_ratio": "1.2000000000000000"
          }
         ],
         "distances": [
@@ -11823,20 +11813,18 @@
        {
         "kind": "shape",
         "optimisation": {
-         "enabled": false,
-         "min_contact_ratio": "1.2000000000000000"
+         "enabled": false
         },
         "load_sharing": "none",
+        "min_planet_clearance": "0.29999999999999999",
         "axes": [
          {
           "carried_by": 0,
-          "count": 1,
-          "min_clearance": "0.29999999999999999"
+          "count": 1
          },
          {
           "carried_by": 2,
-          "count": 3,
-          "min_clearance": "0.29999999999999999"
+          "count": 3
          }
         ],
         "shafts": [
@@ -12042,7 +12030,8 @@
           "overlap": {
            "auto": true,
            "manual": 1
-          }
+          },
+          "min_contact_ratio": "1.2000000000000000"
          },
          {
           "a": 1,
@@ -12052,7 +12041,8 @@
           "overlap": {
            "auto": true,
            "manual": 1
-          }
+          },
+          "min_contact_ratio": "1.2000000000000000"
          }
         ],
         "distances": [
@@ -12208,20 +12198,18 @@
        {
         "kind": "shape",
         "optimisation": {
-         "enabled": false,
-         "min_contact_ratio": "1.2000000000000000"
+         "enabled": false
         },
         "load_sharing": "none",
+        "min_planet_clearance": "0.29999999999999999",
         "axes": [
          {
           "carried_by": 0,
-          "count": 1,
-          "min_clearance": "0.29999999999999999"
+          "count": 1
          },
          {
           "carried_by": 0,
-          "count": 1,
-          "min_clearance": "0.29999999999999999"
+          "count": 1
          }
         ],
         "shafts": [
@@ -12359,7 +12347,8 @@
           "overlap": {
            "auto": true,
            "manual": 1
-          }
+          },
+          "min_contact_ratio": "1.2000000000000000"
          }
         ],
         "distances": [
@@ -12388,20 +12377,18 @@
        {
         "kind": "shape",
         "optimisation": {
-         "enabled": false,
-         "min_contact_ratio": "1.2000000000000000"
+         "enabled": false
         },
         "load_sharing": "none",
+        "min_planet_clearance": "0.29999999999999999",
         "axes": [
          {
           "carried_by": 0,
-          "count": 1,
-          "min_clearance": "0.29999999999999999"
+          "count": 1
          },
          {
           "carried_by": 2,
-          "count": 3,
-          "min_clearance": "0.29999999999999999"
+          "count": 3
          }
         ],
         "shafts": [
@@ -12607,7 +12594,8 @@
           "overlap": {
            "auto": true,
            "manual": 1
-          }
+          },
+          "min_contact_ratio": "1.2000000000000000"
          },
          {
           "a": 1,
@@ -12617,7 +12605,8 @@
           "overlap": {
            "auto": true,
            "manual": 1
-          }
+          },
+          "min_contact_ratio": "1.2000000000000000"
          }
         ],
         "distances": [
@@ -12785,20 +12774,18 @@
        {
         "kind": "shape",
         "optimisation": {
-         "enabled": false,
-         "min_contact_ratio": "1.2000000000000000"
+         "enabled": false
         },
         "load_sharing": "none",
+        "min_planet_clearance": "0.29999999999999999",
         "axes": [
          {
           "carried_by": 0,
-          "count": 1,
-          "min_clearance": "0.29999999999999999"
+          "count": 1
          },
          {
           "carried_by": 0,
-          "count": 1,
-          "min_clearance": "0.29999999999999999"
+          "count": 1
          }
         ],
         "shafts": [
@@ -12936,7 +12923,8 @@
           "overlap": {
            "auto": true,
            "manual": 1
-          }
+          },
+          "min_contact_ratio": "1.2000000000000000"
          }
         ],
         "distances": [
@@ -12965,20 +12953,18 @@
        {
         "kind": "shape",
         "optimisation": {
-         "enabled": false,
-         "min_contact_ratio": "1.2000000000000000"
+         "enabled": false
         },
         "load_sharing": "none",
+        "min_planet_clearance": "0.29999999999999999",
         "axes": [
          {
           "carried_by": 0,
-          "count": 1,
-          "min_clearance": "0.29999999999999999"
+          "count": 1
          },
          {
           "carried_by": 2,
-          "count": 3,
-          "min_clearance": "0.29999999999999999"
+          "count": 3
          }
         ],
         "shafts": [
@@ -13184,7 +13170,8 @@
           "overlap": {
            "auto": true,
            "manual": 1
-          }
+          },
+          "min_contact_ratio": "1.2000000000000000"
          },
          {
           "a": 1,
@@ -13194,7 +13181,8 @@
           "overlap": {
            "auto": true,
            "manual": 1
-          }
+          },
+          "min_contact_ratio": "1.2000000000000000"
          }
         ],
         "distances": [
@@ -13450,20 +13438,18 @@
        {
         "kind": "shape",
         "optimisation": {
-         "enabled": false,
-         "min_contact_ratio": "1.2000000000000000"
+         "enabled": false
         },
         "load_sharing": "none",
+        "min_planet_clearance": "0.29999999999999999",
         "axes": [
          {
           "carried_by": 0,
-          "count": 1,
-          "min_clearance": "0.29999999999999999"
+          "count": 1
          },
          {
           "carried_by": 0,
-          "count": 1,
-          "min_clearance": "0.29999999999999999"
+          "count": 1
          }
         ],
         "shafts": [
@@ -13601,7 +13587,8 @@
           "overlap": {
            "auto": true,
            "manual": 1
-          }
+          },
+          "min_contact_ratio": "1.2000000000000000"
          }
         ],
         "distances": [
@@ -13630,20 +13617,18 @@
        {
         "kind": "shape",
         "optimisation": {
-         "enabled": false,
-         "min_contact_ratio": "1.2000000000000000"
+         "enabled": false
         },
         "load_sharing": "none",
+        "min_planet_clearance": "0.29999999999999999",
         "axes": [
          {
           "carried_by": 0,
-          "count": 1,
-          "min_clearance": "0.29999999999999999"
+          "count": 1
          },
          {
           "carried_by": 2,
-          "count": 3,
-          "min_clearance": "0.29999999999999999"
+          "count": 3
          }
         ],
         "shafts": [
@@ -13849,7 +13834,8 @@
           "overlap": {
            "auto": true,
            "manual": 1
-          }
+          },
+          "min_contact_ratio": "1.2000000000000000"
          },
          {
           "a": 1,
@@ -13859,7 +13845,8 @@
           "overlap": {
            "auto": true,
            "manual": 1
-          }
+          },
+          "min_contact_ratio": "1.2000000000000000"
          }
         ],
         "distances": [
@@ -14108,20 +14095,18 @@
        {
         "kind": "shape",
         "optimisation": {
-         "enabled": false,
-         "min_contact_ratio": "1.2000000000000000"
+         "enabled": false
         },
         "load_sharing": "none",
+        "min_planet_clearance": "0.29999999999999999",
         "axes": [
          {
           "carried_by": 0,
-          "count": 1,
-          "min_clearance": "0.29999999999999999"
+          "count": 1
          },
          {
           "carried_by": 0,
-          "count": 1,
-          "min_clearance": "0.29999999999999999"
+          "count": 1
          }
         ],
         "shafts": [
@@ -14259,7 +14244,8 @@
           "overlap": {
            "auto": true,
            "manual": 1
-          }
+          },
+          "min_contact_ratio": "1.2000000000000000"
          }
         ],
         "distances": [
@@ -14288,20 +14274,18 @@
        {
         "kind": "shape",
         "optimisation": {
-         "enabled": false,
-         "min_contact_ratio": "1.2000000000000000"
+         "enabled": false
         },
         "load_sharing": "none",
+        "min_planet_clearance": "0.29999999999999999",
         "axes": [
          {
           "carried_by": 0,
-          "count": 1,
-          "min_clearance": "0.29999999999999999"
+          "count": 1
          },
          {
           "carried_by": 2,
-          "count": 3,
-          "min_clearance": "0.29999999999999999"
+          "count": 3
          }
         ],
         "shafts": [
@@ -14507,7 +14491,8 @@
           "overlap": {
            "auto": true,
            "manual": 1
-          }
+          },
+          "min_contact_ratio": "1.2000000000000000"
          },
          {
           "a": 1,
@@ -14517,7 +14502,8 @@
           "overlap": {
            "auto": true,
            "manual": 1
-          }
+          },
+          "min_contact_ratio": "1.2000000000000000"
          }
         ],
         "distances": [
@@ -14592,7 +14578,7 @@
           "at": {
            "kind": "of",
            "stage": 1,
-           "shaft": 1
+           "shaft": 2
           },
           "actuations": 1000,
           "reversing": false
@@ -14626,7 +14612,7 @@
           "at": {
            "kind": "of",
            "stage": 1,
-           "shaft": 1
+           "shaft": 2
           },
           "actuations": 1000,
           "reversing": false
@@ -14691,7 +14677,7 @@
           "at": {
            "kind": "of",
            "stage": 1,
-           "shaft": 1
+           "shaft": 2
           },
           "role": "reacted",
           "torque": {
@@ -14710,7 +14696,7 @@
           "at": {
            "kind": "of",
            "stage": 1,
-           "shaft": 1
+           "shaft": 2
           },
           "actuations": 1000,
           "reversing": false
@@ -14741,7 +14727,7 @@
           "at": {
            "kind": "of",
            "stage": 1,
-           "shaft": 1
+           "shaft": 2
           },
           "role": "reacted",
           "torque": {
@@ -14766,20 +14752,18 @@
        {
         "kind": "shape",
         "optimisation": {
-         "enabled": false,
-         "min_contact_ratio": "1.2000000000000000"
+         "enabled": false
         },
         "load_sharing": "none",
+        "min_planet_clearance": "0.29999999999999999",
         "axes": [
          {
           "carried_by": 0,
-          "count": 1,
-          "min_clearance": "0.29999999999999999"
+          "count": 1
          },
          {
           "carried_by": 0,
-          "count": 1,
-          "min_clearance": "0.29999999999999999"
+          "count": 1
          }
         ],
         "shafts": [
@@ -14917,7 +14901,8 @@
           "overlap": {
            "auto": true,
            "manual": 1
-          }
+          },
+          "min_contact_ratio": "1.2000000000000000"
          }
         ],
         "distances": [
@@ -14946,23 +14931,24 @@
        {
         "kind": "shape",
         "optimisation": {
-         "enabled": false,
-         "min_contact_ratio": "1.2000000000000000"
+         "enabled": false
         },
         "load_sharing": "none",
+        "min_planet_clearance": "0.29999999999999999",
         "axes": [
          {
           "carried_by": 0,
-          "count": 1,
-          "min_clearance": "0.29999999999999999"
+          "count": 1
          },
          {
-          "carried_by": 1,
-          "count": 3,
-          "min_clearance": "0.29999999999999999"
+          "carried_by": 2,
+          "count": 3
          }
         ],
         "shafts": [
+         {
+          "axis": 0
+         },
          {
           "axis": 0
          },
@@ -14974,14 +14960,11 @@
          },
          {
           "axis": 0
-         },
-         {
-          "axis": 0
          }
         ],
         "members": [
          {
-          "shaft": 5,
+          "shaft": 1,
           "gear": {
            "teeth": 12,
            "profile_shift": {
@@ -15039,65 +15022,7 @@
           }
          },
          {
-          "shaft": 2,
-          "gear": {
-           "teeth": 30,
-           "profile_shift": {
-            "auto": true,
-            "manual": 0
-           },
-           "no_undercut": true,
-           "working_depth": {
-            "auto": true,
-            "manual": 1
-           },
-           "addendum": 1,
-           "no_sharp_tip": true,
-           "min_tip_width": "0.10000000000000001",
-           "dedendum": "1.2500000000000000",
-           "root_radius": "0.38000000000000000",
-           "helix_angle": {
-            "auto": true,
-            "manual": 0
-           },
-           "face_width": {
-            "auto": true,
-            "manual": 5
-           },
-           "face_sources": {
-            "bending": {
-             "ultimate": true,
-             "fatigue": true
-            },
-            "contact": {
-             "ultimate": false,
-             "fatigue": false
-            }
-           },
-           "rim_thickness": null,
-           "material": "4340 Hardened Steel",
-           "material_overrides": {
-            "density": null,
-            "elastic_modulus": null,
-            "poissons_ratio": null,
-            "ultimate_allowable": null,
-            "fatigue_allowable": null
-           }
-          },
-          "module": 1,
-          "pressure_angle": 20,
-          "thickness_mod": {
-           "auto": true,
-           "manual": 1
-          },
-          "ring": null,
-          "pitch_diameter": {
-           "auto": true,
-           "manual": 0
-          }
-         },
-         {
-          "shaft": 2,
+          "shaft": 3,
           "gear": {
            "teeth": 30,
            "profile_shift": {
@@ -15156,6 +15081,64 @@
          },
          {
           "shaft": 3,
+          "gear": {
+           "teeth": 30,
+           "profile_shift": {
+            "auto": true,
+            "manual": 0
+           },
+           "no_undercut": true,
+           "working_depth": {
+            "auto": true,
+            "manual": 1
+           },
+           "addendum": 1,
+           "no_sharp_tip": true,
+           "min_tip_width": "0.10000000000000001",
+           "dedendum": "1.2500000000000000",
+           "root_radius": "0.38000000000000000",
+           "helix_angle": {
+            "auto": true,
+            "manual": 0
+           },
+           "face_width": {
+            "auto": true,
+            "manual": 5
+           },
+           "face_sources": {
+            "bending": {
+             "ultimate": true,
+             "fatigue": true
+            },
+            "contact": {
+             "ultimate": false,
+             "fatigue": false
+            }
+           },
+           "rim_thickness": null,
+           "material": "4340 Hardened Steel",
+           "material_overrides": {
+            "density": null,
+            "elastic_modulus": null,
+            "poissons_ratio": null,
+            "ultimate_allowable": null,
+            "fatigue_allowable": null
+           }
+          },
+          "module": 1,
+          "pressure_angle": 20,
+          "thickness_mod": {
+           "auto": true,
+           "manual": 1
+          },
+          "ring": null,
+          "pitch_diameter": {
+           "auto": true,
+           "manual": 0
+          }
+         },
+         {
+          "shaft": 4,
           "gear": {
            "teeth": 71,
            "profile_shift": {
@@ -15217,7 +15200,7 @@
           }
          },
          {
-          "shaft": 4,
+          "shaft": 5,
           "gear": {
            "teeth": 11,
            "profile_shift": {
@@ -15284,7 +15267,8 @@
           "overlap": {
            "auto": true,
            "manual": 1
-          }
+          },
+          "min_contact_ratio": "1.2000000000000000"
          },
          {
           "a": 2,
@@ -15294,7 +15278,8 @@
           "overlap": {
            "auto": true,
            "manual": 1
-          }
+          },
+          "min_contact_ratio": "1.2000000000000000"
          },
          {
           "a": 4,
@@ -15304,7 +15289,8 @@
           "overlap": {
            "auto": true,
            "manual": 1
-          }
+          },
+          "min_contact_ratio": "1.2000000000000000"
          }
         ],
         "distances": [
@@ -15331,7 +15317,20 @@
         ]
        }
       ],
-      "couplings": [],
+      "couplings": [
+       {
+        "a": {
+         "kind": "of",
+         "stage": 0,
+         "shaft": 2
+        },
+        "b": {
+         "kind": "of",
+         "stage": 1,
+         "shaft": 1
+        }
+       }
+      ],
       "constraints": []
      }
     ],
@@ -15365,8 +15364,8 @@
           "range_degrees": 25,
           "at": {
            "kind": "of",
-           "stage": 1,
-           "shaft": 1
+           "stage": 2,
+           "shaft": 2
           },
           "actuations": 1000,
           "reversing": false
@@ -15399,8 +15398,8 @@
           "range_degrees": 25,
           "at": {
            "kind": "of",
-           "stage": 1,
-           "shaft": 1
+           "stage": 2,
+           "shaft": 2
           },
           "actuations": 1000,
           "reversing": false
@@ -15464,8 +15463,8 @@
          {
           "at": {
            "kind": "of",
-           "stage": 1,
-           "shaft": 1
+           "stage": 2,
+           "shaft": 2
           },
           "role": "reacted",
           "torque": {
@@ -15483,8 +15482,8 @@
           "range_degrees": 25,
           "at": {
            "kind": "of",
-           "stage": 1,
-           "shaft": 1
+           "stage": 2,
+           "shaft": 2
           },
           "actuations": 1000,
           "reversing": false
@@ -15514,8 +15513,8 @@
          {
           "at": {
            "kind": "of",
-           "stage": 1,
-           "shaft": 1
+           "stage": 2,
+           "shaft": 2
           },
           "role": "reacted",
           "torque": {
@@ -15540,20 +15539,18 @@
        {
         "kind": "shape",
         "optimisation": {
-         "enabled": false,
-         "min_contact_ratio": "1.2000000000000000"
+         "enabled": false
         },
         "load_sharing": "none",
+        "min_planet_clearance": "0.29999999999999999",
         "axes": [
          {
           "carried_by": 0,
-          "count": 1,
-          "min_clearance": "0.29999999999999999"
+          "count": 1
          },
          {
           "carried_by": 0,
-          "count": 1,
-          "min_clearance": "0.29999999999999999"
+          "count": 1
          }
         ],
         "shafts": [
@@ -15691,7 +15688,8 @@
           "overlap": {
            "auto": true,
            "manual": 1
-          }
+          },
+          "min_contact_ratio": "1.2000000000000000"
          }
         ],
         "distances": [
@@ -15720,23 +15718,24 @@
        {
         "kind": "shape",
         "optimisation": {
-         "enabled": false,
-         "min_contact_ratio": "1.2000000000000000"
+         "enabled": false
         },
         "load_sharing": "none",
+        "min_planet_clearance": "0.29999999999999999",
         "axes": [
          {
           "carried_by": 0,
-          "count": 1,
-          "min_clearance": "0.29999999999999999"
+          "count": 1
          },
          {
-          "carried_by": 1,
-          "count": 3,
-          "min_clearance": "0.29999999999999999"
+          "carried_by": 2,
+          "count": 3
          }
         ],
         "shafts": [
+         {
+          "axis": 0
+         },
          {
           "axis": 0
          },
@@ -15748,14 +15747,11 @@
          },
          {
           "axis": 0
-         },
-         {
-          "axis": 0
          }
         ],
         "members": [
          {
-          "shaft": 5,
+          "shaft": 1,
           "gear": {
            "teeth": 12,
            "profile_shift": {
@@ -15813,65 +15809,7 @@
           }
          },
          {
-          "shaft": 2,
-          "gear": {
-           "teeth": 30,
-           "profile_shift": {
-            "auto": true,
-            "manual": 0
-           },
-           "no_undercut": true,
-           "working_depth": {
-            "auto": true,
-            "manual": 1
-           },
-           "addendum": 1,
-           "no_sharp_tip": true,
-           "min_tip_width": "0.10000000000000001",
-           "dedendum": "1.2500000000000000",
-           "root_radius": "0.38000000000000000",
-           "helix_angle": {
-            "auto": true,
-            "manual": 0
-           },
-           "face_width": {
-            "auto": true,
-            "manual": 5
-           },
-           "face_sources": {
-            "bending": {
-             "ultimate": true,
-             "fatigue": true
-            },
-            "contact": {
-             "ultimate": false,
-             "fatigue": false
-            }
-           },
-           "rim_thickness": null,
-           "material": "4340 Hardened Steel",
-           "material_overrides": {
-            "density": null,
-            "elastic_modulus": null,
-            "poissons_ratio": null,
-            "ultimate_allowable": null,
-            "fatigue_allowable": null
-           }
-          },
-          "module": 1,
-          "pressure_angle": 20,
-          "thickness_mod": {
-           "auto": true,
-           "manual": 1
-          },
-          "ring": null,
-          "pitch_diameter": {
-           "auto": true,
-           "manual": 0
-          }
-         },
-         {
-          "shaft": 2,
+          "shaft": 3,
           "gear": {
            "teeth": 30,
            "profile_shift": {
@@ -15930,6 +15868,64 @@
          },
          {
           "shaft": 3,
+          "gear": {
+           "teeth": 30,
+           "profile_shift": {
+            "auto": true,
+            "manual": 0
+           },
+           "no_undercut": true,
+           "working_depth": {
+            "auto": true,
+            "manual": 1
+           },
+           "addendum": 1,
+           "no_sharp_tip": true,
+           "min_tip_width": "0.10000000000000001",
+           "dedendum": "1.2500000000000000",
+           "root_radius": "0.38000000000000000",
+           "helix_angle": {
+            "auto": true,
+            "manual": 0
+           },
+           "face_width": {
+            "auto": true,
+            "manual": 5
+           },
+           "face_sources": {
+            "bending": {
+             "ultimate": true,
+             "fatigue": true
+            },
+            "contact": {
+             "ultimate": false,
+             "fatigue": false
+            }
+           },
+           "rim_thickness": null,
+           "material": "4340 Hardened Steel",
+           "material_overrides": {
+            "density": null,
+            "elastic_modulus": null,
+            "poissons_ratio": null,
+            "ultimate_allowable": null,
+            "fatigue_allowable": null
+           }
+          },
+          "module": 1,
+          "pressure_angle": 20,
+          "thickness_mod": {
+           "auto": true,
+           "manual": 1
+          },
+          "ring": null,
+          "pitch_diameter": {
+           "auto": true,
+           "manual": 0
+          }
+         },
+         {
+          "shaft": 4,
           "gear": {
            "teeth": 71,
            "profile_shift": {
@@ -15991,7 +15987,7 @@
           }
          },
          {
-          "shaft": 4,
+          "shaft": 5,
           "gear": {
            "teeth": 11,
            "profile_shift": {
@@ -16058,7 +16054,8 @@
           "overlap": {
            "auto": true,
            "manual": 1
-          }
+          },
+          "min_contact_ratio": "1.2000000000000000"
          },
          {
           "a": 2,
@@ -16068,7 +16065,8 @@
           "overlap": {
            "auto": true,
            "manual": 1
-          }
+          },
+          "min_contact_ratio": "1.2000000000000000"
          },
          {
           "a": 4,
@@ -16078,7 +16076,8 @@
           "overlap": {
            "auto": true,
            "manual": 1
-          }
+          },
+          "min_contact_ratio": "1.2000000000000000"
          }
         ],
         "distances": [
@@ -16107,25 +16106,22 @@
        {
         "kind": "shape",
         "optimisation": {
-         "enabled": false,
-         "min_contact_ratio": "1.2000000000000000"
+         "enabled": false
         },
         "load_sharing": "none",
+        "min_planet_clearance": "0.29999999999999999",
         "axes": [
          {
           "carried_by": 0,
-          "count": 1,
-          "min_clearance": "0.29999999999999999"
+          "count": 1
          },
          {
           "carried_by": 0,
-          "count": 1,
-          "min_clearance": "0.29999999999999999"
+          "count": 1
          },
          {
           "carried_by": 0,
-          "count": 1,
-          "min_clearance": "0.29999999999999999"
+          "count": 1
          }
         ],
         "shafts": [
@@ -16681,7 +16677,8 @@
           "overlap": {
            "auto": true,
            "manual": 1
-          }
+          },
+          "min_contact_ratio": "1.2000000000000000"
          },
          {
           "a": 2,
@@ -16691,7 +16688,8 @@
           "overlap": {
            "auto": true,
            "manual": 1
-          }
+          },
+          "min_contact_ratio": "1.2000000000000000"
          },
          {
           "a": 4,
@@ -16701,7 +16699,8 @@
           "overlap": {
            "auto": true,
            "manual": 1
-          }
+          },
+          "min_contact_ratio": "1.2000000000000000"
          },
          {
           "a": 6,
@@ -16711,7 +16710,8 @@
           "overlap": {
            "auto": true,
            "manual": 1
-          }
+          },
+          "min_contact_ratio": "1.2000000000000000"
          },
          {
           "a": 6,
@@ -16721,7 +16721,8 @@
           "overlap": {
            "auto": true,
            "manual": 1
-          }
+          },
+          "min_contact_ratio": "1.2000000000000000"
          }
         ],
         "distances": [
@@ -16772,8 +16773,20 @@
        {
         "a": {
          "kind": "of",
+         "stage": 0,
+         "shaft": 2
+        },
+        "b": {
+         "kind": "of",
          "stage": 1,
-         "shaft": 4
+         "shaft": 1
+        }
+       },
+       {
+        "a": {
+         "kind": "of",
+         "stage": 1,
+         "shaft": 2
         },
         "b": {
          "kind": "of",
@@ -16815,8 +16828,8 @@
           "range_degrees": 25,
           "at": {
            "kind": "of",
-           "stage": 1,
-           "shaft": 1
+           "stage": 2,
+           "shaft": 2
           },
           "actuations": 1000,
           "reversing": false
@@ -16849,8 +16862,8 @@
           "range_degrees": 25,
           "at": {
            "kind": "of",
-           "stage": 1,
-           "shaft": 1
+           "stage": 2,
+           "shaft": 2
           },
           "actuations": 1000,
           "reversing": false
@@ -16914,8 +16927,8 @@
          {
           "at": {
            "kind": "of",
-           "stage": 1,
-           "shaft": 1
+           "stage": 2,
+           "shaft": 2
           },
           "role": "reacted",
           "torque": {
@@ -16933,8 +16946,8 @@
           "range_degrees": 25,
           "at": {
            "kind": "of",
-           "stage": 1,
-           "shaft": 1
+           "stage": 2,
+           "shaft": 2
           },
           "actuations": 1000,
           "reversing": false
@@ -16964,8 +16977,8 @@
          {
           "at": {
            "kind": "of",
-           "stage": 1,
-           "shaft": 1
+           "stage": 2,
+           "shaft": 2
           },
           "role": "reacted",
           "torque": {
@@ -16990,20 +17003,18 @@
        {
         "kind": "shape",
         "optimisation": {
-         "enabled": false,
-         "min_contact_ratio": "1.2000000000000000"
+         "enabled": false
         },
         "load_sharing": "none",
+        "min_planet_clearance": "0.29999999999999999",
         "axes": [
          {
           "carried_by": 0,
-          "count": 1,
-          "min_clearance": "0.29999999999999999"
+          "count": 1
          },
          {
           "carried_by": 0,
-          "count": 1,
-          "min_clearance": "0.29999999999999999"
+          "count": 1
          }
         ],
         "shafts": [
@@ -17141,7 +17152,8 @@
           "overlap": {
            "auto": true,
            "manual": 1
-          }
+          },
+          "min_contact_ratio": "1.2000000000000000"
          }
         ],
         "distances": [
@@ -17170,23 +17182,24 @@
        {
         "kind": "shape",
         "optimisation": {
-         "enabled": false,
-         "min_contact_ratio": "1.2000000000000000"
+         "enabled": false
         },
         "load_sharing": "none",
+        "min_planet_clearance": "0.29999999999999999",
         "axes": [
          {
           "carried_by": 0,
-          "count": 1,
-          "min_clearance": "0.29999999999999999"
+          "count": 1
          },
          {
-          "carried_by": 1,
-          "count": 3,
-          "min_clearance": "0.29999999999999999"
+          "carried_by": 2,
+          "count": 3
          }
         ],
         "shafts": [
+         {
+          "axis": 0
+         },
          {
           "axis": 0
          },
@@ -17198,14 +17211,11 @@
          },
          {
           "axis": 0
-         },
-         {
-          "axis": 0
          }
         ],
         "members": [
          {
-          "shaft": 5,
+          "shaft": 1,
           "gear": {
            "teeth": 12,
            "profile_shift": {
@@ -17263,65 +17273,7 @@
           }
          },
          {
-          "shaft": 2,
-          "gear": {
-           "teeth": 30,
-           "profile_shift": {
-            "auto": true,
-            "manual": 0
-           },
-           "no_undercut": true,
-           "working_depth": {
-            "auto": true,
-            "manual": 1
-           },
-           "addendum": 1,
-           "no_sharp_tip": true,
-           "min_tip_width": "0.10000000000000001",
-           "dedendum": "1.2500000000000000",
-           "root_radius": "0.38000000000000000",
-           "helix_angle": {
-            "auto": true,
-            "manual": 0
-           },
-           "face_width": {
-            "auto": true,
-            "manual": 5
-           },
-           "face_sources": {
-            "bending": {
-             "ultimate": true,
-             "fatigue": true
-            },
-            "contact": {
-             "ultimate": false,
-             "fatigue": false
-            }
-           },
-           "rim_thickness": null,
-           "material": "4340 Hardened Steel",
-           "material_overrides": {
-            "density": null,
-            "elastic_modulus": null,
-            "poissons_ratio": null,
-            "ultimate_allowable": null,
-            "fatigue_allowable": null
-           }
-          },
-          "module": 1,
-          "pressure_angle": 20,
-          "thickness_mod": {
-           "auto": true,
-           "manual": 1
-          },
-          "ring": null,
-          "pitch_diameter": {
-           "auto": true,
-           "manual": 0
-          }
-         },
-         {
-          "shaft": 2,
+          "shaft": 3,
           "gear": {
            "teeth": 30,
            "profile_shift": {
@@ -17380,6 +17332,64 @@
          },
          {
           "shaft": 3,
+          "gear": {
+           "teeth": 30,
+           "profile_shift": {
+            "auto": true,
+            "manual": 0
+           },
+           "no_undercut": true,
+           "working_depth": {
+            "auto": true,
+            "manual": 1
+           },
+           "addendum": 1,
+           "no_sharp_tip": true,
+           "min_tip_width": "0.10000000000000001",
+           "dedendum": "1.2500000000000000",
+           "root_radius": "0.38000000000000000",
+           "helix_angle": {
+            "auto": true,
+            "manual": 0
+           },
+           "face_width": {
+            "auto": true,
+            "manual": 5
+           },
+           "face_sources": {
+            "bending": {
+             "ultimate": true,
+             "fatigue": true
+            },
+            "contact": {
+             "ultimate": false,
+             "fatigue": false
+            }
+           },
+           "rim_thickness": null,
+           "material": "4340 Hardened Steel",
+           "material_overrides": {
+            "density": null,
+            "elastic_modulus": null,
+            "poissons_ratio": null,
+            "ultimate_allowable": null,
+            "fatigue_allowable": null
+           }
+          },
+          "module": 1,
+          "pressure_angle": 20,
+          "thickness_mod": {
+           "auto": true,
+           "manual": 1
+          },
+          "ring": null,
+          "pitch_diameter": {
+           "auto": true,
+           "manual": 0
+          }
+         },
+         {
+          "shaft": 4,
           "gear": {
            "teeth": 71,
            "profile_shift": {
@@ -17441,7 +17451,7 @@
           }
          },
          {
-          "shaft": 4,
+          "shaft": 5,
           "gear": {
            "teeth": 11,
            "profile_shift": {
@@ -17508,7 +17518,8 @@
           "overlap": {
            "auto": true,
            "manual": 1
-          }
+          },
+          "min_contact_ratio": "1.2000000000000000"
          },
          {
           "a": 2,
@@ -17518,7 +17529,8 @@
           "overlap": {
            "auto": true,
            "manual": 1
-          }
+          },
+          "min_contact_ratio": "1.2000000000000000"
          },
          {
           "a": 4,
@@ -17528,7 +17540,8 @@
           "overlap": {
            "auto": true,
            "manual": 1
-          }
+          },
+          "min_contact_ratio": "1.2000000000000000"
          }
         ],
         "distances": [
@@ -17557,20 +17570,18 @@
        {
         "kind": "shape",
         "optimisation": {
-         "enabled": false,
-         "min_contact_ratio": "1.2000000000000000"
+         "enabled": false
         },
         "load_sharing": "none",
+        "min_planet_clearance": "0.29999999999999999",
         "axes": [
          {
           "carried_by": 0,
-          "count": 1,
-          "min_clearance": "0.29999999999999999"
+          "count": 1
          },
          {
           "carried_by": 0,
-          "count": 1,
-          "min_clearance": "0.29999999999999999"
+          "count": 1
          }
         ],
         "shafts": [
@@ -17946,7 +17957,8 @@
           "overlap": {
            "auto": true,
            "manual": 1
-          }
+          },
+          "min_contact_ratio": "1.2000000000000000"
          },
          {
           "a": 2,
@@ -17956,7 +17968,8 @@
           "overlap": {
            "auto": true,
            "manual": 1
-          }
+          },
+          "min_contact_ratio": "1.2000000000000000"
          },
          {
           "a": 4,
@@ -17966,7 +17979,8 @@
           "overlap": {
            "auto": true,
            "manual": 1
-          }
+          },
+          "min_contact_ratio": "1.2000000000000000"
          }
         ],
         "distances": [
@@ -17997,8 +18011,20 @@
        {
         "a": {
          "kind": "of",
+         "stage": 0,
+         "shaft": 2
+        },
+        "b": {
+         "kind": "of",
          "stage": 1,
-         "shaft": 4
+         "shaft": 1
+        }
+       },
+       {
+        "a": {
+         "kind": "of",
+         "stage": 1,
+         "shaft": 2
         },
         "b": {
          "kind": "of",
@@ -21301,7 +21327,7 @@
    }
   },
   "export_train": {
-   "ok": "# Geartrain.\n#\n# Inputs only — every ratio, stress, efficiency and backlash is recomputed from\n# these, so nothing here can go stale. Units: mm, degrees, rpm, N·m.\n#\n# Materials are named; the library that defines them is a separate document.\n# Editing this file by hand is expected.\n\nname = \"probe\"\n\n[train]\nreversed_bending = false\ncouplings = []\nconstraints = []\n\n[[train.load_cases]]\nkind = \"ultimate\"\nenabled = true\n\n[[train.load_cases.loads]]\nrole = \"load\"\n\n[train.load_cases.loads.at]\nkind = \"of\"\nstage = 0\nshaft = 1\n\n[train.load_cases.loads.torque]\nauto = false\nmanual = 0.1\n\n[train.load_cases.loads.speed]\nauto = false\nmanual = 30000.0\n\n[[train.load_cases.loads]]\nrole = \"reacted\"\n\n[train.load_cases.loads.at]\nkind = \"of\"\nstage = 0\nshaft = 2\n\n[train.load_cases.loads.torque]\nauto = true\nmanual = 0.0\n\n[train.load_cases.loads.speed]\nauto = true\nmanual = 0.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nactuations = 1000\nreversing = false\n\n[train.load_cases.duty.intermittent.at]\nkind = \"of\"\nstage = 0\nshaft = 2\n\n[[train.load_cases]]\nkind = \"ultimate\"\nenabled = true\n\n[[train.load_cases.loads]]\nrole = \"load\"\n\n[train.load_cases.loads.at]\nkind = \"of\"\nstage = 0\nshaft = 2\n\n[train.load_cases.loads.torque]\nauto = false\nmanual = 3.0\n\n[train.load_cases.loads.speed]\nauto = false\nmanual = 0.0\n\n[[train.load_cases.loads]]\nrole = \"reacted\"\n\n[train.load_cases.loads.at]\nkind = \"of\"\nstage = 0\nshaft = 1\n\n[train.load_cases.loads.torque]\nauto = true\nmanual = 0.0\n\n[train.load_cases.loads.speed]\nauto = true\nmanual = 0.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nactuations = 1000\nreversing = false\n\n[train.load_cases.duty.intermittent.at]\nkind = \"of\"\nstage = 0\nshaft = 2\n\n[[train.load_cases]]\nkind = \"fatigue\"\nenabled = true\n\n[[train.load_cases.loads]]\nrole = \"load\"\n\n[train.load_cases.loads.at]\nkind = \"of\"\nstage = 0\nshaft = 1\n\n[train.load_cases.loads.torque]\nauto = false\nmanual = 0.02\n\n[train.load_cases.loads.speed]\nauto = false\nmanual = 30000.0\n\n[[train.load_cases.loads]]\nrole = \"reacted\"\n\n[train.load_cases.loads.at]\nkind = \"of\"\nstage = 0\nshaft = 2\n\n[train.load_cases.loads.torque]\nauto = true\nmanual = 0.0\n\n[train.load_cases.loads.speed]\nauto = true\nmanual = 0.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nactuations = 1000\nreversing = false\n\n[train.load_cases.duty.intermittent.at]\nkind = \"of\"\nstage = 0\nshaft = 2\n\n[[train.stages]]\nkind = \"shape\"\nload_sharing = \"none\"\n\n[train.stages.optimisation]\nenabled = false\nmin_contact_ratio = 1.2\n\n[[train.stages.axes]]\ncarried_by = 0\ncount = 1\nmin_clearance = 0.3\n\n[[train.stages.axes]]\ncarried_by = 0\ncount = 1\nmin_clearance = 0.3\n\n[[train.stages.shafts]]\naxis = 0\n\n[[train.stages.shafts]]\naxis = 1\n\n[[train.stages.members]]\nshaft = 1\nmodule = 1.0\npressure_angle = 20.0\n\n[train.stages.members.gear]\nteeth = 17\nno_undercut = true\naddendum = 1.0\nno_sharp_tip = true\nmin_tip_width = 0.1\ndedendum = 1.25\nroot_radius = 0.38\nmaterial = \"4340 Hardened Steel\"\n\n[train.stages.members.gear.profile_shift]\nauto = true\nmanual = 0.0\n\n[train.stages.members.gear.working_depth]\nauto = true\nmanual = 1.0\n\n[train.stages.members.gear.helix_angle]\nauto = true\nmanual = 0.0\n\n[train.stages.members.gear.face_width]\nauto = true\nmanual = 5.0\n\n[train.stages.members.gear.face_sources.bending]\nultimate = true\nfatigue = true\n\n[train.stages.members.gear.face_sources.contact]\nultimate = false\nfatigue = false\n\n[train.stages.members.gear.material_overrides]\n\n[train.stages.members.thickness_mod]\nauto = false\nmanual = 1.0\n\n[train.stages.members.pitch_diameter]\nauto = true\nmanual = 17.0\n\n[[train.stages.members]]\nshaft = 2\nmodule = 1.0\npressure_angle = 20.0\n\n[train.stages.members.gear]\nteeth = 43\nno_undercut = true\naddendum = 1.0\nno_sharp_tip = true\nmin_tip_width = 0.1\ndedendum = 1.25\nroot_radius = 0.38\nmaterial = \"4340 Hardened Steel\"\n\n[train.stages.members.gear.profile_shift]\nauto = true\nmanual = 0.0\n\n[train.stages.members.gear.working_depth]\nauto = true\nmanual = 1.0\n\n[train.stages.members.gear.helix_angle]\nauto = true\nmanual = 0.0\n\n[train.stages.members.gear.face_width]\nauto = true\nmanual = 5.0\n\n[train.stages.members.gear.face_sources.bending]\nultimate = true\nfatigue = true\n\n[train.stages.members.gear.face_sources.contact]\nultimate = false\nfatigue = false\n\n[train.stages.members.gear.material_overrides]\n\n[train.stages.members.thickness_mod]\nauto = true\nmanual = 1.0\n\n[train.stages.members.pitch_diameter]\nauto = true\nmanual = 0.0\n\n[[train.stages.meshes]]\na = 0\nb = 1\nsliding_friction = 0.08\nstatic_friction = 0.16\n\n[train.stages.meshes.overlap]\nauto = true\nmanual = 1.0\n\n[[train.stages.distances]]\naxes = [\n    0,\n    1,\n]\nangle = 0.0\nworm = false\ntip_clearance = 0.0\ntolerance_plus = 0.02\ntolerance_minus = 0.02\naxial_clearance = 0.0\n\n[train.stages.distances.distance]\nauto = true\nmanual = 0.0\n\n[train.stages.distances.clearance]\nauto = false\nmanual = 0.02\n"
+   "ok": "# Geartrain.\n#\n# Inputs only — every ratio, stress, efficiency and backlash is recomputed from\n# these, so nothing here can go stale. Units: mm, degrees, rpm, N·m.\n#\n# Materials are named; the library that defines them is a separate document.\n# Editing this file by hand is expected.\n\nname = \"probe\"\n\n[train]\nreversed_bending = false\ncouplings = []\nconstraints = []\n\n[[train.load_cases]]\nkind = \"ultimate\"\nenabled = true\n\n[[train.load_cases.loads]]\nrole = \"load\"\n\n[train.load_cases.loads.at]\nkind = \"of\"\nstage = 0\nshaft = 1\n\n[train.load_cases.loads.torque]\nauto = false\nmanual = 0.1\n\n[train.load_cases.loads.speed]\nauto = false\nmanual = 30000.0\n\n[[train.load_cases.loads]]\nrole = \"reacted\"\n\n[train.load_cases.loads.at]\nkind = \"of\"\nstage = 0\nshaft = 2\n\n[train.load_cases.loads.torque]\nauto = true\nmanual = 0.0\n\n[train.load_cases.loads.speed]\nauto = true\nmanual = 0.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nactuations = 1000\nreversing = false\n\n[train.load_cases.duty.intermittent.at]\nkind = \"of\"\nstage = 0\nshaft = 2\n\n[[train.load_cases]]\nkind = \"ultimate\"\nenabled = true\n\n[[train.load_cases.loads]]\nrole = \"load\"\n\n[train.load_cases.loads.at]\nkind = \"of\"\nstage = 0\nshaft = 2\n\n[train.load_cases.loads.torque]\nauto = false\nmanual = 3.0\n\n[train.load_cases.loads.speed]\nauto = false\nmanual = 0.0\n\n[[train.load_cases.loads]]\nrole = \"reacted\"\n\n[train.load_cases.loads.at]\nkind = \"of\"\nstage = 0\nshaft = 1\n\n[train.load_cases.loads.torque]\nauto = true\nmanual = 0.0\n\n[train.load_cases.loads.speed]\nauto = true\nmanual = 0.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nactuations = 1000\nreversing = false\n\n[train.load_cases.duty.intermittent.at]\nkind = \"of\"\nstage = 0\nshaft = 2\n\n[[train.load_cases]]\nkind = \"fatigue\"\nenabled = true\n\n[[train.load_cases.loads]]\nrole = \"load\"\n\n[train.load_cases.loads.at]\nkind = \"of\"\nstage = 0\nshaft = 1\n\n[train.load_cases.loads.torque]\nauto = false\nmanual = 0.02\n\n[train.load_cases.loads.speed]\nauto = false\nmanual = 30000.0\n\n[[train.load_cases.loads]]\nrole = \"reacted\"\n\n[train.load_cases.loads.at]\nkind = \"of\"\nstage = 0\nshaft = 2\n\n[train.load_cases.loads.torque]\nauto = true\nmanual = 0.0\n\n[train.load_cases.loads.speed]\nauto = true\nmanual = 0.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nactuations = 1000\nreversing = false\n\n[train.load_cases.duty.intermittent.at]\nkind = \"of\"\nstage = 0\nshaft = 2\n\n[[train.stages]]\nkind = \"shape\"\nload_sharing = \"none\"\nmin_planet_clearance = 0.3\n\n[train.stages.optimisation]\nenabled = false\n\n[[train.stages.axes]]\ncarried_by = 0\ncount = 1\n\n[[train.stages.axes]]\ncarried_by = 0\ncount = 1\n\n[[train.stages.shafts]]\naxis = 0\n\n[[train.stages.shafts]]\naxis = 1\n\n[[train.stages.members]]\nshaft = 1\nmodule = 1.0\npressure_angle = 20.0\n\n[train.stages.members.gear]\nteeth = 17\nno_undercut = true\naddendum = 1.0\nno_sharp_tip = true\nmin_tip_width = 0.1\ndedendum = 1.25\nroot_radius = 0.38\nmaterial = \"4340 Hardened Steel\"\n\n[train.stages.members.gear.profile_shift]\nauto = true\nmanual = 0.0\n\n[train.stages.members.gear.working_depth]\nauto = true\nmanual = 1.0\n\n[train.stages.members.gear.helix_angle]\nauto = true\nmanual = 0.0\n\n[train.stages.members.gear.face_width]\nauto = true\nmanual = 5.0\n\n[train.stages.members.gear.face_sources.bending]\nultimate = true\nfatigue = true\n\n[train.stages.members.gear.face_sources.contact]\nultimate = false\nfatigue = false\n\n[train.stages.members.gear.material_overrides]\n\n[train.stages.members.thickness_mod]\nauto = false\nmanual = 1.0\n\n[train.stages.members.pitch_diameter]\nauto = true\nmanual = 17.0\n\n[[train.stages.members]]\nshaft = 2\nmodule = 1.0\npressure_angle = 20.0\n\n[train.stages.members.gear]\nteeth = 43\nno_undercut = true\naddendum = 1.0\nno_sharp_tip = true\nmin_tip_width = 0.1\ndedendum = 1.25\nroot_radius = 0.38\nmaterial = \"4340 Hardened Steel\"\n\n[train.stages.members.gear.profile_shift]\nauto = true\nmanual = 0.0\n\n[train.stages.members.gear.working_depth]\nauto = true\nmanual = 1.0\n\n[train.stages.members.gear.helix_angle]\nauto = true\nmanual = 0.0\n\n[train.stages.members.gear.face_width]\nauto = true\nmanual = 5.0\n\n[train.stages.members.gear.face_sources.bending]\nultimate = true\nfatigue = true\n\n[train.stages.members.gear.face_sources.contact]\nultimate = false\nfatigue = false\n\n[train.stages.members.gear.material_overrides]\n\n[train.stages.members.thickness_mod]\nauto = true\nmanual = 1.0\n\n[train.stages.members.pitch_diameter]\nauto = true\nmanual = 0.0\n\n[[train.stages.meshes]]\na = 0\nb = 1\nsliding_friction = 0.08\nstatic_friction = 0.16\nmin_contact_ratio = 1.2\n\n[train.stages.meshes.overlap]\nauto = true\nmanual = 1.0\n\n[[train.stages.distances]]\naxes = [\n    0,\n    1,\n]\nangle = 0.0\nworm = false\ntip_clearance = 0.0\ntolerance_plus = 0.02\ntolerance_minus = 0.02\naxial_clearance = 0.0\n\n[train.stages.distances.distance]\nauto = true\nmanual = 0.0\n\n[train.stages.distances.clearance]\nauto = false\nmanual = 0.02\n"
   },
   "import_train": {
    "ok": {
@@ -21465,20 +21491,18 @@
        {
         "kind": "shape",
         "optimisation": {
-         "enabled": false,
-         "min_contact_ratio": "1.2000000000000000"
+         "enabled": false
         },
         "load_sharing": "none",
+        "min_planet_clearance": "0.29999999999999999",
         "axes": [
          {
           "carried_by": 0,
-          "count": 1,
-          "min_clearance": "0.29999999999999999"
+          "count": 1
          },
          {
           "carried_by": 0,
-          "count": 1,
-          "min_clearance": "0.29999999999999999"
+          "count": 1
          }
         ],
         "shafts": [
@@ -21616,7 +21640,8 @@
           "overlap": {
            "auto": true,
            "manual": 1
-          }
+          },
+          "min_contact_ratio": "1.2000000000000000"
          }
         ],
         "distances": [

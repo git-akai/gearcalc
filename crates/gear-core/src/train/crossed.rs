@@ -1568,10 +1568,7 @@ mod tests {
         use crate::auto::Search;
         let lib = library();
         let optimised = |mut st: PairStage| {
-            st.optimisation = Optimisation {
-                enabled: true,
-                ..Optimisation::default()
-            };
+            st.optimisation = Optimisation { enabled: true };
             st
         };
         let shifts = |r: &ShapeResult| [r.members[0].profile_shift, r.members[1].profile_shift];
@@ -1609,7 +1606,7 @@ mod tests {
         let best = solve_crossed(&optimised(crossed(5.0)), &StageLoads::just(2.0), &lib).unwrap();
         assert_eq!(best.meshes[0].flank_interference, [false, false]);
         assert!(
-            best.meshes[0].contact_ratio >= Optimisation::default().min_contact_ratio - 1e-9,
+            best.meshes[0].contact_ratio >= super::super::DEFAULT_MIN_CONTACT_RATIO - 1e-9,
             "the floor is the crossed count: {}",
             best.meshes[0].contact_ratio
         );

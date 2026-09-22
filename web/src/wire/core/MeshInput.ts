@@ -16,4 +16,12 @@ a: number, b: number, sliding_friction: number, static_friction: number,
  * first mesh's is the reading; the rest of the group carry the same
  * number, written by the panel). Absent in a file, automatic at one.
  */
-overlap: Auto<number>, };
+overlap: Auto<number>, 
+/**
+ * **The transverse contact ratio the efficiency search may not take
+ * this mesh below** ([`super::DEFAULT_MIN_CONTACT_RATIO`] where a file
+ * gives none) — each mesh's own, since a pair that must stay
+ * continuous by more than its neighbour should not have its neighbour
+ * held to the same. Bounds the optimiser only.
+ */
+min_contact_ratio: number, };

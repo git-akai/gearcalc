@@ -1827,7 +1827,7 @@ pub(super) fn test_library() -> MaterialLibrary {
 /// edit, three serde defaults to keep in step, and a fourth stage away from
 /// being four. The searches differ in what is free and what it is worth; this
 /// does not differ at all.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
 #[cfg_attr(feature = "serde", serde(default))]
@@ -1849,27 +1849,24 @@ pub struct Optimisation {
     /// fixes a shift sum. Enough of them leave nothing to choose, which is a
     /// design fully specified rather than an error.
     pub enabled: bool,
-    /// **The transverse contact ratio the optimiser may not go below.**
-    ///
-    /// Sliding loss falls monotonically with the length of the path, so the
-    /// least-loss pair is always the one whose teeth barely reach: this is the
-    /// constraint that answers rather than the optimum, which is why it is an
-    /// input and not a constant. 1.2 is the usual design minimum; a mesh of one
-    /// tooth of difference sits just above continuous contact at every shift it
-    /// can be built at, and asks for less.
-    ///
-    /// It bounds the *optimiser* only. A design specified by hand is reported as
-    /// it is, with the existing note below 1.
-    pub min_contact_ratio: f64,
 }
 
-impl Default for Optimisation {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            min_contact_ratio: 1.2,
-        }
-    }
+/// **The transverse contact ratio the optimiser may not take a mesh
+/// below**, where the mesh's own field (`MeshInput::min_contact_ratio`) is
+/// not given: 1.2, the usual design minimum.
+///
+/// Sliding loss falls monotonically with the length of the path, so the
+/// least-loss pair is always the one whose teeth barely reach: this is the
+/// constraint that answers rather than the optimum, which is why it is an
+/// input and not a constant. A mesh of one tooth of difference sits just
+/// above continuous contact at every shift it can be built at, and asks
+/// for less. It bounds the *optimiser* only: a design specified by hand is
+/// reported as it is, with the existing note below 1.
+pub const DEFAULT_MIN_CONTACT_RATIO: f64 = 1.2;
+
+/// [`DEFAULT_MIN_CONTACT_RATIO`], for a field a file does not give.
+pub(crate) fn default_min_contact_ratio() -> f64 {
+    DEFAULT_MIN_CONTACT_RATIO
 }
 
 /// A stage of a geartrain, of whichever kind.
@@ -5116,16 +5113,13 @@ mod tests {
                     teeth: teeth[i],
                     ..PairStage::default().gears[i].clone()
                 }),
-                optimisation: Optimisation {
-                    enabled: true,
-                    ..Optimisation::default()
-                },
+                optimisation: Optimisation { enabled: true },
                 ..PairStage::default()
             };
             let asked = [0, 1].map(|i| stage.gears[i].shift_asked(&stage.base_params(i)));
             let bounds = Bounds {
                 floor: asked.map(|a| a.search_floor),
-                min_contact_ratio: stage.optimisation.min_contact_ratio,
+                min_contact_ratio: stage.min_contact_ratio,
                 clearance: stage.clearance.manual,
             };
             let pair = |q: [f64; 2]| [0, 1].map(|i| stage.params_at(i, q[i]));
@@ -5227,10 +5221,7 @@ mod tests {
                     teeth: teeth[i],
                     ..PairStage::default().gears[i].clone()
                 }),
-                optimisation: Optimisation {
-                    enabled: true,
-                    ..Optimisation::default()
-                },
+                optimisation: Optimisation { enabled: true },
                 ..PairStage::default()
             };
             let x = stage.shifts_at(&Search::SHIPPED);
@@ -5258,10 +5249,7 @@ mod tests {
         // --- an epicyclic set, both of its meshes.
         for (sun, planet) in [(17_u32, 17_u32), (24, 18), (13, 25)] {
             let mut set = PlanetaryStage {
-                optimisation: Optimisation {
-                    enabled: true,
-                    ..Optimisation::default()
-                },
+                optimisation: Optimisation { enabled: true },
                 ..PlanetaryStage::default()
             };
             set.sun.teeth = sun;
@@ -5299,10 +5287,7 @@ mod tests {
         // --- a hula stage, both of its meshes, at the crank the shape sizes.
         for n in [12_u32, 18, 30] {
             let mut shape = hula_shape([n + 1, n, n - 1, n]);
-            shape.optimisation = Optimisation {
-                enabled: true,
-                ..Optimisation::default()
-            };
+            shape.optimisation = Optimisation { enabled: true };
             let Ok(b) = shape.build_at(&shape.shifts_at(&Search::SHIPPED)) else {
                 continue;
             };
@@ -5351,10 +5336,7 @@ mod tests {
         for sun in [11_u32, 13, 17, 19, 24, 31] {
             for planet in [14_u32, 17, 18, 21, 25] {
                 let mut set = PlanetaryStage {
-                    optimisation: Optimisation {
-                        enabled: true,
-                        ..Optimisation::default()
-                    },
+                    optimisation: Optimisation { enabled: true },
                     ..PlanetaryStage::default()
                 };
                 set.sun.teeth = sun;
@@ -5413,10 +5395,7 @@ mod tests {
                     teeth: teeth[i],
                     ..PairStage::default().gears[i].clone()
                 }),
-                optimisation: Optimisation {
-                    enabled: true,
-                    ..Optimisation::default()
-                },
+                optimisation: Optimisation { enabled: true },
                 ..PairStage::default()
             };
             let free = solve_pair_stage(&stage, &StageLoads::just(2.0), &lib)
@@ -5566,10 +5545,7 @@ mod tests {
                     teeth: teeth[i],
                     ..PairStage::default().gears[i].clone()
                 }),
-                optimisation: Optimisation {
-                    enabled: true,
-                    ..Optimisation::default()
-                },
+                optimisation: Optimisation { enabled: true },
                 ..PairStage::default()
             };
             // Scored by solving the stage at the shifts each search chose, so
@@ -5642,10 +5618,7 @@ mod tests {
         for sun in [11_u32, 13, 17, 19, 24, 31] {
             for planet in [14_u32, 17, 18, 21, 25] {
                 let mut set = PlanetaryStage {
-                    optimisation: Optimisation {
-                        enabled: true,
-                        ..Optimisation::default()
-                    },
+                    optimisation: Optimisation { enabled: true },
                     ..PlanetaryStage::default()
                 };
                 set.sun.teeth = sun;
@@ -10020,10 +9993,7 @@ mod tests {
     #[test]
     fn every_search_is_quick_enough_to_type_over() {
         let lib = library();
-        let tuned = Optimisation {
-            enabled: true,
-            ..Optimisation::default()
-        };
+        let tuned = Optimisation { enabled: true };
         let each = |name: &str, ceiling: u64, f: &dyn Fn()| {
             let start = std::time::Instant::now();
             for _ in 0..5 {
@@ -10092,10 +10062,7 @@ mod tests {
                 ..PairStage::default().gears[0].clone()
             };
             PairStage {
-                optimisation: Optimisation {
-                    enabled: true,
-                    ..Optimisation::default()
-                },
+                optimisation: Optimisation { enabled: true },
                 gears: [gear(9), gear(37)],
                 ..PairStage::default()
             }
@@ -10156,10 +10123,7 @@ mod tests {
                     ..PairStage::default().gears[1].clone()
                 },
             ],
-            optimisation: Optimisation {
-                enabled: on,
-                ..Optimisation::default()
-            },
+            optimisation: Optimisation { enabled: on },
             ..PairStage::default()
         };
         let plain = stage(false).shifts();
@@ -10214,10 +10178,7 @@ mod tests {
         };
 
         let spur = PairStage {
-            optimisation: Optimisation {
-                enabled: true,
-                ..Optimisation::default()
-            },
+            optimisation: Optimisation { enabled: true },
             ..PairStage::default()
         };
         for (i, x) in spur.shifts().iter().enumerate() {
@@ -10225,10 +10186,7 @@ mod tests {
         }
 
         let mut set = PlanetaryStage {
-            optimisation: Optimisation {
-                enabled: true,
-                ..Optimisation::default()
-            },
+            optimisation: Optimisation { enabled: true },
             ..PlanetaryStage::default()
         };
         set.sun.profile_shift = Auto::automatic(0.0);
@@ -10243,10 +10201,7 @@ mod tests {
         // The hula stage's rack-generated members are its pinions; its
         // rings are the shaper's and are not asked.
         let mut shape = hula_shape([65, 61, 57, 61]);
-        shape.optimisation = Optimisation {
-            enabled: true,
-            ..Optimisation::default()
-        };
+        shape.optimisation = Optimisation { enabled: true };
         let built = shape
             .build_at(&shape.shifts_at(&crate::auto::Search::SHIPPED))
             .expect("the stage solves");
@@ -10276,10 +10231,7 @@ mod tests {
         // distance the automatic solve already closes to.
         let asked = free.distances[0].nominal[0] + 0.05;
         let at = |on: bool| PairStage {
-            optimisation: Optimisation {
-                enabled: on,
-                ..Optimisation::default()
-            },
+            optimisation: Optimisation { enabled: on },
             centre_distance: Auto::fixed(asked),
             clearance: Auto::fixed(0.05),
             ..PairStage::default()
@@ -10329,10 +10281,7 @@ mod tests {
         for on in [false, true] {
             let r = solve_pair_stage(
                 &PairStage {
-                    optimisation: Optimisation {
-                        enabled: on,
-                        ..Optimisation::default()
-                    },
+                    optimisation: Optimisation { enabled: on },
                     clearance: Auto::fixed(0.05),
                     ..PairStage::default()
                 },
@@ -10353,10 +10302,7 @@ mod tests {
         let free = solve_pair_stage(&PairStage::default(), &StageLoads::just(2.0), &lib).unwrap();
         let asked = free.distances[0].nominal[0] + 0.4;
         let stage = PairStage {
-            optimisation: Optimisation {
-                enabled: true,
-                ..Optimisation::default()
-            },
+            optimisation: Optimisation { enabled: true },
             centre_distance: Auto::fixed(asked),
             ..PairStage::default()
         };
@@ -10426,10 +10372,7 @@ mod tests {
             ..PairStage::default().gears[0].clone()
         };
         let tuned = |gears: [StageGear; 2]| PairStage {
-            optimisation: Optimisation {
-                enabled: true,
-                ..Optimisation::default()
-            },
+            optimisation: Optimisation { enabled: true },
             gears,
             ..PairStage::default()
         };

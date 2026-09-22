@@ -47,6 +47,8 @@
   import { notes, type Notes } from "./notes";
   import {
     shaftName,
+    shaftRefName,
+    onShaft,
     memberName,
     memberListName,
     isWorm,
@@ -215,14 +217,8 @@
   const refLabel = (at: ShaftRef, label?: ShaftLabel): string => {
     if (at.kind === "ground") return t("ui.train_ground");
     const { stage, shaft } = at;
-    const known = label ?? result.topology[stage]?.ports.find((x) => x.shaft === shaft)?.label;
-    const name =
-      known?.kind === "member"
-        ? memberListName(tab.train, result.topology, stage, known.member)
-        : known
-          ? shaftName(tab.train, result.topology, stage, known)
-          : String(shaft);
-    return t("ui.train_port_at", { stage: stageName(stage), shaft: name });
+    void label;
+    return t("ui.train_port_at", { stage: stageName(stage), shaft: shaftRefName(tab.train, result.topology, stage, shaft) });
   };
   /** The ports a duty's select offers, keyed for the select; a port is set
    *  by looking its key up here, never by parsing the key. */
@@ -421,9 +417,12 @@
     if (rest.length > 0) out.push(rest);
     return out.filter((g) => g.length > 0);
   };
-  /** The shafts a member may move to: those on its axis, by name. */
+  /** The shafts a member may move to: those on its axis that carry no
+   *  axis themselves, by name. */
   const shaftsOnAxis = (shape: Shape, j: number) =>
-    shape.shafts.map((s, k) => k + 1).filter((k) => shape.shafts[k - 1].axis === axisOf(shape, j));
+    shape.shafts
+      .map((s, k) => k + 1)
+      .filter((k) => shape.shafts[k - 1].axis === axisOf(shape, j) && !shape.axes.some((a) => a.carried_by === k));
 
   function removeStage(i: number) {
     // The constraints, the couplings and the cases name stages by index,
@@ -477,10 +476,7 @@
   /** **A shaft of a stage by name**, off the topology the core sent — the
    *  label a port carries — and by its number where the wiring has no name
    *  for it. */
-  const shaftLabel = (stage: number, s: number): string => {
-    const label = result.topology[stage]?.ports.find((p) => p.shaft === s)?.label;
-    return label ? shaftName(tab.train, result.topology, stage, label) : String(s);
-  };
+  const shaftLabel = (stage: number, s: number): string => shaftRefName(tab.train, result.topology, stage, s);
   /** Whether a mesh is internal and on distance `k` of a shape: one of
    *  its members has a cutter, and its two members' axes are the distance's. */
   const internalOn = (shape: Shape, m: { a: number; b: number }, k: number): boolean => {
@@ -972,6 +968,31 @@
     {@render numberField("ui.train_cutter_tip_round", () => cut.tip_round, (v) => (cut.tip_round = v), 0.02, "ui.train_m")}
   {/if}
   <h4 class="section-heading" class:later={opts.cutter !== undefined}>{title}</h4>
+  {#if opts.edits}
+    <!-- **The shaft first**: what the gear is fixed to, before what it is
+         cut as. A select over the shafts of its axis and a new one — a
+         layshaft's engaged pair is the driven gear moved onto the output,
+         two rings turning together are two members on one shaft — with the
+         carrier's shaft left out, since a gear fixed to the carrier of the
+         planets it meshes locks the stage. -->
+    {@const ed = opts.edits}
+    <label>
+      <span>{t("ui.train_member_shaft")}</span>
+      <select
+        value={String(ed.shape.members[ed.member].shaft)}
+        onchange={(e) => {
+          const v = e.currentTarget.value;
+          editStage(ed.stage, { move_shaft: { member: ed.member, shaft: v === "new" ? null : Number(v) } });
+        }}
+      >
+        {#each shaftsOnAxis(ed.shape, ed.member) as s (s)}
+          <option value={String(s)}>{shaftLabel(ed.stage, s)}</option>
+        {/each}
+        <option value="new">{t("ui.train_new_shaft")}</option>
+      </select>
+      <em></em>
+    </label>
+  {/if}
   <label class:invalid={g && outside(gear.teeth, g.ranges.teeth)}>
     <span>{t(opts.teethLabel ?? "ui.train_tooth_count")}</span>
     <input type="number" step="1" bind:value={() => gear.teeth, finite((v) => (gear.teeth = v))} />
@@ -1286,29 +1307,13 @@
          a ring stays a ring, and a swap is a remove and an add. -->
     {@const ed = opts.edits}
     {@const planet = isPlanetGear(ed.shape, ed.member)}
-    {@const onShaft = ed.shape.members.filter((x) => x.shaft === ed.shape.members[ed.member].shaft).length}
-    <label>
-      <span>{t("ui.train_member_shaft")}</span>
-      <select
-        value={String(ed.shape.members[ed.member].shaft)}
-        onchange={(e) => {
-          const v = e.currentTarget.value;
-          editStage(ed.stage, { move_shaft: { member: ed.member, shaft: v === "new" ? null : Number(v) } });
-        }}
-      >
-        {#each shaftsOnAxis(ed.shape, ed.member) as s (s)}
-          <option value={String(s)}>{shaftLabel(ed.stage, s)}</option>
-        {/each}
-        <option value="new">{t("ui.train_new_shaft")}</option>
-      </select>
-      <em></em>
-    </label>
+    {@const sharing = ed.shape.members.filter((x) => x.shaft === ed.shape.members[ed.member].shaft).length}
     {#if ed.shape.axes.some((a) => a.carried_by !== 0)}
       <div class="edits">
         {#if planet}
           <button class="action add" onclick={() => editStage(ed.stage, { add_central: { gear: ed.member, ring: false } })}>{t("ui.train_add_sun")}</button>
           <button class="action add" onclick={() => editStage(ed.stage, { add_central: { gear: ed.member, ring: true } })}>{t("ui.train_add_ring")}</button>
-          <button class="action danger" disabled={onShaft < 2} onclick={() => editStage(ed.stage, { remove_step: { gear: ed.member } })}>{t("ui.train_remove_step")}</button>
+          <button class="action danger" disabled={sharing < 2} onclick={() => editStage(ed.stage, { remove_step: { gear: ed.member } })}>{t("ui.train_remove_step")}</button>
         {:else}
           <button class="action danger" disabled={lastOnItsStep(ed.shape, ed.member)} onclick={() => editStage(ed.stage, { remove_member: { member: ed.member } })}>{t("ui.train_remove_member")}</button>
         {/if}
@@ -1367,7 +1372,9 @@
     {#each ports as p (p.shaft)}
       {@const state = shaftState(i, p.shaft)}
       <label>
-        <span>{shaftName(tab.train, result.topology, i, p.label)}</span>
+        <!-- The shaft by its number, and what it carries under it, the way
+             a gear within a stage is referenced. -->
+        <span>{shaftName(tab.train, i, p.label, p.shaft)} <small class="on">{onShaft(tab.train, result.topology, i, p.shaft)}</small></span>
         <select value={stateKey(state)} onchange={(e) => setShaft(i, p.shaft, e.currentTarget.value)}>
           <option value="held">{t("ui.train_constraint_held")}</option>
           <optgroup label={t("ui.train_constraint_coupled")}>
@@ -1638,14 +1645,6 @@
     },
     t("ui.train_note_optimise_efficiency"),
   )}
-  {#if o.enabled}
-    <label class="sub">
-      <span>{t("ui.train_min_contact_ratio")}</span>
-      <input type="number" step="0.05" bind:value={() => o.min_contact_ratio, finite((v) => (o.min_contact_ratio = v))} />
-      <em>{t("ui.train_epsilon")}</em>
-      <FieldNote notes={notes(t("ui.train_note_min_contact_ratio"), null)} />
-    </label>
-  {/if}
 {/snippet}
 
 <header class="tab-bar">
@@ -2062,11 +2061,9 @@
                   <em></em>
                 </label>
               {/each}
-              <!-- The tip-to-tip room each replicated axis's planets keep:
-                   the axis's own, one box per such axis. -->
-              {#each replicated as k (k)}
-                {@render numberField(replicated.length > 1 ? "ui.train_minimum_planet_clearance_on" : "ui.train_minimum_planet_clearance", () => stage.axes[k].min_clearance, (v) => (stage.axes[k].min_clearance = v), 0.05, "ui.train_mm", t("ui.train_note_planet_clearance"), { axis: axisName(stage, i, k) })}
-              {/each}
+              {#if replicated.length > 0}
+                {@render numberField("ui.train_minimum_planet_clearance", () => stage.min_planet_clearance, (v) => (stage.min_planet_clearance = v), 0.05, "ui.train_mm", t("ui.train_note_planet_clearance"))}
+              {/if}
               <!-- **The structural edits**: a step on each carried axis of an
                    epicyclic stage; an axis at the end of a parallel chain, and
                    the last one off again while more than a pair's two are
@@ -2214,8 +2211,12 @@
             {#each meshGroups as group, gi (gi)}
               {@const inGroup = (m: { a: number; b: number }) => group.includes(m.a) && group.includes(m.b)}
               {@const groupMeshes = stage.meshes.map((m, k) => (inGroup(m) ? k : -1)).filter((k) => k >= 0)}
+              <!-- One heading per group: a lone mesh is named as the mesh it
+                   is; a run of meshes by the members it joins. -->
               <h4 class="mesh section-heading">
-                {t(meshGroups.length > 1 ? "ui.train_mesh_group" : "ui.train_mesh_group_only", { members: group.map(name).join(" / ") })}
+                {groupMeshes.length === 1
+                  ? t("ui.train_mesh_between", { a: name(stage.meshes[groupMeshes[0]].a), b: name(stage.meshes[groupMeshes[0]].b) })
+                  : t("ui.train_mesh_group", { members: group.map(name).join(" / ") })}
               </h4>
               <div class="grid shared">
                 <label>
@@ -2252,24 +2253,41 @@
                 {#if !crossed && groupMeshes.length > 0}
                   {@render overlapField(stage, groupMeshes, sres?.meshes ?? [])}
                 {/if}
-              </div>
-              {#each stage.meshes as m, k (k)}
-                {#if inGroup(m)}
-                  {@const onDistance = stage.meshes.filter((x) => sameDistance(stage, x, m)).length}
-                  <h4 class="mesh section-heading later">
-                    {t("ui.train_mesh_between", { a: name(m.a), b: name(m.b) })}
-                  </h4>
-                  <div class="grid shared">
-                    {@render numberField("ui.train_sliding_friction", () => m.sliding_friction, (v) => (m.sliding_friction = v), 0.01, "")}
-                    {@render numberField("ui.train_static_friction", () => m.static_friction, (v) => (m.static_friction = v), 0.01, "", t("ui.train_note_static_friction"))}
-                    {#if parallel}
-                      <div class="edits">
-                        <button class="action danger" disabled={onDistance < 2} onclick={() => editStage(i, { remove_pair: { mesh: k } })}>{t("ui.train_remove_pair")}</button>
-                      </div>
-                    {/if}
-                  </div>
+                <!-- The floor the efficiency search holds the group's meshes
+                     to, offered while the search is on; each mesh's own in
+                     the core, the group's written together here. -->
+                {#if stage.optimisation.enabled && groupMeshes.length > 0}
+                  <label>
+                    <span>{t("ui.train_min_contact_ratio")}</span>
+                    <input
+                      type="number"
+                      step="0.05"
+                      bind:value={
+                        () => stage.meshes[groupMeshes[0]].min_contact_ratio,
+                        finite((v) => {
+                          for (const k of groupMeshes) stage.meshes[k].min_contact_ratio = v;
+                        })
+                      }
+                    />
+                    <em>{t("ui.train_epsilon")}</em>
+                    <FieldNote notes={notes(t("ui.train_note_min_contact_ratio"), null)} />
+                  </label>
                 {/if}
-              {/each}
+                <!-- Each mesh's own inputs, what its flanks rub with: named
+                     for the pair where the group has more than one. -->
+                {#each groupMeshes as k (k)}
+                  {@const m = stage.meshes[k]}
+                  {@const onDistance = stage.meshes.filter((x) => sameDistance(stage, x, m)).length}
+                  {@const pair = { a: name(m.a), b: name(m.b) }}
+                  {@render numberField(groupMeshes.length > 1 ? "ui.train_sliding_friction_of" : "ui.train_sliding_friction", () => m.sliding_friction, (v) => (m.sliding_friction = v), 0.01, "", undefined, pair)}
+                  {@render numberField(groupMeshes.length > 1 ? "ui.train_static_friction_of" : "ui.train_static_friction", () => m.static_friction, (v) => (m.static_friction = v), 0.01, "", t("ui.train_note_static_friction"), pair)}
+                  {#if parallel}
+                    <div class="edits">
+                      <button class="action danger" disabled={onDistance < 2} onclick={() => editStage(i, { remove_pair: { mesh: k } })}>{t("ui.train_remove_pair")}</button>
+                    </div>
+                  {/if}
+                {/each}
+              </div>
             {/each}
 
             <!-- **One card per member**, in the shape's order. Which of the
@@ -2374,23 +2392,30 @@
                   {/each}
                 </dd>
               {/each}
-              {#each replicated as k (k)}
-                {@const lay = sres?.layouts.find((l) => l.axis === k)}
-                <dt>{replicated.length > 1 ? t("ui.train_planet_clearance_on", { axis: axisName(stage, i, k) }) : t("ui.train_planet_clearance")}</dt>
+              <!-- **The closest two planets, wherever they are**: one
+                   allowance for the stage, one figure against it — the least
+                   clearance over every replicated axis, which is the one
+                   that decides. -->
+              {#if replicated.length > 0}
+                {@const closest = (sres?.layouts ?? []).reduce<(typeof sres extends undefined ? never : NonNullable<typeof sres>["layouts"][number]) | undefined>((least, l) => (least === undefined || l.clearance < least.clearance ? l : least), undefined)}
+                <dt>{t("ui.train_planet_clearance")}</dt>
                 <dd>
-                  {#if lay}
-                    {num(lay.clearance, 3)} mm
-                    <small class:warn={!lay.clearance_ok}>
-                      {t(lay.clearance_ok ? "ui.train_meets_the_minimum" : "ui.train_below_the_minimum")}
+                  {#if closest}
+                    {num(closest.clearance, 3)} mm
+                    <small class:warn={!closest.clearance_ok}>
+                      {t(closest.clearance_ok ? "ui.train_meets_the_minimum" : "ui.train_below_the_minimum")}{replicated.length > 1 ? ` · ${axisName(stage, i, closest.axis)}` : ""}
                     </small>
                   {/if}
                 </dd>
+              {/if}
+              {#each replicated as k (k)}
+                {@const lay = sres?.layouts.find((l) => l.axis === k)}
                 <!-- Two separate layout checks, so two rows. Even spacing is
                      `N | z_sun + z_ring`; simultaneous meshing is the stricter
                      `N | z_sun` *and* `N | z_ring`, and a false answer is not a
                      fault — it means the planets engage staggered, which is
                      usually preferable. -->
-                <dt>{t("ui.train_even_spacing")}</dt>
+                <dt>{replicated.length > 1 ? t("ui.train_even_spacing_on", { axis: axisName(stage, i, k) }) : t("ui.train_even_spacing")}</dt>
                 <dd>{lay?.equal_spacing == null ? BLANK : lay.equal_spacing ? t("ui.train_yes") : t("ui.train_no")}</dd>
                 <dt>{t("ui.train_simultaneous_meshing")}</dt>
                 <dd>{lay?.simultaneous_meshing == null ? BLANK : lay.simultaneous_meshing ? t("ui.train_yes") : t("ui.train_no")}</dd>
@@ -2947,6 +2972,12 @@
   /* In a row of edits a remove sits beside its add, not below it. */
   .edits .action.danger {
     margin-top: 0;
+  }
+  /* What a shaft carries, under its number in the same cell. */
+  small.on {
+    display: block;
+    color: var(--muted);
+    font-size: 0.72rem;
   }
   /* What the row's buttons do, under them, in a note's voice. */
   .edit-note {

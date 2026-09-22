@@ -68,6 +68,11 @@ planets: number,
  */
 optimisation: Optimisation, 
 /**
+ * The transverse contact ratio the search may not take either mesh
+ * below ([`super::DEFAULT_MIN_CONTACT_RATIO`]).
+ */
+min_contact_ratio: number, 
+/**
  * How the load is divided while two tooth pairs are engaged.
  *
  * **Off by default, and it reaches bending only** — see

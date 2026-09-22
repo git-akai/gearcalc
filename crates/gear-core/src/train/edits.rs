@@ -70,7 +70,11 @@ pub enum StageEdit {
     RemovePair { mesh: usize },
     /// **A member moved to another shaft on its axis** — `None` a new one —
     /// and the shaft it leaves removed where it is emptied and carries no
-    /// axis.
+    /// axis. A member alone on its shaft moved to a new one is already
+    /// there, and nothing changes: the shaft, and what a case or a
+    /// coupling wrote on it, stays. Refused onto a shaft that carries an
+    /// axis — a gear fixed to the carrier of the planets it meshes locks
+    /// the stage.
     MoveShaft { member: usize, shaft: Option<Shaft> },
 }
 
@@ -92,6 +96,9 @@ pub enum EditRefused {
     /// No member of that kind fits at the radius the axis runs at: a sun
     /// inside a planocentric, whose planet all but fills its ring.
     NoRoom,
+    /// The shaft carries an axis: a gear on the carrier of the planets it
+    /// meshes locks the stage.
+    CarriesAnAxis,
 }
 
 impl EditRefused {
@@ -107,6 +114,7 @@ impl EditRefused {
             Self::WrongFamily => "ui.train_edit_refused_family",
             Self::NotOnTheAxis => "ui.train_edit_refused_axis",
             Self::NoRoom => "ui.train_edit_refused_no_room",
+            Self::CarriesAnAxis => "ui.train_edit_refused_carrier",
         }
     }
 }
@@ -120,6 +128,7 @@ impl std::fmt::Display for EditRefused {
             Self::WrongFamily => "not an edit of this family",
             Self::NotOnTheAxis => "not a shaft on the member's axis",
             Self::NoRoom => "nothing of that kind fits at this radius",
+            Self::CarriesAnAxis => "that shaft carries an axis",
         })
     }
 }
@@ -546,7 +555,14 @@ impl Shape {
                 if self.shafts[s - 1].axis != axis {
                     return Err(EditRefused::NotOnTheAxis);
                 }
+                if self.carries_an_axis(s) {
+                    return Err(EditRefused::CarriesAnAxis);
+                }
                 s
+            }
+            // Alone on its shaft, it is already on a shaft of its own.
+            None if self.members_on_shaft(from).len() == 1 => {
+                return Ok(Renumbered::identity(self.shafts.len()))
             }
             None => self.push_shaft(axis),
         };
@@ -839,6 +855,51 @@ mod tests {
             assert_eq!(shape.edit(edit), Err(why), "{edit:?}");
             assert!(same(&shape, &before), "{edit:?} touched the shape");
         }
+    }
+
+    /// **A move keeps what a shaft was told**: a member alone on its shaft
+    /// moved to a new one changes nothing — the case entry and the coupling
+    /// at that shaft stay — and a gear cannot be moved onto the shaft that
+    /// carries the planets it meshes.
+    #[test]
+    fn a_move_to_a_shaft_of_its_own_is_no_move_and_the_carrier_takes_no_gear() {
+        let at = |stage, shaft| ShaftRef::Of { stage, shaft };
+        let mut t = Train::chained(
+            vec![
+                Stage::Shape(Box::new(StagePreset::Spur.build())),
+                Stage::Shape(Box::new(StagePreset::Planetary.build())),
+            ],
+            vec![LoadCase::ultimate(at(0, 1), at(1, 2), 1.0, 1000.0)],
+        );
+        let before = t.clone();
+        t.edit_stage(
+            0,
+            StageEdit::MoveShaft {
+                member: 1,
+                shaft: None,
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            t.couplings, before.couplings,
+            "the coupling at gear 2 stays"
+        );
+        assert_eq!(t.load_cases, before.load_cases);
+        assert!(same(
+            t.stages[0].as_shape().unwrap(),
+            before.stages[0].as_shape().unwrap()
+        ));
+        // The set's carrier is shaft 2; its sun may not go there.
+        assert_eq!(
+            t.edit_stage(
+                1,
+                StageEdit::MoveShaft {
+                    member: 0,
+                    shaft: Some(2),
+                },
+            ),
+            Err(EditRefused::CarriesAnAxis)
+        );
     }
 
     /// **What a remove renumbers, the train follows**: a Wolfrom's first

@@ -1457,10 +1457,7 @@ fn shifts_report(z1: u32, z2: u32) {
             ..StageGear::default()
         }),
         centre_distance: at.map_or(Auto::automatic(0.0), Auto::fixed),
-        optimisation: Optimisation {
-            enabled: on,
-            ..Optimisation::default()
-        },
+        optimisation: Optimisation { enabled: on },
         ..PairStage::default()
     };
     let solved =
@@ -1574,10 +1571,7 @@ fn epicyclic_shifts_report() {
     use gear_core::train::{solve_any, Optimisation, PlanetaryStage, Stage, StageLoads};
 
     let lib = gear_io::default_library();
-    let on = Optimisation {
-        enabled: true,
-        ..Optimisation::default()
-    };
+    let on = Optimisation { enabled: true };
 
     // **The hula stage belongs here too.** It is the third kind that chooses
     // shifts, and the one whose optimiser can find *nothing* to choose — at a
@@ -3548,10 +3542,7 @@ fn crossed_report(z1: u32, z2: u32, shaft_angle: f64) {
     // crossed answer is in the change detector, which is the ninth time this
     // audit has had to put an opt-in the harness never switched on into it.
     let even = gear_core::train::PairStage {
-        optimisation: gear_core::train::Optimisation {
-            enabled: true,
-            ..gear_core::train::Optimisation::default()
-        },
+        optimisation: gear_core::train::Optimisation { enabled: true },
         ..base.clone()
     }
     .with_first_helix(shaft_angle / 2.0);

@@ -278,6 +278,10 @@ pub struct PairStage {
     /// there. See [`super::Optimisation`].
     #[cfg_attr(feature = "serde", serde(default))]
     pub optimisation: super::Optimisation,
+    /// The transverse contact ratio the search may not take the mesh
+    /// below ([`super::DEFAULT_MIN_CONTACT_RATIO`]).
+    #[cfg_attr(feature = "serde", serde(default = "super::default_min_contact_ratio"))]
+    pub min_contact_ratio: f64,
     /// How the load is divided while two tooth pairs are engaged.
     ///
     /// **Off by default, and it reaches bending only.** A contact rating is
@@ -321,6 +325,7 @@ impl Default for PairStage {
             static_friction: 0.16,
             thickness_mod: 1.0,
             optimisation: shape.optimisation,
+            min_contact_ratio: super::DEFAULT_MIN_CONTACT_RATIO,
             centre_distance: Auto::automatic(0.0),
             clearance: Auto::fixed(0.02),
             tolerance_plus: 0.02,

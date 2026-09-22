@@ -23,18 +23,4 @@ export type Optimisation = {
  * fixes a shift sum. Enough of them leave nothing to choose, which is a
  * design fully specified rather than an error.
  */
-enabled: boolean, 
-/**
- * **The transverse contact ratio the optimiser may not go below.**
- *
- * Sliding loss falls monotonically with the length of the path, so the
- * least-loss pair is always the one whose teeth barely reach: this is the
- * constraint that answers rather than the optimum, which is why it is an
- * input and not a constant. 1.2 is the usual design minimum; a mesh of one
- * tooth of difference sits just above continuous contact at every shift it
- * can be built at, and asks for less.
- *
- * It bounds the *optimiser* only. A design specified by hand is reported as
- * it is, with the existing note below 1.
- */
-min_contact_ratio: number, };
+enabled: boolean, };

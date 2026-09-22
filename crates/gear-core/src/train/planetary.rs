@@ -70,6 +70,10 @@ pub struct PlanetaryStage {
     /// contact ratio since a set is only as continuous as its worse half.
     #[cfg_attr(feature = "serde", serde(default))]
     pub optimisation: Optimisation,
+    /// The transverse contact ratio the search may not take either mesh
+    /// below ([`super::DEFAULT_MIN_CONTACT_RATIO`]).
+    #[cfg_attr(feature = "serde", serde(default = "super::default_min_contact_ratio"))]
+    pub min_contact_ratio: f64,
     /// How the load is divided while two tooth pairs are engaged.
     ///
     /// **Off by default, and it reaches bending only** — see
@@ -140,9 +144,10 @@ impl Default for PlanetaryStage {
             centre_distance: Auto::automatic(0.0),
             clearance: Auto::fixed(0.02),
             optimisation: shape.optimisation,
+            min_contact_ratio: super::DEFAULT_MIN_CONTACT_RATIO,
             tolerance_plus: 0.02,
             tolerance_minus: 0.02,
-            min_planet_clearance: 0.3,
+            min_planet_clearance: shape.min_planet_clearance,
             cutter: Cutter::default(),
             // `z_r = z_s + 2 z_p`, the ideal ring, on a sun small enough to
             // need shift — so a fresh set shows what the automatic shift does

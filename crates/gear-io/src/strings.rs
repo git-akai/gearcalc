@@ -986,10 +986,7 @@ mod tests {
             // own way of finding nothing.
             if let Ok(r) = solve_crossed(
                 &gear_core::train::PairStage {
-                    optimisation: gear_core::train::Optimisation {
-                        enabled: true,
-                        ..gear_core::train::Optimisation::default()
-                    },
+                    optimisation: gear_core::train::Optimisation { enabled: true },
                     ..stage.clone()
                 },
                 &gear_core::train::StageLoads::just(2.0),

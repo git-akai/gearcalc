@@ -10,4 +10,11 @@ import type { ShaftOn } from "./ShaftOn";
 /**
  * The stage.
  */
-export type Shape = { optimisation: Optimisation, load_sharing: LoadSharing, axes: Array<Axis>, shafts: Array<ShaftOn>, members: Array<Member>, meshes: Array<MeshInput>, distances: Array<Distance>, };
+export type Shape = { optimisation: Optimisation, load_sharing: LoadSharing, 
+/**
+ * Tip-to-tip clearance between neighbouring planets, mm — one
+ * allowance for every replicated axis, asked only where there is
+ * one; what is reported against it is the closest pair of planets
+ * anywhere in the stage.
+ */
+min_planet_clearance: number, axes: Array<Axis>, shafts: Array<ShaftOn>, members: Array<Member>, meshes: Array<MeshInput>, distances: Array<Distance>, };

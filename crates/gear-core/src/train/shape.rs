@@ -75,18 +75,6 @@ pub struct Axis {
     /// How many times this axis, its shafts and their gears are replicated
     /// about the axis it is carried round — `N` planets. One elsewhere.
     pub count: u32,
-    /// Tip-to-tip clearance between neighbouring instances of this axis's
-    /// gears, mm — asked only where the axis is replicated, and each
-    /// replicated axis's own (a Ravigneaux's short planets need not clear
-    /// by what its long ones do). Absent in a file, 0.3 mm.
-    #[cfg_attr(feature = "serde", serde(default = "default_min_clearance"))]
-    pub min_clearance: f64,
-}
-
-/// The tip-to-tip clearance a replicated axis a file does not give one is
-/// held to.
-pub(crate) fn default_min_clearance() -> f64 {
-    0.3
 }
 
 /// The crate's pressure angle, for a member a file does not give one:
@@ -174,6 +162,18 @@ pub struct MeshInput {
     /// number, written by the panel). Absent in a file, automatic at one.
     #[cfg_attr(feature = "serde", serde(default = "default_overlap"))]
     pub overlap: Auto<f64>,
+    /// **The transverse contact ratio the efficiency search may not take
+    /// this mesh below** ([`super::DEFAULT_MIN_CONTACT_RATIO`] where a file
+    /// gives none) — each mesh's own, since a pair that must stay
+    /// continuous by more than its neighbour should not have its neighbour
+    /// held to the same. Bounds the optimiser only.
+    #[cfg_attr(feature = "serde", serde(default = "default_min_contact_ratio"))]
+    pub min_contact_ratio: f64,
+}
+
+/// The floor a mesh a file does not give one is held to by the search.
+pub(crate) fn default_min_contact_ratio() -> f64 {
+    super::DEFAULT_MIN_CONTACT_RATIO
 }
 
 /// The overlap a mesh a file does not give one runs at: asked for
@@ -237,6 +237,11 @@ pub struct Distance {
 pub struct Shape {
     pub optimisation: Optimisation,
     pub load_sharing: LoadSharing,
+    /// Tip-to-tip clearance between neighbouring planets, mm — one
+    /// allowance for every replicated axis, asked only where there is
+    /// one; what is reported against it is the closest pair of planets
+    /// anywhere in the stage.
+    pub min_planet_clearance: f64,
     pub axes: Vec<Axis>,
     pub shafts: Vec<ShaftOn>,
     pub members: Vec<Member>,
@@ -254,6 +259,7 @@ impl Default for Shape {
         Self {
             optimisation: Optimisation::default(),
             load_sharing: LoadSharing::None,
+            min_planet_clearance: 0.3,
             axes: Vec::new(),
             shafts: Vec::new(),
             members: Vec::new(),
@@ -1982,7 +1988,7 @@ impl Shape {
             }
             let m = self.meshes[k];
             let members = [cut(m.a), cut(m.b)];
-            let min_contact_ratio = self.optimisation.min_contact_ratio;
+            let min_contact_ratio = m.min_contact_ratio;
             product *= match &bm.contact {
                 BuiltContact::Line(l) => crate::auto::MeshTrial {
                     members,
@@ -3462,7 +3468,7 @@ pub fn solve_shape_after(
                 equal_spacing,
                 simultaneous_meshing,
                 clearance,
-                clearance_ok: clearance >= a.min_clearance,
+                clearance_ok: clearance >= shape.min_planet_clearance,
             })
         })
         .collect();
@@ -3475,7 +3481,7 @@ pub fn solve_shape_after(
             notes.push(
                 Note::new(key::STAGE_PLANET_CLEARANCE_BELOW_MINIMUM)
                     .number("gap", l.clearance, 3)
-                    .number("minimum", shape.axes[l.axis].min_clearance, 3),
+                    .number("minimum", shape.min_planet_clearance, 3),
             );
         }
     }
@@ -3977,6 +3983,7 @@ impl From<&super::PairStage> for Shape {
         shape.meshes[0].sliding_friction = p.sliding_friction;
         shape.meshes[0].static_friction = p.static_friction;
         shape.meshes[0].overlap = p.overlap;
+        shape.meshes[0].min_contact_ratio = p.min_contact_ratio;
         shape.distances[0] = Distance {
             axes: [0, 1],
             angle: p.shaft_angle,
@@ -4021,7 +4028,7 @@ impl From<&super::PlanetaryStage> for Shape {
         );
         shape.optimisation = s.optimisation;
         shape.load_sharing = s.load_sharing;
-        shape.axes[1].min_clearance = s.min_planet_clearance;
+        shape.min_planet_clearance = s.min_planet_clearance;
         for (m, (gear, thickness_mod)) in shape.members.iter_mut().zip([
             (&s.sun, Auto::fixed(s.thickness_mod)),
             (&s.planet, Auto::automatic(2.0 - s.thickness_mod)),
@@ -4045,6 +4052,7 @@ impl From<&super::PlanetaryStage> for Shape {
             m.sliding_friction = sliding;
             m.static_friction = stat;
             m.overlap = s.overlap;
+            m.min_contact_ratio = s.min_contact_ratio;
         }
         let d = &mut shape.distances[0];
         d.distance = s.centre_distance;
@@ -5312,10 +5320,7 @@ mod tests {
         let solve = |on: bool| {
             solve_set(
                 &PlanetaryStage {
-                    optimisation: Optimisation {
-                        enabled: on,
-                        ..Optimisation::default()
-                    },
+                    optimisation: Optimisation { enabled: on },
                     ..free()
                 },
                 &StageLoads::just(2.0),
@@ -5352,7 +5357,7 @@ mod tests {
             tuned.meshes[0].line.unwrap().contact_ratios.transverse,
             tuned.meshes[1].line.unwrap().contact_ratios.transverse,
         ] {
-            let asked = free().optimisation.min_contact_ratio;
+            let asked = free().min_contact_ratio;
             assert!(eps >= asked - 1e-3, "contact ratio {eps} under {asked}");
         }
     }
@@ -5361,10 +5366,7 @@ mod tests {
     #[test]
     fn a_given_shift_survives_the_search() {
         let mut stage = PlanetaryStage {
-            optimisation: Optimisation {
-                enabled: true,
-                ..Optimisation::default()
-            },
+            optimisation: Optimisation { enabled: true },
             ..stage_of(24, 18, 60, 0.0)
         };
         stage.sun.profile_shift = Auto::automatic(0.0);

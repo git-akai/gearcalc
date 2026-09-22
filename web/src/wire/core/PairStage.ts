@@ -150,6 +150,11 @@ clearance: Auto<number>, tolerance_plus: number, tolerance_minus: number,
  */
 optimisation: Optimisation, 
 /**
+ * The transverse contact ratio the search may not take the mesh
+ * below ([`super::DEFAULT_MIN_CONTACT_RATIO`]).
+ */
+min_contact_ratio: number, 
+/**
  * How the load is divided while two tooth pairs are engaged.
  *
  * **Off by default, and it reaches bending only.** A contact rating is
