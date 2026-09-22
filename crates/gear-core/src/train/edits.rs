@@ -580,8 +580,7 @@ mod tests {
     use super::super::arrangements::{self as arr, StagePreset};
     use super::super::shape::{solve_loads, ShapeResult};
     use super::super::{
-        test_library as library, Constrained, LoadCase, Reversal, Stage, StageBoundary, StageLoads,
-        Train,
+        test_library as library, LoadCase, Reversal, Shape, StageBoundary, StageLoads, Train,
     };
     use super::*;
 
@@ -805,10 +804,7 @@ mod tests {
     #[test]
     fn a_move_to_a_body_of_its_own_is_no_move_and_the_carrier_takes_no_gear() {
         let mut t = Train::chained(
-            vec![
-                Stage::Shape(Box::new(StagePreset::Spur.build())),
-                Stage::Shape(Box::new(StagePreset::Planetary.build())),
-            ],
+            vec![StagePreset::Spur.build(), StagePreset::Planetary.build()],
             |t| vec![LoadCase::ultimate(t.port(0, 1), t.port(1, 2), 1.0, 1000.0)],
         );
         let before = t.clone();
@@ -824,10 +820,7 @@ mod tests {
         .unwrap();
         assert_eq!(t.ends_of(shared).len(), 2, "gear 2 still runs on");
         assert_eq!(t.load_cases, before.load_cases);
-        assert!(same(
-            t.stages[0].as_shape().unwrap(),
-            before.stages[0].as_shape().unwrap()
-        ));
+        assert!(same(&t.stages[0], &before.stages[0]));
         // The set's carrier is its slot 2; its sun may not go there.
         let carrier = t.port(1, 2);
         assert_eq!(
@@ -850,10 +843,7 @@ mod tests {
     #[test]
     fn a_remove_repoints_the_train_and_drops_what_named_the_body() {
         let mut t = Train::chained(
-            vec![
-                Stage::Shape(Box::new(StagePreset::Wolfrom.build())),
-                Stage::Shape(Box::new(StagePreset::Spur.build())),
-            ],
+            vec![StagePreset::Wolfrom.build(), StagePreset::Spur.build()],
             |t| vec![LoadCase::ultimate(t.port(0, 1), t.port(1, 2), 1.0, 1000.0)],
         );
         // The chain joins ring 2 (slot 3) onward; hold ring 1 (slot 2,
@@ -863,13 +853,13 @@ mod tests {
         t.hold(t.port(0, 2));
         t.edit_stage(0, StageEdit::RemoveMember { member: 1 })
             .unwrap();
-        assert_eq!(t.stages[0].as_shape().unwrap().members.len(), 2);
+        assert_eq!(t.stages[0].members.len(), 2);
         assert_eq!(t.port(0, 2), 2, "ring 2 closed up to body 2");
         assert_eq!(
             t.ends_of(2).len(),
             2,
             "ring 2 still runs on to the spur: {:?}",
-            t.stages[1].as_shape().unwrap().bodies
+            t.stages[1].bodies
         );
         assert!(
             t.constraints.is_empty(),

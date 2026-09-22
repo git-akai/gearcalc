@@ -1541,7 +1541,10 @@ a designer uses, which a shape is filled in from — and every menu entry is a
 under the family the shape reads as; a worm's conventional proportions are
 one thing set on a distance (`Distance::worm`). The hula stage was a
 vocabulary of its own and is a list now, `arrangements::hula`, its corpus
-unmoved. None of them is a type in the core, and `Stage` has one variant.
+unmoved. None of them is a type in the core: a stage *is* a `Shape`. The
+enum over it went too — one variant, forty-eight match arms and an
+`as_shape()` that could not be `None`, buying a `kind = "shape"` a file
+could only ever write one value of.
 
 **It was not built this way, and the reasons it was not are the lessons.**
 Each arrangement was a stage *type* with a result of its own, on the reading
@@ -1595,8 +1598,10 @@ lists of what sits where (`train/arrangements.rs`) with no code of their own.
 
 **What would change it:** an arrangement the shape cannot lay out — a member
 on two axes, a mesh that is not two members — is a change to `shape.rs`, and
-the rule is that it is still not a type: the six questions `Constrained` asks
-are the whole of what a stage owes, and one `impl` answers them.
+the rule is that it is still not a type: the six questions a stage answers
+are the whole of what it owes, and the shape answers them. (They were a
+trait, `Constrained`, while there might have been a second implementor.
+There was never one, so they are the shape's own methods.)
 
 ### Helical is not a lesser case
 
@@ -1799,8 +1804,8 @@ from a toggle another group moves, and a walk that settled only because its
 groups were written in a lucky order. None of it wrong, all of it the shape
 that made the next stage type cost the same again.
 
-So a stage answers six questions, in `train::Constrained`, and nothing
-else: which members it has; every input relief may turn, by name; how its
+So a stage answers six questions — the shape's own methods, once a trait
+while a second implementor was still imaginable — and nothing else: which members it has; every input relief may turn, by name; how its
 helix may be *stated* — the readings, in relief order; which of its inputs
 argue with each other; where its bodies and meshes sit; and which of them a
 train may address. Everything that walks those — counting, relieving, seeding
@@ -1869,7 +1874,7 @@ hand, a planet's `2 − k`. The tab solves those with no guard left to fire —
 a test holds that nothing clamps — and quotes the stage's own pitch diameter.
 
 Which members are rings is the stage's to say, not the tab's to infer from a
-tooth count: `Stage::member_cutter` names the pinion cutter where there is
+tooth count: `Shape::member_cutter` names the pinion cutter where there is
 one, and a member with a cutter is internal and takes it. A worm is refused —
 a thread's proportions are its own and the tab has no model of them — and the
 list shows it greyed rather than omitting it, so a reader sees why.

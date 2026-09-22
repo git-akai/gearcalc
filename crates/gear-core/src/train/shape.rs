@@ -37,9 +37,8 @@
 
 use super::wiring::{BodyLabel, MeshSpec, Mount, Wiring};
 use super::{
-    Constrained, ContactRatios, Freedom, FreedomGroup, GearResult, Loading, MemberFacts,
-    MemberFreedom, MemberRating, MeshReport, Optimisation, Ports, Reading, StageGear, TrainError,
-    PROBE,
+    ContactRatios, Freedom, FreedomGroup, GearResult, Loading, MemberFacts, MemberFreedom,
+    MemberRating, MeshReport, Optimisation, Ports, Reading, StageGear, TrainError, PROBE,
 };
 use crate::contact::{efficiency, ContactPath, Directional, Drive, LoadSharing};
 use crate::kinematics::{Body, GROUND};
@@ -2779,10 +2778,7 @@ pub(crate) fn solve_loads(
     lib: &MaterialLibrary,
     reversal: super::Reversal,
 ) -> Result<ShapeResult, TrainError> {
-    let stage = super::Stage::Shape(Box::new(shape.clone()));
-    super::solve_any_with(&stage, loads, lib, reversal).map(|r| match r {
-        super::StageResult::Shape(s) => *s,
-    })
+    super::solve_any_with(shape, loads, lib, reversal)
 }
 
 // ------------------------------------------------------------ the result ---
@@ -2921,9 +2917,9 @@ pub fn solve_shape_after(
     let helix = shape.helix_angles();
 
     // ---- motion first: tooth counts and topology, before any geometry.
-    let wiring = Constrained::wiring(shape);
+    let wiring = shape.wiring();
     let boundary = boundary.clone();
-    let teeth = super::teeth_of(shape.members());
+    let teeth = super::teeth_of(shape.gears());
     let system = wiring.alone(&teeth)?;
     let solution = system
         .motion(&boundary.conditions)
@@ -3797,14 +3793,37 @@ pub fn solve_shape_after(
 
 // -------------------------------------------------- what a stage owes ---
 
-impl Constrained for Shape {
-    fn members(&self) -> Vec<&StageGear> {
+/// **What the shape declares so the machinery above it can serve it** — the
+/// whole of what a stage owes, and once a trait with one implementor.
+///
+/// Six questions: which gears it has, which inputs relief may turn and by
+/// what name, how its helix may be stated, which of its inputs argue with
+/// each other, **where its bodies and meshes sit**, and **which bodies a
+/// train may address** and what convention holds when it addresses none.
+/// Everything that walks those — counting, relieving, seeding a box, reading
+/// the helix the readings state, assembling the kinematic system, laying a
+/// train's constraints over the convention — is written once above the
+/// shape (`train/mod.rs`), so what answers the six has all of it without
+/// writing any.
+///
+/// The fifth and sixth are the ones that tested the claim
+/// `docs/rationale.md#one-stage-one-result` makes: that a new arrangement
+/// should be new **kinematics** and no new rating machinery. The shape
+/// states its topology here and the one solver in [`crate::kinematics`]
+/// answers every question about motion, torque and play that used to be
+/// answered per stage type; it states its ports here and the train's
+/// conditions decide which is driven and which held, which used to be a
+/// field on the type. The claim held so well that the types went, and the
+/// trait that stated the six went after them: one shape answers them.
+impl Shape {
+    /// The gears in the order [`ShapeResult::members`] reports them.
+    pub fn gears(&self) -> Vec<&StageGear> {
         self.members.iter().map(|m| &m.gear).collect()
     }
 
     /// Every input relief may turn: each distance's, by index, the overlap,
     /// and each member's.
-    fn inputs(&mut self) -> Vec<(Freedom, &mut Auto<f64>)> {
+    pub(crate) fn inputs(&mut self) -> Vec<(Freedom, &mut Auto<f64>)> {
         let mut out = Vec::new();
         for (k, d) in self.distances.iter_mut().enumerate() {
             out.push((Freedom::CentreDistance(k), &mut d.distance));
@@ -3842,7 +3861,7 @@ impl Constrained for Shape {
     /// through meshes and no further — so a layshaft's pairs each state
     /// their own, and [`Self::readings_for`] is the entry a mesh's relation
     /// counts.
-    fn readings(&self) -> Vec<Reading> {
+    pub(crate) fn readings(&self) -> Vec<Reading> {
         let mut out: Vec<Reading> = Vec::new();
         let meshes = self.group_meshes();
         for (g, group) in self.mesh_groups().iter().enumerate() {
@@ -3906,7 +3925,7 @@ impl Constrained for Shape {
     /// by two: relieving the clearance would hand it straight back to the
     /// group below, which pins it again, and the walk would never settle.
     /// A shift gives instead, which is what the set's own kind did.
-    fn freedoms(&self) -> Vec<FreedomGroup> {
+    pub fn freedoms(&self) -> Vec<FreedomGroup> {
         let mut groups = Vec::new();
         for d in 0..self.distances.len() {
             let meshes = self.meshes_on(d);
@@ -3972,7 +3991,7 @@ impl Constrained for Shape {
 
     /// The shape *is* the topology: each member spins with its body in the
     /// frame its axis stands still in, and a mesh's sign is its members'.
-    fn wiring(&self) -> Wiring {
+    pub fn wiring(&self) -> Wiring {
         Wiring {
             slots: (0..=self.bodies.len()).map(|s| self.label_of(s)).collect(),
             mounts: (0..self.members.len())
@@ -4009,7 +4028,7 @@ impl Constrained for Shape {
     /// port it did not load and so held the wobble body; a case declares
     /// what it reacts now, and an orbiting port is a port.) What is held by
     /// convention is the first ring's body, where there is a ring.
-    fn ports(&self) -> Ports {
+    pub fn ports(&self) -> Ports {
         let ports: Vec<Body> = (1..=self.bodies.len())
             .filter(|&s| !self.replicated(s))
             .collect();
@@ -4688,7 +4707,7 @@ mod tests {
     /// A set's two distances must agree, which is one relation among its three
     /// shifts. Give it a distance as well and there is a second — each mesh must
     /// reach *that* distance — so one shift is a design and two are absorbed.
-    /// `Stage::freedoms` says so by reading the distance's toggle, and this is
+    /// `Shape::freedoms` says so by reading the distance's toggle, and this is
     /// what makes that reading true rather than declared: give **two** shifts at
     /// a given distance and one of them cannot survive.
     ///
@@ -4747,8 +4766,8 @@ mod tests {
         // twice anyone's leverage, then the ring, then the sun — all but
         // one given; so a set pinned whole keeps the distance, the
         // clearance, the size and two shifts, the planet's absorbing.
-        use super::super::{Freedom, MemberFreedom, Stage};
-        let groups = Stage::planetary(one.clone()).freedoms();
+        use super::super::{Freedom, MemberFreedom, Shape};
+        let groups = Shape::from(&one.clone()).freedoms();
         let shift = |i: usize| vec![Freedom::Member(i, MemberFreedom::Shift)];
         let first = groups
             .iter()
@@ -5455,9 +5474,7 @@ mod pressure_angle {
     //! and two members in mesh at two are refused.
 
     use super::super::arrangements::{layshaft, StagePreset};
-    use super::super::{
-        test_library, Constrained, Reversal, StageBoundary, StageLoads, TrainError,
-    };
+    use super::super::{test_library, Reversal, StageBoundary, StageLoads, TrainError};
     use super::*;
 
     fn solve(shape: &Shape) -> Result<ShapeResult, TrainError> {
@@ -5515,9 +5532,7 @@ mod overlap_per_group {
     //! under that mesh's own widths.
 
     use super::super::arrangements::layshaft;
-    use super::super::{
-        helix_for_overlap, test_library, Constrained, Reversal, StageBoundary, StageLoads,
-    };
+    use super::super::{helix_for_overlap, test_library, Reversal, StageBoundary, StageLoads};
     use super::*;
 
     fn solve(shape: &Shape) -> ShapeResult {

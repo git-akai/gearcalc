@@ -194,6 +194,16 @@
 //!   the old spellings — a `shafts` table, a member's `shaft`, a
 //!   `couplings` table, a `{ kind = "of", stage, shaft }` reference — is
 //!   refused by name.
+//! - **A stage is a shape, and says so by what it is made of.** `kind =
+//!   "shape"` is gone from `[[train.stages]]` and a file that still writes
+//!   one is refused by name: there was one kind, so the tag said nothing a
+//!   reader or a parser could act on, and the enum it tagged — one variant
+//!   over the shape — went with it. Nothing else about a stage's table
+//!   changed. (The tag could have been kept on the struct itself, and was
+//!   measured: serde writes it but will not read it back beside
+//!   `deny_unknown_fields`, and without that a file's stale field is
+//!   accepted in silence — which is the one thing this format refuses to
+//!   do.)
 //!
 //! No compatibility shim, deliberately. Accepting both shapes means carrying two
 //! readers for one format and testing both forever, and the thing that would go
@@ -339,7 +349,7 @@ mod tests {
     use super::*;
     use gear_core::params::Auto;
     use gear_core::train::{
-        BodyConstraint, Duty, Load, LoadCase, LoadRole, PairStage, PlanetaryStage, Stage,
+        BodyConstraint, Duty, Load, LoadCase, LoadRole, PairStage, PlanetaryStage, Shape,
     };
 
     /// One of every preset, so the `kind` tag and every preset's layout are
@@ -351,24 +361,21 @@ mod tests {
         // exercised both ways.
         let mut train = Train::chained(
             vec![
-                Stage::pair(
-                    PairStage {
+                Shape::from(
+                    &PairStage {
                         ..PairStage::default()
                     }
                     .with_additional_helix(15.0),
                 ),
-                Stage::pair(PairStage::worm()),
-                Stage::pair(
-                    PairStage {
+                Shape::from(&PairStage::worm()),
+                Shape::from(
+                    &PairStage {
                         ..PairStage::worm()
                     }
                     .with_first_helix(45.0),
                 ),
-                Stage::planetary(PlanetaryStage::default()),
-                Stage::Shape(Box::new(gear_core::train::arrangements::hula(
-                    [65, 61, 57, 61],
-                    [1.0, 1.0],
-                ))),
+                Shape::from(&PlanetaryStage::default()),
+                gear_core::train::arrangements::hula([65, 61, 57, 61], [1.0, 1.0]),
             ],
             |t| {
                 let (start, end) = (t.port(0, 1), t.port(4, 4));
@@ -452,14 +459,15 @@ mod tests {
         assert!(text.starts_with("# Geartrain."), "no header:\n{text}");
         assert!(text.contains("Inputs only"));
         assert!(text.contains("name = \"Test train\""));
-        // One tag a stage, one a load case — and none on a body, which is
-        // a number of the train's.
+        // **One tag a load case, and nothing else has one**: a stage is a
+        // shape and says what it is made of rather than naming a type, and
+        // a body is a number of the train's.
         assert_eq!(
             text.matches("kind = ").count(),
-            5 + 4,
-            "one tag a stage and a load case:\n{text}"
+            4,
+            "one tag a load case, and one nowhere else:\n{text}"
         );
-        for kind in ["shape", "ultimate", "fatigue"] {
+        for kind in ["ultimate", "fatigue"] {
             assert!(text.contains(&format!("kind = \"{kind}\"")), "no {kind}");
         }
         // ...and the shapes say what they are made of, by name.
@@ -521,10 +529,12 @@ mod tests {
     #[test]
     fn a_field_the_shape_no_longer_has_is_refused_and_named() {
         let text = to_toml(&document()).unwrap();
-        // ...on a stage.
+        // ...on a stage — which is a shape, and a `kind` on one is itself a
+        // field the shape no longer has, so the tag an older file wrote is
+        // the case this starts from.
         let stale = text.replacen(
-            "kind = \"shape\"",
-            "kind = \"shape\"\nsomething_old = 1.0",
+            "[[train.stages]]",
+            "[[train.stages]]\nsomething_old = 1.0",
             1,
         );
         match from_toml(&stale) {
@@ -532,6 +542,12 @@ mod tests {
                 assert!(e.to_string().contains("something_old"), "{e}")
             }
             other => panic!("a stale field must be a parse error, not {other:?}"),
+        }
+        // ...the tag a stage used to carry included.
+        let stale = text.replacen("[[train.stages]]", "[[train.stages]]\nkind = \"shape\"", 1);
+        match from_toml(&stale) {
+            Err(TrainError::Parse(e)) => assert!(e.to_string().contains("kind"), "{e}"),
+            other => panic!("a stage's old tag must be a parse error, not {other:?}"),
         }
         // ...and on the train itself.
         let stale = text.replacen(
@@ -564,14 +580,13 @@ mod tests {
     #[test]
     fn an_automatic_input_survives_as_a_toggle_and_a_value() {
         let mut doc = document();
-        if let Some(s) = doc.train.stages[0].as_shape_mut() {
+        {
+            let s = &mut doc.train.stages[0];
             s.distances[0].distance = Auto::fixed(31.5);
             s.members[0].gear.face_width = Auto::automatic(4.0);
         }
         let back = from_toml(&to_toml(&doc).unwrap()).unwrap().document;
-        let s = back.train.stages[0]
-            .as_shape()
-            .expect("stage 1 came back a different kind");
+        let s = &back.train.stages[0];
         let d = s.distances[0].distance;
         assert!(!d.auto && (d.manual - 31.5).abs() < 1e-12);
         let w = s.members[0].gear.face_width;
@@ -587,16 +602,10 @@ mod tests {
     #[test]
     fn a_file_asking_for_what_no_stage_honours_is_adjusted_and_says_so() {
         let mut doc = document();
-        doc.train.stages[1]
-            .as_shape_mut()
-            .expect("stage 2 is the worm")
-            .meshes[0]
-            .overlap = Auto::fixed(1.5);
+        doc.train.stages[1].meshes[0].overlap = Auto::fixed(1.5);
         let back = from_toml(&to_toml(&doc).unwrap()).unwrap();
         assert!(back.adjusted);
-        let w = back.document.train.stages[1]
-            .as_shape()
-            .expect("stage 2 came back a different kind");
+        let w = &back.document.train.stages[1];
         assert!(
             w.meshes[0].overlap.auto,
             "a crossed pair's ratio cannot stand given"

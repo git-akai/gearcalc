@@ -6,7 +6,7 @@ import type { MemberFreedom } from "./MemberFreedom";
  *
  * Two levels, because a stage has inputs of two kinds: its own — a distance,
  * a clearance, a ratio, a worm's diameter — and one of each per member.
- * `Member(i, _)` indexes the members in the order [`StageResult::members`]
+ * `Member(i, _)` indexes the members in the order [`ShapeResult::members`]
  * reports them — a pair's two gears, a set's sun, planet and ring, a hula
  * stage's four — and is resolved once for every member (`Shape::inputs`), so
  * a member input that arrives costs one line there and none per preset.

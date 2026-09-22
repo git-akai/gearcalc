@@ -89,7 +89,7 @@ min_tip_width: number, dedendum: number, root_radius: number,
  * decides: a given centre distance with both shifts pinned sizes a pair's
  * first member, and a given axial contact ratio with every face width
  * given sizes the helix any kind needs to reach it
- * ([`Stage::freedoms`] says which may stand). Where nothing decides it,
+ * ([`Shape::freedoms`] says which may stand). Where nothing decides it,
  * the first member's stands at its box.
  */
 helix_angle: Auto<number>, 

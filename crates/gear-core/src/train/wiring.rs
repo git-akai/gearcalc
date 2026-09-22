@@ -87,7 +87,7 @@ pub enum BodyLabel {
     /// The one held frame — see [`GROUND`].
     Ground,
     /// The body a member spins with, by member index in
-    /// [`super::StageResult::members`] order. Where several members share one
+    /// [`super::ShapeResult::members`] order. Where several members share one
     /// — a compound planet, a wobble body — it is the first of them.
     Member { member: usize },
     /// A frame that carries meshes and is no member's body: a set's carrier,
@@ -125,7 +125,7 @@ pub struct Mount {
 /// One mesh, by member index.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct MeshSpec {
-    /// Indices into the stage's members, in [`super::StageResult::members`]
+    /// Indices into the stage's members, in [`super::ShapeResult::members`]
     /// order. On an internal mesh `b` is the **ring**, which is
     /// [`MeshKind::Internal`]'s own convention and the order every kind here
     /// already builds its meshes in.
@@ -154,9 +154,9 @@ pub struct MeshSpec {
 pub struct Wiring {
     /// What each slot is; slot 0 is always ground.
     pub slots: Vec<BodyLabel>,
-    /// One per member, in [`super::StageResult::members`] order.
+    /// One per member, in [`super::ShapeResult::members`] order.
     pub mounts: Vec<Mount>,
-    /// One per mesh, in [`super::StageResult::meshes`] order.
+    /// One per mesh, in [`super::ShapeResult::meshes`] order.
     pub meshes: Vec<MeshSpec>,
 }
 
@@ -372,7 +372,7 @@ pub struct MemberMotion {
 /// this type exists because that was written twice before it was noticed.
 #[derive(Clone, Debug, PartialEq)]
 pub struct UnitMotion {
-    /// One per member, in [`super::StageResult::members`] order.
+    /// One per member, in [`super::ShapeResult::members`] order.
     pub members: Vec<MemberMotion>,
     /// The output body's speed, turns per turn of the input — the wiring's
     /// `output`, whatever sits on it.
@@ -385,7 +385,7 @@ impl UnitMotion {
     /// infinity where the output does not turn, which is what two meshes
     /// cancelling is.
     ///
-    /// One reading, where `StageResult::ratio()` used to mean three: `z₂/z₁`
+    /// One reading, where `ShapeResult::ratio()` used to mean three: `z₂/z₁`
     /// on a pair, a magnitude; the Willis answer on a set, signed; the two
     /// products on a hula stage.
     #[must_use]

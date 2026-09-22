@@ -241,7 +241,7 @@ impl StageBoundary {
 // ------------------------------------------------- the train as one system ---
 
 use super::wiring::BodyLabel;
-use super::{Stage, Train};
+use super::{Shape, Train};
 use crate::kinematics::{Mobility, Refusal, Solution, System};
 
 /// Why a train's motion could not be worked out.
@@ -319,7 +319,7 @@ impl Train {
     /// numbers — so a fixture names a body by its stage and slot
     /// ([`Self::port`]) and the numbers are the train's.
     #[must_use]
-    pub fn chained(stages: Vec<Stage>, cases: impl FnOnce(&Self) -> Vec<super::LoadCase>) -> Self {
+    pub fn chained(stages: Vec<Shape>, cases: impl FnOnce(&Self) -> Vec<super::LoadCase>) -> Self {
         let mut train = Self {
             load_cases: Vec::new(),
             reversed_bending: false,
@@ -338,31 +338,21 @@ impl Train {
     /// numbering does. Ground for a slot the stage does not have.
     #[must_use]
     pub fn port(&self, stage: usize, slot: Body) -> usize {
-        self.stages
-            .get(stage)
-            .and_then(Stage::as_shape)
-            .map_or(GROUND, |s| s.body_at(slot))
+        self.stages.get(stage).map_or(GROUND, |s| s.body_at(slot))
     }
 
     /// **The slot a body has on a stage**, where the stage has it — the
     /// inverse of [`Self::port`].
     #[must_use]
     pub fn slot(&self, stage: usize, body: usize) -> Option<Body> {
-        self.stages
-            .get(stage)
-            .and_then(Stage::as_shape)
-            .and_then(|s| s.slot_if_any(body))
+        self.stages.get(stage).and_then(|s| s.slot_if_any(body))
     }
 
     /// The largest body number anything in the train names — a stage, a
     /// case or a hold — ground where nothing does.
     #[must_use]
     pub fn max_body(&self) -> usize {
-        let stages = self
-            .stages
-            .iter()
-            .filter_map(Stage::as_shape)
-            .map(super::shape::Shape::max_body);
+        let stages = self.stages.iter().map(super::shape::Shape::max_body);
         let cases = self.load_cases.iter().flat_map(|c| {
             c.loads.iter().map(|l| l.at).chain(match c.duty {
                 super::Duty::Intermittent { at, .. } => Some(at),
@@ -382,7 +372,7 @@ impl Train {
             .iter()
             .enumerate()
             .filter_map(|(k, s)| {
-                let slot = s.as_shape()?.slot(body);
+                let slot = s.slot(body);
                 (slot != GROUND).then_some((k, slot))
             })
             .collect()
@@ -399,12 +389,10 @@ impl Train {
                 map(b).unwrap_or(GROUND)
             }
         };
-        for stage in &mut self.stages {
-            if let Some(s) = stage.as_shape_mut() {
-                s.bodies.retain(|b| keep(b.body));
-                s.members.retain(|m| keep(m.body));
-                s.renumber_bodies(to);
-            }
+        for s in &mut self.stages {
+            s.bodies.retain(|b| keep(b.body));
+            s.members.retain(|m| keep(m.body));
+            s.renumber_bodies(to);
         }
         self.constraints.retain(|c| keep(c.body));
         for c in &mut self.constraints {
@@ -429,10 +417,10 @@ impl Train {
         let named: Vec<bool> = (0..=max)
             .map(|b| {
                 b == GROUND
-                    || self.stages.iter().any(|s| {
-                        s.as_shape()
-                            .is_some_and(|s| s.bodies.iter().any(|x| x.body == b))
-                    })
+                    || self
+                        .stages
+                        .iter()
+                        .any(|s| s.bodies.iter().any(|x| x.body == b))
                     || self.constraints.iter().any(|c| c.body == b)
                     || self.load_cases.iter().any(|c| {
                         c.loads.iter().any(|l| l.at == b)
@@ -467,13 +455,7 @@ impl Train {
         if self.stages.is_empty() {
             return;
         }
-        let on_a_stage = |b: usize| {
-            b == GROUND
-                || self
-                    .stages
-                    .iter()
-                    .any(|s| s.as_shape().is_some_and(|s| s.slot(b) != GROUND))
-        };
+        let on_a_stage = |b: usize| b == GROUND || self.stages.iter().any(|s| s.slot(b) != GROUND);
         self.constraints.retain(|c| on_a_stage(c.body));
         for case in &mut self.load_cases {
             case.loads.retain(|l| on_a_stage(l.at));
@@ -530,7 +512,6 @@ impl Train {
     fn stage_bodies(&self) -> usize {
         self.stages
             .iter()
-            .filter_map(Stage::as_shape)
             .map(super::shape::Shape::max_body)
             .max()
             .unwrap_or(GROUND)
@@ -552,7 +533,7 @@ impl Train {
         }
         let mut system = System::new(self.stage_bodies());
         for (k, stage) in self.stages.iter().enumerate() {
-            let teeth = super::teeth_of(stage.members());
+            let teeth = super::teeth_of(stage.gears());
             stage
                 .wiring()
                 .add_to(&mut system, &teeth, |slot| self.port(k, slot))
@@ -681,7 +662,7 @@ impl Train {
                 .collect();
             let first: Vec<Body> = (0..local.len()).filter(|s| !holds.contains(s)).collect();
             if let Err(Refusal::Conflicts(i)) = w
-                .alone(&super::teeth_of(stage.members()))
+                .alone(&super::teeth_of(stage.gears()))
                 .map_err(|e| MotionError::Wiring(k, e))?
                 .motion_in(&local, &first)
             {
@@ -1029,15 +1010,9 @@ impl Train {
             .map(|(k, stage)| {
                 let w = stage.wiring();
                 StagePorts {
-                    members: match stage {
-                        super::Stage::Shape(s) => s.member_names(),
-                    },
-                    mesh_groups: match stage {
-                        super::Stage::Shape(s) => s.mesh_groups(),
-                    },
-                    family: match stage {
-                        super::Stage::Shape(s) => s.family(),
-                    },
+                    members: stage.member_names(),
+                    mesh_groups: stage.mesh_groups(),
+                    family: stage.family(),
                     ports: stage
                         .ports()
                         .ports
@@ -1185,10 +1160,7 @@ impl Train {
         }
         // A stage with both would have one body at two of its slots, which
         // is a mesh or a carrier turning against itself: not a body.
-        let both = |s: &Stage| {
-            s.as_shape()
-                .is_some_and(|s| s.slot(a) != GROUND && s.slot(b) != GROUND)
-        };
+        let both = |s: &Shape| s.slot(a) != GROUND && s.slot(b) != GROUND;
         if self.stages.iter().any(both) {
             return;
         }
@@ -1237,7 +1209,7 @@ impl Train {
             return body;
         }
         let fresh = self.max_body() + 1;
-        if let Some(s) = self.stages.get_mut(stage).and_then(Stage::as_shape_mut) {
+        if let Some(s) = self.stages.get_mut(stage) {
             s.renumber_bodies(|x| if x == body { fresh } else { x });
         }
         fresh
@@ -1362,7 +1334,6 @@ impl Train {
         let shape = self
             .stages
             .get_mut(k)
-            .and_then(super::Stage::as_shape_mut)
             .ok_or(super::EditRefused::NoSuchIndex)?;
         shape.edit(edit, next)?;
         self.drop_orphans();
@@ -1403,15 +1374,13 @@ impl Train {
     /// chain's end is at its new end, which is what the chain did without
     /// saying so. **The first stage takes up the parked cases** at its
     /// conventional input and output.
-    pub fn push_stage(&mut self, mut stage: Stage) {
+    pub fn push_stage(&mut self, mut stage: Shape) {
         let k = self.stages.len();
         let next = self.max_body() + 1;
-        if let Some(s) = stage.as_shape_mut() {
-            // The stage's own numbering, moved above everything the train
-            // has: its slot `i` becomes body `next + i - 1`.
-            let slots: Vec<usize> = s.bodies.iter().map(|b| b.body).collect();
-            s.renumber_bodies(|b| slots.iter().position(|&x| x == b).map_or(b, |i| next + i));
-        }
+        // The stage's own numbering, moved above everything the train has:
+        // its slot `i` becomes body `next + i - 1`.
+        let slots: Vec<usize> = stage.bodies.iter().map(|b| b.body).collect();
+        stage.renumber_bodies(|b| slots.iter().position(|&x| x == b).map_or(b, |i| next + i));
         let input = stage.ports().input();
         let output = stage.ports().output();
         let onward = self.boundaries().ok().and_then(|b| {

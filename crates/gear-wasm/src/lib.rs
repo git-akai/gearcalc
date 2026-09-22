@@ -779,7 +779,7 @@ pub struct TrainOutcome {
     /// given is seeded from ([`relieve_stage`]). Beside the result rather
     /// than inside it because it is the *inputs'* names lined up against the
     /// result's figures, which the core does in one place
-    /// (`StageResult::figure`) and the panel need not know at all: it hands
+    /// (`ShapeResult::figure`) and the panel need not know at all: it hands
     /// this list back with the stage, and never learns which field is which.
     pub figures: Vec<Vec<gear_core::train::Figure>>,
     /// **Every stage's ports**, with the label the panel names each by — so a
@@ -1073,7 +1073,7 @@ pub struct StagePresetEntry {
     pub family: StageFamily,
     /// The catalogue key of its name.
     pub label: String,
-    pub stage: gear_core::train::Stage,
+    pub stage: gear_core::train::Shape,
 }
 
 /// What a new gear tab holds. The values are the specification's, and the
@@ -1103,7 +1103,7 @@ pub struct GearTabDefaults {
 }
 
 fn defaults_impl() -> Result<String, String> {
-    use gear_core::train::{LoadCase, Stage, Train};
+    use gear_core::train::{LoadCase, Train};
 
     // The tab starts with an automatic face width, where the core's own
     // default is a plain 10 mm. Both are right for their caller: the CLI and
@@ -1125,7 +1125,7 @@ fn defaults_impl() -> Result<String, String> {
         for m in &mut shape.members {
             m.gear.face_width = gear_core::params::Auto::automatic(UI_SEED);
         }
-        Stage::Shape(Box::new(shape))
+        shape
     };
     let spur = ui(StagePreset::Spur.build());
 
@@ -1366,7 +1366,7 @@ fn adopt_member_impl(input: &str) -> Result<String, String> {
         .stages
         .get(req.stage)
         .ok_or_else(|| format!("the train has no stage {}", req.stage + 1))?;
-    if req.member >= stage.members().len() {
+    if req.member >= stage.gears().len() {
         return Err(format!(
             "stage {} has no member {}",
             req.stage + 1,
@@ -1375,11 +1375,10 @@ fn adopt_member_impl(input: &str) -> Result<String, String> {
     }
     // A worm is the first member of a distance sized as a worm — the thread
     // the tab cannot hold; its wheel it can.
-    let is_worm = stage.as_shape().is_some_and(|s| {
-        s.distances
-            .first()
-            .is_some_and(|d| d.worm && s.meshes.first().is_some_and(|m| m.a == req.member))
-    });
+    let is_worm = stage
+        .distances
+        .first()
+        .is_some_and(|d| d.worm && stage.meshes.first().is_some_and(|m| m.a == req.member));
     if is_worm {
         return Err("a worm is not a gear the tab can hold".to_string());
     }
@@ -1393,7 +1392,7 @@ fn adopt_member_impl(input: &str) -> Result<String, String> {
             });
             AdoptOutcome {
                 adopted: Some(Adopted {
-                    params: result.stages[req.stage].members()[req.member].params,
+                    params: result.stages[req.stage].members[req.member].params,
                     internal: cutter.is_some(),
                     cutter,
                 }),
@@ -1443,7 +1442,7 @@ pub fn relieve_stage(input: &str) -> Result<String, JsError> {
 
 #[derive(Deserialize)]
 struct RelieveRequest {
-    stage: gear_core::train::Stage,
+    stage: gear_core::train::Shape,
     #[serde(default)]
     just: Option<gear_core::train::Freedom>,
     #[serde(default)]
@@ -1564,7 +1563,7 @@ enum TrainEdit {
         body: usize,
         to: Option<usize>,
     },
-    PushStage(gear_core::train::Stage),
+    PushStage(gear_core::train::Shape),
     RemoveStage(usize),
     AddCase(gear_core::train::CaseKind),
     Duty {
@@ -1644,9 +1643,10 @@ mod tests {
     /// preset offers and the boundary still has to carry, since a file may
     /// hold one and the epicyclic controls can build one.
     fn hula_stage() -> serde_json::Value {
-        serde_json::to_value(gear_core::train::Stage::Shape(Box::new(
-            gear_core::train::arrangements::hula([65, 61, 57, 61], [1.0, 1.0]),
-        )))
+        serde_json::to_value(gear_core::train::arrangements::hula(
+            [65, 61, 57, 61],
+            [1.0, 1.0],
+        ))
         .unwrap()
     }
 
@@ -1657,8 +1657,8 @@ mod tests {
         fatigue: (f64, f64),
         hours: f64,
     ) -> serde_json::Value {
-        use gear_core::train::{Duty, LoadCase, Stage, Train};
-        let stages: Vec<Stage> = stages
+        use gear_core::train::{Duty, LoadCase, Shape, Train};
+        let stages: Vec<Shape> = stages
             .iter()
             .map(|v| serde_json::from_value(v.clone()).expect("a stage"))
             .collect();
@@ -2342,7 +2342,7 @@ mod tests {
 
     /// **A planetary stage crosses the boundary with nothing added for it.**
     ///
-    /// `Stage` is a tagged enum and `Train` already carried a `Vec` of them, so
+    /// `Shape` is a tagged enum and `Train` already carried a `Vec` of them, so
     /// the set needed no entry point of its own — and since the kinds retired
     /// into the one shape, not even a tag: a set is a shape whose planet's
     /// axis is carried. That is the claim worth checking rather than assuming
@@ -2371,7 +2371,6 @@ mod tests {
 
         let v = solved(&req.to_string());
         let stage = &v["stages"][0];
-        assert_eq!(stage["kind"], "shape");
 
         // Ring held, sun driving: the classical 1 + z_r/z_s.
         assert!((v["paths"][0]["ratio"].as_f64().unwrap() - 3.5).abs() < 1e-12);
@@ -2480,7 +2479,6 @@ mod tests {
         });
         let v = solved(&train.to_string());
         let stage = &v["stages"][0];
-        assert_eq!(stage["kind"], "shape");
 
         // Four gears, each with the rating every stage member carries.
         let gears = stage["members"].as_array().expect("four gears");
@@ -2563,9 +2561,9 @@ mod tests {
 
         // Both stages are the one shape, and each says which contact it has
         // by what its mesh carries: the transverse figures on parallel shafts,
-        // the zone on crossed ones.
-        assert_eq!(v["stages"][0]["kind"], "shape");
-        assert_eq!(v["stages"][1]["kind"], "shape");
+        // the zone on crossed ones. Neither carries a kind: there is one.
+        assert!(v["stages"][0]["kind"].is_null());
+        assert!(v["stages"][1]["kind"].is_null());
         let (spur, worm) = (&v["stages"][0], &v["stages"][1]);
         assert!(spur["meshes"][0]["line"].is_object() && spur["meshes"][0]["point"].is_null());
         assert!(worm["meshes"][0]["point"].is_object() && worm["meshes"][0]["line"].is_null());

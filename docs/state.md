@@ -303,7 +303,7 @@ over it: a list in `arrangements.rs` at sensible teeth, which `defaults`
 crosses under the family the shape reads as. The hula stage is the
 arrangement `arrangements::hula`, a stepped Wolfrom at one planet, and no
 preset. There is no
-type in the core to branch on; `Stage` has one variant and keeps its tag.
+type in the core to branch on, and no enum over the shape either.
 What a stage is, the solve reads off the shape — a mesh is internal because a member has a cutter, a set is an axis
 carried by a body and replicated, a worm is a distance marked as one — and
 the panel names the members the same way (`members.ts`). Closing the

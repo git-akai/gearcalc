@@ -14,7 +14,7 @@ export type GearResult = {
  * with, every automatic value resolved and every convention applied: the
  * shift in force, the addendum the tip allows, the helix with the hand
  * this member has, a planet's `2 − k`. What the gear tab receives when it
- * adopts a member ([`Stage::member_cutter`] says whether it is a ring),
+ * adopts a member ([`Shape::member_cutter`] says whether it is a ring),
  * and what a caller that wants to draw or measure this member starts
  * from, rather than rebuilding it from the inputs and hoping to agree.
  */

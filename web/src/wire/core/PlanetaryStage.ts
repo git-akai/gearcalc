@@ -106,7 +106,7 @@ centre_distance: Auto<number>,
  * is solved to leave. That is why it cannot be derived: a given distance
  * and given shifts leave one gap on each mesh, and there is no one number
  * for this field to be. It carries the same `Auto` every distance's does so
- * the front end can offer it the same way; [`super::Stage::freedoms`]
+ * the front end can offer it the same way; [`super::Shape::freedoms`]
  * says it may not be automatic, and relief pins it.
  */
 clearance: Auto<number>, tolerance_plus: number, tolerance_minus: number, 

@@ -12,7 +12,6 @@ import {
   t,
   type MemberName,
   type Shape,
-  type Stage,
   type StagePorts,
   type Train,
 } from "./core";
@@ -32,7 +31,7 @@ export interface MemberRef {
 }
 
 /** How many members a stage has, in the core's member order. */
-export function memberCount(stage: Stage): number {
+export function memberCount(stage: Shape): number {
   return stage.members.length;
 }
 
@@ -174,7 +173,7 @@ export function acrossBody(train: Train, topology: StagePorts[], body: number): 
 }
 
 /** **A body in a reference**: its name and, in parentheses, every end of
- *  it — "Body 2 (Stage 1 Gear 2 · Stage 2 Sun)" — since a body bridges
+ *  it — "Body 2 (Shape 1 Gear 2 · Stage 2 Sun)" — since a body bridges
  *  stages and a reference has to say what it is on each. */
 export function bodyRefName(train: Train, topology: StagePorts[], body: number): string {
   if (body === 0) return t("ui.train_ground");

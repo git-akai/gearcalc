@@ -746,7 +746,7 @@ mod tests {
     //! the set's kind could not name.
 
     use super::super::shape::{solve_loads, ShapeResult};
-    use super::super::{test_library as library, Constrained, Reversal, StageBoundary, StageLoads};
+    use super::super::{test_library as library, Reversal, StageBoundary, StageLoads};
     use super::*;
 
     fn solve(shape: &Shape, held: &[Body], input: Body, output: Body) -> ShapeResult {

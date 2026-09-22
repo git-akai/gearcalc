@@ -24,7 +24,7 @@ export type TrainOutcome = { result: TrainResult | null, failure: TrainFailure |
  * given is seeded from ([`relieve_stage`]). Beside the result rather
  * than inside it because it is the *inputs'* names lined up against the
  * result's figures, which the core does in one place
- * (`StageResult::figure`) and the panel need not know at all: it hands
+ * (`ShapeResult::figure`) and the panel need not know at all: it hands
  * this list back with the stage, and never learns which field is which.
  */
 figures: Array<Array<Figure>>, 

@@ -172,7 +172,6 @@
      "reversed_bending": false,
      "stages": [
       {
-       "kind": "shape",
        "optimisation": {
         "enabled": false
        },
@@ -361,7 +360,6 @@
       "family": "parallel",
       "label": "ui.train_preset_spur",
       "stage": {
-       "kind": "shape",
        "optimisation": {
         "enabled": false
        },
@@ -547,7 +545,6 @@
       "family": "parallel",
       "label": "ui.train_preset_idler",
       "stage": {
-       "kind": "shape",
        "optimisation": {
         "enabled": false
        },
@@ -830,7 +827,6 @@
       "family": "parallel",
       "label": "ui.train_preset_layshaft",
       "stage": {
-       "kind": "shape",
        "optimisation": {
         "enabled": false
        },
@@ -1278,7 +1274,6 @@
       "family": "skew",
       "label": "ui.train_preset_worm",
       "stage": {
-       "kind": "shape",
        "optimisation": {
         "enabled": false
        },
@@ -1464,7 +1459,6 @@
       "family": "skew",
       "label": "ui.train_preset_crossed",
       "stage": {
-       "kind": "shape",
        "optimisation": {
         "enabled": false
        },
@@ -1650,7 +1644,6 @@
       "family": "epicyclic",
       "label": "ui.train_preset_planetary",
       "stage": {
-       "kind": "shape",
        "optimisation": {
         "enabled": false
        },
@@ -1917,7 +1910,6 @@
       "family": "epicyclic",
       "label": "ui.train_preset_wolfrom",
       "stage": {
-       "kind": "shape",
        "optimisation": {
         "enabled": false
        },
@@ -2188,7 +2180,6 @@
       "family": "epicyclic",
       "label": "ui.train_preset_compound",
       "stage": {
-       "kind": "shape",
        "optimisation": {
         "enabled": false
        },
@@ -2590,7 +2581,6 @@
       "family": "epicyclic",
       "label": "ui.train_preset_planocentric",
       "stage": {
-       "kind": "shape",
        "optimisation": {
         "enabled": false
        },
@@ -2784,7 +2774,6 @@
       "family": "epicyclic",
       "label": "ui.train_preset_meshed_planets",
       "stage": {
-       "kind": "shape",
        "optimisation": {
         "enabled": false
        },
@@ -7493,7 +7482,6 @@
     [
      "spur",
      {
-      "kind": "shape",
       "optimisation": {
        "enabled": false
       },
@@ -7677,7 +7665,6 @@
     [
      "idler",
      {
-      "kind": "shape",
       "optimisation": {
        "enabled": false
       },
@@ -7958,7 +7945,6 @@
     [
      "layshaft",
      {
-      "kind": "shape",
       "optimisation": {
        "enabled": false
       },
@@ -8404,7 +8390,6 @@
     [
      "worm",
      {
-      "kind": "shape",
       "optimisation": {
        "enabled": false
       },
@@ -8588,7 +8573,6 @@
     [
      "crossed",
      {
-      "kind": "shape",
       "optimisation": {
        "enabled": false
       },
@@ -8772,7 +8756,6 @@
     [
      "planetary",
      {
-      "kind": "shape",
       "optimisation": {
        "enabled": false
       },
@@ -9037,7 +9020,6 @@
     [
      "wolfrom",
      {
-      "kind": "shape",
       "optimisation": {
        "enabled": false
       },
@@ -9306,7 +9288,6 @@
     [
      "compound",
      {
-      "kind": "shape",
       "optimisation": {
        "enabled": false
       },
@@ -9706,7 +9687,6 @@
     [
      "planocentric",
      {
-      "kind": "shape",
       "optimisation": {
        "enabled": false
       },
@@ -9898,7 +9878,6 @@
     [
      "meshed_planets",
      {
-      "kind": "shape",
       "optimisation": {
        "enabled": false
       },
@@ -10492,7 +10471,6 @@
       "reversed_bending": false,
       "stages": [
        {
-        "kind": "shape",
         "optimisation": {
          "enabled": false
         },
@@ -10673,7 +10651,6 @@
         ]
        },
        {
-        "kind": "shape",
         "optimisation": {
          "enabled": false
         },
@@ -11024,7 +11001,6 @@
       "reversed_bending": false,
       "stages": [
        {
-        "kind": "shape",
         "optimisation": {
          "enabled": false
         },
@@ -11205,7 +11181,6 @@
         ]
        },
        {
-        "kind": "shape",
         "optimisation": {
          "enabled": false
         },
@@ -11561,7 +11536,6 @@
       "reversed_bending": false,
       "stages": [
        {
-        "kind": "shape",
         "optimisation": {
          "enabled": false
         },
@@ -11742,7 +11716,6 @@
         ]
        },
        {
-        "kind": "shape",
         "optimisation": {
          "enabled": false
         },
@@ -12093,7 +12066,6 @@
       "reversed_bending": false,
       "stages": [
        {
-        "kind": "shape",
         "optimisation": {
          "enabled": false
         },
@@ -12274,7 +12246,6 @@
         ]
        },
        {
-        "kind": "shape",
         "optimisation": {
          "enabled": false
         },
@@ -12625,7 +12596,6 @@
       "reversed_bending": false,
       "stages": [
        {
-        "kind": "shape",
         "optimisation": {
          "enabled": false
         },
@@ -12806,7 +12776,6 @@
         ]
        },
        {
-        "kind": "shape",
         "optimisation": {
          "enabled": false
         },
@@ -13233,7 +13202,6 @@
       "reversed_bending": false,
       "stages": [
        {
-        "kind": "shape",
         "optimisation": {
          "enabled": false
         },
@@ -13414,7 +13382,6 @@
         ]
        },
        {
-        "kind": "shape",
         "optimisation": {
          "enabled": false
         },
@@ -13838,7 +13805,6 @@
       "reversed_bending": false,
       "stages": [
        {
-        "kind": "shape",
         "optimisation": {
          "enabled": false
         },
@@ -14019,7 +13985,6 @@
         ]
        },
        {
-        "kind": "shape",
         "optimisation": {
          "enabled": false
         },
@@ -14443,7 +14408,6 @@
       "reversed_bending": false,
       "stages": [
        {
-        "kind": "shape",
         "optimisation": {
          "enabled": false
         },
@@ -14624,7 +14588,6 @@
         ]
        },
        {
-        "kind": "shape",
         "optimisation": {
          "enabled": false
         },
@@ -15179,7 +15142,6 @@
       "reversed_bending": false,
       "stages": [
        {
-        "kind": "shape",
         "optimisation": {
          "enabled": false
         },
@@ -15360,7 +15322,6 @@
         ]
        },
        {
-        "kind": "shape",
         "optimisation": {
          "enabled": false
         },
@@ -15753,7 +15714,6 @@
         ]
        },
        {
-        "kind": "shape",
         "optimisation": {
          "enabled": false
         },
@@ -16586,7 +16546,6 @@
       "reversed_bending": false,
       "stages": [
        {
-        "kind": "shape",
         "optimisation": {
          "enabled": false
         },
@@ -16767,7 +16726,6 @@
         ]
        },
        {
-        "kind": "shape",
         "optimisation": {
          "enabled": false
         },
@@ -17160,7 +17118,6 @@
         ]
        },
        {
-        "kind": "shape",
         "optimisation": {
          "enabled": false
         },
@@ -17749,7 +17706,6 @@
        ],
        "stages": [
         {
-         "kind": "shape",
          "ratio": "-2.5294117647058822",
          "ratio_per_tooth": [
           "-2.3888888888888888",
@@ -18752,7 +18708,6 @@
        ],
        "stages": [
         {
-         "kind": "shape",
          "ratio": "-2.5294117647058822",
          "ratio_per_tooth": [
           "-2.3888888888888888",
@@ -19261,7 +19216,6 @@
          "notes": []
         },
         {
-         "kind": "shape",
          "ratio": 7,
          "ratio_per_tooth": [
           "6.5384615384615383",
@@ -20691,7 +20645,7 @@
    }
   },
   "export_train": {
-   "ok": "# Geartrain.\n#\n# Inputs only — every ratio, stress, efficiency and backlash is recomputed from\n# these, so nothing here can go stale. Units: mm, degrees, rpm, N·m.\n#\n# Materials are named; the library that defines them is a separate document.\n# Editing this file by hand is expected.\n\nname = \"probe\"\n\n[train]\nreversed_bending = false\nconstraints = []\n\n[[train.load_cases]]\nkind = \"ultimate\"\nenabled = true\n\n[[train.load_cases.loads]]\nat = 1\nrole = \"load\"\n\n[train.load_cases.loads.torque]\nauto = false\nmanual = 0.1\n\n[train.load_cases.loads.speed]\nauto = false\nmanual = 30000.0\n\n[[train.load_cases.loads]]\nat = 2\nrole = \"reacted\"\n\n[train.load_cases.loads.torque]\nauto = true\nmanual = 0.0\n\n[train.load_cases.loads.speed]\nauto = true\nmanual = 0.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nat = 2\nactuations = 1000\nreversing = false\n\n[[train.load_cases]]\nkind = \"ultimate\"\nenabled = true\n\n[[train.load_cases.loads]]\nat = 2\nrole = \"load\"\n\n[train.load_cases.loads.torque]\nauto = false\nmanual = 3.0\n\n[train.load_cases.loads.speed]\nauto = false\nmanual = 0.0\n\n[[train.load_cases.loads]]\nat = 1\nrole = \"reacted\"\n\n[train.load_cases.loads.torque]\nauto = true\nmanual = 0.0\n\n[train.load_cases.loads.speed]\nauto = true\nmanual = 0.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nat = 2\nactuations = 1000\nreversing = false\n\n[[train.load_cases]]\nkind = \"fatigue\"\nenabled = true\n\n[[train.load_cases.loads]]\nat = 1\nrole = \"load\"\n\n[train.load_cases.loads.torque]\nauto = false\nmanual = 0.02\n\n[train.load_cases.loads.speed]\nauto = false\nmanual = 30000.0\n\n[[train.load_cases.loads]]\nat = 2\nrole = \"reacted\"\n\n[train.load_cases.loads.torque]\nauto = true\nmanual = 0.0\n\n[train.load_cases.loads.speed]\nauto = true\nmanual = 0.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nat = 2\nactuations = 1000\nreversing = false\n\n[[train.stages]]\nkind = \"shape\"\nload_sharing = \"none\"\nmin_planet_clearance = 0.3\n\n[train.stages.optimisation]\nenabled = false\n\n[[train.stages.axes]]\ncarried_by = 0\ncount = 1\n\n[[train.stages.axes]]\ncarried_by = 0\ncount = 1\n\n[[train.stages.bodies]]\nbody = 1\naxis = 0\n\n[[train.stages.bodies]]\nbody = 2\naxis = 1\n\n[[train.stages.members]]\nbody = 1\nmodule = 1.0\npressure_angle = 20.0\n\n[train.stages.members.gear]\nteeth = 17\nno_undercut = true\naddendum = 1.0\nno_sharp_tip = true\nmin_tip_width = 0.1\ndedendum = 1.25\nroot_radius = 0.38\nmaterial = \"4340 Hardened Steel\"\n\n[train.stages.members.gear.profile_shift]\nauto = true\nmanual = 0.0\n\n[train.stages.members.gear.working_depth]\nauto = true\nmanual = 1.0\n\n[train.stages.members.gear.helix_angle]\nauto = true\nmanual = 0.0\n\n[train.stages.members.gear.face_width]\nauto = true\nmanual = 5.0\n\n[train.stages.members.gear.face_sources.bending]\nultimate = true\nfatigue = true\n\n[train.stages.members.gear.face_sources.contact]\nultimate = false\nfatigue = false\n\n[train.stages.members.gear.material_overrides]\n\n[train.stages.members.thickness_mod]\nauto = false\nmanual = 1.0\n\n[train.stages.members.pitch_diameter]\nauto = true\nmanual = 17.0\n\n[[train.stages.members]]\nbody = 2\nmodule = 1.0\npressure_angle = 20.0\n\n[train.stages.members.gear]\nteeth = 43\nno_undercut = true\naddendum = 1.0\nno_sharp_tip = true\nmin_tip_width = 0.1\ndedendum = 1.25\nroot_radius = 0.38\nmaterial = \"4340 Hardened Steel\"\n\n[train.stages.members.gear.profile_shift]\nauto = true\nmanual = 0.0\n\n[train.stages.members.gear.working_depth]\nauto = true\nmanual = 1.0\n\n[train.stages.members.gear.helix_angle]\nauto = true\nmanual = 0.0\n\n[train.stages.members.gear.face_width]\nauto = true\nmanual = 5.0\n\n[train.stages.members.gear.face_sources.bending]\nultimate = true\nfatigue = true\n\n[train.stages.members.gear.face_sources.contact]\nultimate = false\nfatigue = false\n\n[train.stages.members.gear.material_overrides]\n\n[train.stages.members.thickness_mod]\nauto = true\nmanual = 1.0\n\n[train.stages.members.pitch_diameter]\nauto = true\nmanual = 0.0\n\n[[train.stages.meshes]]\na = 0\nb = 1\nsliding_friction = 0.08\nstatic_friction = 0.16\nmin_contact_ratio = 1.2\n\n[train.stages.meshes.overlap]\nauto = true\nmanual = 1.0\n\n[[train.stages.distances]]\naxes = [\n    0,\n    1,\n]\nangle = 0.0\nworm = false\ntip_clearance = 0.0\ntolerance_plus = 0.02\ntolerance_minus = 0.02\naxial_clearance = 0.0\n\n[train.stages.distances.distance]\nauto = true\nmanual = 0.0\n\n[train.stages.distances.clearance]\nauto = false\nmanual = 0.02\n"
+   "ok": "# Geartrain.\n#\n# Inputs only — every ratio, stress, efficiency and backlash is recomputed from\n# these, so nothing here can go stale. Units: mm, degrees, rpm, N·m.\n#\n# Materials are named; the library that defines them is a separate document.\n# Editing this file by hand is expected.\n\nname = \"probe\"\n\n[train]\nreversed_bending = false\nconstraints = []\n\n[[train.load_cases]]\nkind = \"ultimate\"\nenabled = true\n\n[[train.load_cases.loads]]\nat = 1\nrole = \"load\"\n\n[train.load_cases.loads.torque]\nauto = false\nmanual = 0.1\n\n[train.load_cases.loads.speed]\nauto = false\nmanual = 30000.0\n\n[[train.load_cases.loads]]\nat = 2\nrole = \"reacted\"\n\n[train.load_cases.loads.torque]\nauto = true\nmanual = 0.0\n\n[train.load_cases.loads.speed]\nauto = true\nmanual = 0.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nat = 2\nactuations = 1000\nreversing = false\n\n[[train.load_cases]]\nkind = \"ultimate\"\nenabled = true\n\n[[train.load_cases.loads]]\nat = 2\nrole = \"load\"\n\n[train.load_cases.loads.torque]\nauto = false\nmanual = 3.0\n\n[train.load_cases.loads.speed]\nauto = false\nmanual = 0.0\n\n[[train.load_cases.loads]]\nat = 1\nrole = \"reacted\"\n\n[train.load_cases.loads.torque]\nauto = true\nmanual = 0.0\n\n[train.load_cases.loads.speed]\nauto = true\nmanual = 0.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nat = 2\nactuations = 1000\nreversing = false\n\n[[train.load_cases]]\nkind = \"fatigue\"\nenabled = true\n\n[[train.load_cases.loads]]\nat = 1\nrole = \"load\"\n\n[train.load_cases.loads.torque]\nauto = false\nmanual = 0.02\n\n[train.load_cases.loads.speed]\nauto = false\nmanual = 30000.0\n\n[[train.load_cases.loads]]\nat = 2\nrole = \"reacted\"\n\n[train.load_cases.loads.torque]\nauto = true\nmanual = 0.0\n\n[train.load_cases.loads.speed]\nauto = true\nmanual = 0.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nat = 2\nactuations = 1000\nreversing = false\n\n[[train.stages]]\nload_sharing = \"none\"\nmin_planet_clearance = 0.3\n\n[train.stages.optimisation]\nenabled = false\n\n[[train.stages.axes]]\ncarried_by = 0\ncount = 1\n\n[[train.stages.axes]]\ncarried_by = 0\ncount = 1\n\n[[train.stages.bodies]]\nbody = 1\naxis = 0\n\n[[train.stages.bodies]]\nbody = 2\naxis = 1\n\n[[train.stages.members]]\nbody = 1\nmodule = 1.0\npressure_angle = 20.0\n\n[train.stages.members.gear]\nteeth = 17\nno_undercut = true\naddendum = 1.0\nno_sharp_tip = true\nmin_tip_width = 0.1\ndedendum = 1.25\nroot_radius = 0.38\nmaterial = \"4340 Hardened Steel\"\n\n[train.stages.members.gear.profile_shift]\nauto = true\nmanual = 0.0\n\n[train.stages.members.gear.working_depth]\nauto = true\nmanual = 1.0\n\n[train.stages.members.gear.helix_angle]\nauto = true\nmanual = 0.0\n\n[train.stages.members.gear.face_width]\nauto = true\nmanual = 5.0\n\n[train.stages.members.gear.face_sources.bending]\nultimate = true\nfatigue = true\n\n[train.stages.members.gear.face_sources.contact]\nultimate = false\nfatigue = false\n\n[train.stages.members.gear.material_overrides]\n\n[train.stages.members.thickness_mod]\nauto = false\nmanual = 1.0\n\n[train.stages.members.pitch_diameter]\nauto = true\nmanual = 17.0\n\n[[train.stages.members]]\nbody = 2\nmodule = 1.0\npressure_angle = 20.0\n\n[train.stages.members.gear]\nteeth = 43\nno_undercut = true\naddendum = 1.0\nno_sharp_tip = true\nmin_tip_width = 0.1\ndedendum = 1.25\nroot_radius = 0.38\nmaterial = \"4340 Hardened Steel\"\n\n[train.stages.members.gear.profile_shift]\nauto = true\nmanual = 0.0\n\n[train.stages.members.gear.working_depth]\nauto = true\nmanual = 1.0\n\n[train.stages.members.gear.helix_angle]\nauto = true\nmanual = 0.0\n\n[train.stages.members.gear.face_width]\nauto = true\nmanual = 5.0\n\n[train.stages.members.gear.face_sources.bending]\nultimate = true\nfatigue = true\n\n[train.stages.members.gear.face_sources.contact]\nultimate = false\nfatigue = false\n\n[train.stages.members.gear.material_overrides]\n\n[train.stages.members.thickness_mod]\nauto = true\nmanual = 1.0\n\n[train.stages.members.pitch_diameter]\nauto = true\nmanual = 0.0\n\n[[train.stages.meshes]]\na = 0\nb = 1\nsliding_friction = 0.08\nstatic_friction = 0.16\nmin_contact_ratio = 1.2\n\n[train.stages.meshes.overlap]\nauto = true\nmanual = 1.0\n\n[[train.stages.distances]]\naxes = [\n    0,\n    1,\n]\nangle = 0.0\nworm = false\ntip_clearance = 0.0\ntolerance_plus = 0.02\ntolerance_minus = 0.02\naxial_clearance = 0.0\n\n[train.stages.distances.distance]\nauto = true\nmanual = 0.0\n\n[train.stages.distances.clearance]\nauto = false\nmanual = 0.02\n"
   },
   "import_train": {
    "ok": {
@@ -20817,7 +20771,6 @@
       "reversed_bending": false,
       "stages": [
        {
-        "kind": "shape",
         "optimisation": {
          "enabled": false
         },

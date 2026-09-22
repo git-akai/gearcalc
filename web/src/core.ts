@@ -72,9 +72,7 @@ import type {
   SlotCase,
   Axis,
   BodyOn,
-  Stage,
   StageGear,
-  StageResult,
   ToleranceOut,
   Train,
   TrainResult,
@@ -161,9 +159,7 @@ export type {
   SlotCase,
   Axis,
   BodyOn,
-  Stage,
   StageGear,
-  StageResult,
   ToleranceOut,
   Train,
   TrainResult,
@@ -706,10 +702,10 @@ export function exportLibrary(
  *  A stage that will not cross the boundary is left alone. Relief runs on a
  *  click, and a click is not the place to discover a broken boundary.
  */
-export function relieveStage(stage: Stage, just: Freedom | null, figures: Figure[] = []): void {
-  let corrected: Stage;
+export function relieveStage(stage: Shape, just: Freedom | null, figures: Figure[] = []): void {
+  let corrected: Shape;
   try {
-    corrected = JSON.parse(relieve_stage(JSON.stringify({ stage, just, figures }))) as Stage;
+    corrected = JSON.parse(relieve_stage(JSON.stringify({ stage, just, figures }))) as Shape;
   } catch {
     return;
   }
@@ -846,7 +842,7 @@ export type TrainEdit =
   | { hold: number }
   | { release: number }
   | { move_end: { stage: number; body: number; to: number | null } }
-  | { push_stage: Stage }
+  | { push_stage: Shape }
   | { remove_stage: number }
   | { add_case: CaseKind }
   | { duty: { case: number; intermittent: boolean } }

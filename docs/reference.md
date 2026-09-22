@@ -503,8 +503,8 @@ given while any of its readings is, and within it at most one reading stands.
 A stage with **no** distance input would say `automatic_at_most = 0` for its
 clearance and so could never derive it — the same statement counted rather
 than special-cased, and since every distance has the input, none says it.
-The shape declares its groups, its readings and its inputs through
-`train::Constrained`, and the walk over them is written once
+The shape declares its groups, its readings and its inputs, and the walk
+over them is written once
 ([rationale](rationale.md#what-a-stage-owes-relief)).
 
 The objective and the constraints are not the same kind of thing, and failing at
@@ -2212,8 +2212,8 @@ harness and the panel name a member the same way. A spur pair is two ground
 axes, one mesh, one distance; a worm is the same at 90° with `worm` set; a
 set is three axes of which the planet's is carried by the carrier body and
 replicated `N` times, two meshes and one distance. `gear-wasm`'s `defaults`
-builds each, and a document names them by writing the shape
-(`kind = "shape"`).
+builds each, and a document writes the shape itself — there is no kind to
+name.
 
 **Families and presets.** A shape *reads as* one of three families, never
 stored: **epicyclic** where an axis is carried, **skew** where a distance is

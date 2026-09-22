@@ -187,7 +187,7 @@ impl ShiftAsked {
 ///
 /// The centre distance, the clearance, the two shifts and the size are bound
 /// by `a = a₀(size, x₁ + x₂) + clearance`, so four of the five may be given and
-/// the fifth follows — [`super::Stage::freedoms`] says so for every kind of
+/// the fifth follows — [`super::Shape::freedoms`] says so for every kind of
 /// pair alike. Which one absorbs a given distance is a preference, not a law:
 /// the shifts do wherever one of them is automatic, and the size only when
 /// both shifts are pinned, because a shift moves the teeth and a size changes

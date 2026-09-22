@@ -30,7 +30,7 @@
 //!
 //! # Why the members and the meshes are read through the shape
 //!
-//! `StageResult::members()` and `::meshes()` answer for any stage, and
+//! `ShapeResult::members()` and `::meshes()` answer for any stage, and
 //! everything below reads through them so that this harness cannot be the
 //! place an arrangement is forgotten. Which members a mesh joins and in whose
 //! frame, and what each body is called, are read off the shape ([`member_role`])
@@ -38,8 +38,8 @@
 //! that were per type went with the types.
 
 use gear_core::train::{
-    solve_train, BodyConstraint, Duty, LoadCase, PairStage, PlanetaryStage, Stage, StageGear,
-    StageResult, Train, TrainResult,
+    solve_train, BodyConstraint, Duty, LoadCase, PairStage, PlanetaryStage, Shape, ShapeResult,
+    StageGear, Train, TrainResult,
 };
 
 /// The loads every fixture is rated for, between two bodies: one from each,
@@ -73,7 +73,7 @@ fn gear(teeth: u32) -> StageGear {
 }
 
 /// A pair at these tooth counts and this helix.
-fn pair(z1: u32, z2: u32, helix: f64) -> Stage {
+fn pair(z1: u32, z2: u32, helix: f64) -> Shape {
     let mut s = PairStage {
         gears: [gear(z1), gear(z2)],
         ..PairStage::default()
@@ -81,7 +81,7 @@ fn pair(z1: u32, z2: u32, helix: f64) -> Stage {
     if helix != 0.0 {
         s = s.with_first_helix(helix);
     }
-    Stage::pair(s)
+    Shape::from(&s)
 }
 
 /// A set's slot by name, in its wiring's order: ground, sun, carrier, ring,
@@ -114,8 +114,8 @@ fn arranged(input: &str, fixed: &str) -> Train {
 
 /// A default epicyclic set. What drives it and what holds it is the train's
 /// to say ([`arranged`]); alone, it is solved sun in and ring held.
-fn set() -> Stage {
-    Stage::planetary(PlanetaryStage::default())
+fn set() -> Shape {
+    Shape::from(&PlanetaryStage::default())
 }
 
 /// **A set whose two centre distances no planet shift can bring together.**
@@ -125,12 +125,12 @@ fn set() -> Stage {
 /// merely unconverged. Its **kinematics are perfectly well defined** — Willis
 /// needs the tooth counts and nothing else — and the fixture is here to record
 /// that the tool currently reports none of them.
-fn unclosed() -> Stage {
+fn unclosed() -> Shape {
     let mut p = PlanetaryStage::default();
     p.sun.teeth = 17;
     p.planet.teeth = 17;
     p.ring.teeth = 80;
-    Stage::planetary(p)
+    Shape::from(&p)
 }
 
 /// **Every fixture, and why each is here.**
@@ -139,7 +139,7 @@ fn unclosed() -> Stage {
 /// added with no row is a fixture the corpus cannot record.
 fn fixtures() -> Vec<(String, Train)> {
     // A chain of these stages, loaded between its two ends.
-    let train = |stages: Vec<Stage>| {
+    let train = |stages: Vec<Shape>| {
         let mut t = Train::chained(stages, |_| Vec::new());
         let (input, output) = t
             .boundaries()
@@ -159,7 +159,7 @@ fn fixtures() -> Vec<(String, Train)> {
         // one that can refuse to be driven at all.
         (
             "worm".to_string(),
-            train(vec![Stage::pair(PairStage::worm())]),
+            train(vec![Shape::from(&PairStage::worm())]),
         ),
     ];
     // **All six arrangements**, because which body is held is the whole of
@@ -175,9 +175,10 @@ fn fixtures() -> Vec<(String, Train)> {
     }
     out.push((
         "hula".to_string(),
-        train(vec![Stage::Shape(Box::new(
-            gear_core::train::arrangements::hula([65, 61, 57, 61], [1.0, 1.0]),
-        ))]),
+        train(vec![gear_core::train::arrangements::hula(
+            [65, 61, 57, 61],
+            [1.0, 1.0],
+        )]),
     ));
     // **The arrangements the shape reaches with no code of their own**
     // (`gear_core::train::arrangements`), each under its textbook boundary,
@@ -186,7 +187,7 @@ fn fixtures() -> Vec<(String, Train)> {
     // derives the same speeds from rigid-body velocities.
     {
         use gear_core::train::arrangements as arr;
-        let shape = |s| Stage::Shape(Box::new(s));
+        let shape = |s| s;
         // Three ratios on one layshaft, the second engaged: 17/43 in, then
         // 31/29 out, the idlers turning free.
         out.push((
@@ -281,7 +282,7 @@ fn fixtures() -> Vec<(String, Train)> {
         train(vec![
             pair(17, 43, 0.0),
             set(),
-            Stage::pair(PairStage::worm()),
+            Shape::from(&PairStage::worm()),
         ]),
     ));
     // **A reversing stage, in front of another and behind one.** An epicyclic
@@ -346,9 +347,9 @@ type SlotLine = Vec<(usize, f64, f64)>;
 
 /// **Every slot's speed and torque per case**, named as the harness names
 /// a stage's bodies: a shape's from its own per-slot cases.
-fn slot_cases(stage: &Stage, s: &StageResult) -> Vec<(String, SlotLine)> {
-    match s {
-        StageResult::Shape(r) => {
+fn slot_cases(stage: &Shape, r: &ShapeResult) -> Vec<(String, SlotLine)> {
+    {
+        {
             let w = stage.wiring();
             (1..w.slots.len())
                 .map(|i| {
@@ -507,7 +508,8 @@ fn report(name: &str, train: &Train, r: &TrainResult) {
         // What the teeth pass over what comes in, both ways, and what one
         // more tooth on each member would make the ratio — the two figures
         // Phase 7 added, recorded so their path is known to be walked.
-        if let Some(shape) = s.as_shape() {
+        {
+            let shape = s;
             println!(
                 "    power through the teeth {:>10.6} / {:<10.6}   one more tooth on each member: {}",
                 crate::ways_or_nan(shape.circulation).forward,
@@ -531,7 +533,7 @@ fn report(name: &str, train: &Train, r: &TrainResult) {
                 );
             }
         }
-        for (i, g) in s.members().iter().enumerate() {
+        for (i, g) in s.members.iter().enumerate() {
             println!("    member {}  z {:<4}", i + 1, g.params.teeth);
             for c in &g.cases {
                 println!(
@@ -588,12 +590,12 @@ pub fn named(train: &Train, body: usize) -> String {
 
 /// What a stage calls one of its bodies, from the label its wiring gives
 /// the slot: ground, carrier, or the member's role ([`member_role`]).
-fn labelled(stage: &Stage, label: gear_core::train::BodyLabel) -> String {
+fn labelled(stage: &Shape, label: gear_core::train::BodyLabel) -> String {
     use gear_core::train::BodyLabel;
     match (label, stage) {
         (BodyLabel::Ground, _) => "ground".into(),
         (BodyLabel::Carrier { .. }, _) => "carrier".into(),
-        (BodyLabel::Member { member }, Stage::Shape(shape)) => member_role(shape, member),
+        (BodyLabel::Member { member }, shape) => member_role(shape, member),
     }
 }
 
