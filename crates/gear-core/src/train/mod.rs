@@ -3170,8 +3170,6 @@ impl CaseLoad {
 /// train are solved the one way.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct StageLoad {
-    /// Index into the train's list of load cases.
-    pub case: usize,
     pub kind: CaseKind,
     /// Forward enters at the stage's input; backward at its output, at this
     /// torque times the ratio, as a train's walk once referred it.
@@ -3185,9 +3183,15 @@ pub struct StageLoad {
     pub turns: Option<Turns>,
 }
 
-/// Every load case a stage is rated for, in the train's order — and what the
-/// stage is asked, since both come from the train and a stage needs both to
-/// rate anything.
+/// **What a lone stage is asked**: its loads *by direction* — the port is
+/// the convention's to choose, which is why this says `Drive` where a
+/// train's [`Load`] says a body — and the boundary to read them under.
+///
+/// Not a second load model: [`solve_any`] wraps the stage in a train of one
+/// and turns each of these into a [`LoadCase`] at the port the boundary
+/// names, so a stage alone and a stage in a train are solved the one way.
+/// It exists because a caller with no train cannot name a body: which slot
+/// is the input is what the boundary decides.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct StageLoads {
     pub cases: Vec<StageLoad>,
@@ -3214,9 +3218,7 @@ impl StageLoads {
         Self {
             cases: CaseKind::BOTH
                 .iter()
-                .enumerate()
-                .map(|(i, &kind)| StageLoad {
-                    case: i,
+                .map(|&kind| StageLoad {
                     kind,
                     drive: Drive::Forward,
                     torque,
@@ -3372,18 +3374,6 @@ pub fn loaded_cycles(turns: Turns) -> Cycles {
                 bending: n,
                 contact: n,
             }
-        }
-    }
-}
-
-impl Turns {
-    /// The same duty seen from a body that turns `by` times for each turn of
-    /// this one — a member's engagements from its stage's input revolutions.
-    #[must_use]
-    pub fn scaled(self, by: f64) -> Self {
-        Self {
-            revolutions: self.revolutions * by,
-            ..self
         }
     }
 }

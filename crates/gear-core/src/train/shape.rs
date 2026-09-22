@@ -4082,7 +4082,6 @@ mod tests {
     fn loads() -> StageLoads {
         let mut l = StageLoads::at(2.0, 3000.0);
         l.cases.push(StageLoad {
-            case: 2,
             kind: super::super::CaseKind::Ultimate,
             drive: Drive::Backward,
             torque: 0.5,
@@ -5654,7 +5653,6 @@ mod hula_recorded {
     fn a_case_from_the_output_is_entered_at_the_output() {
         let mut loads = StageLoads::at(2.0, 3000.0);
         loads.cases.push(super::super::StageLoad {
-            case: 2,
             kind: super::super::CaseKind::Ultimate,
             drive: crate::contact::Drive::Backward,
             torque: 0.5,
