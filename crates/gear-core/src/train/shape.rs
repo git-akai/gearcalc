@@ -388,6 +388,50 @@ impl Shape {
             .collect()
     }
 
+    /// **Who can absorb for a later mesh on a distance**, in order of
+    /// preference: the members of the first mesh and of this one with
+    /// leverage on the difference between the two — a shift moves a
+    /// distance one way on an external mesh and the other on an internal
+    /// one, so a planet between a sun and a ring moves the two apart at
+    /// twice the rate while a planet between two rings moves them together
+    /// and closes nothing — the most leverage first and, among equals, the
+    /// later mesh's own member; never one in a mesh already closed
+    /// (`closed`, the first mesh among them counting only while it is
+    /// alone), which is what solving the constraints one after another
+    /// relies on. The plan takes the first of these that is free; relief
+    /// declares them in this order so what it leaves automatic is one the
+    /// plan can use.
+    fn absorbers(&self, first: usize, m: usize, closed: &[usize]) -> Vec<usize> {
+        let MeshInput { a, b, .. } = self.meshes[m];
+        let MeshInput { a: fa, b: fb, .. } = self.meshes[first];
+        let lever = |i: usize, mesh: usize| -> f64 {
+            let mm = self.meshes[mesh];
+            let sign = self.kind_of(mesh).map_or(1.0, MeshKind::sign);
+            let c = f64::from(u8::from(mm.a == i)) + if mm.b == i { sign } else { 0.0 };
+            c * self.tooth_sum(mesh).signum()
+        };
+        let undisturbed = |i: usize| {
+            closed.iter().all(|&q| {
+                q == m
+                    || (q == first && closed.len() == 1)
+                    || (self.meshes[q].a != i && self.meshes[q].b != i)
+            })
+        };
+        // The later mesh's own members first, its first before its second,
+        // then the first mesh's — the order the plan always preferred among
+        // equals.
+        let mut out: Vec<(usize, f64)> = Vec::new();
+        for i in [a, b, fa, fb] {
+            let leverage = (lever(i, first) - lever(i, m)).abs();
+            if undisturbed(i) && leverage > 0.0 && !out.iter().any(|x| x.0 == i) {
+                out.push((i, leverage));
+            }
+        }
+        // Stable: the later mesh's own members stay first among equals.
+        out.sort_by(|p, q| q.1.total_cmp(&p.1));
+        out.into_iter().map(|(i, _)| i).collect()
+    }
+
     /// **The running distance the shifts are asked to reach**: given where
     /// both the distance and the clearance are stated, so the shifts have a
     /// sum to close on; automatic otherwise.
@@ -1030,30 +1074,10 @@ impl Shape {
                 // constraints one after another relies on.
                 let mut closed: Vec<usize> = vec![first];
                 for &m in rest {
-                    let MeshInput { a, b, .. } = self.meshes[m];
-                    let MeshInput { a: fa, b: fb, .. } = self.meshes[first];
-                    let lever = |i: usize, mesh: usize| -> f64 {
-                        let mm = self.meshes[mesh];
-                        let sign = self.kind_of(mesh).map_or(1.0, MeshKind::sign);
-                        let c = f64::from(u8::from(mm.a == i)) + if mm.b == i { sign } else { 0.0 };
-                        c * self.tooth_sum(mesh).signum()
-                    };
-                    let undisturbed = |i: usize| {
-                        closed.iter().all(|&q| {
-                            q == m
-                                || (q == first && closed.len() == 1)
-                                || (self.meshes[q].a != i && self.meshes[q].b != i)
-                        })
-                    };
-                    // Reversed, so that among equals the later mesh's own
-                    // member — the last — is the one kept.
-                    let absorber = [fb, fa, b, a]
+                    let absorber = self
+                        .absorbers(first, m, &closed)
                         .into_iter()
-                        .filter(|&i| role[i] == Role::Free && undisturbed(i))
-                        .map(|i| (i, (lever(i, first) - lever(i, m)).abs()))
-                        .filter(|&(_, leverage)| leverage > 0.0)
-                        .max_by(|p, q| p.1.total_cmp(&q.1))
-                        .map(|(i, _)| i);
+                        .find(|&i| role[i] == Role::Free);
                     if let Some(i) = absorber {
                         role[i] = Role::Absorbs(constraints.len());
                     }
@@ -3683,14 +3707,31 @@ impl Constrained for Shape {
         out
     }
 
-    /// **One relation per distance**: the distance, the shifts of every
-    /// member on its meshes, the clearance and the size are related by one
-    /// equation per mesh on it, so that many may be given less the meshes.
+    /// **One relation per mesh**: a mesh's two shifts, the clearance and the
+    /// size are related to the distance it runs at by one equation, so of
+    /// them all but one may be given. **The distance is a freedom of the
+    /// first mesh on it alone**: an automatic distance is whatever the
+    /// first mesh's shifts leave, and every later mesh on it *absorbs* the
+    /// difference on one of its members — so a later mesh's relation is
+    /// the shifts that can absorb for it, in the plan's own order of
+    /// preference ([`Self::absorbers`]), and at least one of those gives:
+    /// a planet between a sun and a ring before either, never a planet
+    /// between two rings, which closes nothing, and neither the clearance
+    /// nor the size, which move every mesh on the distance together and
+    /// close no difference between two.
     /// The distance gives way first — it is the one a designer expects to
-    /// give when they pin everything else — then the shifts in member order,
-    /// then the clearance, then the size, since a shift moves the teeth
-    /// where a size changes them. And of the distance and the clearance at
-    /// most one may be automatic.
+    /// give when they pin everything else — then the shifts, then the
+    /// clearance, then the size, since a shift moves the teeth where a
+    /// size changes them. And of the distance and the clearance at most
+    /// one may be automatic.
+    ///
+    /// It was one relation per *distance*, counting entries less meshes —
+    /// the right total and the wrong distribution: a layshaft's three pairs
+    /// pinned and relieved gave the distance and the first pair's two
+    /// shifts back and left the other two pairs both-given on a distance
+    /// the first defined, which the solve refuses (`NoCommonDistance`).
+    /// The law `every_input_relief_leaves_given_is_honoured_by_the_solve`
+    /// found it the day the layshaft joined the presets it sweeps.
     ///
     /// The clearance sits *after* the shifts, where the pair had it before
     /// them, because a shape with three shifts on one distance can be over
@@ -3705,28 +3746,37 @@ impl Constrained for Shape {
             if meshes.is_empty() {
                 continue;
             }
-            let mut members: Vec<usize> = Vec::new();
-            for &k in &meshes {
-                for i in [self.meshes[k].a, self.meshes[k].b] {
-                    if !members.contains(&i) {
-                        members.push(i);
+            for (n, &k) in meshes.iter().enumerate() {
+                let m = self.meshes[k];
+                let mut order = Vec::new();
+                if n == 0 {
+                    order.push(vec![Freedom::CentreDistance(d)]);
+                    order.push(vec![Freedom::Member(m.a, MemberFreedom::Shift)]);
+                    order.push(vec![Freedom::Member(m.b, MemberFreedom::Shift)]);
+                    order.push(vec![Freedom::Clearance(d)]);
+                    order.push(super::entry(&readings));
+                } else {
+                    // A later mesh gives on a member that can absorb for
+                    // it — the plan's own list — and on nothing else: not
+                    // a member with no leverage, and not the clearance or
+                    // the size, which move every mesh on the distance
+                    // together and close no difference between two.
+                    order.extend(
+                        self.absorbers(meshes[0], k, &meshes[..n])
+                            .into_iter()
+                            .map(|i| vec![Freedom::Member(i, MemberFreedom::Shift)]),
+                    );
+                    if order.is_empty() {
+                        continue;
                     }
                 }
+                let entries = order.len();
+                groups.push(FreedomGroup {
+                    given_at_most: entries - 1,
+                    automatic_at_most: entries,
+                    order,
+                });
             }
-            let mut order = vec![vec![Freedom::CentreDistance(d)]];
-            order.extend(
-                members
-                    .iter()
-                    .map(|&i| vec![Freedom::Member(i, MemberFreedom::Shift)]),
-            );
-            order.push(vec![Freedom::Clearance(d)]);
-            order.push(super::entry(&readings));
-            let entries = order.len();
-            groups.push(FreedomGroup {
-                given_at_most: entries - meshes.len(),
-                automatic_at_most: entries,
-                order,
-            });
             groups.push(super::distance_and_clearance(d));
         }
         // **A mesh's two thickness coefficients are one number said twice**
@@ -4519,19 +4569,32 @@ mod tests {
             over.distances[0].nominal[1]
         );
 
-        // ...and the declaration says the same thing: one relation over the
-        // distance, the clearance, the three shifts and the size, with two
-        // meshes on the distance, so four of six may be given — the distance,
-        // the clearance, the size and **one** shift.
-        use super::super::{Freedom, Stage};
-        let relation = Stage::planetary(one.clone())
-            .freedoms()
-            .into_iter()
-            .find(|g| g.order.len() == 6)
-            .expect("a set declares one relation over its distance");
-        assert_eq!(relation.given_at_most, 4);
-        assert_eq!(relation.order[0], vec![Freedom::CentreDistance(0)]);
-        assert_eq!(relation.order[4], vec![Freedom::Clearance(0)]);
+        // ...and the declaration says the same thing: one relation per
+        // mesh. The sun's mesh relates the distance, its two shifts, the
+        // clearance and the size, four of five given at most; the ring's
+        // mesh, which absorbs on the distance the first defines, relates
+        // only the shifts that can absorb for it — the planet first, with
+        // twice anyone's leverage, then the ring, then the sun — all but
+        // one given; so a set pinned whole keeps the distance, the
+        // clearance, the size and two shifts, the planet's absorbing.
+        use super::super::{Freedom, MemberFreedom, Stage};
+        let groups = Stage::planetary(one.clone()).freedoms();
+        let shift = |i: usize| vec![Freedom::Member(i, MemberFreedom::Shift)];
+        let first = groups
+            .iter()
+            .find(|g| g.order[0] == vec![Freedom::CentreDistance(0)])
+            .expect("the sun's mesh declares its relation");
+        assert_eq!(first.given_at_most, 4);
+        assert_eq!(first.order.len(), 5);
+        assert_eq!(first.order[3], vec![Freedom::Clearance(0)]);
+        let second = groups
+            .iter()
+            .find(|g| g.order[0] == shift(1))
+            .expect("the ring's mesh declares its relation, the planet first");
+        assert_eq!(second.order.len(), 3);
+        assert_eq!(second.given_at_most, 2);
+        assert_eq!(second.order[1], shift(2));
+        assert_eq!(second.order[2], shift(0));
     }
 
     /// **A set runs at the centre distance it was given**, and both of its

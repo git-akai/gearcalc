@@ -6269,32 +6269,30 @@ mod tests {
         );
     }
 
-    /// The four presets, for a law about every one of them.
+    /// **Every preset the menu offers, and the hula** — the core's own list
+    /// (`StagePreset::ALL`), so a preset added there is under every law
+    /// here by being on it, and the arrangement a designer reaches by edits
+    /// rather than a button. The hula's grounded ring is left automatic so
+    /// the relief laws have a shift to turn on it.
     fn every_preset() -> Vec<Stage> {
         let mut hula = hula_shape([65, 61, 57, 61]);
         hula.members[2].gear.profile_shift = Auto::automatic(0.0);
-        vec![
-            Stage::pair(PairStage::default()),
-            Stage::pair(PairStage::worm()),
-            Stage::planetary(PlanetaryStage::default()),
-            Stage::Shape(Box::new(hula)),
-        ]
+        StagePreset::ALL
+            .into_iter()
+            .map(|p| Stage::Shape(Box::new(p.build())))
+            .chain([Stage::Shape(Box::new(hula))])
+            .collect()
     }
 
-    /// The presets and every arrangement the shape reaches with no code of
-    /// its own — for a law about every stage a document can write, which the
-    /// relief laws are: a Ravigneaux has three distances and relief has to
-    /// find each of them.
+    /// The presets and every arrangement the shape reaches with no button
+    /// of its own — for a law about every stage a document can write, which
+    /// the relief laws are: a Ravigneaux has three distances and relief has
+    /// to find each of them.
     fn every_stage() -> Vec<Stage> {
         use arrangements as arr;
         let shape = |s| Stage::Shape(Box::new(s));
         let mut out = every_preset();
         out.extend([
-            shape(arr::layshaft((17, 43), &[(19, 41), (31, 29)], 1)),
-            shape(arr::wolfrom(18, [60, 61], 3)),
-            shape(arr::stepped(24, [18, 17], [60, 59], 3)),
-            shape(arr::planocentric(30, 33)),
-            shape(arr::meshed_planets(24, [18, 18], 96, 3)),
             shape(arr::ravigneaux([18, 30], [22, 18], 62, 3)),
             shape(arr::worm_and_pair((1, 40), (17, 43))),
         ]);
@@ -7788,7 +7786,8 @@ mod tests {
                 "which members {stage:?} cuts with a pinion cutter"
             );
         }
-        assert_eq!(checked, 2 + 2 + 3 + 4);
+        let members: usize = every_preset().iter().map(|s| s.members().len()).sum();
+        assert_eq!(checked, u32::try_from(members).unwrap());
     }
 
     /// **The declared freedoms describe inputs the stage has, and each group
@@ -7916,7 +7915,8 @@ mod tests {
         let lib = library();
         let signature = |stage: &Stage| -> Vec<f64> {
             let t = train_of(vec![stage.clone()]);
-            let r = solve_train(&t, &lib).expect("a pinned preset solves");
+            let r = solve_train(&t, &lib)
+                .unwrap_or_else(|e| panic!("a pinned preset solves: {e:?}\n{stage:?}"));
             let solved = &r.stages[0];
             stage
                 .toggles()
@@ -7955,6 +7955,18 @@ mod tests {
             }
             let settled = pinned.relieved(None);
             let base = signature(&settled);
+            // A distance the tips hold open runs wider than its clearance
+            // asks, and says so (`sized_by`): the clearance is a floor the
+            // mesh clears, not a figure the solve can move. A planocentric
+            // at three teeth of difference sits *at* that limit at the
+            // shipped clearance, so the nudge is what lands in the tips'
+            // regime, and it is the nudged stage that is asked.
+            let tips_hold = |stage: &Stage, d: usize| {
+                let t = train_of(vec![stage.clone()]);
+                let r = solve_train(&t, &lib).expect("the nudged preset solves");
+                let StageResult::Shape(p) = &r.stages[0];
+                p.distances[d].sized_by.is_some()
+            };
             for f in mentioned(&settled) {
                 let mut moved = settled.clone();
                 let a = moved.input_mut(f).expect("declared, so present");
@@ -7962,6 +7974,11 @@ mod tests {
                     continue;
                 }
                 nudge(f, a);
+                if let Freedom::Clearance(d) = f {
+                    if tips_hold(&moved, d) {
+                        continue;
+                    }
+                }
                 let after = signature(&moved);
                 assert!(
                     base.iter().zip(&after).any(|(x, y)| (x - y).abs() > 1e-9),

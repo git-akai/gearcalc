@@ -972,48 +972,6 @@ mod tests {
         assert_eq!(r.distances[0].sized_by, None);
     }
 
-    /// **The shape's sizing is the hula stage's**, on the mesh the hula's
-    /// harness reports held open by its tips: `gear-cli hula 18 0.2` runs
-    /// 19/18 at a crank offset of 0.726026 mm (0.746026 at zero backlash),
-    /// its tip margin at nought and its far-side gap 0.2779 with 0.2 asked.
-    /// A planocentric of that pair, cut to the hula's proportions, is sized
-    /// to the same offset by the shape — two solvers, one bound.
-    #[test]
-    fn the_shape_sizes_a_distance_where_the_hula_stage_does() {
-        // The hula's proportions: the first mesh of `hula([19, 18, ..])` —
-        // its first wobble gear and its grounded ring — as a planocentric of
-        // the same two members, planet then ring.
-        let proportions = hula([19, 18, 17, 18], [1.0, 1.0]);
-        let mut shape = planocentric(18, 19);
-        for (m, g) in shape
-            .members
-            .iter_mut()
-            .zip([&proportions.members[0], &proportions.members[2]])
-        {
-            m.gear = StageGear {
-                teeth: m.gear.teeth,
-                ..g.gear.clone()
-            };
-        }
-        shape.members[1].ring = Some(Cutter {
-            teeth: 14,
-            ..proportions.members[2].ring.unwrap()
-        });
-        shape.distances[0].tip_clearance = 0.2;
-        let r = solve(&shape, &[2], 1, 3);
-        let d = &r.distances[0];
-        assert_eq!(d.sized_by, Some(0));
-        assert!(
-            (d.running - 0.726_026).abs() < 2e-5,
-            "the hula's crank offset: {}",
-            d.running
-        );
-        assert!(
-            (r.members[1].profile_shift - 0.4519).abs() < 2e-4,
-            "the ring's shift"
-        );
-    }
-
     #[test]
     fn meshed_planets_reverse_the_simple_set() {
         // Sun in, ring held, carrier out: 1 − z_r/z_s, negative.

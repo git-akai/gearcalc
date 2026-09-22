@@ -7920,7 +7920,7 @@
         "gear": {
          "teeth": 17,
          "profile_shift": {
-          "auto": true,
+          "auto": false,
           "manual": "0.10000000000000001"
          },
          "no_undercut": true,
@@ -7977,7 +7977,7 @@
         "gear": {
          "teeth": 43,
          "profile_shift": {
-          "auto": true,
+          "auto": false,
           "manual": "0.10000000000000001"
          },
          "no_undercut": true,
@@ -8034,7 +8034,7 @@
         "gear": {
          "teeth": 19,
          "profile_shift": {
-          "auto": false,
+          "auto": true,
           "manual": "0.10000000000000001"
          },
          "no_undercut": true,
@@ -8148,7 +8148,7 @@
         "gear": {
          "teeth": 31,
          "profile_shift": {
-          "auto": false,
+          "auto": true,
           "manual": "0.10000000000000001"
          },
          "no_undercut": true,
@@ -8709,7 +8709,7 @@
         "gear": {
          "teeth": 12,
          "profile_shift": {
-          "auto": true,
+          "auto": false,
           "manual": "0.10000000000000001"
          },
          "no_undercut": true,
@@ -8766,7 +8766,7 @@
         "gear": {
          "teeth": 30,
          "profile_shift": {
-          "auto": false,
+          "auto": true,
           "manual": "0.10000000000000001"
          },
          "no_undercut": true,
@@ -8963,7 +8963,7 @@
         "gear": {
          "teeth": 18,
          "profile_shift": {
-          "auto": true,
+          "auto": false,
           "manual": "0.10000000000000001"
          },
          "no_undercut": true,
@@ -9081,7 +9081,7 @@
         "gear": {
          "teeth": 61,
          "profile_shift": {
-          "auto": false,
+          "auto": true,
           "manual": "0.10000000000000001"
          },
          "no_undercut": true,
@@ -9224,7 +9224,7 @@
         "gear": {
          "teeth": 24,
          "profile_shift": {
-          "auto": true,
+          "auto": false,
           "manual": "0.10000000000000001"
          },
          "no_undercut": true,
@@ -9460,7 +9460,7 @@
         "gear": {
          "teeth": 17,
          "profile_shift": {
-          "auto": false,
+          "auto": true,
           "manual": "0.10000000000000001"
          },
          "no_undercut": true,

@@ -436,6 +436,20 @@ them. On a crossed mesh the shift enters as a rack's does,
 `a₀ = a_ref + (x₁ + x₂) m_n` exactly ([Crossed axes](#crossed-axes)), so the
 sum is one subtraction; on a parallel one it is `shift_sum_for` as before.
 
+**Relief declares one relation per mesh, and a later mesh's names only the
+shifts that can absorb for it.** The first mesh on a distance relates the
+distance, its two shifts, the clearance and the size, all but one given; an
+automatic distance is what that mesh leaves, and every later mesh on it
+absorbs the difference, so its relation is the shifts with *leverage* on
+the difference — the plan's own list (`Shape::absorbers`): a planet between
+a sun and a ring before either, and never a planet between two rings, which
+moves both the same way and closes nothing — with the clearance and the
+size, again all but one given. It was one relation per *distance*, entries
+less meshes: the right total and the wrong distribution, which left a
+layshaft's second and third pairs both-given on a distance the first
+defined and a Wolfrom's planet automatic where it could absorb nothing;
+the law that sweeps every preset found both the day the presets joined it.
+
 **The axial contact ratio is a sixth, on parallel shafts only.** `ε_β = b sin β
 / (π m_n)` ties the helix to the narrower face, so a given ratio is one more
 reading of the size when both faces are given, and a floor under an automatic
