@@ -2528,6 +2528,19 @@ gathered into one (`bodies` on the motion report): a pair's output and the
 next pair's input are one shaft with two names, and a case says one thing of
 it. A load names a shaft and nothing else — no "start", no "end".
 
+**A shaft, to the panel, is a body.** What a stage calls a shaft is a port
+— the stage's end of something that generally runs on into the next stage
+— so the panel numbers the *bodies* across the train as it numbers the
+gears (Shaft 1, Shaft 2, …, a held body being the ground), lists each with
+everything it carries stage by stage at the head of the train card, and
+names a port in a reference by its shaft and its own end: "Shaft 2 (Stage 2
+Sun)". Beside each port of a stage the select is the shaft it is on — the
+ground, a numbered shaft it shares with another stage's port, or a shaft
+of its own — which is the coupling, the hold and the release read as one
+question. The core's graph is unchanged underneath: stage-local shafts,
+couplings between them, bodies derived; the numbering is a reading of the
+bodies in the order the core lists them.
+
 **What a case says of a port.** Each entry carries a `role`: a **load**
 carries a torque and a speed, each given or derived; a **reacted** port is
 held by whatever is attached — it turns as the motion says and carries the

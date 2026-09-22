@@ -258,9 +258,9 @@ export function setKind(tab: GearTab, kind: GearKind) {
 export const workspace = new Workspace();
 
 function freshTrain(name = t("ui.train_default_name")): TrainTab {
-  // The first stage open, as a fresh panel has always shown it; the load
-  // cases closed, since their headings say what each one is.
-  return { id: nextTrainId++, name, train: defaultTrain(), open: { 0: true }, openCases: {} };
+  // The stages closed, as the load cases are: each heading says what its
+  // stage is, and a stage added by the menu opens itself.
+  return { id: nextTrainId++, name, train: defaultTrain(), open: {}, openCases: {} };
 }
 
 /** The geartrain tabs.
@@ -344,7 +344,7 @@ class Trains {
       id: nextTrainId++,
       name: r.ok.document.name,
       train: r.ok.document.train,
-      open: { 0: true },
+      open: {},
       openCases: {},
     };
     this.tabs.push(t);

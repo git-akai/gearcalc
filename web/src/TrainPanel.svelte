@@ -46,13 +46,17 @@
   import Switch from "./Switch.svelte";
   import { notes, type Notes } from "./notes";
   import {
-    shaftName,
+    trainShafts,
+    shaftOfPort,
+    trainShaftName,
+    acrossShaft,
     shaftRefName,
     onShaft,
     memberName,
     memberListName,
     isWorm,
     carried,
+    type TrainShaft,
   } from "./members";
 
   /** **Resolving an over-determined stage is the core's rule, not this file's.**
@@ -124,51 +128,44 @@
   const figuresOf = (stage: Stage): Figure[] =>
     result.figures[tab.train.stages.indexOf(stage)] ?? [];
 
-  /** **What a shaft is**, as one word for the select: held to ground,
-   *  coupled to another shaft (the body it is part of, named by its other
-   *  shafts), or free — nothing attached, which is what a load case loads.
-   *  Read off the train's constraints and bodies; never decided here. */
-  type ShaftState = { kind: "held" } | { kind: "coupled"; to: ShaftRef[] } | { kind: "free" };
-  const shaftState = (stage: number, shaft: number): ShaftState => {
-    const at: ShaftRef = { kind: "of", stage, shaft };
-    const body = bodies.find((b) => b.shafts.some(([s]) => portKey(s) === portKey(at)));
-    if (body?.held) return { kind: "held" };
-    const others = body?.shafts.map(([s]) => s).filter((s) => portKey(s) !== portKey(at)) ?? [];
-    return others.length > 0 ? { kind: "coupled", to: others } : { kind: "free" };
+  /** **The train's shafts are its bodies**: the ports the couplings join
+   *  into one thing that turns, numbered across the train as gears are, the
+   *  held ones the ground. A stage's port is on one of them, and the select
+   *  beside it says which — the ground, a numbered shaft, or a new one of
+   *  its own — so a coupling is read as two ports on one shaft rather than
+   *  as a pair of names. */
+  /** The select's value for a port: `held`, `free` (a shaft of its own), or
+   *  the index of the body it shares. */
+  const shaftKey = (at: ShaftRef): string => {
+    const s = shaftOfPort(trainShaftList, at);
+    if (s === undefined) return "free";
+    return s.number === null ? "held" : `body:${trainShaftList.indexOf(s)}`;
   };
-  /** The select's value for a state: the coupled partner's key, so one
-   *  coupling reads the same on either shaft. */
-  const stateKey = (s: ShaftState): string =>
-    s.kind === "coupled" ? `coupled:${portKey(s.to[0])}` : s.kind;
+  /** The shafts a port could be put on, and the one it is on: every unheld
+   *  body that has no *other* port of the port's own stage — a stage's two
+   *  ports cannot turn as one. */
+  const joinable = (at: ShaftRef): TrainShaft[] =>
+    trainShaftList.filter(
+      (s) =>
+        s.number !== null &&
+        !s.body.shafts.some(
+          ([p]) => p.kind === "of" && at.kind === "of" && p.stage === at.stage && portKey(p) !== portKey(at),
+        ),
+    );
   /** **The select's answer written back through the core**: a hold
-   *  uncouples, a release withdraws every statement, and a coupling to a
-   *  port ties the two — each a rule the core owns (`edit_train`). */
-  function setShaft(stage: number, shaft: number, key: string) {
-    const at: ShaftRef = { kind: "of", stage, shaft };
+   *  uncouples, a shaft of its own withdraws every statement, and a shaft
+   *  shared is a coupling to any port already on it — each a rule the core
+   *  owns (`edit_train`). */
+  function setShaft(at: ShaftRef, key: string) {
     if (key === "held") editTrain(tab.train, { hold: at });
     else if (key === "free") editTrain(tab.train, { release: at });
-    else if (key.startsWith("coupled:")) {
-      const to = bodies.flatMap((b) => b.shafts.map(([s]) => s)).find((s) => portKey(s) === key.slice(8));
+    else if (key.startsWith("body:")) {
+      const to = trainShaftList[Number(key.slice(5))]?.body.shafts[0]?.[0];
       if (!to) return;
       editTrain(tab.train, { release: at });
       editTrain(tab.train, { couple: { a: at, b: to } });
     }
   }
-  /** **Every shaft another shaft could be coupled to**: the shafts of every
-   *  body the train does not hold, on other stages, grouped by stage for the
-   *  select — none where there is no other stage, and the group is empty. */
-  const couplable = (stage: number): { stage: number; shafts: [ShaftRef, ShaftLabel][] }[] => {
-    const out: { stage: number; shafts: [ShaftRef, ShaftLabel][] }[] = [];
-    for (const b of bodies) {
-      if (b.held) continue;
-      for (const [s, label] of b.shafts) {
-        if (s.kind !== "of" || s.stage === stage) continue;
-        const group = out.find((g) => g.stage === s.stage) ?? (out.push({ stage: s.stage, shafts: [] }), out[out.length - 1]);
-        group.shafts.push([s, label]);
-      }
-    }
-    return out.sort((a, b) => a.stage - b.stage);
-  };
 
   /** Which duty a fatigue case is counted over. Switching seeds the other
    *  shape from the core's own defaults — a fresh case's intermittent duty,
@@ -218,7 +215,7 @@
     if (at.kind === "ground") return t("ui.train_ground");
     const { stage, shaft } = at;
     void label;
-    return t("ui.train_port_at", { stage: stageName(stage), shaft: shaftRefName(tab.train, result.topology, stage, shaft) });
+    return shaftRefName(tab.train, result.topology, trainShaftList, { kind: "of", stage, shaft });
   };
   /** The ports a duty's select offers, keyed for the select; a port is set
    *  by looking its key up here, never by parsing the key. */
@@ -231,6 +228,7 @@
    *  it, and otherwise a load, a reaction or free. Where the train has no
    *  motion to list them from there are no rows, and the summary says why. */
   const bodies = $derived<TrainBody[]>(result.motion?.bodies ?? []);
+  const trainShaftList: TrainShaft[] = $derived(trainShafts(bodies));
   /** A body's name: every shaft of it, as a shaft is named anywhere. */
   const bodyLabel = (b: TrainBody): string => b.shafts.map(([at, label]) => refLabel(at, label)).join(" · ");
   /** **What the case declares a body**, or free where it says nothing —
@@ -476,7 +474,14 @@
   /** **A shaft of a stage by name**, off the topology the core sent — the
    *  label a port carries — and by its number where the wiring has no name
    *  for it. */
-  const shaftLabel = (stage: number, s: number): string => shaftRefName(tab.train, result.topology, stage, s);
+  /** A stage's local shaft by name, for the member card's select: the
+   *  train shaft it is a port of, or what it carries where it is no port
+   *  (a planet shaft). */
+  const shaftLabel = (stage: number, s: number): string => {
+    const at: ShaftRef = { kind: "of", stage, shaft: s };
+    const on = shaftOfPort(trainShaftList, at);
+    return on === undefined ? onShaft(tab.train, result.topology, stage, s) : trainShaftName(on);
+  };
   /** Whether a mesh is internal and on distance `k` of a shape: one of
    *  its members has a cutter, and its two members' axes are the distance's. */
   const internalOn = (shape: Shape, m: { a: number; b: number }, k: number): boolean => {
@@ -1361,37 +1366,31 @@
          held, coupled or loaded; an axis is the line it turns about, which
          a set's sun, carrier and ring share. -->
     <small class="edit-note">{t("ui.train_note_shafts")}</small>
-    <!-- **The select shows what the shaft is**: held to ground, coupled to
-         a named shaft of another stage — one coupling reads the same on
-         either of its shafts — or free, with nothing attached, which is what
-         a load case loads. The choices under "coupled" are every shaft of
-         every other stage the train does not hold; with one stage there are
-         none. What each choice does to the rest — a hold uncouples, a
-         coupling turns a case's reaction into a take-off — is the core's
-         rule, written back through it. -->
+    <!-- **Each port of the stage, and the train's shaft it is on.** The row
+         names what the port carries; the select is the shaft — the ground,
+         a numbered shaft the port shares with another stage's, or a shaft
+         of its own — and everything on the chosen shaft is read beside it.
+         What each choice does to the rest — a hold uncouples, a shared
+         shaft turns a case's reaction into a take-off — is the core's rule,
+         written back through it. -->
     {#each ports as p (p.shaft)}
-      {@const state = shaftState(i, p.shaft)}
+      {@const at = { kind: "of", stage: i, shaft: p.shaft } as const}
+      {@const key = shaftKey(at)}
+      {@const on = shaftOfPort(trainShaftList, at)}
       <label>
-        <!-- The shaft by its number, and what it carries under it, the way
-             a gear within a stage is referenced. -->
-        <span>{shaftName(tab.train, i, p.label, p.shaft)} <small class="on">{onShaft(tab.train, result.topology, i, p.shaft)}</small></span>
-        <select value={stateKey(state)} onchange={(e) => setShaft(i, p.shaft, e.currentTarget.value)}>
-          <option value="held">{t("ui.train_constraint_held")}</option>
-          <optgroup label={t("ui.train_constraint_coupled")}>
-            {#if state.kind === "coupled"}
-              <option value={stateKey(state)}>
-                {state.to.map((s) => refLabel(s)).join(" · ")}
-              </option>
-            {/if}
-            {#each couplable(i) as group (group.stage)}
-              {#each group.shafts as [s, label] (portKey(s))}
-                {#if state.kind !== "coupled" || !state.to.some((x) => portKey(x) === portKey(s))}
-                  <option value={`coupled:${portKey(s)}`}>{refLabel(s, label)}</option>
-                {/if}
-              {/each}
-            {/each}
-          </optgroup>
-          <option value="free">{t("ui.train_constraint_free")}</option>
+        <span>{onShaft(tab.train, result.topology, i, p.shaft)}
+          {#if on !== undefined && on.body.shafts.length > 1}
+            <small class="on">{acrossShaft(tab.train, result.topology, on)}</small>
+          {/if}
+        </span>
+        <select value={key} onchange={(e) => setShaft(at, e.currentTarget.value)}>
+          <option value="held">{t("ui.train_ground")}</option>
+          {#each joinable(at) as sh (sh.number)}
+            <option value={`body:${trainShaftList.indexOf(sh)}`}>{trainShaftName(sh)}</option>
+          {/each}
+          {#if on === undefined || on.number === null || on.body.shafts.length > 1}
+            <option value="free">{t("ui.train_new_shaft")}</option>
+          {/if}
         </select>
         <em></em>
       </label>
@@ -1738,6 +1737,19 @@
     </div>
     {#if solved && solved.paths.length === 0 && tab.train.stages.length > 0}
       <p class="notice">{t("ui.train_family_no_figure")}</p>
+    {/if}
+    <!-- **The train's shafts, and what each carries across the stages** —
+         the bodies the core lists, numbered as the gears are, the held ones
+         the ground — so what is linked to what is read here at a glance and
+         every reference to a shaft below names one of these. -->
+    {#if trainShaftList.length > 0}
+      <h4 class="section-heading">{t("ui.train_shafts")}</h4>
+      <dl class="out shafts">
+        {#each trainShaftList as sh, k (k)}
+          <dt>{trainShaftName(sh)}</dt>
+          <dd>{acrossShaft(tab.train, result.topology, sh)}</dd>
+        {/each}
+      </dl>
     {/if}
   </div>
   <div class="grid shared">
@@ -2539,6 +2551,9 @@
   .train .paths {
     grid-column: 1 / -1;
     min-width: 0;
+  }
+  .train .paths dl.shafts {
+    margin: 0.5rem 0 0;
   }
   .train .paths h4 {
     margin: 0;
