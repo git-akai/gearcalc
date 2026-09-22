@@ -116,9 +116,51 @@ function roleName(topology: StagePorts[], stage: number, member: number): string
   return roleLabel(topology[stage]?.members[member]);
 }
 
-/** **A gear this stage could fix to another of its bodies**, and where it
- *  may go — the second question a body answers, and the one the train
- *  knows nothing about.
+/** **One axis of a stage, the bodies on it and the gears on those** — the
+ *  shape's own three levels, read off it in one pass. A card is drawn in
+ *  this order because it is the order the shape is in: a gear is fixed to
+ *  a body, a body turns about an axis, and what a gear may be moved to is
+ *  what else is on its axis. */
+export interface AxisGroup {
+  /** The shape's index for it, and the number a name goes by, from 1. */
+  axis: number;
+  /** The body whose frame it stands still in, `null` where that is ground
+   *  — a carried axis is a planet's, and what carries it is a body of
+   *  this stage like any other. */
+  carriedBy: number | null;
+  /** How many times it is replicated about the axis it is carried round:
+   *  the planet count, which nothing else on the card says. */
+  count: number;
+  bodies: {
+    body: number;
+    /** The members fixed to it, in the shape's order. */
+    members: number[];
+    /** Whether it carries an axis of its own — a carrier, which is what a
+     *  body with no gear on it generally is. */
+    carries: boolean;
+  }[];
+}
+
+/** Every axis of a stage with what sits on it, in the shape's order. */
+export function axisGroups(shape: Shape): AxisGroup[] {
+  return shape.axes.map((a, axis) => ({
+    axis,
+    carriedBy: a.carried_by === 0 ? null : a.carried_by,
+    count: a.count,
+    bodies: shape.bodies
+      .filter((b) => b.axis === axis)
+      .map((b) => ({
+        body: b.body,
+        members: shape.members.flatMap((m, j) => (m.body === b.body ? [j] : [])),
+        carries: shape.axes.some((x) => x.carried_by === b.body),
+      })),
+  }));
+}
+
+/** **Where a gear of this stage could be moved to**, which is the question
+ *  a body answers that the train knows nothing about. The gear's own body
+ *  is not among them: it is the row the gear is already listed under, and
+ *  offering it back would be an option that does nothing.
  *
  *  A gear may go to a body on its own axis that carries no axis itself (a
  *  gear fixed to the carrier of the planets it meshes locks the stage, and
@@ -129,13 +171,10 @@ function roleName(topology: StagePorts[], stage: number, member: number): string
  *  a filter rather than a refusal: turning as one, they hold their common
  *  mate to two ratios at once, so the stage is locked by construction
  *  rather than by its numbers. It is what a set's sun and ring would do,
- *  and offering it would put a second select on every epicyclic card
- *  whose only answer is a refusal. A layshaft's gears mesh *different*
+ *  and offering it would put a control on every epicyclic card whose only
+ *  answer is a refusal. The gears of a layshaft's ratios mesh *different*
  *  members of the layshaft, so its ratios stay on offer: that is how one
- *  is engaged.
- *
- *  Listed only where something is left to choose, since a select whose
- *  every option does nothing is what this panel is not to show. */
+ *  is engaged. */
 export function movableGears(
   shape: Shape,
 ): { member: number; bodies: number[]; own: boolean }[] {
@@ -149,17 +188,17 @@ export function movableGears(
         .filter(
           (b) =>
             b.axis === axis &&
+            b.body !== m.body &&
             !shape.axes.some((a) => a.carried_by === b.body) &&
-            (b.body === m.body ||
-              shape.members.every(
-                (x, k) => x.body !== b.body || !partners(k).some((p) => mine.includes(p)),
-              )),
+            shape.members.every(
+              (x, k) => x.body !== b.body || !partners(k).some((p) => mine.includes(p)),
+            ),
         )
         .map((b) => b.body);
       const own = shape.members.some((x, k) => k !== member && x.body === m.body);
       return { member, bodies, own };
     })
-    .filter((g) => g.bodies.length > 1 || g.own);
+    .filter((g) => g.bodies.length > 0 || g.own);
 }
 
 /** **A body's own name**: "Body 4", numbered across the train as the core

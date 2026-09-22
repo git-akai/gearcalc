@@ -2240,15 +2240,13 @@ while and said nothing: every mesh is a pair of gears, and what this adds
 is another **ratio across the same centres**.
 
 And on any stage, a member **moved to another body** on its axis — the
-edit that engages that ratio, and the second question a body answers. Both
-are asked over the one list on the card: beside each port, where this
-stage's body sits in the *train*; beneath them, what is fixed to it
-**here**. A gear is listed only where something is left to choose, and
-never offered a body whose gears mesh the same member as its own — two
+edit that engages that ratio. It is asked on the stage's own list, under
+the body the gear sits on ([bodies and constraints](#bodies-and-constraints)),
+and never offers a body whose gears mesh the same member as its own — two
 gears turning as one hold their common mate to two ratios at once, so the
 stage is locked by construction rather than by its numbers. That is what a
-set's sun and ring would do, which is why an epicyclic card shows no second
-list at all. **The body a gear leaves stays** while anything still names
+set's sun and ring would do, which is why an epicyclic card offers the move
+on nothing but its steps. **The body a gear leaves stays** while anything still names
 it — another stage, a hold, a case: taking it with the gear is how
 engaging a layshaft's other ratio used to lose the output, and a body with
 nothing on it is a shaft in neutral, which is a thing a train has
@@ -2426,10 +2424,13 @@ stage's bodies by number, and a train the panel builds writes each one:
 adding a stage numbers its bodies after every body the train has, joins
 its conventional input to the last stage's remaining open output and
 carries every case entry there to the new stage's output (`push_stage`);
-the select beside a port is one rule (`move_end`) — the stage's end of the
-body is split off where the body ran on to another stage, and then held to
-ground, joined to the body chosen (the lower number kept, `join`), or left
-a body of its own with every hold on it withdrawn (`split`, `release`).
+the **move to** menu on a body's end is one rule (`move_end`) — the
+stage's end of the body is split off where the body ran on to another
+stage, and then joined to the body chosen (the lower number kept, `join`)
+or left a body of its own (`split`). Held is not among its entries: a hold
+is a statement about the *body*, which every end of it shares, so it is a
+button on the body's own row (`hold`, `release`, the latter writing off a
+stage convention's hold in so many words).
 Joining a body to one a case had declared *reacted* turns that entry into a
 load with its torque derived — an inline take-off, the same physics — since
 a body two stages share cannot be a reaction; a hold drops every case entry
@@ -2568,13 +2569,28 @@ and nothing else — no "start", no "end".
 
 **A body, to the panel, is its number.** The panel numbers nothing of its
 own: a body is "Body 2" wherever it is named, with its ends in parentheses
-— "Body 2 (Stage 1 Gear 2 · Stage 2 Sun)" — the train card lists every
-port body with everything it carries stage by stage, and beside each port
-of a stage the select is the body it is on — the ground, a numbered body
-it shares with another stage's port, or a body of its own — which is the
-join, the hold and the release read as one question ([Bodies and
-constraints](#bodies-and-constraints)). A held body keeps its number and
-is said to be fixed.
+— "Body 2 (Stage 1 Gear 2 · Stage 2 Sun)". **It is wired in one place, the
+train's own list**, which is where a body belongs: every port body in
+number order, each with its ends indented under it — the stage and what it
+is there — a **hold** on the body's row and a **move to** menu on each
+end's ([Bodies and constraints](#bodies-and-constraints)). A held body
+keeps its number and is said to be fixed.
+
+A stage's card asks the other question, and only it: **what turns with
+what, here**. One list in the shape's own order — an axis, the bodies on
+it, the gears on each — so a gear is a row under the body it is fixed to
+and a body a row under the axis it turns about, each name written once in
+one meaning. A gear's menu moves it to another body of its own axis, or
+onto one of its own where it shares (`StageEdit::MoveBody`), and it is
+there only where there is somewhere to go. **Axes are numbered, not
+named**: a name off a preset — a layshaft, a centreline — states a
+distinction the shape does not have, and what is on the axis is the rows
+under it. What a number cannot say is written beside it: the body a
+carried axis rides, and how many times it is replicated, which is the
+planet count and is nowhere else on the card. Neither list shows a body
+back as the value of a control: **a menu says what it does, not what is
+the case**, since where a row already sits under its body a select
+repeating it puts a reading where there is only an action.
 
 **What a case says of a port.** Each entry carries a `role`: a **load**
 carries a torque and a speed, each given or derived; a **reacted** port is

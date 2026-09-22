@@ -43,10 +43,10 @@
   import Switch from "./Switch.svelte";
   import { notes, type Notes } from "./notes";
   import {
+    axisGroups,
     axisOfBody,
     bodyName,
     endsOf,
-    acrossBody,
     bodyRefName,
     movableGears,
     onSlot,
@@ -133,9 +133,6 @@
   /** Whether a body is held, as the constraints in force have it: the
    *  train's own word on it, or the convention the port reports. */
   const heldNow = (p: PortSpec): boolean => (constraintOn(tab.train, p.body) ?? p.by_convention) === "held";
-  /** The select's value for a port: the ground where its body is held,
-   *  and the body's number otherwise. */
-  const bodyKey = (p: PortSpec): string => (heldNow(p) ? "0" : String(p.body));
   /** Every body some stage has as a port, once, in number order. */
   const portBodies = $derived<PortSpec[]>(
     result.topology
@@ -143,6 +140,10 @@
       .filter((p, i, all) => all.findIndex((q) => q.body === p.body) === i)
       .sort((a, b) => a.body - b.body),
   );
+  /** **Every body the train holds**, by number — the same reading as
+   *  `heldNow`, gathered once so a stage's card can mark a body held
+   *  without asking the train again per row. */
+  const heldBodies = $derived(new Set(portBodies.filter(heldNow).map((p) => p.body)));
   /** The bodies a port could be put on, and the one it is on: every unheld
    *  body that has no *other* end on the port's own stage — a stage's two
    *  ports cannot turn as one — and its own, held or not. */
@@ -152,12 +153,14 @@
         q.body === p.body ||
         (!heldNow(q) && !endsOf(tab.train, q.body).some((e) => e.stage === stage)),
     );
-  /** **The select's answer written back through the core**, one rule
-   *  (`move_end`): the end is split off where the body ran on, then held
-   *  (the ground), joined (a body) or left its own (a new body). */
-  function setBody(stage: number, p: PortSpec, key: string) {
+  /** **A stage's end moved to another body**, written back through the
+   *  core's one rule (`move_end`): the end is split off where the body ran
+   *  on, then joined to a body or left on one of its own. Holding is not
+   *  among them any more — it is a statement about a *body*, which every
+   *  end of it shares, and it has a button of its own on the body's row. */
+  function moveEnd(stage: number, body: number, key: string) {
     editTrain(tab.train, {
-      move_end: { stage, body: p.body, to: key === "new" ? null : Number(key) },
+      move_end: { stage, body, to: key === "new" ? null : Number(key) },
     });
   }
 
@@ -1283,77 +1286,89 @@
      set's carrier releases its ring — which is the core's rule and is read
      back, not repeated. -->
 {#snippet bodies_of(i: number)}
-  {@const ports = result.topology[i]?.ports ?? []}
-  {#if ports.length > 0}
-    <h4 class="bodies section-heading">{t("ui.train_bodies")}</h4>
-    <!-- Two words for two things, said once: a body is what turns and is
-         held, shared or loaded; an axis is the line it turns about, which
-         a set's sun, carrier and ring share. -->
-    <small class="edit-note">{t("ui.train_note_bodies")}</small>
-    <!-- **Each port of the stage, and the body it is on.** The row names
-         what the port carries; the select is the body — the ground, a
-         numbered body the port shares with another stage's, or a body of
-         its own — and everything on the chosen body is read beside it.
-         What each choice does to the rest — an end moved off a shared body
-         is split from it first, a shared body turns a case's reaction into
-         a take-off — is the core's rule, written back through it. -->
-    {#each ports as p (p.slot)}
-      {@const ends = endsOf(tab.train, p.body)}
-      <label>
-        <span>{onSlot(tab.train, result.topology, i, p.slot)}
-          {#if ends.length > 1}
-            <small class="on">{acrossBody(tab.train, result.topology, p.body)}</small>
-          {/if}
-        </span>
-        <select value={bodyKey(p)} onchange={(e) => setBody(i, p, e.currentTarget.value)}>
-          <option value="0">{t("ui.train_ground")}</option>
-          {#each joinable(i, p) as q (q.body)}
-            <option value={String(q.body)}>{bodyName(q.body)}</option>
+  {@const shape = tab.train.stages[i]}
+  {@const movable = movableGears(shape)}
+  <h4 class="bodies section-heading">{t("ui.train_stage_bodies")}</h4>
+  <!-- **The stage's own three levels, in the order the shape has them**: an
+       axis is a line, a body turns about one, a gear is fixed to a body. So
+       a gear is a row under the body it turns with, and the body is a row
+       under the axis it turns about — each name printed once, in one
+       meaning. What a gear may be moved to follows from where it sits: the
+       other bodies of its own axis. Where a body of this stage sits in the
+       *train* is not asked here but once, in the train's own list of
+       bodies, since a body is the train's and a gear is the stage's. -->
+  <small class="edit-note">{t("ui.train_note_stage_bodies")}</small>
+  {#each axisGroups(shape) as g (g.axis)}
+    <!-- Axes are numbered, not named: a name taken from a preset — a
+         layshaft, a centreline — says more than a shape knows, and what is
+         on the axis is the rows under it. What a number cannot say is
+         written beside it: the body a carried axis rides, and how many
+         times it is replicated, which is the planet count and is nowhere
+         else on the card. -->
+    <div class="axis-line">
+      <span class="axis-name">{t("ui.train_axis_name", { number: String(g.axis + 1) })}</span>
+      {#if g.carriedBy !== null}
+        <span class="chip">{t("ui.train_axis_carried", { body: bodyName(g.carriedBy) })}</span>
+      {/if}
+      {#if g.count > 1}
+        <span class="chip">{t("ui.train_axis_count", { count: String(g.count) })}</span>
+      {/if}
+      <span class="rule"></span>
+    </div>
+    {#each g.bodies as b (b.body)}
+      <div class="bodygrp">
+        <div class="bodyrow">
+          <span class="body-name">{bodyName(b.body)}</span>
+          {#if heldBodies.has(b.body)}<span class="chip held">{t("ui.train_case_fixed")}</span>{/if}
+          <!-- A body another stage also lists is the same body: what it is
+               over there is said here, since that is what makes it shared. -->
+          {#each endsOf(tab.train, b.body).filter((e) => e.stage !== i) as e (e.stage)}
+            <span class="chip">{t("ui.train_port_at", {
+              stage: t("ui.train_stage_heading", { number: String(e.stage + 1) }),
+              on: onSlot(tab.train, result.topology, e.stage, e.slot, false),
+            })}</span>
           {/each}
-          {#if ends.length > 1}
-            <option value="new">{t("ui.train_own_body")}</option>
-          {/if}
-        </select>
-        <em></em>
-      </label>
-    {/each}
-
-    <!-- **...and which of them each gear turns with**, which is the other
-         question a body answers and the one the train knows nothing about:
-         the rows above say where this stage's bodies sit in the *train*,
-         these say what is fixed to them *here*. Only the gears with
-         somewhere to go are listed — another body on their axis, or a body
-         of their own where they share one — so every option does
-         something, and a stage whose gears are each alone on a body has no
-         rows at all. -->
-    {@const movable = movableGears(tab.train.stages[i])}
-    {#if movable.length > 0}
-      <h4 class="bodies section-heading later">{t("ui.train_gear_bodies")}</h4>
-      <small class="edit-note">{t("ui.train_note_gear_bodies")}</small>
-      {#each movable as g (g.member)}
-        <label>
-          <span>{memberListName(tab.train, result.topology, i, g.member)}</span>
-          <select
-            value={String(tab.train.stages[i].members[g.member].body)}
-            onchange={(e) => {
-              const v = e.currentTarget.value;
-              editStage(i, {
-                move_body: { member: g.member, body: v === "own" ? null : Number(v) },
-              });
-            }}
-          >
-            {#each g.bodies as b (b)}
-              <option value={String(b)}>{bodyName(b)}</option>
-            {/each}
-            {#if g.own}
-              <option value="own">{t("ui.train_own_body")}</option>
+        </div>
+        {#if b.members.length === 0 && b.carries}
+          <div class="onbody"><span class="dim">{t("ui.train_carrier")}</span></div>
+        {/if}
+        {#each b.members as j (j)}
+          {@const where = movable.find((x) => x.member === j)}
+          <div class="onbody">
+            <span>{memberListName(tab.train, result.topology, i, j)}</span>
+            <!-- **A menu, not a value.** The body it is on is the row it is
+                 under; a select showing it back would put a reading where
+                 there is only an action. Listed only where there is
+                 somewhere to go. -->
+            {#if where !== undefined}
+              <select
+                class="action move"
+                value=""
+                aria-label={t("ui.train_move_to_of", {
+                  name: memberListName(tab.train, result.topology, i, j),
+                })}
+                onchange={(e) => {
+                  const v = e.currentTarget.value;
+                  e.currentTarget.value = "";
+                  editStage(i, {
+                    move_body: { member: j, body: v === "own" ? null : Number(v) },
+                  });
+                }}
+              >
+                <option value="" disabled>{t("ui.train_move_to")}</option>
+                {#each where.bodies as x (x)}
+                  <option value={String(x)}>{bodyName(x)}</option>
+                {/each}
+                {#if where.own}
+                  <option value="own">{t("ui.train_own_body")}</option>
+                {/if}
+              </select>
             {/if}
-          </select>
-          <em></em>
-        </label>
-      {/each}
-    {/if}
-  {/if}
+          </div>
+        {/each}
+      </div>
+    {/each}
+  {/each}
 {/snippet}
 
 {#snippet numberField(
@@ -1698,16 +1713,67 @@
     {/if}
     <!-- **The train's bodies, and what each carries across the stages** —
          every body some stage has as a port, numbered as the gears are,
-         the held ones said so — so what is linked to what is read here at
-         a glance and every reference to a body below names one of these. -->
+         with its ends under it. This is where a body is *wired*, because a
+         body is the train's: held to the housing, joined to another
+         stage's end, or split back onto one of its own. A stage's card
+         says which bodies it turns about and what is fixed to them, and
+         asks none of this a second time. -->
     {#if portBodies.length > 0}
       <h4 class="section-heading">{t("ui.train_bodies")}</h4>
-      <dl class="out bodies">
-        {#each portBodies as p (p.body)}
-          <dt>{bodyName(p.body)}{#if heldNow(p)} <small>{t("ui.train_case_fixed")}</small>{/if}</dt>
-          <dd>{acrossBody(tab.train, result.topology, p.body)}</dd>
-        {/each}
-      </dl>
+      <small class="edit-note">{t("ui.train_note_bodies")}</small>
+      <div class="bodylist">
+      {#each portBodies as p (p.body)}
+        {@const ends = endsOf(tab.train, p.body)}
+        {@const held = heldNow(p)}
+        <div class="bodygrp">
+          <div class="bodyrow">
+            <span class="body-name">{bodyName(p.body)}</span>
+            {#if held}<span class="chip held">{t("ui.train_case_fixed")}</span>{/if}
+            <span class="filler"></span>
+            <!-- Held is a statement about the body, so it is made on the
+                 body's row and every end of it is held at once. A hold the
+                 stage's own convention puts on reads the same and is
+                 written off in so many words when released, which is the
+                 core's rule (`Train::release`). -->
+            <button
+              class="action"
+              onclick={() => editTrain(tab.train, held ? { release: p.body } : { hold: p.body })}
+            >{held ? t("ui.train_release") : t("ui.train_hold")}</button>
+          </div>
+          {#each ends as e (e.stage)}
+            {@const targets = joinable(e.stage, p).filter((q) => q.body !== p.body)}
+            <div class="onbody">
+              <span>{t("ui.train_port_at", {
+                stage: t("ui.train_stage_heading", { number: String(e.stage + 1) }),
+                on: onSlot(tab.train, result.topology, e.stage, e.slot, false),
+              })}</span>
+              {#if targets.length > 0 || ends.length > 1}
+                <select
+                  class="action move"
+                  value=""
+                  aria-label={t("ui.train_move_to_of", {
+                    name: onSlot(tab.train, result.topology, e.stage, e.slot),
+                  })}
+                  onchange={(ev) => {
+                    const v = ev.currentTarget.value;
+                    ev.currentTarget.value = "";
+                    moveEnd(e.stage, p.body, v);
+                  }}
+                >
+                  <option value="" disabled>{t("ui.train_move_to")}</option>
+                  {#each targets as q (q.body)}
+                    <option value={String(q.body)}>{bodyName(q.body)}</option>
+                  {/each}
+                  {#if ends.length > 1}
+                    <option value="new">{t("ui.train_own_body")}</option>
+                  {/if}
+                </select>
+              {/if}
+            </div>
+          {/each}
+        </div>
+      {/each}
+      </div>
     {/if}
   </div>
   <div class="grid shared">
@@ -2516,9 +2582,6 @@
     grid-column: 1 / -1;
     min-width: 0;
   }
-  .train .paths dl.bodies {
-    margin: 0.5rem 0 0;
-  }
   .train .paths h4 {
     margin: 0;
   }
@@ -2726,6 +2789,93 @@
   /* The bodies' rows sit under their own small heading, in the shared grid. */
   h4.bodies {
     margin: 0.75rem 0 0;
+  }
+  /* **One list, three levels** — the shape's own: an axis, the bodies on it,
+     the gears on those. The nesting is the whole of what says which is which,
+     so it is an indent and a ground rather than a rule down the side: a body's
+     row is the tinted one, and what is fixed to it hangs under it. Both lists
+     in this panel are drawn from these — the train's bodies with their ends,
+     a stage's with its gears — because they are the same picture at two
+     levels. */
+  .bodylist {
+    max-width: 34rem;
+    margin-top: 0.3rem;
+  }
+  .bodygrp {
+    margin-bottom: 0.4rem;
+  }
+  .bodyrow {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.25rem 0.4rem;
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    font-size: 0.8rem;
+  }
+  .bodyrow .body-name {
+    font-weight: 600;
+  }
+  .bodyrow .filler {
+    flex: 1 1 auto;
+  }
+  .onbody {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0.4rem 0.25rem 1.4rem;
+    font-size: 0.85rem;
+  }
+  .onbody + .onbody {
+    border-top: 1px dotted var(--rule);
+  }
+  .onbody > span:first-child {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .onbody .dim {
+    color: var(--muted);
+  }
+  /* The axis a run of bodies turns about, over them: a number and what a
+     number cannot say, then a rule to the edge. */
+  .axis-line {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin: 0.7rem 0 0.3rem;
+  }
+  .axis-line .axis-name {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  .axis-line .rule {
+    flex: 1 1 auto;
+    height: 1px;
+    background: var(--rule);
+  }
+  /* What a row states about itself and nothing edits: held, or the other
+     stage that names the same body. */
+  .chip {
+    font-size: 0.68rem;
+    color: var(--muted);
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    padding: 0 0.4rem;
+    white-space: nowrap;
+  }
+  .chip.held {
+    color: var(--warn);
+    border-color: var(--warn);
+  }
+  /* A select drawn as a button, as the add menus are: it shows what it does,
+     never what is the case, and snaps back to its label. */
+  select.move {
+    width: max-content;
+    max-width: 12rem;
   }
   /* One mesh's readout, sitting under its heading. */
   h4.mesh {
@@ -2951,12 +3101,6 @@
   /* In a row of edits a remove sits beside its add, not below it. */
   .edits .action.danger {
     margin-top: 0;
-  }
-  /* What a shaft carries, under its number in the same cell. */
-  small.on {
-    display: block;
-    color: var(--muted);
-    font-size: 0.72rem;
   }
   /* What the row's buttons do, under them, in a note's voice. */
   .edit-note {
