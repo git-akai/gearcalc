@@ -1535,13 +1535,17 @@ A stage is a `Shape` — axes, the train's bodies on them, members on the
 bodies, meshes between members, one distance per pair of axes that mesh — and its result is
 one `ShapeResult`: a `GearResult` per member, a `MeshReport` per mesh, a
 `DistanceReport` per distance, `MemberRating` over the meshes each member is
-in. A spur pair, a worm and a planetary set are **vocabularies** — the words
-a designer uses, which a shape is filled in from — and every menu entry is a
-**preset** (`StagePreset`): a list of what sits where, at sensible teeth,
-under the family the shape reads as; a worm's conventional proportions are
-one thing set on a distance (`Distance::worm`). The hula stage was a
-vocabulary of its own and is a list now, `arrangements::hula`, its corpus
-unmoved. None of them is a type in the core: a stage *is* a `Shape`. The
+in. A spur pair, a worm and a planetary set are **lists of what sits
+where** like every other arrangement — `arrangements::pair`, `::worm`,
+`::planetary` — and every menu entry is a **preset** (`StagePreset`): one
+of those lists at sensible teeth, under the family the shape reads as; a
+worm's conventional proportions are one thing set on a distance
+(`Distance::worm`). Each was a *vocabulary* first — a struct of the words a
+designer uses, converted into the shape — and each carried a stage-level
+module, pressure angle, overlap and contact-ratio floor that the shape had
+already moved onto its members and its meshes, which is what decided it:
+the second spelling could state what the first no longer could. The hula
+stage went the same way, `arrangements::hula`, its corpus unmoved. None of them is a type in the core: a stage *is* a `Shape`. The
 enum over it went too — one variant, forty-eight match arms and an
 `as_shape()` that could not be `None`, buying a `kind = "shape"` a file
 could only ever write one value of.

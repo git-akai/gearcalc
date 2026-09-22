@@ -1996,6 +1996,21 @@ impl Shape {
             .map_or(super::Searched::FoundNothing, |c| c.how)
     }
 
+    /// The shifts the shape settles on at the shipped effort.
+    #[cfg(test)]
+    pub(crate) fn shifts(&self) -> Vec<f64> {
+        self.shifts_at(&crate::auto::Search::SHIPPED)
+    }
+
+    /// **The first member's pitch diameter**, mm, as the shape reads it
+    /// from the helix the readings decide — a worm's size, stated or
+    /// derived.
+    #[cfg(test)]
+    pub(crate) fn first_pitch_diameter(&self) -> f64 {
+        let m = &self.members[0];
+        f64::from(m.gear.teeth.max(1)) * m.module / self.helix_angles()[0].to_radians().cos()
+    }
+
     /// The shifts the shape settles on under a search — what the tests
     /// written against the retired stage types' own choosers ask.
     #[cfg(test)]
@@ -4044,115 +4059,6 @@ impl Shape {
     }
 }
 
-// ---------------------------------------------------- from each preset ---
-
-impl From<&super::PairStage> for Shape {
-    /// **The pair's vocabulary over the line of two**: `arrangements::line`
-    /// lays the two axes, the mesh and the distance out, and the pair's
-    /// words are written on it — its module and pressure angle, the first
-    /// gear's thickness coefficient with the second following, the first
-    /// gear's diameter as the size reading, the distance's angle, worm
-    /// sizing, clearances and tolerances.
-    fn from(p: &super::PairStage) -> Self {
-        let mut shape = super::arrangements::line(&[p.gears[0].teeth, p.gears[1].teeth]);
-        shape.optimisation = p.optimisation;
-        shape.load_sharing = p.load_sharing;
-        for (i, m) in shape.members.iter_mut().enumerate() {
-            m.gear = p.gears[i].clone();
-            m.module = p.module;
-            m.pressure_angle = p.pressure_angle;
-            m.thickness_mod = if i == 0 {
-                Auto::fixed(p.thickness_mod)
-            } else {
-                Auto::automatic(2.0 - p.thickness_mod)
-            };
-            if i == 0 {
-                m.pitch_diameter = p.pitch_diameter;
-            }
-        }
-        shape.meshes[0].sliding_friction = p.sliding_friction;
-        shape.meshes[0].static_friction = p.static_friction;
-        shape.meshes[0].overlap = p.overlap;
-        shape.meshes[0].min_contact_ratio = p.min_contact_ratio;
-        shape.distances[0] = Distance {
-            axes: [0, 1],
-            angle: p.shaft_angle,
-            worm: p.worm,
-            distance: p.centre_distance,
-            clearance: p.clearance,
-            tip_clearance: 0.0,
-            tolerance_plus: p.tolerance_plus,
-            tolerance_minus: p.tolerance_minus,
-            axial_clearance: p.axial_clearance,
-        };
-        shape
-    }
-}
-
-impl From<&super::PlanetaryStage> for Shape {
-    /// **The set's vocabulary over the epicyclic list** — sun, carrier,
-    /// ring, so the bodies are numbered as the set's own solver numbered
-    /// them (sun 1, carrier 2, ring 3, planet 4) and the members read sun,
-    /// planet, ring — with the set's words written on it: each member's
-    /// gear, the shared module and pressure angle, the sun's thickness
-    /// coefficient with the planet and the ring following, the ring's
-    /// cutter, each mesh's own friction, and the one distance's centre
-    /// distance, clearance and tolerances.
-    fn from(s: &super::PlanetaryStage) -> Self {
-        use super::arrangements::{epicyclic, Central};
-        let mut shape = epicyclic(
-            s.planets.max(1),
-            &[&[i32::try_from(s.planet.teeth).unwrap_or(i32::MAX)]],
-            &[
-                Central::Sun {
-                    on: 0,
-                    teeth: s.sun.teeth,
-                },
-                Central::Carrier,
-                Central::Ring {
-                    on: 0,
-                    teeth: s.ring.teeth,
-                },
-            ],
-            &[],
-        );
-        shape.optimisation = s.optimisation;
-        shape.load_sharing = s.load_sharing;
-        shape.min_planet_clearance = s.min_planet_clearance;
-        for (m, (gear, thickness_mod)) in shape.members.iter_mut().zip([
-            (&s.sun, Auto::fixed(s.thickness_mod)),
-            (&s.planet, Auto::automatic(2.0 - s.thickness_mod)),
-            (&s.ring, Auto::automatic(2.0 - s.thickness_mod)),
-        ]) {
-            m.gear = gear.clone();
-            m.module = s.module;
-            m.pressure_angle = s.pressure_angle;
-            m.thickness_mod = thickness_mod;
-            if m.ring.is_some() {
-                m.ring = Some(s.cutter);
-            }
-        }
-        for (m, (sliding, stat)) in shape.meshes.iter_mut().zip([
-            (s.sliding_friction_sun_planet, s.static_friction_sun_planet),
-            (
-                s.sliding_friction_planet_ring,
-                s.static_friction_planet_ring,
-            ),
-        ]) {
-            m.sliding_friction = sliding;
-            m.static_friction = stat;
-            m.overlap = s.overlap;
-            m.min_contact_ratio = s.min_contact_ratio;
-        }
-        let d = &mut shape.distances[0];
-        d.distance = s.centre_distance;
-        d.clearance = s.clearance;
-        d.tolerance_plus = s.tolerance_plus;
-        d.tolerance_minus = s.tolerance_minus;
-        shape
-    }
-}
-
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
@@ -4169,7 +4075,8 @@ mod tests {
 
     use super::*;
     use crate::planetary::{Arrangement, PlanetaryShaft};
-    use crate::train::{test_library, PairStage, PlanetaryStage, StageLoad, StageLoads};
+    use crate::train::arrangements as arr;
+    use crate::train::{planetary_boundary, test_library, StageLoad, StageLoads};
 
     /// Both directions and both case kinds, at a torque and a speed.
     fn loads() -> StageLoads {
@@ -4195,30 +4102,22 @@ mod tests {
 
     /// A set through the shape, under its convention or a boundary.
     fn solve_set(
-        set: &PlanetaryStage,
+        set: &Shape,
         loads: &StageLoads,
         lib: &MaterialLibrary,
     ) -> Result<ShapeResult, TrainError> {
-        solve_loads(
-            &Shape::from(set),
-            loads,
-            lib,
-            super::super::Reversal::default(),
-        )
+        solve_loads(set, loads, lib, super::super::Reversal::default())
     }
 
     /// **A crossed distance is built as the point-contact model**, and the
     /// shape reports what it reports: a point contact, no bending on the worm.
     #[test]
     fn a_crossed_distance_is_a_point_contact() {
-        for pair in [
-            PairStage::worm(),
-            PairStage {
-                worm: false,
-                ..PairStage::worm().with_first_helix(45.0)
-            },
-        ] {
-            let shape = Shape::from(&pair);
+        for shape in [arr::worm(1, 40), {
+            let mut s = arr::worm(1, 40).with_first_helix(45.0);
+            s.distances[0].worm = false;
+            s
+        }] {
             assert!(shape.is_crossed(0) && shape.screw(0).is_ok());
             let r = solve_loads(
                 &shape,
@@ -4243,19 +4142,17 @@ mod tests {
     /// A set as the closure's laws ask it: the shifts as typed, no
     /// undercut floor, zero backlash, the planet closing it.
     fn closure_set(sun: u32, planet: u32, ring: u32) -> Shape {
-        let mut set = PlanetaryStage {
-            clearance: Auto::fixed(0.0),
-            ..PlanetaryStage::default()
-        };
-        set.sun.teeth = sun;
-        set.planet.teeth = planet;
-        set.ring.teeth = ring;
-        set.sun.profile_shift = Auto::fixed(0.0);
-        set.ring.profile_shift = Auto::fixed(0.0);
-        for g in [&mut set.sun, &mut set.planet, &mut set.ring] {
-            g.no_undercut = false;
+        let mut set = arr::planetary(12, 30, 72, 3);
+        set.distances[0].clearance = Auto::fixed(0.0);
+        for (m, z) in set.members.iter_mut().zip([sun, planet, ring]) {
+            m.gear.teeth = z;
         }
-        Shape::from(&set)
+        set.members[0].gear.profile_shift = Auto::fixed(0.0);
+        set.members[2].gear.profile_shift = Auto::fixed(0.0);
+        for m in &mut set.members {
+            m.gear.no_undercut = false;
+        }
+        set
     }
 
     /// **The ideal ring needs no planet shift** — `z_r = z_s + 2 z_p` puts
@@ -4338,7 +4235,7 @@ mod tests {
     #[test]
     fn one_more_tooth_moves_the_ratio_as_the_graph_says() {
         let lib = test_library();
-        let pair = Shape::from(&PairStage::default());
+        let pair = arr::pair([17, 43]);
         let r = solve_loads(&pair, &loads(), &lib, super::super::Reversal::default()).unwrap();
         let per = |i: usize| r.ratio_per_tooth.as_ref().unwrap()[i].unwrap();
         assert!((per(1) + 44.0 / 17.0).abs() < 1e-12);
@@ -4347,7 +4244,7 @@ mod tests {
             (r.circulation.unwrap().forward - 1.0).abs() < 1e-12,
             "a pair passes it all once"
         );
-        let set = PlanetaryStage::default();
+        let set = arr::planetary(12, 30, 72, 3);
         let r = solve_set(&set, &loads(), &lib).unwrap();
         assert!((r.ratio.unwrap() - 7.0).abs() < 1e-12);
         let per = |i: usize| r.ratio_per_tooth.as_ref().unwrap()[i].unwrap();
@@ -4400,7 +4297,7 @@ mod tests {
     #[test]
     fn every_arrangement_of_a_set_solves() {
         use crate::planetary::{Arrangement, PlanetaryShaft};
-        let set = PlanetaryStage::default();
+        let set = arr::planetary(12, 30, 72, 3);
         let mut checked = 0;
         for input in PlanetaryShaft::ALL {
             for fixed in PlanetaryShaft::ALL {
@@ -4408,7 +4305,7 @@ mod tests {
                     continue;
                 }
                 let arrangement = Arrangement { input, fixed };
-                let boundary = PlanetaryStage::boundary_for(arrangement);
+                let boundary = planetary_boundary(arrangement);
                 let r = solve_set(&set, &loads().under(boundary), &test_library()).unwrap();
                 let want = crate::planetary::power(
                     crate::planetary::basic_ratio(crate::planetary::Teeth {
@@ -4466,25 +4363,16 @@ mod tests {
         let lib = test_library();
         let mut checked = 0u32;
         for face in [2.5_f64, 10.0, 40.0] {
-            let stage = PlanetaryStage {
-                sun: StageGear {
-                    face_width: Auto::fixed(face),
-                    ..PlanetaryStage::default().sun
-                },
-                planet: StageGear {
-                    face_width: Auto::fixed(face),
-                    ..PlanetaryStage::default().planet
-                },
-                ring: StageGear {
-                    face_width: Auto::fixed(face),
-                    ..PlanetaryStage::default().ring
-                },
-                ..PlanetaryStage::default()
+            let stage = {
+                let mut s = arr::planetary(12, 30, 72, 3);
+                for m in &mut s.members {
+                    m.gear.face_width = Auto::fixed(face);
+                }
+                s
             };
             let r = solve_set(&stage, &StageLoads::just(2.0), &lib)
                 .unwrap_or_else(|e| panic!("face {face}: {e}"));
-            let shape = Shape::from(&stage);
-            let b = shape
+            let b = stage
                 .build_at(
                     &r.members
                         .iter()
@@ -4499,8 +4387,12 @@ mod tests {
             // planet path already.
             let load = Load::new(r.members[0].cases[0].torque, face);
             let e_star = contact_modulus(
-                &lib.get(&stage.sun.material).expect("a material").clone(),
-                &lib.get(&stage.planet.material).expect("a material").clone(),
+                &lib.get(&stage.members[0].gear.material)
+                    .expect("a material")
+                    .clone(),
+                &lib.get(&stage.members[1].gear.material)
+                    .expect("a material")
+                    .clone(),
             );
             let direct = contact_stress(
                 &b.meshes[0].line().unwrap().path,
@@ -4543,14 +4435,10 @@ mod tests {
         let mut sun_won = false;
         let mut ring_won = false;
         for ring_face in [10.0_f64, 3.0] {
-            let stage = PlanetaryStage {
-                ring: StageGear {
-                    teeth: 60,
-                    profile_shift: Auto::fixed(0.0),
-                    face_width: Auto::fixed(ring_face),
-                    ..StageGear::default()
-                },
-                ..stage_of(24, 18, 60, 0.0)
+            let stage = {
+                let mut s = stage_of(24, 18, 60, 0.0);
+                s.members[2].gear.face_width = Auto::fixed(ring_face);
+                s
             };
             let r = solve_set(&stage, &StageLoads::just(2.0), &lib)
                 .unwrap_or_else(|e| panic!("ring face {ring_face}: {e}"));
@@ -4561,8 +4449,7 @@ mod tests {
             // The two contributions, rebuilt from what the result reports rather
             // than from the expression that produced them: each mesh's own
             // section under its own load, over the width that mesh carries.
-            let shape = Shape::from(&stage);
-            let built = shape
+            let built = stage
                 .build_at(
                     &r.members
                         .iter()
@@ -4570,7 +4457,7 @@ mod tests {
                         .collect::<Vec<_>>(),
                 )
                 .unwrap();
-            let planets = f64::from(stage.planets);
+            let planets = f64::from(stage.axes[1].count);
             let sp_width = r.members[1].face_width.min(r.members[0].face_width);
             let pr_width = r.members[1].face_width.min(r.members[2].face_width);
             let planet = built.members[1].as_gear();
@@ -4638,9 +4525,13 @@ mod tests {
     fn a_ring_with_no_notch_costs_its_bending_rather_than_the_stage() {
         let lib = test_library();
         for k in [1.3_f64, 1.4, 1.5, 1.7] {
-            let stage = PlanetaryStage {
-                thickness_mod: k,
-                ..Default::default()
+            let stage = {
+                let mut s = arr::planetary(12, 30, 72, 3);
+                s.members[0].thickness_mod = Auto::fixed(k);
+                for m in &mut s.members[1..] {
+                    m.thickness_mod = Auto::automatic(2.0 - k);
+                }
+                s
             };
             let r = solve_set(&stage, &StageLoads::just(2.0), &lib)
                 .unwrap_or_else(|e| panic!("k={k}: the set should still solve, got {e}"));
@@ -4672,24 +4563,10 @@ mod tests {
         }
     }
 
-    fn stage_of(sun: u32, planet: u32, ring: u32, helix: f64) -> PlanetaryStage {
-        PlanetaryStage {
-            sun: StageGear {
-                teeth: sun,
-                helix_angle: Auto::fixed(helix),
-                ..StageGear::default()
-            },
-            planet: StageGear {
-                teeth: planet,
-                ..StageGear::default()
-            },
-            ring: StageGear {
-                teeth: ring,
-                profile_shift: Auto::fixed(0.0),
-                ..StageGear::default()
-            },
-            ..PlanetaryStage::default()
-        }
+    fn stage_of(sun: u32, planet: u32, ring: u32, helix: f64) -> Shape {
+        let mut s = arr::planetary(sun, planet, ring, 3);
+        s.members[0].gear.helix_angle = Auto::fixed(helix);
+        s
     }
 
     fn solved(sun: u32, planet: u32, ring: u32) -> ShapeResult {
@@ -4718,17 +4595,19 @@ mod tests {
     #[test]
     fn a_given_distance_leaves_a_set_one_free_shift() {
         let lib = super::super::test_library();
-        let base = PlanetaryStage::default();
+        let base = arr::planetary(12, 30, 72, 3);
         let free = solve_set(&base, &StageLoads::just(2.0), &lib).expect("the shipped set solves");
         let asked = free.distances[0].running + 0.1;
 
         // One shift given — the ring's, as the shipped set has it — and every
         // given number stands.
         let mut one = base.clone();
-        one.centre_distance = Auto::fixed(asked);
+        one.distances[0].distance = Auto::fixed(asked);
         let r = solve_set(&one, &StageLoads::just(2.0), &lib).expect("one free shift is enough");
         assert!((r.distances[0].running - asked).abs() < 1e-9);
-        assert!((r.members[2].profile_shift - one.ring.profile_shift.manual).abs() < 1e-12);
+        assert!(
+            (r.members[2].profile_shift - one.members[2].gear.profile_shift.manual).abs() < 1e-12
+        );
 
         // A second shift given, and it cannot also stand: three relations'
         // worth of demands on two freedoms. Every input is honoured as
@@ -4738,12 +4617,16 @@ mod tests {
         // reaches the sun mesh's, and the ring mesh is left with the ring
         // and the planet both decided.
         let mut two = one.clone();
-        two.sun.profile_shift = Auto::fixed(r.members[0].profile_shift + 0.25);
+        two.members[0].gear.profile_shift = Auto::fixed(r.members[0].profile_shift + 0.25);
         let over = solve_set(&two, &StageLoads::just(2.0), &lib)
             .expect("it still builds; it just cannot honour everything");
         assert!((over.distances[0].running - asked).abs() < 1e-9);
-        assert!((over.members[0].profile_shift - two.sun.profile_shift.manual).abs() < 1e-9);
-        assert!((over.members[2].profile_shift - two.ring.profile_shift.manual).abs() < 1e-9);
+        assert!(
+            (over.members[0].profile_shift - two.members[0].gear.profile_shift.manual).abs() < 1e-9
+        );
+        assert!(
+            (over.members[2].profile_shift - two.members[2].gear.profile_shift.manual).abs() < 1e-9
+        );
         assert!(
             over.notes
                 .iter()
@@ -4751,7 +4634,8 @@ mod tests {
             "the mesh whose sum nothing reached says so: {:?}",
             over.notes
         );
-        let ring_mesh_wants = MeshKind::Internal.nominal_of(asked, two.clearance.manual);
+        let ring_mesh_wants =
+            MeshKind::Internal.nominal_of(asked, two.distances[0].clearance.manual);
         assert!(
             (over.distances[0].nominal[1] - ring_mesh_wants).abs() > 1e-3,
             "and the ring mesh does not run at the clearance asked: {} vs {ring_mesh_wants}",
@@ -4766,8 +4650,8 @@ mod tests {
         // twice anyone's leverage, then the ring, then the sun — all but
         // one given; so a set pinned whole keeps the distance, the
         // clearance, the size and two shifts, the planet's absorbing.
-        use super::super::{Freedom, MemberFreedom, Shape};
-        let groups = Shape::from(&one.clone()).freedoms();
+        use super::super::{Freedom, MemberFreedom};
+        let groups = one.freedoms();
         let shift = |i: usize| vec![Freedom::Member(i, MemberFreedom::Shift)];
         let first = groups
             .iter()
@@ -4801,14 +4685,14 @@ mod tests {
     #[test]
     fn a_set_runs_at_the_centre_distance_it_was_given() {
         let lib = super::super::test_library();
-        let base = PlanetaryStage::default();
+        let base = arr::planetary(12, 30, 72, 3);
         let free = solve_set(&base, &StageLoads::just(2.0), &lib).expect("the shipped set solves");
 
         let mut checked = 0u32;
         for step in -2..=4 {
             let asked = free.distances[0].running + 0.2 * f64::from(step);
             let mut stage = base.clone();
-            stage.centre_distance = Auto::fixed(asked);
+            stage.distances[0].distance = Auto::fixed(asked);
             let Ok(r) = solve_set(&stage, &StageLoads::just(2.0), &lib) else {
                 // A distance no set can reach is refused, not answered — which
                 // is the honest end of the range rather than a gap in it.
@@ -4822,7 +4706,7 @@ mod tests {
                 r.distances[0].running
             );
             assert!(
-                (r.distances[0].clearance - stage.clearance.manual).abs() < 1e-9,
+                (r.distances[0].clearance - stage.distances[0].clearance.manual).abs() < 1e-9,
                 "the clearance asked for should be the clearance left: {}",
                 r.distances[0].clearance
             );
@@ -4831,8 +4715,8 @@ mod tests {
             // zero-backlash distances rather than from the expression that
             // placed the shifts: opened by the clearance each its own way,
             // they must land on one running distance.
-            let residual = (r.distances[0].nominal[0] + stage.clearance.manual
-                - (r.distances[0].nominal[1] - stage.clearance.manual))
+            let residual = (r.distances[0].nominal[0] + stage.distances[0].clearance.manual
+                - (r.distances[0].nominal[1] - stage.distances[0].clearance.manual))
                 .abs();
             assert!(
                 residual < 1e-9,
@@ -4842,10 +4726,11 @@ mod tests {
             // The ring's shift is given on the shipped set, so it is the one
             // freedom a target leaves and must come back untouched.
             assert!(
-                (r.members[2].profile_shift - stage.ring.profile_shift.manual).abs() < 1e-12,
+                (r.members[2].profile_shift - stage.members[2].gear.profile_shift.manual).abs()
+                    < 1e-12,
                 "a given shift moved: {} for {}",
                 r.members[2].profile_shift,
-                stage.ring.profile_shift.manual
+                stage.members[2].gear.profile_shift.manual
             );
         }
         assert!(checked >= 5, "only {checked} distances were reachable");
@@ -4878,7 +4763,7 @@ mod tests {
         // distances part by twice the clearance.
         let lib = test_library();
         let mut exact = stage_of(24, 18, 60, 0.0);
-        exact.clearance = Auto::fixed(0.0);
+        exact.distances[0].clearance = Auto::fixed(0.0);
         let exact = solve_set(&exact, &StageLoads::just(2.0), &lib).unwrap();
         assert!(exact.members[1].profile_shift.abs() < 1e-12);
         assert!(exact.distances[0]
@@ -4913,26 +4798,22 @@ mod tests {
     #[test]
     fn whichever_shift_is_left_automatic_is_the_one_that_closes_the_set() {
         let lib = test_library();
-        let base = Shape::from(&PlanetaryStage::default());
+        let base = arr::planetary(12, 30, 72, 3);
         // The shifts the default set settles at, so each variant below asks for
         // values a set of these counts can actually be built at.
         let settled = base.shifts_at(&crate::auto::Search::SHIPPED);
 
         for absorber in 0..3 {
-            let mut s = PlanetaryStage::default();
+            let mut s = arr::planetary(12, 30, 72, 3);
             // Pin every member but the one meant to absorb.
-            for (i, gear) in [&mut s.sun, &mut s.planet, &mut s.ring]
-                .into_iter()
-                .enumerate()
-            {
-                gear.profile_shift = if i == absorber {
+            for (i, m) in s.members.iter_mut().enumerate() {
+                m.gear.profile_shift = if i == absorber {
                     Auto::automatic(0.0)
                 } else {
                     Auto::fixed(settled[i])
                 };
             }
-            let shape = Shape::from(&s);
-            let plan = shape.plan(&shape.helix_angles());
+            let plan = s.plan(&s.helix_angles());
             assert_eq!(
                 plan.role[absorber],
                 Role::Absorbs(0),
@@ -4973,19 +4854,16 @@ mod tests {
     /// the set is refused for it unless its distances happen to agree.
     #[test]
     fn the_planet_closes_the_set_unless_it_is_pinned() {
-        let role_of = |s: &PlanetaryStage| {
-            let shape = Shape::from(s);
-            shape.plan(&shape.helix_angles()).role
-        };
-        assert_eq!(role_of(&PlanetaryStage::default())[1], Role::Absorbs(0));
-        let mut s = PlanetaryStage::default();
-        s.planet.profile_shift = Auto::fixed(0.0);
+        let role_of = |shape: &Shape| shape.plan(&shape.helix_angles()).role;
+        assert_eq!(role_of(&arr::planetary(12, 30, 72, 3))[1], Role::Absorbs(0));
+        let mut s = arr::planetary(12, 30, 72, 3);
+        s.members[1].gear.profile_shift = Auto::fixed(0.0);
         assert_eq!(
             role_of(&s)[0],
             Role::Absorbs(0),
             "pinning the planet hands it to the sun"
         );
-        s.sun.profile_shift = Auto::fixed(0.0);
+        s.members[0].gear.profile_shift = Auto::fixed(0.0);
         // The shipped ring's shift is given, so with the other two pinned as
         // well nothing is left automatic and the set is over-specified: the
         // panel relieves it as it is created, and a document that reaches
@@ -4995,7 +4873,7 @@ mod tests {
             solve_set(&s, &StageLoads::just(2.0), &test_library()).err(),
             Some(TrainError::NoCommonDistance)
         );
-        s.ring.profile_shift = Auto::automatic(0.0);
+        s.members[2].gear.profile_shift = Auto::automatic(0.0);
         assert_eq!(
             role_of(&s)[2],
             Role::Absorbs(0),
@@ -5028,7 +4906,7 @@ mod tests {
         for (input, fixed, output, ratio) in want {
             // The same stage, asked six things.
             let stage = stage_of(24, 18, 60, 0.0);
-            let asked = PlanetaryStage::boundary_for(Arrangement { input, fixed });
+            let asked = planetary_boundary(Arrangement { input, fixed });
             let r =
                 solve_set(&stage, &StageLoads::just(2.0).under(asked), &test_library()).unwrap();
             let _ = output;
@@ -5046,7 +4924,7 @@ mod tests {
     #[test]
     fn a_held_carrier_gives_exactly_the_product_of_the_mesh_efficiencies() {
         let stage = stage_of(24, 18, 60, 0.0);
-        let carrier_held = PlanetaryStage::boundary_for(Arrangement {
+        let carrier_held = planetary_boundary(Arrangement {
             input: PlanetaryShaft::Sun,
             fixed: PlanetaryShaft::Carrier,
         });
@@ -5121,7 +4999,7 @@ mod tests {
             // Ring held: the sun and the carrier are the two possible outputs.
             let stage = stage_of(s, p, r, 0.0);
             let asked = |input| {
-                StageLoads::just(2.0).under(PlanetaryStage::boundary_for(Arrangement {
+                StageLoads::just(2.0).under(planetary_boundary(Arrangement {
                     input,
                     fixed: PlanetaryShaft::Ring,
                 }))
@@ -5155,9 +5033,10 @@ mod tests {
         let tight = solve_set(&base, &StageLoads::just(2.0), &lib).unwrap();
 
         // More clearance opens both meshes, so the output must loosen.
-        let loose = PlanetaryStage {
-            clearance: Auto::fixed(base.clearance.manual + 0.05),
-            ..base.clone()
+        let loose = {
+            let mut s = base.clone();
+            s.distances[0].clearance = Auto::fixed(base.distances[0].clearance.manual + 0.05);
+            s
         };
         let loose = solve_set(&loose, &StageLoads::just(2.0), &lib).unwrap();
         assert!(
@@ -5188,11 +5067,12 @@ mod tests {
         );
 
         // At the zero-backlash centre distance there is no play at all.
-        let exact = PlanetaryStage {
-            clearance: Auto::fixed(0.0),
-            tolerance_plus: 0.0,
-            tolerance_minus: 0.0,
-            ..base
+        let exact = {
+            let mut s = base.clone();
+            s.distances[0].clearance = Auto::fixed(0.0);
+            s.distances[0].tolerance_plus = 0.0;
+            s.distances[0].tolerance_minus = 0.0;
+            s
         };
         let exact = solve_set(&exact, &StageLoads::just(2.0), &lib).unwrap();
         assert!(
@@ -5223,7 +5103,7 @@ mod tests {
     #[test]
     fn a_reversed_root_is_corrected_only_when_the_train_asks() {
         let lib = test_library();
-        let stage = PlanetaryStage::default();
+        let stage = arr::planetary(12, 30, 72, 3);
         // `StageLoads::just` reverses nothing; the reversing duty is the
         // fatigue case's own, so the second solve hands the stage one.
         let solve = |reversal: crate::train::Reversal, reversing: bool| {
@@ -5232,7 +5112,7 @@ mod tests {
                 revolutions: 1.0,
                 reversing_actuations: reversing.then_some(1.0),
             });
-            solve_loads(&Shape::from(&stage), &loads, &lib, reversal).unwrap()
+            solve_loads(&stage, &loads, &lib, reversal).unwrap()
         };
         // **On the member, not the stage.** Three members raising one note is
         // exactly what a stage-level list could not carry: one key, three
@@ -5305,9 +5185,10 @@ mod tests {
 
         // A single planet has no neighbour to clear, and says so rather than
         // reporting a gap of nothing.
-        let one = PlanetaryStage {
-            planets: 1,
-            ..stage_of(24, 18, 60, 0.0)
+        let one = {
+            let mut s = stage_of(24, 18, 60, 0.0);
+            s.axes[1].count = 1;
+            s
         };
         let r = solve_set(&one, &StageLoads::just(2.0), &test_library()).unwrap();
         assert!(r.layouts.is_empty(), "one planet has no layout to check");
@@ -5363,11 +5244,7 @@ mod tests {
     #[test]
     fn one_thickness_modification_satisfies_both_invariants() {
         for k in [0.9, 1.0, 1.15] {
-            let stage = PlanetaryStage {
-                thickness_mod: k,
-                ..stage_of(24, 18, 60, 0.0)
-            };
-            let mut shape = Shape::from(&stage);
+            let mut shape = stage_of(24, 18, 60, 0.0);
             for given in 0..3 {
                 for (i, m) in shape.members.iter_mut().enumerate() {
                     m.thickness_mod = if i == given {
@@ -5386,7 +5263,7 @@ mod tests {
                 assert!((ks[given] - k).abs() < 1e-15, "the given one is the given");
             }
             // ...and it still solves.
-            assert!(solve_set(&stage, &StageLoads::just(2.0), &test_library()).is_ok());
+            assert!(solve_set(&shape, &StageLoads::just(2.0), &test_library()).is_ok());
         }
     }
     /// **The set's shifts follow the same rule as a pair's**: off, the sun sits
@@ -5403,15 +5280,16 @@ mod tests {
         // of them has nothing left to search.
         let free = || {
             let mut s = stage_of(24, 18, 60, 0.0);
-            s.sun.profile_shift = Auto::automatic(0.0);
-            s.ring.profile_shift = Auto::automatic(0.0);
+            s.members[0].gear.profile_shift = Auto::automatic(0.0);
+            s.members[2].gear.profile_shift = Auto::automatic(0.0);
             s
         };
         let solve = |on: bool| {
             solve_set(
-                &PlanetaryStage {
-                    optimisation: Optimisation { enabled: on },
-                    ..free()
+                &{
+                    let mut s = free();
+                    s.optimisation = Optimisation { enabled: on };
+                    s
                 },
                 &StageLoads::just(2.0),
                 &lib,
@@ -5447,7 +5325,7 @@ mod tests {
             tuned.meshes[0].line.unwrap().contact_ratios.transverse,
             tuned.meshes[1].line.unwrap().contact_ratios.transverse,
         ] {
-            let asked = free().min_contact_ratio;
+            let asked = free().meshes[0].min_contact_ratio;
             assert!(eps >= asked - 1e-3, "contact ratio {eps} under {asked}");
         }
     }
@@ -5455,12 +5333,10 @@ mod tests {
     /// A shift given by hand is a constraint the search may not overrule.
     #[test]
     fn a_given_shift_survives_the_search() {
-        let mut stage = PlanetaryStage {
-            optimisation: Optimisation { enabled: true },
-            ..stage_of(24, 18, 60, 0.0)
-        };
-        stage.sun.profile_shift = Auto::automatic(0.0);
-        stage.ring.profile_shift = Auto::fixed(0.25);
+        let mut stage = stage_of(24, 18, 60, 0.0);
+        stage.optimisation = Optimisation { enabled: true };
+        stage.members[0].gear.profile_shift = Auto::automatic(0.0);
+        stage.members[2].gear.profile_shift = Auto::fixed(0.25);
         let r = solve_set(&stage, &StageLoads::just(2.0), &test_library()).expect("solves");
         assert!((r.members[2].profile_shift - 0.25).abs() < 1e-9);
     }
@@ -5808,7 +5684,6 @@ mod member_names {
     //! when its own naming was replaced by this — is the second reader.
 
     use super::super::arrangements as arr;
-    use super::super::{PairStage, PlanetaryStage};
     use super::{MemberRole, Shape};
 
     fn names(shape: &Shape) -> Vec<String> {
@@ -5825,24 +5700,19 @@ mod member_names {
     #[test]
     fn every_preset_and_arrangement_names_its_members_as_a_designer_does() {
         let s = |v: &[&str]| v.iter().map(|s| (*s).to_string()).collect::<Vec<_>>();
-        assert_eq!(
-            names(&Shape::from(&PairStage::default())),
-            s(&["gear", "gear"])
-        );
-        assert_eq!(
-            names(&Shape::from(&PairStage::worm())),
-            s(&["worm", "wheel"])
-        );
+        assert_eq!(names(&arr::pair([17, 43])), s(&["gear", "gear"]));
+        assert_eq!(names(&arr::worm(1, 40)), s(&["worm", "wheel"]));
         // The same teeth as a crossed gear pair are gears by number.
         assert_eq!(
-            names(&Shape::from(&PairStage {
-                worm: false,
-                ..PairStage::worm()
-            })),
+            names(&{
+                let mut s = arr::worm(1, 40);
+                s.distances[0].worm = false;
+                s
+            }),
             s(&["gear", "gear"])
         );
         assert_eq!(
-            names(&Shape::from(&PlanetaryStage::default())),
+            names(&arr::planetary(12, 30, 72, 3)),
             s(&["sun", "planet", "ring"])
         );
         assert_eq!(
@@ -5878,8 +5748,7 @@ mod assembly {
     //! whole too, at every station round the carrier.
 
     use super::super::arrangements as arr;
-    use super::super::PlanetaryStage;
-    use super::Shape;
+
     use crate::params::Auto;
 
     /// Whether `n` stations can each find a turn `ψ` that puts every mesh
@@ -5943,15 +5812,14 @@ mod assembly {
         for n in 2..=6_u32 {
             for (sun, planet) in [(24_u32, 18_u32), (17, 20), (30, 15)] {
                 for ring in [sun + 2 * planet, sun + 2 * planet + 1] {
-                    let mut set = PlanetaryStage::default();
-                    set.sun.teeth = sun;
-                    set.planet.teeth = planet;
-                    set.ring.teeth = ring;
-                    set.planets = n;
-                    set.planet.profile_shift = Auto::automatic(0.0);
-                    let shape = Shape::from(&set);
+                    let mut set = arr::planetary(12, 30, 72, 3);
+                    set.members[0].gear.teeth = sun;
+                    set.members[1].gear.teeth = planet;
+                    set.members[2].gear.teeth = ring;
+                    set.axes[1].count = n;
+                    set.members[1].gear.profile_shift = Auto::automatic(0.0);
                     assert_eq!(
-                        shape.assembly(1),
+                        set.assembly(1),
                         Some(((sun + ring) % n == 0, sun % n == 0 && ring % n == 0))
                     );
                 }

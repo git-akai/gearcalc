@@ -891,7 +891,7 @@ leaves it unread.
 ## Crossed axes
 
 One model covers a worm stage and a crossed helical pair, and one stage
-too: a worm is a `PairStage` whose first member states its pitch diameter
+too: a worm is a pair whose first member states its pitch diameter
 rather than its helix angle — the same reading of the same size — with the
 shift, addendum, dedendum and root round every other member has, and a root
 round of zero by preset because a worm's thread is ground to its root. The
@@ -2338,8 +2338,9 @@ zero-backlash one.
 
 **The arrangements it reaches** with no code of their own are written down
 in `train/arrangements.rs` as lists of what sits where, through a builder
-whose whole vocabulary is an axis, a shaft, a gear or ring, a mesh and a
-distance: a layshaft transmission (one distance, a pair per ratio, the
+whose whole vocabulary is an axis, a body, a gear or ring, a mesh and a
+distance: a pair (the spur preset), a crossed pair, a worm and its wheel,
+a planetary set, a layshaft transmission (one distance, a pair per ratio, the
 disengaged pairs' gears idling on shafts of their own), a Wolfrom (one
 planet, two rings, no sun), a stepped planet (two gears on the planet shaft,
 two rings), a planocentric reducer (one planet on an eccentric carrier, its

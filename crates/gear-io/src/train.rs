@@ -348,9 +348,8 @@ pub fn to_toml(doc: &TrainDocument) -> Result<String, TrainError> {
 mod tests {
     use super::*;
     use gear_core::params::Auto;
-    use gear_core::train::{
-        BodyConstraint, Duty, Load, LoadCase, LoadRole, PairStage, PlanetaryStage, Shape,
-    };
+    use gear_core::train::arrangements as arr;
+    use gear_core::train::{BodyConstraint, Duty, Load, LoadCase, LoadRole};
 
     /// One of every preset, so the `kind` tag and every preset's layout are
     /// exercised in both directions and none can quietly stop round-tripping.
@@ -361,20 +360,10 @@ mod tests {
         // exercised both ways.
         let mut train = Train::chained(
             vec![
-                Shape::from(
-                    &PairStage {
-                        ..PairStage::default()
-                    }
-                    .with_additional_helix(15.0),
-                ),
-                Shape::from(&PairStage::worm()),
-                Shape::from(
-                    &PairStage {
-                        ..PairStage::worm()
-                    }
-                    .with_first_helix(45.0),
-                ),
-                Shape::from(&PlanetaryStage::default()),
+                arr::pair([17, 43]).with_additional_helix(15.0),
+                arr::worm(1, 40),
+                arr::worm(1, 40).with_first_helix(45.0),
+                arr::planetary(12, 30, 72, 3),
                 gear_core::train::arrangements::hula([65, 61, 57, 61], [1.0, 1.0]),
             ],
             |t| {

@@ -301,6 +301,7 @@ fn fill(template: &str, values: &BTreeMap<String, String>) -> String {
 mod tests {
     use super::*;
     use gear_core::note::key;
+    use gear_core::train::arrangements as arr;
 
     #[test]
     fn the_shipped_english_catalogue_parses() {
@@ -699,33 +700,16 @@ mod tests {
         // notes each of them can raise. Every one of them is the one shape;
         // the names here say which preset the case is about.
         let lib = crate::default_library();
-        let solve_spur = |stage: &gear_core::train::PairStage,
+        let solve_spur = |stage: &gear_core::train::Shape,
                           loads: &gear_core::train::StageLoads,
                           lib: &gear_core::material::MaterialLibrary| {
-            gear_core::train::solve_any(&gear_core::train::Shape::from(&stage.clone()), loads, lib)
+            gear_core::train::solve_any(stage, loads, lib)
         };
         let solve_crossed = solve_spur;
-        let solve_worm = |stage: &gear_core::train::PairStage,
-                          loads: &gear_core::train::StageLoads,
-                          lib: &gear_core::material::MaterialLibrary| {
-            gear_core::train::solve_any(&gear_core::train::Shape::from(&stage.clone()), loads, lib)
-        };
+        let solve_worm = solve_spur;
         for helix in [0.0_f64, 3.0, 20.0] {
             for teeth in [(17_u32, 43_u32), (9, 11)] {
-                let stage = gear_core::train::PairStage {
-                    gears: [
-                        gear_core::train::StageGear {
-                            teeth: teeth.0,
-                            ..Default::default()
-                        },
-                        gear_core::train::StageGear {
-                            teeth: teeth.1,
-                            ..Default::default()
-                        },
-                    ],
-                    ..Default::default()
-                }
-                .with_additional_helix(helix);
+                let stage = arr::pair([teeth.0, teeth.1]).with_additional_helix(helix);
                 if let Ok(r) = solve_spur(&stage, &gear_core::train::StageLoads::just(2.0), &lib) {
                     record(&r.every_note());
                 }
@@ -734,12 +718,13 @@ mod tests {
                         gear_core::params::Auto::automatic(0.0),
                         gear_core::params::Auto::fixed(0.4),
                     ] {
-                        let mut crossed = gear_core::train::PairStage {
-                            shaft_angle: sigma,
-                            ..stage.clone()
+                        let mut crossed = {
+                            let mut s = stage.clone();
+                            s.distances[0].angle = sigma;
+                            s
                         };
-                        for g in &mut crossed.gears {
-                            g.face_width = face;
+                        for m in &mut crossed.members {
+                            m.gear.face_width = face;
                         }
                         if let Ok(r) =
                             solve_crossed(&crossed, &gear_core::train::StageLoads::just(2.0), &lib)
@@ -764,10 +749,12 @@ mod tests {
                 profile_shift: gear_core::params::Auto::fixed(0.0),
                 ..Default::default()
             };
-            let stage = gear_core::train::PairStage {
-                load_sharing: gear_core::contact::LoadSharing::LinearRamp,
-                gears: [gear.clone(), gear],
-                ..Default::default()
+            let stage = {
+                let mut s = arr::pair([gear.teeth, gear.teeth]);
+                s.load_sharing = gear_core::contact::LoadSharing::LinearRamp;
+                s.members[0].gear = gear.clone();
+                s.members[1].gear = gear;
+                s
             };
             if let Ok(r) = solve_spur(&stage, &gear_core::train::StageLoads::just(2.0), &lib) {
                 record(&r.every_note());
@@ -787,9 +774,11 @@ mod tests {
                 rim_thickness: rim,
                 ..Default::default()
             };
-            let stage = gear_core::train::PairStage {
-                gears: [gear.clone(), gear],
-                ..Default::default()
+            let stage = {
+                let mut s = arr::pair([gear.teeth, gear.teeth]);
+                s.members[0].gear = gear.clone();
+                s.members[1].gear = gear;
+                s
             };
             if let Ok(r) = solve_spur(&stage, &gear_core::train::StageLoads::just(2.0), &lib) {
                 record(&r.every_note());
@@ -808,9 +797,11 @@ mod tests {
                 root_radius,
                 ..Default::default()
             };
-            let stage = gear_core::train::PairStage {
-                gears: [gear.clone(), gear],
-                ..Default::default()
+            let stage = {
+                let mut s = arr::pair([gear.teeth, gear.teeth]);
+                s.members[0].gear = gear.clone();
+                s.members[1].gear = gear;
+                s
             };
             if let Ok(r) = solve_spur(&stage, &gear_core::train::StageLoads::just(2.0), &lib) {
                 record(&r.every_note());
@@ -829,9 +820,11 @@ mod tests {
                 min_tip_width: 0.4,
                 ..Default::default()
             };
-            let stage = gear_core::train::PairStage {
-                gears: [gear(17), gear(43)],
-                ..Default::default()
+            let stage = {
+                let mut s = arr::pair([17, 43]);
+                s.members[0].gear = gear(17);
+                s.members[1].gear = gear(43);
+                s
             };
             if let Ok(r) = solve_spur(&stage, &gear_core::train::StageLoads::just(2.0), &lib) {
                 record(&r.every_note());
@@ -849,11 +842,12 @@ mod tests {
             (2, 0.10),
             (2, 0.12),
         ] {
-            let mut stage = gear_core::train::PairStage {
-                sliding_friction: friction,
-                ..gear_core::train::PairStage::worm()
+            let mut stage = {
+                let mut s = arr::worm(1, 40);
+                s.meshes[0].sliding_friction = friction;
+                s
             };
-            stage.gears[0].teeth = starts;
+            stage.members[0].gear.teeth = starts;
             if let Ok(r) = solve_worm(&stage, &gear_core::train::StageLoads::just(2.0), &lib) {
                 record(&r.every_note());
             }
@@ -862,7 +856,7 @@ mod tests {
         // correction switched on is what fires the "applied" half of the pair;
         // switched off — every other case here — fires the disclosure.
         if let Ok(r) = gear_core::train::solve_any_with(
-            &gear_core::train::Shape::from(&gear_core::train::PlanetaryStage::default()),
+            &arr::planetary(12, 30, 72, 3),
             &gear_core::train::StageLoads::just(2.0),
             &lib,
             gear_core::train::Reversal { correct: true },
@@ -875,16 +869,14 @@ mod tests {
             }
         }
         for (planets, clearance) in [(3_u32, 0.5_f64), (4, 9.0), (5, 0.5), (6, 40.0), (7, 0.5)] {
-            let stage = gear_core::train::PlanetaryStage {
-                planets,
-                min_planet_clearance: clearance,
-                ..Default::default()
+            let stage = {
+                let mut s = arr::planetary(12, 30, 72, planets);
+                s.min_planet_clearance = clearance;
+                s
             };
-            if let Ok(r) = gear_core::train::solve_any(
-                &gear_core::train::Shape::from(&stage),
-                &gear_core::train::StageLoads::just(2.0),
-                &lib,
-            ) {
+            if let Ok(r) =
+                gear_core::train::solve_any(&stage, &gear_core::train::StageLoads::just(2.0), &lib)
+            {
                 record(&r.every_note());
                 for g in r.members {
                     record(&g.notes);
@@ -919,20 +911,12 @@ mod tests {
 
         // A parallel pair that loses contact between teeth: short addenda.
         for addendum in [0.35_f64, 0.5] {
-            let stage = gear_core::train::PairStage {
-                gears: [
-                    gear_core::train::StageGear {
-                        teeth: 17,
-                        addendum,
-                        ..Default::default()
-                    },
-                    gear_core::train::StageGear {
-                        teeth: 43,
-                        addendum,
-                        ..Default::default()
-                    },
-                ],
-                ..Default::default()
+            let stage = {
+                let mut s = arr::pair([17, 43]);
+                for m in &mut s.members {
+                    m.gear.addendum = addendum;
+                }
+                s
             };
             if let Ok(r) = solve_spur(&stage, &gear_core::train::StageLoads::just(2.0), &lib) {
                 record(&r.every_note());
@@ -943,19 +927,18 @@ mod tests {
             // ...and a crossed pair of the same, whose teeth then reach a full
             // contact ratio at no width at all.
             for sigma in [45.0_f64, 90.0] {
-                let crossed = gear_core::train::PairStage {
-                    shaft_angle: sigma,
-                    gears: [
-                        gear_core::train::StageGear {
-                            face_width: gear_core::params::Auto::automatic(0.0),
-                            ..stage.gears[0].clone()
-                        },
-                        gear_core::train::StageGear {
-                            face_width: gear_core::params::Auto::automatic(0.0),
-                            ..stage.gears[1].clone()
-                        },
-                    ],
-                    ..stage.clone()
+                let crossed = {
+                    let mut s = stage.clone();
+                    s.distances[0].angle = sigma;
+                    s.members[0].gear = gear_core::train::StageGear {
+                        face_width: gear_core::params::Auto::automatic(0.0),
+                        ..stage.members[0].gear.clone()
+                    };
+                    s.members[1].gear = gear_core::train::StageGear {
+                        face_width: gear_core::params::Auto::automatic(0.0),
+                        ..stage.members[1].gear.clone()
+                    };
+                    s
                 };
                 if let Ok(r) =
                     solve_crossed(&crossed, &gear_core::train::StageLoads::just(2.0), &lib)
@@ -971,11 +954,12 @@ mod tests {
         // threshold, so both the self-locking note and the "close to it" one
         // get their turn.
         for friction in [0.06_f64, 0.115, 0.12, 0.125] {
-            let stage = gear_core::train::PairStage {
-                sliding_friction: friction,
-                static_friction: friction,
-                ..gear_core::train::PairStage::worm()
-            }
+            let stage = ({
+                let mut s = arr::worm(1, 40);
+                s.meshes[0].sliding_friction = friction;
+                s.meshes[0].static_friction = friction;
+                s
+            })
             .with_first_helix(45.0);
             if let Ok(r) = solve_crossed(&stage, &gear_core::train::StageLoads::just(2.0), &lib) {
                 record(&r.every_note());
@@ -983,10 +967,11 @@ mod tests {
             // ...the optimiser asked of a crossed mesh, whose search has its
             // own way of finding nothing.
             if let Ok(r) = solve_crossed(
-                &gear_core::train::PairStage {
-                    optimisation: gear_core::train::Optimisation { enabled: true },
-                    ..stage.clone()
-                },
+                &({
+                    let mut s = stage.clone();
+                    s.optimisation = gear_core::train::Optimisation { enabled: true };
+                    s
+                }),
                 &gear_core::train::StageLoads::just(2.0),
                 &lib,
             ) {
@@ -994,11 +979,12 @@ mod tests {
             }
             // ...and a worm sitting just under its self-locking threshold.
             if let Ok(r) = solve_worm(
-                &gear_core::train::PairStage {
-                    sliding_friction: friction,
-                    static_friction: friction,
-                    ..gear_core::train::PairStage::worm()
-                },
+                &({
+                    let mut s = arr::worm(1, 40);
+                    s.meshes[0].sliding_friction = friction;
+                    s.meshes[0].static_friction = friction;
+                    s
+                }),
                 &gear_core::train::StageLoads::just(2.0),
                 &lib,
             ) {
@@ -1029,12 +1015,8 @@ mod tests {
         // runs 0.44 mm *inside* its own zero-backlash distance and cannot be
         // assembled at all. Both used to be silent.
         for distance in [23.0_f64, 23.46, 25.0] {
-            let mut sp = gear_core::train::PairStage {
-                centre_distance: gear_core::params::Auto::fixed(distance),
-                ..Default::default()
-            };
-            sp.gears[0].teeth = 9;
-            sp.gears[1].teeth = 37;
+            let mut sp = arr::pair([9, 37]);
+            sp.distances[0].distance = gear_core::params::Auto::fixed(distance);
             if let Ok(r) = solve_spur(&sp, &gear_core::train::StageLoads::just(2.0), &lib) {
                 record(&r.every_note());
             }
@@ -1051,11 +1033,12 @@ mod tests {
         // forward" note and the "close to it" one both get their turn.
         for friction in [0.02_f64, 0.045, 0.06, 0.10] {
             if let Ok(r) = solve_crossed(
-                &gear_core::train::PairStage {
-                    sliding_friction: friction,
-                    static_friction: friction,
-                    ..gear_core::train::PairStage::worm()
-                }
+                &({
+                    let mut s = arr::worm(1, 40);
+                    s.meshes[0].sliding_friction = friction;
+                    s.meshes[0].static_friction = friction;
+                    s
+                })
                 .with_first_helix(3.0),
                 &gear_core::train::StageLoads::just(2.0),
                 &lib,
@@ -1084,28 +1067,17 @@ mod tests {
             (11, 13, 0.7, -1.4),
             (17, 18, 0.5, -1.6),
         ] {
-            let stage = gear_core::train::PlanetaryStage {
-                sun: gear_core::train::StageGear {
-                    teeth: sun,
-                    ..Default::default()
-                },
-                planet: gear_core::train::StageGear {
-                    teeth: planet,
-                    ..Default::default()
-                },
-                ring: gear_core::train::StageGear {
-                    // **And its tooth count**, which the version before this
-                    // left at `StageGear`'s own 17 while setting the sun and the
-                    // planet — a ring that does not close the set it is in.
-                    teeth: sun + 2 * planet,
-                    addendum,
-                    profile_shift: gear_core::params::Auto::fixed(shift),
-                    ..Default::default()
-                },
-                ..Default::default()
+            // **The ring's tooth count too**, which the version before this
+            // left at `StageGear`'s own 17 while setting the sun and the
+            // planet — a ring that does not close the set it is in.
+            let stage = {
+                let mut s = arr::planetary(sun, planet, sun + 2 * planet, 3);
+                s.members[2].gear.addendum = addendum;
+                s.members[2].gear.profile_shift = gear_core::params::Auto::fixed(shift);
+                s
             };
             match gear_core::train::solve_any(
-                &gear_core::train::Shape::from(&stage),
+                &stage,
                 &gear_core::train::StageLoads::just(2.0),
                 &lib,
             ) {
@@ -1135,7 +1107,7 @@ mod tests {
         // through the geometry — the case has to be live, not merely
         // constructible.
         {
-            use gear_core::train::{LoadCase, PairStage, Shape, Train};
+            use gear_core::train::{LoadCase, Train};
             let train = |stages| {
                 Train::chained(stages, |t| {
                     let (start, end) = (t.port(0, 1), t.port(0, 2));
@@ -1157,19 +1129,17 @@ mod tests {
                 })
             };
             // A load nothing reacts...
-            if let Ok(r) = gear_core::train::solve_train(
-                &train(vec![Shape::from(&PairStage::default())]),
-                &lib,
-            ) {
+            if let Ok(r) = gear_core::train::solve_train(&train(vec![arr::pair([17, 43])]), &lib) {
                 record(&r.every_note());
             }
             // ...and the same load against a worm that cannot be back-driven.
             if let Ok(r) = gear_core::train::solve_train(
-                &train(vec![Shape::from(&PairStage {
-                    sliding_friction: 0.3,
-                    static_friction: 0.3,
-                    ..PairStage::worm()
-                })]),
+                &train(vec![{
+                    let mut s = arr::worm(1, 40);
+                    s.meshes[0].sliding_friction = 0.3;
+                    s.meshes[0].static_friction = 0.3;
+                    s
+                }]),
                 &lib,
             ) {
                 record(&r.every_note());
@@ -1181,7 +1151,7 @@ mod tests {
             {
                 use gear_core::params::Auto;
                 use gear_core::train::{Load, LoadRole};
-                let mut t = train(vec![Shape::from(&PairStage::default())]);
+                let mut t = train(vec![arr::pair([17, 43])]);
                 let (start, end) = (t.port(0, 1), t.port(0, 2));
                 t.load_cases = vec![
                     LoadCase {
@@ -1215,12 +1185,13 @@ mod tests {
             // A ratio asked to decide the helix that no helix reaches: three
             // base pitches of overlap on a two-millimetre face.
             {
-                let mut narrow = PairStage {
-                    overlap: gear_core::params::Auto::fixed(3.0),
-                    ..PairStage::default()
+                let mut narrow = {
+                    let mut s = arr::pair([17, 43]);
+                    s.meshes[0].overlap = gear_core::params::Auto::fixed(3.0);
+                    s
                 };
-                for g in &mut narrow.gears {
-                    g.face_width = gear_core::params::Auto::fixed(2.0);
+                for m in &mut narrow.members {
+                    m.gear.face_width = gear_core::params::Auto::fixed(2.0);
                 }
                 if let Ok(r) = solve_spur(&narrow, &gear_core::train::StageLoads::just(2.0), &lib) {
                     record(&r.every_note());
@@ -1229,11 +1200,12 @@ mod tests {
             // A ratio given as a floor under an automatic width, on straight
             // teeth — where no width buys any overlap.
             {
-                let mut straight = PairStage {
-                    overlap: gear_core::params::Auto::fixed(1.2),
-                    ..PairStage::default()
+                let mut straight = {
+                    let mut s = arr::pair([17, 43]);
+                    s.meshes[0].overlap = gear_core::params::Auto::fixed(1.2);
+                    s
                 };
-                straight.gears[0].face_width = gear_core::params::Auto::automatic(5.0);
+                straight.members[0].gear.face_width = gear_core::params::Auto::automatic(5.0);
                 if let Ok(r) = solve_spur(&straight, &gear_core::train::StageLoads::just(2.0), &lib)
                 {
                     record(&r.every_note());
@@ -1255,10 +1227,12 @@ mod tests {
                 ..Default::default()
             };
             if let Ok(r) = solve_spur(
-                &PairStage {
-                    gears: [no_source.clone(), no_source],
-                    ..PairStage::default()
-                },
+                &({
+                    let mut s = arr::pair([17, 43]);
+                    s.members[0].gear = no_source.clone();
+                    s.members[1].gear = no_source;
+                    s
+                }),
                 &gear_core::train::StageLoads::just(2.0),
                 &lib,
             ) {
@@ -1385,10 +1359,10 @@ mod tests {
             // tooth is too undercut to have a root section", which describes a
             // tooth that exists.
             {
-                let mut st = gear_core::train::PairStage::default();
-                st.gears[1].teeth = 0;
+                let mut st = arr::pair([17, 43]);
+                st.members[1].gear.teeth = 0;
                 let out = gear_core::train::solve_any(
-                    &gear_core::train::Shape::from(&st),
+                    &st,
                     &gear_core::train::StageLoads::just(1.0),
                     &lib,
                 );
@@ -1407,12 +1381,9 @@ mod tests {
             // to say *the teeth never contact*, at a reader who would then go
             // and look at the teeth.
             {
-                let mut set = gear_core::train::PlanetaryStage::default();
-                set.sun.teeth = 17;
-                set.planet.teeth = 17;
-                set.ring.teeth = 80;
+                let set = arr::planetary(17, 17, 80, 3);
                 let out = gear_core::train::solve_any(
-                    &gear_core::train::Shape::from(&set),
+                    &set,
                     &gear_core::train::StageLoads::just(1.0),
                     &lib,
                 );
@@ -1439,25 +1410,19 @@ mod tests {
             // on a two-pair chain: a load on the held ground, and a load on
             // the body the two pairs share.
             {
-                use gear_core::train::{Load, LoadCase, LoadRole, PairStage, Shape, Train};
+                use gear_core::train::{Load, LoadCase, LoadRole, Train};
                 let at = |port: usize| {
-                    Train::chained(
-                        vec![
-                            Shape::from(&PairStage::default()),
-                            Shape::from(&PairStage::default()),
-                        ],
-                        |t| {
-                            let (start, end) = (t.port(0, 1), t.port(1, 2));
-                            vec![LoadCase {
-                                loads: vec![
-                                    Load::given(port, 2.0, 3000.0),
-                                    Load::declared(start, LoadRole::Reacted),
-                                    Load::declared(end, LoadRole::Reacted),
-                                ],
-                                ..LoadCase::ultimate(start, end, 2.0, 3000.0)
-                            }]
-                        },
-                    )
+                    Train::chained(vec![arr::pair([17, 43]), arr::pair([17, 43])], |t| {
+                        let (start, end) = (t.port(0, 1), t.port(1, 2));
+                        vec![LoadCase {
+                            loads: vec![
+                                Load::given(port, 2.0, 3000.0),
+                                Load::declared(start, LoadRole::Reacted),
+                                Load::declared(end, LoadRole::Reacted),
+                            ],
+                            ..LoadCase::ultimate(start, end, 2.0, 3000.0)
+                        }]
+                    })
                 };
                 // A load on ground is refused by name; one on the shared
                 // body, held at both ends, is a case that says so.
@@ -1482,14 +1447,11 @@ mod tests {
             // (the sun cannot turn); a constraint on a body no stage has;
             // and a chain whose tooth counts multiply past `i128`.
             {
-                use gear_core::train::{
-                    BodyConstraint, LoadCase, PairStage, PlanetaryStage, Shape, StageGear, Train,
-                };
+                use gear_core::train::{BodyConstraint, LoadCase, StageGear, Train};
                 let set = |constraints| {
-                    let mut t =
-                        Train::chained(vec![Shape::from(&PlanetaryStage::default())], |t| {
-                            vec![LoadCase::ultimate(t.port(0, 1), t.port(0, 2), 2.0, 3000.0)]
-                        });
+                    let mut t = Train::chained(vec![arr::planetary(12, 30, 72, 3)], |t| {
+                        vec![LoadCase::ultimate(t.port(0, 1), t.port(0, 2), 2.0, 3000.0)]
+                    });
                     t.constraints = constraints;
                     t
                 };
@@ -1500,10 +1462,10 @@ mod tests {
                 let wide = Train::chained(
                     (0..6)
                         .map(|k| {
-                            Shape::from(&PairStage {
-                                gears: [huge(4_000_000_000 + k), huge(4_000_000_001 + k)],
-                                ..PairStage::default()
-                            })
+                            let mut s = arr::pair([17, 43]);
+                            s.members[0].gear = huge(4_000_000_000 + k);
+                            s.members[1].gear = huge(4_000_000_001 + k);
+                            s
                         })
                         .collect(),
                     |t| vec![LoadCase::ultimate(t.port(0, 1), t.port(5, 2), 2.0, 3000.0)],

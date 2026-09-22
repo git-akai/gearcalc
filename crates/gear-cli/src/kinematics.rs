@@ -37,9 +37,9 @@
 //! rather than off a result type of the arrangement's own — the two readings
 //! that were per type went with the types.
 
+use gear_core::train::arrangements as arr;
 use gear_core::train::{
-    solve_train, BodyConstraint, Duty, LoadCase, PairStage, PlanetaryStage, Shape, ShapeResult,
-    StageGear, Train, TrainResult,
+    solve_train, BodyConstraint, Duty, LoadCase, Shape, ShapeResult, StageGear, Train, TrainResult,
 };
 
 /// The loads every fixture is rated for, between two bodies: one from each,
@@ -74,14 +74,13 @@ fn gear(teeth: u32) -> StageGear {
 
 /// A pair at these tooth counts and this helix.
 fn pair(z1: u32, z2: u32, helix: f64) -> Shape {
-    let mut s = PairStage {
-        gears: [gear(z1), gear(z2)],
-        ..PairStage::default()
-    };
+    let mut s = arr::pair([z1, z2]);
+    s.members[0].gear = gear(z1);
+    s.members[1].gear = gear(z2);
     if helix != 0.0 {
         s = s.with_first_helix(helix);
     }
-    Shape::from(&s)
+    s
 }
 
 /// A set's slot by name, in its wiring's order: ground, sun, carrier, ring,
@@ -115,7 +114,7 @@ fn arranged(input: &str, fixed: &str) -> Train {
 /// A default epicyclic set. What drives it and what holds it is the train's
 /// to say ([`arranged`]); alone, it is solved sun in and ring held.
 fn set() -> Shape {
-    Shape::from(&PlanetaryStage::default())
+    arr::planetary(12, 30, 72, 3)
 }
 
 /// **A set whose two centre distances no planet shift can bring together.**
@@ -126,11 +125,7 @@ fn set() -> Shape {
 /// needs the tooth counts and nothing else — and the fixture is here to record
 /// that the tool currently reports none of them.
 fn unclosed() -> Shape {
-    let mut p = PlanetaryStage::default();
-    p.sun.teeth = 17;
-    p.planet.teeth = 17;
-    p.ring.teeth = 80;
-    Shape::from(&p)
+    arr::planetary(17, 17, 80, 3)
 }
 
 /// **Every fixture, and why each is here.**
@@ -157,10 +152,7 @@ fn fixtures() -> Vec<(String, Train)> {
         ("helical".to_string(), train(vec![pair(17, 43, 20.0)])),
         // A worm: the one preset whose two directions genuinely differ, and the
         // one that can refuse to be driven at all.
-        (
-            "worm".to_string(),
-            train(vec![Shape::from(&PairStage::worm())]),
-        ),
+        ("worm".to_string(), train(vec![arr::worm(1, 40)])),
     ];
     // **All six arrangements**, because which body is held is the whole of
     // what an epicyclic set's ratio and efficiency depend on, and the plan
@@ -279,11 +271,7 @@ fn fixtures() -> Vec<(String, Train)> {
     ));
     out.push((
         "mixed".to_string(),
-        train(vec![
-            pair(17, 43, 0.0),
-            set(),
-            Shape::from(&PairStage::worm()),
-        ]),
+        train(vec![pair(17, 43, 0.0), set(), arr::worm(1, 40)]),
     ));
     // **A reversing stage, in front of another and behind one.** An epicyclic
     // set with its carrier held has a negative ratio, and no shipped fixture

@@ -266,6 +266,59 @@ pub fn line(teeth: &[u32]) -> Shape {
     b.build()
 }
 
+/// **Stating one reading of a stage's size** — the three a pair has, as a
+/// builder over any shape: its first member's helix, its first member's
+/// pitch diameter, or neither and let a given distance or a given overlap
+/// decide. At most one stands; relief keeps it so, and each of these puts
+/// the others back to automatic so a fixture says one thing.
+impl Shape {
+    /// **This shape with its first member's helix stated**, degrees — the
+    /// other readings of the size left to follow. `β₂ = Σ − β₁`.
+    #[must_use]
+    pub fn with_first_helix(mut self, beta_deg: f64) -> Self {
+        self.members[0].gear.helix_angle = Auto::fixed(beta_deg);
+        for m in &mut self.members[1..] {
+            m.gear.helix_angle.auto = true;
+        }
+        self.members[0].pitch_diameter.auto = true;
+        self
+    }
+
+    /// **This shape with what each member carries beyond half the shaft
+    /// angle stated**, degrees: `β₁ = Σ/2 + β_add`, `β₂ = Σ/2 − β_add`. At
+    /// `Σ = 0` it is the familiar shared helix with the hands opposed — the
+    /// specification's own "Total Helix Angle = 0.5 × Axis Angle +
+    /// Additional Helix Angle" — stated on the first member.
+    #[must_use]
+    pub fn with_additional_helix(self, add_deg: f64) -> Self {
+        let half = self.distances.first().map_or(0.0, |d| d.angle) / 2.0;
+        self.with_first_helix(half + add_deg)
+    }
+
+    /// **This shape with its first member's pitch diameter stated**, mm — a
+    /// worm's reading, with every helix angle left to follow.
+    #[must_use]
+    pub fn with_first_diameter(mut self, d1: f64) -> Self {
+        self.members[0].pitch_diameter = Auto::fixed(d1);
+        for m in &mut self.members {
+            m.gear.helix_angle.auto = true;
+        }
+        self
+    }
+
+    /// **This shape with every reading of its size automatic**, so a given
+    /// centre distance with both shifts pinned decides it, or a given axial
+    /// contact ratio with both widths given does.
+    #[must_use]
+    pub fn size_free(mut self) -> Self {
+        for m in &mut self.members {
+            m.pitch_diameter.auto = true;
+            m.gear.helix_angle.auto = true;
+        }
+        self
+    }
+}
+
 /// **Growing a shape a piece at a time** — what [`Builder`] does to a new
 /// one and the card's edits (`train/edits.rs`) do to one that exists, so
 /// the two add a body, a member, a mesh or a distance by one rule. Every
@@ -544,6 +597,106 @@ pub fn ravigneaux(suns: [u32; 2], planets: [u32; 2], ring: u32, count: u32) -> S
     )
 }
 
+/// **A pair of gears on parallel axes** — the spur preset, and what every
+/// pair fixture starts from: two members at one module and one pressure
+/// angle, one mesh, one distance with the running clearance and the
+/// tolerance band a pair ships with. A helical pair is this with a helix
+/// stated ([`Shape::with_first_helix`]).
+#[must_use]
+pub fn pair(teeth: [u32; 2]) -> Shape {
+    let mut shape = line(&teeth);
+    shape.members[0].thickness_mod = Auto::fixed(1.0);
+    shape.members[1].thickness_mod = Auto::automatic(1.0);
+    shape.members[0].pitch_diameter = Auto::automatic(f64::from(teeth[0]));
+    shape.distances[0].clearance = Auto::fixed(0.02);
+    shape.distances[0].tolerance_plus = 0.02;
+    shape.distances[0].tolerance_minus = 0.02;
+    shape
+}
+
+/// **A crossed pair**: the pair at a shaft angle, which is the one thing
+/// that makes its mesh a point contact rather than a line one.
+#[must_use]
+pub fn crossed(teeth: [u32; 2], shaft_angle: f64) -> Shape {
+    let mut shape = pair(teeth);
+    shape.distances[0].angle = shaft_angle;
+    shape
+}
+
+/// **A worm and its wheel**: a crossed pair at a right angle, sized as a
+/// worm drive — the bit that gives the two their conventional proportions
+/// and their names ([`super::shape::Shape::member_names`]).
+///
+/// Two conventions of worm practice are set here as inputs rather than
+/// built in, so a designer can undo either:
+///
+/// - **the worm carries no profile shift** — it is the tool its wheel is
+///   cut by, so its shift is pinned at zero and a given centre distance is
+///   absorbed by the *wheel's* shift, as DIN 3975 has it; pin the wheel's
+///   too and the worm's size absorbs it instead;
+/// - **the face widths are automatic**, and a distance sized as a worm's
+///   resolves them to a worm drive's conventional proportions rather than
+///   to a rating.
+///
+/// The preset is a single start of 7 mm pitch diameter driving a 40-tooth
+/// brass wheel, with the float a worm's thrust bearing leaves it.
+#[must_use]
+pub fn worm(starts: u32, wheel_teeth: u32) -> Shape {
+    let mut shape = crossed([starts, wheel_teeth], 90.0);
+    // The helix boxes hold what 7 mm on one start gives — `cos β₁ = m/d₁`,
+    // and the wheel's is the rest of the right angle — so a reading pinned
+    // by relief stands where the diameter had it rather than at a zero.
+    let helix = (f64::from(starts) / 7.0).acos().to_degrees();
+    shape.distances[0].worm = true;
+    shape.distances[0].axial_clearance = 0.04;
+    shape.members[0].pitch_diameter = Auto::fixed(7.0);
+    let thread = &mut shape.members[0].gear;
+    thread.profile_shift = Auto::fixed(0.0);
+    // A worm's thread has no fillet of the rack's kind: its root is cut by
+    // the thread mill's own round, which this model does not describe, so
+    // the coefficient is nought.
+    thread.root_radius = 0.0;
+    thread.helix_angle = Auto::automatic(helix);
+    thread.face_width = Auto::automatic(10.0);
+    let wheel = &mut shape.members[1].gear;
+    wheel.helix_angle = Auto::automatic(90.0 - helix);
+    wheel.face_width = Auto::automatic(10.0);
+    wheel.material = "Brass C360".to_string();
+    shape
+}
+
+/// **A planetary set**: sun, carrier and ring on the first three bodies —
+/// the order the conventions read, and the one the set's own solver
+/// numbered them in — with `count` planets on a carried axis.
+///
+/// `z_r = z_s + 2 z_p` is the ideal ring, and the preset's sun is small
+/// enough to need shift, so a fresh set shows what the automatic shift
+/// does rather than three zeros.
+#[must_use]
+pub fn planetary(sun: u32, planet: u32, ring: u32, count: u32) -> Shape {
+    let mut shape = epicyclic(
+        count.max(1),
+        &[&[i32::try_from(planet).unwrap_or(i32::MAX)]],
+        &[
+            Central::Sun { on: 0, teeth: sun },
+            Central::Carrier,
+            Central::Ring { on: 0, teeth: ring },
+        ],
+        &[],
+    );
+    shape.members[0].thickness_mod = Auto::fixed(1.0);
+    for m in &mut shape.members[1..] {
+        m.thickness_mod = Auto::automatic(1.0);
+    }
+    // A ring is cut by a pinion cutter and its shift is the cutter's to
+    // absorb, so the preset pins it and lets the planet close the set.
+    shape.members[2].gear.profile_shift = Auto::fixed(0.0);
+    shape.distances[0].clearance = Auto::fixed(0.02);
+    shape.distances[0].tolerance_plus = 0.02;
+    shape.distances[0].tolerance_minus = 0.02;
+    shape
+}
+
 /// **A worm feeding a spur pair in one stage**: the worm on its own axis at
 /// a right angle to a wheel body that also carries a pinion, and the gear
 /// the pinion drives on a third axis parallel to it. Two distances, one at
@@ -714,21 +867,17 @@ impl StagePreset {
         }
     }
 
-    /// The shape the preset starts as. The two pairs and the simple set
-    /// are their own vocabularies' defaults; the rest are the lists above
-    /// at the counts the suite's textbook checks use.
+    /// The shape the preset starts as: one of the lists above, at the
+    /// counts the suite's textbook checks use.
     #[must_use]
     pub fn build(self) -> Shape {
         match self {
-            Self::Spur => Shape::from(&super::PairStage::default()),
+            Self::Spur => pair([17, 43]),
             Self::Idler => line(&[17, 25, 43]),
             Self::Layshaft => layshaft((17, 43), &[(19, 41), (31, 29)], 1),
-            Self::Worm => Shape::from(&super::PairStage::worm()),
-            Self::Crossed => Shape::from(&super::PairStage {
-                shaft_angle: 90.0,
-                ..super::PairStage::default()
-            }),
-            Self::Planetary => Shape::from(&super::PlanetaryStage::default()),
+            Self::Worm => worm(1, 40),
+            Self::Crossed => crossed([17, 43], 90.0),
+            Self::Planetary => planetary(12, 30, 72, 3),
             Self::Wolfrom => wolfrom(18, [60, 61], 3),
             Self::Compound => stepped(24, [18, 17], [60, 59], 3),
             Self::Planocentric => planocentric(30, 33),
