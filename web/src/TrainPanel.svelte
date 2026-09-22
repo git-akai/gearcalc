@@ -373,13 +373,6 @@
     if (rest.length > 0) out.push(rest);
     return out.filter((g) => g.length > 0);
   };
-  /** The bodies a member may move to: those on its axis that carry no
-   *  axis themselves, by number. */
-  const bodiesOnAxis = (shape: Shape, j: number) =>
-    shape.bodies
-      .filter((b) => b.axis === axisOf(shape, j) && !shape.axes.some((a) => a.carried_by === b.body))
-      .map((b) => b.body);
-
   function removeStage(i: number) {
     // The stage's bodies leave with it where no other stage has them, and
     // the core renumbers the rest and everything that names them.
@@ -919,31 +912,6 @@
     {@render numberField("ui.train_cutter_tip_round", () => cut.tip_round, (v) => (cut.tip_round = v), 0.02, "ui.train_m")}
   {/if}
   <h4 class="section-heading" class:later={opts.cutter !== undefined}>{title}</h4>
-  {#if opts.edits}
-    <!-- **The body first**: what the gear is fixed to, before what it is
-         cut as. A select over the bodies on its axis and a new one — a
-         layshaft's engaged pair is the driven gear moved onto the output,
-         two rings turning together are two members on one body — with the
-         carrier's body left out, since a gear fixed to the carrier of the
-         planets it meshes locks the stage. -->
-    {@const ed = opts.edits}
-    <label>
-      <span>{t("ui.train_member_body")}</span>
-      <select
-        value={String(ed.shape.members[ed.member].body)}
-        onchange={(e) => {
-          const v = e.currentTarget.value;
-          editStage(ed.stage, { move_body: { member: ed.member, body: v === "new" ? null : Number(v) } });
-        }}
-      >
-        {#each bodiesOnAxis(ed.shape, ed.member) as b (b)}
-          <option value={String(b)}>{bodyName(b)}</option>
-        {/each}
-        <option value="new">{t("ui.train_new_body")}</option>
-      </select>
-      <em></em>
-    </label>
-  {/if}
   <label class:invalid={g && outside(gear.teeth, g.ranges.teeth)}>
     <span>{t(opts.teethLabel ?? "ui.train_tooth_count")}</span>
     <input type="number" step="1" bind:value={() => gear.teeth, finite((v) => (gear.teeth = v))} />
@@ -2046,6 +2014,98 @@
             <p class="refused">{t(refused.key)}</p>
           {/if}
 
+          <!-- **Each mesh group, with its meshes under it.** The members a
+               run of meshes joins share a normal module and a pressure
+               angle — two gears in mesh do, so everything the run joins
+               does — and the core reports the groups (`mesh_groups`, a
+               layer read off the graph): one on a pair or a set, two on a
+               stepped planet, three on a layshaft. One box each per group,
+               written to every member of it; nothing is computed here, the
+               value is copied to the members the core says must agree.
+               Then each of the group's meshes' own inputs: what its flanks
+               rub with, which a set's two meshes may differ in. -->
+          {#each meshGroups as group, gi (gi)}
+            {@const inGroup = (m: { a: number; b: number }) => group.includes(m.a) && group.includes(m.b)}
+            {@const groupMeshes = stage.meshes.map((m, k) => (inGroup(m) ? k : -1)).filter((k) => k >= 0)}
+            <!-- One heading per group: a lone mesh is named as the mesh it
+                 is; a run of meshes by the members it joins. -->
+            <h4 class="mesh section-heading">
+              {groupMeshes.length === 1
+                ? t("ui.train_mesh_between", { a: name(stage.meshes[groupMeshes[0]].a), b: name(stage.meshes[groupMeshes[0]].b) })
+                : t("ui.train_mesh_group", { members: group.map(name).join(" / ") })}
+            </h4>
+            <div class="grid shared">
+              <label>
+                <span>{t("ui.train_normal_module")}</span>
+                <input
+                  type="number"
+                  step="0.1"
+                  bind:value={
+                    () => stage.members[group[0]]?.module ?? 0,
+                    finite((v) => {
+                      for (const j of group) stage.members[j].module = v;
+                    })
+                  }
+                />
+                <em>{t("ui.train_mm")}</em>
+              </label>
+              <label>
+                <span>{t("ui.train_pressure_angle")}</span>
+                <input
+                  type="number"
+                  step="0.5"
+                  bind:value={
+                    () => stage.members[group[0]]?.pressure_angle ?? 0,
+                    finite((v) => {
+                      for (const j of group) stage.members[j].pressure_angle = v;
+                    })
+                  }
+                />
+                <em>°</em>
+              </label>
+              <!-- The group's axial contact ratio: one size per group, so
+                   one ratio — on parallel shafts, where a line contact has
+                   an overlap at all. -->
+              {#if !crossed && groupMeshes.length > 0}
+                {@render overlapField(stage, groupMeshes, res?.meshes ?? [])}
+              {/if}
+              <!-- The floor the efficiency search holds the group's meshes
+                   to, offered while the search is on; each mesh's own in
+                   the core, the group's written together here. -->
+              {#if stage.optimisation.enabled && groupMeshes.length > 0}
+                <label>
+                  <span>{t("ui.train_min_contact_ratio")}</span>
+                  <input
+                    type="number"
+                    step="0.05"
+                    bind:value={
+                      () => stage.meshes[groupMeshes[0]].min_contact_ratio,
+                      finite((v) => {
+                        for (const k of groupMeshes) stage.meshes[k].min_contact_ratio = v;
+                      })
+                    }
+                  />
+                  <em>{t("ui.train_epsilon")}</em>
+                  <FieldNote notes={notes(t("ui.train_note_min_contact_ratio"), null)} />
+                </label>
+              {/if}
+              <!-- Each mesh's own inputs, what its flanks rub with: named
+                   for the pair where the group has more than one. -->
+              {#each groupMeshes as k (k)}
+                {@const m = stage.meshes[k]}
+                {@const onDistance = stage.meshes.filter((x) => sameDistance(stage, x, m)).length}
+                {@const pair = { a: name(m.a), b: name(m.b) }}
+                {@render numberField(groupMeshes.length > 1 ? "ui.train_sliding_friction_of" : "ui.train_sliding_friction", () => m.sliding_friction, (v) => (m.sliding_friction = v), 0.01, "", undefined, pair)}
+                {@render numberField(groupMeshes.length > 1 ? "ui.train_static_friction_of" : "ui.train_static_friction", () => m.static_friction, (v) => (m.static_friction = v), 0.01, "", t("ui.train_note_static_friction"), pair)}
+                {#if parallel}
+                  <div class="edits">
+                    <button class="action danger" disabled={onDistance < 2} onclick={() => editStage(i, { remove_pair: { mesh: k } })}>{t("ui.train_remove_pair")}</button>
+                  </div>
+                {/if}
+              {/each}
+            </div>
+          {/each}
+
           <!-- **Each distance between two axes**, with what goes with it: the
                angle the axes cross at, the distance and the clearance —
                either may be the one given and the other the one derived,
@@ -2149,98 +2209,6 @@
                   <small class="edit-note">{t("ui.train_note_add_pair")}</small>
                 </div>
               {/if}
-            </div>
-          {/each}
-
-          <!-- **Each mesh group, with its meshes under it.** The members a
-               run of meshes joins share a normal module and a pressure
-               angle — two gears in mesh do, so everything the run joins
-               does — and the core reports the groups (`mesh_groups`, a
-               layer read off the graph): one on a pair or a set, two on a
-               stepped planet, three on a layshaft. One box each per group,
-               written to every member of it; nothing is computed here, the
-               value is copied to the members the core says must agree.
-               Then each of the group's meshes' own inputs: what its flanks
-               rub with, which a set's two meshes may differ in. -->
-          {#each meshGroups as group, gi (gi)}
-            {@const inGroup = (m: { a: number; b: number }) => group.includes(m.a) && group.includes(m.b)}
-            {@const groupMeshes = stage.meshes.map((m, k) => (inGroup(m) ? k : -1)).filter((k) => k >= 0)}
-            <!-- One heading per group: a lone mesh is named as the mesh it
-                 is; a run of meshes by the members it joins. -->
-            <h4 class="mesh section-heading">
-              {groupMeshes.length === 1
-                ? t("ui.train_mesh_between", { a: name(stage.meshes[groupMeshes[0]].a), b: name(stage.meshes[groupMeshes[0]].b) })
-                : t("ui.train_mesh_group", { members: group.map(name).join(" / ") })}
-            </h4>
-            <div class="grid shared">
-              <label>
-                <span>{t("ui.train_normal_module")}</span>
-                <input
-                  type="number"
-                  step="0.1"
-                  bind:value={
-                    () => stage.members[group[0]]?.module ?? 0,
-                    finite((v) => {
-                      for (const j of group) stage.members[j].module = v;
-                    })
-                  }
-                />
-                <em>{t("ui.train_mm")}</em>
-              </label>
-              <label>
-                <span>{t("ui.train_pressure_angle")}</span>
-                <input
-                  type="number"
-                  step="0.5"
-                  bind:value={
-                    () => stage.members[group[0]]?.pressure_angle ?? 0,
-                    finite((v) => {
-                      for (const j of group) stage.members[j].pressure_angle = v;
-                    })
-                  }
-                />
-                <em>°</em>
-              </label>
-              <!-- The group's axial contact ratio: one size per group, so
-                   one ratio — on parallel shafts, where a line contact has
-                   an overlap at all. -->
-              {#if !crossed && groupMeshes.length > 0}
-                {@render overlapField(stage, groupMeshes, res?.meshes ?? [])}
-              {/if}
-              <!-- The floor the efficiency search holds the group's meshes
-                   to, offered while the search is on; each mesh's own in
-                   the core, the group's written together here. -->
-              {#if stage.optimisation.enabled && groupMeshes.length > 0}
-                <label>
-                  <span>{t("ui.train_min_contact_ratio")}</span>
-                  <input
-                    type="number"
-                    step="0.05"
-                    bind:value={
-                      () => stage.meshes[groupMeshes[0]].min_contact_ratio,
-                      finite((v) => {
-                        for (const k of groupMeshes) stage.meshes[k].min_contact_ratio = v;
-                      })
-                    }
-                  />
-                  <em>{t("ui.train_epsilon")}</em>
-                  <FieldNote notes={notes(t("ui.train_note_min_contact_ratio"), null)} />
-                </label>
-              {/if}
-              <!-- Each mesh's own inputs, what its flanks rub with: named
-                   for the pair where the group has more than one. -->
-              {#each groupMeshes as k (k)}
-                {@const m = stage.meshes[k]}
-                {@const onDistance = stage.meshes.filter((x) => sameDistance(stage, x, m)).length}
-                {@const pair = { a: name(m.a), b: name(m.b) }}
-                {@render numberField(groupMeshes.length > 1 ? "ui.train_sliding_friction_of" : "ui.train_sliding_friction", () => m.sliding_friction, (v) => (m.sliding_friction = v), 0.01, "", undefined, pair)}
-                {@render numberField(groupMeshes.length > 1 ? "ui.train_static_friction_of" : "ui.train_static_friction", () => m.static_friction, (v) => (m.static_friction = v), 0.01, "", t("ui.train_note_static_friction"), pair)}
-                {#if parallel}
-                  <div class="edits">
-                    <button class="action danger" disabled={onDistance < 2} onclick={() => editStage(i, { remove_pair: { mesh: k } })}>{t("ui.train_remove_pair")}</button>
-                  </div>
-                {/if}
-              {/each}
             </div>
           {/each}
 

@@ -2234,8 +2234,12 @@ stage a **step** (one more gear on the planet's body, with a ring on it), a
 **sun or a ring on a planet gear**, a step or a central member removed; on
 a parallel one an **axis** at the end of the chain (an idler) and a **pair**
 on a distance (a layshaft's next ratio, one gear on the body the pairs
-share and the other on a body of its own until it is moved onto the
-output); and on any, a member **moved to another body** on its axis. A
+share and the other on a body of its own — which pair is engaged is which
+gear sits on the output's body); and on any, a member **moved to another
+body** on its axis, which the panel no longer offers: it had a select per
+gear beside the stage's own, saying the same thing twice for every stage
+whose members are each alone on a body, and a *train* body select is the
+one a designer meets. The edit stands, through the boundary and a file. A
 sun and a ring differ in more than a flag — a cutter, a shift rule — so a
 swap is a remove and an add, the new member sized by the core to the
 carrier radius its axis already runs at: a count that would repeat one on
