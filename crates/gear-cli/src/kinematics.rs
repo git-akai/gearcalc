@@ -582,6 +582,8 @@ fn labelled(stage: &Shape, label: gear_core::train::BodyLabel) -> String {
     use gear_core::train::BodyLabel;
     match (label, stage) {
         (BodyLabel::Ground, _) => "ground".into(),
+        // A shaft with nothing on it: a gearbox in neutral.
+        (BodyLabel::Bare, _) => "bare".into(),
         (BodyLabel::Carrier { .. }, _) => "carrier".into(),
         (BodyLabel::Member { member }, shape) => member_role(shape, member),
     }

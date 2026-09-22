@@ -2232,15 +2232,30 @@ pair, which is what a preset is for.
 an arrangement by adding and removing, never by flipping: on an epicyclic
 stage a **step** (one more gear on the planet's body, with a ring on it), a
 **sun or a ring on a planet gear**, a step or a central member removed; on
-a parallel one an **axis** at the end of the chain (an idler) and a **pair**
-on a distance (a layshaft's next ratio, one gear on the body the pairs
-share and the other on a body of its own — which pair is engaged is which
-gear sits on the output's body); and on any, a member **moved to another
-body** on its axis, which the panel no longer offers: it had a select per
-gear beside the stage's own, saying the same thing twice for every stage
-whose members are each alone on a body, and a *train* body select is the
-one a designer meets. The edit stands, through the boundary and a file. A
-sun and a ring differ in more than a flag — a cutter, a shift rule — so a
+a parallel one an **axis** at the end of the chain (an idler) and a
+**mesh** on a distance (a layshaft's next ratio, one gear on the body the
+meshes share and the other on a body of its own — which ratio is engaged
+is which gear sits on the output's body). *Pair* named that edit for a
+while and said nothing: every mesh is a pair of gears, and what this adds
+is another **ratio across the same centres**.
+
+And on any stage, a member **moved to another body** on its axis — the
+edit that engages that ratio, and the second question a body answers. Both
+are asked over the one list on the card: beside each port, where this
+stage's body sits in the *train*; beneath them, what is fixed to it
+**here**. A gear is listed only where something is left to choose, and
+never offered a body whose gears mesh the same member as its own — two
+gears turning as one hold their common mate to two ratios at once, so the
+stage is locked by construction rather than by its numbers. That is what a
+set's sun and ring would do, which is why an epicyclic card shows no second
+list at all. **The body a gear leaves stays** while anything still names
+it — another stage, a hold, a case: taking it with the gear is how
+engaging a layshaft's other ratio used to lose the output, and a body with
+nothing on it is a shaft in neutral, which is a thing a train has
+(`BodyLabel::Bare`). One that nothing names at all is given up a level up
+(`Train::drop_bare`), where what else names a body can be seen.
+
+A sun and a ring differ in more than a flag — a cutter, a shift rule — so a
 swap is a remove and an add, the new member sized by the core to the
 carrier radius its axis already runs at: a count that would repeat one on
 the same planet gear, or on an equal gear of the same body, is moved a

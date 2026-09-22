@@ -4,7 +4,7 @@
 //!
 //! A designer permutes an arrangement by adding and removing: a step on the
 //! planet body, a sun or a ring on a planet gear, an axis at the end of a
-//! parallel chain, a pair on a distance; and by moving a member to another
+//! parallel chain, one more mesh on a distance; and by moving a member to another
 //! body on its axis. Nothing is *flipped*: a member's kind is decided by
 //! the button that adds it and a ring stays a ring, since a sun and a ring
 //! differ in more than a flag (a cutter, a shift rule) and a swap is a
@@ -59,15 +59,21 @@ pub enum StageEdit {
     /// **The last axis of a parallel chain removed**, with everything on it.
     /// Refused where two would be left short.
     RemoveAxis,
-    /// **A pair on a distance**, copying its first: one gear on the body
-    /// the distance's pairs share — a layshaft — or the first pair's second
-    /// gear's body where none is shared yet, the other on a body of its
-    /// own, an idler until it is moved onto the output.
-    AddPair { distance: usize },
-    /// **A pair removed**: both members of `mesh`, their bodies where
-    /// nothing else is on them. Refused for a distance's last mesh, and for
-    /// a mesh a carried axis is on.
-    RemovePair { mesh: usize },
+    /// **One more mesh on a distance**, copying the first mesh there and
+    /// bringing the two gears it needs: one on the body the distance's
+    /// meshes share — a layshaft — or on the first mesh's second gear's
+    /// body where none is shared yet, the other on a body of its own, an
+    /// idler until it is the one moved onto the output.
+    ///
+    /// *A mesh, not a pair.* Every mesh is a pair of gears, so the word
+    /// said nothing about what this adds: another **ratio across the same
+    /// centres**, which is what makes a layshaft a gearbox rather than one
+    /// reduction.
+    AddMesh { distance: usize },
+    /// **A mesh removed**: both its members, and their bodies where nothing
+    /// else is on them. Refused for a distance's last mesh, and for a mesh
+    /// a carried axis is on.
+    RemoveMesh { mesh: usize },
     /// **A member moved to another body on its axis** — `None` a new one —
     /// and the body it leaves taken off the stage where it is emptied and
     /// carries no axis. A member alone on its body moved to a new one is
@@ -149,8 +155,8 @@ impl Shape {
             StageEdit::RemoveMember { member } => self.remove_member(member),
             StageEdit::AddAxis => self.add_axis(next),
             StageEdit::RemoveAxis => self.remove_axis(),
-            StageEdit::AddPair { distance } => self.add_pair(distance, next),
-            StageEdit::RemovePair { mesh } => self.remove_pair(mesh),
+            StageEdit::AddMesh { distance } => self.add_mesh_on(distance, next),
+            StageEdit::RemoveMesh { mesh } => self.remove_mesh(mesh),
             StageEdit::MoveBody { member, body } => self.move_body(member, body, next),
         }
     }
@@ -166,7 +172,7 @@ impl Shape {
         self.axis_of_slot(self.slot(self.axes[axis].carried_by))
     }
 
-    fn members_on_body(&self, body: usize) -> Vec<usize> {
+    pub(crate) fn members_on_body(&self, body: usize) -> Vec<usize> {
         (0..self.members.len())
             .filter(|&i| self.members[i].body == body)
             .collect()
@@ -194,7 +200,7 @@ impl Shape {
             .is_some_and(|a| self.carried(a))
     }
 
-    fn carries_an_axis(&self, body: usize) -> bool {
+    pub(crate) fn carries_an_axis(&self, body: usize) -> bool {
         self.axes.iter().any(|a| a.carried_by == body)
     }
 
@@ -436,7 +442,7 @@ impl Shape {
         Ok(())
     }
 
-    fn add_pair(&mut self, distance: usize, next: usize) -> Result<(), EditRefused> {
+    fn add_mesh_on(&mut self, distance: usize, next: usize) -> Result<(), EditRefused> {
         if distance >= self.distances.len() {
             return Err(EditRefused::NoSuchIndex);
         }
@@ -488,7 +494,7 @@ impl Shape {
         Ok(())
     }
 
-    fn remove_pair(&mut self, mesh: usize) -> Result<(), EditRefused> {
+    fn remove_mesh(&mut self, mesh: usize) -> Result<(), EditRefused> {
         if mesh >= self.meshes.len() {
             return Err(EditRefused::NoSuchIndex);
         }
@@ -543,9 +549,15 @@ impl Shape {
             None => self.push_body(axis, next),
         };
         self.members[member].body = to;
-        if self.members_on_body(from).is_empty() && !self.carries_an_axis(from) {
-            self.bodies.retain(|b| b.body != from);
-        }
+        // **The body it leaves stays.** A body a stage lists is a port the
+        // train may hold, share or load, and dropping it because its gear
+        // moved would take the coupling with it — which is how engaging a
+        // layshaft's other ratio used to lose the output. A body with
+        // nothing on it is a shaft with nothing driving it, which is what
+        // *neutral* is, and the motion says so by being a family one
+        // condition short. What no longer has a reason to exist is given
+        // up a level up ([`super::Train::edit_stage`]), where what else
+        // names a body can be seen.
         Ok(())
     }
 
@@ -620,7 +632,7 @@ mod tests {
                 member: 0,
                 body: None,
             },
-            StageEdit::AddPair { distance: 0 },
+            StageEdit::AddMesh { distance: 0 },
         ];
         match carried {
             Some(axis) => {
@@ -651,7 +663,7 @@ mod tests {
                 // A pair on a crossed distance is a second point contact at
                 // the same angle, which the worm's proportions do not size;
                 // a parallel pair is what "add pair" is for.
-                if matches!(edit, StageEdit::AddPair { .. })
+                if matches!(edit, StageEdit::AddMesh { .. })
                     && base.family() != arr::StageFamily::Parallel
                 {
                     continue;
@@ -726,15 +738,15 @@ mod tests {
         assert!(same(&shape, &idler), "an axis added and removed");
         let layshaft = StagePreset::Layshaft.build();
         let mut shape = layshaft.clone();
-        edit(&mut shape, StageEdit::AddPair { distance: 0 }).unwrap();
+        edit(&mut shape, StageEdit::AddMesh { distance: 0 }).unwrap();
         let last = shape.meshes.len() - 1;
-        edit(&mut shape, StageEdit::RemovePair { mesh: last }).unwrap();
-        assert!(same(&shape, &layshaft), "a pair added and removed");
+        edit(&mut shape, StageEdit::RemoveMesh { mesh: last }).unwrap();
+        assert!(same(&shape, &layshaft), "a mesh added and removed");
     }
 
     /// **A refused edit changes nothing**, and refuses for the reason named:
-    /// the last central on a step, the last gear on a planet axis, a pair's
-    /// two axes, a distance's one mesh, an edit of the other family.
+    /// the last central on a step, the last gear on a planet axis, a
+    /// chain's two axes, a distance's one mesh, an edit of the other family.
     #[test]
     fn a_refused_edit_changes_nothing() {
         let cases: Vec<(Shape, StageEdit, EditRefused)> = vec![
@@ -755,7 +767,7 @@ mod tests {
             ),
             (
                 StagePreset::Spur.build(),
-                StageEdit::RemovePair { mesh: 0 },
+                StageEdit::RemoveMesh { mesh: 0 },
                 EditRefused::LastOfItsKind,
             ),
             (
@@ -832,6 +844,108 @@ mod tests {
                 },
             ),
             Err(EditRefused::CarriesAnAxis)
+        );
+    }
+
+    /// **A gear moved off a shaft does not take the shaft with it.** A body
+    /// a stage lists is a port the train may hold, share or load, and it
+    /// stays where anything still names it — with nothing on it, which is
+    /// what a gearbox in neutral is. Dropping it took the coupling and the
+    /// case with it: a layshaft's output moved to an idler left the next
+    /// stage joined to nothing.
+    ///
+    /// It is given up where nothing names it, so a stage asked about alone
+    /// keeps no numbers it has no use for. And engaging another ratio is
+    /// the two moves it is on the machine: the other gear onto the output,
+    /// this one off to a body of its own.
+    #[test]
+    fn a_gear_moved_off_a_shaft_does_not_take_the_shaft_with_it() {
+        let lay = || arr::layshaft((17, 43), &[(19, 41), (31, 29)], 1);
+        let mut t = Train::chained(vec![lay(), StagePreset::Spur.build()], |t| {
+            vec![LoadCase::ultimate(t.port(0, 1), t.port(1, 2), 1.0, 1000.0)]
+        });
+        // The layshaft's output (slot 2) runs on to the spur; the engaged
+        // pair's gear is the one sitting on it, and the other pair's idles
+        // on a body of its own.
+        let output = t.port(0, 2);
+        let input = t.port(0, 1);
+        assert_eq!(t.ends_of(output).len(), 2, "the output runs on");
+        let shape = t.stages[0].clone();
+        let axis = shape.axis_of_slot(shape.slot(output));
+        let engaged = shape
+            .members_on_body(output)
+            .first()
+            .copied()
+            .expect("a gear is engaged");
+        let (idle, idler) = (0..shape.members.len())
+            .filter_map(|i| {
+                let on = shape.members[i].body;
+                (on != output && on != input && shape.axis_of_slot(shape.slot(on)) == axis)
+                    .then_some((i, on))
+            })
+            .next()
+            .expect("the other pair's gear idles on a body of its own");
+
+        // **The destructive move, which is not destructive now**: the
+        // engaged gear onto the idler's body. The output keeps its number,
+        // its end on the spur and the case at it, with nothing on it.
+        t.edit_stage(
+            0,
+            StageEdit::MoveBody {
+                member: engaged,
+                body: Some(idler),
+            },
+        )
+        .unwrap();
+        assert_eq!(t.port(0, 2), output, "the output is where it was");
+        assert_eq!(t.ends_of(output).len(), 2, "...and still runs on");
+        assert!(
+            t.stages[0].members_on_body(output).is_empty(),
+            "nothing is engaged: neutral"
+        );
+
+        // ...and the other ratio engaged: the idle gear on, this one off —
+        // which it may be now, since it shares.
+        t.edit_stage(
+            0,
+            StageEdit::MoveBody {
+                member: idle,
+                body: Some(output),
+            },
+        )
+        .unwrap();
+        t.edit_stage(
+            0,
+            StageEdit::MoveBody {
+                member: engaged,
+                body: None,
+            },
+        )
+        .unwrap();
+        assert_eq!(t.stages[0].members_on_body(output), vec![idle]);
+        assert_eq!(t.ends_of(output).len(), 2, "the output is the output");
+
+        // **A bare body nothing names is given up**: the same first move on
+        // a stage of its own, with no train to mean the shaft to be there.
+        let mut alone = Train::chained(vec![lay()], |_| Vec::new());
+        let was = alone.stages[0].bodies.len();
+        let (on, to) = {
+            let s = &alone.stages[0];
+            (s.members_on_body(alone.port(0, 2))[0], s.members[idle].body)
+        };
+        alone
+            .edit_stage(
+                0,
+                StageEdit::MoveBody {
+                    member: on,
+                    body: Some(to),
+                },
+            )
+            .unwrap();
+        assert_eq!(
+            alone.stages[0].bodies.len(),
+            was - 1,
+            "the shaft nothing named is given up"
         );
     }
 

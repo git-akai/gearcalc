@@ -48,6 +48,7 @@
     endsOf,
     acrossBody,
     bodyRefName,
+    movableGears,
     onSlot,
     memberName,
     memberListName,
@@ -1301,12 +1302,48 @@
             <option value={String(q.body)}>{bodyName(q.body)}</option>
           {/each}
           {#if ends.length > 1}
-            <option value="new">{t("ui.train_new_body")}</option>
+            <option value="new">{t("ui.train_own_body")}</option>
           {/if}
         </select>
         <em></em>
       </label>
     {/each}
+
+    <!-- **...and which of them each gear turns with**, which is the other
+         question a body answers and the one the train knows nothing about:
+         the rows above say where this stage's bodies sit in the *train*,
+         these say what is fixed to them *here*. Only the gears with
+         somewhere to go are listed — another body on their axis, or a body
+         of their own where they share one — so every option does
+         something, and a stage whose gears are each alone on a body has no
+         rows at all. -->
+    {@const movable = movableGears(tab.train.stages[i])}
+    {#if movable.length > 0}
+      <h4 class="bodies section-heading later">{t("ui.train_gear_bodies")}</h4>
+      <small class="edit-note">{t("ui.train_note_gear_bodies")}</small>
+      {#each movable as g (g.member)}
+        <label>
+          <span>{memberListName(tab.train, result.topology, i, g.member)}</span>
+          <select
+            value={String(tab.train.stages[i].members[g.member].body)}
+            onchange={(e) => {
+              const v = e.currentTarget.value;
+              editStage(i, {
+                move_body: { member: g.member, body: v === "own" ? null : Number(v) },
+              });
+            }}
+          >
+            {#each g.bodies as b (b)}
+              <option value={String(b)}>{bodyName(b)}</option>
+            {/each}
+            {#if g.own}
+              <option value="own">{t("ui.train_own_body")}</option>
+            {/if}
+          </select>
+          <em></em>
+        </label>
+      {/each}
+    {/if}
   {/if}
 {/snippet}
 
@@ -2099,7 +2136,7 @@
                 {@render numberField(groupMeshes.length > 1 ? "ui.train_static_friction_of" : "ui.train_static_friction", () => m.static_friction, (v) => (m.static_friction = v), 0.01, "", t("ui.train_note_static_friction"), pair)}
                 {#if parallel}
                   <div class="edits">
-                    <button class="action danger" disabled={onDistance < 2} onclick={() => editStage(i, { remove_pair: { mesh: k } })}>{t("ui.train_remove_pair")}</button>
+                    <button class="action danger" disabled={onDistance < 2} onclick={() => editStage(i, { remove_mesh: { mesh: k } })}>{t("ui.train_remove_mesh")}</button>
                   </div>
                 {/if}
               {/each}
@@ -2199,14 +2236,14 @@
               {#if d.worm}
                 {@render numberField("ui.train_worm_axial_clearance", () => d.axial_clearance, (v) => (d.axial_clearance = v), 0.01, "ui.train_mm")}
               {/if}
-              <!-- A pair more on a parallel distance: a layshaft's next
-                   ratio, one gear on the shaft the pairs share and the
-                   other on a shaft of its own until it is moved onto the
-                   output. -->
+              <!-- One more mesh across these same centres: a layshaft's
+                   next ratio, one gear on the body the meshes share and the
+                   other on a body of its own, which the body list engages
+                   by moving it onto the output's. -->
               {#if parallel}
                 <div class="edits">
-                  <button class="action add" onclick={() => editStage(i, { add_pair: { distance: k } })}>{t("ui.train_add_pair")}</button>
-                  <small class="edit-note">{t("ui.train_note_add_pair")}</small>
+                  <button class="action add" onclick={() => editStage(i, { add_mesh: { distance: k } })}>{t("ui.train_add_mesh")}</button>
+                  <small class="edit-note">{t("ui.train_note_add_mesh")}</small>
                 </div>
               {/if}
             </div>

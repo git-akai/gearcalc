@@ -116,6 +116,52 @@ function roleName(topology: StagePorts[], stage: number, member: number): string
   return roleLabel(topology[stage]?.members[member]);
 }
 
+/** **A gear this stage could fix to another of its bodies**, and where it
+ *  may go — the second question a body answers, and the one the train
+ *  knows nothing about.
+ *
+ *  A gear may go to a body on its own axis that carries no axis itself (a
+ *  gear fixed to the carrier of the planets it meshes locks the stage, and
+ *  the core refuses it), and, where it shares its body with another gear,
+ *  to a body of its own.
+ *
+ *  **Two gears meshing the same member may not share a body**, and that is
+ *  a filter rather than a refusal: turning as one, they hold their common
+ *  mate to two ratios at once, so the stage is locked by construction
+ *  rather than by its numbers. It is what a set's sun and ring would do,
+ *  and offering it would put a second select on every epicyclic card
+ *  whose only answer is a refusal. A layshaft's gears mesh *different*
+ *  members of the layshaft, so its ratios stay on offer: that is how one
+ *  is engaged.
+ *
+ *  Listed only where something is left to choose, since a select whose
+ *  every option does nothing is what this panel is not to show. */
+export function movableGears(
+  shape: Shape,
+): { member: number; bodies: number[]; own: boolean }[] {
+  const partners = (j: number) =>
+    shape.meshes.filter((m) => m.a === j || m.b === j).map((m) => (m.a === j ? m.b : m.a));
+  return shape.members
+    .map((m, member) => {
+      const axis = axisOfBody(shape, m.body);
+      const mine = partners(member);
+      const bodies = shape.bodies
+        .filter(
+          (b) =>
+            b.axis === axis &&
+            !shape.axes.some((a) => a.carried_by === b.body) &&
+            (b.body === m.body ||
+              shape.members.every(
+                (x, k) => x.body !== b.body || !partners(k).some((p) => mine.includes(p)),
+              )),
+        )
+        .map((b) => b.body);
+      const own = shape.members.some((x, k) => k !== member && x.body === m.body);
+      return { member, bodies, own };
+    })
+    .filter((g) => g.bodies.length > 1 || g.own);
+}
+
 /** **A body's own name**: "Body 4", numbered across the train as the core
  *  numbers it — the same number a file writes and a case names — or the
  *  ground's word for body 0. */

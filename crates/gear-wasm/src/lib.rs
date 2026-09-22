@@ -1531,7 +1531,7 @@ fn relieve_case_impl(input: &str) -> Result<String, String> {
 ///   seeded as a fresh case's is ([`Train::set_duty`]);
 /// - `{ "stage": { "stage", "edit" } }` — one stage edited on its card
 ///   ([`gear_core::train::StageEdit`]: a step, a sun or a ring, an axis, a
-///   pair added or removed, a member moved to another body), a body it
+///   mesh added or removed, a member moved to another body), a body it
 ///   adds numbered after the train's and one it takes off the stage leaving
 ///   the train where no other stage has it ([`Train::edit_stage`]). A
 ///   refused edit is an error and the train is returned unchanged.

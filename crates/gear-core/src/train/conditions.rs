@@ -1297,6 +1297,13 @@ impl Train {
     /// has leaves the train, with every case entry and hold at it, and the
     /// rest are numbered densely again.
     ///
+    /// **A body an edit leaves empty stays while anything still names it**
+    /// — another stage, a hold, a case — and is given up otherwise
+    /// ([`Self::drop_bare`]). A gear moved off a shaft does not take the
+    /// shaft with it: that is how a layshaft's engaged ratio is changed,
+    /// one gear off and the other on, with the output the train couples to
+    /// standing still there between the two.
+    ///
     /// # Errors
     ///
     /// [`super::EditRefused`] where the shape refuses, with nothing changed.
@@ -1311,9 +1318,45 @@ impl Train {
             .get_mut(k)
             .ok_or(super::EditRefused::NoSuchIndex)?;
         shape.edit(edit, next)?;
+        self.drop_bare();
         self.drop_orphans();
         self.prune();
         Ok(())
+    }
+
+    /// **Every body with nothing on it that nothing else names, given up.**
+    ///
+    /// A body a stage lists with no member and no axis to carry is a shaft
+    /// in neutral, which is a state worth being able to reach — but only
+    /// while something means it to be there. Another stage on it, a hold,
+    /// a case's entry: any of those is a reason. None of them, and it is a
+    /// number nothing would ever read again.
+    fn drop_bare(&mut self) {
+        let named = |train: &Self, body: usize, except: usize| {
+            train
+                .stages
+                .iter()
+                .enumerate()
+                .any(|(k, s)| k != except && s.slot(body) != GROUND)
+                || train.constraints.iter().any(|c| c.body == body)
+                || train.load_cases.iter().any(|c| {
+                    c.loads.iter().any(|l| l.at == body)
+                        || matches!(c.duty, super::Duty::Intermittent { at, .. } if at == body)
+                })
+        };
+        for k in 0..self.stages.len() {
+            let bare: Vec<usize> = self.stages[k]
+                .bodies
+                .iter()
+                .map(|b| b.body)
+                .filter(|&b| {
+                    self.stages[k].members_on_body(b).is_empty()
+                        && !self.stages[k].carries_an_axis(b)
+                        && !named(self, b, k)
+                })
+                .collect();
+            self.stages[k].bodies.retain(|b| !bare.contains(&b.body));
+        }
     }
 
     /// **A case's duty switched**, to intermittent or continuous, seeded from

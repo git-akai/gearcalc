@@ -94,6 +94,11 @@ pub enum BodyLabel {
     /// A frame that carries meshes and is no member's body: a set's carrier,
     /// a hula stage's crank. Numbered within the stage.
     Carrier { index: usize },
+    /// **Nothing on it**: a body a stage lists with no member and no axis
+    /// to carry — a gearbox's output while no gear is engaged, which is
+    /// what neutral is. It turns as nothing decides, and the motion says
+    /// so by being a family one condition short.
+    Bare,
 }
 
 /// Where one member sits: what it turns with, and what its axis stands still

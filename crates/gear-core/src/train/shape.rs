@@ -703,12 +703,10 @@ impl Shape {
         if let Some(index) = carriers.iter().position(|&c| c == shaft) {
             return BodyLabel::Carrier { index };
         }
-        let member = self
-            .members
+        self.members
             .iter()
             .position(|m| self.slot(m.body) == shaft)
-            .unwrap_or(0);
-        BodyLabel::Member { member }
+            .map_or(BodyLabel::Bare, |member| BodyLabel::Member { member })
     }
 
     // ---------------------------------------------------------- helices ---

@@ -160,11 +160,11 @@ const out = {
     t = stage(1, { move_body: { member: 0, body: null } });
     out.push(["stage_epicyclic", structuredClone(t)]);
     t = edit(t, { push_stage: preset("layshaft") });
-    t = stage(2, { add_pair: { distance: 0 } });
+    t = stage(2, { add_mesh: { distance: 0 } });
     t = stage(2, { add_axis: null });
     out.push(["stage_parallel_added", structuredClone(t)]);
     t = stage(2, "remove_axis");
-    t = stage(2, { remove_pair: { mesh: t.stages[2].meshes.length - 1 } });
+    t = stage(2, { remove_mesh: { mesh: t.stages[2].meshes.length - 1 } });
     out.push(["stage_parallel_removed", t]);
     return out;
   }),
