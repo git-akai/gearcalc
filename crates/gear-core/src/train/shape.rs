@@ -283,15 +283,24 @@ impl Default for Shape {
 // ------------------------------------------------------------ the shape ---
 
 impl Shape {
-    /// **A body's slot in this stage** — the stage's own numbering of the
-    /// bodies on its axes, ground 0 and the first listed 1, which is what
-    /// the stage's kinematics and its conventions count in. Ground for a
-    /// body the stage does not have.
-    pub(crate) fn slot(&self, body: usize) -> Body {
+    /// **A body's slot in this stage**, where the stage has it — the
+    /// stage's own numbering of the bodies on its axes, ground 0 and the
+    /// first listed 1, which is what the stage's kinematics and its
+    /// conventions count in.
+    ///
+    /// The one lookup: [`Self::slot`] reads ground for a body the stage
+    /// does not have, which is what a frame wants; this says which, which
+    /// is what a case naming a body wants.
+    pub(crate) fn slot_if_any(&self, body: usize) -> Option<Body> {
         self.bodies
             .iter()
             .position(|b| b.body == body)
-            .map_or(GROUND, |i| i + 1)
+            .map(|i| i + 1)
+    }
+
+    /// As [`Self::slot_if_any`], ground for a body the stage does not have.
+    pub(crate) fn slot(&self, body: usize) -> Body {
+        self.slot_if_any(body).unwrap_or(GROUND)
     }
 
     /// The train's body at one of this stage's slots; ground at 0.

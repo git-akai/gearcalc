@@ -7,7 +7,8 @@
 //! in order — which slot each of its members spins with and in whose frame
 //! that member's axis stands still, and which members mesh. Nothing else: no
 //! module, no shift, no centre distance, and nothing about which train body
-//! a slot is ([`Slots`] says, when the train assembles its system). **A
+//! a slot is (the stage's own list of bodies says, and the train hands
+//! `add_to` the lookup). **A
 //! ratio needs tooth counts and topology, and this is the topology.**
 //!
 //! # The frame is derived, not stated
@@ -61,7 +62,7 @@
 //!   which tangent the two circles admit, not [`MeshKind::sign`].
 
 use super::StageGear;
-use crate::kinematics::{Body, MeshRow, System, GROUND};
+use crate::kinematics::{Body, MeshRow, System};
 use crate::mesh::MeshKind;
 use crate::ratio::Ratio;
 
@@ -237,9 +238,10 @@ impl Wiring {
     /// **The system this wiring and these tooth counts make**, with `teeth` one
     /// entry per member in the same order as [`Self::mounts`].
     ///
-    /// `at` is what this stage's slots are in a larger system, so a train
-    /// can lay several stages over one set of bodies; a stage asked about
-    /// on its own passes [`Slots::alone`].
+    /// `at` says what this stage's slots are in a larger system, so a train
+    /// can lay several stages over one set of bodies — a stage lists its
+    /// bodies and answers this off that list ([`super::shape::Shape::body_at`]);
+    /// a stage asked about on its own passes the identity.
     ///
     /// # Errors
     ///
@@ -249,7 +251,7 @@ impl Wiring {
         &self,
         system: &mut System,
         teeth: &[u32],
-        at: &Slots,
+        at: impl Fn(Body) -> Body,
     ) -> Result<(), WiringError> {
         for (k, m) in self.meshes.iter().enumerate() {
             let frame = self.frame(k)?;
@@ -263,12 +265,12 @@ impl Wiring {
             let (za, zb) = (count(m.a)?, count(m.b)?);
             system
                 .mesh(MeshRow {
-                    a: at.of(self.mounts[m.a].spins_with),
-                    b: at.of(self.mounts[m.b].spins_with),
+                    a: at(self.mounts[m.a].spins_with),
+                    b: at(self.mounts[m.b].spins_with),
                     za,
                     // **The sign is the mesh kind's**, never the wiring's.
                     zb: m.kind.signed(zb),
-                    frame: at.of(frame),
+                    frame: at(frame),
                 })
                 .ok_or(WiringError::NotAMesh(k))?;
         }
@@ -331,7 +333,7 @@ impl Wiring {
     /// As [`Self::add_to`].
     pub fn alone(&self, teeth: &[u32]) -> Result<System, WiringError> {
         let mut system = System::new(self.slots.len());
-        self.add_to(&mut system, teeth, &Slots::alone(self.slots.len()))?;
+        self.add_to(&mut system, teeth, |slot| slot)?;
         Ok(system)
     }
 }
@@ -389,39 +391,6 @@ impl UnitMotion {
     #[must_use]
     pub fn ratio(&self) -> f64 {
         self.output.recip().map_or(f64::INFINITY, Ratio::to_f64)
-    }
-}
-
-/// **A stage's slots as the train's bodies**: what each of the stage's own
-/// numbers is in the assembled system, ground shared at 0. A stage asked
-/// about on its own is the identity.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Slots(pub Vec<Body>);
-
-impl Slots {
-    /// A stage of `n` slots with the whole system to itself.
-    #[must_use]
-    pub fn alone(n: usize) -> Self {
-        Self((0..n).collect())
-    }
-
-    /// The body one of this stage's slots is.
-    #[must_use]
-    pub fn of(&self, local: Body) -> Body {
-        if local == GROUND {
-            GROUND
-        } else {
-            self.0[local]
-        }
-    }
-
-    /// The slot a body has on this stage, where it has one.
-    #[must_use]
-    pub fn slot_of(&self, body: Body) -> Option<Body> {
-        if body == GROUND {
-            return None;
-        }
-        self.0.iter().position(|&b| b == body)
     }
 }
 

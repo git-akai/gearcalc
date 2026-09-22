@@ -9,7 +9,7 @@ export type PortSpec = {
 /**
  * The stage's own numbering of it.
  */
-shaft: number, 
+slot: number, 
 /**
  * The train's body it is.
  */

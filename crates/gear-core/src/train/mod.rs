@@ -62,9 +62,7 @@ pub use pair::PairStage;
 pub(crate) use pair::ShiftAsked;
 pub use planetary::PlanetaryStage;
 pub(crate) use wiring::teeth_of;
-pub use wiring::{
-    BodyLabel, MemberMotion, MeshSpec, Mount, Slots, UnitMotion, Wiring, WiringError,
-};
+pub use wiring::{BodyLabel, MemberMotion, MeshSpec, Mount, UnitMotion, Wiring, WiringError};
 
 /// The three contact ratios.
 #[derive(Clone, Copy, Debug)]
@@ -3928,7 +3926,7 @@ impl Train {
     ///
     /// [`MotionError`] where the train has no graph to ask.
     pub fn case_mobility(&self) -> Result<usize, MotionError> {
-        let (system, _) = self.system()?;
+        let system = self.system()?;
         let shafts = system.bodies();
         let conditions: Vec<Condition> = self
             .conditions(shafts)?
@@ -4336,7 +4334,7 @@ fn solve_train_under(
     let (first, chosen) = solve(&|_| Vec::new(), None)?;
 
     // ---- the train's graph, with every stage's meshes on it.
-    let (system, at) = train.system()?;
+    let system = train.system()?;
     let shafts = system.bodies();
     let wirings: Vec<Wiring> = train.stages.iter().map(Stage::wiring).collect();
     // Each stage's meshes as the flow sees them, in one list, with the first
@@ -4349,9 +4347,9 @@ fn solve_train_under(
         for (j, m) in w.meshes.iter().enumerate() {
             mine.push(meshes.len());
             meshes.push(flow::MeshFlow {
-                a: at[k].of(w.mounts[m.a].spins_with),
-                b: at[k].of(w.mounts[m.b].spins_with),
-                frame: w.frame(j).map_or(GROUND, |f| at[k].of(f)),
+                a: train.port(k, w.mounts[m.a].spins_with),
+                b: train.port(k, w.mounts[m.b].spins_with),
+                frame: w.frame(j).map_or(GROUND, |f| train.port(k, f)),
                 za: f64::from(first[k].members()[m.a].params.teeth),
                 zb: m.kind.sign() * f64::from(first[k].members()[m.b].params.teeth),
                 efficiency: reports[j].efficiency,
@@ -4406,7 +4404,7 @@ fn solve_train_under(
         for (k, stage) in train.stages.iter().enumerate() {
             for s in stage.ports().ports {
                 if boundaries[k].conditions[s] != Condition::Ground {
-                    ports.push(at[k].of(s));
+                    ports.push(train.port(k, s));
                 }
             }
         }
@@ -4666,11 +4664,13 @@ fn solve_train_under(
                 kind: case.kind,
                 mesh_torques: mine.iter().map(|&g| flow.mesh_torques[g]).collect(),
                 directions: mine.iter().map(|&g| flow.directions[g]).collect(),
-                speeds: (0..w.slots.len()).map(|l| speeds[at[k].of(l)]).collect(),
+                speeds: (0..w.slots.len())
+                    .map(|l| speeds[train.port(k, l)])
+                    .collect(),
                 torques,
                 turns: turns
                     .as_ref()
-                    .map(|t| (0..w.slots.len()).map(|l| t[at[k].of(l)]).collect()),
+                    .map(|t| (0..w.slots.len()).map(|l| t[train.port(k, l)]).collect()),
                 reversing_actuations,
             });
         }
@@ -6530,7 +6530,7 @@ mod tests {
             // Exactly as many conditions as degrees of freedom: what the
             // train holds, and the one drive at its end its motion is read
             // from.
-            let (system, _) = train.system().unwrap();
+            let system = train.system().unwrap();
             let asked = train
                 .conditions(system.bodies())
                 .unwrap()
@@ -6579,7 +6579,7 @@ mod tests {
             let ratios: Vec<f64> = r.stages.iter().map(|s| s.ratio().unwrap()).collect();
             let boundaries = train.boundaries().unwrap();
             for (k, b) in boundaries.iter().enumerate() {
-                let graph = m.solution.values[m.body_of(k, b.input)].to_f64();
+                let graph = m.solution.values[train.port(k, b.input)].to_f64();
                 let hand = 1.0 / ratios[..k].iter().product::<f64>();
                 assert!(
                     (graph.abs() - hand.abs()).abs() < 1e-9 * hand.abs(),
@@ -6937,10 +6937,9 @@ mod tests {
         let (start, end) = ends_of(&t);
         assert_eq!((start, end), (t.port(0, 1), t.port(1, sun)));
         t.load_cases = vec![LoadCase::ultimate(start, end, 2.0, 3000.0)];
-        let (at, n) = t.layout();
-        let conditions = t.conditions(n).unwrap();
+        let conditions = t.conditions(t.max_body() + 1).unwrap();
         assert_eq!(
-            conditions[at[1].of(carrier)],
+            conditions[t.port(1, carrier)],
             crate::kinematics::Condition::Free,
             "turned by the pair, not driven"
         );
@@ -7611,7 +7610,7 @@ mod tests {
         for p in [0i64, 1, -2, 7] {
             let p = crate::ratio::Ratio::whole(p);
             let at = |shaft: usize| {
-                let i = m.body_of(0, shaft);
+                let i = t.port(0, shaft);
                 m.solution.values[i]
                     .checked_add(m.solution.residual[0].direction[i].checked_mul(p).unwrap())
                     .unwrap()
@@ -7630,7 +7629,7 @@ mod tests {
             assert_eq!(lhs, rhs, "Willis at p = {p}");
             // ...and the report is the same family, read as floats.
             for shaft in [sun, carrier, ring] {
-                let s = &r.speeds[m.body_of(0, shaft)];
+                let s = &r.speeds[t.port(0, shaft)];
                 let read = s.speed.value
                     + s.terms
                         .iter()

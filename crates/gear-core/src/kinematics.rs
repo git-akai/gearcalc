@@ -97,8 +97,9 @@ pub type Body = usize;
 /// **Why it is body zero** is the only thing special about it, and it is a
 /// bookkeeping fact rather than a physical one: every stage needs the *same*
 /// one, so that a fixed-axis mesh in stage 1 and a grounded ring in stage 3 are
-/// held against one frame rather than two ([`crate::train::Slots`] maps every
-/// stage's other slots to the train's bodies and leaves this alone).
+/// held against one frame rather than two (a stage lists the train bodies
+/// on its axes and numbers its own slots off that list, and every stage's
+/// slot 0 is this one).
 ///
 /// **A train here has no housing.** An element is fixed to ground, carries a
 /// load, or is attached to another element. Calling the reference a housing

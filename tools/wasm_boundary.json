@@ -18376,7 +18376,7 @@
        {
         "ports": [
          {
-          "shaft": 1,
+          "slot": 1,
           "body": 1,
           "label": {
            "kind": "member",
@@ -18385,7 +18385,7 @@
           "by_convention": "free"
          },
          {
-          "shaft": 2,
+          "slot": 2,
           "body": 2,
           "label": {
            "kind": "member",
@@ -20345,7 +20345,7 @@
        {
         "ports": [
          {
-          "shaft": 1,
+          "slot": 1,
           "body": 1,
           "label": {
            "kind": "member",
@@ -20354,7 +20354,7 @@
           "by_convention": "free"
          },
          {
-          "shaft": 2,
+          "slot": 2,
           "body": 2,
           "label": {
            "kind": "member",
@@ -20384,7 +20384,7 @@
        {
         "ports": [
          {
-          "shaft": 1,
+          "slot": 1,
           "body": 2,
           "label": {
            "kind": "member",
@@ -20393,7 +20393,7 @@
           "by_convention": "free"
          },
          {
-          "shaft": 2,
+          "slot": 2,
           "body": 3,
           "label": {
            "kind": "carrier",
@@ -20402,7 +20402,7 @@
           "by_convention": "free"
          },
          {
-          "shaft": 3,
+          "slot": 3,
           "body": 4,
           "label": {
            "kind": "member",

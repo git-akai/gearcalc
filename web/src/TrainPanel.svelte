@@ -175,7 +175,7 @@
 
   /** **The load cases are a list, as the stages are**, added one of each kind
    *  by the core, between the train's two ends. Unlike the stages, the last
-   *  one may go: a train with no load case is a shaft line and nothing else,
+   *  one may go: a train with no load case is a body line and nothing else,
    *  every rating row stands empty, and the two buttons under the list are
    *  how one comes back — where a train with no stage is one the core
    *  refuses. */
@@ -244,7 +244,7 @@
   /** What the case comes to at a port: its row of the train-level result,
    *  which a derived box shows and a blank stands for where the case did
    *  not solve. */
-  const shaftOf = (cres: { bodies: CaseBody[]; solved: boolean } | undefined, at: number) =>
+  const bodyOf = (cres: { bodies: CaseBody[]; solved: boolean } | undefined, at: number) =>
     cres?.solved ? cres.bodies.find((s) => s.at === at) : undefined;
   /** **What a case comes to, body by body**: the frame first, then every
    *  body a case can name in the chain's order, then every body that is no
@@ -1301,10 +1301,10 @@
      here replaces the stage's convention's holds on the stage — holding a
      set's carrier releases its ring — which is the core's rule and is read
      back, not repeated. -->
-{#snippet shafts(i: number)}
+{#snippet bodies_of(i: number)}
   {@const ports = result.topology[i]?.ports ?? []}
   {#if ports.length > 0}
-    <h4 class="shafts section-heading">{t("ui.train_bodies")}</h4>
+    <h4 class="bodies section-heading">{t("ui.train_bodies")}</h4>
     <!-- Two words for two things, said once: a body is what turns and is
          held, shared or loaded; an axis is the line it turns about, which
          a set's sun, carrier and ring share. -->
@@ -1316,10 +1316,10 @@
          What each choice does to the rest — an end moved off a shared body
          is split from it first, a shared body turns a case's reaction into
          a take-off — is the core's rule, written back through it. -->
-    {#each ports as p (p.shaft)}
+    {#each ports as p (p.slot)}
       {@const ends = endsOf(tab.train, p.body)}
       <label>
-        <span>{onSlot(tab.train, result.topology, i, p.shaft)}
+        <span>{onSlot(tab.train, result.topology, i, p.slot)}
           {#if ends.length > 1}
             <small class="on">{acrossBody(tab.train, result.topology, p.body)}</small>
           {/if}
@@ -1685,7 +1685,7 @@
          a glance and every reference to a body below names one of these. -->
     {#if portBodies.length > 0}
       <h4 class="section-heading">{t("ui.train_bodies")}</h4>
-      <dl class="out shafts">
+      <dl class="out bodies">
         {#each portBodies as p (p.body)}
           <dt>{bodyName(p.body)}{#if heldNow(p)} <small>{t("ui.train_case_fixed")}</small>{/if}</dt>
           <dd>{acrossBody(tab.train, result.topology, p.body)}</dd>
@@ -1839,7 +1839,7 @@
             {#each bodies as b (b.body)}
               {@const role = roleOf(c, b)}
               {@const load = role === "load" ? entryOf(c, b) : undefined}
-              {@const at = shaftOf(cres, b.body)}
+              {@const at = bodyOf(cres, b.body)}
               {@const shared = b.ends.length > 1}
               <div class="mode" class:later={c.kind === "fatigue" || b !== bodies[0]}>
                 <span>{refLabel(b.body)}</span>
@@ -1953,13 +1953,13 @@
     <section class="stage">
       {#if stage.kind === "shape"}
         <!-- **One stage, whatever it is.** A spur pair, a worm, a crossed pair
-             and a planetary set are the same `Shape` — axes, the shafts on
+             and a planetary set are the same `Shape` — axes, the bodies on
              them, members, meshes and distances — and are drawn by the one
              block below: the shape's own inputs first, then each distance,
              then each mesh, then a card per member, then what it came to.
              What a kind used to decide is read off the shape instead: a
              worm drive is a distance marked as one, a crossed pair is an
-             angle, a set is an axis carried by a shaft, a ring is a member
+             angle, a set is an axis carried by a body, a ring is a member
              with a cutter. There is no branch on a kind here because there
              is no kind in the core to branch on. -->
         {@const sres = res && res.kind === "shape" ? res : null}
@@ -2030,7 +2030,7 @@
                   <small class="edit-note">{t("ui.train_note_add_step")}</small>
                 </div>
               {/if}
-              {@render shafts(i)}
+              {@render bodies_of(i)}
               {#if parallel}
                 <!-- The axes at the end of the bodies they carry: one more
                      axis is one more shaft in series. -->
@@ -2493,7 +2493,7 @@
     grid-column: 1 / -1;
     min-width: 0;
   }
-  .train .paths dl.shafts {
+  .train .paths dl.bodies {
     margin: 0.5rem 0 0;
   }
   .train .paths h4 {
@@ -2700,8 +2700,8 @@
     margin: 0.75rem 0 0;
     font-size: 0.85rem;
   }
-  /* The shafts' rows sit under their own small heading, in the shared grid. */
-  h4.shafts {
+  /* The bodies' rows sit under their own small heading, in the shared grid. */
+  h4.bodies {
     margin: 0.75rem 0 0;
   }
   /* One mesh's readout, sitting under its heading. */

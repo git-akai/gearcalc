@@ -240,7 +240,7 @@ impl StageBoundary {
 
 // ------------------------------------------------- the train as one system ---
 
-use super::wiring::{BodyLabel, Slots};
+use super::wiring::BodyLabel;
 use super::{Stage, Train};
 use crate::kinematics::{Mobility, Refusal, Solution, System};
 
@@ -288,8 +288,6 @@ pub struct TrainMotion {
     pub total: Option<Ratio>,
     /// How many conditions the train needs, and which bodies nothing touches.
     pub mobility: Mobility,
-    /// Each stage's slots as train bodies.
-    pub at: Vec<Slots>,
     /// The solution in full, for a caller that wants a body this does not
     /// name — a member's, through its stage's [`Wiring::mounts`].
     pub solution: Solution,
@@ -311,12 +309,6 @@ impl TrainMotion {
         self.solution.values[of]
             .checked_div(self.solution.values[per])
             .map_or(0.0, |r| r.scale(x))
-    }
-
-    /// The body at one of a stage's slots.
-    #[must_use]
-    pub fn body_of(&self, stage: usize, local: Body) -> usize {
-        self.at[stage].of(local)
     }
 }
 
@@ -350,6 +342,16 @@ impl Train {
             .get(stage)
             .and_then(Stage::as_shape)
             .map_or(GROUND, |s| s.body_at(slot))
+    }
+
+    /// **The slot a body has on a stage**, where the stage has it — the
+    /// inverse of [`Self::port`].
+    #[must_use]
+    pub fn slot(&self, stage: usize, body: usize) -> Option<Body> {
+        self.stages
+            .get(stage)
+            .and_then(Stage::as_shape)
+            .and_then(|s| s.slot_if_any(body))
     }
 
     /// The largest body number anything in the train names — a stage, a
@@ -535,25 +537,6 @@ impl Train {
             + 1
     }
 
-    /// Each stage's slots as train bodies, and how many bodies there are.
-    pub(crate) fn layout(&self) -> (Vec<Slots>, usize) {
-        let at: Vec<Slots> = self
-            .stages
-            .iter()
-            .map(|s| {
-                Slots(s.as_shape().map_or_else(
-                    || vec![GROUND],
-                    |s| {
-                        std::iter::once(GROUND)
-                            .chain(s.bodies.iter().map(|b| b.body))
-                            .collect()
-                    },
-                ))
-            })
-            .collect();
-        (at, self.stage_bodies())
-    }
-
     /// **The whole train as one system**: one node per body, ground shared,
     /// and each stage's meshes written in terms of the bodies on its axes —
     /// a body two stages list is one node, which is what a coupling row
@@ -563,20 +546,19 @@ impl Train {
     ///
     /// [`MotionError::Empty`], or a stage whose wiring does not describe
     /// meshes.
-    pub fn system(&self) -> Result<(System, Vec<Slots>), MotionError> {
+    pub fn system(&self) -> Result<System, MotionError> {
         if self.stages.is_empty() {
             return Err(MotionError::Empty);
         }
-        let (at, bodies) = self.layout();
-        let mut system = System::new(bodies);
+        let mut system = System::new(self.stage_bodies());
         for (k, stage) in self.stages.iter().enumerate() {
             let teeth = super::teeth_of(stage.members());
             stage
                 .wiring()
-                .add_to(&mut system, &teeth, &at[k])
+                .add_to(&mut system, &teeth, |slot| self.port(k, slot))
                 .map_err(|e| MotionError::Wiring(k, e))?;
         }
-        Ok((system, at))
+        Ok(system)
     }
 
     /// **What the train asks of every body**, one condition per body: ground
@@ -622,14 +604,13 @@ impl Train {
     ///
     /// As [`Self::system`].
     pub fn boundaries(&self) -> Result<Vec<StageBoundary>, MotionError> {
-        let (at, bodies) = self.layout();
-        let conditions = self.conditions(bodies)?;
+        let conditions = self.conditions(self.stage_bodies())?;
         let mut out = Vec::with_capacity(self.stages.len());
         for (k, stage) in self.stages.iter().enumerate() {
             let w = stage.wiring();
             let ports = stage.ports();
             let mut local: Vec<Condition> = (0..w.slots.len())
-                .map(|s| conditions[at[k].of(s)])
+                .map(|s| conditions[self.port(k, s)])
                 .collect();
             local[GROUND] = Condition::Ground;
             let side = |earlier: bool| -> Option<Body> {
@@ -637,7 +618,7 @@ impl Train {
                     .ports
                     .iter()
                     .copied()
-                    .find(|&slot| self.shared_with(at[k].of(slot), k, earlier))
+                    .find(|&slot| self.shared_with(self.port(k, slot), k, earlier))
             };
             let held: Vec<Body> = local
                 .iter()
@@ -666,7 +647,7 @@ impl Train {
                 .flat_map(|c| c.loads.iter())
                 .find(|l| l.is_load())
                 .and_then(|l| {
-                    let slot = at[k].slot_of(l.at)?;
+                    let slot = self.slot(k, l.at)?;
                     ports.ports.contains(&slot).then_some(slot)
                 })
                 .filter(open);
@@ -696,7 +677,7 @@ impl Train {
             let holds: Vec<Body> = self
                 .constraints
                 .iter()
-                .filter_map(|c| at[k].slot_of(c.body))
+                .filter_map(|c| self.slot(k, c.body))
                 .collect();
             let first: Vec<Body> = (0..local.len()).filter(|s| !holds.contains(s)).collect();
             if let Err(Refusal::Conflicts(i)) = w
@@ -704,7 +685,7 @@ impl Train {
                 .map_err(|e| MotionError::Wiring(k, e))?
                 .motion_in(&local, &first)
             {
-                return Err(MotionError::Conflicts(at[k].of(i)));
+                return Err(MotionError::Conflicts(self.port(k, i)));
             }
             out.push(StageBoundary {
                 conditions: local,
@@ -722,7 +703,7 @@ impl Train {
     /// [`MotionError`] — and never a geometric one, which is the whole reason
     /// this is separate from [`super::solve_train`].
     pub fn motion(&self) -> Result<TrainMotion, MotionError> {
-        let (system, at) = self.system()?;
+        let system = self.system()?;
         let mut conditions = self.conditions(system.bodies())?;
         // **The train has a ratio between exactly two open bodies**, driven
         // at the first: a chain's two ends, whatever stage each is on. With
@@ -754,7 +735,7 @@ impl Train {
         for open in [true, false] {
             for (k, stage) in self.stages.iter().enumerate() {
                 for slot in stage.ports().ports {
-                    let b = at[k].of(slot);
+                    let b = self.port(k, slot);
                     let shared = self.ends_of(b).len() > 1;
                     if (conditions[b] == Condition::Free && !shared) == open
                         && !preferred.contains(&b)
@@ -771,7 +752,7 @@ impl Train {
             .iter()
             .enumerate()
             .map(|(k, b)| {
-                let (i, o) = (at[k].of(b.input), at[k].of(b.output));
+                let (i, o) = (self.port(k, b.input), self.port(k, b.output));
                 // `None` where the answer is a family: the quotient of two
                 // families is not a number, and the particular values alone
                 // would print one as if it were.
@@ -787,7 +768,6 @@ impl Train {
             ratios,
             total,
             mobility,
-            at,
             solution,
         })
     }
@@ -884,7 +864,7 @@ impl From<Ratio> for Exact {
 )]
 pub struct PortSpec {
     /// The stage's own numbering of it.
-    pub shaft: Body,
+    pub slot: Body,
     /// The train's body it is.
     pub body: usize,
     pub label: BodyLabel,
@@ -1062,16 +1042,16 @@ impl Train {
                         .ports()
                         .ports
                         .iter()
-                        .map(|&shaft| {
-                            let body = self.port(k, shaft);
+                        .map(|&slot| {
+                            let body = self.port(k, slot);
                             // The train without its own word on this body,
                             // and what the overlay then asks of it.
                             let mut without = self.clone();
                             without.constraints.retain(|c| c.body != body);
                             PortSpec {
-                                shaft,
+                                slot,
                                 body,
-                                label: w.slots[shaft],
+                                label: w.slots[slot],
                                 by_convention: without
                                     .constraints_in_force()
                                     .iter()
