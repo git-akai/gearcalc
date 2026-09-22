@@ -412,6 +412,15 @@
     shape.members.forEach((_, j) => deal(j));
     return out;
   };
+  /** The cards in groups: each mesh group's members in the dealt order,
+   *  then any member no group names, so every card is dealt once. */
+  const cardGroups = (shape: Shape, groups: number[][]): number[][] => {
+    const order = cardOrder(shape);
+    const out = groups.map((g) => order.filter((j) => g.includes(j)));
+    const rest = order.filter((j) => !groups.some((g) => g.includes(j)));
+    if (rest.length > 0) out.push(rest);
+    return out.filter((g) => g.length > 0);
+  };
   /** The shafts a member may move to: those on its axis, by name. */
   const shaftsOnAxis = (shape: Shape, j: number) =>
     shape.shafts.map((s, k) => k + 1).filter((k) => shape.shafts[k - 1].axis === axisOf(shape, j));
@@ -2068,14 +2077,19 @@
                   {#each carriedAxes as k (k)}
                     <button class="action add" onclick={() => editStage(i, { add_step: { axis: k } })}>{carriedAxes.length > 1 ? `${t("ui.train_add_step")} · ${axisName(stage, i, k)}` : t("ui.train_add_step")}</button>
                   {/each}
-                </div>
-              {:else if parallel}
-                <div class="edits">
-                  <button class="action add" onclick={() => editStage(i, "add_axis")}>{t("ui.train_add_axis")}</button>
-                  <button class="action danger" disabled={stage.axes.length < 3} onclick={() => editStage(i, "remove_axis")}>{t("ui.train_remove_axis")}</button>
+                  <small class="edit-note">{t("ui.train_note_add_step")}</small>
                 </div>
               {/if}
               {@render shafts(i)}
+              {#if parallel}
+                <!-- The axes at the end of the shafts they carry: one more
+                     axis is one more shaft in series. -->
+                <div class="edits">
+                  <button class="action add" onclick={() => editStage(i, "add_axis")}>{t("ui.train_add_axis")}</button>
+                  <button class="action danger" disabled={stage.axes.length < 3} onclick={() => editStage(i, "remove_axis")}>{t("ui.train_remove_axis")}</button>
+                  <small class="edit-note">{t("ui.train_note_add_axis")}</small>
+                </div>
+              {/if}
             </div>
             {#if refused?.stage === i}
               <p class="refused">{t(refused.key)}</p>
@@ -2181,6 +2195,7 @@
                 {#if parallel}
                   <div class="edits">
                     <button class="action add" onclick={() => editStage(i, { add_pair: { distance: k } })}>{t("ui.train_add_pair")}</button>
+                    <small class="edit-note">{t("ui.train_note_add_pair")}</small>
                   </div>
                 {/if}
               </div>
@@ -2211,8 +2226,15 @@
                  a planet is how a designer asks for the sun to close it
                  instead; the absorbing member is an automatic one like any
                  other, box and toggle and all. -->
+            <!-- **One row of cards per mesh group**: the members a run of
+                 meshes joins (`module_groups`, the mesh graph's components)
+                 share a grid of their own, so a row never mixes gears of
+                 unrelated meshes — a layshaft's pairs two to a row, a set's
+                 three — and each grid reflows on its own as the window
+                 narrows. Within a group the cards are dealt by step. -->
+            {#each cardGroups(stage, moduleGroups) as group, gi (gi)}
             <div class="gears">
-              {#each cardOrder(stage) as j (j)}
+              {#each group as j (j)}
                 {@const m = stage.members[j]}
                 {@const g = sres?.members[j]}
                 {@const isWormMember = worm && stage.meshes[0]?.a === j}
@@ -2236,6 +2258,7 @@
                 })}
               {/each}
             </div>
+            {/each}
 
             <!-- No centre-distance row: the distance each pair of axes runs at
                  and the clearance it runs with are the two inputs above, each
@@ -2863,9 +2886,25 @@
   .edits {
     grid-column: 1 / -1;
     display: flex;
+    align-items: center;
     gap: 0.4rem;
     flex-wrap: wrap;
     margin: 0.3rem 0;
+  }
+  /* In a row of edits a remove sits beside its add, not below it. */
+  .edits .action.danger {
+    margin-top: 0;
+  }
+  /* What the row's buttons do, under them, in a note's voice. */
+  .edit-note {
+    flex-basis: 100%;
+    font-size: 0.72rem;
+    color: var(--muted);
+  }
+  /* The one menu that adds a stage is as wide as its longest entry, no
+     wider, like the gear tab's adopt menu. */
+  select.add {
+    width: max-content;
   }
   /* The core's reason for refusing an edit, under the stage's shared block. */
   .refused {
