@@ -482,14 +482,16 @@ def layshaft(z_in, pairs, engaged):
     """An input and an output shaft on one axis, a layshaft beside them, one
     pair per ratio at the one distance -- every disengaged pair's output-side
     gear idling on a shaft of its own. The same arrangement
-    `gear_core::train::arrangements::layshaft` lays out."""
+    `gear_core::train::arrangements::layshaft` lays out, and each pair is
+    written the way round that one lists its members: the gear on the
+    centreline, then its mate on the layshaft."""
     t = Train()
     inp, out, lay = t.shaft("input"), t.shaft("output"), t.shaft("lay")
     e = F(z_in[0] + z_in[1], 2)
     t.mesh(t.gear("in", inp, 0, z_in[0], 0), t.gear("lay0", lay, 0, z_in[1], e))
-    for i, (on_lay, on_out) in enumerate(pairs):
+    for i, (on_out, on_lay) in enumerate(pairs):
         shaft = out if i == engaged else t.shaft(f"idler{i}")
-        t.mesh(t.gear(f"lay{i + 1}", lay, 0, on_lay, e), t.gear(f"out{i}", shaft, 0, on_out, 0))
+        t.mesh(t.gear(f"out{i}", shaft, 0, on_out, 0), t.gear(f"lay{i + 1}", lay, 0, on_lay, e))
     return t, dict(input=inp, output=out, lay=lay)
 
 
@@ -673,7 +675,7 @@ def main():
     )
 
     print("\nthe arrangements the shape reaches -- the same rows, more of them\n")
-    t, s = layshaft((17, 43), [(19, 41), (31, 29), (43, 17)], 1)
+    t, s = layshaft((17, 43), [(41, 19), (29, 31), (17, 43)], 1)
     fail = compare("layshaft, second pair engaged", t, {0: 0, s["input"]: 1}, s, verbose, fail)
     t, s = planocentric(30, 33)
     fail = compare(

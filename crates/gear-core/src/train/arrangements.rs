@@ -105,9 +105,18 @@ impl Builder {
 /// centreline, a layshaft beside them, and a pair of gears per ratio at the
 /// one distance between the two axes. The input's gear drives the layshaft;
 /// the engaged pair drives the output body; every other pair's output-side
-/// gear idles on a body of its own, coaxial with the output. `pairs` are
-/// `(on the layshaft, on the output side)` in order, `engaged` the index of
-/// the one driving; the first pair is the input's constant mesh.
+/// gear idles on a body of its own, coaxial with the output. `input` and
+/// each of `pairs` is `(on the centreline, on the layshaft)`, `engaged` the
+/// index of the pair driving; the input's is the constant mesh.
+///
+/// **Every tuple reads the same way round, and so does the member list**:
+/// the centreline gear, then its mate on the layshaft, pair after pair. So
+/// the odd members are the ones on the centreline — the input, the output
+/// and the idlers — and the even ones are the layshaft's, which is what
+/// makes a number tell a reader which shaft a gear is on. Listing a pair
+/// the other way round (the layshaft's gear first, as the constant mesh's
+/// mate is second) made members 2 and 3 both the layshaft's and the
+/// numbering zig-zag.
 ///
 /// Bodies: input 1, output 2, layshaft 3, then one idler per disengaged
 /// pair — the output before the layshaft so that the convention's "first
@@ -123,11 +132,11 @@ pub fn layshaft(input: (u32, u32), pairs: &[(u32, u32)], engaged: usize) -> Shap
     let driving = b.gear(input_shaft, input.0);
     let driven = b.gear(layshaft, input.1);
     b.mesh(driving, driven);
-    for (i, &(on_lay, on_out)) in pairs.iter().enumerate() {
+    for (i, &(on_out, on_lay)) in pairs.iter().enumerate() {
         let shaft = if i == engaged { output } else { b.body(centre) };
-        let a = b.gear(layshaft, on_lay);
         let z = b.gear(shaft, on_out);
-        b.mesh(a, z);
+        let a = b.gear(layshaft, on_lay);
+        b.mesh(z, a);
     }
     b.distance([centre, lay]);
     b.build()
@@ -875,7 +884,7 @@ impl StagePreset {
         match self {
             Self::Spur => pair([17, 43]),
             Self::Idler => line(&[17, 25, 43]),
-            Self::Layshaft => layshaft((17, 43), &[(19, 41), (31, 29)], 1),
+            Self::Layshaft => layshaft((17, 43), &[(41, 19), (29, 31)], 1),
             Self::Worm => worm(1, 40),
             Self::Crossed => crossed([17, 43], 90.0),
             Self::Planetary => planetary(12, 30, 72, 3),
@@ -1012,11 +1021,13 @@ mod tests {
     #[test]
     fn a_layshaft_transmission_is_the_engaged_pair_times_the_constant_mesh() {
         // 17/43 into the layshaft; three ratios, the second engaged.
-        let pairs = [(19, 41), (31, 29), (43, 17)];
+        // Each pair is written as the arrangement lists it: the gear on the
+        // centreline, then its mate on the layshaft.
+        let pairs = [(41, 19), (29, 31), (17, 43)];
         for engaged in 0..pairs.len() {
             let shape = layshaft((17, 43), &pairs, engaged);
             let r = solve(&shape, &[], 1, 2);
-            let (on_lay, on_out) = pairs[engaged];
+            let (on_out, on_lay) = pairs[engaged];
             let want = (43.0 / 17.0) * (f64::from(on_out) / f64::from(on_lay));
             assert!(
                 (r.ratio.unwrap() - want).abs() < 1e-12,

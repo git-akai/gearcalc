@@ -506,45 +506,45 @@
     b4     planet 1  of stage 1 speed -4/61
 
 == layshaft ==
-  path b1    -> b2    ratio       2.366224   efficiency  96.998754 / 96.998754  %   backlash   0.099391 / 0.235181   deg
+  path b1    -> b2    ratio       2.366224   efficiency  96.998856 / 96.998856  %   backlash   0.099391 / 0.235181   deg
   case 1       2.0000 Nm /   3000.00 rpm at b1     +reacted at b2   
-    fixed    ground ground                          -  torque     2.590415
+    fixed    ground ground                          -  torque     2.590420
     load     b1  member 1               3000.0000 rpm  torque     2.000000
-    reacted  b2  member 6               1267.8428 rpm  torque    -4.590415
+    reacted  b2  member 5               1267.8428 rpm  torque    -4.590420
     free     b3  member 2               -1186.0465 rpm  torque     0.000000
-    free     b4  member 4               549.6313 rpm  torque     0.000000
-    free     b5  member 8               3000.0000 rpm  torque     0.000000
+    free     b4  member 3               549.6313 rpm  torque     0.000000
+    free     b5  member 7               3000.0000 rpm  torque     0.000000
   case 2       0.6000 Nm /      0.00 rpm at b2     +reacted at b1   
-    fixed    ground ground                          -  torque    -0.354042
-    reacted  b1  member 1               0.0000 rpm  torque    -0.245958
-    load     b2  member 6               0.0000 rpm  torque     0.600000
+    fixed    ground ground                          -  torque    -0.354041
+    reacted  b1  member 1               0.0000 rpm  torque    -0.245959
+    load     b2  member 5               0.0000 rpm  torque     0.600000
     free     b3  member 2               0.0000 rpm  torque     0.000000
-    free     b4  member 4               0.0000 rpm  torque     0.000000
-    free     b5  member 8               0.0000 rpm  torque     0.000000
+    free     b4  member 3               0.0000 rpm  torque     0.000000
+    free     b5  member 7               0.0000 rpm  torque     0.000000
   case 3       2.0000 Nm /   2400.00 rpm at b1     +reacted at b2   
-    fixed    ground ground                          -  torque     2.590415
+    fixed    ground ground                          -  torque     2.590420
     load     b1  member 1               2400.0000 rpm  torque     2.000000
-    reacted  b2  member 6               1014.2743 rpm  torque    -4.590415
+    reacted  b2  member 5               1014.2743 rpm  torque    -4.590420
     free     b3  member 2               -948.8372 rpm  torque     0.000000
-    free     b4  member 4               439.7050 rpm  torque     0.000000
-    free     b5  member 8               2400.0000 rpm  torque     0.000000
-  stage 1  ratio       2.366224   efficiency  96.998754 / 96.998754  %   backlash   0.099391 / 0.235181   deg
-    power through the teeth   1.983450 / 1.986311     one more tooth on each member: 2.234767 2.421252 2.366224 2.366224 2.292279 2.447818 2.366224 2.366224
+    free     b4  member 3               439.7050 rpm  torque     0.000000
+    free     b5  member 7               2400.0000 rpm  torque     0.000000
+  stage 1  ratio       2.366224   efficiency  96.998856 / 96.998856  %   backlash   0.099391 / 0.235181   deg
+    power through the teeth   1.983450 / 1.986312     one more tooth on each member: 2.234767 2.421252 2.366224 2.366224 2.447818 2.292279 2.366224 2.366224
     slot member 1  case 1  speed    3000.000000  torque       2.000000
-    slot member 1  case 2  speed       0.000000  torque      -0.245958
+    slot member 1  case 2  speed       0.000000  torque      -0.245959
     slot member 1  case 3  speed    2400.000000  torque       2.000000
-    slot member 6  case 1  speed    1267.842823  torque      -4.590415
-    slot member 6  case 2  speed       0.000000  torque       0.600000
-    slot member 6  case 3  speed    1014.274258  torque      -4.590415
+    slot member 5  case 1  speed    1267.842823  torque      -4.590420
+    slot member 5  case 2  speed       0.000000  torque       0.600000
+    slot member 5  case 3  speed    1014.274258  torque      -4.590420
     slot member 2  case 1  speed   -1186.046512  torque       0.000000
     slot member 2  case 2  speed       0.000000  torque       0.000000
     slot member 2  case 3  speed    -948.837209  torque       0.000000
-    slot member 4  case 1  speed     549.631310  torque       0.000000
-    slot member 4  case 2  speed       0.000000  torque       0.000000
-    slot member 4  case 3  speed     439.705048  torque       0.000000
-    slot member 8  case 1  speed    3000.000000  torque       0.000000
-    slot member 8  case 2  speed       0.000000  torque       0.000000
-    slot member 8  case 3  speed    2400.000000  torque       0.000000
+    slot member 3  case 1  speed     549.631310  torque       0.000000
+    slot member 3  case 2  speed       0.000000  torque       0.000000
+    slot member 3  case 3  speed     439.705048  torque       0.000000
+    slot member 7  case 1  speed    3000.000000  torque       0.000000
+    slot member 7  case 2  speed       0.000000  torque       0.000000
+    slot member 7  case 3  speed    2400.000000  torque       0.000000
     member 1  z 17  
       case 1  speed    3000.000000  vs frame    3000.000000  torque       2.000000  cycles -
       case 2  speed       0.000000  vs frame       0.000000  torque       0.250098  cycles -
@@ -553,42 +553,42 @@
       case 1  speed   -1186.046512  vs frame   -1186.046512  torque       5.058824  cycles -
       case 2  speed       0.000000  vs frame       0.000000  torque       0.632600  cycles -
       case 3  speed    -948.837209  vs frame    -948.837209  torque       5.058824  cycles 5.693023e7 / 5.693023e7
-    member 3  z 19  
-      case 1  speed   -1186.046512  vs frame   -1186.046512  torque       0.000000  cycles -
-      case 2  speed       0.000000  vs frame       0.000000  torque       0.000000  cycles -
-      case 3  speed    -948.837209  vs frame    -948.837209  torque       0.000000  cycles 5.693023e7 / 5.693023e7
-    member 4  z 41  
+    member 3  z 41  
       case 1  speed     549.631310  vs frame     549.631310  torque       0.000000  cycles -
       case 2  speed       0.000000  vs frame       0.000000  torque       0.000000  cycles -
       case 3  speed     439.705048  vs frame     439.705048  torque       0.000000  cycles 2.638230e7 / 2.638230e7
-    member 5  z 31  
-      case 1  speed   -1186.046512  vs frame   -1186.046512  torque       4.975099  cycles -
-      case 2  speed       0.000000  vs frame       0.000000  torque       0.641379  cycles -
-      case 3  speed    -948.837209  vs frame    -948.837209  torque       4.975099  cycles 5.693023e7 / 5.693023e7
-    member 6  z 29  
-      case 1  speed    1267.842823  vs frame    1267.842823  torque       4.654125  cycles -
-      case 2  speed       0.000000  vs frame       0.000000  torque       0.600000  cycles -
-      case 3  speed    1014.274258  vs frame    1014.274258  torque       4.654125  cycles 6.085646e7 / 6.085646e7
-    member 7  z 43  
+    member 4  z 19  
       case 1  speed   -1186.046512  vs frame   -1186.046512  torque       0.000000  cycles -
       case 2  speed       0.000000  vs frame       0.000000  torque       0.000000  cycles -
       case 3  speed    -948.837209  vs frame    -948.837209  torque       0.000000  cycles 5.693023e7 / 5.693023e7
-    member 8  z 17  
+    member 5  z 29  
+      case 1  speed    1267.842823  vs frame    1267.842823  torque       4.654125  cycles -
+      case 2  speed       0.000000  vs frame       0.000000  torque       0.600000  cycles -
+      case 3  speed    1014.274258  vs frame    1014.274258  torque       4.654125  cycles 6.085646e7 / 6.085646e7
+    member 6  z 31  
+      case 1  speed   -1186.046512  vs frame   -1186.046512  torque       4.975099  cycles -
+      case 2  speed       0.000000  vs frame       0.000000  torque       0.641379  cycles -
+      case 3  speed    -948.837209  vs frame    -948.837209  torque       4.975099  cycles 5.693023e7 / 5.693023e7
+    member 7  z 17  
       case 1  speed    3000.000000  vs frame    3000.000000  torque       0.000000  cycles -
       case 2  speed       0.000000  vs frame       0.000000  torque       0.000000  cycles -
       case 3  speed    2400.000000  vs frame    2400.000000  torque       0.000000  cycles 1.440000e8 / 1.440000e8
+    member 8  z 43  
+      case 1  speed   -1186.046512  vs frame   -1186.046512  torque       0.000000  cycles -
+      case 2  speed       0.000000  vs frame       0.000000  torque       0.000000  cycles -
+      case 3  speed    -948.837209  vs frame    -948.837209  torque       0.000000  cycles 5.693023e7 / 5.693023e7
     mesh 1  efficiency  98.344976 / 98.344976  %  contact ratio   1.5993  coprime
-    mesh 2  efficiency  98.439013 / 98.439013  %  contact ratio   1.6093  coprime
-    mesh 3  efficiency  98.631123 / 98.631123  %  contact ratio   1.6321  coprime
+    mesh 2  efficiency  98.437612 / 98.437612  %  contact ratio   1.6100  coprime
+    mesh 3  efficiency  98.631227 / 98.631227  %  contact ratio   1.6320  coprime
     mesh 4  efficiency  98.344976 / 98.344976  %  contact ratio   1.5993  coprime
   graph    mobility 1 degree(s), 1 given   total ratio 1247/527
     stage 1  ratio 1247/527
     ground ground    of the train speed 0
     b1     member 1  of stage 1 speed 1
-    b2     member 6  of stage 1 speed 527/1247
+    b2     member 5  of stage 1 speed 527/1247
     b3     member 2  of stage 1 speed -17/43
-    b4     member 4  of stage 1 speed 323/1763
-    b5     member 8  of stage 1 speed 1
+    b4     member 3  of stage 1 speed 323/1763
+    b5     member 7  of stage 1 speed 1
 
 == wormpair ==
   path b1    -> b2    ratio     101.176471   efficiency  60.781728 / 0.000000   %   backlash   0.055440 / 5.609180   deg

@@ -860,7 +860,7 @@ mod tests {
     /// this one off to a body of its own.
     #[test]
     fn a_gear_moved_off_a_shaft_does_not_take_the_shaft_with_it() {
-        let lay = || arr::layshaft((17, 43), &[(19, 41), (31, 29)], 1);
+        let lay = || arr::layshaft((17, 43), &[(41, 19), (29, 31)], 1);
         let mut t = Train::chained(vec![lay(), StagePreset::Spur.build()], |t| {
             vec![LoadCase::ultimate(t.port(0, 1), t.port(1, 2), 1.0, 1000.0)]
         });

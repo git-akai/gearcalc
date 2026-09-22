@@ -5364,7 +5364,7 @@ mod pressure_angle {
     /// each mesh reporting its own operating angle above its own reference.
     #[test]
     fn two_mesh_groups_of_one_stage_run_at_two_pressure_angles() {
-        let mut shape = layshaft((17, 43), &[(19, 41)], 0);
+        let mut shape = layshaft((17, 43), &[(41, 19)], 0);
         for j in [2, 3] {
             shape.members[j].pressure_angle = 25.0;
         }
@@ -5423,7 +5423,7 @@ mod overlap_per_group {
     fn each_mesh_group_takes_the_helix_its_own_ratio_needs() {
         // Two pairs on one distance: the second's counts chosen so its
         // steeper helix reaches the first's distance by a shift.
-        let mut shape = layshaft((17, 43), &[(19, 38)], 0);
+        let mut shape = layshaft((17, 43), &[(38, 19)], 0);
         for m in &mut shape.members {
             m.gear.face_width = Auto::fixed(10.0);
         }
@@ -5441,7 +5441,7 @@ mod overlap_per_group {
 
     #[test]
     fn a_ratio_given_over_an_automatic_width_floors_that_meshs_widths_alone() {
-        let mut shape = layshaft((17, 43), &[(19, 41)], 0);
+        let mut shape = layshaft((17, 43), &[(41, 19)], 0);
         for m in &mut shape.members {
             m.gear.face_width = Auto::automatic(5.0);
         }
@@ -5728,7 +5728,7 @@ mod member_names {
             s(&["worm", "wheel", "gear", "gear"])
         );
         // A gear is never numbered by its role: its number is the train's.
-        assert!(arr::layshaft((17, 43), &[(19, 41)], 0)
+        assert!(arr::layshaft((17, 43), &[(41, 19)], 0)
             .member_names()
             .iter()
             .all(|n| n.role == MemberRole::Gear && n.ordinal.is_none()));

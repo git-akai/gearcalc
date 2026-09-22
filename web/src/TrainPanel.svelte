@@ -2150,18 +2150,22 @@
                      add is offered once per distance, on the last of its
                      meshes, so a stage whose meshes all share one distance
                      shows it at the foot of the mesh section and an idler
-                     chain shows one under each of its meshes. -->
+                     chain shows one under each of its meshes. It sits on a
+                     row of its own **under** the remove rather than beside
+                     it, so that every mesh's remove is in the same place
+                     down the column and only the last carries a second
+                     row. -->
                 {#if parallel}
                   {@const lastOnDistance = stage.meshes.every((x, kk) => kk <= k || !sameDistance(stage, x, m))}
                   <div class="edits">
-                    {#if lastOnDistance}
-                      <button class="action add" onclick={() => editStage(i, { add_mesh: { distance: distanceOf(stage, m) } })}>{t("ui.train_add_mesh")}</button>
-                    {/if}
                     <button class="action danger" disabled={onDistance < 2} onclick={() => editStage(i, { remove_mesh: { mesh: k } })}>{t("ui.train_remove_mesh")}</button>
-                    {#if lastOnDistance}
-                      <small class="edit-note">{t("ui.train_note_add_mesh")}</small>
-                    {/if}
                   </div>
+                  {#if lastOnDistance}
+                    <div class="edits">
+                      <button class="action add" onclick={() => editStage(i, { add_mesh: { distance: distanceOf(stage, m) } })}>{t("ui.train_add_mesh")}</button>
+                      <small class="edit-note">{t("ui.train_note_add_mesh")}</small>
+                    </div>
+                  {/if}
                 {/if}
               {/each}
             </div>

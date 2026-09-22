@@ -181,12 +181,14 @@ fn fixtures() -> Vec<(String, Train)> {
         use gear_core::train::arrangements as arr;
         let shape = |s| s;
         // Three ratios on one layshaft, the second engaged: 17/43 in, then
-        // 31/29 out, the idlers turning free.
+        // out through the layshaft's 31 to the 29 on the output, the idlers
+        // turning free. Each pair is `(on the centreline, on the layshaft)`,
+        // as the arrangement lists its members.
         out.push((
             "layshaft".to_string(),
             train(vec![shape(arr::layshaft(
                 (17, 43),
-                &[(19, 41), (31, 29), (43, 17)],
+                &[(41, 19), (29, 31), (17, 43)],
                 1,
             ))]),
         ));

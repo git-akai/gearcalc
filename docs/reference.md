@@ -2359,8 +2359,11 @@ zero-backlash one.
 in `train/arrangements.rs` as lists of what sits where, through a builder
 whose whole vocabulary is an axis, a body, a gear or ring, a mesh and a
 distance: a pair (the spur preset), a crossed pair, a worm and its wheel,
-a planetary set, a layshaft transmission (one distance, a pair per ratio, the
-disengaged pairs' gears idling on bodies of their own), a Wolfrom (one
+a planetary set, a layshaft transmission (one distance, a pair per ratio
+listed the way round every other tuple is — the gear on the centreline,
+then its mate on the layshaft, so the odd members are the input, the output
+and the idlers and the even ones the layshaft's — the disengaged pairs'
+gears idling on bodies of their own), a Wolfrom (one
 planet, two rings, no sun), a stepped planet (two gears on the planet's body,
 two rings), a planocentric reducer (one planet on an eccentric carrier, its
 own turn the output), meshed planets (sun, planet, planet, ring — the
