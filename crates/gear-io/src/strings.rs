@@ -954,13 +954,10 @@ mod tests {
         // threshold, so both the self-locking note and the "close to it" one
         // get their turn.
         for friction in [0.06_f64, 0.115, 0.12, 0.125] {
-            let stage = ({
-                let mut s = arr::worm(1, 40);
-                s.meshes[0].sliding_friction = friction;
-                s.meshes[0].static_friction = friction;
-                s
-            })
-            .with_first_helix(45.0);
+            let mut s = arr::worm(1, 40);
+            s.meshes[0].sliding_friction = friction;
+            s.meshes[0].static_friction = friction;
+            let stage = s.with_first_helix(45.0);
             if let Ok(r) = solve_crossed(&stage, &gear_core::train::StageLoads::just(2.0), &lib) {
                 record(&r.every_note());
             }

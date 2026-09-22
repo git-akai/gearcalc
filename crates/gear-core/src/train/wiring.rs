@@ -75,13 +75,14 @@ use crate::ratio::Ratio;
 /// that survives that: ground, the body a member spins with, or a carrier —
 /// a frame that is nobody's body. The front end names the second after the
 /// member (`gearNumber`) and the third with its own word, as it already does.
+///
+/// **It does not cross the boundary.** The panel names a body off the train
+/// it already holds — which member sits on it, by the one rule
+/// `members.ts` reads — so a label sent beside every port, every case row
+/// and every end was a second naming nothing read. The harness uses it in
+/// process (`gear-cli kinematics`), which is what it is for.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-#[cfg_attr(
-    feature = "typescript",
-    derive(ts_rs::TS),
-    ts(export, export_to = "core/")
-)]
 #[cfg_attr(feature = "serde", serde(tag = "kind", rename_all = "snake_case"))]
 pub enum BodyLabel {
     /// The one held frame — see [`GROUND`].

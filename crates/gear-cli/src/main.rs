@@ -3510,12 +3510,9 @@ fn crossed_report(z1: u32, z2: u32, shaft_angle: f64) {
     // search, on the crossed mesh's own objective. Here so the optimiser's
     // crossed answer is in the change detector, which is the ninth time this
     // audit has had to put an opt-in the harness never switched on into it.
-    let even = ({
-        let mut s = base.clone();
-        s.optimisation = gear_core::train::Optimisation { enabled: true };
-        s
-    })
-    .with_first_helix(shaft_angle / 2.0);
+    let mut s = base.clone();
+    s.optimisation = gear_core::train::Optimisation { enabled: true };
+    let even = s.with_first_helix(shaft_angle / 2.0);
     let mut free = even.clone();
     for m in &mut free.members {
         m.gear.profile_shift = gear_core::params::Auto::automatic(0.0);

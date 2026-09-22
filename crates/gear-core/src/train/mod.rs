@@ -3896,7 +3896,6 @@ pub enum BodyRole {
 )]
 pub struct CaseBody {
     pub at: usize,
-    pub label: BodyLabel,
     pub role: BodyRole,
     /// rpm; `None` on a body that is held, which has none to report.
     pub speed: Option<f64>,
@@ -4241,9 +4240,8 @@ fn solve_train_under(
                     bodies: refs
                         .iter()
                         .enumerate()
-                        .map(|(s, &(at, label))| CaseBody {
+                        .map(|(s, &(at, _))| CaseBody {
                             at,
-                            label,
                             role: role(s),
                             speed: (conditions[s] != Condition::Ground).then_some(0.0),
                             torque: 0.0,
@@ -4467,9 +4465,8 @@ fn solve_train_under(
             bodies: refs
                 .iter()
                 .enumerate()
-                .map(|(s, &(at, label))| CaseBody {
+                .map(|(s, &(at, _))| CaseBody {
                     at,
-                    label,
                     role: role(s),
                     speed: (conditions[s] != Condition::Ground).then_some(speeds[s]),
                     // A body's external torque is reported on the body it
@@ -4969,14 +4966,8 @@ mod tests {
 
         // --- an epicyclic set, both of its meshes.
         for (sun, planet) in [(17_u32, 17_u32), (24, 18), (13, 25)] {
-            let mut set = {
-                let mut s = arr::planetary(12, 30, 72, 3);
-                s.optimisation = Optimisation { enabled: true };
-                s
-            };
-            set.members[0].gear.teeth = sun;
-            set.members[1].gear.teeth = planet;
-            set.members[2].gear.teeth = sun + 2 * planet;
+            let mut set = arr::planetary(sun, planet, sun + 2 * planet, 3);
+            set.optimisation = Optimisation { enabled: true };
             set.members[0].gear.profile_shift = Auto::automatic(0.0);
             set.members[2].gear.profile_shift = Auto::automatic(0.0);
             let shape = set.clone();
@@ -5057,14 +5048,8 @@ mod tests {
         let mut checked = 0u32;
         for sun in [11_u32, 13, 17, 19, 24, 31] {
             for planet in [14_u32, 17, 18, 21, 25] {
-                let mut set = {
-                    let mut s = arr::planetary(12, 30, 72, 3);
-                    s.optimisation = Optimisation { enabled: true };
-                    s
-                };
-                set.members[0].gear.teeth = sun;
-                set.members[1].gear.teeth = planet;
-                set.members[2].gear.teeth = sun + 2 * planet;
+                let mut set = arr::planetary(sun, planet, sun + 2 * planet, 3);
+                set.optimisation = Optimisation { enabled: true };
                 set.members[0].gear.profile_shift = Auto::automatic(0.0);
                 set.members[2].gear.profile_shift = Auto::automatic(0.0);
                 let Ok(r) = solve_planetary_stage(&set, &StageLoads::just(2.0), &lib) else {
@@ -5335,14 +5320,8 @@ mod tests {
         let mut worst_set = 0.0_f64;
         for sun in [11_u32, 13, 17, 19, 24, 31] {
             for planet in [14_u32, 17, 18, 21, 25] {
-                let mut set = {
-                    let mut s = arr::planetary(12, 30, 72, 3);
-                    s.optimisation = Optimisation { enabled: true };
-                    s
-                };
-                set.members[0].gear.teeth = sun;
-                set.members[1].gear.teeth = planet;
-                set.members[2].gear.teeth = sun + 2 * planet;
+                let mut set = arr::planetary(sun, planet, sun + 2 * planet, 3);
+                set.optimisation = Optimisation { enabled: true };
                 set.members[0].gear.profile_shift = Auto::automatic(0.0);
                 set.members[2].gear.profile_shift = Auto::automatic(0.0);
                 let shape = set.clone();
@@ -5992,10 +5971,8 @@ mod tests {
         };
         let mut out = Vec::new();
         for (z1, z2) in [(17_u32, 43_u32), (9, 37), (13, 13)] {
-            let mut s = arr::pair([17, 43]);
-            s.members[0].gear.teeth = z1;
-            s.members[1].gear.teeth = z2;
-            out.push(conventional(format!("spur {z1}/{z2}"), s.clone()));
+            let s = arr::pair([z1, z2]);
+            out.push(conventional(format!("spur {z1}/{z2}"), s));
         }
         out.push(conventional("worm".into(), arr::worm(1, 40)));
         // **The arrangement is what a set is asked, not what it is**: one

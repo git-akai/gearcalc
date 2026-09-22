@@ -828,7 +828,6 @@ pub struct PortSpec {
     pub slot: Body,
     /// The train's body it is.
     pub body: usize,
-    pub label: BodyLabel,
     /// **What this port is asked if the train says nothing about it** — the
     /// stage's convention *as the overlay leaves it*, with everything else
     /// the train states in force: a set's ring reads `free` here once its
@@ -877,7 +876,6 @@ pub struct StagePorts {
 )]
 pub struct BodyEnd {
     pub stage: usize,
-    pub label: BodyLabel,
 }
 
 /// One body of the train's motion, for the front end.
@@ -989,7 +987,6 @@ impl Train {
             .iter()
             .enumerate()
             .map(|(k, stage)| {
-                let w = stage.wiring();
                 StagePorts {
                     members: stage.member_names(),
                     mesh_groups: stage.mesh_groups(),
@@ -1007,7 +1004,6 @@ impl Train {
                             PortSpec {
                                 slot,
                                 body,
-                                label: w.slots[slot],
                                 by_convention: without
                                     .constraints_in_force()
                                     .iter()
@@ -1055,10 +1051,7 @@ impl Train {
             }
             self.ends_of(body)
                 .into_iter()
-                .map(|(stage, slot)| BodyEnd {
-                    stage,
-                    label: self.stages[stage].wiring().slots[slot],
-                })
+                .map(|(stage, _)| BodyEnd { stage })
                 .collect()
         };
         Some(MotionReport {
@@ -1101,7 +1094,7 @@ impl Train {
         })
     }
 
-    /// **Every body some stage has as a port** — see [`TrainBody`] — in
+    /// **Every body some stage has as a port** — see [`PortBody`] — in
     /// body order, each with its ends.
     #[must_use]
     pub fn bodies(&self, boundaries: &[StageBoundary]) -> Vec<PortBody> {

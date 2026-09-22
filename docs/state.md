@@ -137,6 +137,7 @@ python3 tools/crossed_path.py                      # the crossed path, from the 
 python3 tools/hula_kinematics.py                   # the hula ratio, from the rolling circles
 python3 tools/train_kinematics.py                  # every topology's speeds and torques, from rigid-body velocities
 python3 tools/iso_6336_3_stack.py                  # where this tool stands against ISO 6336-3, factor by factor
+python3 tools/line_census.py                       # the prose-to-code ratio, at this tree or between two
 ```
 
 [`bending-check.html`](bending-check.html) is `gear-cli bending`'s figures with
@@ -235,9 +236,9 @@ when the pair of them became a list, and when a case became a list of loads
 solved as one flow. All are single-load reports, and a stage asked for one
 torque answers with the figure it always did — which is the check that a case
 was added rather than substituted for the first. The corpus's train reports
-moved in layout each time — every shaft's role, speed and torque per case now
+moved in layout each time — every body's role, speed and torque per case now
 — and in one sign: a reaction is reported as the external torque on its
-shaft, where the walk had printed the mesh's torque on it. Every member's
+body, where the walk had printed the mesh's torque on it. Every member's
 figures in the three cases a train used to hold as fields are what they were,
 save the back-driving case's start, which the preset now reacts rather than
 leaving free (below).
@@ -329,7 +330,7 @@ figures its own solver recorded before it retired.
 Two figures the graph makes free are reported beside the ratio and the
 efficiency: what one more tooth on each member would make the ratio, and
 the power through the teeth over the power in, per mesh and summed. A load
-on a shaft two stages share goes the way that holds it, and is refused only
+on a body two stages share goes the way that holds it, and is refused only
 where it would be held at both ends.
 Retiring the stage types into it moved four figures, each recorded in
 [corrections](corrections.md#the-log) with its size: a set's driven-side
@@ -376,7 +377,7 @@ has a sun small enough to need shift, so it opens with +0.298 on the sun and
 −0.170 on the planet, and its planet–ring mesh fouls at a full-depth ring as
 the reference records. The
 ring sweep (`gear-cli planetary`), layout checks, Willis kinematics,
-Pennestrì–Freudenstein efficiency in all six arrangements, and backlash referred to the output shaft —
+Pennestrì–Freudenstein efficiency in all six arrangements, and backlash referred to the output body —
 which on the ideal ring a centre tolerance cannot move, the sun mesh gaining
 what the ring mesh loses. The set's clearance is always given: it is what the
 two nominal distances differ by, and no one distance could hand it back.
@@ -518,7 +519,7 @@ parameter outside the band the `Y_S` fit is stated for says so on the gear too.
 per revolution *relative to the carrier of its mesh*, once for each parallel
 mesh path. A pair has no carrier and one path, so this is its own revolutions; an
 epicyclic set has both, and the consequence a per-member reading cannot state is
-that a shaft which does not turn is still loaded — a held ring meets a planet
+that a body which does not turn is still loaded — a held ring meets a planet
 once per carrier revolution.
 
 **Languages.** English, German, Portuguese, Simplified Chinese and Traditional
@@ -535,8 +536,9 @@ DXF with exact arcs for external *and* internal gears, written to the published
 R2000 minimum so a reader that repairs nothing still opens it — confirmed
 importing into SOLIDWORKS · geartrain presets under three families: parallel
 axes (spur/helical, idler, layshaft), skew shafts (worm, crossed), epicyclic
-(planetary, Wolfrom, compound, planocentric, meshed planets), all one shape,
-the hula an arrangement of the epicyclic family the harness names · a stage
+(planetary, Wolfrom, compound, planocentric, meshed planets), all one shape
+and all one list of what sits where (`arrangements`), the hula an
+arrangement of the epicyclic family the harness names · a stage
 edited on its card — a step, a sun or a ring, an axis, a pair, a member's
 body — by the core's rules, the cases following, the cards dealt by step
 and by mesh group · **a train's bodies are its one vocabulary for what
@@ -583,7 +585,7 @@ been. They are not a backlog.
 | A ring's own bounds for a stage member | The gear card shows a rack's buildable range, which is not a ring's, so it shows nothing there and says so |
 | A coupled glass POM grade | Can be added if one is wanted; it must be *coupled*, not filled |
 | **Two carried axes placed round the carrier** | A meshed-planet or Ravigneaux set has three distances — centre to each planet axis and between them — and each closes on its own shifts; nothing checks the three form a triangle, and the planet-clearance layout places one axis's planets without the other's. A preset carries it, the figures it reports are the meshes', and a layout that does not close is a fault this tool does not yet name |
-| **A stepped planet's assembly, timed** | The assembly rule (`Shape::assembly`) takes every planet identical: two gears on one planet shaft at one relative phase. Planets timed individually at manufacture assemble equally spaced at any count, which the rule then under-reports as *no*; the rule's answer is the cheaper build, not the only one |
+| **A stepped planet's assembly, timed** | The assembly rule (`Shape::assembly`) takes every planet identical: two gears on one planet's body at one relative phase. Planets timed individually at manufacture assemble equally spaced at any count, which the rule then under-reports as *no*; the rule's answer is the cheaper build, not the only one |
 
 ---
 
@@ -701,7 +703,7 @@ whose size is unmeasured is a debt still owed, and is marked as one.
   equivalent shift, and the model would need to say what that does to
   backlash and to the tips before it could be offered — so it is not
   offered, and relief keeps the pair on the rule.
-- **A planet's net shaft torque is reported as zero**, which is what it is —
+- **A planet's net body torque is reported as zero**, which is what it is —
   a free idler's two meshes balance — and what the set's own solver never printed.
   The torque its teeth carry is on its card, per mesh, as every member's is.
 

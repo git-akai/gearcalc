@@ -17600,29 +17600,18 @@
          "bodies": [
           {
            "at": 0,
-           "label": {
-            "kind": "ground"
-           },
            "role": "fixed",
            "speed": null,
            "torque": "-0.34875494009790137"
           },
           {
            "at": 1,
-           "label": {
-            "kind": "member",
-            "member": 0
-           },
            "role": "load",
            "speed": 30000,
            "torque": "0.10000000000000001"
           },
           {
            "at": 2,
-           "label": {
-            "kind": "member",
-            "member": 1
-           },
            "role": "reacted",
            "speed": "-11860.465116279069",
            "torque": "0.24875494009790136"
@@ -17636,29 +17625,18 @@
          "bodies": [
           {
            "at": 0,
-           "label": {
-            "kind": "ground"
-           },
            "role": "fixed",
            "speed": null,
            "torque": "-4.1664171609782610"
           },
           {
            "at": 1,
-           "label": {
-            "kind": "member",
-            "member": 0
-           },
            "role": "reacted",
            "speed": 0,
            "torque": "1.1664171609782612"
           },
           {
            "at": 2,
-           "label": {
-            "kind": "member",
-            "member": 1
-           },
            "role": "load",
            "speed": 0,
            "torque": 3
@@ -17672,29 +17650,18 @@
          "bodies": [
           {
            "at": 0,
-           "label": {
-            "kind": "ground"
-           },
            "role": "fixed",
            "speed": null,
            "torque": "-0.069750988019580282"
           },
           {
            "at": 1,
-           "label": {
-            "kind": "member",
-            "member": 0
-           },
            "role": "load",
            "speed": 30000,
            "torque": "0.020000000000000000"
           },
           {
            "at": 2,
-           "label": {
-            "kind": "member",
-            "member": 1
-           },
            "role": "reacted",
            "speed": "-11860.465116279069",
            "torque": "0.049750988019580278"
@@ -18334,19 +18301,11 @@
          {
           "slot": 1,
           "body": 1,
-          "label": {
-           "kind": "member",
-           "member": 0
-          },
           "by_convention": "free"
          },
          {
           "slot": 2,
           "body": 2,
-          "label": {
-           "kind": "member",
-           "member": 1
-          },
           "by_convention": "free"
          }
         ],
@@ -18389,11 +18348,7 @@
          "body": 1,
          "ends": [
           {
-           "stage": 0,
-           "label": {
-            "kind": "member",
-            "member": 0
-           }
+           "stage": 0
           }
          ],
          "port": true,
@@ -18408,11 +18363,7 @@
          "body": 2,
          "ends": [
           {
-           "stage": 0,
-           "label": {
-            "kind": "member",
-            "member": 1
-           }
+           "stage": 0
           }
          ],
          "port": true,
@@ -18472,59 +18423,36 @@
          "bodies": [
           {
            "at": 0,
-           "label": {
-            "kind": "ground"
-           },
            "role": "fixed",
            "speed": null,
            "torque": "-0.34875494009790142"
           },
           {
            "at": 1,
-           "label": {
-            "kind": "member",
-            "member": 0
-           },
            "role": "load",
            "speed": 30000,
            "torque": "0.10000000000000002"
           },
           {
            "at": 2,
-           "label": {
-            "kind": "member",
-            "member": 1
-           },
            "role": "free",
            "speed": "-11860.465116279069",
            "torque": 0
           },
           {
            "at": 3,
-           "label": {
-            "kind": "carrier",
-            "index": 0
-           },
            "role": "reacted",
            "speed": "-1694.3521594684387",
            "torque": "1.7009183035807283"
           },
           {
            "at": 4,
-           "label": {
-            "kind": "member",
-            "member": 2
-           },
            "role": "fixed",
            "speed": null,
            "torque": "-1.4521633634828268"
           },
           {
            "at": 5,
-           "label": {
-            "kind": "member",
-            "member": 1
-           },
            "role": "free",
            "speed": "2372.0930232558139",
            "torque": 0
@@ -18538,59 +18466,36 @@
          "bodies": [
           {
            "at": 0,
-           "label": {
-            "kind": "ground"
-           },
            "role": "fixed",
            "speed": null,
            "torque": "-0.58135101346394558"
           },
           {
            "at": 1,
-           "label": {
-            "kind": "member",
-            "member": 0
-           },
            "role": "reacted",
            "speed": 0,
            "torque": "0.16275321756240921"
           },
           {
            "at": 2,
-           "label": {
-            "kind": "member",
-            "member": 1
-           },
            "role": "free",
            "speed": 0,
            "torque": 0
           },
           {
            "at": 3,
-           "label": {
-            "kind": "carrier",
-            "index": 0
-           },
            "role": "load",
            "speed": 0,
            "torque": 3
           },
           {
            "at": 4,
-           "label": {
-            "kind": "member",
-            "member": 2
-           },
            "role": "fixed",
            "speed": null,
            "torque": "-2.5814022040984641"
           },
           {
            "at": 5,
-           "label": {
-            "kind": "member",
-            "member": 1
-           },
            "role": "free",
            "speed": 0,
            "torque": 0
@@ -18604,59 +18509,36 @@
          "bodies": [
           {
            "at": 0,
-           "label": {
-            "kind": "ground"
-           },
            "role": "fixed",
            "speed": null,
            "torque": "-0.069750988019580268"
           },
           {
            "at": 1,
-           "label": {
-            "kind": "member",
-            "member": 0
-           },
            "role": "load",
            "speed": 30000,
            "torque": "0.019999999999999997"
           },
           {
            "at": 2,
-           "label": {
-            "kind": "member",
-            "member": 1
-           },
            "role": "free",
            "speed": "-11860.465116279069",
            "torque": 0
           },
           {
            "at": 3,
-           "label": {
-            "kind": "carrier",
-            "index": 0
-           },
            "role": "reacted",
            "speed": "-1694.3521594684387",
            "torque": "0.34018366071614559"
           },
           {
            "at": 4,
-           "label": {
-            "kind": "member",
-            "member": 2
-           },
            "role": "fixed",
            "speed": null,
            "torque": "-0.29043267269656531"
           },
           {
            "at": 5,
-           "label": {
-            "kind": "member",
-            "member": 1
-           },
            "role": "free",
            "speed": "2372.0930232558139",
            "torque": 0
@@ -20261,19 +20143,11 @@
          {
           "slot": 1,
           "body": 1,
-          "label": {
-           "kind": "member",
-           "member": 0
-          },
           "by_convention": "free"
          },
          {
           "slot": 2,
           "body": 2,
-          "label": {
-           "kind": "member",
-           "member": 1
-          },
           "by_convention": "free"
          }
         ],
@@ -20300,28 +20174,16 @@
          {
           "slot": 1,
           "body": 2,
-          "label": {
-           "kind": "member",
-           "member": 0
-          },
           "by_convention": "free"
          },
          {
           "slot": 2,
           "body": 3,
-          "label": {
-           "kind": "carrier",
-           "index": 0
-          },
           "by_convention": "free"
          },
          {
           "slot": 3,
           "body": 4,
-          "label": {
-           "kind": "member",
-           "member": 2
-          },
           "by_convention": "held"
          }
         ],
@@ -20369,11 +20231,7 @@
          "body": 1,
          "ends": [
           {
-           "stage": 0,
-           "label": {
-            "kind": "member",
-            "member": 0
-           }
+           "stage": 0
           }
          ],
          "port": true,
@@ -20388,18 +20246,10 @@
          "body": 2,
          "ends": [
           {
-           "stage": 0,
-           "label": {
-            "kind": "member",
-            "member": 1
-           }
+           "stage": 0
           },
           {
-           "stage": 1,
-           "label": {
-            "kind": "member",
-            "member": 0
-           }
+           "stage": 1
           }
          ],
          "port": true,
@@ -20414,11 +20264,7 @@
          "body": 3,
          "ends": [
           {
-           "stage": 1,
-           "label": {
-            "kind": "carrier",
-            "index": 0
-           }
+           "stage": 1
           }
          ],
          "port": true,
@@ -20433,11 +20279,7 @@
          "body": 4,
          "ends": [
           {
-           "stage": 1,
-           "label": {
-            "kind": "member",
-            "member": 2
-           }
+           "stage": 1
           }
          ],
          "port": true,
@@ -20452,11 +20294,7 @@
          "body": 5,
          "ends": [
           {
-           "stage": 1,
-           "label": {
-            "kind": "member",
-            "member": 1
-           }
+           "stage": 1
           }
          ],
          "port": false,

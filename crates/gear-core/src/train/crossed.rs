@@ -361,22 +361,11 @@ mod tests {
         // against a comment saying the two cases exist because the answer
         // differs at the two ends.
         let crossed = |sigma_deg: f64| {
-            ({
-                let mut s = arr::worm(1, 40);
-                s.members[0].gear.teeth = 17;
-                s.members[1].gear.teeth = 23;
-                s.distances[0].angle = sigma_deg;
-                s
-            })
-            .with_first_helix(sigma_deg / 2.0)
+            let mut s = arr::worm(17, 23);
+            s.distances[0].angle = sigma_deg;
+            s.with_first_helix(sigma_deg / 2.0)
         };
-        let worm = ({
-            let mut s = arr::worm(1, 40);
-            s.members[0].gear.teeth = 1;
-            s.members[1].gear.teeth = 40;
-            s
-        })
-        .with_first_diameter(7.0);
+        let worm = arr::worm(1, 40).with_first_diameter(7.0);
         for (name, stage, line_should_govern) in [
             ("crossed 0.5°", crossed(0.5), true),
             ("crossed 1°", crossed(1.0), true),
@@ -452,17 +441,12 @@ mod tests {
     #[test]
     fn axial_slack_reproduces_the_two_handbook_relations() {
         for (starts, wheel, d1) in [(1u32, 40u32, 7.0), (2, 31, 9.0), (4, 60, 14.0)] {
-            let stage = ({
-                let mut s = arr::worm(1, 40);
-                s.members[0].gear.teeth = starts;
-                s.members[1].gear.teeth = wheel;
-                s.distances[0].axial_clearance = 0.04;
-                s.distances[0].clearance = Auto::fixed(0.0);
-                s.distances[0].tolerance_plus = 0.0;
-                s.distances[0].tolerance_minus = 0.0;
-                s
-            })
-            .with_first_diameter(d1);
+            let mut s = arr::worm(starts, wheel);
+            s.distances[0].axial_clearance = 0.04;
+            s.distances[0].clearance = Auto::fixed(0.0);
+            s.distances[0].tolerance_plus = 0.0;
+            s.distances[0].tolerance_minus = 0.0;
+            let stage = s.with_first_diameter(d1);
             let r = solved(&stage);
             let s = stage.screw(0).unwrap();
 
@@ -690,13 +674,8 @@ mod tests {
     /// recommendation beside it.
     #[test]
     fn a_crossed_gear_pair_is_not_given_a_worms_proportions() {
-        let stage = ({
-            let mut s = arr::worm(1, 40);
-            s.members[0].gear.teeth = 17;
-            s.members[1].gear.teeth = 23;
-            s
-        })
-        .with_first_helix(45.0);
+        let s = arr::worm(17, 23);
+        let stage = s.with_first_helix(45.0);
         let lib = library();
         let as_gears = solve_crossed(&stage, &StageLoads::just(2.0), &lib).unwrap();
         let as_worm = solve_worm(&stage, &StageLoads::just(2.0), &lib).unwrap();
@@ -972,13 +951,7 @@ mod tests {
 
         for stage in [
             arr::worm(1, 40),
-            ({
-                let mut s = arr::worm(1, 40);
-                s.members[0].gear.teeth = 2;
-                s.members[1].gear.teeth = 40;
-                s
-            })
-            .with_first_diameter(12.0),
+            ({ arr::worm(2, 40) }).with_first_diameter(12.0),
         ] {
             let r = solve_worm(&stage, &StageLoads::just(2.0), &lib).unwrap();
             let classical = point(&r).point.map(|_| ()).map(|()| {
@@ -1112,8 +1085,6 @@ mod tests {
         let r = solved(
             &({
                 let mut s = arr::worm(1, 40);
-                s.members[0].gear.teeth = 1;
-                s.members[1].gear.teeth = 40;
                 s.meshes[0].sliding_friction = 0.06;
                 s
             })
@@ -1133,13 +1104,7 @@ mod tests {
     #[test]
     fn a_pair_that_cannot_exist_says_which_way_it_failed() {
         let err = solve_worm(
-            &({
-                let mut s = arr::worm(1, 40);
-                s.members[0].gear.teeth = 9;
-                s.members[1].gear.teeth = 40;
-                s
-            })
-            .with_first_diameter(8.0),
+            &({ arr::worm(9, 40) }).with_first_diameter(8.0),
             &StageLoads::just(2.0),
             &library(),
         )
@@ -1168,14 +1133,9 @@ mod tests {
                     if sigma - beta1 < 0.0 || sigma - beta1 > 89.0 {
                         continue;
                     }
-                    let by_angle = ({
-                        let mut s = arr::worm(1, 40);
-                        s.members[0].gear.teeth = z1;
-                        s.members[1].gear.teeth = z2;
-                        s.distances[0].angle = sigma;
-                        s
-                    })
-                    .with_first_helix(beta1);
+                    let mut s = arr::worm(z1, z2);
+                    s.distances[0].angle = sigma;
+                    let by_angle = s.with_first_helix(beta1);
                     let Ok(a) = by_angle.screw(0) else { continue };
                     assert!(
                         (a.lead_angle_rad.to_degrees() - (90.0 - beta1)).abs() < 1e-9,
@@ -1223,14 +1183,9 @@ mod tests {
     #[test]
     fn a_crossed_axis_spur_pair_puts_the_spur_member_second() {
         for sigma in [20.0f64, 30.0, 45.0, 60.0] {
-            let stage = ({
-                let mut s = arr::worm(1, 40);
-                s.members[0].gear.teeth = 17;
-                s.members[1].gear.teeth = 23;
-                s.distances[0].angle = sigma;
-                s
-            })
-            .with_first_helix(sigma);
+            let mut stage = arr::worm(17, 23);
+            stage.distances[0].angle = sigma;
+            let stage = stage.with_first_helix(sigma);
             let s = stage
                 .screw(0)
                 .unwrap_or_else(|e| panic!("Sigma={sigma}: {e}"));
@@ -1249,14 +1204,9 @@ mod tests {
         }
 
         // The other way round is refused, not fudged.
-        let backwards = ({
-            let mut s = arr::worm(1, 40);
-            s.members[0].gear.teeth = 17;
-            s.members[1].gear.teeth = 23;
-            s.distances[0].angle = 30.0;
-            s
-        })
-        .with_first_helix(0.0);
+        let mut s = arr::worm(17, 23);
+        s.distances[0].angle = 30.0;
+        let backwards = s.with_first_helix(0.0);
         assert!(
             backwards.screw(0).is_err(),
             "a spur first member has no lead angle to report"
@@ -1274,26 +1224,16 @@ mod tests {
     #[test]
     fn a_ninety_degree_helix_is_refused_where_it_is_still_visible() {
         for beta in [90.0f64, 91.0, 120.0, -90.0] {
-            let stage = ({
-                let mut s = arr::worm(1, 40);
-                s.members[0].gear.teeth = 17;
-                s.members[1].gear.teeth = 23;
-                s.distances[0].angle = 90.0;
-                s
-            })
-            .with_first_helix(beta);
+            let mut s = arr::worm(17, 23);
+            s.distances[0].angle = 90.0;
+            let stage = s.with_first_helix(beta);
             assert!(stage.screw(0).is_err(), "beta={beta}: a disc is not a gear");
         }
         // Just inside is silly but representable — the project's standing rule is
         // that a limit answers "could this exist", not "would anyone want it".
-        let stage = ({
-            let mut s = arr::worm(1, 40);
-            s.members[0].gear.teeth = 17;
-            s.members[1].gear.teeth = 23;
-            s.distances[0].angle = 90.0;
-            s
-        })
-        .with_first_helix(89.0);
+        let mut s = arr::worm(17, 23);
+        s.distances[0].angle = 90.0;
+        let stage = s.with_first_helix(89.0);
         let g = stage.screw(0).unwrap();
         assert!(g.worm_pitch_diameter.is_finite() && g.worm_pitch_diameter > 0.0);
     }
@@ -1316,25 +1256,19 @@ mod tests {
             face_width: Auto::fixed(8.0),
             ..StageGear::default()
         };
-        let spur = ({
-            let mut s = arr::pair([17, 43]);
-            s.distances[0].angle = 90.0;
-            s.members[0].gear = gear(17);
-            s.members[1].gear = gear(23);
-            s
-        })
-        .with_additional_helix(0.0);
+        let mut s = arr::pair([17, 43]);
+        s.distances[0].angle = 90.0;
+        s.members[0].gear = gear(17);
+        s.members[1].gear = gear(23);
+        let spur = s.with_additional_helix(0.0);
         // The same pair entered the worm way: by the first member's helix,
         // as a worm kind, with the worm preset's float taken off.
-        let as_screw = ({
-            let mut s = arr::worm(1, 40);
-            s.distances[0].angle = 90.0;
-            s.distances[0].axial_clearance = 0.0;
-            s.members[0].gear = gear(17);
-            s.members[1].gear = gear(23);
-            s
-        })
-        .with_first_helix(45.0);
+        let mut s = arr::worm(1, 40);
+        s.distances[0].angle = 90.0;
+        s.distances[0].axial_clearance = 0.0;
+        s.members[0].gear = gear(17);
+        s.members[1].gear = gear(23);
+        let as_screw = s.with_first_helix(45.0);
 
         let a = solve_crossed(&spur, &StageLoads::just(2.0), &lib).unwrap();
         let b = solve_worm(&as_screw, &StageLoads::just(2.0), &lib).unwrap();
@@ -1987,14 +1921,7 @@ mod tests {
     /// reports — the result shape is shared because the mathematics is.
     #[test]
     fn a_crossed_gear_pair_solves_end_to_end() {
-        let stage = ({
-            let mut s = arr::worm(1, 40);
-            s.members[0].gear.teeth = 17;
-            s.members[1].gear.teeth = 23;
-            s.distances[0].angle = 90.0;
-            s
-        })
-        .with_first_helix(45.0);
+        let stage = arr::worm(17, 23).with_first_helix(45.0);
         let r = solve_worm(
             &stage,
             &StageLoads::just(2.0),
@@ -2015,8 +1942,6 @@ mod tests {
         let worm = solve_worm(
             &({
                 let mut s = arr::worm(1, 40);
-                s.members[0].gear.teeth = 1;
-                s.members[1].gear.teeth = 40;
                 s.distances[0].angle = 90.0;
                 s
             })
@@ -2042,9 +1967,7 @@ mod tests {
         for sigma in [20.0f64, 40.0, 60.0, 90.0] {
             let e = solve_worm(
                 &({
-                    let mut s = arr::worm(1, 40);
-                    s.members[0].gear.teeth = 17;
-                    s.members[1].gear.teeth = 23;
+                    let mut s = arr::worm(17, 23);
                     s.distances[0].angle = sigma;
                     s
                 })

@@ -118,7 +118,7 @@ those is a limit of the mathematics; all four were convention.
 `tests/extremes.rs` is the standing evidence.
 
 The converse also holds: a *cutter* whose corner rounds overlap is not a tool,
-and a shaft with `T ω ≤ 0` is not an input. Both are refused.
+and a body with `T ω ≤ 0` is not an input. Both are refused.
 
 **And it cuts against convenience.** The buildable shift range runs past the
 depth the dedendum asked for, because a deeper hob cuts that gear perfectly well
@@ -136,7 +136,7 @@ answering. A **clearance** is secondary: it says how much room to leave, and
 leaving slightly less is a part rather than a contradiction. So a dedendum, a
 tip round, a cutter depth are all clamped and noted. What is refused is input
 that describes *no shape at all*: a pinion cutter larger than the ring it is to
-cut, a module of zero, a shaft with `T ω ≤ 0`, two gears with different racks.
+cut, a module of zero, a body with `T ω ≤ 0`, two gears with different racks.
 
 This is the reading that settles the shift ceiling above — the dedendum is
 clearance, so treating it as secondary to unify the model is a fair conceit —
@@ -1193,7 +1193,7 @@ at an automatic width, every enabled rating is met.
 
 ### Direction is the reader's, not the mechanism's
 
-A geartrain has no forward. It has shafts, teeth and losses, and which end a
+A geartrain has no forward. It has bodies, teeth and losses, and which end a
 designer calls the input is a label they bring to it. So **the reverse case is
 never written a second time**: it is the same construction with the roles
 swapped, evaluated again and *asserted*, and where the two answers differ — a
@@ -1207,7 +1207,7 @@ kind asks whether the stage breaks away at all, and the geometry decides whether
 it bites.
 
 **Measured, and it is not a tidiness argument.** An epicyclic set solves its
-power flow twice, once each way, because which shaft drives decides where `η₀`
+power flow twice, once each way, because which body drives decides where `η₀`
 multiplies. It then reported its members' back-driving torques by scaling the
 *forward* distribution — the reverse solve's own torques were computed for their
 efficiency and discarded — and the ring came out **6 % low**. Scaling is exact
@@ -1224,7 +1224,7 @@ in which they *never* differ has thrown the direction away.
 rule was hardest to see. While the train held two loads and rated a "peak"
 that was the worse of driving and being driven, the maximum had to be taken
 **after** each direction's own distribution rather than before it: collapsing
-the two shaft torques to one magnitude first and pushing that through the
+the two bodies' torques to one magnitude first and pushing that through the
 forward construction is the same answer only where the distribution is
 direction-independent — a parallel-axis mesh carries one tangential force
 whichever way it turns — and every stage type for which it is *not* had this fault
@@ -1296,7 +1296,7 @@ the interface rule below says must be **said** rather than silently ignored
 
 **Why what reacts a load is the designer's and not the model's.** Whether a
 port holds a load is a fact about what is connected there — a brake, a motor
-with holding torque, a free shaft — and nothing in the geometry can know it.
+with holding torque, a free body — and nothing in the geometry can know it.
 The train used to decide it by direction: a load from the input was always
 held (the output was assumed to be a load) and a load from the output never
 was (the input was assumed free), which is the ordinary case written down as
@@ -1311,12 +1311,12 @@ back, and the same question is on the stage card as its backward efficiency.
 
 The graph refactor asked whether a reaction could be *derived* — "nothing
 reacts it" as "no torque in the rowspace of the shaft line puts that load on
-that shaft" — and the answer is that the law restates the declaration. With
+that body" — and the answer is that the law restates the declaration. With
 a port allowed a torque, the rowspace supplies one; with it allowed none,
 there is none; and whether it is allowed one is exactly what loading it says.
 What *is* derivable is where the reaction lands once the ports are declared
 — a self-locking stage holding it first, the reacted ends otherwise — and
-every shaft's torque is reported per case so it can be read off.
+every body's torque is reported per case so it can be read off.
 
 **Why a two-pass solve.** A stage's torque depends on the ratio and efficiency
 of every stage between it and the port, which are not known until those stages
@@ -1491,7 +1491,7 @@ leave to be guessed at.
 
 **What this is not** is a licence to answer where the answer would be wrong.
 Input that describes no shape at all is still refused — a cutter larger than the
-ring it cuts, a module of zero, a shaft absorbing power. The distinction is the
+ring it cuts, a module of zero, a body absorbing power. The distinction is the
 one [clamp rather than refuse](#clamp-rather-than-refuse-and-say-so) already
 draws: a rating is a question *about* a part, and a part can be perfectly real
 while one question about it has no answer.
@@ -1507,15 +1507,15 @@ exist. The stage then reports an efficiency, a backlash and a set of speeds
 computed from it, all of them meaningless and none of them saying so. That is
 the failure this rule exists to prevent, not an example of it.
 
-### A planetary needs the held shaft named
+### A planetary needs the held body named
 
-Three shafts means naming two. The specification names one, which does not
+Three central bodies means naming two. The specification names one, which does not
 determine an answer: a sun-driven set behaves quite differently with the ring
 held than with the carrier held, and the two are not variants of one answer. This
 is an **input** the specification omitted, and inventing a default for it would
 be choosing a machine on the user's behalf.
 
-It is the **train's** input now, not the set's: which shaft is held is a
+It is the **train's** input now, not the set's: which body is held is a
 constraint on a port, laid over what the stage holds *by convention* — the
 ring, for a set, and the panel's select shows that hold as the choice it
 is, so the default is named rather than invented. A convention is the
@@ -1526,7 +1526,7 @@ lock it, and the train says which hold closed it rather than quietly
 dropping one. That asymmetry is the whole of "relief over constraints": the
 machinery that relieves a *number* exists because an automatic value has
 nothing to say for itself, and a constraint a designer wrote has. Which
-shaft is *driven* is no constraint at all: what drives a set is a load on
+body is *driven* is no constraint at all: what drives a set is a load on
 one of its open ports, and a load case says so.
 
 ### One stage, one result
@@ -1552,7 +1552,7 @@ could only ever write one value of.
 
 **It was not built this way, and the reasons it was not are the lessons.**
 Each arrangement was a stage *type* with a result of its own, on the reading
-that a crossed mesh has no bending stress and a set has a shaft that is not a
+that a crossed mesh has no bending stress and a set has a body that is not a
 gear, so one shape would be a row of `Option`s. Three things were wrong with
 that reading, and each is a rule now.
 
@@ -1586,7 +1586,7 @@ every member of a stage that reacts a load reports a share of it, finite, and
 signed like its own torque — and it is the one asserted.
 
 **A new arrangement is new kinematics and nothing else.** That was the claim
-the division was to be judged by: a new arrangement should be how its shafts
+the division was to be judged by: a new arrangement should be how its bodies
 relate, where its meshes sit and what carries what, with `MemberRating` and
 `MeshReport` keyed on members and meshes rather than on named roles. It was
 tested by building the shape and running a pair, a worm and every arrangement
@@ -1595,7 +1595,7 @@ agreed, and each of the four was a fault in a type
 ([corrections](corrections.md#the-log)) rather than a difference of model — so
 the types went. An epicyclic set is more reference frames than a pair, not a
 different thing; a centre distance shared by several meshes is a layshaft's
-question as much as a set's; what a type kept apart — three shafts here, two
+question as much as a set's; what a type kept apart — three bodies here, two
 there, a planet's own row — the shape reads off its graph, and a layshaft, a
 Wolfrom, a stepped planet, a planocentric, a Ravigneaux and a hula stage are
 lists of what sits where (`train/arrangements.rs`) with no code of their own.
@@ -1711,7 +1711,7 @@ it belongs to and reserves a line for nothing.
 **A mesh reports what a mesh has, and a stage what a stage has.** Efficiency and
 backlash exist at both levels and are different quantities there — a pair's own
 loss against what the arrangement does with it, a pair's own play against what
-that play comes to at a shaft — so each is a row where it belongs and neither is
+that play comes to at a body — so each is a row where it belongs and neither is
 mentioned in the other's annotation. A stage whose efficiency note quoted the
 meshes' product was answering, in small type beside the wrong number, a question
 the mesh rows answer in full: the epicyclic set and the hula stage both did
@@ -1758,7 +1758,7 @@ any crossed-axis mesh — a spur pair at a shaft angle as much as a worm — and
 "the wheel cannot back-drive the worm" named parts that stage has none of.
 "The second member cannot drive the first" is what `Directional::locked` says.
 
-**What would change this:** a fourth thing to remark on — a shaft, say — which
+**What would change this:** a fourth thing to remark on — a body, say — which
 would be a fourth section rather than a note on the nearest of these three.
 
 ### A readout does not repeat an input
@@ -2048,7 +2048,7 @@ determine an answer.
 |---|---|---|
 | Stage, beside `Ratio` | contact ratios `ε_α`, `ε_β`, `ε_γ` | the spec has helix-angle inputs but no way to see whether they bought full axial overlap |
 | Stage, per gear | provenance marker on each material property | the library ships estimates as well as measurements and must not present them alike |
-| Planetary stage | **Held** — which shaft is grounded | the spec names only the driven shaft, which picks one of three and leaves the arrangement undetermined |
+| Planetary stage | **Held** — which body is grounded | the spec names only the driven one, which picks one of three and leaves the arrangement undetermined |
 
 **One more input has two faces:** an eccentric gear's eccentricity can be entered
 as the angular-shift amplitude or as the centre-distance offset. The second is the

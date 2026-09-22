@@ -15,7 +15,6 @@ export type { Basis } from "./core/Basis";
 export type { BetweenPins } from "./core/BetweenPins";
 export type { BodyConstraint } from "./core/BodyConstraint";
 export type { BodyEnd } from "./core/BodyEnd";
-export type { BodyLabel } from "./core/BodyLabel";
 export type { BodyOn } from "./core/BodyOn";
 export type { BodyReport } from "./core/BodyReport";
 export type { BodyRole } from "./core/BodyRole";

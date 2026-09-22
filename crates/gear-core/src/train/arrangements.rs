@@ -1,13 +1,14 @@
 //! **The arrangements the one shape makes free**, each written as the list
 //! of what sits where and nothing else — no solve, no kinematics, no model.
 //!
-//! A spur pair and a planetary set are the presets a panel offers
-//! ([`super::PairStage`], [`super::PlanetaryStage`]); these are the ones the
-//! shape reaches with no code of their own, kept here so the harness
-//! (`gear-cli kinematics`) and the suite can name them, and so a future
-//! preset is a function of tooth counts rather than a type of its own. Each is a
-//! textbook arrangement, and the test beside each holds the ratio the
-//! textbook gives.
+//! Every arrangement is here, the shipped presets included: a pair, a
+//! crossed pair, a worm and its wheel and a planetary set were each a type
+//! of their own once, then a vocabulary the shape was filled in from, and
+//! are lists like the rest now. Kept here so the harness (`gear-cli
+//! kinematics`) and the suite can name them, and so the next arrangement
+//! is a function of tooth counts rather than a type. Each is a textbook
+//! arrangement, and the test beside each holds the ratio the textbook
+//! gives.
 //!
 //! [`Builder`] is the whole vocabulary: an axis, carried or not and
 //! replicated or not; a body on an axis; a gear or a ring on a body; a
@@ -795,17 +796,17 @@ impl Shape {
 )]
 #[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 pub enum StagePreset {
-    /// A spur or helical pair ([`super::PairStage`]).
+    /// A spur or helical pair ([`pair`]).
     Spur,
     /// A pair with an idler between: the same ratio, the other sense.
     Idler,
     /// Two pairs on one distance with a layshaft between, one engaged.
     Layshaft,
-    /// A worm and its wheel ([`super::PairStage::worm`]).
+    /// A worm and its wheel ([`worm`]).
     Worm,
     /// A helical pair on bodies at a right angle: a point contact.
     Crossed,
-    /// A simple set ([`super::PlanetaryStage`]).
+    /// A simple set ([`planetary`]).
     Planetary,
     /// A planet meshing two rings, no sun: the 3K reduction.
     Wolfrom,

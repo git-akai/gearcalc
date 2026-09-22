@@ -1836,13 +1836,13 @@ rather than two independent meshes.
 **It is an arrangement of [the stage](#the-stage)**, and no preset of its
 own: a stepped Wolfrom at one planet — a central axis carrying the grounded
 gear, the crank and the output; a wobble axis the crank carries, with both
-wobble gears on one shaft; two internal meshes on the one distance between
+wobble gears on one body; two internal meshes on the one distance between
 the axes, which the tips size where it is automatic. `arrangements::hula` is
 the list (`epicyclic`, one planet, two steps, a central member on each) at
 the proportions the family runs at, the harness builds it from that list,
 and the menu reaches it from the Wolfrom preset with a step added. Everything
 below — the offset from the gap and the tips, the shifts that reach it, the
-circulating power, the play at either shaft — the shape solves as it solves
+circulating power, the play at either body — the shape solves as it solves
 any arrangement, and `hula_recorded` in `train/shape.rs` holds it to the
 figures its own solver recorded, to the digits the corpus printed, before it
 retired; the three hula corpus files did not move by a byte when the preset
@@ -2142,11 +2142,11 @@ gear does not, and no arithmetic written twice to produce it
 ([Load cases](#load-cases)).
 
 What the *arrangement* decides is where the load comes from, and it is not read
-off "this stage's input" the way a pair's is: four gears sit on three shafts,
-and only two of those shafts carry a torque the power flow reports. **Each mesh
+off "this stage's input" the way a pair's is: four gears sit on three bodies,
+and only two of those bodies carry a torque the power flow reports. **Each mesh
 is loaded by whichever of its members sits on the fixed axis** — mesh A by the
 grounded gear's reaction, mesh B by the output's — and the member riding the
-wobble body takes the same mesh force at its own radius. The three shaft torques
+wobble body takes the same mesh force at its own radius. The three bodies' torques
 sum to zero, which is what says the two readings agree.
 
 That load is the whole reason the ratings are worth having here. A reduction
@@ -2239,7 +2239,7 @@ output); and on any, a member **moved to another body** on its axis. A
 sun and a ring differ in more than a flag — a cutter, a shift rule — so a
 swap is a remove and an add, the new member sized by the core to the
 carrier radius its axis already runs at: a count that would repeat one on
-the same planet gear, or on an equal gear of the same shaft, is moved a
+the same planet gear, or on an equal gear of the same body, is moved a
 tooth *down*, since a shift can open a mesh past its reference distance by
 `1/cos α` at most and a planocentric's radius is a few teeth. A body an
 edit adds is numbered after every body the train has; a body an edit
@@ -2305,16 +2305,16 @@ distance when every shift is pinned.
 then the flow of power mesh by mesh with each mesh's loss in the direction it
 turns ([efficiency](#efficiency-parallel-axes) reproduces Pennestrì's
 `η₀^w` on every arrangement). Under a load case the stage is handed what the
-train's one flow put on its meshes and its shafts ([load
+train's one flow put on its meshes and its bodies ([load
 cases](#load-cases)); a lone stage asked with a torque at its input or its
 output is a one-stage train with that load. Every mesh is pressed with its **driver's** force: where the
 driven member's torque is the one the row states, the flank sees it over
 `η`, in bending as `1/η` and in contact as `1/√η`. A member's reported torque
 per case is the torque **its teeth carry** — its worst mesh's pressing
-torque at its own radius — and the shaft torques, signed so that torque
+torque at its own radius — and the bodies' torques, signed so that torque
 times the forward speed is positive where power enters, are the stage's
 `cases`. A backward case's signs follow that rule and not the forward case's:
-the shaft it enters by is the one whose product is positive.
+the body it enters by is the one whose product is positive.
 
 **What it reports.** The ratio, signed, and **the ratio one more tooth on
 each member would give** — the graph's exact answer at `z_i + 1`, which is
@@ -2331,7 +2331,7 @@ own** distance plus a helical member's axial slide, the band being every
 distance at the same end of its own tolerance; each distance's nominal per
 mesh, running and clearance; the layout of every replicated axis — count,
 even spacing, simultaneous meshing, tip clearance between neighbours at the
-radius the carrier holds it at; every shaft's speed and torque per case; and
+radius the carrier holds it at; every body's speed and torque per case; and
 the members and meshes as any stage reports them. Every mesh's operating
 angle is the **running** mesh's, opened by the clearance, not the
 zero-backlash one.
@@ -2341,8 +2341,8 @@ in `train/arrangements.rs` as lists of what sits where, through a builder
 whose whole vocabulary is an axis, a body, a gear or ring, a mesh and a
 distance: a pair (the spur preset), a crossed pair, a worm and its wheel,
 a planetary set, a layshaft transmission (one distance, a pair per ratio, the
-disengaged pairs' gears idling on shafts of their own), a Wolfrom (one
-planet, two rings, no sun), a stepped planet (two gears on the planet shaft,
+disengaged pairs' gears idling on bodies of their own), a Wolfrom (one
+planet, two rings, no sun), a stepped planet (two gears on the planet's body,
 two rings), a planocentric reducer (one planet on an eccentric carrier, its
 own turn the output), meshed planets (sun, planet, planet, ring — the
 carrier turning against the sun) and a Ravigneaux (two suns, long and short
@@ -2560,7 +2560,7 @@ held by whatever is attached — it turns as the motion says and carries the
 torque the flow puts on it, both found; a **free** port turns and carries
 nothing. A port the case does not mention is free. A port the train holds is
 fixed — ground under another name — and no case can say anything of it. A
-shaft two stages share can be a load (an inline take-off, its torque given
+body two stages share can be a load (an inline take-off, its torque given
 or derived) or free, not a reaction: a second reaction on one chain is a
 division by stiffness this model does not make, and the case says so and
 rates nothing. A free port beside a given torque nothing else holds is the question
@@ -2570,11 +2570,11 @@ the second — and switched off, so that adding one moves no figure until the
 designer has written it; a train with no two ends gets a case with nothing
 on it, for the designer to write. The two ends it does not load are
 **reacted**: each turns as the motion says and carries whatever torque the
-flow puts on it, and both are reported — the same thing as a shaft the train
-fixes, except that a fixed shaft is ground and reports no speed. Every other
+flow puts on it, and both are reported — the same thing as a body the train
+fixes, except that a fixed body is ground and reports no speed. Every other
 open port the case does not load is **free**: it turns and carries nothing,
 since a reaction there is a thing a designer attaches and says so by loading
-it. What each shaft is in a case — load, reacted, fixed, free — is reported
+it. What each body is in a case — load, reacted, fixed, free — is reported
 beside its speed and torque, ground first.
 
 **Given and derived.** Each load's torque and speed is given or derived, on
@@ -2618,20 +2618,20 @@ exceed one another freely; nothing is clamped against anything.
 
 **Carrying a load.** A case is solved as **one flow across every stage's
 meshes at once** ([the stage](#the-stage) says how a flow is found): the given torques
-known, the derived loads, the reacted ends, the fixed shafts and ground
+known, the derived loads, the reacted ends, the fixed bodies and ground
 unknown, and the direction of the flow read off the case's speeds — a load
 held still takes its direction from the sign of its torque, so a stall case
 rates as one turning the way it pushes. Each mesh's driver is whichever side
 the flow puts power across it from, its driven side under that direction's
 `η`, so a self-locking worm **holds** a load from its wheel where it stands —
 its driver pressing the flanks, nothing beyond it seeing any — and a load put
-on a shaft two stages share divides by what holds it at each end, the pair
+on a body two stages share divides by what holds it at each end, the pair
 carrying its part backward and the set its part forward. Two ends that could
 both hold the same load are a division by stiffness this model does not make,
 and the case says so by name (`train.load_shared`) and rates nothing; a
-load at a shaft that is not an open port — ground, a held shaft, a planet —
+load at a body that is not an open port — ground, a held body, a planet —
 is refused by name. Every stage is then handed what the flow puts on its meshes and its
-shafts, and rates that.
+bodies, and rates that.
 
 **Every rating is per case, at that case's torque and in that case's
 direction.** Which way a stage is driven decides how a load distributes through
@@ -2648,7 +2648,7 @@ A gear reports, per case, the torque its teeth carry at its own radius, its
 speed, its speed **against the carrier of its mesh** (its own speed on a pair;
 a held ring's is not zero while its speed is), its cycles on a fatigue case,
 both stresses and the widths each would need. A mesh reports its contact per
-case, and a stage every shaft's speed and torque per case.
+case, and a stage every body's speed and torque per case.
 
 **Load sharing.** A stage input, `LoadSharing`, **off by default**, on every
 stage that reports a bending stress. It reaches bending alone — a contact rating
@@ -2763,12 +2763,12 @@ continuous     runtime_hours at the case's own speed
 
 An intermittent sweep is measured at a **named port** — the sweep is a fact
 about the mechanism's motion, not about where its load enters, so a 25° sweep
-of the output is stated at `end` whichever shaft drives it, and a sweep of a
-set's carrier can be stated at the carrier — and every other shaft's
+of the output is stated at its body whichever one drives it, and a sweep of
+a set's carrier can be stated at the carrier — and every other body's
 revolutions follow through the ratios: `(range/360) × actuations × (turns of
-this shaft per turn of that port)`, the quotient taken exactly off the graph
+this body per turn of that port)`, the quotient taken exactly off the graph
 and the float multiplied in last. Continuous: `rpm × 60 × hours` at
-each shaft's own speed, from the case's speed at its port through the same
+each body's own speed, from the case's speed at its port through the same
 ratios. An ultimate case counts nothing: it is survived once.
 
 Then engagements, and **one rule covers every arrangement here**: a member's
