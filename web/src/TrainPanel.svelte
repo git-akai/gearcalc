@@ -341,6 +341,15 @@
     const [p, q] = [pair(x), pair(y)];
     return p[0] === q[0] && p[1] === q[1];
   };
+  /** **The distance a mesh runs on**: the one between its two members'
+   *  axes. Every mesh has one — the shape refuses a mesh whose axes have
+   *  no distance, and a distance carrying none — so the search finds it. */
+  const distanceOf = (shape: Shape, m: { a: number; b: number }) => {
+    const [a, b] = [axisOf(shape, m.a), axisOf(shape, m.b)];
+    return shape.distances.findIndex(
+      (d) => (d.axes[0] === a && d.axes[1] === b) || (d.axes[0] === b && d.axes[1] === a),
+    );
+  };
   /** **The order the cards are dealt in**: on an epicyclic stage, each
    *  planet gear followed by the central members meshing it — a step and
    *  what sits on it — so the "+ Sun / + Ring" buttons on a planet gear are
@@ -2134,9 +2143,24 @@
                 {@const pair = { a: name(m.a), b: name(m.b) }}
                 {@render numberField(groupMeshes.length > 1 ? "ui.train_sliding_friction_of" : "ui.train_sliding_friction", () => m.sliding_friction, (v) => (m.sliding_friction = v), 0.01, "", undefined, pair)}
                 {@render numberField(groupMeshes.length > 1 ? "ui.train_static_friction_of" : "ui.train_static_friction", () => m.static_friction, (v) => (m.static_friction = v), 0.01, "", t("ui.train_note_static_friction"), pair)}
+                <!-- **Add and remove, where the meshes are.** One more
+                     mesh across these same centres is a layshaft's next
+                     ratio, and it belongs beside the mesh it doubles
+                     rather than under the distance that carries both: the
+                     add is offered once per distance, on the last of its
+                     meshes, so a stage whose meshes all share one distance
+                     shows it at the foot of the mesh section and an idler
+                     chain shows one under each of its meshes. -->
                 {#if parallel}
+                  {@const lastOnDistance = stage.meshes.every((x, kk) => kk <= k || !sameDistance(stage, x, m))}
                   <div class="edits">
+                    {#if lastOnDistance}
+                      <button class="action add" onclick={() => editStage(i, { add_mesh: { distance: distanceOf(stage, m) } })}>{t("ui.train_add_mesh")}</button>
+                    {/if}
                     <button class="action danger" disabled={onDistance < 2} onclick={() => editStage(i, { remove_mesh: { mesh: k } })}>{t("ui.train_remove_mesh")}</button>
+                    {#if lastOnDistance}
+                      <small class="edit-note">{t("ui.train_note_add_mesh")}</small>
+                    {/if}
                   </div>
                 {/if}
               {/each}
@@ -2235,16 +2259,6 @@
                    source of backlash. Anything else leaves it at zero unseen. -->
               {#if d.worm}
                 {@render numberField("ui.train_worm_axial_clearance", () => d.axial_clearance, (v) => (d.axial_clearance = v), 0.01, "ui.train_mm")}
-              {/if}
-              <!-- One more mesh across these same centres: a layshaft's
-                   next ratio, one gear on the body the meshes share and the
-                   other on a body of its own, which the body list engages
-                   by moving it onto the output's. -->
-              {#if parallel}
-                <div class="edits">
-                  <button class="action add" onclick={() => editStage(i, { add_mesh: { distance: k } })}>{t("ui.train_add_mesh")}</button>
-                  <small class="edit-note">{t("ui.train_note_add_mesh")}</small>
-                </div>
               {/if}
             </div>
           {/each}
