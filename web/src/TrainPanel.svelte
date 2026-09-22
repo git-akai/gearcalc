@@ -999,7 +999,7 @@
       opts.pitchDiameter,
       g?.pitch_diameter,
       0.5,
-      () => opts.relief && relieveStage(opts.relief.stage, "first_pitch_diameter", opts.relief.figures),
+      () => opts.relief && relieveStage(opts.relief.stage, { member: [opts.relief.member, "pitch_diameter"] }, opts.relief.figures),
       undefined,
       "ui.train_mm",
     )}
@@ -1588,19 +1588,35 @@
      relief keeps those readings from arguing. The mesh's finding that the
      ratio is below one is drawn here, beside the box it is about, rather than
      under a contact-ratio row that already prints the figure. -->
-{#snippet overlapField(
-  stage: { overlap: Auto<number> } & Stage,
-  computed: number | undefined,
-  meshes: (MeshReport | undefined)[],
-)}
+{#snippet overlapField(stage: Stage, meshes: number[], reports: (MeshReport | undefined)[])}
+  <!-- **One box for a mesh group's ratio.** The datum is each mesh's
+       (`MeshInput.overlap`); the group's meshes carry one number, so the
+       box reads the first and writes them all — an `Auto` with accessors,
+       which is what the field binds to. The core reads the group's first
+       mesh as the size reading and every mesh's as a floor. -->
+  {@const first = stage.meshes[meshes[0]]}
+  {@const shared: Auto<number> = {
+    get auto() {
+      return first.overlap.auto;
+    },
+    set auto(v: boolean) {
+      for (const k of meshes) stage.meshes[k].overlap.auto = v;
+    },
+    get manual() {
+      return first.overlap.manual;
+    },
+    set manual(v: number) {
+      for (const k of meshes) stage.meshes[k].overlap.manual = v;
+    },
+  }}
   {@render autoNumber(
     "ui.train_overlap",
-    stage.overlap,
-    computed,
+    shared,
+    reports[meshes[0]]?.line?.contact_ratios.overlap,
     0.1,
-    () => relieveStage(stage, "overlap", figuresOf(stage)),
+    () => relieveStage(stage, { overlap: meshes[0] }, figuresOf(stage)),
     meshes
-      .flatMap((m) => m?.notes ?? [])
+      .flatMap((k) => reports[k]?.notes ?? [])
       .filter((n) => n.key === "mesh.overlap_below_one")
       .slice(0, 1)
       .map(note)[0] ?? t("ui.train_note_overlap"),
@@ -2029,7 +2045,6 @@
           <div class="body">
             <div class="grid shared">
               {#if !crossed}
-                {@render overlapField(stage, sres?.overlap, sres?.meshes ?? [])}
                 {@render loadSharing(stage)}
               {/if}
               <!-- One search for either contact: the loss integral along a
@@ -2194,6 +2209,7 @@
                  rub with, which a set's two meshes may differ in. -->
             {#each meshGroups as group, gi (gi)}
               {@const inGroup = (m: { a: number; b: number }) => group.includes(m.a) && group.includes(m.b)}
+              {@const groupMeshes = stage.meshes.map((m, k) => (inGroup(m) ? k : -1)).filter((k) => k >= 0)}
               <h4 class="mesh section-heading">
                 {t(meshGroups.length > 1 ? "ui.train_mesh_group" : "ui.train_mesh_group_only", { members: group.map(name).join(" / ") })}
               </h4>
@@ -2226,6 +2242,12 @@
                   />
                   <em>°</em>
                 </label>
+                <!-- The group's axial contact ratio: one size per group, so
+                     one ratio — on parallel shafts, where a line contact has
+                     an overlap at all. -->
+                {#if !crossed && groupMeshes.length > 0}
+                  {@render overlapField(stage, groupMeshes, sres?.meshes ?? [])}
+                {/if}
               </div>
               {#each stage.meshes as m, k (k)}
                 {#if inGroup(m)}

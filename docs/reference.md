@@ -450,13 +450,21 @@ layshaft's second and third pairs both-given on a distance the first
 defined and a Wolfrom's planet automatic where it could absorb nothing;
 the law that sweeps every preset found both the day the presets joined it.
 
-**The axial contact ratio is a sixth, on parallel shafts only.** `ε_β = b sin β
-/ (π m_n)` ties the helix to the narrower face, so a given ratio is one more
-reading of the size when both faces are given, and a floor under an automatic
-face otherwise ([Load cases](#load-cases) has the automatic width). It is the reading
-the relief takes **last**, since the ratio is asked for less often than an
-angle, and it has no answer at all when `ε_β π m_n / b > 1`: the note
-`stage.overlap_unreachable` says so and the pair is built at the even split.
+**The axial contact ratio is a sixth, on parallel shafts only, and it is a
+mesh's.** `ε_β = b sin β / (π m_n)` ties the helix to the narrower face, so
+a given ratio is one more reading of the size when every face of its mesh
+group is given, and a floor under an automatic face otherwise ([Load
+cases](#load-cases) has the automatic width). **A size is a mesh group's**:
+the helix propagates through meshes and no further, so each group's readings
+— its members' helices and diameters, its first mesh's ratio — are the
+entry its meshes' relations count, and a layshaft's pairs each take the
+helix their own ratio needs at one distance, where a stage-wide ratio could
+give them only one. Every mesh's ratio is a floor under its own automatic
+widths; the panel offers the ratio once per group and writes the group's
+meshes together. It is the reading the relief takes **last**, since the
+ratio is asked for less often than an angle, and it has no answer at all
+when `ε_β π m_n / b > 1`: the note `stage.overlap_unreachable` says so and
+the pair is built at the even split.
 Given as a floor on straight teeth it asks nothing, since no width buys
 overlap at zero helix, and `stage.overlap_needs_helix` says so. Crossed shafts
 have no overlap in this sense: the input is not offered there, and one that
@@ -2177,7 +2185,7 @@ shaft      axis        the axis it spins about; shaft 0 is the ground
 member     shaft, gear, module, pressure angle, k, ring cutter (none for an
            external gear), pitch diameter (a helix reading — a worm's way of
            stating its size)
-mesh       a, b, sliding and static friction
+mesh       a, b, sliding and static friction, the axial contact ratio asked of it
 distance   two axes, the angle between them, worm (a sizing convention),
            distance, clearance, tip clearance, tolerance ±, axial clearance
 ```

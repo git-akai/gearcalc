@@ -2054,13 +2054,13 @@ pub enum Freedom {
     CentreDistance(usize),
     /// What portion of that distance is running play.
     Clearance(usize),
-    /// A pair's first member's pitch diameter — the same freedom as its helix
-    /// read as a size, which is a worm's reading.
-    FirstPitchDiameter,
-    /// The stage's axial contact ratio, which relates the helix to the face
-    /// width the mesh carries: given with every width given, it decides the
-    /// helix; given with a width automatic, it is a floor under that width.
-    Overlap,
+    /// **A mesh's axial contact ratio**, by the mesh's index in the shape,
+    /// which relates the helix to the face width the mesh carries: given
+    /// with every width of its mesh group given, it decides the group's
+    /// helix; given with a width automatic, it is a floor under that
+    /// width. The panel offers it once per mesh group and writes every
+    /// mesh of the group.
+    Overlap(usize),
     /// One member's own input.
     Member(usize, MemberFreedom),
 }
@@ -2084,6 +2084,10 @@ pub enum MemberFreedom {
     Shift,
     /// The helix angle.
     Helix,
+    /// The pitch diameter — the same freedom as the helix read as a size,
+    /// which is a worm's reading of it; any member may state it, and the
+    /// panel offers the box on a worm.
+    PitchDiameter,
     /// The face width.
     FaceWidth,
     /// The tooth-thickness coefficient `k` — one per member, with the two
@@ -2146,10 +2150,11 @@ impl Reading {
         }
     }
 
-    /// The ratio's reading, where it is given the size to decide.
-    pub(crate) fn overlap(overlap: &Auto<f64>, module: f64, width: f64) -> Self {
+    /// The ratio's reading on mesh `k`, where it is given the size to
+    /// decide.
+    pub(crate) fn overlap(k: usize, overlap: &Auto<f64>, module: f64, width: f64) -> Self {
         Self {
-            freedom: Freedom::Overlap,
+            freedom: Freedom::Overlap(k),
             helix: (!overlap.auto)
                 .then(|| helix_for_overlap(overlap.manual, module, width))
                 .flatten(),
@@ -2704,16 +2709,16 @@ impl StageResult {
             Freedom::Clearance(d) => match self {
                 Self::Shape(r) => r.distances.get(d).map(|d| d.clearance),
             },
-            Freedom::FirstPitchDiameter => self.members().first().map(|g| g.pitch_diameter),
-            Freedom::Overlap => match self {
+            Freedom::Overlap(k) => match self {
                 Self::Shape(r) => r
                     .meshes
-                    .first()
+                    .get(k)
                     .and_then(|m| m.line.as_ref().map(|l| l.contact_ratios.overlap)),
             },
             Freedom::Member(i, m) => self.members().get(i).map(|g| match m {
                 MemberFreedom::Shift => g.profile_shift,
                 MemberFreedom::Helix => g.helix_angle,
+                MemberFreedom::PitchDiameter => g.pitch_diameter,
                 MemberFreedom::FaceWidth => g.face_width,
                 MemberFreedom::ThicknessMod => g.params.thickness_mod,
             }),
@@ -7928,8 +7933,8 @@ mod tests {
         let nudge = |f: Freedom, a: &mut Auto<f64>| match f {
             Freedom::CentreDistance(_) => a.manual += 0.2,
             Freedom::Clearance(_) => a.manual += 0.01,
-            Freedom::FirstPitchDiameter => a.manual *= 1.05,
-            Freedom::Overlap => a.manual += 0.1,
+            Freedom::Overlap(_) => a.manual += 0.1,
+            Freedom::Member(_, MemberFreedom::PitchDiameter) => a.manual *= 1.05,
             Freedom::Member(_, MemberFreedom::Shift) => a.manual += 0.05,
             Freedom::Member(_, MemberFreedom::Helix) => a.manual += 2.0,
             Freedom::Member(_, MemberFreedom::FaceWidth) => a.manual += 1.0,
@@ -8016,7 +8021,7 @@ mod tests {
         with_ratio.overlap = Auto::fixed(1.2);
         let relieved = Stage::pair(with_ratio).relieved(None);
         let pair = relieved.as_shape().unwrap();
-        assert!(pair.members[0].gear.helix_angle.auto && !pair.overlap.auto);
+        assert!(pair.members[0].gear.helix_angle.auto && !pair.meshes[0].overlap.auto);
         let width = pair.members[0]
             .gear
             .face_width
@@ -8037,16 +8042,16 @@ mod tests {
         crossed.overlap = Auto::fixed(1.5);
         for just in [
             None,
-            Some(Freedom::Overlap),
+            Some(Freedom::Overlap(0)),
             Some(Freedom::CentreDistance(0)),
         ] {
             let relieved = Stage::pair(crossed.clone()).relieved(just);
             let p = relieved.as_shape().unwrap();
             assert!(
-                p.overlap.auto,
+                p.meshes[0].overlap.auto,
                 "the ratio stood given on crossed shafts after {just:?}"
             );
-            assert_eq!(p.overlap.manual, 1.5, "and the number is kept");
+            assert_eq!(p.meshes[0].overlap.manual, 1.5, "and the number is kept");
         }
         // ...and on parallel shafts the same input stands.
         let parallel = PairStage {
@@ -8054,7 +8059,7 @@ mod tests {
             ..PairStage::default()
         };
         let relieved = Stage::pair(parallel).relieved(None);
-        assert!(!relieved.as_shape().unwrap().overlap.auto);
+        assert!(!relieved.as_shape().unwrap().meshes[0].overlap.auto);
     }
 
     /// **A ratio given on straight teeth is said to have asked nothing.** As
@@ -8543,16 +8548,17 @@ mod tests {
             relation.order[4],
             vec![
                 Freedom::Member(0, MemberFreedom::Helix),
+                Freedom::Member(0, MemberFreedom::PitchDiameter),
                 Freedom::Member(1, MemberFreedom::Helix),
-                Freedom::FirstPitchDiameter,
-                Freedom::Overlap,
+                Freedom::Member(1, MemberFreedom::PitchDiameter),
+                Freedom::Overlap(0),
             ],
             "the size is the last to give: a shift moves the teeth, a size changes them — and the preset's widths are given, so the ratio is a reading of it"
         );
         // ...and with a width automatic the ratio is a floor, in no argument.
         let mut width_free = PairStage::default();
         width_free.gears[0].face_width = Auto::automatic(8.0);
-        assert!(!mentioned(&Stage::pair(width_free)).contains(&Freedom::Overlap));
+        assert!(!mentioned(&Stage::pair(width_free)).contains(&Freedom::Overlap(0)));
 
         // And the second group is the one that stops *both* ways of saying the
         // distance being left automatic at once.

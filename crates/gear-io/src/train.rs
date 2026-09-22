@@ -170,6 +170,13 @@
 //!   members in mesh must agree, as they must on the module — so a stage
 //!   whose meshes do not all join, a layshaft's pairs, may run at two. A
 //!   member that omits it is at 20°, which is what every older file meant.
+//! - **The axial contact ratio moved onto the meshes.** A stage's `overlap`
+//!   is gone and a file that still writes one is refused; every mesh
+//!   carries `overlap = { auto, manual }`, and the meshes a run joins carry
+//!   one number — the panel writes the group's meshes together, the core
+//!   reads the group's first as the size reading and each mesh's as a floor
+//!   under its own automatic widths. A mesh that omits it is `{ auto =
+//!   true, manual = 1.0 }`, which is what every older file meant.
 //!
 //! No compatibility shim, deliberately. Accepting both shapes means carrying two
 //! readers for one format and testing both forever, and the thing that would go
@@ -579,14 +586,21 @@ mod tests {
         doc.train.stages[1]
             .as_shape_mut()
             .expect("stage 2 is the worm")
+            .meshes[0]
             .overlap = Auto::fixed(1.5);
         let back = from_toml(&to_toml(&doc).unwrap()).unwrap();
         assert!(back.adjusted);
         let w = back.document.train.stages[1]
             .as_shape()
             .expect("stage 2 came back a different kind");
-        assert!(w.overlap.auto, "a crossed pair's ratio cannot stand given");
-        assert!((w.overlap.manual - 1.5).abs() < 1e-12, "the number is kept");
+        assert!(
+            w.meshes[0].overlap.auto,
+            "a crossed pair's ratio cannot stand given"
+        );
+        assert!(
+            (w.meshes[0].overlap.manual - 1.5).abs() < 1e-12,
+            "the number is kept"
+        );
         // ...and a second read of the adjusted document adjusts nothing.
         assert!(
             !from_toml(&to_toml(&back.document).unwrap())

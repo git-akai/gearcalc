@@ -329,6 +329,7 @@ impl Shape {
             b,
             sliding_friction,
             static_friction,
+            overlap: Auto::automatic(1.0),
         });
     }
 

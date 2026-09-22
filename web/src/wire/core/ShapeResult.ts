@@ -46,7 +46,7 @@ circulation: Directional<number> | null,
  * Play at the output shaft driven forward, at the input driven back.
  * `None` with the ratio.
  */
-backlash: Directional<Backlash> | null, distances: Array<DistanceReport>, overlap: number, 
+backlash: Directional<Backlash> | null, distances: Array<DistanceReport>, 
 /**
  * One per replicated axis, in axis order.
  */

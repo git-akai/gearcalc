@@ -8,4 +8,4 @@
  * is as big as its helix makes it, which is what absorbs a centre distance
  * once both shifts are pinned.
  */
-export type MemberFreedom = "shift" | "helix" | "face_width" | "thickness_mod";
+export type MemberFreedom = "shift" | "helix" | "pitch_diameter" | "face_width" | "thickness_mod";

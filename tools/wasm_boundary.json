@@ -209,10 +209,6 @@
      "stages": [
       {
        "kind": "shape",
-       "overlap": {
-        "auto": true,
-        "manual": 1
-       },
        "optimisation": {
         "enabled": false,
         "min_contact_ratio": "1.2000000000000000"
@@ -360,7 +356,11 @@
          "a": 0,
          "b": 1,
          "sliding_friction": "0.080000000000000002",
-         "static_friction": "0.16000000000000000"
+         "static_friction": "0.16000000000000000",
+         "overlap": {
+          "auto": true,
+          "manual": 1
+         }
         }
        ],
        "distances": [
@@ -397,10 +397,6 @@
       "label": "ui.train_preset_spur",
       "stage": {
        "kind": "shape",
-       "overlap": {
-        "auto": true,
-        "manual": 1
-       },
        "optimisation": {
         "enabled": false,
         "min_contact_ratio": "1.2000000000000000"
@@ -548,7 +544,11 @@
          "a": 0,
          "b": 1,
          "sliding_friction": "0.080000000000000002",
-         "static_friction": "0.16000000000000000"
+         "static_friction": "0.16000000000000000",
+         "overlap": {
+          "auto": true,
+          "manual": 1
+         }
         }
        ],
        "distances": [
@@ -581,10 +581,6 @@
       "label": "ui.train_preset_idler",
       "stage": {
        "kind": "shape",
-       "overlap": {
-        "auto": true,
-        "manual": 1
-       },
        "optimisation": {
         "enabled": false,
         "min_contact_ratio": "1.2000000000000000"
@@ -797,13 +793,21 @@
          "a": 0,
          "b": 1,
          "sliding_friction": "0.080000000000000002",
-         "static_friction": "0.16000000000000000"
+         "static_friction": "0.16000000000000000",
+         "overlap": {
+          "auto": true,
+          "manual": 1
+         }
         },
         {
          "a": 1,
          "b": 2,
          "sliding_friction": "0.080000000000000002",
-         "static_friction": "0.16000000000000000"
+         "static_friction": "0.16000000000000000",
+         "overlap": {
+          "auto": true,
+          "manual": 1
+         }
         }
        ],
        "distances": [
@@ -856,10 +860,6 @@
       "label": "ui.train_preset_layshaft",
       "stage": {
        "kind": "shape",
-       "overlap": {
-        "auto": true,
-        "manual": 1
-       },
        "optimisation": {
         "enabled": false,
         "min_contact_ratio": "1.2000000000000000"
@@ -1245,19 +1245,31 @@
          "a": 0,
          "b": 1,
          "sliding_friction": "0.080000000000000002",
-         "static_friction": "0.16000000000000000"
+         "static_friction": "0.16000000000000000",
+         "overlap": {
+          "auto": true,
+          "manual": 1
+         }
         },
         {
          "a": 2,
          "b": 3,
          "sliding_friction": "0.080000000000000002",
-         "static_friction": "0.16000000000000000"
+         "static_friction": "0.16000000000000000",
+         "overlap": {
+          "auto": true,
+          "manual": 1
+         }
         },
         {
          "a": 4,
          "b": 5,
          "sliding_friction": "0.080000000000000002",
-         "static_friction": "0.16000000000000000"
+         "static_friction": "0.16000000000000000",
+         "overlap": {
+          "auto": true,
+          "manual": 1
+         }
         }
        ],
        "distances": [
@@ -1290,10 +1302,6 @@
       "label": "ui.train_preset_worm",
       "stage": {
        "kind": "shape",
-       "overlap": {
-        "auto": true,
-        "manual": 1
-       },
        "optimisation": {
         "enabled": false,
         "min_contact_ratio": "1.2000000000000000"
@@ -1441,7 +1449,11 @@
          "a": 0,
          "b": 1,
          "sliding_friction": "0.080000000000000002",
-         "static_friction": "0.16000000000000000"
+         "static_friction": "0.16000000000000000",
+         "overlap": {
+          "auto": true,
+          "manual": 1
+         }
         }
        ],
        "distances": [
@@ -1474,10 +1486,6 @@
       "label": "ui.train_preset_crossed",
       "stage": {
        "kind": "shape",
-       "overlap": {
-        "auto": true,
-        "manual": 1
-       },
        "optimisation": {
         "enabled": false,
         "min_contact_ratio": "1.2000000000000000"
@@ -1625,7 +1633,11 @@
          "a": 0,
          "b": 1,
          "sliding_friction": "0.080000000000000002",
-         "static_friction": "0.16000000000000000"
+         "static_friction": "0.16000000000000000",
+         "overlap": {
+          "auto": true,
+          "manual": 1
+         }
         }
        ],
        "distances": [
@@ -1658,10 +1670,6 @@
       "label": "ui.train_preset_planetary",
       "stage": {
        "kind": "shape",
-       "overlap": {
-        "auto": true,
-        "manual": 1
-       },
        "optimisation": {
         "enabled": false,
         "min_contact_ratio": "1.2000000000000000"
@@ -1877,13 +1885,21 @@
          "a": 0,
          "b": 1,
          "sliding_friction": "0.080000000000000002",
-         "static_friction": "0.16000000000000000"
+         "static_friction": "0.16000000000000000",
+         "overlap": {
+          "auto": true,
+          "manual": 1
+         }
         },
         {
          "a": 1,
          "b": 2,
          "sliding_friction": "0.080000000000000002",
-         "static_friction": "0.16000000000000000"
+         "static_friction": "0.16000000000000000",
+         "overlap": {
+          "auto": true,
+          "manual": 1
+         }
         }
        ],
        "distances": [
@@ -1916,10 +1932,6 @@
       "label": "ui.train_preset_wolfrom",
       "stage": {
        "kind": "shape",
-       "overlap": {
-        "auto": true,
-        "manual": 1
-       },
        "optimisation": {
         "enabled": false,
         "min_contact_ratio": "1.2000000000000000"
@@ -2139,13 +2151,21 @@
          "a": 0,
          "b": 1,
          "sliding_friction": "0.080000000000000002",
-         "static_friction": "0.16000000000000000"
+         "static_friction": "0.16000000000000000",
+         "overlap": {
+          "auto": true,
+          "manual": 1
+         }
         },
         {
          "a": 0,
          "b": 2,
          "sliding_friction": "0.080000000000000002",
-         "static_friction": "0.16000000000000000"
+         "static_friction": "0.16000000000000000",
+         "overlap": {
+          "auto": true,
+          "manual": 1
+         }
         }
        ],
        "distances": [
@@ -2178,10 +2198,6 @@
       "label": "ui.train_preset_compound",
       "stage": {
        "kind": "shape",
-       "overlap": {
-        "auto": true,
-        "manual": 1
-       },
        "optimisation": {
         "enabled": false,
         "min_contact_ratio": "1.2000000000000000"
@@ -2520,19 +2536,31 @@
          "a": 0,
          "b": 3,
          "sliding_friction": "0.080000000000000002",
-         "static_friction": "0.16000000000000000"
+         "static_friction": "0.16000000000000000",
+         "overlap": {
+          "auto": true,
+          "manual": 1
+         }
         },
         {
          "a": 3,
          "b": 1,
          "sliding_friction": "0.080000000000000002",
-         "static_friction": "0.16000000000000000"
+         "static_friction": "0.16000000000000000",
+         "overlap": {
+          "auto": true,
+          "manual": 1
+         }
         },
         {
          "a": 4,
          "b": 2,
          "sliding_friction": "0.080000000000000002",
-         "static_friction": "0.16000000000000000"
+         "static_friction": "0.16000000000000000",
+         "overlap": {
+          "auto": true,
+          "manual": 1
+         }
         }
        ],
        "distances": [
@@ -2565,10 +2593,6 @@
       "label": "ui.train_preset_planocentric",
       "stage": {
        "kind": "shape",
-       "overlap": {
-        "auto": true,
-        "manual": 1
-       },
        "optimisation": {
         "enabled": false,
         "min_contact_ratio": "1.2000000000000000"
@@ -2723,7 +2747,11 @@
          "a": 0,
          "b": 1,
          "sliding_friction": "0.080000000000000002",
-         "static_friction": "0.16000000000000000"
+         "static_friction": "0.16000000000000000",
+         "overlap": {
+          "auto": true,
+          "manual": 1
+         }
         }
        ],
        "distances": [
@@ -2756,10 +2784,6 @@
       "label": "ui.train_preset_meshed_planets",
       "stage": {
        "kind": "shape",
-       "overlap": {
-        "auto": true,
-        "manual": 1
-       },
        "optimisation": {
         "enabled": false,
         "min_contact_ratio": "1.2000000000000000"
@@ -3040,19 +3064,31 @@
          "a": 0,
          "b": 1,
          "sliding_friction": "0.080000000000000002",
-         "static_friction": "0.16000000000000000"
+         "static_friction": "0.16000000000000000",
+         "overlap": {
+          "auto": true,
+          "manual": 1
+         }
         },
         {
          "a": 2,
          "b": 3,
          "sliding_friction": "0.080000000000000002",
-         "static_friction": "0.16000000000000000"
+         "static_friction": "0.16000000000000000",
+         "overlap": {
+          "auto": true,
+          "manual": 1
+         }
         },
         {
          "a": 1,
          "b": 2,
          "sliding_friction": "0.080000000000000002",
-         "static_friction": "0.16000000000000000"
+         "static_friction": "0.16000000000000000",
+         "overlap": {
+          "auto": true,
+          "manual": 1
+         }
         }
        ],
        "distances": [
@@ -7450,10 +7486,6 @@
      "spur",
      {
       "kind": "shape",
-      "overlap": {
-       "auto": true,
-       "manual": 1
-      },
       "optimisation": {
        "enabled": false,
        "min_contact_ratio": "1.2000000000000000"
@@ -7601,7 +7633,11 @@
         "a": 0,
         "b": 1,
         "sliding_friction": "0.080000000000000002",
-        "static_friction": "0.16000000000000000"
+        "static_friction": "0.16000000000000000",
+        "overlap": {
+         "auto": true,
+         "manual": 1
+        }
        }
       ],
       "distances": [
@@ -7632,10 +7668,6 @@
      "idler",
      {
       "kind": "shape",
-      "overlap": {
-       "auto": true,
-       "manual": 1
-      },
       "optimisation": {
        "enabled": false,
        "min_contact_ratio": "1.2000000000000000"
@@ -7848,13 +7880,21 @@
         "a": 0,
         "b": 1,
         "sliding_friction": "0.080000000000000002",
-        "static_friction": "0.16000000000000000"
+        "static_friction": "0.16000000000000000",
+        "overlap": {
+         "auto": true,
+         "manual": 1
+        }
        },
        {
         "a": 1,
         "b": 2,
         "sliding_friction": "0.080000000000000002",
-        "static_friction": "0.16000000000000000"
+        "static_friction": "0.16000000000000000",
+        "overlap": {
+         "auto": true,
+         "manual": 1
+        }
        }
       ],
       "distances": [
@@ -7905,10 +7945,6 @@
      "layshaft",
      {
       "kind": "shape",
-      "overlap": {
-       "auto": true,
-       "manual": 1
-      },
       "optimisation": {
        "enabled": false,
        "min_contact_ratio": "1.2000000000000000"
@@ -8294,19 +8330,31 @@
         "a": 0,
         "b": 1,
         "sliding_friction": "0.080000000000000002",
-        "static_friction": "0.16000000000000000"
+        "static_friction": "0.16000000000000000",
+        "overlap": {
+         "auto": true,
+         "manual": 1
+        }
        },
        {
         "a": 2,
         "b": 3,
         "sliding_friction": "0.080000000000000002",
-        "static_friction": "0.16000000000000000"
+        "static_friction": "0.16000000000000000",
+        "overlap": {
+         "auto": true,
+         "manual": 1
+        }
        },
        {
         "a": 4,
         "b": 5,
         "sliding_friction": "0.080000000000000002",
-        "static_friction": "0.16000000000000000"
+        "static_friction": "0.16000000000000000",
+        "overlap": {
+         "auto": true,
+         "manual": 1
+        }
        }
       ],
       "distances": [
@@ -8337,10 +8385,6 @@
      "worm",
      {
       "kind": "shape",
-      "overlap": {
-       "auto": true,
-       "manual": 1
-      },
       "optimisation": {
        "enabled": false,
        "min_contact_ratio": "1.2000000000000000"
@@ -8488,7 +8532,11 @@
         "a": 0,
         "b": 1,
         "sliding_friction": "0.080000000000000002",
-        "static_friction": "0.16000000000000000"
+        "static_friction": "0.16000000000000000",
+        "overlap": {
+         "auto": true,
+         "manual": 1
+        }
        }
       ],
       "distances": [
@@ -8519,10 +8567,6 @@
      "crossed",
      {
       "kind": "shape",
-      "overlap": {
-       "auto": true,
-       "manual": 1
-      },
       "optimisation": {
        "enabled": false,
        "min_contact_ratio": "1.2000000000000000"
@@ -8670,7 +8714,11 @@
         "a": 0,
         "b": 1,
         "sliding_friction": "0.080000000000000002",
-        "static_friction": "0.16000000000000000"
+        "static_friction": "0.16000000000000000",
+        "overlap": {
+         "auto": true,
+         "manual": 1
+        }
        }
       ],
       "distances": [
@@ -8701,10 +8749,6 @@
      "planetary",
      {
       "kind": "shape",
-      "overlap": {
-       "auto": true,
-       "manual": 1
-      },
       "optimisation": {
        "enabled": false,
        "min_contact_ratio": "1.2000000000000000"
@@ -8920,13 +8964,21 @@
         "a": 0,
         "b": 1,
         "sliding_friction": "0.080000000000000002",
-        "static_friction": "0.16000000000000000"
+        "static_friction": "0.16000000000000000",
+        "overlap": {
+         "auto": true,
+         "manual": 1
+        }
        },
        {
         "a": 1,
         "b": 2,
         "sliding_friction": "0.080000000000000002",
-        "static_friction": "0.16000000000000000"
+        "static_friction": "0.16000000000000000",
+        "overlap": {
+         "auto": true,
+         "manual": 1
+        }
        }
       ],
       "distances": [
@@ -8957,10 +9009,6 @@
      "wolfrom",
      {
       "kind": "shape",
-      "overlap": {
-       "auto": true,
-       "manual": 1
-      },
       "optimisation": {
        "enabled": false,
        "min_contact_ratio": "1.2000000000000000"
@@ -9180,13 +9228,21 @@
         "a": 0,
         "b": 1,
         "sliding_friction": "0.080000000000000002",
-        "static_friction": "0.16000000000000000"
+        "static_friction": "0.16000000000000000",
+        "overlap": {
+         "auto": true,
+         "manual": 1
+        }
        },
        {
         "a": 0,
         "b": 2,
         "sliding_friction": "0.080000000000000002",
-        "static_friction": "0.16000000000000000"
+        "static_friction": "0.16000000000000000",
+        "overlap": {
+         "auto": true,
+         "manual": 1
+        }
        }
       ],
       "distances": [
@@ -9217,10 +9273,6 @@
      "compound",
      {
       "kind": "shape",
-      "overlap": {
-       "auto": true,
-       "manual": 1
-      },
       "optimisation": {
        "enabled": false,
        "min_contact_ratio": "1.2000000000000000"
@@ -9559,19 +9611,31 @@
         "a": 0,
         "b": 3,
         "sliding_friction": "0.080000000000000002",
-        "static_friction": "0.16000000000000000"
+        "static_friction": "0.16000000000000000",
+        "overlap": {
+         "auto": true,
+         "manual": 1
+        }
        },
        {
         "a": 3,
         "b": 1,
         "sliding_friction": "0.080000000000000002",
-        "static_friction": "0.16000000000000000"
+        "static_friction": "0.16000000000000000",
+        "overlap": {
+         "auto": true,
+         "manual": 1
+        }
        },
        {
         "a": 4,
         "b": 2,
         "sliding_friction": "0.080000000000000002",
-        "static_friction": "0.16000000000000000"
+        "static_friction": "0.16000000000000000",
+        "overlap": {
+         "auto": true,
+         "manual": 1
+        }
        }
       ],
       "distances": [
@@ -9602,10 +9666,6 @@
      "planocentric",
      {
       "kind": "shape",
-      "overlap": {
-       "auto": true,
-       "manual": 1
-      },
       "optimisation": {
        "enabled": false,
        "min_contact_ratio": "1.2000000000000000"
@@ -9760,7 +9820,11 @@
         "a": 0,
         "b": 1,
         "sliding_friction": "0.080000000000000002",
-        "static_friction": "0.16000000000000000"
+        "static_friction": "0.16000000000000000",
+        "overlap": {
+         "auto": true,
+         "manual": 1
+        }
        }
       ],
       "distances": [
@@ -9791,10 +9855,6 @@
      "meshed_planets",
      {
       "kind": "shape",
-      "overlap": {
-       "auto": true,
-       "manual": 1
-      },
       "optimisation": {
        "enabled": false,
        "min_contact_ratio": "1.2000000000000000"
@@ -10075,19 +10135,31 @@
         "a": 0,
         "b": 1,
         "sliding_friction": "0.080000000000000002",
-        "static_friction": "0.16000000000000000"
+        "static_friction": "0.16000000000000000",
+        "overlap": {
+         "auto": true,
+         "manual": 1
+        }
        },
        {
         "a": 2,
         "b": 3,
         "sliding_friction": "0.080000000000000002",
-        "static_friction": "0.16000000000000000"
+        "static_friction": "0.16000000000000000",
+        "overlap": {
+         "auto": true,
+         "manual": 1
+        }
        },
        {
         "a": 1,
         "b": 2,
         "sliding_friction": "0.080000000000000002",
-        "static_friction": "0.16000000000000000"
+        "static_friction": "0.16000000000000000",
+        "overlap": {
+         "auto": true,
+         "manual": 1
+        }
        }
       ],
       "distances": [
@@ -10406,10 +10478,6 @@
       "stages": [
        {
         "kind": "shape",
-        "overlap": {
-         "auto": true,
-         "manual": 1
-        },
         "optimisation": {
          "enabled": false,
          "min_contact_ratio": "1.2000000000000000"
@@ -10557,7 +10625,11 @@
           "a": 0,
           "b": 1,
           "sliding_friction": "0.080000000000000002",
-          "static_friction": "0.16000000000000000"
+          "static_friction": "0.16000000000000000",
+          "overlap": {
+           "auto": true,
+           "manual": 1
+          }
          }
         ],
         "distances": [
@@ -10585,10 +10657,6 @@
        },
        {
         "kind": "shape",
-        "overlap": {
-         "auto": true,
-         "manual": 1
-        },
         "optimisation": {
          "enabled": false,
          "min_contact_ratio": "1.2000000000000000"
@@ -10804,13 +10872,21 @@
           "a": 0,
           "b": 1,
           "sliding_friction": "0.080000000000000002",
-          "static_friction": "0.16000000000000000"
+          "static_friction": "0.16000000000000000",
+          "overlap": {
+           "auto": true,
+           "manual": 1
+          }
          },
          {
           "a": 1,
           "b": 2,
           "sliding_friction": "0.080000000000000002",
-          "static_friction": "0.16000000000000000"
+          "static_friction": "0.16000000000000000",
+          "overlap": {
+           "auto": true,
+           "manual": 1
+          }
          }
         ],
         "distances": [
@@ -10965,10 +11041,6 @@
       "stages": [
        {
         "kind": "shape",
-        "overlap": {
-         "auto": true,
-         "manual": 1
-        },
         "optimisation": {
          "enabled": false,
          "min_contact_ratio": "1.2000000000000000"
@@ -11116,7 +11188,11 @@
           "a": 0,
           "b": 1,
           "sliding_friction": "0.080000000000000002",
-          "static_friction": "0.16000000000000000"
+          "static_friction": "0.16000000000000000",
+          "overlap": {
+           "auto": true,
+           "manual": 1
+          }
          }
         ],
         "distances": [
@@ -11144,10 +11220,6 @@
        },
        {
         "kind": "shape",
-        "overlap": {
-         "auto": true,
-         "manual": 1
-        },
         "optimisation": {
          "enabled": false,
          "min_contact_ratio": "1.2000000000000000"
@@ -11363,13 +11435,21 @@
           "a": 0,
           "b": 1,
           "sliding_friction": "0.080000000000000002",
-          "static_friction": "0.16000000000000000"
+          "static_friction": "0.16000000000000000",
+          "overlap": {
+           "auto": true,
+           "manual": 1
+          }
          },
          {
           "a": 1,
           "b": 2,
           "sliding_friction": "0.080000000000000002",
-          "static_friction": "0.16000000000000000"
+          "static_friction": "0.16000000000000000",
+          "overlap": {
+           "auto": true,
+           "manual": 1
+          }
          }
         ],
         "distances": [
@@ -11533,10 +11613,6 @@
       "stages": [
        {
         "kind": "shape",
-        "overlap": {
-         "auto": true,
-         "manual": 1
-        },
         "optimisation": {
          "enabled": false,
          "min_contact_ratio": "1.2000000000000000"
@@ -11684,7 +11760,11 @@
           "a": 0,
           "b": 1,
           "sliding_friction": "0.080000000000000002",
-          "static_friction": "0.16000000000000000"
+          "static_friction": "0.16000000000000000",
+          "overlap": {
+           "auto": true,
+           "manual": 1
+          }
          }
         ],
         "distances": [
@@ -11712,10 +11792,6 @@
        },
        {
         "kind": "shape",
-        "overlap": {
-         "auto": true,
-         "manual": 1
-        },
         "optimisation": {
          "enabled": false,
          "min_contact_ratio": "1.2000000000000000"
@@ -11931,13 +12007,21 @@
           "a": 0,
           "b": 1,
           "sliding_friction": "0.080000000000000002",
-          "static_friction": "0.16000000000000000"
+          "static_friction": "0.16000000000000000",
+          "overlap": {
+           "auto": true,
+           "manual": 1
+          }
          },
          {
           "a": 1,
           "b": 2,
           "sliding_friction": "0.080000000000000002",
-          "static_friction": "0.16000000000000000"
+          "static_friction": "0.16000000000000000",
+          "overlap": {
+           "auto": true,
+           "manual": 1
+          }
          }
         ],
         "distances": [
@@ -12092,10 +12176,6 @@
       "stages": [
        {
         "kind": "shape",
-        "overlap": {
-         "auto": true,
-         "manual": 1
-        },
         "optimisation": {
          "enabled": false,
          "min_contact_ratio": "1.2000000000000000"
@@ -12243,7 +12323,11 @@
           "a": 0,
           "b": 1,
           "sliding_friction": "0.080000000000000002",
-          "static_friction": "0.16000000000000000"
+          "static_friction": "0.16000000000000000",
+          "overlap": {
+           "auto": true,
+           "manual": 1
+          }
          }
         ],
         "distances": [
@@ -12271,10 +12355,6 @@
        },
        {
         "kind": "shape",
-        "overlap": {
-         "auto": true,
-         "manual": 1
-        },
         "optimisation": {
          "enabled": false,
          "min_contact_ratio": "1.2000000000000000"
@@ -12490,13 +12570,21 @@
           "a": 0,
           "b": 1,
           "sliding_friction": "0.080000000000000002",
-          "static_friction": "0.16000000000000000"
+          "static_friction": "0.16000000000000000",
+          "overlap": {
+           "auto": true,
+           "manual": 1
+          }
          },
          {
           "a": 1,
           "b": 2,
           "sliding_friction": "0.080000000000000002",
-          "static_friction": "0.16000000000000000"
+          "static_friction": "0.16000000000000000",
+          "overlap": {
+           "auto": true,
+           "manual": 1
+          }
          }
         ],
         "distances": [
@@ -12663,10 +12751,6 @@
       "stages": [
        {
         "kind": "shape",
-        "overlap": {
-         "auto": true,
-         "manual": 1
-        },
         "optimisation": {
          "enabled": false,
          "min_contact_ratio": "1.2000000000000000"
@@ -12814,7 +12898,11 @@
           "a": 0,
           "b": 1,
           "sliding_friction": "0.080000000000000002",
-          "static_friction": "0.16000000000000000"
+          "static_friction": "0.16000000000000000",
+          "overlap": {
+           "auto": true,
+           "manual": 1
+          }
          }
         ],
         "distances": [
@@ -12842,10 +12930,6 @@
        },
        {
         "kind": "shape",
-        "overlap": {
-         "auto": true,
-         "manual": 1
-        },
         "optimisation": {
          "enabled": false,
          "min_contact_ratio": "1.2000000000000000"
@@ -13061,13 +13145,21 @@
           "a": 0,
           "b": 1,
           "sliding_friction": "0.080000000000000002",
-          "static_friction": "0.16000000000000000"
+          "static_friction": "0.16000000000000000",
+          "overlap": {
+           "auto": true,
+           "manual": 1
+          }
          },
          {
           "a": 1,
           "b": 2,
           "sliding_friction": "0.080000000000000002",
-          "static_friction": "0.16000000000000000"
+          "static_friction": "0.16000000000000000",
+          "overlap": {
+           "auto": true,
+           "manual": 1
+          }
          }
         ],
         "distances": [
@@ -13322,10 +13414,6 @@
       "stages": [
        {
         "kind": "shape",
-        "overlap": {
-         "auto": true,
-         "manual": 1
-        },
         "optimisation": {
          "enabled": false,
          "min_contact_ratio": "1.2000000000000000"
@@ -13473,7 +13561,11 @@
           "a": 0,
           "b": 1,
           "sliding_friction": "0.080000000000000002",
-          "static_friction": "0.16000000000000000"
+          "static_friction": "0.16000000000000000",
+          "overlap": {
+           "auto": true,
+           "manual": 1
+          }
          }
         ],
         "distances": [
@@ -13501,10 +13593,6 @@
        },
        {
         "kind": "shape",
-        "overlap": {
-         "auto": true,
-         "manual": 1
-        },
         "optimisation": {
          "enabled": false,
          "min_contact_ratio": "1.2000000000000000"
@@ -13720,13 +13808,21 @@
           "a": 0,
           "b": 1,
           "sliding_friction": "0.080000000000000002",
-          "static_friction": "0.16000000000000000"
+          "static_friction": "0.16000000000000000",
+          "overlap": {
+           "auto": true,
+           "manual": 1
+          }
          },
          {
           "a": 1,
           "b": 2,
           "sliding_friction": "0.080000000000000002",
-          "static_friction": "0.16000000000000000"
+          "static_friction": "0.16000000000000000",
+          "overlap": {
+           "auto": true,
+           "manual": 1
+          }
          }
         ],
         "distances": [
@@ -13974,10 +14070,6 @@
       "stages": [
        {
         "kind": "shape",
-        "overlap": {
-         "auto": true,
-         "manual": 1
-        },
         "optimisation": {
          "enabled": false,
          "min_contact_ratio": "1.2000000000000000"
@@ -14125,7 +14217,11 @@
           "a": 0,
           "b": 1,
           "sliding_friction": "0.080000000000000002",
-          "static_friction": "0.16000000000000000"
+          "static_friction": "0.16000000000000000",
+          "overlap": {
+           "auto": true,
+           "manual": 1
+          }
          }
         ],
         "distances": [
@@ -14153,10 +14249,6 @@
        },
        {
         "kind": "shape",
-        "overlap": {
-         "auto": true,
-         "manual": 1
-        },
         "optimisation": {
          "enabled": false,
          "min_contact_ratio": "1.2000000000000000"
@@ -14372,13 +14464,21 @@
           "a": 0,
           "b": 1,
           "sliding_friction": "0.080000000000000002",
-          "static_friction": "0.16000000000000000"
+          "static_friction": "0.16000000000000000",
+          "overlap": {
+           "auto": true,
+           "manual": 1
+          }
          },
          {
           "a": 1,
           "b": 2,
           "sliding_friction": "0.080000000000000002",
-          "static_friction": "0.16000000000000000"
+          "static_friction": "0.16000000000000000",
+          "overlap": {
+           "auto": true,
+           "manual": 1
+          }
          }
         ],
         "distances": [
@@ -14626,10 +14726,6 @@
       "stages": [
        {
         "kind": "shape",
-        "overlap": {
-         "auto": true,
-         "manual": 1
-        },
         "optimisation": {
          "enabled": false,
          "min_contact_ratio": "1.2000000000000000"
@@ -14777,7 +14873,11 @@
           "a": 0,
           "b": 1,
           "sliding_friction": "0.080000000000000002",
-          "static_friction": "0.16000000000000000"
+          "static_friction": "0.16000000000000000",
+          "overlap": {
+           "auto": true,
+           "manual": 1
+          }
          }
         ],
         "distances": [
@@ -14805,10 +14905,6 @@
        },
        {
         "kind": "shape",
-        "overlap": {
-         "auto": true,
-         "manual": 1
-        },
         "optimisation": {
          "enabled": false,
          "min_contact_ratio": "1.2000000000000000"
@@ -15143,19 +15239,31 @@
           "a": 0,
           "b": 1,
           "sliding_friction": "0.080000000000000002",
-          "static_friction": "0.16000000000000000"
+          "static_friction": "0.16000000000000000",
+          "overlap": {
+           "auto": true,
+           "manual": 1
+          }
          },
          {
           "a": 2,
           "b": 3,
           "sliding_friction": "0.080000000000000002",
-          "static_friction": "0.16000000000000000"
+          "static_friction": "0.16000000000000000",
+          "overlap": {
+           "auto": true,
+           "manual": 1
+          }
          },
          {
           "a": 4,
           "b": 2,
           "sliding_friction": "0.080000000000000002",
-          "static_friction": "0.16000000000000000"
+          "static_friction": "0.16000000000000000",
+          "overlap": {
+           "auto": true,
+           "manual": 1
+          }
          }
         ],
         "distances": [
@@ -15390,10 +15498,6 @@
       "stages": [
        {
         "kind": "shape",
-        "overlap": {
-         "auto": true,
-         "manual": 1
-        },
         "optimisation": {
          "enabled": false,
          "min_contact_ratio": "1.2000000000000000"
@@ -15541,7 +15645,11 @@
           "a": 0,
           "b": 1,
           "sliding_friction": "0.080000000000000002",
-          "static_friction": "0.16000000000000000"
+          "static_friction": "0.16000000000000000",
+          "overlap": {
+           "auto": true,
+           "manual": 1
+          }
          }
         ],
         "distances": [
@@ -15569,10 +15677,6 @@
        },
        {
         "kind": "shape",
-        "overlap": {
-         "auto": true,
-         "manual": 1
-        },
         "optimisation": {
          "enabled": false,
          "min_contact_ratio": "1.2000000000000000"
@@ -15907,19 +16011,31 @@
           "a": 0,
           "b": 1,
           "sliding_friction": "0.080000000000000002",
-          "static_friction": "0.16000000000000000"
+          "static_friction": "0.16000000000000000",
+          "overlap": {
+           "auto": true,
+           "manual": 1
+          }
          },
          {
           "a": 2,
           "b": 3,
           "sliding_friction": "0.080000000000000002",
-          "static_friction": "0.16000000000000000"
+          "static_friction": "0.16000000000000000",
+          "overlap": {
+           "auto": true,
+           "manual": 1
+          }
          },
          {
           "a": 4,
           "b": 2,
           "sliding_friction": "0.080000000000000002",
-          "static_friction": "0.16000000000000000"
+          "static_friction": "0.16000000000000000",
+          "overlap": {
+           "auto": true,
+           "manual": 1
+          }
          }
         ],
         "distances": [
@@ -15947,10 +16063,6 @@
        },
        {
         "kind": "shape",
-        "overlap": {
-         "auto": true,
-         "manual": 1
-        },
         "optimisation": {
          "enabled": false,
          "min_contact_ratio": "1.2000000000000000"
@@ -16520,31 +16632,51 @@
           "a": 0,
           "b": 1,
           "sliding_friction": "0.080000000000000002",
-          "static_friction": "0.16000000000000000"
+          "static_friction": "0.16000000000000000",
+          "overlap": {
+           "auto": true,
+           "manual": 1
+          }
          },
          {
           "a": 2,
           "b": 3,
           "sliding_friction": "0.080000000000000002",
-          "static_friction": "0.16000000000000000"
+          "static_friction": "0.16000000000000000",
+          "overlap": {
+           "auto": true,
+           "manual": 1
+          }
          },
          {
           "a": 4,
           "b": 5,
           "sliding_friction": "0.080000000000000002",
-          "static_friction": "0.16000000000000000"
+          "static_friction": "0.16000000000000000",
+          "overlap": {
+           "auto": true,
+           "manual": 1
+          }
          },
          {
           "a": 6,
           "b": 7,
           "sliding_friction": "0.080000000000000002",
-          "static_friction": "0.16000000000000000"
+          "static_friction": "0.16000000000000000",
+          "overlap": {
+           "auto": true,
+           "manual": 1
+          }
          },
          {
           "a": 6,
           "b": 8,
           "sliding_friction": "0.080000000000000002",
-          "static_friction": "0.16000000000000000"
+          "static_friction": "0.16000000000000000",
+          "overlap": {
+           "auto": true,
+           "manual": 1
+          }
          }
         ],
         "distances": [
@@ -16812,10 +16944,6 @@
       "stages": [
        {
         "kind": "shape",
-        "overlap": {
-         "auto": true,
-         "manual": 1
-        },
         "optimisation": {
          "enabled": false,
          "min_contact_ratio": "1.2000000000000000"
@@ -16963,7 +17091,11 @@
           "a": 0,
           "b": 1,
           "sliding_friction": "0.080000000000000002",
-          "static_friction": "0.16000000000000000"
+          "static_friction": "0.16000000000000000",
+          "overlap": {
+           "auto": true,
+           "manual": 1
+          }
          }
         ],
         "distances": [
@@ -16991,10 +17123,6 @@
        },
        {
         "kind": "shape",
-        "overlap": {
-         "auto": true,
-         "manual": 1
-        },
         "optimisation": {
          "enabled": false,
          "min_contact_ratio": "1.2000000000000000"
@@ -17329,19 +17457,31 @@
           "a": 0,
           "b": 1,
           "sliding_friction": "0.080000000000000002",
-          "static_friction": "0.16000000000000000"
+          "static_friction": "0.16000000000000000",
+          "overlap": {
+           "auto": true,
+           "manual": 1
+          }
          },
          {
           "a": 2,
           "b": 3,
           "sliding_friction": "0.080000000000000002",
-          "static_friction": "0.16000000000000000"
+          "static_friction": "0.16000000000000000",
+          "overlap": {
+           "auto": true,
+           "manual": 1
+          }
          },
          {
           "a": 4,
           "b": 2,
           "sliding_friction": "0.080000000000000002",
-          "static_friction": "0.16000000000000000"
+          "static_friction": "0.16000000000000000",
+          "overlap": {
+           "auto": true,
+           "manual": 1
+          }
          }
         ],
         "distances": [
@@ -17369,10 +17509,6 @@
        },
        {
         "kind": "shape",
-        "overlap": {
-         "auto": true,
-         "manual": 1
-        },
         "optimisation": {
          "enabled": false,
          "min_contact_ratio": "1.2000000000000000"
@@ -17758,19 +17894,31 @@
           "a": 0,
           "b": 1,
           "sliding_friction": "0.080000000000000002",
-          "static_friction": "0.16000000000000000"
+          "static_friction": "0.16000000000000000",
+          "overlap": {
+           "auto": true,
+           "manual": 1
+          }
          },
          {
           "a": 2,
           "b": 3,
           "sliding_friction": "0.080000000000000002",
-          "static_friction": "0.16000000000000000"
+          "static_friction": "0.16000000000000000",
+          "overlap": {
+           "auto": true,
+           "manual": 1
+          }
          },
          {
           "a": 4,
           "b": 5,
           "sliding_friction": "0.080000000000000002",
-          "static_friction": "0.16000000000000000"
+          "static_friction": "0.16000000000000000",
+          "overlap": {
+           "auto": true,
+           "manual": 1
+          }
          }
         ],
         "distances": [
@@ -18031,7 +18179,6 @@
            "sized_by": null
           }
          ],
-         "overlap": 0,
          "layouts": [],
          "cases": [
           {
@@ -18522,11 +18669,18 @@
          "value": "0.019999999999999574"
         },
         {
-         "freedom": "overlap",
+         "freedom": {
+          "overlap": 0
+         },
          "value": 0
         },
         {
-         "freedom": "first_pitch_diameter",
+         "freedom": {
+          "member": [
+           0,
+           "pitch_diameter"
+          ]
+         },
          "value": 17
         },
         {
@@ -18564,6 +18718,15 @@
           ]
          },
          "value": 1
+        },
+        {
+         "freedom": {
+          "member": [
+           1,
+           "pitch_diameter"
+          ]
+         },
+         "value": 43
         },
         {
          "freedom": {
@@ -19147,7 +19310,6 @@
            "sized_by": null
           }
          ],
-         "overlap": 0,
          "layouts": [],
          "cases": [
           {
@@ -19659,7 +19821,6 @@
            "sized_by": null
           }
          ],
-         "overlap": 0,
          "layouts": [
           {
            "axis": 1,
@@ -20444,11 +20605,18 @@
          "value": "0.019999999999999574"
         },
         {
-         "freedom": "overlap",
+         "freedom": {
+          "overlap": 0
+         },
          "value": 0
         },
         {
-         "freedom": "first_pitch_diameter",
+         "freedom": {
+          "member": [
+           0,
+           "pitch_diameter"
+          ]
+         },
          "value": 17
         },
         {
@@ -20486,6 +20654,15 @@
           ]
          },
          "value": 1
+        },
+        {
+         "freedom": {
+          "member": [
+           1,
+           "pitch_diameter"
+          ]
+         },
+         "value": 43
         },
         {
          "freedom": {
@@ -20538,11 +20715,24 @@
          "value": "0.019999999999999574"
         },
         {
-         "freedom": "overlap",
+         "freedom": {
+          "overlap": 0
+         },
          "value": 0
         },
         {
-         "freedom": "first_pitch_diameter",
+         "freedom": {
+          "overlap": 1
+         },
+         "value": 0
+        },
+        {
+         "freedom": {
+          "member": [
+           0,
+           "pitch_diameter"
+          ]
+         },
          "value": 12
         },
         {
@@ -20585,6 +20775,15 @@
          "freedom": {
           "member": [
            1,
+           "pitch_diameter"
+          ]
+         },
+         "value": 30
+        },
+        {
+         "freedom": {
+          "member": [
+           1,
            "shift"
           ]
          },
@@ -20616,6 +20815,15 @@
           ]
          },
          "value": 1
+        },
+        {
+         "freedom": {
+          "member": [
+           2,
+           "pitch_diameter"
+          ]
+         },
+         "value": 72
         },
         {
          "freedom": {
@@ -21045,7 +21253,7 @@
    }
   },
   "export_train": {
-   "ok": "# Geartrain.\n#\n# Inputs only — every ratio, stress, efficiency and backlash is recomputed from\n# these, so nothing here can go stale. Units: mm, degrees, rpm, N·m.\n#\n# Materials are named; the library that defines them is a separate document.\n# Editing this file by hand is expected.\n\nname = \"probe\"\n\n[train]\nreversed_bending = false\ncouplings = []\nconstraints = []\n\n[[train.load_cases]]\nkind = \"ultimate\"\nenabled = true\n\n[[train.load_cases.loads]]\nrole = \"load\"\n\n[train.load_cases.loads.at]\nkind = \"of\"\nstage = 0\nshaft = 1\n\n[train.load_cases.loads.torque]\nauto = false\nmanual = 0.1\n\n[train.load_cases.loads.speed]\nauto = false\nmanual = 30000.0\n\n[[train.load_cases.loads]]\nrole = \"reacted\"\n\n[train.load_cases.loads.at]\nkind = \"of\"\nstage = 0\nshaft = 2\n\n[train.load_cases.loads.torque]\nauto = true\nmanual = 0.0\n\n[train.load_cases.loads.speed]\nauto = true\nmanual = 0.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nactuations = 1000\nreversing = false\n\n[train.load_cases.duty.intermittent.at]\nkind = \"of\"\nstage = 0\nshaft = 2\n\n[[train.load_cases]]\nkind = \"ultimate\"\nenabled = true\n\n[[train.load_cases.loads]]\nrole = \"load\"\n\n[train.load_cases.loads.at]\nkind = \"of\"\nstage = 0\nshaft = 2\n\n[train.load_cases.loads.torque]\nauto = false\nmanual = 3.0\n\n[train.load_cases.loads.speed]\nauto = false\nmanual = 0.0\n\n[[train.load_cases.loads]]\nrole = \"reacted\"\n\n[train.load_cases.loads.at]\nkind = \"of\"\nstage = 0\nshaft = 1\n\n[train.load_cases.loads.torque]\nauto = true\nmanual = 0.0\n\n[train.load_cases.loads.speed]\nauto = true\nmanual = 0.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nactuations = 1000\nreversing = false\n\n[train.load_cases.duty.intermittent.at]\nkind = \"of\"\nstage = 0\nshaft = 2\n\n[[train.load_cases]]\nkind = \"fatigue\"\nenabled = true\n\n[[train.load_cases.loads]]\nrole = \"load\"\n\n[train.load_cases.loads.at]\nkind = \"of\"\nstage = 0\nshaft = 1\n\n[train.load_cases.loads.torque]\nauto = false\nmanual = 0.02\n\n[train.load_cases.loads.speed]\nauto = false\nmanual = 30000.0\n\n[[train.load_cases.loads]]\nrole = \"reacted\"\n\n[train.load_cases.loads.at]\nkind = \"of\"\nstage = 0\nshaft = 2\n\n[train.load_cases.loads.torque]\nauto = true\nmanual = 0.0\n\n[train.load_cases.loads.speed]\nauto = true\nmanual = 0.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nactuations = 1000\nreversing = false\n\n[train.load_cases.duty.intermittent.at]\nkind = \"of\"\nstage = 0\nshaft = 2\n\n[[train.stages]]\nkind = \"shape\"\nload_sharing = \"none\"\nmin_planet_clearance = 0.0\n\n[train.stages.overlap]\nauto = true\nmanual = 1.0\n\n[train.stages.optimisation]\nenabled = false\nmin_contact_ratio = 1.2\n\n[[train.stages.axes]]\ncarried_by = 0\ncount = 1\n\n[[train.stages.axes]]\ncarried_by = 0\ncount = 1\n\n[[train.stages.shafts]]\naxis = 0\n\n[[train.stages.shafts]]\naxis = 1\n\n[[train.stages.members]]\nshaft = 1\nmodule = 1.0\npressure_angle = 20.0\n\n[train.stages.members.gear]\nteeth = 17\nno_undercut = true\naddendum = 1.0\nno_sharp_tip = true\nmin_tip_width = 0.1\ndedendum = 1.25\nroot_radius = 0.38\nmaterial = \"4340 Hardened Steel\"\n\n[train.stages.members.gear.profile_shift]\nauto = true\nmanual = 0.0\n\n[train.stages.members.gear.working_depth]\nauto = true\nmanual = 1.0\n\n[train.stages.members.gear.helix_angle]\nauto = true\nmanual = 0.0\n\n[train.stages.members.gear.face_width]\nauto = true\nmanual = 5.0\n\n[train.stages.members.gear.face_sources.bending]\nultimate = true\nfatigue = true\n\n[train.stages.members.gear.face_sources.contact]\nultimate = false\nfatigue = false\n\n[train.stages.members.gear.material_overrides]\n\n[train.stages.members.thickness_mod]\nauto = false\nmanual = 1.0\n\n[train.stages.members.pitch_diameter]\nauto = true\nmanual = 17.0\n\n[[train.stages.members]]\nshaft = 2\nmodule = 1.0\npressure_angle = 20.0\n\n[train.stages.members.gear]\nteeth = 43\nno_undercut = true\naddendum = 1.0\nno_sharp_tip = true\nmin_tip_width = 0.1\ndedendum = 1.25\nroot_radius = 0.38\nmaterial = \"4340 Hardened Steel\"\n\n[train.stages.members.gear.profile_shift]\nauto = true\nmanual = 0.0\n\n[train.stages.members.gear.working_depth]\nauto = true\nmanual = 1.0\n\n[train.stages.members.gear.helix_angle]\nauto = true\nmanual = 0.0\n\n[train.stages.members.gear.face_width]\nauto = true\nmanual = 5.0\n\n[train.stages.members.gear.face_sources.bending]\nultimate = true\nfatigue = true\n\n[train.stages.members.gear.face_sources.contact]\nultimate = false\nfatigue = false\n\n[train.stages.members.gear.material_overrides]\n\n[train.stages.members.thickness_mod]\nauto = true\nmanual = 1.0\n\n[train.stages.members.pitch_diameter]\nauto = true\nmanual = 0.0\n\n[[train.stages.meshes]]\na = 0\nb = 1\nsliding_friction = 0.08\nstatic_friction = 0.16\n\n[[train.stages.distances]]\naxes = [\n    0,\n    1,\n]\nangle = 0.0\nworm = false\ntip_clearance = 0.0\ntolerance_plus = 0.02\ntolerance_minus = 0.02\naxial_clearance = 0.0\n\n[train.stages.distances.distance]\nauto = true\nmanual = 0.0\n\n[train.stages.distances.clearance]\nauto = false\nmanual = 0.02\n"
+   "ok": "# Geartrain.\n#\n# Inputs only — every ratio, stress, efficiency and backlash is recomputed from\n# these, so nothing here can go stale. Units: mm, degrees, rpm, N·m.\n#\n# Materials are named; the library that defines them is a separate document.\n# Editing this file by hand is expected.\n\nname = \"probe\"\n\n[train]\nreversed_bending = false\ncouplings = []\nconstraints = []\n\n[[train.load_cases]]\nkind = \"ultimate\"\nenabled = true\n\n[[train.load_cases.loads]]\nrole = \"load\"\n\n[train.load_cases.loads.at]\nkind = \"of\"\nstage = 0\nshaft = 1\n\n[train.load_cases.loads.torque]\nauto = false\nmanual = 0.1\n\n[train.load_cases.loads.speed]\nauto = false\nmanual = 30000.0\n\n[[train.load_cases.loads]]\nrole = \"reacted\"\n\n[train.load_cases.loads.at]\nkind = \"of\"\nstage = 0\nshaft = 2\n\n[train.load_cases.loads.torque]\nauto = true\nmanual = 0.0\n\n[train.load_cases.loads.speed]\nauto = true\nmanual = 0.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nactuations = 1000\nreversing = false\n\n[train.load_cases.duty.intermittent.at]\nkind = \"of\"\nstage = 0\nshaft = 2\n\n[[train.load_cases]]\nkind = \"ultimate\"\nenabled = true\n\n[[train.load_cases.loads]]\nrole = \"load\"\n\n[train.load_cases.loads.at]\nkind = \"of\"\nstage = 0\nshaft = 2\n\n[train.load_cases.loads.torque]\nauto = false\nmanual = 3.0\n\n[train.load_cases.loads.speed]\nauto = false\nmanual = 0.0\n\n[[train.load_cases.loads]]\nrole = \"reacted\"\n\n[train.load_cases.loads.at]\nkind = \"of\"\nstage = 0\nshaft = 1\n\n[train.load_cases.loads.torque]\nauto = true\nmanual = 0.0\n\n[train.load_cases.loads.speed]\nauto = true\nmanual = 0.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nactuations = 1000\nreversing = false\n\n[train.load_cases.duty.intermittent.at]\nkind = \"of\"\nstage = 0\nshaft = 2\n\n[[train.load_cases]]\nkind = \"fatigue\"\nenabled = true\n\n[[train.load_cases.loads]]\nrole = \"load\"\n\n[train.load_cases.loads.at]\nkind = \"of\"\nstage = 0\nshaft = 1\n\n[train.load_cases.loads.torque]\nauto = false\nmanual = 0.02\n\n[train.load_cases.loads.speed]\nauto = false\nmanual = 30000.0\n\n[[train.load_cases.loads]]\nrole = \"reacted\"\n\n[train.load_cases.loads.at]\nkind = \"of\"\nstage = 0\nshaft = 2\n\n[train.load_cases.loads.torque]\nauto = true\nmanual = 0.0\n\n[train.load_cases.loads.speed]\nauto = true\nmanual = 0.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nactuations = 1000\nreversing = false\n\n[train.load_cases.duty.intermittent.at]\nkind = \"of\"\nstage = 0\nshaft = 2\n\n[[train.stages]]\nkind = \"shape\"\nload_sharing = \"none\"\nmin_planet_clearance = 0.0\n\n[train.stages.optimisation]\nenabled = false\nmin_contact_ratio = 1.2\n\n[[train.stages.axes]]\ncarried_by = 0\ncount = 1\n\n[[train.stages.axes]]\ncarried_by = 0\ncount = 1\n\n[[train.stages.shafts]]\naxis = 0\n\n[[train.stages.shafts]]\naxis = 1\n\n[[train.stages.members]]\nshaft = 1\nmodule = 1.0\npressure_angle = 20.0\n\n[train.stages.members.gear]\nteeth = 17\nno_undercut = true\naddendum = 1.0\nno_sharp_tip = true\nmin_tip_width = 0.1\ndedendum = 1.25\nroot_radius = 0.38\nmaterial = \"4340 Hardened Steel\"\n\n[train.stages.members.gear.profile_shift]\nauto = true\nmanual = 0.0\n\n[train.stages.members.gear.working_depth]\nauto = true\nmanual = 1.0\n\n[train.stages.members.gear.helix_angle]\nauto = true\nmanual = 0.0\n\n[train.stages.members.gear.face_width]\nauto = true\nmanual = 5.0\n\n[train.stages.members.gear.face_sources.bending]\nultimate = true\nfatigue = true\n\n[train.stages.members.gear.face_sources.contact]\nultimate = false\nfatigue = false\n\n[train.stages.members.gear.material_overrides]\n\n[train.stages.members.thickness_mod]\nauto = false\nmanual = 1.0\n\n[train.stages.members.pitch_diameter]\nauto = true\nmanual = 17.0\n\n[[train.stages.members]]\nshaft = 2\nmodule = 1.0\npressure_angle = 20.0\n\n[train.stages.members.gear]\nteeth = 43\nno_undercut = true\naddendum = 1.0\nno_sharp_tip = true\nmin_tip_width = 0.1\ndedendum = 1.25\nroot_radius = 0.38\nmaterial = \"4340 Hardened Steel\"\n\n[train.stages.members.gear.profile_shift]\nauto = true\nmanual = 0.0\n\n[train.stages.members.gear.working_depth]\nauto = true\nmanual = 1.0\n\n[train.stages.members.gear.helix_angle]\nauto = true\nmanual = 0.0\n\n[train.stages.members.gear.face_width]\nauto = true\nmanual = 5.0\n\n[train.stages.members.gear.face_sources.bending]\nultimate = true\nfatigue = true\n\n[train.stages.members.gear.face_sources.contact]\nultimate = false\nfatigue = false\n\n[train.stages.members.gear.material_overrides]\n\n[train.stages.members.thickness_mod]\nauto = true\nmanual = 1.0\n\n[train.stages.members.pitch_diameter]\nauto = true\nmanual = 0.0\n\n[[train.stages.meshes]]\na = 0\nb = 1\nsliding_friction = 0.08\nstatic_friction = 0.16\n\n[train.stages.meshes.overlap]\nauto = true\nmanual = 1.0\n\n[[train.stages.distances]]\naxes = [\n    0,\n    1,\n]\nangle = 0.0\nworm = false\ntip_clearance = 0.0\ntolerance_plus = 0.02\ntolerance_minus = 0.02\naxial_clearance = 0.0\n\n[train.stages.distances.distance]\nauto = true\nmanual = 0.0\n\n[train.stages.distances.clearance]\nauto = false\nmanual = 0.02\n"
   },
   "import_train": {
    "ok": {
@@ -21208,10 +21416,6 @@
       "stages": [
        {
         "kind": "shape",
-        "overlap": {
-         "auto": true,
-         "manual": 1
-        },
         "optimisation": {
          "enabled": false,
          "min_contact_ratio": "1.2000000000000000"
@@ -21359,7 +21563,11 @@
           "a": 0,
           "b": 1,
           "sliding_friction": "0.080000000000000002",
-          "static_friction": "0.16000000000000000"
+          "static_friction": "0.16000000000000000",
+          "overlap": {
+           "auto": true,
+           "manual": 1
+          }
          }
         ],
         "distances": [

@@ -316,7 +316,7 @@ impl Default for PairStage {
             shaft_angle: 0.0,
             worm: false,
             pitch_diameter: Auto::automatic(17.0),
-            overlap: shape.overlap,
+            overlap: super::shape::default_overlap(),
             sliding_friction: 0.08,
             static_friction: 0.16,
             thickness_mod: 1.0,

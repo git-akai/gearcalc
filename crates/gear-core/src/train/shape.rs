@@ -155,6 +155,19 @@ pub struct MeshInput {
     pub b: usize,
     pub sliding_friction: f64,
     pub static_friction: f64,
+    /// **The axial contact ratio** `ε_β` this mesh is asked for — a floor
+    /// under an automatic face width, or, with every width of its mesh
+    /// group given, the thing that decides the group's helix (the group's
+    /// first mesh's is the reading; the rest of the group carry the same
+    /// number, written by the panel). Absent in a file, automatic at one.
+    #[cfg_attr(feature = "serde", serde(default = "default_overlap"))]
+    pub overlap: Auto<f64>,
+}
+
+/// The overlap a mesh a file does not give one runs at: asked for
+/// automatically, at one.
+pub(crate) fn default_overlap() -> Auto<f64> {
+    Auto::automatic(1.0)
 }
 
 /// The distance between two axes, in the frame both stand still in, and what
@@ -210,7 +223,6 @@ pub struct Distance {
     ts(export, export_to = "core/")
 )]
 pub struct Shape {
-    pub overlap: Auto<f64>,
     pub optimisation: Optimisation,
     pub load_sharing: LoadSharing,
     /// Tip-to-tip clearance between neighbouring instances of a replicated
@@ -231,7 +243,6 @@ pub struct Shape {
 impl Default for Shape {
     fn default() -> Self {
         Self {
-            overlap: Auto::automatic(1.0),
             optimisation: Optimisation::default(),
             load_sharing: LoadSharing::None,
             min_planet_clearance: 0.3,
@@ -625,16 +636,17 @@ impl Shape {
     /// across an internal one — else straight teeth.
     pub(crate) fn helix_angles(&self) -> Vec<f64> {
         let readings = self.readings();
-        let first_a = self.meshes.first().map(|m| m.a);
         // The last reading given is the one relief leaves standing, and the
         // one the solve honours.
         let stated = |i: usize| -> Option<f64> {
             readings.iter().rev().find_map(|r| match r.freedom {
-                Freedom::Member(m, MemberFreedom::Helix) if m == i => r.helix,
-                Freedom::FirstPitchDiameter if i == 0 => r.helix,
-                // The overlap reads the size of the first mesh's first
-                // member, as the pair's did.
-                Freedom::Overlap if Some(i) == first_a => r.helix,
+                Freedom::Member(m, MemberFreedom::Helix | MemberFreedom::PitchDiameter)
+                    if m == i =>
+                {
+                    r.helix
+                }
+                // A mesh's overlap reads the size of its first member.
+                Freedom::Overlap(k) if self.meshes[k].a == i => r.helix,
                 _ => None,
             })
         };
@@ -788,20 +800,57 @@ impl Shape {
         .map(helix_of)
     }
 
-    /// The width the overlap reads its size against: the least given width.
-    fn given_width(&self) -> f64 {
-        self.members
+    /// The width a mesh group's overlap reads its size against: the least
+    /// given width among its members.
+    fn given_width(&self, group: &[usize]) -> f64 {
+        group
             .iter()
-            .map(|m| m.gear.face_width.manual)
+            .map(|&i| self.members[i].gear.face_width.manual)
             .fold(f64::INFINITY, f64::min)
     }
 
-    fn overlap_reads_size(&self) -> bool {
-        self.members.iter().all(|m| !m.gear.face_width.auto)
+    /// Whether a mesh group's overlap decides its helix: every width of
+    /// the group given.
+    fn overlap_reads_size(&self, group: &[usize]) -> bool {
+        group.iter().all(|&i| !self.members[i].gear.face_width.auto)
     }
 
-    fn size_taken_by_overlap(&self) -> bool {
-        !self.overlap.auto && self.overlap_reads_size()
+    /// **The meshes of each mesh group**, in the groups' order: the mesh's
+    /// members are one group's, so the mesh is that group's.
+    pub(crate) fn group_meshes(&self) -> Vec<Vec<usize>> {
+        self.mesh_groups()
+            .iter()
+            .map(|g| {
+                (0..self.meshes.len())
+                    .filter(|&k| g.contains(&self.meshes[k].a))
+                    .collect()
+            })
+            .collect()
+    }
+
+    /// The readings of mesh `k`'s group alone — the size entry its
+    /// relation counts.
+    fn readings_for(&self, k: usize) -> Vec<Reading> {
+        let (group, meshes) = self.group_of_mesh(k);
+        self.readings()
+            .into_iter()
+            .filter(|r| match r.freedom {
+                Freedom::Member(i, _) => group.contains(&i),
+                Freedom::Overlap(j) => meshes.contains(&j),
+                _ => false,
+            })
+            .collect()
+    }
+
+    /// The mesh group a mesh belongs to, and that group's meshes.
+    fn group_of_mesh(&self, k: usize) -> (Vec<usize>, Vec<usize>) {
+        let groups = self.mesh_groups();
+        let meshes = self.group_meshes();
+        let g = groups
+            .iter()
+            .position(|g| g.contains(&self.meshes[k].a))
+            .unwrap_or(0);
+        (groups[g].clone(), meshes[g].clone())
     }
 
     // ----------------------------------------------------------- params ---
@@ -2748,7 +2797,6 @@ pub struct ShapeResult {
     /// `None` with the ratio.
     pub backlash: Option<Directional<super::Backlash>>,
     pub distances: Vec<DistanceReport>,
-    pub overlap: f64,
     /// One per replicated axis, in axis order.
     pub layouts: Vec<LayoutReport>,
     pub cases: Vec<ShaftCase>,
@@ -3159,18 +3207,27 @@ pub fn solve_shape_after(
         }
     };
     let probe_widths = vec![PROBE; shape.meshes.len()];
-    // ...and the width a given axial contact ratio needs, a floor under every
-    // automatic width: one helix per mesh, the least floor the largest.
-    let for_overlap = shape
+    // ...and the width a given axial contact ratio needs, a floor under an
+    // automatic width: each mesh's own, at its own helix, and a member's is
+    // the largest of its meshes'.
+    let mesh_floor: Vec<f64> = shape
         .meshes
         .iter()
         .enumerate()
-        .filter(|(k, _)| built.meshes[*k].line().is_some())
-        .map(|(_, m)| {
-            super::width_for_overlap(&shape.overlap, helix[m.a], shape.members[m.a].module)
+        .map(|(k, m)| {
+            if built.meshes[k].line().is_none() {
+                return 0.0;
+            }
+            super::width_for_overlap(&m.overlap, helix[m.a], shape.members[m.a].module)
                 .unwrap_or(0.0)
         })
-        .fold(0.0_f64, f64::max);
+        .collect();
+    let for_overlap = |i: usize| -> f64 {
+        meshes_of[i]
+            .iter()
+            .map(|&k| mesh_floor[k])
+            .fold(0.0_f64, f64::max)
+    };
     // A member on no line mesh has nothing to ask of a rating, and asks
     // nothing of its mate: its width is its own — a worm distance's
     // proportions, or the box's, and the gear says which.
@@ -3184,7 +3241,7 @@ pub fn solve_shape_after(
                         &rating(i, &probe_widths).asks(),
                         shape.members[i].gear.face_width.manual,
                     )
-                    .max(for_overlap)
+                    .max(for_overlap(i))
             } else {
                 0.0
             }
@@ -3348,14 +3405,20 @@ pub fn solve_shape_after(
         });
     }
     notes.extend(chosen.how.note());
-    if let Some(m) = shape.meshes.first() {
-        notes.extend(super::overlap_notes(
-            shape.size_taken_by_overlap(),
-            &shape.overlap,
-            shape.members[m.a].module,
-            shape.given_width(),
-            helix[m.a],
-        ));
+    // What each mesh group's ratio owes its reader: the group's first mesh
+    // reads the size, every mesh's is a floor.
+    for (group, meshes) in shape.mesh_groups().iter().zip(shape.group_meshes()) {
+        let reads_size = shape.overlap_reads_size(group);
+        for (n, &k) in meshes.iter().enumerate() {
+            let m = shape.meshes[k];
+            notes.extend(super::overlap_notes(
+                n == 0 && reads_size && !m.overlap.auto,
+                &m.overlap,
+                shape.members[m.a].module,
+                shape.given_width(group),
+                helix[m.a],
+            ));
+        }
     }
     // ---- the layout of every replicated axis.
     let layouts: Vec<LayoutReport> = shape
@@ -3613,11 +3676,6 @@ pub fn solve_shape_after(
         })
         .collect();
 
-    let overlap = meshes
-        .first()
-        .and_then(|m| m.line.as_ref().map(|l| l.contact_ratios.overlap))
-        .unwrap_or(0.0);
-
     let result = ShapeResult {
         ratio: motion.as_ref().map(super::wiring::UnitMotion::ratio),
         ratio_per_tooth: motion
@@ -3636,7 +3694,6 @@ pub fn solve_shape_after(
         }),
         backlash,
         distances,
-        overlap,
         layouts,
         cases: cases
             .iter()
@@ -3668,11 +3725,14 @@ impl Constrained for Shape {
             out.push((Freedom::CentreDistance(k), &mut d.distance));
             out.push((Freedom::Clearance(k), &mut d.clearance));
         }
-        out.push((Freedom::Overlap, &mut self.overlap));
+        for (k, m) in self.meshes.iter_mut().enumerate() {
+            out.push((Freedom::Overlap(k), &mut m.overlap));
+        }
         for (i, m) in self.members.iter_mut().enumerate() {
-            if i == 0 {
-                out.push((Freedom::FirstPitchDiameter, &mut m.pitch_diameter));
-            }
+            out.push((
+                Freedom::Member(i, MemberFreedom::PitchDiameter),
+                &mut m.pitch_diameter,
+            ));
             let StageGear {
                 profile_shift,
                 helix_angle,
@@ -3690,34 +3750,41 @@ impl Constrained for Shape {
         out
     }
 
-    /// Each member's helix in its own hand, the first member's diameter, and
-    /// the overlap where it decides the size.
+    /// **Every reading of a size, mesh group by mesh group**: each member's
+    /// helix in its own hand and its pitch diameter, and the group's first
+    /// mesh's overlap where every width of the group is given and the
+    /// ratio decides the helix. One size per group — the helix propagates
+    /// through meshes and no further — so a layshaft's pairs each state
+    /// their own, and [`Self::readings_for`] is the entry a mesh's relation
+    /// counts.
     fn readings(&self) -> Vec<Reading> {
-        let mut out: Vec<Reading> = self
-            .members
-            .iter()
-            .enumerate()
-            .map(|(i, m)| Reading::helix(i, &m.gear, |b| b))
-            .collect();
-        if let Some(first) = self.members.first() {
-            let z1 = f64::from(first.gear.teeth.max(1)) * first.module;
-            out.push(Reading {
-                freedom: Freedom::FirstPitchDiameter,
-                helix: (!first.pitch_diameter.auto).then(|| {
-                    (z1 / first.pitch_diameter.manual)
-                        .clamp(-1.0, 1.0)
-                        .acos()
-                        .to_degrees()
-                }),
-            });
-        }
-        if self.overlap_reads_size() {
-            if let Some(m) = self.meshes.first() {
-                out.push(Reading::overlap(
-                    &self.overlap,
-                    self.members[m.a].module,
-                    self.given_width(),
-                ));
+        let mut out: Vec<Reading> = Vec::new();
+        let meshes = self.group_meshes();
+        for (g, group) in self.mesh_groups().iter().enumerate() {
+            for &i in group {
+                let m = &self.members[i];
+                out.push(Reading::helix(i, &m.gear, |b| b));
+                let z1 = f64::from(m.gear.teeth.max(1)) * m.module;
+                out.push(Reading {
+                    freedom: Freedom::Member(i, MemberFreedom::PitchDiameter),
+                    helix: (!m.pitch_diameter.auto).then(|| {
+                        (z1 / m.pitch_diameter.manual)
+                            .clamp(-1.0, 1.0)
+                            .acos()
+                            .to_degrees()
+                    }),
+                });
+            }
+            if self.overlap_reads_size(group) {
+                if let Some(&k) = meshes[g].first() {
+                    let m = self.meshes[k];
+                    out.push(Reading::overlap(
+                        k,
+                        &m.overlap,
+                        self.members[m.a].module,
+                        self.given_width(group),
+                    ));
+                }
             }
         }
         out
@@ -3755,7 +3822,6 @@ impl Constrained for Shape {
     /// group below, which pins it again, and the walk would never settle.
     /// A shift gives instead, which is what the set's own kind did.
     fn freedoms(&self) -> Vec<FreedomGroup> {
-        let readings = self.readings();
         let mut groups = Vec::new();
         for d in 0..self.distances.len() {
             let meshes = self.meshes_on(d);
@@ -3770,7 +3836,7 @@ impl Constrained for Shape {
                     order.push(vec![Freedom::Member(m.a, MemberFreedom::Shift)]);
                     order.push(vec![Freedom::Member(m.b, MemberFreedom::Shift)]);
                     order.push(vec![Freedom::Clearance(d)]);
-                    order.push(super::entry(&readings));
+                    order.push(super::entry(&self.readings_for(k)));
                 } else {
                     // A later mesh gives on a member that can absorb for
                     // it — the plan's own list — and on nothing else: not
@@ -3811,8 +3877,10 @@ impl Constrained for Shape {
         }
         // On crossed shafts an axial contact ratio is nothing at all, and is
         // turned back automatic.
-        if self.distances.iter().any(|d| d.angle != 0.0) {
-            groups.push(super::always_automatic(Freedom::Overlap));
+        for k in 0..self.meshes.len() {
+            if self.is_crossed(k) {
+                groups.push(super::always_automatic(Freedom::Overlap(k)));
+            }
         }
         groups
     }
@@ -3883,7 +3951,6 @@ impl From<&super::PairStage> for Shape {
     /// sizing, clearances and tolerances.
     fn from(p: &super::PairStage) -> Self {
         let mut shape = super::arrangements::line(&[p.gears[0].teeth, p.gears[1].teeth]);
-        shape.overlap = p.overlap;
         shape.optimisation = p.optimisation;
         shape.load_sharing = p.load_sharing;
         shape.min_planet_clearance = 0.0;
@@ -3902,6 +3969,7 @@ impl From<&super::PairStage> for Shape {
         }
         shape.meshes[0].sliding_friction = p.sliding_friction;
         shape.meshes[0].static_friction = p.static_friction;
+        shape.meshes[0].overlap = p.overlap;
         shape.distances[0] = Distance {
             axes: [0, 1],
             angle: p.shaft_angle,
@@ -3944,7 +4012,6 @@ impl From<&super::PlanetaryStage> for Shape {
             ],
             &[],
         );
-        shape.overlap = s.overlap;
         shape.optimisation = s.optimisation;
         shape.load_sharing = s.load_sharing;
         shape.min_planet_clearance = s.min_planet_clearance;
@@ -3970,6 +4037,7 @@ impl From<&super::PlanetaryStage> for Shape {
         ]) {
             m.sliding_friction = sliding;
             m.static_friction = stat;
+            m.overlap = s.overlap;
         }
         let d = &mut shape.distances[0];
         d.distance = s.centre_distance;
@@ -5354,6 +5422,72 @@ mod pressure_angle {
                 "{preset:?}"
             );
         }
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod overlap_per_group {
+    //! **An axial contact ratio is a mesh's, and a size is a mesh group's**:
+    //! a layshaft's pairs, each with every width given and its own ratio,
+    //! each take the helix that ratio needs — one size per group, not one
+    //! per stage — and a ratio given where a width is automatic is a floor
+    //! under that mesh's own widths.
+
+    use super::super::arrangements::layshaft;
+    use super::super::{
+        helix_for_overlap, test_library, Constrained, Reversal, StageBoundary, StageLoads,
+    };
+    use super::*;
+
+    fn solve(shape: &Shape) -> ShapeResult {
+        solve_loads(
+            shape,
+            &StageLoads::at(2.0, 3000.0)
+                .under(StageBoundary::conventional(&shape.wiring(), &shape.ports())),
+            &test_library(),
+            Reversal::default(),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn each_mesh_group_takes_the_helix_its_own_ratio_needs() {
+        // Two pairs on one distance: the second's counts chosen so its
+        // steeper helix reaches the first's distance by a shift.
+        let mut shape = layshaft((17, 43), &[(19, 38)], 0);
+        for m in &mut shape.members {
+            m.gear.face_width = Auto::fixed(10.0);
+        }
+        shape.meshes[0].overlap = Auto::fixed(0.8);
+        shape.meshes[1].overlap = Auto::fixed(1.2);
+        let r = solve(&shape);
+        let want = |ratio: f64| helix_for_overlap(ratio, 1.0, 10.0).unwrap();
+        assert!((r.members[0].helix_angle.abs() - want(0.8)).abs() < 1e-9);
+        assert!((r.members[2].helix_angle.abs() - want(1.2)).abs() < 1e-9);
+        assert!(
+            (r.meshes[0].line.unwrap().contact_ratios.overlap - 0.8).abs() < 1e-6
+                && (r.meshes[1].line.unwrap().contact_ratios.overlap - 1.2).abs() < 1e-6
+        );
+    }
+
+    #[test]
+    fn a_ratio_given_over_an_automatic_width_floors_that_meshs_widths_alone() {
+        let mut shape = layshaft((17, 43), &[(19, 41)], 0);
+        for m in &mut shape.members {
+            m.gear.face_width = Auto::automatic(5.0);
+        }
+        // One helix stated per pair; its mate follows in the other hand.
+        shape.members[0].gear.helix_angle = Auto::fixed(15.0);
+        shape.members[2].gear.helix_angle = Auto::fixed(15.0);
+        shape.meshes[1].overlap = Auto::fixed(2.0);
+        let r = solve(&shape);
+        let floor = super::super::width_for_overlap(&Auto::fixed(2.0), 15.0, 1.0).unwrap();
+        assert!(r.members[2].face_width >= floor - 1e-9 && r.members[3].face_width >= floor - 1e-9);
+        assert!(
+            r.members[0].face_width < floor,
+            "the first pair asked no floor"
+        );
     }
 }
 

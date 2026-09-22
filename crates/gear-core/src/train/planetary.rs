@@ -129,7 +129,7 @@ impl Default for PlanetaryStage {
         Self {
             module: 1.0,
             pressure_angle: crate::params::GearParams::default().pressure_angle,
-            overlap: shape.overlap,
+            overlap: super::shape::default_overlap(),
             sliding_friction_sun_planet: 0.08,
             static_friction_sun_planet: 0.16,
             sliding_friction_planet_ring: 0.08,
