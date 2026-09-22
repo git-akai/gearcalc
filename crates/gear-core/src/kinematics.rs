@@ -1,4 +1,4 @@
-//! **Shafts, meshes and what relates them** — one matrix, read four ways.
+//! **Bodies, meshes and what relates them** — one matrix, read four ways.
 //!
 //! Nothing here knows what a tooth looks like. A gear reaches this as a signed
 //! tooth count and nothing else, in the discipline of [`crate::solve`] and
@@ -13,7 +13,7 @@
 //! z_a (ω_a − ω_f) + z_b (ω_b − ω_f) = 0
 //! ```
 //!
-//! with `f` the **frame** — the shaft in whose rotating frame both gear axes
+//! with `f` the **frame** — the body in whose rotating frame both gear axes
 //! stand still — and the tooth counts **signed**, a ring's being negative.
 //! That sign is not a new convention: it is [`crate::mesh::MeshKind::sign`],
 //! which this crate already documents as "the whole of the difference between
@@ -37,14 +37,14 @@
 //! # Four readings
 //!
 //! Assemble one row per mesh and one per rigid coupling over the vector of
-//! shaft speeds, and call it `A`:
+//! body speeds, and call it `A`:
 //!
 //! | reading | gives |
 //! |---|---|
 //! | `A ω = 0`, with the boundary conditions | speeds, ratios, and what is left free ([`System::motion`]) |
 //! | `dim null(A)` | **mobility** — how many conditions the train needs ([`System::mobility`]) |
 //! | `τ ∈ rowspace(A)` | torques and reactions ([`System::torques`]) |
-//! | `A θ = Δ` | the play at each shaft per unit play in one mesh ([`System::play`]) |
+//! | `A θ = Δ` | the play at each body per unit play in one mesh ([`System::play`]) |
 //!
 //! # The invariant that costs nothing, and exactly what it is worth
 //!
@@ -68,7 +68,7 @@
 //! | a row assembled anywhere but [`System::mesh`] or [`System::couple`] | **yes** |
 //! | a frame coefficient written by hand — the classic transposition | **yes** |
 //! | a tooth count with the wrong sign | no — the cross-check and the geometry do |
-//! | a frame on the wrong shaft | no — the cross-check does |
+//! | a frame on the wrong body | no — the cross-check does |
 //!
 //! So it is a guard on rows that arrive some other way, and the constructors
 //! satisfy it by construction — which is itself asserted, so that "by
@@ -84,27 +84,27 @@ use crate::ratio::Ratio;
 
 /// A body with one angular velocity. Ground is one of these — pinned by a
 /// condition, not by being a different kind of thing.
-pub type Shaft = usize;
+pub type Body = usize;
 
 /// **Ground — a frame like any other, which happens to be held.**
 ///
 /// It is not a different kind of thing and nothing here treats it as one: it is
-/// a [`Shaft`], it appears in mesh rows as a frame, it carries torque, and what
+/// a [`Body`], it appears in mesh rows as a frame, it carries torque, and what
 /// makes it ground is [`Condition::Ground`] on it and nothing else. Turn that
 /// condition into a [`Condition::Drive`] and the whole train is being measured
 /// from a turning frame, which is a coherent question with a coherent answer.
 ///
-/// **Why it is shaft zero** is the only thing special about it, and it is a
+/// **Why it is body zero** is the only thing special about it, and it is a
 /// bookkeeping fact rather than a physical one: every stage needs the *same*
 /// one, so that a fixed-axis mesh in stage 1 and a grounded ring in stage 3 are
-/// held against one frame rather than two ([`crate::train::Offsets`] maps every
-/// stage's other shafts and leaves this alone).
+/// held against one frame rather than two ([`crate::train::Slots`] maps every
+/// stage's other slots to the train's bodies and leaves this alone).
 ///
 /// **A train here has no housing.** An element is fixed to ground, carries a
 /// load, or is attached to another element. Calling the reference a housing
 /// invites two wrong readings, and both bite in the arrangements this module
 /// exists for: that the reference is a component with an interface to size, and
-/// that a *frame* must stand still. A frame is whatever shaft carries a mesh's
+/// that a *frame* must stand still. A frame is whatever body carries a mesh's
 /// axes, and in a compound set that is a **carrier** — turning, and shared by
 /// several meshes at once.
 ///
@@ -114,14 +114,14 @@ pub type Shaft = usize;
 /// different job, and the two are named apart on purpose: a noun meaning two
 /// things in two modules is the fault `tools/check_units.py` exists for in the
 /// angle domain.)*
-pub const GROUND: Shaft = 0;
+pub const GROUND: Body = 0;
 
-/// What is asked of a shaft. Three things, and no fourth.
+/// What is asked of a body. Three things, and no fourth.
 ///
-/// This is the whole of the boundary layer: which shafts are held, which are
+/// This is the whole of the boundary layer: which bodies are held, which are
 /// driven and at what speed, and which are left to whatever the rest decides.
 /// **"Fixed" and "free" are not structural** — nothing above changes when one
-/// of these does, which is what lets a designer turn a shaft loose and re-solve
+/// of these does, which is what lets a designer turn a body loose and re-solve
 /// without editing the train.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Condition {
@@ -130,7 +130,7 @@ pub enum Condition {
     /// `ω` is this.
     Drive(Ratio),
     /// Nothing is asked of it. It takes whatever the others leave, and carries
-    /// no torque — which is why a free shaft leaves a residual degree of
+    /// no torque — which is why a free body leaves a residual degree of
     /// freedom rather than being solved for.
     Free,
 }
@@ -139,9 +139,9 @@ pub enum Condition {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Refusal {
     /// A condition contradicts what the structure and the earlier conditions
-    /// already decided, at the **shaft** it was asked of — named, because
+    /// already decided, at the **body** it was asked of — named, because
     /// "over-determined" is not something a designer can act on.
-    Conflicts(Shaft),
+    Conflicts(Body),
     /// The structure itself admits no such displacement: a loop of meshes whose
     /// plays do not add up, which is teeth binding rather than a condition
     /// anyone chose. It cannot arise from [`System::motion`], whose right-hand
@@ -154,7 +154,7 @@ pub enum Refusal {
 
 /// How much of the train is still free, and how much of that is real.
 ///
-/// A shaft that no mesh and no coupling touches adds a degree of freedom that
+/// A body that no mesh and no coupling touches adds a degree of freedom that
 /// belongs to nothing — the handoff this work answers is right that counting it
 /// silently is a trap — so it is **named** rather than folded into the number.
 /// The commonest one is ground itself, in a train made only of epicyclic
@@ -162,27 +162,27 @@ pub enum Refusal {
 /// the moment a fixed-axis stage joins the train.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Mobility {
-    /// `shafts − rank`: how many independent conditions the train needs.
+    /// `bodies − rank`: how many independent conditions the train needs.
     pub degrees: usize,
-    /// The shafts no row touches, ascending.
-    pub untouched: Vec<Shaft>,
+    /// The bodies no row touches, ascending.
+    pub untouched: Vec<Body>,
 }
 
-/// One residual degree of freedom, as a direction in shaft space.
+/// One residual degree of freedom, as a direction in body space.
 ///
-/// Normalised at a shaft — `direction[at] == 1` — so that a reader can say
+/// Normalised at a body — `direction[at] == 1` — so that a reader can say
 /// *"and this much per turn of that one"*, which is what a family of answers
 /// has to be presented as to be any use.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Residual {
-    pub at: Shaft,
+    pub at: Body,
     pub direction: Vec<Ratio>,
 }
 
 /// **An answer, and what is still free about it.**
 ///
 /// One shape for every reading, because they are one object: a particular
-/// solution per shaft, plus a basis for whatever the conditions did not pin.
+/// solution per body, plus a basis for whatever the conditions did not pin.
 /// A unique answer is this with **no** residual — the degenerate value rather
 /// than a second variant, so nothing downstream branches on which it got.
 ///
@@ -191,17 +191,17 @@ pub struct Residual {
 /// ```
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Solution {
-    /// One value per shaft: the particular answer, taken with every free
+    /// One value per body: the particular answer, taken with every free
     /// parameter at zero.
     pub values: Vec<Ratio>,
     /// What the conditions left open. Empty is a unique answer.
     pub residual: Vec<Residual>,
-    /// The **shafts** whose condition, or whose given torque, said nothing the
+    /// The **bodies** whose condition, or whose given torque, said nothing the
     /// structure had not already said. Not an error — a ring grounded and also
     /// coupled to ground is a designer being explicit — but worth
     /// reporting, since it is also how an over-determined train looks when it
     /// happens to be consistent.
-    pub redundant: Vec<Shaft>,
+    pub redundant: Vec<Body>,
 }
 
 impl Solution {
@@ -211,24 +211,24 @@ impl Solution {
         self.residual.is_empty()
     }
 
-    /// **The same family, parameterised by the shafts named** — so a
+    /// **The same family, parameterised by the bodies named** — so a
     /// differential reads *per turn of the ring* rather than per turn of a
     /// planet nobody drives.
     ///
     /// A family is a particular answer plus a basis for what is free, and any
-    /// shaft a direction moves can be the parameter of that direction: the
+    /// body a direction moves can be the parameter of that direction: the
     /// basis is re-normalised at the first of `preferred` each direction
     /// moves and not yet taken, and the particular answer moved to where that
-    /// shaft stands still. Directions that move none of the preferred shafts
+    /// body stands still. Directions that move none of the preferred bodies
     /// keep the parameter they had. The set of answers is unchanged — every
     /// answer the old family contained the new one contains, and no other.
     ///
     /// `None` on overflow, which is a refusal rather than a wrap.
     #[must_use]
-    pub fn rebased(&self, preferred: &[Shaft]) -> Option<Self> {
+    pub fn rebased(&self, preferred: &[Body]) -> Option<Self> {
         let mut values = self.values.clone();
         let mut residual = self.residual.clone();
-        let mut taken: Vec<Shaft> = Vec::new();
+        let mut taken: Vec<Body> = Vec::new();
         for k in 0..residual.len() {
             let Some(&at) = preferred
                 .iter()
@@ -244,7 +244,7 @@ impl Solution {
             }
             residual[k].at = at;
             // ...and take `at` out of the particular answer and every other
-            // direction, so the parameter is that shaft's own speed.
+            // direction, so the parameter is that body's own speed.
             let dk = residual[k].direction.clone();
             let v = values[at];
             for (x, d) in values.iter_mut().zip(&dk) {
@@ -270,11 +270,11 @@ impl Solution {
         })
     }
 
-    /// The ratio of one shaft's value to another's, exactly — `None` where the
+    /// The ratio of one body's value to another's, exactly — `None` where the
     /// divisor is zero, or where the answer is a family and the quotient is not
     /// a number at all.
     #[must_use]
-    pub fn ratio(&self, of: Shaft, per: Shaft) -> Option<Ratio> {
+    pub fn ratio(&self, of: Body, per: Body) -> Option<Ratio> {
         self.is_unique()
             .then(|| self.values[of].checked_div(self.values[per]))
             .flatten()
@@ -289,18 +289,18 @@ impl Solution {
 /// built the mesh is the thing that knows.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct MeshRow {
-    pub a: Shaft,
-    pub b: Shaft,
+    pub a: Body,
+    pub b: Body,
     pub za: i64,
     pub zb: i64,
-    pub frame: Shaft,
+    pub frame: Body,
 }
 
-/// A system of shafts and what relates them.
+/// A system of bodies and what relates them.
 #[derive(Clone, Debug)]
 pub struct System {
-    shafts: usize,
-    /// One row per constraint, over the shafts. Mesh rows first is *not*
+    bodies: usize,
+    /// One row per constraint, over the bodies. Mesh rows first is *not*
     /// assumed anywhere; [`Self::mesh_rows`] indexes them.
     rows: Vec<Vec<Ratio>>,
     /// Which rows came from meshes, in the order they were added — what
@@ -309,25 +309,25 @@ pub struct System {
 }
 
 impl System {
-    /// A system of `shafts` bodies, of which [`GROUND`] is one.
+    /// A system of `bodies` bodies, of which [`GROUND`] is one.
     ///
     /// # Panics
     ///
-    /// If asked for no shafts at all, which is not a mechanism: ground always
+    /// If asked for no bodies at all, which is not a mechanism: ground always
     /// exists.
     #[must_use]
-    pub fn new(shafts: usize) -> Self {
-        assert!(shafts > 0, "ground is always a shaft");
+    pub fn new(bodies: usize) -> Self {
+        assert!(bodies > 0, "ground is always a body");
         Self {
-            shafts,
+            bodies,
             rows: Vec::new(),
             mesh_rows: Vec::new(),
         }
     }
 
     #[must_use]
-    pub const fn shafts(&self) -> usize {
-        self.shafts
+    pub const fn bodies(&self) -> usize {
+        self.bodies
     }
 
     /// How many meshes have been added.
@@ -336,24 +336,24 @@ impl System {
         self.mesh_rows.len()
     }
 
-    /// Add a mesh. `None` where a shaft index is out of range, a tooth count is
+    /// Add a mesh. `None` where a body index is out of range, a tooth count is
     /// zero, or the row would not represent: all three are a caller's mistake
     /// rather than a design's, and none of them is a number to carry on with.
     pub fn mesh(&mut self, m: MeshRow) -> Option<()> {
-        if m.a >= self.shafts || m.b >= self.shafts || m.frame >= self.shafts {
+        if m.a >= self.bodies || m.b >= self.bodies || m.frame >= self.bodies {
             return None;
         }
         if m.za == 0 || m.zb == 0 || m.a == m.b {
             return None;
         }
-        let mut row = vec![Ratio::ZERO; self.shafts];
+        let mut row = vec![Ratio::ZERO; self.bodies];
         let (za, zb) = (Ratio::whole(m.za), Ratio::whole(m.zb));
         row[m.a] = row[m.a].checked_add(za)?;
         row[m.b] = row[m.b].checked_add(zb)?;
         // **The frame's coefficient is what makes lock-up free.** Both members
         // are seen from it, so it carries the negative of their sum — and a
         // mesh whose frame is one of its own members (a gear rolling on a
-        // carrier that is its own shaft) simply cancels there, which is the
+        // carrier that is its own body) simply cancels there, which is the
         // degenerate case rather than a refusal.
         let sum = za.checked_add(zb)?;
         row[m.frame] = row[m.frame].checked_sub(sum)?;
@@ -362,18 +362,18 @@ impl System {
         Some(())
     }
 
-    /// Rigidly connect two shafts: `ω_a − ω_b = 0`.
+    /// Rigidly connect two bodies: `ω_a − ω_b = 0`.
     ///
     /// A coaxial output coupling, a locked clutch and a stage's shaft line are
     /// one mechanism, which is why there is one method. **Grounding is not one
     /// of them** — that is [`Condition::Ground`], a boundary rather than a
-    /// structural edit, so a shaft can be held and released without the train
+    /// structural edit, so a body can be held and released without the train
     /// changing shape.
-    pub fn couple(&mut self, a: Shaft, b: Shaft) -> Option<()> {
-        if a >= self.shafts || b >= self.shafts || a == b {
+    pub fn couple(&mut self, a: Body, b: Body) -> Option<()> {
+        if a >= self.bodies || b >= self.bodies || a == b {
             return None;
         }
-        let mut row = vec![Ratio::ZERO; self.shafts];
+        let mut row = vec![Ratio::ZERO; self.bodies];
         row[a] = Ratio::ONE;
         row[b] = Ratio::ONE.checked_neg()?;
         self.rows.push(row);
@@ -403,21 +403,21 @@ impl System {
     }
 
     /// How many independent conditions this train needs, and which of its
-    /// shafts nothing constrains.
+    /// bodies nothing constrains.
     #[must_use]
     pub fn mobility(&self) -> Option<Mobility> {
-        let rank = Reduced::of(&self.rows, self.shafts)?.pivots.len();
+        let rank = Reduced::of(&self.rows, self.bodies)?.pivots.len();
         Some(Mobility {
-            degrees: self.shafts - rank,
-            untouched: (0..self.shafts)
+            degrees: self.bodies - rank,
+            untouched: (0..self.bodies)
                 .filter(|&j| self.rows.iter().all(|row| row[j].is_zero()))
                 .collect(),
         })
     }
 
-    /// **The speeds**, given what is asked of each shaft.
+    /// **The speeds**, given what is asked of each body.
     ///
-    /// `conditions` is one per shaft. Fewer conditions than the mobility is not
+    /// `conditions` is one per body. Fewer conditions than the mobility is not
     /// an error: the answer is the family, and for a differential that family
     /// *is* the useful output — `ω_out = a ω_1 + b ω_2` in exact coefficients.
     ///
@@ -430,8 +430,8 @@ impl System {
     }
 
     /// [`Self::motion`], with the conditions absorbed **in the order given**
-    /// — `first` names shafts whose conditions go in before the rest, which
-    /// are then taken in shaft order.
+    /// — `first` names bodies whose conditions go in before the rest, which
+    /// are then taken in body order.
     ///
     /// The order changes no answer. What it changes is *which* condition a
     /// conflict is reported at: a condition is refused against what is
@@ -442,19 +442,15 @@ impl System {
     /// # Errors
     ///
     /// As [`Self::motion`].
-    pub fn motion_in(
-        &self,
-        conditions: &[Condition],
-        first: &[Shaft],
-    ) -> Result<Solution, Refusal> {
+    pub fn motion_in(&self, conditions: &[Condition], first: &[Body]) -> Result<Solution, Refusal> {
         self.solve(&vec![Ratio::ZERO; self.rows.len()], conditions, first)
     }
 
-    /// **Where each shaft stands per unit of play in one mesh** — the same
+    /// **Where each body stands per unit of play in one mesh** — the same
     /// system with a load on it.
     ///
     /// `A θ = Δ` with `Δ` a single unit at mesh `which`, so the answer is the
-    /// **coefficient** each shaft's angular play takes; the millimetres are the
+    /// **coefficient** each body's angular play takes; the millimetres are the
     /// mesh's own and multiply it afterwards. That split is deliberate: the
     /// coefficients are quotients of tooth counts and exact, the play is a
     /// length and is not.
@@ -473,7 +469,7 @@ impl System {
         Some(self.solve(&rhs, conditions, &[]))
     }
 
-    /// **The torque on every shaft**, from the ones that are known.
+    /// **The torque on every body**, from the ones that are known.
     ///
     /// For a lossless train the external torques do no net work over any motion
     /// the structure allows, so `Σ τ_i ω_i = 0` for every `ω` in the nullspace
@@ -481,14 +477,14 @@ impl System {
     /// is that, and nothing else: one transpose solve on a matrix already
     /// assembled, no second model.
     ///
-    /// `applied` is one entry per shaft: `Some` where the torque is known — an
-    /// input, a load, or the exact zero a free shaft carries — and `None` where
-    /// it is the reaction being solved for. A held shaft is the ordinary
-    /// `None`, and what comes back on it is **that shaft's own reaction**.
+    /// `applied` is one entry per body: `Some` where the torque is known — an
+    /// input, a load, or the exact zero a free body carries — and `None` where
+    /// it is the reaction being solved for. A held body is the ordinary
+    /// `None`, and what comes back on it is **that body's own reaction**.
     ///
-    /// **What is taken to ground is the sum over the held shafts**, not the
+    /// **What is taken to ground is the sum over the held bodies**, not the
     /// entry at [`GROUND`]. A holding constraint is external, so its reaction
-    /// appears on the shaft it holds; `GROUND` itself carries only what
+    /// appears on the body it holds; `GROUND` itself carries only what
     /// something *meshes* against it — everything, in a fixed-axis train, and
     /// exactly nothing in a pure epicyclic, where the held ring carries the lot.
     /// Both readings are right and they are different questions.
@@ -506,12 +502,12 @@ impl System {
     ///
     /// # Errors
     ///
-    /// [`Refusal::Conflicts`] naming the shaft whose given torque no
+    /// [`Refusal::Conflicts`] naming the body whose given torque no
     /// equilibrium can carry — which is what *nothing reacts this load* looks
     /// like from here — or [`Refusal::Overflow`].
     pub fn torques(&self, applied: &[Option<Ratio>]) -> Result<Solution, Refusal> {
         // Unknowns are the row multipliers `c`, since `τ = Aᵀ c` is what
-        // "lies in the rowspace" means. One equation per shaft whose torque is
+        // "lies in the rowspace" means. One equation per body whose torque is
         // given.
         let n = self.rows.len();
         let mut reduced = Reduced::new(n);
@@ -533,7 +529,7 @@ impl System {
         // reached twice, not an ambiguity a reader should be shown.
         let c = reduced.solution(n);
         let project = |multipliers: &[Ratio]| -> Option<Vec<Ratio>> {
-            (0..self.shafts)
+            (0..self.bodies)
                 .map(|i| {
                     self.rows
                         .iter()
@@ -571,9 +567,9 @@ impl System {
         &self,
         rhs: &[Ratio],
         conditions: &[Condition],
-        first: &[Shaft],
+        first: &[Body],
     ) -> Result<Solution, Refusal> {
-        let mut reduced = Reduced::new(self.shafts);
+        let mut reduced = Reduced::new(self.bodies);
         for (row, b) in self.rows.iter().zip(rhs) {
             let mut augmented = row.clone();
             augmented.push(*b);
@@ -597,7 +593,7 @@ impl System {
                 Condition::Ground => Ratio::ZERO,
                 Condition::Drive(v) => *v,
             };
-            let mut row = vec![Ratio::ZERO; self.shafts];
+            let mut row = vec![Ratio::ZERO; self.bodies];
             row[i] = Ratio::ONE;
             row.push(value);
             match reduced.absorb(row)? {
@@ -606,7 +602,7 @@ impl System {
                 Insert::Conflicts => return Err(Refusal::Conflicts(i)),
             }
         }
-        let mut out = reduced.solution(self.shafts);
+        let mut out = reduced.solution(self.bodies);
         out.redundant = redundant;
         Ok(out)
     }
@@ -742,7 +738,7 @@ mod tests {
 
     /// An ordinary fixed-axis pair: two gears whose axes stand still in ground.
     ///
-    /// Shafts `[ground, a, b]`.
+    /// Bodies `[ground, a, b]`.
     fn pair(za: i64, zb: i64) -> System {
         let mut s = System::new(3);
         s.mesh(MeshRow {
@@ -756,8 +752,8 @@ mod tests {
         s
     }
 
-    /// A planetary set, **with no shaft held**: that is a condition, not a
-    /// structure. Shafts `[ground, sun, carrier, ring, planet]`, and the
+    /// A planetary set, **with no body held**: that is a condition, not a
+    /// structure. Bodies `[ground, sun, carrier, ring, planet]`, and the
     /// ring's tooth count enters negative because a ring is a gear with a
     /// negative tooth count.
     fn set(t: Teeth) -> System {
@@ -781,10 +777,10 @@ mod tests {
         s
     }
 
-    const SUN: Shaft = 1;
-    const CARRIER: Shaft = 2;
-    const RING: Shaft = 3;
-    const PLANET: Shaft = 4;
+    const SUN: Body = 1;
+    const CARRIER: Body = 2;
+    const RING: Body = 3;
+    const PLANET: Body = 4;
 
     fn teeth() -> Teeth {
         Teeth {
@@ -801,7 +797,7 @@ mod tests {
         c
     }
 
-    /// **Re-basing a family changes which shaft it is read per turn of, and
+    /// **Re-basing a family changes which body it is read per turn of, and
     /// nothing else.** A set with only its sun driven is a one-parameter
     /// family; the solver parameterises it at whichever column fell last, and
     /// re-based at the ring every answer the first family contained the
@@ -812,7 +808,7 @@ mod tests {
     fn a_family_rebased_at_a_port_is_the_same_family() {
         let sys = set(teeth());
         let evaluate = |f: &Solution, p: &[Ratio]| -> Vec<Ratio> {
-            (0..sys.shafts())
+            (0..sys.bodies())
                 .map(|i| {
                     f.residual.iter().zip(p).fold(f.values[i], |acc, (r, q)| {
                         acc.checked_add(r.direction[i].checked_mul(*q).unwrap())
@@ -1000,7 +996,7 @@ mod tests {
     #[test]
     fn a_fixed_axis_pair_is_minus_the_tooth_count_ratio() {
         let c = |s: &System| {
-            let mut c = base(s.shafts());
+            let mut c = base(s.bodies());
             c[1] = Condition::Drive(Ratio::ONE);
             c
         };
@@ -1015,8 +1011,8 @@ mod tests {
 
     /// **The six arrangements, against the model they replace.**
     ///
-    /// `planetary::power` solves Willis for three named roles with one shaft
-    /// held; this solves the same set as a graph of four shafts and two meshes,
+    /// `planetary::power` solves Willis for three named roles with one body
+    /// held; this solves the same set as a graph of four bodies and two meshes,
     /// with the holding as a condition. Agreeing on all six is what says the
     /// graph reproduces the kinematics — and the planet's own speed, which
     /// `power` has to be asked for separately, falls out of the same solve.
@@ -1043,7 +1039,7 @@ mod tests {
                 }
                 let arrangement = Arrangement { input, fixed };
                 let p = planetary::power(i0, arrangement, 1.0, 1.0, 1.0).unwrap();
-                let mut c = base(s.shafts());
+                let mut c = base(s.bodies());
                 c[index(fixed)] = Condition::Ground;
                 c[index(input)] = Condition::Drive(Ratio::ONE);
                 let m = s.motion(&c).unwrap();
@@ -1082,7 +1078,7 @@ mod tests {
     ///
     /// # What is asserted, and what deliberately is not
     ///
-    /// **Not which shaft the parameter is taken at.** A first draft assumed it
+    /// **Not which body the parameter is taken at.** A first draft assumed it
     /// would be the ring and read the particular solution as "the ring held" —
     /// the elimination left the *planet* free instead, so the particular
     /// solution is the planet standing still, the carrier came back at 4/7
@@ -1104,7 +1100,7 @@ mod tests {
         assert_eq!(m.degrees, 3);
         assert_eq!(m.untouched, vec![GROUND]);
 
-        let mut c = base(s.shafts());
+        let mut c = base(s.bodies());
         c[SUN] = Condition::Drive(Ratio::ONE);
         let f = s.motion(&c).unwrap();
         assert!(
@@ -1116,7 +1112,7 @@ mod tests {
         assert_eq!(r.direction[r.at], Ratio::ONE, "a residual is normalised");
 
         // `ω = particular + p · direction`, at three points of the family.
-        let at = |p: Ratio, i: Shaft| {
+        let at = |p: Ratio, i: Body| {
             f.values[i]
                 .checked_add(p.checked_mul(r.direction[i]).unwrap())
                 .unwrap()
@@ -1160,7 +1156,7 @@ mod tests {
     #[test]
     fn a_condition_that_contradicts_the_structure_names_itself() {
         let s = pair(17, 43);
-        let mut c = base(s.shafts());
+        let mut c = base(s.bodies());
         c[1] = Condition::Drive(Ratio::ONE);
         // The second gear's speed is already decided; asking for a different
         // one is a contradiction, and asking for the right one is a repetition.
@@ -1184,7 +1180,7 @@ mod tests {
     #[test]
     fn torque_balances_the_power_it_is_solved_from() {
         let s = pair(17, 43);
-        let mut c = base(s.shafts());
+        let mut c = base(s.bodies());
         c[1] = Condition::Drive(Ratio::ONE);
         let speeds = s.motion(&c).unwrap();
 
@@ -1212,7 +1208,7 @@ mod tests {
     }
 
     /// The same law on an epicyclic set, in every arrangement — which is the
-    /// case a pair cannot reach, because a pair has no third shaft for the
+    /// case a pair cannot reach, because a pair has no third body for the
     /// reaction to be shared with.
     #[test]
     fn an_epicyclic_sets_torques_balance_in_every_arrangement() {
@@ -1224,13 +1220,13 @@ mod tests {
                 if input == fixed {
                     continue;
                 }
-                let mut c = base(s.shafts());
+                let mut c = base(s.bodies());
                 c[fixed] = Condition::Ground;
                 c[input] = Condition::Drive(Ratio::ONE);
                 let speeds = s.motion(&c).unwrap();
                 // The planet carries no external torque, and neither does the
                 // ground: nothing outside the set touches either.
-                let mut applied = vec![None; s.shafts()];
+                let mut applied = vec![None; s.bodies()];
                 applied[PLANET] = Some(Ratio::ZERO);
                 applied[GROUND] = Some(Ratio::ZERO);
                 applied[input] = Some(Ratio::ONE);
@@ -1243,8 +1239,8 @@ mod tests {
                     .try_fold(Ratio::ZERO, |a, (t, w)| a.checked_add(t.checked_mul(*w)?))
                     .unwrap();
                 assert_eq!(power, Ratio::ZERO, "input {input}, fixed {fixed}");
-                // The three shafts' torques sum to zero: the set is in
-                // equilibrium and the held shaft's is the reaction it carries.
+                // The three bodies' torques sum to zero: the set is in
+                // equilibrium and the held body's is the reaction it carries.
                 let sum = [SUN, CARRIER, RING]
                     .iter()
                     .try_fold(Ratio::ZERO, |a, &i| a.checked_add(tq.values[i]))
@@ -1264,7 +1260,7 @@ mod tests {
     /// same rows the speeds came from.
     #[test]
     fn play_at_a_shaft_is_the_chain_referral_the_reference_derives() {
-        // Shafts: ground, a, b, c — two meshes, `b` shared.
+        // Bodies: ground, a, b, c — two meshes, `b` shared.
         let mut s = System::new(4);
         s.mesh(MeshRow {
             a: 1,
@@ -1298,7 +1294,7 @@ mod tests {
             first.values[3].checked_div(first.values[2]).unwrap(),
             Ratio::new(-13, 31).unwrap()
         );
-        // ...and a mesh's play does not reach the shaft the other side of a
+        // ...and a mesh's play does not reach the body the other side of a
         // held input: the second mesh moves `c` and leaves `b` where it is.
         assert!(second.values[2].is_zero());
         assert_eq!(second.values[3], Ratio::new(1, 31).unwrap());
@@ -1317,7 +1313,7 @@ mod tests {
     /// a refusal rather than a very large number.
     #[test]
     fn a_hula_arrangement_reduces_by_its_two_products() {
-        // Shafts: ground, gear 1, crank, wobble, gear 4. Both meshes are
+        // Bodies: ground, gear 1, crank, wobble, gear 4. Both meshes are
         // internal, so the larger member of each carries the negative count.
         let build = |z: [i64; 4]| {
             let mut s = System::new(5);
@@ -1359,7 +1355,7 @@ mod tests {
         assert!(m.ratio(2, 4).is_none());
     }
 
-    /// A shaft nothing touches is named rather than counted, on the case that
+    /// A body nothing touches is named rather than counted, on the case that
     /// produces it: a pure epicyclic, in which nothing meshes against ground until
     /// something is grounded to it.
     #[test]

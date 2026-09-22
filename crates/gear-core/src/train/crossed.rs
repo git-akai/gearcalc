@@ -2,7 +2,7 @@
 //! turn.
 //!
 //! **Not a stage of its own, and not a solve of its own.** A worm stage and a
-//! crossed gear pair are one [`super::PairStage`] whose shafts are not
+//! crossed gear pair are one [`super::PairStage`] whose bodies are not
 //! parallel, and a distance at an angle in any [`super::shape::Shape`] is
 //! this mesh; the shape builds it as a point contact beside its line
 //! contacts (`shape::BuiltContact`) and fills the same [`super::MeshReport`]
@@ -44,7 +44,7 @@
 //! (docs/corrections.md).
 //!
 //! `sin α_n` there is an identity, not a small-angle reading: the contact
-//! normal's component along the line of centres is `sin α_n` at **every** shaft
+//! normal's component along the line of centres is `sin α_n` at **every** body
 //! angle, which `screw.rs` gates and `tools/crossed_path.py` measures off the
 //! surfaces.
 //!
@@ -223,7 +223,7 @@ mod tests {
         solve_pair_stage(stage, &StageLoads::just(2.0), &library()).unwrap()
     }
 
-    /// **The same teeth with their shafts brought parallel**, as an efficiency
+    /// **The same teeth with their bodies brought parallel**, as an efficiency
     /// — the best the pair can be, which a crossed figure is measured against
     /// here and nowhere else. The stage can describe it exactly, since a
     /// crossed pair *is* this stage at `Σ = 0`: the same helix on the first
@@ -347,7 +347,7 @@ mod tests {
     /// **A crossed pair is rated on the contact line its teeth actually have.**
     ///
     /// The elliptical solution assumes half-spaces of unlimited extent, so as
-    /// the shafts come parallel its patch lengthens without bound and the
+    /// the bodies come parallel its patch lengthens without bound and the
     /// pressure it reports falls toward **zero** — while the real pair carries
     /// the same load on a contact line the face has not lengthened at all. The
     /// two models cross once, and the physical answer is the larger on each
@@ -561,8 +561,8 @@ mod tests {
         );
         // **A member's torque is the torque its teeth carry** — the driver's
         // read across the mesh, which is what every stress on the member is
-        // proportional to — and what its *shaft* delivers is `η` less, on the
-        // shaft's own row. `|ratio|`: the reduction is signed and a worm's is
+        // proportional to — and what its *body* delivers is `η` less, on the
+        // body's own row. `|ratio|`: the reduction is signed and a worm's is
         // negative. The wheel's tooth load used to be quoted delivered, and
         // the shape's rule for every member is the tooth load
         // (`docs/corrections.md`).
@@ -785,7 +785,7 @@ mod tests {
         // which is the point. The face is centred on its own gear and the
         // contact is not quite centred on the face, because the pair runs at its
         // nominal centre distance *plus the clearance* and that slides the
-        // contact along the shafts (docs/reference.md#centre-distance-and-backlash). Trimming a face symmetrically about
+        // contact along the bodies (docs/reference.md#centre-distance-and-backlash). Trimming a face symmetrically about
         // an asymmetric contact loses a little more than half.
         let narrow = solve_crossed(
             &stage(Auto::fixed(sized[0] / 2.0)),
@@ -1035,11 +1035,11 @@ mod tests {
         );
     }
 
-    /// **Crossing shafts adds sliding, and the figures show it** — with one
+    /// **Crossing bodies adds sliding, and the figures show it** — with one
     /// exception that is the *other* formula's approximation, not this one's.
     ///
     /// A crossed pair loses more than the same teeth running parallel, and by
-    /// more the further the shafts are turned. At a shaft angle small enough
+    /// more the further the bodies are turned. At a shaft angle small enough
     /// that the two are the same mesh, the balance comes out a hundredth of a
     /// point *above* the parallel closed form — because that closed form is
     /// first order in `μ` and the balance is exact in it. `screw.rs` measures
@@ -1056,11 +1056,11 @@ mod tests {
                 gears: [
                     StageGear {
                         teeth: 17,
-                        // Wide enough that the **tips** end the zone at every shaft
+                        // Wide enough that the **tips** end the zone at every body
                         // angle below, which is what makes this a like-for-like
                         // comparison. A 12 mm face is not: near the parallel limit a
                         // centre-distance error slides the contact several
-                        // millimetres along the shafts, the face cuts the zone
+                        // millimetres along the bodies, the face cuts the zone
                         // short, and comparing a partly engaged pair against a fully
                         // engaged one measures the truncation rather than the
                         // sliding. That effect has its own test below.
@@ -1106,7 +1106,7 @@ mod tests {
         }
 
         // A worm has one too now — it is a helical gear with one start — and
-        // the same ordering holds against it: crossing the shafts to a right
+        // the same ordering holds against it: crossing the bodies to a right
         // angle costs a single-start worm most of what it had.
         let worm = solved(&PairStage::worm());
         let parallel = parallel_counterpart(&PairStage::worm());
@@ -1396,7 +1396,7 @@ mod tests {
         }
     }
 
-    /// **The crossed backlash law and the parallel one meet where the shafts
+    /// **The crossed backlash law and the parallel one meet where the bodies
     /// straighten — and the gate is the meeting, not a number.**
     ///
     /// This is the check that was missing while the crossed centre-distance term
@@ -1892,7 +1892,7 @@ mod tests {
     }
 
     /// **A centre-distance error slides a crossed pair's contact along the
-    /// shafts, and near the parallel limit it slides clean off the face.**
+    /// bodies, and near the parallel limit it slides clean off the face.**
     ///
     /// The effect the model could not see while every path was built at the
     /// zero-backlash centre distance. A crossed pair's line of action cannot

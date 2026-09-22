@@ -1,6 +1,6 @@
 //! Geartrains: a stage at a time, and the accumulation along the shaft line.
 //!
-//! **One stage shape.** A stage is a [`shape::Shape`] — axes, the shafts on
+//! **One stage shape.** A stage is a [`shape::Shape`] — axes, the bodies on
 //! them, members, meshes and distances — or, until the shape can size a
 //! distance from a tip bound, a [`HulaStage`]. What stays here is the
 //! vocabulary every stage shares ([`Backlash`], [`TrainError`], the duty
@@ -51,20 +51,19 @@ pub mod shape;
 mod wiring;
 
 pub use conditions::{
-    Constraint, Coupling, Exact, MotionError, MotionReport, OpenPort, PortSpec, Ports,
-    ShaftConstraint, ShaftMotion, ShaftRef, ShaftReport, StageBoundary, StagePorts, Term,
-    TrainBody, TrainMotion, PARKED_IN, PARKED_OUT,
+    BodyConstraint, BodyEnd, BodyReport, Constraint, Exact, MotionError, MotionReport, OpenPort,
+    PortSpec, Ports, StageBoundary, StagePorts, Term, TrainBody, TrainMotion,
 };
 
-use crate::kinematics::{Condition, Shaft, GROUND};
+use crate::kinematics::{Body, Condition, GROUND};
 pub use arrangements::{StageFamily, StagePreset};
-pub use edits::{EditRefused, Renumbered, StageEdit};
+pub use edits::{EditRefused, StageEdit};
 pub use pair::PairStage;
 pub(crate) use pair::ShiftAsked;
 pub use planetary::PlanetaryStage;
 pub(crate) use wiring::teeth_of;
 pub use wiring::{
-    MemberMotion, MeshSpec, Mount, Offsets, ShaftLabel, UnitMotion, Wiring, WiringError,
+    BodyLabel, MemberMotion, MeshSpec, Mount, Slots, UnitMotion, Wiring, WiringError,
 };
 
 /// The three contact ratios.
@@ -139,7 +138,7 @@ impl Backlash {
     /// the other. This used to assign `minus` to the minimum outright, which
     /// reads perfectly well and is inside out on every internal mesh.
     ///
-    /// A set that carries one of each, referred to one shaft, is neither: what
+    /// A set that carries one of each, referred to one body, is neither: what
     /// the sun mesh gains from a planet moved outward the ring mesh loses, so
     /// on the ideal ring the referred play is stationary at the running
     /// distance and both ends of the band sit *below* the nominal. The nominal
@@ -166,7 +165,7 @@ impl Backlash {
 }
 
 /// **What one mesh reports**, whatever stage it is in and whichever way its
-/// shafts run.
+/// bodies run.
 ///
 /// One type, because the physics is one model with the shaft angle as a
 /// parameter and not two models: the Hertz answer is general contact of which a
@@ -174,7 +173,7 @@ impl Backlash {
 /// efficiency is one friction balance the parallel loss integral is the limit
 /// of, the backlash is one gap projected onto one normal, and the interference
 /// verdict is one relation asked in the transverse plane or along the line —
-/// each of which a test holds at the limit. So a designer turning a shaft
+/// each of which a test holds at the limit. So a designer turning a body
 /// angle from zero sees the same rows with the numbers moving, not a readout
 /// changing shape. What a line contact has that a point does not, and the other
 /// way, is the little in [`LineContact`] and [`PointContact`]: the transverse
@@ -219,13 +218,13 @@ pub struct MeshReport {
     /// The two are the same *count* and not the same measure, which is the
     /// one place the two contacts do not meet continuously: a line counts
     /// lines across the face, a point counts points along one line, and the
-    /// point's limit as the shafts straighten is the normal-plane `ε_α / cos²β_b`
+    /// point's limit as the bodies straighten is the normal-plane `ε_α / cos²β_b`
     /// rather than the total. The decomposition each has is in [`Self::line`]
     /// and [`Self::point`].
     pub contact_ratio: f64,
     /// Mesh efficiency, both drive senses. Equal for a parallel-axis mesh — the
     /// mirror flank is the same integral — and genuinely different on crossed
-    /// shafts, where **either** can be zero or negative: backward is what
+    /// bodies, where **either** can be zero or negative: backward is what
     /// self-locking is, forward a steep helix split that cannot drive at all.
     /// [`Directional::locked`] reads them rather than a separate flag that
     /// could disagree.
@@ -258,7 +257,7 @@ pub struct MeshReport {
     /// **The mesh's play as its row in the kinematics sees it**, radians of
     /// the row — `j |Σz| / a` on a line contact, plus the axial float's — at
     /// its distance's minus, running and plus tolerance in turn. What a
-    /// play referred to any shaft of the train is read from
+    /// play referred to any body of the train is read from
     /// ([`kinematics::System::play`]), so a path's backlash sums every mesh
     /// it crosses and none it does not ([`PathReport`]).
     pub row_play: [f64; 3],
@@ -384,7 +383,7 @@ pub struct ContactPatch {
     pub patch_width: f64,
     /// Relative curvature along the contact, 1/mm. **Zero is line contact** —
     /// the degenerate value, and every parallel mesh's — and that it is not
-    /// zero is what crossing the shafts did.
+    /// zero is what crossing the bodies did.
     pub curvature_along: f64,
     /// ...and across it, `1/ρ` — the reciprocal of the relative radius of
     /// curvature at the worst point, in the normal plane.
@@ -1555,7 +1554,7 @@ pub enum TrainError {
     /// **before** any geometry so the answer is about what is wrong.
     Wiring(WiringError),
     /// **No self-consistent power flow.** The arrangement is self-locking, or
-    /// the shaft named as the input is not the one driving (`T ω ≤ 0`) — see
+    /// the body named as the input is not the one driving (`T ω ≤ 0`) — see
     /// [`crate::planetary::power`], which tries both signs of the rolling power
     /// and keeps the physical one, or neither.
     NoPowerFlow,
@@ -1564,19 +1563,18 @@ pub enum TrainError {
     UnknownMaterial(String),
     /// A tooth so undercut there is no root section left to rate.
     NoRootSection,
-    /// **Two conditions cannot both hold**, at this shaft: what it is asked
+    /// **Two conditions cannot both hold**, at this body: what it is asked
     /// to do contradicts what the meshes and the other conditions already
     /// decided — a sun driven while its carrier and its ring are both held.
-    Overdetermined { at: ShaftRef },
-    /// A constraint, a coupling or a load case names a stage or a shaft the
-    /// train does not have.
-    NoSuchShaft { at: ShaftRef },
+    Overdetermined { at: usize },
+    /// A constraint or a load case names a body the train does not have.
+    NoSuchBody { at: usize },
     /// The tooth counts along the shaft line multiply past what an exact
     /// ratio can hold, and a ratio is refused rather than wrapped.
     Overflow,
-    /// **A load case enters by a shaft no load can be put on**: ground, a
-    /// held shaft, a shaft the train does not have, or one of a stage's
-    /// shafts that is not a port — a planet's. Zero-based, as the cases are
+    /// **A load case enters by a body no load can be put on**: ground, a
+    /// held body, a body the train does not have, or one of a stage's
+    /// bodies that is not a port — a planet's. Zero-based, as the cases are
     /// indexed; the front end numbers from 1.
     LoadPort { case: usize },
     /// **No distance clears the tips of this mesh**: an automatic distance
@@ -1608,15 +1606,13 @@ impl From<MotionError> for TrainError {
     fn from(e: MotionError) -> Self {
         match e {
             // A train with no stages is solved before its motion is asked;
-            // a motion asked of one anyway names the one shaft it has.
-            MotionError::Empty => Self::NoSuchShaft {
-                at: ShaftRef::Ground,
-            },
+            // a motion asked of one anyway names the one body it has.
+            MotionError::Empty => Self::NoSuchBody { at: GROUND },
             MotionError::Wiring(stage, cause) => Self::InStage {
                 stage,
                 cause: Box::new(Self::Wiring(cause)),
             },
-            MotionError::NoSuchShaft(at) => Self::NoSuchShaft { at },
+            MotionError::NoSuchBody(at) => Self::NoSuchBody { at },
             MotionError::Conflicts(at) => Self::Overdetermined { at },
             MotionError::Overflow => Self::Overflow,
         }
@@ -1630,17 +1626,10 @@ impl From<WiringError> for TrainError {
     }
 }
 
-/// A note about one shaft, carrying where it is as the front end counts —
-/// stage and shaft from one — or `0` and `0` for ground, which every stage
-/// shares and no stage numbers.
-fn located(key: &'static str, at: ShaftRef) -> Note {
-    let (stage, shaft) = match at {
-        ShaftRef::Ground => (0, 0),
-        ShaftRef::Of { stage, shaft } => (stage + 1, shaft),
-    };
-    Note::new(key)
-        .text("stage", stage.to_string())
-        .text("shaft", shaft.to_string())
+/// A note about one body, carrying its number as the train counts it —
+/// ground being 0.
+fn located(key: &'static str, at: usize) -> Note {
+    Note::new(key).text("body", at.to_string())
 }
 
 impl crate::note::Explain for TrainError {
@@ -1670,7 +1659,7 @@ impl crate::note::Explain for TrainError {
             }
             Self::NoRootSection => Note::new(key::ERROR_TRAIN_NO_ROOT_SECTION),
             Self::Overdetermined { at } => located(key::ERROR_TRAIN_OVERDETERMINED, *at),
-            Self::NoSuchShaft { at } => located(key::ERROR_TRAIN_NO_SUCH_SHAFT, *at),
+            Self::NoSuchBody { at } => located(key::ERROR_TRAIN_NO_SUCH_BODY, *at),
             Self::Overflow => Note::new(key::ERROR_TRAIN_OVERFLOW),
             Self::LoadPort { case } => {
                 Note::new(key::ERROR_TRAIN_LOAD_PORT).text("case", (case + 1).to_string())
@@ -1683,11 +1672,12 @@ impl crate::note::Explain for TrainError {
     }
 }
 
-/// A shaft as the harness writes it: one-based stage and the shaft's index.
-fn place(at: ShaftRef) -> String {
-    match at {
-        ShaftRef::Ground => "ground".to_string(),
-        ShaftRef::Of { stage, shaft } => format!("stage {}, shaft {shaft}", stage + 1),
+/// A body as the harness writes it.
+fn place(at: usize) -> String {
+    if at == GROUND {
+        "ground".to_string()
+    } else {
+        format!("body {at}")
     }
 }
 
@@ -1762,7 +1752,7 @@ impl std::fmt::Display for TrainError {
             Self::Overdetermined { at } => {
                 write!(f, "two conditions cannot both hold at {}", place(*at))
             }
-            Self::NoSuchShaft { at } => write!(f, "no such shaft: {}", place(*at)),
+            Self::NoSuchBody { at } => write!(f, "no such body: {}", place(*at)),
             Self::Overflow => write!(
                 f,
                 "the tooth counts along the shaft line multiply past what an exact ratio holds"
@@ -2306,7 +2296,7 @@ pub(crate) fn entry(readings: &[Reading]) -> Vec<Freedom> {
 ///
 /// Six questions: which members it has, which inputs relief may turn and by
 /// what name, how its helix may be stated, which of its inputs argue with each
-/// other, **where its shafts and meshes sit**, and **which shafts a train may
+/// other, **where its bodies and meshes sit**, and **which bodies a train may
 /// address** and what convention holds when it addresses none. Everything
 /// that walks those — counting, relieving, seeding a box, reading the helix
 /// the readings state, assembling the kinematic system, laying a train's
@@ -2332,7 +2322,7 @@ pub(crate) trait Constrained {
     fn readings(&self) -> Vec<Reading>;
     /// Every argument the stage's inputs can get into with each other.
     fn freedoms(&self) -> Vec<FreedomGroup>;
-    /// **Where the stage's shafts and meshes sit** — topology alone, with no
+    /// **Where the stage's bodies and meshes sit** — topology alone, with no
     /// module, no shift and no distance in it. See [`Wiring`].
     fn wiring(&self) -> Wiring;
     /// **The stage's conventional ports and what it holds by convention** — what
@@ -2392,7 +2382,7 @@ impl Stage {
         self.shape().members()
     }
 
-    /// **Where this stage's shafts and meshes sit** ([`Wiring`]) — the topology
+    /// **Where this stage's bodies and meshes sit** ([`Wiring`]) — the topology
     /// the one kinematic solver is assembled from, with no geometry in it.
     #[must_use]
     pub fn wiring(&self) -> Wiring {
@@ -3025,13 +3015,13 @@ pub enum Duty {
     /// A limited sweep, repeated. The range is measured at a **named** port —
     /// the sweep is a fact about the mechanism's motion, not about where its
     /// load enters, and a 25° sweep of the output is what a designer knows
-    /// whichever shaft is driving it. Every other shaft's revolutions are
+    /// whichever body is driving it. Every other body's revolutions are
     /// worked from there through the ratios.
     Intermittent {
         /// Sweep per actuation, degrees, at [`Self::Intermittent::at`].
         range_degrees: f64,
-        /// The shaft the sweep is measured at.
-        at: ShaftRef,
+        /// The body the sweep is measured at.
+        at: usize,
         actuations: u32,
         /// Whether the duty reverses between actuations.
         ///
@@ -3049,10 +3039,10 @@ pub enum Duty {
 }
 
 impl Duty {
-    /// The default duty: a thousand sweeps of 25° measured at this shaft —
+    /// The default duty: a thousand sweeps of 25° measured at this body —
     /// the output, on a train's presets.
     #[must_use]
-    pub const fn intermittent(at: ShaftRef) -> Self {
+    pub const fn intermittent(at: usize) -> Self {
         Self::Intermittent {
             range_degrees: 25.0,
             at,
@@ -3107,8 +3097,8 @@ pub struct LoadCase {
     /// **The loads on the train's open ports.** The chain's two ends, where
     /// the case does not load them, are *reacted*: each turns as the motion
     /// says and carries the torque the flow puts on it, and both are
-    /// reported — a reaction the designer cares about, where a shaft the
-    /// train fixes is ground and reports no speed ([`ShaftRole`]). Every
+    /// reported — a reaction the designer cares about, where a body the
+    /// train fixes is ground and reports no speed ([`BodyRole`]). Every
     /// other open port the case does not load is *free* — it turns and
     /// carries nothing, since a reaction there is a thing a designer
     /// attaches and says so by loading it. A load carries a torque and a
@@ -3160,7 +3150,7 @@ pub enum LoadRole {
     ts(export, export_to = "core/")
 )]
 pub struct Load {
-    pub at: ShaftRef,
+    pub at: usize,
     /// What the port is. The two figures below are read only for a load,
     /// and kept while the port is reacted or free for the reason
     /// [`Auto::manual`] is kept while automatic: switching back finds them
@@ -3178,7 +3168,7 @@ pub struct Load {
 impl Load {
     /// A load with both figures given.
     #[must_use]
-    pub fn given(at: ShaftRef, torque: f64, speed: f64) -> Self {
+    pub fn given(at: usize, torque: f64, speed: f64) -> Self {
         Self {
             at,
             role: LoadRole::Load,
@@ -3190,7 +3180,7 @@ impl Load {
     /// A load whose torque and speed the other loads decide — what a load
     /// case's output is.
     #[must_use]
-    pub fn derived(at: ShaftRef) -> Self {
+    pub fn derived(at: usize) -> Self {
         Self {
             at,
             role: LoadRole::Load,
@@ -3202,7 +3192,7 @@ impl Load {
     /// A port declared reacted or free in so many words, its figures at
     /// nought until it is made a load.
     #[must_use]
-    pub fn declared(at: ShaftRef, role: LoadRole) -> Self {
+    pub fn declared(at: usize, role: LoadRole) -> Self {
         Self {
             role,
             ..Self::derived(at)
@@ -3221,7 +3211,7 @@ impl LoadCase {
     /// at a speed, reacted at `output`, the duty's sweep measured at the
     /// output. The train's own default case, between its two ends.
     #[must_use]
-    pub fn ultimate(input: ShaftRef, output: ShaftRef, torque: f64, speed: f64) -> Self {
+    pub fn ultimate(input: usize, output: usize, torque: f64, speed: f64) -> Self {
         Self {
             kind: CaseKind::Ultimate,
             enabled: true,
@@ -3235,7 +3225,7 @@ impl LoadCase {
 
     /// The same load, judged for fatigue over the default duty.
     #[must_use]
-    pub fn fatigue(input: ShaftRef, output: ShaftRef, torque: f64, speed: f64) -> Self {
+    pub fn fatigue(input: usize, output: usize, torque: f64, speed: f64) -> Self {
         Self {
             kind: CaseKind::Fatigue,
             ..Self::ultimate(input, output, torque, speed)
@@ -3250,7 +3240,7 @@ impl LoadCase {
     /// back-driven turns under the load and reacts none of it — is the
     /// same case with the reaction declared free.
     #[must_use]
-    pub fn back_driving(input: ShaftRef, output: ShaftRef, torque: f64) -> Self {
+    pub fn back_driving(input: usize, output: usize, torque: f64) -> Self {
         Self {
             kind: CaseKind::Ultimate,
             enabled: true,
@@ -3262,9 +3252,9 @@ impl LoadCase {
         }
     }
 
-    /// The entry at a shaft, where the case has one.
+    /// The entry at a body, where the case has one.
     #[must_use]
-    pub fn load_at(&self, at: ShaftRef) -> Option<&Load> {
+    pub fn load_at(&self, at: usize) -> Option<&Load> {
         self.loads.iter().find(|l| l.at == at)
     }
 
@@ -3295,8 +3285,8 @@ impl LoadCase {
         }
     }
 
-    /// Move the first load to another shaft.
-    pub fn set_port(&mut self, at: ShaftRef) {
+    /// Move the first load to another body.
+    pub fn set_port(&mut self, at: usize) {
         if let Some(l) = self.loads.first_mut() {
             l.at = at;
         }
@@ -3309,7 +3299,7 @@ impl LoadCase {
     }
 }
 
-/// How often the shaft a stage takes its load on comes round in one case.
+/// How often the body a stage takes its load on comes round in one case.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Turns {
     /// Revolutions over the whole duty.
@@ -3321,13 +3311,13 @@ pub struct Turns {
 }
 
 /// **One load case as one stage is rated for it**: the train's flow, read
-/// off for this stage's meshes and shafts.
+/// off for this stage's meshes and bodies.
 ///
 /// Assembled by [`solve_train`], which is the only level that solves a
 /// case: the motion from the loads' given speeds, then one flow across every
 /// stage's meshes with the loads' given torques known and the reactions
 /// unknown. A stage rates what it is handed — the torque pressing each of
-/// its meshes and which member drives it, every shaft's speed and the torque
+/// its meshes and which member drives it, every body's speed and the torque
 /// its meshes put on it — and solves no flow of its own for a case.
 #[derive(Clone, Debug, PartialEq)]
 pub struct CaseLoad {
@@ -3339,12 +3329,12 @@ pub struct CaseLoad {
     /// ([`flow::Flow::mesh_torques`]); and which member drives.
     pub mesh_torques: Vec<f64>,
     pub directions: Vec<Drive>,
-    /// Per local shaft, ground first: rpm, and the torque this stage's
+    /// Per local body, ground first: rpm, and the torque this stage's
     /// meshes put on it — the external load at a port, what the stage
     /// delivers onward at a coupling.
     pub speeds: Vec<f64>,
     pub torques: Vec<f64>,
-    /// Per local shaft: revolutions over a fatigue case's duty; `None` on an
+    /// Per local body: revolutions over a fatigue case's duty; `None` on an
     /// ultimate case, which has no cycles to count.
     pub turns: Option<Vec<f64>>,
     /// The actuations a reversing duty counts, where it reverses.
@@ -3358,7 +3348,7 @@ impl CaseLoad {
         self.turns.is_some() && self.reversing_actuations.is_some()
     }
 
-    /// A case carrying nothing: every torque nought, every shaft still.
+    /// A case carrying nothing: every torque nought, every body still.
     #[must_use]
     pub fn nothing(case: usize, kind: CaseKind, meshes: usize, shafts: usize) -> Self {
         Self {
@@ -3402,7 +3392,7 @@ pub struct StageLoad {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct StageLoads {
     pub cases: Vec<StageLoad>,
-    /// **Which of the stage's shafts are held and which driven**, assembled by
+    /// **Which of the stage's bodies are held and which driven**, assembled by
     /// [`solve_train`] from the train's constraints and couplings
     /// ([`Train::boundaries`]). `None` is a stage asked about on its own — by
     /// a test, the harness, the sweep — which is solved under its own
@@ -3502,7 +3492,7 @@ pub(crate) const fn gcd(mut a: u32, mut b: u32) -> u32 {
 }
 
 /// **How often one member of an epicyclic set is engaged**, per revolution of
-/// the shaft the train counted revolutions on.
+/// the body the train counted revolutions on.
 ///
 /// One rule, and every carried axis obeys it: a member's teeth are
 /// engaged once per revolution **relative to the carrier**, once for each
@@ -3512,18 +3502,18 @@ pub(crate) const fn gcd(mut a: u32, mut b: u32) -> u32 {
 /// grounded gear and a wobble body, so no member is the exception it has to be
 /// remembered for.
 ///
-/// It had been three sentences. A sun and a ring counted the *input shaft's*
+/// It had been three sentences. A sun and a ring counted the *input body's*
 /// revolutions, which on an ordinary set with the ring held over-counts the sun
 /// by `(z_s + z_r)/z_r` and the ring — whose teeth are loaded while it does not
 /// turn at all — by the whole of `(z_s + z_r)/z_s`, three and a half times on
 /// the shipped counts. Only the planet was carrier-relative, and it was
 /// referred to the *sun's* speed rather than to the input's, so it was right
-/// only in the arrangements where those are the same shaft.
+/// only in the arrangements where those are the same body.
 ///
 /// A ratio of speeds, so their magnitude cancels — which is why it is asked
 /// of the **unit** kinematics, the speeds at one turn of its input, rather
 /// than of a load case's: a case held still is still engaged by every sweep
-/// its duty counts. A train whose input shaft does not turn has no ratio to
+/// its duty counts. A train whose input body does not turn has no ratio to
 /// take, and answers zero.
 pub(crate) fn engagements(member: f64, carrier: f64, input: f64, paths: f64) -> f64 {
     if input == 0.0 {
@@ -3588,7 +3578,7 @@ pub fn loaded_cycles(turns: Turns) -> Cycles {
 }
 
 impl Turns {
-    /// The same duty seen from a shaft that turns `by` times for each turn of
+    /// The same duty seen from a body that turns `by` times for each turn of
     /// this one — a member's engagements from its stage's input revolutions.
     #[must_use]
     pub fn scaled(self, by: f64) -> Self {
@@ -3629,7 +3619,7 @@ pub fn solve_any_with(
     reversal: Reversal,
 ) -> Result<StageResult, TrainError> {
     // **A stage alone is a train of one.** Its boundary is the train's
-    // constraints — every held shaft held — and each load asked of it is a
+    // constraints — every held body held — and each load asked of it is a
     // case with one load at the port the direction names, so a stage on its
     // own and a stage in a train are solved the one way, and there is no
     // second flow for a case.
@@ -3637,18 +3627,18 @@ pub fn solve_any_with(
         .boundary
         .clone()
         .unwrap_or_else(|| stage.conventional_boundary());
+    // The stage alone: its own numbering is the train's.
+    let port = |shaft: Body| stage.as_shape().map_or(shaft, |s| s.body_at(shaft));
     let mut train = Train {
         load_cases: Vec::new(),
         reversed_bending: reversal.correct,
         stages: vec![stage.clone()],
-        couplings: Vec::new(),
         constraints: boundary
             .held()
             .into_iter()
-            .map(|s| ShaftConstraint::held(0, s))
+            .map(|s| BodyConstraint::held(port(s)))
             .collect(),
     };
-    let port = |shaft: Shaft| ShaftRef::Of { stage: 0, shaft };
     // The stage's reduction, for a load stated at its input but entering
     // at its output.
     let ratio = stage
@@ -3713,27 +3703,20 @@ fn paths_of(
     train: &Train,
     boundaries: &[StageBoundary],
     system: &crate::kinematics::System,
-    at: &[Offsets],
     body_meshes: &[flow::MeshFlow],
-    rep: &[Shaft],
+    rep: &[Body],
     base: &[Condition],
     stages: &[StageResult],
 ) -> Vec<PathReport> {
-    let shafts = system.shafts();
-    let global = |r: ShaftRef| -> Shaft {
-        match r {
-            ShaftRef::Ground => GROUND,
-            ShaftRef::Of { stage, shaft } => at[stage].of(shaft),
-        }
-    };
+    let shafts = system.bodies();
     // **Which paths are worth a row**: the two conventional ends — what a
     // chain's total was, present whether or not any case loads it — and
     // then, in case order, every path an enabled case actually uses, from
     // each of its loads to each of its reactions. Every pair of open bodies
     // is a path the graph could answer, and on a train of many stages
     // nearly all of them are ones nobody asked about.
-    let mut wanted: Vec<(ShaftRef, ShaftRef)> = Vec::new();
-    let mut want = |a: ShaftRef, b: ShaftRef| {
+    let mut wanted: Vec<(usize, usize)> = Vec::new();
+    let mut want = |a: usize, b: usize| {
         if a != b
             && !wanted
                 .iter()
@@ -3745,19 +3728,18 @@ fn paths_of(
     if let Some((a, b)) = train.ends(boundaries) {
         want(a, b);
     }
-    // A body is named by its first shaft, whichever of its shafts a case
-    // wrote its entry at.
+    // An entry at a held body, or at one no stage has, is no path's end.
     let bodies = train.bodies(boundaries);
-    let body_of = |r: ShaftRef| -> Option<ShaftRef> {
+    let open = |b: usize| -> Option<usize> {
         bodies
             .iter()
-            .find(|b| !b.held && b.shafts.iter().any(|(s, _)| *s == r))
-            .map(|b| b.shafts[0].0)
+            .find(|x| !x.held && x.body == b)
+            .map(|x| x.body)
     };
     for case in train.load_cases.iter().filter(|c| c.enabled) {
         for load in case.loads.iter().filter(|l| l.is_load()) {
             for reaction in case.loads.iter().filter(|l| l.role == LoadRole::Reacted) {
-                if let (Some(a), Some(b)) = (body_of(load.at), body_of(reaction.at)) {
+                if let (Some(a), Some(b)) = (open(load.at), open(reaction.at)) {
                     want(a, b);
                 }
             }
@@ -3765,14 +3747,14 @@ fn paths_of(
     }
     // One motion, or none: driven at one open body with the rest free, the
     // holds must leave nothing else to decide.
-    let motion_from = |from: Shaft| -> Option<Vec<f64>> {
+    let motion_from = |from: Body| -> Option<Vec<f64>> {
         let mut c: Vec<Condition> = base.to_vec();
         c[from] = Condition::Drive(crate::ratio::Ratio::ONE);
         let s = system.motion_in(&c, &[from]).ok()?;
         s.is_unique()
             .then(|| s.values.iter().map(|r| r.to_f64()).collect())
     };
-    let held: Vec<Shaft> = (1..shafts)
+    let held: Vec<Body> = (1..shafts)
         .filter(|&s| base[s] == Condition::Ground)
         .collect();
     // Every mesh's play in the row's own units at the three band points,
@@ -3781,7 +3763,7 @@ fn paths_of(
         .iter()
         .flat_map(|s| s.meshes().iter().map(|m| m.row_play).collect::<Vec<_>>())
         .collect();
-    let efficiency = |from: Shaft, to: Shaft, speed: &[f64]| -> f64 {
+    let efficiency = |from: Body, to: Body, speed: &[f64]| -> f64 {
         flow::solve(
             shafts,
             body_meshes,
@@ -3791,8 +3773,8 @@ fn paths_of(
         .map_or(0.0, |f| f.efficiency)
     };
     // Play at `read` per unit of play in mesh `k`, with `from` and the held
-    // shafts standing still — the stage's own construction, on the graph.
-    let coefficient = |k: usize, read: Shaft, from: Shaft| -> f64 {
+    // bodies standing still — the stage's own construction, on the graph.
+    let coefficient = |k: usize, read: Body, from: Body| -> f64 {
         let mut c: Vec<Condition> = base.to_vec();
         c[from] = Condition::Ground;
         system
@@ -3800,7 +3782,7 @@ fn paths_of(
             .and_then(Result::ok)
             .map_or(0.0, |s| s.values[read].to_f64().abs())
     };
-    let backlash_at = |read: Shaft, from: Shaft| -> Backlash {
+    let backlash_at = |read: Body, from: Body| -> Backlash {
         Backlash::banded(0.0, 1.0, 1.0, |t| {
             let band = if t < 0.0 {
                 0
@@ -3819,7 +3801,7 @@ fn paths_of(
     };
     let mut out = Vec::new();
     for (from, to) in wanted {
-        let (a, b) = (global(from), global(to));
+        let (a, b) = (from, to);
         let Some(forward) = motion_from(a) else {
             continue;
         };
@@ -3885,19 +3867,16 @@ pub struct Train {
     /// [`Reversal`].
     #[cfg_attr(feature = "serde", serde(default))]
     pub reversed_bending: bool,
+    /// The stages, each naming the train's bodies on its axes: a body two
+    /// stages name is what a coupling used to say, and the bodies are the
+    /// numbers in use — nothing lists them.
     pub stages: Vec<Stage>,
-    /// **Which shafts turn as one** — every coupling the train has, written
-    /// out: a chain's, a coaxial output, a locked clutch, a second stage on
-    /// a set's ring. Empty is a train of isolated stages. See [`Coupling`]
-    /// and [`Train::chain`].
-    #[cfg_attr(feature = "serde", serde(default))]
-    pub couplings: Vec<Coupling>,
-    /// **What is asked of each shaft** — held or free. Empty is each stage's
+    /// **What is asked of a body** — held or free. Empty is each stage's
     /// convention. Written out, this is where a planetary set's arrangement
     /// lives, and where a released ring is one more line. See
-    /// [`ShaftConstraint`].
+    /// [`BodyConstraint`].
     #[cfg_attr(feature = "serde", serde(default))]
-    pub constraints: Vec<ShaftConstraint>,
+    pub constraints: Vec<BodyConstraint>,
 }
 
 impl Train {
@@ -3949,10 +3928,10 @@ impl Train {
     ///
     /// [`MotionError`] where the train has no graph to ask.
     pub fn case_mobility(&self) -> Result<usize, MotionError> {
-        let (system, at) = self.system()?;
-        let shafts = system.shafts();
+        let (system, _) = self.system()?;
+        let shafts = system.bodies();
         let conditions: Vec<Condition> = self
-            .conditions(&at, shafts)?
+            .conditions(shafts)?
             .into_iter()
             .map(|c| match c {
                 Condition::Drive(_) => Condition::Free,
@@ -4049,7 +4028,7 @@ impl Train {
             .count();
         for which in [LoadFreedom::Speed, LoadFreedom::Torque] {
             // The speeds decide the motion: `m` of them. The torques are
-            // one short of the shafts that carry one, per degree of freedom.
+            // one short of the bodies that carry one, per degree of freedom.
             let limit = match which {
                 LoadFreedom::Speed => m,
                 LoadFreedom::Torque if speeds_given < m => usize::MAX,
@@ -4096,7 +4075,7 @@ impl Train {
     }
 }
 
-/// What a shaft is in one load case.
+/// What a body is in one load case.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(
@@ -4105,7 +4084,7 @@ impl Train {
     ts(export, export_to = "core/")
 )]
 #[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
-pub enum ShaftRole {
+pub enum BodyRole {
     /// An open port the case loads: it turns, and carries the torque given
     /// or derived for it.
     Load,
@@ -4115,13 +4094,13 @@ pub enum ShaftRole {
     Reacted,
     /// Held by the train's own constraints or a stage's convention: ground.
     Fixed,
-    /// Neither a port nor held — an idler's shaft, a planet's, a coupling
+    /// Neither a port nor held — an idler's body, a planet's, a coupling
     /// inside the train: it turns as the graph says and carries no external
     /// torque.
     Free,
 }
 
-/// One shaft of the train in one load case.
+/// One body of the train in one load case.
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(
@@ -4129,18 +4108,18 @@ pub enum ShaftRole {
     derive(ts_rs::TS),
     ts(export, export_to = "core/")
 )]
-pub struct CaseShaft {
-    pub at: ShaftRef,
-    pub label: ShaftLabel,
-    pub role: ShaftRole,
-    /// rpm; `None` on a shaft that is held, which has none to report.
+pub struct CaseBody {
+    pub at: usize,
+    pub label: BodyLabel,
+    pub role: BodyRole,
+    /// rpm; `None` on a body that is held, which has none to report.
     pub speed: Option<f64>,
     /// The external torque on it, N·m: the load at a loaded port, the
-    /// reaction at a held one, nought on a free shaft.
+    /// reaction at a held one, nought on a free body.
     pub torque: f64,
 }
 
-/// **What one load case comes to at the train level**: every shaft, with
+/// **What one load case comes to at the train level**: every body, with
 /// what it is in this case and what it carries — the loads as given or
 /// derived, the reactions found.
 #[derive(Clone, Debug)]
@@ -4153,11 +4132,11 @@ pub struct CaseShaft {
 pub struct TrainCase {
     /// Index into the train's list of load cases.
     pub case: usize,
-    /// Every shaft of every stage, ground first, in the train's order.
-    pub shafts: Vec<CaseShaft>,
+    /// Every body of every stage, ground first, in the train's order.
+    pub bodies: Vec<CaseBody>,
     /// Whether the case could be solved at all: its loads decide the motion
     /// and the flow. Where they do not — too few given, or nothing driving —
-    /// the shafts carry nothing and the notes say why.
+    /// the bodies carry nothing and the notes say why.
     pub solved: bool,
     /// What the train wants read about this case: that it is short of a
     /// speed or a torque, that nothing drives it, or that nothing holds it.
@@ -4165,15 +4144,15 @@ pub struct TrainCase {
 }
 
 impl TrainCase {
-    /// One shaft of the case, by reference.
+    /// One body of the case, by reference.
     #[must_use]
-    pub fn shaft(&self, at: ShaftRef) -> Option<&CaseShaft> {
-        self.shafts.iter().find(|s| s.at == at)
+    pub fn shaft(&self, at: usize) -> Option<&CaseBody> {
+        self.bodies.iter().find(|s| s.at == at)
     }
 
     /// The ports this case reacts, in the train's order.
-    pub fn reacted(&self) -> impl Iterator<Item = &CaseShaft> {
-        self.shafts.iter().filter(|s| s.role == ShaftRole::Reacted)
+    pub fn reacted(&self) -> impl Iterator<Item = &CaseBody> {
+        self.bodies.iter().filter(|s| s.role == BodyRole::Reacted)
     }
 }
 
@@ -4188,8 +4167,8 @@ impl TrainCase {
     ts(export, export_to = "core/")
 )]
 pub struct PathReport {
-    pub from: ShaftRef,
-    pub to: ShaftRef,
+    pub from: usize,
+    pub to: usize,
     /// Turns of `from` per turn of `to`, signed, off the one motion.
     pub ratio: f64,
     /// Driving `from` with `to` holding the load and every other open body
@@ -4252,7 +4231,7 @@ impl TrainResult {
 /// torques then decide the flow — one flow across every stage's meshes at
 /// once ([`flow::solve`]), with the given torques known and the derived
 /// loads, the held ports and ground unknown — and each stage is handed
-/// what that flow puts on its meshes and shafts ([`CaseLoad`]). A given
+/// what that flow puts on its meshes and bodies ([`CaseLoad`]). A given
 /// torque is a load whichever way it works: one that works with its port's
 /// speed drives, one that works against it is driven — a brake, a load the
 /// designer stated at the output — and what drives it is among the
@@ -4298,7 +4277,7 @@ fn solve_train_under(
                 .enumerate()
                 .map(|(index, _)| TrainCase {
                     case: index,
-                    shafts: Vec::new(),
+                    bodies: Vec::new(),
                     solved: false,
                     notes: Vec::new(),
                 })
@@ -4314,7 +4293,7 @@ fn solve_train_under(
     };
 
     // **The train's motion is asked first**, for what refuses before any
-    // geometry: a hold that locks a stage, a shaft no stage has, a ratio no
+    // geometry: a hold that locks a stage, a body no stage has, a ratio no
     // exact number holds. What it comes to per path is read below, and a
     // family is rated under its cases: each case's loads decide its own
     // motion, and what a family has none of is a figure read under one.
@@ -4358,7 +4337,7 @@ fn solve_train_under(
 
     // ---- the train's graph, with every stage's meshes on it.
     let (system, at) = train.system()?;
-    let shafts = system.shafts();
+    let shafts = system.bodies();
     let wirings: Vec<Wiring> = train.stages.iter().map(Stage::wiring).collect();
     // Each stage's meshes as the flow sees them, in one list, with the first
     // pass's efficiencies — sliding, and locked where it locks at rest.
@@ -4381,55 +4360,28 @@ fn solve_train_under(
         }
         mesh_of_stage.push(mine);
     }
-    // Every shaft's label and reference, ground first, as the report lists
-    // them and as the case's conditions index them.
-    let mut refs: Vec<(ShaftRef, ShaftLabel)> = vec![(ShaftRef::Ground, ShaftLabel::Ground)];
-    for (k, w) in wirings.iter().enumerate() {
-        for (local, label) in w.shafts.iter().enumerate().skip(1) {
-            refs.push((
-                ShaftRef::Of {
-                    stage: k,
-                    shaft: local,
-                },
-                *label,
-            ));
-        }
-    }
-    let global = |r: ShaftRef| -> Shaft {
-        match r {
-            ShaftRef::Ground => GROUND,
-            ShaftRef::Of { stage, shaft } => at[stage].of(shaft),
-        }
-    };
-    // What the train itself holds and joins, before any case.
-    let base = train.conditions(&at, shafts)?;
-    // **Two coupled shafts are one body to the flow.** The kinematics keeps
-    // them as two shafts and a row that says they turn together; a torque
-    // balance is on the body, so the flow is solved over one representative
-    // per coupled set, and what a mesh puts on either is put on the body.
-    let mut rep: Vec<Shaft> = (0..shafts).collect();
-    let find = |rep: &Vec<Shaft>, mut s: Shaft| {
-        while rep[s] != s {
-            s = rep[s];
-        }
-        s
-    };
-    for c in train.couplings.clone() {
-        let (a, b) = (find(&rep, global(c.a)), find(&rep, global(c.b)));
-        if a != b {
-            rep[a.max(b)] = a.min(b);
-        }
-    }
-    let rep: Vec<Shaft> = (0..shafts).map(|s| find(&rep, s)).collect();
-    let body_meshes: Vec<flow::MeshFlow> = meshes
-        .iter()
-        .map(|m| flow::MeshFlow {
-            a: rep[m.a],
-            b: rep[m.b],
-            frame: rep[m.frame],
-            ..*m
+    // Every body's label, ground first, as the report lists them and as the
+    // case's conditions index them: what the body is on the first stage
+    // that has it.
+    let refs: Vec<(usize, BodyLabel)> = (0..shafts)
+        .map(|b| {
+            let label = train
+                .ends_of(b)
+                .first()
+                .map_or(BodyLabel::Ground, |&(k, slot)| wirings[k].slots[slot]);
+            (b, label)
         })
         .collect();
+    let global = |b: usize| -> Body { b };
+    // What the train itself holds, before any case.
+    let base = train.conditions(shafts)?;
+    // **A body is one thing to the flow** as to the kinematics: the torque
+    // balance is on it, and what a mesh puts on either of a body's ends is
+    // put on the body. (Two coupled bodies were once two nodes and a row,
+    // and the flow solved over a representative per coupled set; a body
+    // needs no representative but itself.)
+    let rep: Vec<Body> = (0..shafts).collect();
+    let body_meshes: Vec<flow::MeshFlow> = meshes.clone();
 
     // --- what each stage is loaded by, case by case. **Every case is
     // solved at the train level**, switched off or not, so a panel can say
@@ -4439,18 +4391,18 @@ fn solve_train_under(
     let mut per_stage: Vec<Vec<CaseLoad>> = vec![Vec::new(); train.stages.len()];
     for (index, case) in train.load_cases.iter().enumerate() {
         let mut notes = Vec::new();
-        // Every entry by the shaft it names, whatever it declares; the
+        // Every entry by the body it names, whatever it declares; the
         // loads among them are what carry figures.
-        let entries: Vec<(Shaft, &Load)> = case.loads.iter().map(|l| (global(l.at), l)).collect();
-        let loads: Vec<(Shaft, &Load)> = entries
+        let entries: Vec<(Body, &Load)> = case.loads.iter().map(|l| (global(l.at), l)).collect();
+        let loads: Vec<(Body, &Load)> = entries
             .iter()
             .filter(|(_, l)| l.is_load())
             .copied()
             .collect();
-        // An entry at a shaft that is not a port — a planet's, a held
-        // ring's — is refused by name. A shaft two stages share is a port
+        // An entry at a body that is not a port — a planet's, a held
+        // ring's — is refused by name. A body two stages share is a port
         // of both, and a load there is a load on the body they make.
-        let mut ports: Vec<Shaft> = Vec::new();
+        let mut ports: Vec<Body> = Vec::new();
         for (k, stage) in train.stages.iter().enumerate() {
             for s in stage.ports().ports {
                 if boundaries[k].conditions[s] != Condition::Ground {
@@ -4461,18 +4413,18 @@ fn solve_train_under(
         if entries.iter().any(|(g, _)| !ports.contains(g)) {
             return Err(TrainError::LoadPort { case: index });
         }
-        let loaded = |s: Shaft| loads.iter().any(|(g, _)| *g == s);
+        let loaded = |s: Body| loads.iter().any(|(g, _)| *g == s);
         let declared =
-            |s: Shaft, role: LoadRole| entries.iter().any(|(g, l)| *g == s && l.role == role);
+            |s: Body, role: LoadRole| entries.iter().any(|(g, l)| *g == s && l.role == role);
         // **A port is what the case declares it, and free where it says
         // nothing.** A reacted port turns as the motion says and carries
-        // whatever torque the flow puts on it — the same thing as a shaft
-        // the train holds by constraint, except that a fixed shaft is ground
+        // whatever torque the flow puts on it — the same thing as a body
+        // the train holds by constraint, except that a fixed body is ground
         // and a reacted one may turn; a free port turns and carries nothing,
         // since a reaction is a thing a designer attaches, and says so by
         // declaring it. Nothing is driven but by a load: the train's own
         // motion, driven at one end for its ratio, is nobody's here.
-        let reacted: Vec<Shaft> = ports
+        let reacted: Vec<Body> = ports
             .iter()
             .copied()
             .filter(|&s| declared(s, LoadRole::Reacted))
@@ -4484,26 +4436,26 @@ fn solve_train_under(
                 other => *other,
             })
             .collect();
-        // Roles, before anything is solved: what each shaft is in this case.
-        let role = |s: Shaft| -> ShaftRole {
+        // Roles, before anything is solved: what each body is in this case.
+        let role = |s: Body| -> BodyRole {
             if loaded(s) {
-                ShaftRole::Load
+                BodyRole::Load
             } else if reacted.contains(&s) {
-                ShaftRole::Reacted
+                BodyRole::Reacted
             } else if conditions[s] == Condition::Ground {
-                ShaftRole::Fixed
+                BodyRole::Fixed
             } else {
-                ShaftRole::Free
+                BodyRole::Free
             }
         };
         let nothing =
             |notes: Vec<Note>, cases: &mut Vec<TrainCase>, per_stage: &mut [Vec<CaseLoad>]| {
                 cases.push(TrainCase {
                     case: index,
-                    shafts: refs
+                    bodies: refs
                         .iter()
                         .enumerate()
-                        .map(|(s, &(at, label))| CaseShaft {
+                        .map(|(s, &(at, label))| CaseBody {
                             at,
                             label,
                             role: role(s),
@@ -4522,7 +4474,7 @@ fn solve_train_under(
                         index,
                         case.kind,
                         w.meshes.len(),
-                        w.shafts.len(),
+                        w.slots.len(),
                     ));
                 }
             };
@@ -4535,7 +4487,7 @@ fn solve_train_under(
         // every other given port still, and the case's speeds are those
         // solutions scaled and summed. The flow's direction comes from the
         // same sum, a load held still weighing in by its torque's sign.
-        let given_speeds: Vec<(Shaft, f64, f64)> = loads
+        let given_speeds: Vec<(Body, f64, f64)> = loads
             .iter()
             .filter(|(_, l)| !l.speed.auto)
             .map(|(g, l)| {
@@ -4591,9 +4543,9 @@ fn solve_train_under(
             continue;
         }
         // ---- the flow: the given torques known; the derived loads, the
-        // reacted ports, the fixed shafts and ground to be found.
+        // reacted ports, the fixed bodies and ground to be found.
         let mut known: Vec<Option<f64>> = vec![Some(0.0); shafts];
-        let mut unknown: Vec<Shaft> = vec![GROUND];
+        let mut unknown: Vec<Body> = vec![GROUND];
         for s in 0..shafts {
             if conditions[s] == Condition::Ground || reacted.contains(&s) {
                 known[s] = None;
@@ -4611,10 +4563,10 @@ fn solve_train_under(
             }
         }
         // ...on the bodies: a coupled set's known torques summed on its
-        // representative, unknown where any of its shafts is.
-        let on_bodies = |known: &[Option<f64>], unknown: &[Shaft]| -> flow::Asked {
+        // representative, unknown where any of its bodies is.
+        let on_bodies = |known: &[Option<f64>], unknown: &[Body]| -> flow::Asked {
             let mut k: Vec<Option<f64>> = vec![Some(0.0); shafts];
-            let mut u: Vec<Shaft> = Vec::new();
+            let mut u: Vec<Body> = Vec::new();
             for s in 0..shafts {
                 let r = rep[s];
                 match (known[s], k[r]) {
@@ -4660,7 +4612,7 @@ fn solve_train_under(
                 continue;
             }
         };
-        // ---- how many times each shaft comes round over a fatigue duty.
+        // ---- how many times each body comes round over a fatigue duty.
         let turns: Option<Vec<f64>> = case.counted().map(|duty| match *duty {
             Duty::Intermittent {
                 range_degrees,
@@ -4669,7 +4621,7 @@ fn solve_train_under(
                 ..
             } => {
                 let port = global(sweep_at);
-                // **A sweep is a magnitude**, stated at a port; every shaft's
+                // **A sweep is a magnitude**, stated at a port; every body's
                 // share of it is the ratio of the two speeds, which the
                 // unit motion has where a held load's speed does not. The
                 // turns are **signed** here, so a member's turns against
@@ -4698,10 +4650,10 @@ fn solve_train_under(
             } => Some(f64::from(actuations)),
             _ => None,
         });
-        // ---- what each stage's meshes put on each of its shafts.
+        // ---- what each stage's meshes put on each of its bodies.
         for (k, w) in wirings.iter().enumerate().filter(|_| case.enabled) {
             let mine = &mesh_of_stage[k];
-            let mut torques = vec![0.0; w.shafts.len()];
+            let mut torques = vec![0.0; w.slots.len()];
             for (j, &g) in mine.iter().enumerate() {
                 let [on_a, on_b, on_frame] = flow.on_shafts(g, &meshes[g]);
                 let m = &w.meshes[j];
@@ -4714,31 +4666,31 @@ fn solve_train_under(
                 kind: case.kind,
                 mesh_torques: mine.iter().map(|&g| flow.mesh_torques[g]).collect(),
                 directions: mine.iter().map(|&g| flow.directions[g]).collect(),
-                speeds: (0..w.shafts.len()).map(|l| speeds[at[k].of(l)]).collect(),
+                speeds: (0..w.slots.len()).map(|l| speeds[at[k].of(l)]).collect(),
                 torques,
                 turns: turns
                     .as_ref()
-                    .map(|t| (0..w.shafts.len()).map(|l| t[at[k].of(l)]).collect()),
+                    .map(|t| (0..w.slots.len()).map(|l| t[at[k].of(l)]).collect()),
                 reversing_actuations,
             });
         }
         cases.push(TrainCase {
             case: index,
-            shafts: refs
+            bodies: refs
                 .iter()
                 .enumerate()
-                .map(|(s, &(at, label))| CaseShaft {
+                .map(|(s, &(at, label))| CaseBody {
                     at,
                     label,
                     role: role(s),
                     speed: (conditions[s] != Condition::Ground).then_some(speeds[s]),
-                    // A body's external torque is reported on the shaft it
+                    // A body's external torque is reported on the body it
                     // is applied at — the loaded or reacted one — and a
-                    // shaft coupled to it carries the coupling, not a load.
-                    // A free shaft carries nothing by declaration, and says
+                    // body coupled to it carries the coupling, not a load.
+                    // A free body carries nothing by declaration, and says
                     // exactly nought rather than the `−1e-17` the solve
                     // leaves on a body it was told carries none.
-                    torque: if role(s) == ShaftRole::Free {
+                    torque: if role(s) == BodyRole::Free {
                         0.0
                     } else {
                         flow.shaft_torques[rep[s]]
@@ -4762,7 +4714,6 @@ fn solve_train_under(
         train,
         &boundaries,
         &system,
-        &at,
         &body_meshes,
         &rep,
         &base,
@@ -4812,7 +4763,7 @@ mod tests {
 
     /// The hula arrangement (`arrangements::hula`) at the shipped counts,
     /// as a stage: members the two wobble gears, the grounded gear, the
-    /// output; shafts crank 1, grounded 2, output 3, wobble 4.
+    /// output; bodies crank 1, grounded 2, output 3, wobble 4.
     fn hula() -> Stage {
         Stage::Shape(Box::new(hula_shape([65, 61, 57, 61])))
     }
@@ -4854,13 +4805,13 @@ mod tests {
     /// **A back-driving load is the load, and the reverse is the forward
     /// construction with the roles swapped.**
     ///
-    /// It enters at the output. The member *on* that shaft carries the applied
+    /// It enters at the output. The member *on* that body carries the applied
     /// torque itself — nothing has happened to it yet — and the member at the
     /// other end carries it **referred by the ratio**: a member's torque is
     /// the torque its teeth carry, the driver's read across the mesh, whether
-    /// or not the mesh passes any of it on. What the far *shaft* delivers is
+    /// or not the mesh passes any of it on. What the far *body* delivers is
     /// that cut by the mesh's loss the backward way — nought where the mesh
-    /// locks — and it is the shaft's figure, not the gear's. One
+    /// locks — and it is the body's figure, not the gear's. One
     /// construction, read from either end.
     ///
     /// Two things this has caught, in opposite directions. It once *divided* by
@@ -4868,8 +4819,8 @@ mod tests {
     /// — the case a worm is chosen for — so the wheel reported **2.2e307 N·m**:
     /// finite, so it crossed the boundary as a number rather than as the `null`
     /// an infinity becomes, and drew on screen as a figure. The correction
-    /// dropped the factor altogether, which left the *worm* claiming a shaft
-    /// torque a locked mesh does not deliver — which is why the shaft's
+    /// dropped the factor altogether, which left the *worm* claiming a body
+    /// torque a locked mesh does not deliver — which is why the body's
     /// delivered torque is asserted here beside the tooth load.
     ///
     /// **Both ends of the friction range**, because a self-locking worm alone
@@ -4922,7 +4873,7 @@ mod tests {
                      ratio of {} is {want}",
                     w.ratio.unwrap(),
                 );
-                // What the worm's *shaft* delivers is that attenuated by the
+                // What the worm's *body* delivers is that attenuated by the
                 // loss the mesh takes carrying it backward: nought where it
                 // locks, something where it does not.
                 let delivered = w.cases[BACK].torques[1].abs();
@@ -4943,14 +4894,14 @@ mod tests {
         }
     }
 
-    /// **Crossing the shafts does not stop a gear being a gear.**
+    /// **Crossing the bodies does not stop a gear being a gear.**
     ///
     /// A crossed pair is a spur stage with an axis angle, and it is solved by
     /// translating it into the equivalent screw pair — which carries no tooth
     /// form, because a worm is a thread. So the translation dropped the shift,
     /// the dedendum and the root round on the way, and with them everything the
     /// members had to say about themselves: **the same pair reported
-    /// `clamp.tooth_undercut` with its shafts parallel and nothing at all with
+    /// `clamp.tooth_undercut` with its bodies parallel and nothing at all with
     /// them crossed.**
     ///
     /// `docs/corrections.md` records that gap being closed once already — "a gear
@@ -5696,11 +5647,11 @@ mod tests {
     /// torque and direction reproduces it to the bit.
     ///
     /// **The fault it is for.** A load case was collapsed to one magnitude *at
-    /// the stage's input shaft* and that magnitude pushed through the forward
+    /// the stage's input body* and that magnitude pushed through the forward
     /// construction. That is the same answer only where the distribution does not
     /// depend on direction — a parallel-axis mesh carries one tangential force
     /// whichever way it turns — and an epicyclic set is not such a stage: which
-    /// shaft drives decides on which side `η₀` multiplies. Measured on the shipped
+    /// body drives decides on which side `η₀` multiplies. Measured on the shipped
     /// set, a back-driven ring was rated **6.0 % low** in bending and 3.0 % low in
     /// contact; on the hula stage, whose reduction is far larger, **41 % low** and
     /// 23 % low. The member torques themselves had already been put right
@@ -6000,7 +5951,7 @@ mod tests {
     ///
     /// The same 17/43 pair, a hundredth of a degree off parallel against
     /// parallel, the contact centred (no clearance, or the near-parallel
-    /// contact slides along the shafts by `Δa / sin Σ`) and the face wide
+    /// contact slides along the bodies by `Δa / sin Σ`) and the face wide
     /// enough that the line governs:
     ///
     /// - **the pitch point meets exactly** at no friction — a part in 10⁵ —
@@ -6232,7 +6183,7 @@ mod tests {
                 continue;
             }
             checked += 1;
-            // Torques are in the *size* of the ratio; the sign is the shaft's.
+            // Torques are in the *size* of the ratio; the sign is the body's.
             let want = spur.ratio.unwrap().abs();
             assert!(
                 (b / a - want).abs() < 1e-9 * want.abs(),
@@ -6284,7 +6235,7 @@ mod tests {
     /// *topology's* answer, which is what a law about topology has to be swept
     /// over. An axis nobody turns is an axis nobody tests
     /// (`docs/corrections.md`), and for the graph that axis is the arrangement:
-    /// which shaft is held is the whole of what an epicyclic set's ratio
+    /// which body is held is the whole of what an epicyclic set's ratio
     /// depends on, and a sweep that leaves it at the preset checks one sixth of
     /// the model.
     fn every_wiring() -> Vec<(String, Stage, StageBoundary)> {
@@ -6394,7 +6345,7 @@ mod tests {
             //
             // Solved at unit input speed, so the graph's speeds *are* the
             // stage's — which is the strongest form of this check: not a
-            // ratio each, but every shaft at once.
+            // ratio each, but every body at once.
             for (i, g) in r.members().iter().enumerate() {
                 let shaft = w.mounts[i].spins_with;
                 let case = &g.cases[0];
@@ -6479,7 +6430,7 @@ mod tests {
                     // The planet carries no external torque and nothing in a
                     // pure epicyclic meshes against ground, so both are
                     // exact zeros rather than unknowns.
-                    let mut applied = vec![None; w.shafts.len()];
+                    let mut applied = vec![None; w.slots.len()];
                     applied[crate::kinematics::GROUND] = Some(Ratio::ZERO);
                     applied[w.mounts[1].spins_with] = Some(Ratio::ZERO);
                     applied[b.input] = Some(Ratio::ONE);
@@ -6490,7 +6441,7 @@ mod tests {
                             PlanetaryShaft::Sun => w.mounts[0].spins_with,
                             PlanetaryShaft::Ring => w.mounts[2].spins_with,
                             // The carrier is the frame both meshes are seen
-                            // from, and the one shaft that is not a gear.
+                            // from, and the one body that is not a gear.
                             PlanetaryShaft::Carrier => w.mounts[1].axis_fixed_in,
                         };
                         let got = t.values[shaft].to_f64();
@@ -6566,7 +6517,7 @@ mod tests {
     /// It also holds the thing a product cannot say: the **mobility** of the
     /// assembled train equals the number of conditions it is given, so a chain
     /// is neither over- nor under-determined by construction, and an
-    /// arrangement that introduced a shaft nothing constrains would fail here rather than
+    /// arrangement that introduced a body nothing constrains would fail here rather than
     /// quietly widening the answer.
     #[test]
     fn the_chained_graph_agrees_with_the_product_of_the_stage_ratios() {
@@ -6579,9 +6530,9 @@ mod tests {
             // Exactly as many conditions as degrees of freedom: what the
             // train holds, and the one drive at its end its motion is read
             // from.
-            let (system, at) = train.system().unwrap();
+            let (system, _) = train.system().unwrap();
             let asked = train
-                .conditions(&at, system.shafts())
+                .conditions(system.bodies())
                 .unwrap()
                 .iter()
                 .filter(|c| **c != crate::kinematics::Condition::Free)
@@ -6628,7 +6579,7 @@ mod tests {
             let ratios: Vec<f64> = r.stages.iter().map(|s| s.ratio().unwrap()).collect();
             let boundaries = train.boundaries().unwrap();
             for (k, b) in boundaries.iter().enumerate() {
-                let graph = m.solution.values[m.shaft_of(k, b.input)].to_f64();
+                let graph = m.solution.values[m.body_of(k, b.input)].to_f64();
                 let hand = 1.0 / ratios[..k].iter().product::<f64>();
                 assert!(
                     (graph.abs() - hand.abs()).abs() < 1e-9 * hand.abs(),
@@ -6684,7 +6635,7 @@ mod tests {
     ///   nothing: those teeth mesh perfectly well. **A planetary set with its
     ///   carrier held could not be followed by any stage at all.**
     /// - **the backlash referral.** Play does not cancel — two independent
-    ///   sources of lost motion add up whichever way their shafts turn — and a
+    ///   sources of lost motion add up whichever way their bodies turn — and a
     ///   reversing stage downstream made an upstream stage's contribution
     ///   *subtract*. A spur pair ahead of that same set reported 0.0422° where
     ///   the two stages have 0.0552°, 23.5 % light.
@@ -6697,32 +6648,27 @@ mod tests {
     #[test]
     fn a_reversing_stage_does_not_poison_the_stages_around_it() {
         let lib = library();
-        // A set with its **carrier** held reverses. Which shaft is held is the
+        // A set with its **carrier** held reverses. Which body is held is the
         // train's to say now, so it is a constraint on the train and the set
-        // itself is the default one. Shaft 2 is the carrier in the set's wiring.
+        // itself is the default one. Slot 2 is the carrier in the set's wiring.
         let reversing = || Stage::planetary(PlanetaryStage::default());
-        // The set's three central shafts, stated in full: the train's
-        // constraints lay over the stage's conventions shaft by shaft, so
+        // The set's three central bodies, stated in full: the train's
+        // constraints lay over the stage's conventions body by body, so
         // holding the carrier *instead of* the ring says so about the ring.
-        let carrier_held = |stage: usize| {
+        let carrier_held = |t: &Train, stage: usize| {
             vec![
-                ShaftConstraint::held(stage, 2),
-                ShaftConstraint {
-                    at: ShaftRef::Of { stage, shaft: 3 },
-                    constraint: Constraint::Free,
-                },
+                BodyConstraint::held(t.port(stage, 2)),
+                BodyConstraint::free(t.port(stage, 3)),
             ]
         };
 
         // --- the set ahead of a pair, chained by its ring once its carrier
-        // is held. It used to refuse outright.
+        // is held: the pair's end of the carrier split off, and the ring
+        // joined to it. It used to refuse outright.
         let mut t = train_of(vec![reversing(), Stage::pair(PairStage::default())]);
-        t.constraints = carrier_held(0);
-        t.uncouple(ShaftRef::Of { stage: 0, shaft: 2 });
-        t.couple(
-            ShaftRef::Of { stage: 0, shaft: 3 },
-            ShaftRef::Of { stage: 1, shaft: 1 },
-        );
+        t.constraints = carrier_held(&t, 0);
+        t.split(1, t.port(0, 2));
+        t.join(t.port(0, 3), t.port(1, 1));
         let r = solve_train(&t, &lib).expect("a reversing stage can be followed");
         assert!(r.stages[0].ratio().unwrap() < 0.0, "this set reverses");
         for (k, s) in r.stages.iter().enumerate() {
@@ -6738,11 +6684,8 @@ mod tests {
         // --- and behind one, where the play is referred through it: the
         // pair's output coupled to the sun still, and the ring the end.
         let mut t = train_of(vec![Stage::pair(PairStage::default()), reversing()]);
-        t.constraints = carrier_held(1);
-        let (was, end) = (
-            ShaftRef::Of { stage: 1, shaft: 2 },
-            ShaftRef::Of { stage: 1, shaft: 3 },
-        );
+        t.constraints = carrier_held(&t, 1);
+        let (was, end) = (t.port(1, 2), t.port(1, 3));
         for c in &mut t.load_cases {
             for l in &mut c.loads {
                 if l.at == was {
@@ -6772,7 +6715,7 @@ mod tests {
         );
     }
 
-    /// **One shaft, one speed** — a stage's output member and the next stage's
+    /// **One body, one speed** — a stage's output member and the next stage's
     /// input member are the same piece of metal and must say the same thing.
     ///
     /// They did not. Every kind worked its members' speeds out for itself, and
@@ -6781,7 +6724,7 @@ mod tests {
     /// epicyclic set's came back signed. So a two-stage train reported
     /// `+1186 rpm` at the end of stage 1 and `+1186 rpm` at the start of stage
     /// 2 — agreeing by accident — and a set in front of a pair reported
-    /// `−500` and `+500` for one shaft.
+    /// `−500` and `+500` for one body.
     ///
     /// Now every member's motion comes from the graph, through
     /// `Wiring::unit_motion`, and the coupling is a row in the same system.
@@ -6794,10 +6737,10 @@ mod tests {
             let r = solve_train(&train, &lib).expect("these trains solve");
             let wirings: Vec<Wiring> = train.stages.iter().map(Stage::wiring).collect();
             let boundaries = train.boundaries().unwrap();
-            // **Which member sits on a shaft is the wiring's answer, not the
+            // **Which member sits on a body is the wiring's answer, not the
             // member order's.** An epicyclic set's output is its *carrier*,
             // which carries no gear at all — the planet rides it and spins with
-            // its own shaft — so "the stage's last member" is right for a pair
+            // its own body — so "the stage's last member" is right for a pair
             // and wrong for a set, and a first draft of this test asserted it.
             let on = |k: usize, shaft: usize| -> Vec<usize> {
                 wirings[k]
@@ -6827,17 +6770,14 @@ mod tests {
                 }
             }
             // ...and the far port's delivered speed is what the member on that
-            // shaft turns at, where one sits there.
+            // body turns at, where one sits there.
             let k = r.stages.len() - 1;
             let last = r.stages[k].members();
             for into in on(k, boundaries[k].output) {
                 for c in &r.cases {
                     let member = &last[into].cases[c.case];
                     let delivered = c
-                        .shaft(ShaftRef::Of {
-                            stage: k,
-                            shaft: boundaries[k].output,
-                        })
+                        .shaft(train.port(k, boundaries[k].output))
                         .and_then(|s| s.speed)
                         .expect("the far port turns");
                     assert!(
@@ -6900,6 +6840,55 @@ mod tests {
         assert!(one(Stage::planetary(PlanetaryStage::default())) > 0.0);
     }
 
+    /// **A port's select is one rule**: a stage's end of a body moved to
+    /// another is split off where the body ran on, then held, joined or
+    /// left its own — so the pair behind a set moved from the carrier to
+    /// the ring leaves the carrier the set's alone and enters the pair by
+    /// the ring; the carrier moved to ground is held; moved to nothing it
+    /// is its own and free; and an end moved to the body it is on already
+    /// changes nothing.
+    #[test]
+    fn a_ports_select_is_one_rule_split_then_held_joined_or_its_own() {
+        let set = || Stage::planetary(PlanetaryStage::default());
+        let (carrier, ring) = (2, 3);
+        let mut t = train_of(vec![set(), Stage::pair(PairStage::default())]);
+        let before = t.clone();
+        let shared = t.port(0, carrier);
+        assert_eq!(t.port(1, 1), shared);
+        // The pair's end moved to the ring.
+        t.move_end(1, shared, Some(t.port(0, ring)));
+        assert_eq!(
+            t.ends_of(t.port(0, carrier)).len(),
+            1,
+            "the carrier is the set's"
+        );
+        assert_eq!(t.port(1, 1), t.port(0, ring), "the pair enters by the ring");
+        assert_eq!(
+            t.max_body(),
+            before.max_body(),
+            "a body split and joined is no new body"
+        );
+        // The carrier moved to ground: held.
+        t.move_end(0, t.port(0, carrier), Some(GROUND));
+        assert!(t
+            .constraints_in_force()
+            .iter()
+            .any(|c| c.body == t.port(0, carrier) && c.constraint == Constraint::Held));
+        // ...and to nothing: its own, and free.
+        t.move_end(0, t.port(0, carrier), None);
+        assert!(!t.constraints.iter().any(|c| c.body == t.port(0, carrier)));
+        // An end moved to the body it is on changes nothing.
+        let same = t.clone();
+        t.move_end(0, t.port(0, ring), Some(t.port(0, ring)));
+        assert_eq!(format!("{t:?}"), format!("{same:?}"));
+        // ...and the ring, shared with the pair, moved to its own body
+        // leaves the pair with a body of its own and the ring the set's.
+        t.move_end(1, t.port(0, ring), None);
+        assert_eq!(t.ends_of(t.port(0, ring)).len(), 1);
+        assert_eq!(t.ends_of(t.port(1, 1)).len(), 1);
+        assert_ne!(t.port(1, 1), t.port(0, ring));
+    }
+
     /// **A hold on a stage replaces the convention's hold, and a coupling
     /// says where a stage is entered.** Holding a set's carrier is *instead
     /// of* the ring — one line, and the ring is released without being
@@ -6907,46 +6896,53 @@ mod tests {
     /// entered at the carrier and leaves by the sun; coupled by its ring
     /// with its sun held, it is entered at the ring and leaves by the
     /// carrier at the ring-in ratio, not by the ring at a ratio of one.
-    /// Nothing is driven but by a load, and no statement about a shaft
-    /// touches another stage.
+    /// Nothing is driven but by a load, and a statement about a body is
+    /// about that body: holding one that runs on to a second stage holds
+    /// that stage's end of it too, and it is a split that says otherwise.
     #[test]
-    fn a_hold_replaces_the_conventions_hold_and_a_coupling_says_where_a_stage_is_entered() {
+    fn a_hold_replaces_the_conventions_hold_and_a_shared_body_says_where_a_stage_is_entered() {
         let lib = library();
         let set = || Stage::planetary(PlanetaryStage::default());
         let (sun, carrier, ring) = (1, 2, 3);
-        let of = |stage, shaft| ShaftRef::Of { stage, shaft };
 
         // --- one line: the carrier held, the ring released — and the set,
-        // chained onward by its carrier, uncoupled there by the hold, so
-        // the ring is what the pair is coupled to now.
+        // chained onward by its carrier, holds the pair's gear with it, so
+        // the pair's end is split off and the ring is what it runs on by.
         let mut t = train_of(vec![set(), Stage::pair(PairStage::default())]);
-        t.hold(of(0, carrier));
-        let held: Vec<ShaftRef> = t
+        t.hold(t.port(0, carrier));
+        let held: Vec<usize> = t
             .constraints_in_force()
             .iter()
             .filter(|c| c.constraint == Constraint::Held)
-            .map(|c| c.at)
+            .map(|c| c.body)
             .collect();
-        assert_eq!(held, vec![of(0, carrier)]);
-        assert!(t.couplings.is_empty(), "a held shaft turns nothing");
-        t.couple(of(0, ring), of(1, 1));
+        assert_eq!(held, vec![t.port(0, carrier)]);
+        assert_eq!(
+            t.ends_of(t.port(0, carrier)).len(),
+            2,
+            "the pair is held with it"
+        );
+        t.split(1, t.port(0, carrier));
+        t.join(t.port(0, ring), t.port(1, 1));
         let r = solve_train(&t, &lib).expect("solves");
         assert!(r.stages[0].ratio().unwrap() < 0.0, "carrier held reverses");
 
-        // --- behind a pair, coupled by its carrier: entered there, leaving
+        // --- behind a pair, joined by its carrier: entered there, leaving
         // by the sun, and the pair before it is what it was.
-        let mut t = Train::chained(vec![Stage::pair(PairStage::default()), set()], Vec::new());
-        t.uncouple(of(1, sun));
-        t.couple(of(0, 2), of(1, carrier));
+        let mut t = Train::chained(vec![Stage::pair(PairStage::default()), set()], |_| {
+            Vec::new()
+        });
+        t.split(1, t.port(1, sun));
+        t.join(t.port(0, 2), t.port(1, carrier));
         let (start, end) = ends_of(&t);
-        assert_eq!((start, end), (of(0, 1), of(1, sun)));
+        assert_eq!((start, end), (t.port(0, 1), t.port(1, sun)));
         t.load_cases = vec![LoadCase::ultimate(start, end, 2.0, 3000.0)];
         let (at, n) = t.layout();
-        let conditions = t.conditions(&at, n).unwrap();
+        let conditions = t.conditions(n).unwrap();
         assert_eq!(
             conditions[at[1].of(carrier)],
             crate::kinematics::Condition::Free,
-            "turned by the coupling, not driven"
+            "turned by the pair, not driven"
         );
         let b = t.boundaries().unwrap();
         assert_eq!((b[1].input, b[1].output), (carrier, sun));
@@ -6957,15 +6953,15 @@ mod tests {
         );
         assert!(r.cases[0].solved);
 
-        // ...and coupled by its ring with its sun held: entered at the ring,
+        // ...and joined by its ring with its sun held: entered at the ring,
         // leaving by the carrier at the ring-in ratio.
-        t.uncouple(of(1, carrier));
-        t.couple(of(0, 2), of(1, ring));
-        t.constraints = vec![ShaftConstraint::held(1, sun)];
+        t.split(1, t.port(1, carrier));
+        t.join(t.port(0, 2), t.port(1, ring));
+        t.constraints = vec![BodyConstraint::held(t.port(1, sun))];
         let b = t.boundaries().unwrap();
         assert_eq!((b[1].input, b[1].output), (ring, carrier));
         let (start, end) = ends_of(&t);
-        assert_eq!(end, of(1, carrier));
+        assert_eq!(end, t.port(1, carrier));
         t.load_cases = vec![LoadCase::ultimate(start, end, 2.0, 3000.0)];
         let r = solve_train(&t, &lib).expect("solves ring-in behind a pair");
         let set_ratio = r.stages[1].ratio().unwrap();
@@ -7035,17 +7031,14 @@ mod tests {
             .any(|n| n.is(key::TRAIN_CASE_UNDERDETERMINED)));
         // A differential: a lone set with its ring released has two.
         let mut diff = train_of(vec![Stage::planetary(PlanetaryStage::default())]);
-        diff.constraints = vec![ShaftConstraint {
-            at: ShaftRef::Of { stage: 0, shaft: 3 },
-            constraint: Constraint::Free,
-        }];
+        diff.constraints = vec![BodyConstraint::free(diff.port(0, 3))];
         assert_eq!(diff.case_mobility().unwrap(), 2);
         // The released ring is `End` by convention; the carrier by reference.
         diff.load_cases = vec![LoadCase {
             loads: vec![
                 Load::given(start_of(&t), 2.0, 3000.0),
-                Load::given(ShaftRef::Of { stage: 0, shaft: 3 }, 1.0, -500.0),
-                Load::derived(ShaftRef::Of { stage: 0, shaft: 2 }),
+                Load::given(diff.port(0, 3), 1.0, -500.0),
+                Load::derived(diff.port(0, 2)),
             ],
             ..template(&t)
         }];
@@ -7141,10 +7134,7 @@ mod tests {
             Stage::pair(PairStage::default()),
             Stage::planetary(PlanetaryStage::default()),
         ]);
-        t.constraints = vec![ShaftConstraint {
-            at: ShaftRef::Of { stage: 1, shaft: 3 },
-            constraint: Constraint::Free,
-        }];
+        t.constraints = vec![BodyConstraint::free(t.port(1, 3))];
         let (start, end) = ends_of(&t);
         t.load_cases = vec![LoadCase::ultimate(start, end, 0.1, 30000.0)];
         for st in &mut t.stages {
@@ -7197,27 +7187,26 @@ mod tests {
             .notes
             .iter()
             .any(|n| n.is(key::TRAIN_LOAD_NOT_REACTED)));
-        assert_eq!(at_port(&r, &t, 0, end_of(&t)).role, ShaftRole::Free);
+        assert_eq!(at_port(&r, &t, 0, end_of(&t)).role, BodyRole::Free);
         // Reacted in so many words: the case solves, and the end holds the
         // load — where a port the case says nothing of is free, and a load
         // at the start alone is one nothing holds.
         t.load_cases[0].loads[1] = Load::declared(end_of(&t), LoadRole::Reacted);
         let said = solve_train(&t, &lib).unwrap();
         assert!(said.cases[0].solved);
-        assert_eq!(at_port(&said, &t, 0, end_of(&t)).role, ShaftRole::Reacted);
+        assert_eq!(at_port(&said, &t, 0, end_of(&t)).role, BodyRole::Reacted);
         assert!(at_port(&said, &t, 0, end_of(&t)).torque.abs() > 0.0);
         t.load_cases[0].loads.truncate(1);
         let unsaid = solve_train(&t, &lib).unwrap();
         assert!(!unsaid.cases[0].solved);
-        assert_eq!(at_port(&unsaid, &t, 0, end_of(&t)).role, ShaftRole::Free);
+        assert_eq!(at_port(&unsaid, &t, 0, end_of(&t)).role, BodyRole::Free);
         // A differential's ring declared reacted: one unknown among three
         // ports, so one of the two loads' torques gives way — the last.
         let mut diff = train_of(vec![Stage::planetary(PlanetaryStage::default())]);
-        let at = |shaft| ShaftRef::Of { stage: 0, shaft };
-        diff.constraints = vec![ShaftConstraint {
-            at: at(3),
-            constraint: Constraint::Free,
-        }];
+        let at = |slot| diff.port(0, slot);
+        let (b1, b2, b3) = (at(1), at(2), at(3));
+        let at = |slot: usize| [b1, b2, b3][slot - 1];
+        diff.constraints = vec![BodyConstraint::free(at(3))];
         diff.load_cases = vec![LoadCase {
             loads: vec![
                 Load::given(at(1), 2.0, 3000.0),
@@ -7234,15 +7223,15 @@ mod tests {
         let r = solve_train(&diff, &lib).unwrap();
         assert!(r.cases[0].solved, "{:?}", r.cases[0].notes);
         let ring = r.cases[0].shaft(at(3)).unwrap();
-        assert_eq!(ring.role, ShaftRole::Reacted);
+        assert_eq!(ring.role, BodyRole::Reacted);
         assert!(ring.torque.abs() > 0.0);
     }
 
-    /// **The last stage removed parks the cases on ground, and the first
-    /// stage pushed takes them up conventionally.** A pair's three cases,
-    /// the pair removed, keep every figure; a set pushed in its place has
-    /// them sun in, carrier out, the sweep at the carrier — the set's
-    /// conventional use — and solves them.
+    /// **The last stage removed leaves the cases parked at their bodies,
+    /// and the first stage pushed takes them up conventionally.** A pair's
+    /// three cases, the pair removed, keep every figure; a set pushed in its
+    /// place has them sun in, carrier out, the sweep at the carrier — the
+    /// set's conventional use — and solves them.
     #[test]
     fn the_cases_survive_the_last_stage_and_take_the_next_one_conventionally() {
         let lib = library();
@@ -7256,14 +7245,14 @@ mod tests {
         assert!(t.stages.is_empty());
         let r = solve_train(&t, &lib).expect("a train with no stages solves");
         assert!(!r.cases[0].solved);
-        assert_eq!(t.load_cases[0].loads[0].at, PARKED_IN);
-        assert_eq!(t.load_cases[0].loads[1].at, PARKED_OUT);
+        assert_eq!(t.load_cases[0].loads[0].at, 1, "parked where it was");
+        assert_eq!(t.load_cases[0].loads[1].at, 2);
         assert!(
             (t.load_cases[0].torque() - 0.7).abs() < 1e-12,
             "the figures are kept"
         );
         t.push_stage(Stage::planetary(PlanetaryStage::default()));
-        let at = |shaft| ShaftRef::Of { stage: 0, shaft };
+        let at = |slot| t.port(0, slot);
         let c = &t.load_cases[0];
         assert_eq!((c.loads[0].at, c.loads[0].role), (at(1), LoadRole::Load));
         assert_eq!((c.loads[1].at, c.loads[1].role), (at(2), LoadRole::Reacted));
@@ -7278,8 +7267,8 @@ mod tests {
         // ...and a fresh case on a train with no stages is parked the same.
         t.remove_stage(0);
         let fresh = t.fresh_case(CaseKind::Fatigue, 1.0, 100.0);
-        assert_eq!(fresh.loads[0].at, PARKED_IN);
-        assert_eq!(fresh.loads[1].at, PARKED_OUT);
+        assert_eq!(fresh.loads[0].at, 1);
+        assert_eq!(fresh.loads[1].at, 2);
         assert!(
             !fresh.enabled,
             "a fresh case moves no rating until it is switched on"
@@ -7306,7 +7295,11 @@ mod tests {
             Stage::pair(PairStage::default()),
             Stage::pair(PairStage::default()),
         ]);
-        let at = |stage, shaft| ShaftRef::Of { stage, shaft };
+        // Three pairs chained: bodies 1 to 4, stage k's slot s at k + s.
+        let at = |stage: usize, slot: usize| stage + slot;
+        for (k, s) in [(0, 1), (0, 2), (1, 1), (1, 2), (2, 1), (2, 2)] {
+            assert_eq!(t.port(k, s), at(k, s));
+        }
         let ends_only = solve_train(&t, &lib).unwrap();
         assert_eq!(ends_only.paths.len(), 1, "the ends, and nothing unasked");
         t.load_cases
@@ -7371,53 +7364,57 @@ mod tests {
         ));
         // A differential has no path.
         let mut diff = train_of(vec![Stage::planetary(PlanetaryStage::default())]);
-        diff.release(at(0, 3));
+        diff.release(diff.port(0, 3));
         let r = solve_train(&diff, &lib).unwrap();
         assert!(r.paths.is_empty());
     }
 
-    /// **The train's bodies are its ports joined by its couplings**: three
-    /// pairs in a chain are four bodies, the two inner ones a shaft with two
-    /// names, and only the outer two are ends; a set's held ring is a body
-    /// no case can name.
+    /// **The train's bodies are numbered across it, each with its ends**:
+    /// three pairs in a chain are four bodies, the two inner ones with an
+    /// end on each of two stages, and only the outer two are ends of the
+    /// train; a set's held ring is a body no case can name.
     #[test]
-    fn the_bodies_are_the_ports_joined_by_the_couplings() {
+    fn the_bodies_are_numbered_across_the_train_each_with_its_ends() {
         let mut t = train_of(vec![
             Stage::pair(PairStage::default()),
             Stage::pair(PairStage::default()),
             Stage::pair(PairStage::default()),
         ]);
-        let at = |stage, shaft| ShaftRef::Of { stage, shaft };
         let bodies = t.bodies(&t.boundaries().unwrap());
-        let shafts: Vec<Vec<ShaftRef>> = bodies
+        let ends: Vec<(usize, Vec<usize>)> = bodies
             .iter()
-            .map(|b| b.shafts.iter().map(|(s, _)| *s).collect())
+            .map(|b| (b.body, b.ends.iter().map(|(k, _)| *k).collect()))
             .collect();
         assert_eq!(
-            shafts,
-            vec![
-                vec![at(0, 1)],
-                vec![at(0, 2), at(1, 1)],
-                vec![at(1, 2), at(2, 1)],
-                vec![at(2, 2)],
-            ]
+            ends,
+            vec![(1, vec![0]), (2, vec![0, 1]), (3, vec![1, 2]), (4, vec![2])]
         );
-        assert_eq!(ends_of(&t), (at(0, 1), at(2, 2)));
+        for (k, slot, body) in [
+            (0, 1, 1),
+            (0, 2, 2),
+            (1, 1, 2),
+            (1, 2, 3),
+            (2, 1, 3),
+            (2, 2, 4),
+        ] {
+            assert_eq!(t.port(k, slot), body);
+        }
+        assert_eq!(ends_of(&t), (1, 4));
         assert!(bodies.iter().all(|b| !b.held));
         restage(&mut t, vec![Stage::planetary(PlanetaryStage::default())]);
         let bodies = t.bodies(&t.boundaries().unwrap());
         assert_eq!(bodies.len(), 3, "the planet is no body a case can name");
         assert!(bodies[2].held);
-        assert_eq!(t.ends(&t.boundaries().unwrap()), Some((at(0, 1), at(0, 2))));
+        assert_eq!(t.ends(&t.boundaries().unwrap()), Some((1, 2)));
     }
 
     /// **A load between two stages is one flow across both**, and where it
     /// can be held decides what it does: a load on the sun a pair drives,
     /// with the pair's input reacted and the set's carrier reacted, is a
-    /// load two shafts could hold — the division by stiffness this model
+    /// load two bodies could hold — the division by stiffness this model
     /// does not make, which the train refuses by name; with the pair's input
     /// a load of nought — free, carrying nothing — the carrier holds it and
-    /// every stage between carries it; and a load at a shaft that is not a
+    /// every stage between carries it; and a load at a body that is not a
     /// port is refused by name.
     #[test]
     fn a_load_between_two_stages_is_held_by_what_can_hold_it() {
@@ -7427,7 +7424,7 @@ mod tests {
             Stage::pair(PairStage::default()),
             Stage::planetary(PlanetaryStage::default()),
         ]);
-        let at = |stage, shaft| ShaftRef::Of { stage, shaft };
+        let at = |stage, slot| t.port(stage, slot);
         // Both ends reacted: the sun's load could be held by either.
         let mut shared = t.clone();
         shared.load_cases[1] = LoadCase {
@@ -7450,7 +7447,7 @@ mod tests {
         let r = solve_train(&shared, &lib).expect("the carrier holds it");
         assert!(r.cases[1].solved);
         let end = r.cases[1].shaft(at(1, carrier)).unwrap();
-        assert_eq!(end.role, ShaftRole::Reacted);
+        assert_eq!(end.role, BodyRole::Reacted);
         assert!(
             end.torque.abs() > 0.5,
             "the carrier holds the sun's load stepped up"
@@ -7458,7 +7455,7 @@ mod tests {
         for g in r.stages[0].members() {
             assert_eq!(g.cases[1].torque, 0.0, "the pair carries none of it");
         }
-        // A shaft that is not a port.
+        // A body that is not a port.
         let mut held = t.clone();
         held.load_cases[2].set_port(at(1, ring));
         assert_eq!(
@@ -7475,12 +7472,12 @@ mod tests {
                 Stage::planetary(PlanetaryStage::default()),
                 Stage::pair(PairStage::default()),
             ],
-            Vec::new(),
+            |_| Vec::new(),
         );
-        t.uncouple(at(0, carrier));
-        t.couple(at(0, sun), at(1, 1));
+        t.split(1, t.port(0, carrier));
+        t.join(t.port(0, sun), t.port(1, 1));
         let (start, end) = ends_of(&t);
-        assert_eq!(start, at(0, carrier));
+        assert_eq!(start, t.port(0, carrier));
         t.load_cases = vec![LoadCase::ultimate(start, end, 2.0, 3000.0)];
         let r = solve_train(&t, &lib).expect("carrier-driven set at the head");
         assert!(
@@ -7491,20 +7488,25 @@ mod tests {
     }
 
     /// **The open ports are what a load can enter by**: every body the
-    /// train does not hold, by its first shaft — the shaft each coupling
-    /// joins once, under the earlier stage's name, a take-off between two
-    /// stages — and a released ring, un-held and uncoupled, is another.
-    /// A chain has two ends; a set with its ring released has three open
-    /// ports and no ends.
+    /// train does not hold, once, under the earliest stage's name — a body
+    /// two stages share is a take-off between them — and a released ring,
+    /// un-held and shared with nothing, is another. A chain has two ends; a
+    /// set with its ring released has three open ports and no ends.
     #[test]
     fn the_open_ports_are_the_bodies_the_train_does_not_hold() {
-        let at = |stage, shaft| ShaftRef::Of { stage, shaft };
         let t = mixed_train();
+        let at = |stage, slot| t.port(stage, slot);
         let b = t.boundaries().unwrap();
         let ports = t.open_ports(&b);
         assert_eq!(
-            ports.iter().map(|p| p.at).collect::<Vec<_>>(),
-            vec![at(0, 1), at(0, 2), at(1, 2), at(2, 2), at(3, 2)]
+            ports.iter().map(|p| (p.body, p.stage)).collect::<Vec<_>>(),
+            vec![
+                (at(0, 1), 0),
+                (at(0, 2), 0),
+                (at(1, 2), 1),
+                (at(2, 2), 2),
+                (at(3, 2), 3)
+            ]
         );
         assert_eq!(
             t.ends(&b),
@@ -7512,29 +7514,26 @@ mod tests {
             "the chain's ends, with three take-offs between them"
         );
         let mut t = train_of(vec![Stage::planetary(PlanetaryStage::default())]);
-        assert_eq!(ends_of(&t), (at(0, 1), at(0, 2)));
-        t.constraints = vec![ShaftConstraint {
-            at: at(0, 3),
-            constraint: Constraint::Free,
-        }];
+        assert_eq!(ends_of(&t), (1, 2));
+        t.constraints = vec![BodyConstraint::free(3)];
         let b = t.boundaries().unwrap();
         let ports = t.open_ports(&b);
         assert_eq!(
-            ports.iter().map(|p| p.at).collect::<Vec<_>>(),
-            vec![at(0, 1), at(0, 2), at(0, 3)]
+            ports.iter().map(|p| p.body).collect::<Vec<_>>(),
+            vec![1, 2, 3]
         );
-        assert_eq!(ports[2].label, ShaftLabel::Member { member: 2 });
+        assert_eq!(ports[2].label, BodyLabel::Member { member: 2 });
         assert_eq!(
             t.ends(&b),
-            Some((at(0, 1), at(0, 2))),
+            Some((1, 2)),
             "a set's ends by convention, whatever its ring does"
         );
     }
 
     /// **A train one condition short reports the family, has no figure of
     /// its own, and rates its cases.** A set with its ring released and its
-    /// sun driven — a differential — has one free parameter; every shaft's
-    /// speed is a particular value plus one term per turn of the free shaft,
+    /// sun driven — a differential — has one free parameter; every body's
+    /// speed is a particular value plus one term per turn of the free body,
     /// and at every value of that parameter the family satisfies Willis —
     /// `z_s ω_s + z_r ω_r = (z_s + z_r) ω_c` — exactly, with the sun at one
     /// turn throughout. The report's terms are the same family read as
@@ -7548,16 +7547,14 @@ mod tests {
     fn a_train_one_condition_short_reports_the_family_and_rates_its_cases() {
         let lib = library();
         let mut t = train_of(vec![Stage::planetary(PlanetaryStage::default())]);
-        t.constraints = vec![ShaftConstraint {
-            at: ShaftRef::Of { stage: 0, shaft: 3 },
-            constraint: Constraint::Free,
-        }];
+        t.constraints = vec![BodyConstraint::free(t.port(0, 3))];
         let (sun, carrier, ring) = (1, 2, 3);
-        let at = |shaft| ShaftRef::Of { stage: 0, shaft };
+        // A lone stage's bodies are numbered as its slots are.
+        let at = |slot| slot;
         // The ring, released, is the chain's `End` by convention — the
         // next free port in order — so the carrier is loaded by reference.
         // (A load used to name the output; it does not, since that moved
-        // `End` from one shaft to another as loads were added.)
+        // `End` from one body to another as loads were added.)
         t.load_cases = vec![
             LoadCase {
                 loads: vec![
@@ -7614,7 +7611,7 @@ mod tests {
         for p in [0i64, 1, -2, 7] {
             let p = crate::ratio::Ratio::whole(p);
             let at = |shaft: usize| {
-                let i = m.shaft_of(0, shaft);
+                let i = m.body_of(0, shaft);
                 m.solution.values[i]
                     .checked_add(m.solution.residual[0].direction[i].checked_mul(p).unwrap())
                     .unwrap()
@@ -7633,7 +7630,7 @@ mod tests {
             assert_eq!(lhs, rhs, "Willis at p = {p}");
             // ...and the report is the same family, read as floats.
             for shaft in [sun, carrier, ring] {
-                let s = &r.shafts[m.shaft_of(0, shaft)];
+                let s = &r.speeds[m.body_of(0, shaft)];
                 let read = s.speed.value
                     + s.terms
                         .iter()
@@ -7648,7 +7645,7 @@ mod tests {
     }
 
     /// **Every other way the conditions can fail to give one motion is
-    /// named**: a shaft asked two things that contradict, a shaft the train
+    /// named**: a body asked two things that contradict, a body the train
     /// does not have, and tooth counts whose product outgrows an exact ratio
     /// — and none of them is the wiring sentence, which describes a stage
     /// that is no mechanism.
@@ -7665,36 +7662,32 @@ mod tests {
         // named at the last statement the designer made, the ring.
         assert_eq!(
             solve_train(
-                &set(vec![
-                    ShaftConstraint::held(0, 2),
-                    ShaftConstraint::held(0, 3)
-                ]),
+                &set(vec![BodyConstraint::held(2), BodyConstraint::held(3)]),
                 &lib
             )
             .err(),
-            Some(TrainError::Overdetermined {
-                at: ShaftRef::Of { stage: 0, shaft: 3 }
-            })
+            Some(TrainError::Overdetermined { at: 3 })
         );
         assert_eq!(
-            solve_train(&set(vec![ShaftConstraint::held(7, 1)]), &lib).err(),
-            Some(TrainError::NoSuchShaft {
-                at: ShaftRef::Of { stage: 7, shaft: 1 }
-            })
+            solve_train(&set(vec![BodyConstraint::held(7)]), &lib).err(),
+            Some(TrainError::NoSuchBody { at: 7 })
         );
         let huge = |teeth| StageGear {
             teeth,
             ..StageGear::default()
         };
         let mut wide = two_stage();
-        wide.stages = (0..6)
-            .map(|k| {
-                Stage::pair(PairStage {
-                    gears: [huge(4_000_000_000 + k), huge(4_000_000_001 + k)],
-                    ..PairStage::default()
+        restage(
+            &mut wide,
+            (0..6)
+                .map(|k| {
+                    Stage::pair(PairStage {
+                        gears: [huge(4_000_000_000 + k), huge(4_000_000_001 + k)],
+                        ..PairStage::default()
+                    })
                 })
-            })
-            .collect();
+                .collect(),
+        );
         assert_eq!(solve_train(&wide, &lib).err(), Some(TrainError::Overflow));
         assert!(wide.motion_report().is_none());
     }
@@ -8758,7 +8751,7 @@ mod tests {
     /// reported instead was the forward distribution scaled by the ratio of the
     /// two stage torques, which is exact wherever the forward torque is a
     /// geometric projection or the two directional efficiencies agree. An
-    /// epicyclic set is neither: **which shaft drives decides where `η₀`
+    /// epicyclic set is neither: **which body drives decides where `η₀`
     /// multiplies.** The shipped set's ring came out 6 % low.
     ///
     /// The law is the degenerate case rather than the figure: **at zero friction
@@ -8864,8 +8857,8 @@ mod tests {
     const BACK: usize = 1;
     const CYCLIC: usize = 2;
 
-    /// The shaft a case reports at a port of the train.
-    fn at_port<'a>(r: &'a TrainResult, _train: &Train, case: usize, at: ShaftRef) -> &'a CaseShaft {
+    /// The body a case reports at a port of the train.
+    fn at_port<'a>(r: &'a TrainResult, _train: &Train, case: usize, at: usize) -> &'a CaseBody {
         r.cases[case]
             .shaft(at)
             .expect("every port is a shaft of the case")
@@ -8873,16 +8866,16 @@ mod tests {
 
     /// A port declared free: turning, carrying nothing — what "not
     /// reacted" at that end comes to.
-    fn free(at: ShaftRef) -> Load {
+    fn free(at: usize) -> Load {
         Load::declared(at, LoadRole::Free)
     }
     /// **The train's two ends**, where it has exactly two — every chain
     /// fixture here — which its preset cases are written between.
-    fn ends_of(t: &Train) -> (ShaftRef, ShaftRef) {
+    fn ends_of(t: &Train) -> (usize, usize) {
         t.ends(&t.boundaries().expect("a fixture has boundaries"))
             .expect("a chain fixture has two ends")
     }
-    fn start_of(t: &Train) -> ShaftRef {
+    fn start_of(t: &Train) -> usize {
         ends_of(t).0
     }
     /// An ultimate case between the train's ends with nothing on it, for a
@@ -8891,7 +8884,7 @@ mod tests {
         let (start, end) = ends_of(t);
         LoadCase::ultimate(start, end, 0.0, 0.0)
     }
-    fn end_of(t: &Train) -> ShaftRef {
+    fn end_of(t: &Train) -> usize {
         ends_of(t).1
     }
     /// The three cases a train used to hold as fields, written between the
@@ -8922,15 +8915,16 @@ mod tests {
         ]
     }
 
-    /// **A fixture's stages replaced, its chain rewritten and its cases
+    /// **A fixture's stages replaced, chained afresh, and its cases
     /// carried to the new ends** — what the chain convention did without
     /// saying so when a test swapped a train's stages under its cases.
     fn restage(t: &mut Train, stages: Vec<Stage>) {
         let (old_start, old_end) = ends_of(t);
-        t.stages = stages;
-        t.couplings = Train::chain(&t.stages);
+        let fresh = Train::chained(stages, |_| Vec::new());
+        t.stages = fresh.stages;
+        t.constraints = fresh.constraints;
         let (start, end) = ends_of(t);
-        let carry = |at: &mut ShaftRef| {
+        let carry = |at: &mut usize| {
             if *at == old_start {
                 *at = start;
             } else if *at == old_end {
@@ -8948,18 +8942,18 @@ mod tests {
     }
 
     /// **A chain of these stages with the classic cases between its ends.**
-    /// What every fixture here is built by: the chain's couplings written
-    /// once, and the cases at whatever shafts the ends come to.
+    /// What every fixture here is built by: the chain's bodies numbered
+    /// once, and the cases at whatever bodies the ends come to.
     fn train_of(stages: Vec<Stage>) -> Train {
-        let mut t = Train::chained(stages, Vec::new());
+        let mut t = Train::chained(stages, |_| Vec::new());
         let duty = Duty::intermittent(end_of(&t));
         t.load_cases = classic(&t, 3000.0, 2.0, 0.0, 2.0, 3000.0, duty);
         t
     }
 
     /// **A chain of three presets**, so the graph's assembly meets a stage with
-    /// three shafts sitting between two with two — which a train of one preset
-    /// cannot exercise and which is where a coupling to the wrong shaft would
+    /// three bodies sitting between two with two — which a train of one preset
+    /// cannot exercise and which is where a coupling to the wrong body would
     /// show.
     fn mixed_train() -> Train {
         let second = two_stage().stages.remove(1);
@@ -9000,7 +8994,7 @@ mod tests {
         assert!((r.total().unwrap().ratio - want).abs() < 1e-12);
         let t = two_stage();
         let end = at_port(&r, &t, PEAK, end_of(&t));
-        assert_eq!(end.role, ShaftRole::Reacted);
+        assert_eq!(end.role, BodyRole::Reacted);
         assert!((end.speed.unwrap() - 3000.0 / want).abs() < 1e-9);
 
         // Every stage produced real numbers.
@@ -9022,7 +9016,7 @@ mod tests {
 
     /// **The two backlash figures are one gap seen from the two ends.**
     ///
-    /// Referred to the output shaft or to the input shaft, the same play must
+    /// Referred to the output body or to the input body, the same play must
     /// differ by exactly the total ratio — every stage's contribution scales the
     /// same way, because a stage's own two figures are its gap at two lever arms
     /// whose ratio *is* that stage's ratio. If a stage ever got that wrong the
@@ -9529,7 +9523,7 @@ mod tests {
     /// - the **sun** counted its own rather than its rotation against the
     ///   carrier, which is 1.4 times too many;
     /// - the **planet** was referred to the sun's speed rather than to the input
-    ///   shaft's, right only where those are the same shaft.
+    ///   body's, right only where those are the same body.
     ///
     /// # And a fourth, which this test asserted for a while
     ///
@@ -9564,7 +9558,7 @@ mod tests {
             restage(&mut train, vec![stage]);
             let r = solve_train(&train, &lib).unwrap_or_else(|e| panic!("{name}: {e}"));
             let cycles = |g: &GearResult| g.cases[CYCLIC].cycles.expect("a fatigue case counts");
-            // The revolutions the input shaft turns over the duty, which is what
+            // The revolutions the input body turns over the duty, which is what
             // every member's count is a multiple of.
             let turns = 3000.0 * 60.0;
 
@@ -9573,7 +9567,7 @@ mod tests {
             };
             let StageResult::Shape(p) = &r.stages[0];
             if name == "hula" {
-                // The hula's shafts: ground, crank, grounded, output, wobble.
+                // The hula's bodies: ground, crank, grounded, output, wobble.
                 let crank = p.cases[CYCLIC].speeds[1];
                 for g in &p.members {
                     let c = &g.cases[CYCLIC];
@@ -9597,7 +9591,7 @@ mod tests {
                 );
             } else {
                 {
-                    // The shape's shafts: ground, sun, carrier, ring, planet.
+                    // The shape's bodies: ground, sun, carrier, ring, planet.
                     let shafts = &p.cases[CYCLIC];
                     let carrier = shafts.speeds[2];
                     let planets = p.layouts.first().map_or(1, |l| l.count);
@@ -9628,7 +9622,7 @@ mod tests {
                     assert_eq!(w.paths_seen(2), planets, "and so does a ring");
                     assert_eq!(w.paths_seen(1), 1, "a planet meets the one sun");
                     assert!(n > 1.0, "this fixture has to have more than one planet");
-                    // **A shaft that does not turn is still loaded**, which is
+                    // **A body that does not turn is still loaded**, which is
                     // the case the old rule could not state: it counted the
                     // input's revolutions, so a held ring came out as though it
                     // turned with the sun. It meets a planet once per *carrier*
@@ -10552,15 +10546,9 @@ mod tests {
     #[test]
     fn an_empty_train_solves_to_nothing() {
         let t = Train {
-            load_cases: vec![LoadCase::ultimate(
-                ShaftRef::Ground,
-                ShaftRef::Ground,
-                1.0,
-                1.0,
-            )],
+            load_cases: vec![LoadCase::ultimate(1, 2, 1.0, 1.0)],
             reversed_bending: false,
             stages: vec![],
-            couplings: Vec::new(),
             constraints: Vec::new(),
         };
         let r = solve_train(&t, &library()).expect("a train with no stages is a train");
@@ -10866,7 +10854,7 @@ mod tests {
 
     /// **A load between two stages goes the way that holds it.** A worm
     /// ahead of a pair locks against a load from its wheel; a load put on
-    /// the shaft the two share, with both far ends free — loads of nought —
+    /// the body the two share, with both far ends free — loads of nought —
     /// can only be held by the worm, so the worm is loaded and the pair is
     /// not. The same load with the far ends reacted as well could be held
     /// at either, which is a division this model does not make, and is
@@ -10878,9 +10866,9 @@ mod tests {
             Stage::pair(PairStage::worm()),
             Stage::pair(PairStage::default()),
         ]);
-        // The shared shaft: the worm's wheel, coupled to the pair's first.
+        // The shared body: the worm's wheel, one with the pair's first.
         t.load_cases[BACK].loads = vec![
-            Load::given(ShaftRef::Of { stage: 0, shaft: 2 }, 0.5, 0.0),
+            Load::given(t.port(0, 2), 0.5, 0.0),
             free(start_of(&t)),
             free(end_of(&t)),
         ];
@@ -10897,19 +10885,20 @@ mod tests {
             "the pair carries none of it"
         );
         assert_eq!(pair[1].cases[BACK].torque, 0.0);
-        // ...and the same shaft named from the pair's side is the same load.
+        // ...and the same body named from the pair's side is the same body.
         let mut same = t.clone();
-        same.load_cases[BACK].set_port(ShaftRef::Of { stage: 1, shaft: 1 });
-        let again = solve_train(&same, &lib).expect("the same shaft");
+        assert_eq!(t.port(1, 1), t.port(0, 2));
+        same.load_cases[BACK].set_port(t.port(1, 1));
+        let again = solve_train(&same, &lib).expect("the same body");
         assert!(again.cases[BACK].solved);
         assert!(
             (again.stages[0].members()[1].cases[BACK].torque - worm[1].cases[BACK].torque).abs()
                 < 1e-12
         );
-        // The far ends reacted as well: two shafts could hold it, and a
+        // The far ends reacted as well: two bodies could hold it, and a
         // refusal.
         t.load_cases[BACK].loads = vec![
-            Load::given(ShaftRef::Of { stage: 0, shaft: 2 }, 0.5, 0.0),
+            Load::given(t.port(0, 2), 0.5, 0.0),
             Load::declared(start_of(&t), LoadRole::Reacted),
             Load::declared(end_of(&t), LoadRole::Reacted),
         ];
@@ -10978,7 +10967,7 @@ mod tests {
             at = expect * p.meshes[0].efficiency.backward;
         }
         let start = at_port(&h, &held, BACK, start_of(&t));
-        assert_eq!(start.role, ShaftRole::Reacted);
+        assert_eq!(start.role, BodyRole::Reacted);
         assert!((start.torque.abs() - at).abs() < 1e-12);
 
         // The same load against a stage that cannot be driven backward. A worm
@@ -11002,9 +10991,9 @@ mod tests {
             "this worm was meant to lock: backward efficiency {}",
             screw.efficiency.backward
         );
-        // The wheel is on the shaft the load enters by and carries all of it,
+        // The wheel is on the body the load enters by and carries all of it,
         // and the worm's teeth carry it read across the mesh; the worm is at
-        // the far end of a mesh that cannot pass it, so its *shaft* carries
+        // the far end of a mesh that cannot pass it, so its *body* carries
         // **none** — which is what a locked stage means and is not the same
         // as the case being absent (`a_self_locking_worm_reports_the_load_it_reacts`).
         let teeth: Vec<f64> = worm.members.iter().map(|m| m.cases[BACK].torque).collect();
@@ -11122,7 +11111,7 @@ mod tests {
             4,
             "a case switched off is still solved at the train level"
         );
-        assert!(with.cases[3].solved && with.cases[3].shaft(ShaftRef::Ground).is_some());
+        assert!(with.cases[3].solved && with.cases[3].shaft(GROUND).is_some());
         let near = |x: f64, y: f64| (x - y).abs() <= 1e-9 * x.abs().max(1e-300);
         let mut checked = 0;
         for (a, b) in alone.stages.iter().zip(&with.stages) {

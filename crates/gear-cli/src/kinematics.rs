@@ -15,14 +15,14 @@
 //! depends on. Those are recorded by `train`, `planetstage`, `hula` and the
 //! rest, and printing them twice would be a second copy to keep in step.
 //!
-//! What is here is exactly the set of facts a graph over shafts and meshes has
+//! What is here is exactly the set of facts a graph over bodies and meshes has
 //! to produce:
 //!
 //! - per train — total ratio, efficiency and backlash both ways, and where each
 //!   load case ends up;
 //! - per stage — ratio, efficiency and backlash both ways;
-//! - per shaft of an epicyclic preset — speed and torque in every case,
-//!   **including the shaft that is not a gear**;
+//! - per body of an epicyclic preset — speed and torque in every case,
+//!   **including the body that is not a gear**;
 //! - per member — its speed, its speed *against the frame of its mesh*, its
 //!   torque and its cycles, in every case;
 //! - per mesh — efficiency both ways, the contact ratio its loss is read over,
@@ -33,23 +33,23 @@
 //! `StageResult::members()` and `::meshes()` answer for any stage, and
 //! everything below reads through them so that this harness cannot be the
 //! place an arrangement is forgotten. Which members a mesh joins and in whose
-//! frame, and what each shaft is called, are read off the shape ([`member_role`])
+//! frame, and what each body is called, are read off the shape ([`member_role`])
 //! rather than off a result type of the arrangement's own — the two readings
 //! that were per type went with the types.
 
 use gear_core::train::{
-    solve_train, Duty, LoadCase, PairStage, PlanetaryStage, ShaftConstraint, ShaftRef, Stage,
-    StageGear, StageResult, Train, TrainResult,
+    solve_train, BodyConstraint, Duty, LoadCase, PairStage, PlanetaryStage, Stage, StageGear,
+    StageResult, Train, TrainResult,
 };
 
-/// The loads every fixture is rated for, between two shafts: one from each,
+/// The loads every fixture is rated for, between two bodies: one from each,
 /// reacted at the other, and a fatigue case counted over a continuous duty.
 ///
 /// **Both ports, because torque distributes differently from each.** Which way
 /// a stage is driven decides where `η₀` multiplies in an epicyclic set and
 /// which flank a screw pair presses, so a characterisation taken from one end
 /// records half the model.
-fn loads(input: ShaftRef, output: ShaftRef) -> Vec<LoadCase> {
+fn loads(input: usize, output: usize) -> Vec<LoadCase> {
     vec![
         LoadCase::ultimate(input, output, 2.0, 3000.0),
         LoadCase::back_driving(input, output, 0.6),
@@ -84,8 +84,8 @@ fn pair(z1: u32, z2: u32, helix: f64) -> Stage {
     Stage::pair(s)
 }
 
-/// A set's shaft by name, in its wiring's order: ground, sun, carrier, ring,
-/// planet.
+/// A set's slot by name, in its wiring's order: ground, sun, carrier, ring,
+/// planet — a lone set's bodies are numbered the same.
 fn member(s: &str) -> usize {
     match s {
         "sun" => 1,
@@ -94,7 +94,7 @@ fn member(s: &str) -> usize {
     }
 }
 
-/// **An arrangement as a train states it**: a lone set with one shaft held
+/// **An arrangement as a train states it**: a lone set with one body held
 /// — one line, since a hold on a stage replaces the stage's conventional
 /// hold, so holding the carrier releases the ring without a word about it —
 /// and its loads between the other two, the input named first. The set
@@ -104,13 +104,11 @@ fn arranged(input: &str, fixed: &str) -> Train {
     let output = ["sun", "carrier", "ring"]
         .into_iter()
         .find(|s| *s != input && *s != fixed)
-        .expect("three shafts, two named");
-    let at = |s: &str| ShaftRef::Of {
-        stage: 0,
-        shaft: member(s),
-    };
-    let mut t = Train::chained(vec![set()], loads(at(input), at(output)));
-    t.constraints = vec![ShaftConstraint::held(0, member(fixed))];
+        .expect("three bodies, two named");
+    let mut t = Train::chained(vec![set()], |t| {
+        loads(t.port(0, member(input)), t.port(0, member(output)))
+    });
+    t.constraints = vec![BodyConstraint::held(t.port(0, member(fixed)))];
     t
 }
 
@@ -142,7 +140,7 @@ fn unclosed() -> Stage {
 fn fixtures() -> Vec<(String, Train)> {
     // A chain of these stages, loaded between its two ends.
     let train = |stages: Vec<Stage>| {
-        let mut t = Train::chained(stages, Vec::new());
+        let mut t = Train::chained(stages, |_| Vec::new());
         let (input, output) = t
             .boundaries()
             .ok()
@@ -164,7 +162,7 @@ fn fixtures() -> Vec<(String, Train)> {
             train(vec![Stage::pair(PairStage::worm())]),
         ),
     ];
-    // **All six arrangements**, because which shaft is held is the whole of
+    // **All six arrangements**, because which body is held is the whole of
     // what an epicyclic set's ratio and efficiency depend on, and the plan
     // moves that decision from the stage to the train. Six rows here is what
     // says whether the move cost anything.
@@ -183,7 +181,7 @@ fn fixtures() -> Vec<(String, Train)> {
     ));
     // **The arrangements the shape reaches with no code of their own**
     // (`gear_core::train::arrangements`), each under its textbook boundary,
-    // which the shape's convention — first shaft driven, first ring held —
+    // which the shape's convention — first body driven, first ring held —
     // gives some of and the constraints the rest. `tools/train_kinematics.py`
     // derives the same speeds from rigid-body velocities.
     {
@@ -247,13 +245,14 @@ fn fixtures() -> Vec<(String, Train)> {
         // carrier, and declares the small sun free, which is how a case says
         // a port turns and carries nothing.
         out.push(("ravigneaux-large-sun".to_string(), {
-            let at = |shaft| ShaftRef::Of { stage: 0, shaft };
             let (small_sun, carrier, large_sun) = (1, 2, 3);
-            let mut t =
-                Train::chained(vec![shape(ravigneaux())], loads(at(large_sun), at(carrier)));
+            let mut t = Train::chained(vec![shape(ravigneaux())], |t| {
+                loads(t.port(0, large_sun), t.port(0, carrier))
+            });
+            let free = t.port(0, small_sun);
             for c in &mut t.load_cases {
                 c.loads.push(gear_core::train::Load::declared(
-                    at(small_sun),
+                    free,
                     gear_core::train::LoadRole::Free,
                 ));
             }
@@ -263,15 +262,16 @@ fn fixtures() -> Vec<(String, Train)> {
         // the carrier is the output, and the hold on the large sun replaces
         // the convention's hold on the ring.
         out.push(("ravigneaux-ring-free".to_string(), {
-            let at = |shaft| ShaftRef::Of { stage: 0, shaft };
-            let mut t = Train::chained(vec![shape(ravigneaux())], loads(at(1), at(2)));
-            t.constraints = vec![ShaftConstraint::held(0, 3)];
+            let mut t = Train::chained(vec![shape(ravigneaux())], |t| {
+                loads(t.port(0, 1), t.port(0, 2))
+            });
+            t.constraints = vec![BodyConstraint::held(t.port(0, 3))];
             t
         }));
     }
     // Chains, because the accumulation is the third place the same kinematics
     // is written: two pairs, and a chain with an epicyclic set in the middle of
-    // it so that a stage with three shafts sits between two with two.
+    // it so that a stage with three bodies sits between two with two.
     out.push((
         "chain".to_string(),
         train(vec![pair(17, 43, 0.0), pair(13, 31, 15.0)]),
@@ -290,23 +290,23 @@ fn fixtures() -> Vec<(String, Train)> {
     // into a size were both outside the change detector. A set that could not
     // be followed by anything at all, and a backlash 23.5 % light, are what
     // that cost; these two rows are what keeps them caught.
-    // A set with its carrier held reverses. Ahead of a pair it is coupled
-    // onward by its ring — the chain's coupling is to the carrier, which the
-    // hold takes back — and loaded at its sun; behind one it is entered by
-    // its sun through the coupling and leaves by the ring.
+    // A set with its carrier held reverses. Ahead of a pair it runs on by
+    // its ring — the chain shares the carrier with the pair, which the hold
+    // would hold too, so the pair's end is split off and joined to the
+    // ring — and is loaded at its sun; behind one it is entered by its sun
+    // through the shared body and leaves by the ring.
     out.push(("set-then-pair".to_string(), {
-        let of = |stage, shaft| ShaftRef::Of { stage, shaft };
-        let mut t = Train::chained(vec![set(), pair(17, 43, 0.0)], Vec::new());
-        t.hold(of(0, 2));
-        t.couple(of(0, 3), of(1, 1));
-        t.load_cases = loads(of(0, 1), of(1, 2));
+        let mut t = Train::chained(vec![set(), pair(17, 43, 0.0)], |_| Vec::new());
+        t.hold(t.port(0, 2));
+        t.split(1, t.port(0, 2));
+        t.join(t.port(0, 3), t.port(1, 1));
+        t.load_cases = loads(t.port(0, 1), t.port(1, 2));
         t
     }));
     out.push(("pair-then-set".to_string(), {
-        let of = |stage, shaft| ShaftRef::Of { stage, shaft };
-        let mut t = Train::chained(vec![pair(17, 43, 0.0), set()], Vec::new());
-        t.hold(of(1, 2));
-        t.load_cases = loads(of(0, 1), of(1, 3));
+        let mut t = Train::chained(vec![pair(17, 43, 0.0), set()], |_| Vec::new());
+        t.hold(t.port(1, 2));
+        t.load_cases = loads(t.port(0, 1), t.port(1, 3));
         t
     }));
     // **A train that does not close, recorded as it currently answers.** A
@@ -323,42 +323,37 @@ fn fixtures() -> Vec<(String, Train)> {
         train(vec![pair(17, 43, 0.0), unclosed()]),
     ));
     // **A train that is one condition short, and one that asks two things
-    // of a shaft** — recorded for what each answers, since each used to
+    // of a body** — recorded for what each answers, since each used to
     // answer with the wiring sentence. The first is a set with its ring
     // released: no figure of its own, every case one speed short under the
     // line, and the ring free. The second holds the carrier and the ring
     // both, so the sun cannot turn, named at the hold that closed it.
     out.push(("ring-released".to_string(), {
         let mut t = arranged("sun", "ring");
-        t.release(ShaftRef::Of { stage: 0, shaft: 3 });
+        t.release(t.port(0, 3));
         t
     }));
     out.push(("conflict".to_string(), {
         let mut t = arranged("sun", "carrier");
-        t.hold(ShaftRef::Of { stage: 0, shaft: 3 });
+        t.hold(t.port(0, 3));
         t
     }));
     out
 }
 
-/// One shaft's `(case, speed, torque)` per load case.
-type ShaftLine = Vec<(usize, f64, f64)>;
+/// One slot's `(case, speed, torque)` per load case.
+type SlotLine = Vec<(usize, f64, f64)>;
 
-/// **Every shaft's speed and torque per case**, named as the harness names
-/// shafts: a shape's from its own per-shaft cases, a hula stage's from its
-/// three.
-fn shaft_cases(stage: &Stage, s: &StageResult) -> Vec<(String, ShaftLine)> {
+/// **Every slot's speed and torque per case**, named as the harness names
+/// a stage's bodies: a shape's from its own per-slot cases.
+fn slot_cases(stage: &Stage, s: &StageResult) -> Vec<(String, SlotLine)> {
     match s {
         StageResult::Shape(r) => {
             let w = stage.wiring();
-            (1..w.shafts.len())
+            (1..w.slots.len())
                 .map(|i| {
                     (
-                        named(
-                            std::slice::from_ref(stage),
-                            gear_core::train::ShaftRef::Of { stage: 0, shaft: i },
-                            w.shafts[i],
-                        ),
+                        labelled(stage, w.slots[i]),
                         r.cases
                             .iter()
                             .map(|c| (c.case, c.speeds[i], c.torques[i]))
@@ -388,12 +383,7 @@ fn graph(train: &Train) {
             return;
         }
     };
-    let by_ref = |r: gear_core::train::ShaftRef| -> String {
-        m.shafts
-            .iter()
-            .find(|s| s.at == r)
-            .map_or_else(|| format!("{r:?}"), |s| named(&train.stages, s.at, s.label))
-    };
+    let by_ref = |b: usize| -> String { named(train, b) };
     // A quotient that is not there is a family where the answer is one, and
     // an output that does not turn where it is not.
     let quotient = |r: &Option<gear_core::train::Exact>| -> String {
@@ -410,7 +400,7 @@ fn graph(train: &Train) {
         if m.untouched.is_empty() {
             String::new()
         } else {
-            format!("  ({} shaft(s) untouched)", m.untouched.len())
+            format!("  ({} body(ies) untouched)", m.untouched.len())
         },
         if m.free.is_empty() {
             String::new()
@@ -419,7 +409,7 @@ fn graph(train: &Train) {
                 "  free: {}",
                 m.free
                     .iter()
-                    .map(|&r| by_ref(r))
+                    .map(|r| format!("{} {}", port(*r), by_ref(*r)))
                     .collect::<Vec<_>>()
                     .join(", ")
             )
@@ -429,19 +419,27 @@ fn graph(train: &Train) {
     for (k, r) in m.ratios.iter().enumerate() {
         println!("    stage {}  ratio {}", k + 1, quotient(r));
     }
-    for s in &m.shafts {
+    for s in &m.speeds {
         let terms: String = s
             .terms
             .iter()
-            .map(|t| format!(" + {} × ω({})", t.coefficient.text, by_ref(t.per)))
+            .map(|t| {
+                format!(
+                    " + {} × ω({} {})",
+                    t.coefficient.text,
+                    port(t.per),
+                    by_ref(t.per)
+                )
+            })
             .collect();
         println!(
-            "    shaft {:<9} of {:<7} speed {}{terms}",
-            named(&train.stages, s.at, s.label),
-            match s.at {
-                gear_core::train::ShaftRef::Ground => "the train".to_string(),
-                gear_core::train::ShaftRef::Of { stage, .. } => format!("stage {}", stage + 1),
-            },
+            "    {:<6} {:<9} of {:<7} speed {}{terms}",
+            port(s.body),
+            named(train, s.body),
+            s.ends.first().map_or_else(
+                || "the train".to_string(),
+                |e| format!("stage {}", e.stage + 1)
+            ),
             s.speed.text,
         );
     }
@@ -466,7 +464,7 @@ fn report(name: &str, train: &Train, r: &TrainResult) {
     if r.paths.is_empty() {
         println!("  no path: the train's holds leave its motion a family");
     }
-    // Every shaft of every case: what it is in the case and what it
+    // Every body of every case: what it is in the case and what it
     // carries — the loads as given or derived, the reactions found.
     for c in &r.cases {
         let input = &train.load_cases[c.case];
@@ -484,11 +482,12 @@ fn report(name: &str, train: &Train, r: &TrainResult) {
         for n in &c.notes {
             println!("    ! {}", n.key);
         }
-        for s in &c.shafts {
+        for s in &c.bodies {
             println!(
-                "    {:<8} {:<26} {:>10}  torque {:>12.6}",
+                "    {:<8} {:<3} {:<22} {:>10}  torque {:>12.6}",
                 format!("{:?}", s.role).to_lowercase(),
-                named(&train.stages, s.at, s.label),
+                port(s.at),
+                named(train, s.at),
                 s.speed
                     .map_or_else(|| "-".to_string(), |v| format!("{v:.4} rpm")),
                 s.torque
@@ -522,10 +521,10 @@ fn report(name: &str, train: &Train, r: &TrainResult) {
                     .join(" ")
             );
         }
-        for (label, cases) in shaft_cases(&train.stages[k], s) {
+        for (label, cases) in slot_cases(&train.stages[k], s) {
             for (case, speed, torque) in cases {
                 println!(
-                    "    shaft {label:<9} case {}  speed {:>14.6}  torque {:>14.6}",
+                    "    slot {label:<9} case {}  speed {:>14.6}  torque {:>14.6}",
                     case + 1,
                     speed,
                     torque,
@@ -567,20 +566,34 @@ fn report(name: &str, train: &Train, r: &TrainResult) {
     println!();
 }
 
-/// What to call a shaft here — the harness's English, which the core does not
-/// have. A member's shaft is named after the member's role where the shape
+/// What to call a body here — the harness's English, which the core does not
+/// have. A member's body is named after the member's role where the shape
 /// gives it one, so the corpus reads as it did.
-pub fn named(stages: &[Stage], at: ShaftRef, label: gear_core::train::ShaftLabel) -> String {
-    use gear_core::train::ShaftLabel;
-    let stage = match at {
-        ShaftRef::Ground => None,
-        ShaftRef::Of { stage, .. } => stages.get(stage),
-    };
+pub fn named(train: &Train, body: usize) -> String {
+    let ends = train.ends_of(body);
+    match ends.first() {
+        None => {
+            if body == gear_core::kinematics::GROUND {
+                "ground".into()
+            } else {
+                format!("body {body}")
+            }
+        }
+        Some(&(k, slot)) => {
+            let stage = &train.stages[k];
+            labelled(stage, stage.wiring().slots[slot])
+        }
+    }
+}
+
+/// What a stage calls one of its bodies, from the label its wiring gives
+/// the slot: ground, carrier, or the member's role ([`member_role`]).
+fn labelled(stage: &Stage, label: gear_core::train::BodyLabel) -> String {
+    use gear_core::train::BodyLabel;
     match (label, stage) {
-        (ShaftLabel::Ground, _) => "ground".into(),
-        (ShaftLabel::Carrier { .. }, _) => "carrier".into(),
-        (ShaftLabel::Member { member }, Some(Stage::Shape(shape))) => member_role(shape, member),
-        (ShaftLabel::Member { member }, None) => format!("member {}", member + 1),
+        (BodyLabel::Ground, _) => "ground".into(),
+        (BodyLabel::Carrier { .. }, _) => "carrier".into(),
+        (BodyLabel::Member { member }, Stage::Shape(shape)) => member_role(shape, member),
     }
 }
 
@@ -611,7 +624,7 @@ fn member_role(shape: &gear_core::train::shape::Shape, member: usize) -> String 
 }
 
 /// One entry of a case as the harness prints it: a load's two figures at
-/// its shaft, or the word a declared port carries.
+/// its body, or the word a declared port carries.
 pub fn entry(l: &gear_core::train::Load) -> String {
     match l.role {
         gear_core::train::LoadRole::Load => format!(
@@ -625,12 +638,12 @@ pub fn entry(l: &gear_core::train::Load) -> String {
     }
 }
 
-/// A shaft as the harness prints it: `stage.shaft`, one-based both ways as
-/// the front end counts.
-pub fn port(p: ShaftRef) -> String {
-    match p {
-        ShaftRef::Ground => "ground".into(),
-        ShaftRef::Of { stage, shaft } => format!("{}.{shaft}", stage + 1),
+/// A body as the harness prints it: its number, as the front end counts.
+pub fn port(body: usize) -> String {
+    if body == gear_core::kinematics::GROUND {
+        "ground".into()
+    } else {
+        format!("b{body}")
     }
 }
 

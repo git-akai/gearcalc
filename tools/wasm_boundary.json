@@ -59,11 +59,7 @@
        "enabled": true,
        "loads": [
         {
-         "at": {
-          "kind": "of",
-          "stage": 0,
-          "shaft": 1
-         },
+         "at": 1,
          "role": "load",
          "torque": {
           "auto": false,
@@ -75,11 +71,7 @@
          }
         },
         {
-         "at": {
-          "kind": "of",
-          "stage": 0,
-          "shaft": 2
-         },
+         "at": 2,
          "role": "reacted",
          "torque": {
           "auto": true,
@@ -94,11 +86,7 @@
        "duty": {
         "intermittent": {
          "range_degrees": 25,
-         "at": {
-          "kind": "of",
-          "stage": 0,
-          "shaft": 2
-         },
+         "at": 2,
          "actuations": 1000,
          "reversing": false
         }
@@ -109,11 +97,7 @@
        "enabled": true,
        "loads": [
         {
-         "at": {
-          "kind": "of",
-          "stage": 0,
-          "shaft": 2
-         },
+         "at": 2,
          "role": "load",
          "torque": {
           "auto": false,
@@ -125,11 +109,7 @@
          }
         },
         {
-         "at": {
-          "kind": "of",
-          "stage": 0,
-          "shaft": 1
-         },
+         "at": 1,
          "role": "reacted",
          "torque": {
           "auto": true,
@@ -144,11 +124,7 @@
        "duty": {
         "intermittent": {
          "range_degrees": 25,
-         "at": {
-          "kind": "of",
-          "stage": 0,
-          "shaft": 2
-         },
+         "at": 2,
          "actuations": 1000,
          "reversing": false
         }
@@ -159,11 +135,7 @@
        "enabled": true,
        "loads": [
         {
-         "at": {
-          "kind": "of",
-          "stage": 0,
-          "shaft": 1
-         },
+         "at": 1,
          "role": "load",
          "torque": {
           "auto": false,
@@ -175,11 +147,7 @@
          }
         },
         {
-         "at": {
-          "kind": "of",
-          "stage": 0,
-          "shaft": 2
-         },
+         "at": 2,
          "role": "reacted",
          "torque": {
           "auto": true,
@@ -194,11 +162,7 @@
        "duty": {
         "intermittent": {
          "range_degrees": 25,
-         "at": {
-          "kind": "of",
-          "stage": 0,
-          "shaft": 2
-         },
+         "at": 2,
          "actuations": 1000,
          "reversing": false
         }
@@ -224,17 +188,19 @@
          "count": 1
         }
        ],
-       "shafts": [
+       "bodies": [
         {
+         "body": 1,
          "axis": 0
         },
         {
+         "body": 2,
          "axis": 1
         }
        ],
        "members": [
         {
-         "shaft": 1,
+         "body": 1,
          "gear": {
           "teeth": 17,
           "profile_shift": {
@@ -292,7 +258,7 @@
          }
         },
         {
-         "shaft": 2,
+         "body": 2,
          "gear": {
           "teeth": 43,
           "profile_shift": {
@@ -387,7 +353,6 @@
        ]
       }
      ],
-     "couplings": [],
      "constraints": []
     },
     "stages": [
@@ -412,17 +377,19 @@
          "count": 1
         }
        ],
-       "shafts": [
+       "bodies": [
         {
+         "body": 1,
          "axis": 0
         },
         {
+         "body": 2,
          "axis": 1
         }
        ],
        "members": [
         {
-         "shaft": 1,
+         "body": 1,
          "gear": {
           "teeth": 17,
           "profile_shift": {
@@ -480,7 +447,7 @@
          }
         },
         {
-         "shaft": 2,
+         "body": 2,
          "gear": {
           "teeth": 43,
           "profile_shift": {
@@ -600,20 +567,23 @@
          "count": 1
         }
        ],
-       "shafts": [
+       "bodies": [
         {
+         "body": 1,
          "axis": 0
         },
         {
+         "body": 2,
          "axis": 1
         },
         {
+         "body": 3,
          "axis": 2
         }
        ],
        "members": [
         {
-         "shaft": 1,
+         "body": 1,
          "gear": {
           "teeth": 17,
           "profile_shift": {
@@ -671,7 +641,7 @@
          }
         },
         {
-         "shaft": 2,
+         "body": 2,
          "gear": {
           "teeth": 25,
           "profile_shift": {
@@ -729,7 +699,7 @@
          }
         },
         {
-         "shaft": 3,
+         "body": 3,
          "gear": {
           "teeth": 43,
           "profile_shift": {
@@ -876,23 +846,27 @@
          "count": 1
         }
        ],
-       "shafts": [
+       "bodies": [
         {
+         "body": 1,
          "axis": 0
         },
         {
+         "body": 2,
          "axis": 0
         },
         {
+         "body": 3,
          "axis": 1
         },
         {
+         "body": 4,
          "axis": 0
         }
        ],
        "members": [
         {
-         "shaft": 1,
+         "body": 1,
          "gear": {
           "teeth": 17,
           "profile_shift": {
@@ -950,7 +924,7 @@
          }
         },
         {
-         "shaft": 3,
+         "body": 3,
          "gear": {
           "teeth": 43,
           "profile_shift": {
@@ -1008,7 +982,7 @@
          }
         },
         {
-         "shaft": 3,
+         "body": 3,
          "gear": {
           "teeth": 19,
           "profile_shift": {
@@ -1066,7 +1040,7 @@
          }
         },
         {
-         "shaft": 4,
+         "body": 4,
          "gear": {
           "teeth": 41,
           "profile_shift": {
@@ -1124,7 +1098,7 @@
          }
         },
         {
-         "shaft": 3,
+         "body": 3,
          "gear": {
           "teeth": 31,
           "profile_shift": {
@@ -1182,7 +1156,7 @@
          }
         },
         {
-         "shaft": 2,
+         "body": 2,
          "gear": {
           "teeth": 29,
           "profile_shift": {
@@ -1320,17 +1294,19 @@
          "count": 1
         }
        ],
-       "shafts": [
+       "bodies": [
         {
+         "body": 1,
          "axis": 0
         },
         {
+         "body": 2,
          "axis": 1
         }
        ],
        "members": [
         {
-         "shaft": 1,
+         "body": 1,
          "gear": {
           "teeth": 1,
           "profile_shift": {
@@ -1388,7 +1364,7 @@
          }
         },
         {
-         "shaft": 2,
+         "body": 2,
          "gear": {
           "teeth": 40,
           "profile_shift": {
@@ -1504,17 +1480,19 @@
          "count": 1
         }
        ],
-       "shafts": [
+       "bodies": [
         {
+         "body": 1,
          "axis": 0
         },
         {
+         "body": 2,
          "axis": 1
         }
        ],
        "members": [
         {
-         "shaft": 1,
+         "body": 1,
          "gear": {
           "teeth": 17,
           "profile_shift": {
@@ -1572,7 +1550,7 @@
          }
         },
         {
-         "shaft": 2,
+         "body": 2,
          "gear": {
           "teeth": 43,
           "profile_shift": {
@@ -1688,23 +1666,27 @@
          "count": 3
         }
        ],
-       "shafts": [
+       "bodies": [
         {
+         "body": 1,
          "axis": 0
         },
         {
+         "body": 2,
          "axis": 0
         },
         {
+         "body": 3,
          "axis": 0
         },
         {
+         "body": 4,
          "axis": 1
         }
        ],
        "members": [
         {
-         "shaft": 1,
+         "body": 1,
          "gear": {
           "teeth": 12,
           "profile_shift": {
@@ -1762,7 +1744,7 @@
          }
         },
         {
-         "shaft": 4,
+         "body": 4,
          "gear": {
           "teeth": 30,
           "profile_shift": {
@@ -1820,7 +1802,7 @@
          }
         },
         {
-         "shaft": 3,
+         "body": 3,
          "gear": {
           "teeth": 72,
           "profile_shift": {
@@ -1951,23 +1933,27 @@
          "count": 3
         }
        ],
-       "shafts": [
+       "bodies": [
         {
+         "body": 1,
          "axis": 0
         },
         {
+         "body": 2,
          "axis": 0
         },
         {
+         "body": 3,
          "axis": 0
         },
         {
+         "body": 4,
          "axis": 1
         }
        ],
        "members": [
         {
-         "shaft": 4,
+         "body": 4,
          "gear": {
           "teeth": 18,
           "profile_shift": {
@@ -2025,7 +2011,7 @@
          }
         },
         {
-         "shaft": 2,
+         "body": 2,
          "gear": {
           "teeth": 60,
           "profile_shift": {
@@ -2087,7 +2073,7 @@
          }
         },
         {
-         "shaft": 3,
+         "body": 3,
          "gear": {
           "teeth": 61,
           "profile_shift": {
@@ -2218,26 +2204,31 @@
          "count": 3
         }
        ],
-       "shafts": [
+       "bodies": [
         {
+         "body": 1,
          "axis": 0
         },
         {
+         "body": 2,
          "axis": 0
         },
         {
+         "body": 3,
          "axis": 0
         },
         {
+         "body": 4,
          "axis": 0
         },
         {
+         "body": 5,
          "axis": 1
         }
        ],
        "members": [
         {
-         "shaft": 1,
+         "body": 1,
          "gear": {
           "teeth": 24,
           "profile_shift": {
@@ -2295,7 +2286,7 @@
          }
         },
         {
-         "shaft": 2,
+         "body": 2,
          "gear": {
           "teeth": 60,
           "profile_shift": {
@@ -2357,7 +2348,7 @@
          }
         },
         {
-         "shaft": 3,
+         "body": 3,
          "gear": {
           "teeth": 59,
           "profile_shift": {
@@ -2419,7 +2410,7 @@
          }
         },
         {
-         "shaft": 5,
+         "body": 5,
          "gear": {
           "teeth": 18,
           "profile_shift": {
@@ -2477,7 +2468,7 @@
          }
         },
         {
-         "shaft": 5,
+         "body": 5,
          "gear": {
           "teeth": 17,
           "profile_shift": {
@@ -2615,20 +2606,23 @@
          "count": 1
         }
        ],
-       "shafts": [
+       "bodies": [
         {
+         "body": 1,
          "axis": 0
         },
         {
+         "body": 2,
          "axis": 0
         },
         {
+         "body": 3,
          "axis": 1
         }
        ],
        "members": [
         {
-         "shaft": 3,
+         "body": 3,
          "gear": {
           "teeth": 30,
           "profile_shift": {
@@ -2686,7 +2680,7 @@
          }
         },
         {
-         "shaft": 2,
+         "body": 2,
          "gear": {
           "teeth": 33,
           "profile_shift": {
@@ -2810,26 +2804,31 @@
          "count": 3
         }
        ],
-       "shafts": [
+       "bodies": [
         {
+         "body": 1,
          "axis": 0
         },
         {
+         "body": 2,
          "axis": 0
         },
         {
+         "body": 3,
          "axis": 0
         },
         {
+         "body": 4,
          "axis": 1
         },
         {
+         "body": 5,
          "axis": 2
         }
        ],
        "members": [
         {
-         "shaft": 1,
+         "body": 1,
          "gear": {
           "teeth": 24,
           "profile_shift": {
@@ -2887,7 +2886,7 @@
          }
         },
         {
-         "shaft": 4,
+         "body": 4,
          "gear": {
           "teeth": 18,
           "profile_shift": {
@@ -2945,7 +2944,7 @@
          }
         },
         {
-         "shaft": 5,
+         "body": 5,
          "gear": {
           "teeth": 18,
           "profile_shift": {
@@ -3003,7 +3002,7 @@
          }
         },
         {
-         "shaft": 3,
+         "body": 3,
          "gear": {
           "teeth": 96,
           "profile_shift": {
@@ -7510,17 +7509,19 @@
         "count": 1
        }
       ],
-      "shafts": [
+      "bodies": [
        {
+        "body": 1,
         "axis": 0
        },
        {
+        "body": 2,
         "axis": 1
        }
       ],
       "members": [
        {
-        "shaft": 1,
+        "body": 1,
         "gear": {
          "teeth": 17,
          "profile_shift": {
@@ -7578,7 +7579,7 @@
         }
        },
        {
-        "shaft": 2,
+        "body": 2,
         "gear": {
          "teeth": 43,
          "profile_shift": {
@@ -7696,20 +7697,23 @@
         "count": 1
        }
       ],
-      "shafts": [
+      "bodies": [
        {
+        "body": 1,
         "axis": 0
        },
        {
+        "body": 2,
         "axis": 1
        },
        {
+        "body": 3,
         "axis": 2
        }
       ],
       "members": [
        {
-        "shaft": 1,
+        "body": 1,
         "gear": {
          "teeth": 17,
          "profile_shift": {
@@ -7767,7 +7771,7 @@
         }
        },
        {
-        "shaft": 2,
+        "body": 2,
         "gear": {
          "teeth": 25,
          "profile_shift": {
@@ -7825,7 +7829,7 @@
         }
        },
        {
-        "shaft": 3,
+        "body": 3,
         "gear": {
          "teeth": 43,
          "profile_shift": {
@@ -7970,23 +7974,27 @@
         "count": 1
        }
       ],
-      "shafts": [
+      "bodies": [
        {
+        "body": 1,
         "axis": 0
        },
        {
+        "body": 2,
         "axis": 0
        },
        {
+        "body": 3,
         "axis": 1
        },
        {
+        "body": 4,
         "axis": 0
        }
       ],
       "members": [
        {
-        "shaft": 1,
+        "body": 1,
         "gear": {
          "teeth": 17,
          "profile_shift": {
@@ -8044,7 +8052,7 @@
         }
        },
        {
-        "shaft": 3,
+        "body": 3,
         "gear": {
          "teeth": 43,
          "profile_shift": {
@@ -8102,7 +8110,7 @@
         }
        },
        {
-        "shaft": 3,
+        "body": 3,
         "gear": {
          "teeth": 19,
          "profile_shift": {
@@ -8160,7 +8168,7 @@
         }
        },
        {
-        "shaft": 4,
+        "body": 4,
         "gear": {
          "teeth": 41,
          "profile_shift": {
@@ -8218,7 +8226,7 @@
         }
        },
        {
-        "shaft": 3,
+        "body": 3,
         "gear": {
          "teeth": 31,
          "profile_shift": {
@@ -8276,7 +8284,7 @@
         }
        },
        {
-        "shaft": 2,
+        "body": 2,
         "gear": {
          "teeth": 29,
          "profile_shift": {
@@ -8412,17 +8420,19 @@
         "count": 1
        }
       ],
-      "shafts": [
+      "bodies": [
        {
+        "body": 1,
         "axis": 0
        },
        {
+        "body": 2,
         "axis": 1
        }
       ],
       "members": [
        {
-        "shaft": 1,
+        "body": 1,
         "gear": {
          "teeth": 1,
          "profile_shift": {
@@ -8480,7 +8490,7 @@
         }
        },
        {
-        "shaft": 2,
+        "body": 2,
         "gear": {
          "teeth": 40,
          "profile_shift": {
@@ -8594,17 +8604,19 @@
         "count": 1
        }
       ],
-      "shafts": [
+      "bodies": [
        {
+        "body": 1,
         "axis": 0
        },
        {
+        "body": 2,
         "axis": 1
        }
       ],
       "members": [
        {
-        "shaft": 1,
+        "body": 1,
         "gear": {
          "teeth": 17,
          "profile_shift": {
@@ -8662,7 +8674,7 @@
         }
        },
        {
-        "shaft": 2,
+        "body": 2,
         "gear": {
          "teeth": 43,
          "profile_shift": {
@@ -8776,23 +8788,27 @@
         "count": 3
        }
       ],
-      "shafts": [
+      "bodies": [
        {
+        "body": 1,
         "axis": 0
        },
        {
+        "body": 2,
         "axis": 0
        },
        {
+        "body": 3,
         "axis": 0
        },
        {
+        "body": 4,
         "axis": 1
        }
       ],
       "members": [
        {
-        "shaft": 1,
+        "body": 1,
         "gear": {
          "teeth": 12,
          "profile_shift": {
@@ -8850,7 +8866,7 @@
         }
        },
        {
-        "shaft": 4,
+        "body": 4,
         "gear": {
          "teeth": 30,
          "profile_shift": {
@@ -8908,7 +8924,7 @@
         }
        },
        {
-        "shaft": 3,
+        "body": 3,
         "gear": {
          "teeth": 72,
          "profile_shift": {
@@ -9037,23 +9053,27 @@
         "count": 3
        }
       ],
-      "shafts": [
+      "bodies": [
        {
+        "body": 1,
         "axis": 0
        },
        {
+        "body": 2,
         "axis": 0
        },
        {
+        "body": 3,
         "axis": 0
        },
        {
+        "body": 4,
         "axis": 1
        }
       ],
       "members": [
        {
-        "shaft": 4,
+        "body": 4,
         "gear": {
          "teeth": 18,
          "profile_shift": {
@@ -9111,7 +9131,7 @@
         }
        },
        {
-        "shaft": 2,
+        "body": 2,
         "gear": {
          "teeth": 60,
          "profile_shift": {
@@ -9173,7 +9193,7 @@
         }
        },
        {
-        "shaft": 3,
+        "body": 3,
         "gear": {
          "teeth": 61,
          "profile_shift": {
@@ -9302,26 +9322,31 @@
         "count": 3
        }
       ],
-      "shafts": [
+      "bodies": [
        {
+        "body": 1,
         "axis": 0
        },
        {
+        "body": 2,
         "axis": 0
        },
        {
+        "body": 3,
         "axis": 0
        },
        {
+        "body": 4,
         "axis": 0
        },
        {
+        "body": 5,
         "axis": 1
        }
       ],
       "members": [
        {
-        "shaft": 1,
+        "body": 1,
         "gear": {
          "teeth": 24,
          "profile_shift": {
@@ -9379,7 +9404,7 @@
         }
        },
        {
-        "shaft": 2,
+        "body": 2,
         "gear": {
          "teeth": 60,
          "profile_shift": {
@@ -9441,7 +9466,7 @@
         }
        },
        {
-        "shaft": 3,
+        "body": 3,
         "gear": {
          "teeth": 59,
          "profile_shift": {
@@ -9503,7 +9528,7 @@
         }
        },
        {
-        "shaft": 5,
+        "body": 5,
         "gear": {
          "teeth": 18,
          "profile_shift": {
@@ -9561,7 +9586,7 @@
         }
        },
        {
-        "shaft": 5,
+        "body": 5,
         "gear": {
          "teeth": 17,
          "profile_shift": {
@@ -9697,20 +9722,23 @@
         "count": 1
        }
       ],
-      "shafts": [
+      "bodies": [
        {
+        "body": 1,
         "axis": 0
        },
        {
+        "body": 2,
         "axis": 0
        },
        {
+        "body": 3,
         "axis": 1
        }
       ],
       "members": [
        {
-        "shaft": 3,
+        "body": 3,
         "gear": {
          "teeth": 30,
          "profile_shift": {
@@ -9768,7 +9796,7 @@
         }
        },
        {
-        "shaft": 2,
+        "body": 2,
         "gear": {
          "teeth": 33,
          "profile_shift": {
@@ -9890,26 +9918,31 @@
         "count": 3
        }
       ],
-      "shafts": [
+      "bodies": [
        {
+        "body": 1,
         "axis": 0
        },
        {
+        "body": 2,
         "axis": 0
        },
        {
+        "body": 3,
         "axis": 0
        },
        {
+        "body": 4,
         "axis": 1
        },
        {
+        "body": 5,
         "axis": 2
        }
       ],
       "members": [
        {
-        "shaft": 1,
+        "body": 1,
         "gear": {
          "teeth": 24,
          "profile_shift": {
@@ -9967,7 +10000,7 @@
         }
        },
        {
-        "shaft": 4,
+        "body": 4,
         "gear": {
          "teeth": 18,
          "profile_shift": {
@@ -10025,7 +10058,7 @@
         }
        },
        {
-        "shaft": 5,
+        "body": 5,
         "gear": {
          "teeth": 18,
          "profile_shift": {
@@ -10083,7 +10116,7 @@
         }
        },
        {
-        "shaft": 3,
+        "body": 3,
         "gear": {
          "teeth": 96,
          "profile_shift": {
@@ -10346,11 +10379,7 @@
         "enabled": true,
         "loads": [
          {
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 1
-          },
+          "at": 1,
           "role": "load",
           "torque": {
            "auto": false,
@@ -10362,11 +10391,7 @@
           }
          },
          {
-          "at": {
-           "kind": "of",
-           "stage": 1,
-           "shaft": 2
-          },
+          "at": 3,
           "role": "reacted",
           "torque": {
            "auto": true,
@@ -10381,11 +10406,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": {
-           "kind": "of",
-           "stage": 1,
-           "shaft": 2
-          },
+          "at": 3,
           "actuations": 1000,
           "reversing": false
          }
@@ -10396,11 +10417,7 @@
         "enabled": true,
         "loads": [
          {
-          "at": {
-           "kind": "of",
-           "stage": 1,
-           "shaft": 2
-          },
+          "at": 3,
           "role": "load",
           "torque": {
            "auto": false,
@@ -10412,11 +10429,7 @@
           }
          },
          {
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 1
-          },
+          "at": 1,
           "role": "reacted",
           "torque": {
            "auto": true,
@@ -10431,11 +10444,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": {
-           "kind": "of",
-           "stage": 1,
-           "shaft": 2
-          },
+          "at": 3,
           "actuations": 1000,
           "reversing": false
          }
@@ -10446,11 +10455,7 @@
         "enabled": true,
         "loads": [
          {
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 1
-          },
+          "at": 1,
           "role": "load",
           "torque": {
            "auto": false,
@@ -10462,11 +10467,7 @@
           }
          },
          {
-          "at": {
-           "kind": "of",
-           "stage": 1,
-           "shaft": 2
-          },
+          "at": 3,
           "role": "reacted",
           "torque": {
            "auto": true,
@@ -10481,11 +10482,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": {
-           "kind": "of",
-           "stage": 1,
-           "shaft": 2
-          },
+          "at": 3,
           "actuations": 1000,
           "reversing": false
          }
@@ -10511,17 +10508,19 @@
           "count": 1
          }
         ],
-        "shafts": [
+        "bodies": [
          {
+          "body": 1,
           "axis": 0
          },
          {
+          "body": 2,
           "axis": 1
          }
         ],
         "members": [
          {
-          "shaft": 1,
+          "body": 1,
           "gear": {
            "teeth": 17,
            "profile_shift": {
@@ -10579,7 +10578,7 @@
           }
          },
          {
-          "shaft": 2,
+          "body": 2,
           "gear": {
            "teeth": 43,
            "profile_shift": {
@@ -10686,27 +10685,31 @@
           "count": 1
          },
          {
-          "carried_by": 2,
+          "carried_by": 3,
           "count": 3
          }
         ],
-        "shafts": [
+        "bodies": [
          {
+          "body": 2,
           "axis": 0
          },
          {
+          "body": 3,
           "axis": 0
          },
          {
+          "body": 4,
           "axis": 0
          },
          {
+          "body": 5,
           "axis": 1
          }
         ],
         "members": [
          {
-          "shaft": 1,
+          "body": 2,
           "gear": {
            "teeth": 12,
            "profile_shift": {
@@ -10764,7 +10767,7 @@
           }
          },
          {
-          "shaft": 4,
+          "body": 5,
           "gear": {
            "teeth": 30,
            "profile_shift": {
@@ -10822,7 +10825,7 @@
           }
          },
          {
-          "shaft": 3,
+          "body": 4,
           "gear": {
            "teeth": 72,
            "profile_shift": {
@@ -10930,20 +10933,6 @@
           "axial_clearance": 0
          }
         ]
-       }
-      ],
-      "couplings": [
-       {
-        "a": {
-         "kind": "of",
-         "stage": 0,
-         "shaft": 2
-        },
-        "b": {
-         "kind": "of",
-         "stage": 1,
-         "shaft": 1
-        }
        }
       ],
       "constraints": []
@@ -10958,11 +10947,7 @@
         "enabled": true,
         "loads": [
          {
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 1
-          },
+          "at": 1,
           "role": "load",
           "torque": {
            "auto": false,
@@ -10977,11 +10962,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": {
-           "kind": "of",
-           "stage": 1,
-           "shaft": 2
-          },
+          "at": 3,
           "actuations": 1000,
           "reversing": false
          }
@@ -10992,11 +10973,7 @@
         "enabled": true,
         "loads": [
          {
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 1
-          },
+          "at": 1,
           "role": "reacted",
           "torque": {
            "auto": true,
@@ -11011,11 +10988,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": {
-           "kind": "of",
-           "stage": 1,
-           "shaft": 2
-          },
+          "at": 3,
           "actuations": 1000,
           "reversing": false
          }
@@ -11026,11 +10999,7 @@
         "enabled": true,
         "loads": [
          {
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 1
-          },
+          "at": 1,
           "role": "load",
           "torque": {
            "auto": false,
@@ -11045,11 +11014,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": {
-           "kind": "of",
-           "stage": 1,
-           "shaft": 2
-          },
+          "at": 3,
           "actuations": 1000,
           "reversing": false
          }
@@ -11075,17 +11040,19 @@
           "count": 1
          }
         ],
-        "shafts": [
+        "bodies": [
          {
+          "body": 1,
           "axis": 0
          },
          {
+          "body": 2,
           "axis": 1
          }
         ],
         "members": [
          {
-          "shaft": 1,
+          "body": 1,
           "gear": {
            "teeth": 17,
            "profile_shift": {
@@ -11143,7 +11110,7 @@
           }
          },
          {
-          "shaft": 2,
+          "body": 2,
           "gear": {
            "teeth": 43,
            "profile_shift": {
@@ -11250,27 +11217,31 @@
           "count": 1
          },
          {
-          "carried_by": 2,
+          "carried_by": 3,
           "count": 3
          }
         ],
-        "shafts": [
+        "bodies": [
          {
+          "body": 2,
           "axis": 0
          },
          {
+          "body": 3,
           "axis": 0
          },
          {
+          "body": 4,
           "axis": 0
          },
          {
+          "body": 5,
           "axis": 1
          }
         ],
         "members": [
          {
-          "shaft": 1,
+          "body": 2,
           "gear": {
            "teeth": 12,
            "profile_shift": {
@@ -11328,7 +11299,7 @@
           }
          },
          {
-          "shaft": 4,
+          "body": 5,
           "gear": {
            "teeth": 30,
            "profile_shift": {
@@ -11386,7 +11357,7 @@
           }
          },
          {
-          "shaft": 3,
+          "body": 4,
           "gear": {
            "teeth": 72,
            "profile_shift": {
@@ -11496,27 +11467,9 @@
         ]
        }
       ],
-      "couplings": [
-       {
-        "a": {
-         "kind": "of",
-         "stage": 0,
-         "shaft": 2
-        },
-        "b": {
-         "kind": "of",
-         "stage": 1,
-         "shaft": 1
-        }
-       }
-      ],
       "constraints": [
        {
-        "at": {
-         "kind": "of",
-         "stage": 1,
-         "shaft": 2
-        },
+        "body": 3,
         "constraint": "held"
        }
       ]
@@ -11531,11 +11484,7 @@
         "enabled": true,
         "loads": [
          {
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 1
-          },
+          "at": 1,
           "role": "load",
           "torque": {
            "auto": false,
@@ -11550,11 +11499,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": {
-           "kind": "of",
-           "stage": 1,
-           "shaft": 2
-          },
+          "at": 3,
           "actuations": 1000,
           "reversing": false
          }
@@ -11565,11 +11510,7 @@
         "enabled": true,
         "loads": [
          {
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 1
-          },
+          "at": 1,
           "role": "reacted",
           "torque": {
            "auto": true,
@@ -11584,11 +11525,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": {
-           "kind": "of",
-           "stage": 1,
-           "shaft": 2
-          },
+          "at": 3,
           "actuations": 1000,
           "reversing": false
          }
@@ -11599,11 +11536,7 @@
         "enabled": true,
         "loads": [
          {
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 1
-          },
+          "at": 1,
           "role": "load",
           "torque": {
            "auto": false,
@@ -11618,11 +11551,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": {
-           "kind": "of",
-           "stage": 1,
-           "shaft": 2
-          },
+          "at": 3,
           "actuations": 1000,
           "reversing": false
          }
@@ -11648,17 +11577,19 @@
           "count": 1
          }
         ],
-        "shafts": [
+        "bodies": [
          {
+          "body": 1,
           "axis": 0
          },
          {
+          "body": 2,
           "axis": 1
          }
         ],
         "members": [
          {
-          "shaft": 1,
+          "body": 1,
           "gear": {
            "teeth": 17,
            "profile_shift": {
@@ -11716,7 +11647,7 @@
           }
          },
          {
-          "shaft": 2,
+          "body": 2,
           "gear": {
            "teeth": 43,
            "profile_shift": {
@@ -11823,27 +11754,31 @@
           "count": 1
          },
          {
-          "carried_by": 2,
+          "carried_by": 3,
           "count": 3
          }
         ],
-        "shafts": [
+        "bodies": [
          {
+          "body": 2,
           "axis": 0
          },
          {
+          "body": 3,
           "axis": 0
          },
          {
+          "body": 4,
           "axis": 0
          },
          {
+          "body": 5,
           "axis": 1
          }
         ],
         "members": [
          {
-          "shaft": 1,
+          "body": 2,
           "gear": {
            "teeth": 12,
            "profile_shift": {
@@ -11901,7 +11836,7 @@
           }
          },
          {
-          "shaft": 4,
+          "body": 5,
           "gear": {
            "teeth": 30,
            "profile_shift": {
@@ -11959,7 +11894,7 @@
           }
          },
          {
-          "shaft": 3,
+          "body": 4,
           "gear": {
            "teeth": 72,
            "profile_shift": {
@@ -12069,25 +12004,11 @@
         ]
        }
       ],
-      "couplings": [
-       {
-        "a": {
-         "kind": "of",
-         "stage": 0,
-         "shaft": 2
-        },
-        "b": {
-         "kind": "of",
-         "stage": 1,
-         "shaft": 1
-        }
-       }
-      ],
       "constraints": []
      }
     ],
     [
-     "couple",
+     "split_join",
      {
       "load_cases": [
        {
@@ -12095,11 +12016,7 @@
         "enabled": true,
         "loads": [
          {
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 1
-          },
+          "at": 1,
           "role": "load",
           "torque": {
            "auto": false,
@@ -12114,11 +12031,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": {
-           "kind": "of",
-           "stage": 1,
-           "shaft": 2
-          },
+          "at": 3,
           "actuations": 1000,
           "reversing": false
          }
@@ -12129,11 +12042,7 @@
         "enabled": true,
         "loads": [
          {
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 1
-          },
+          "at": 1,
           "role": "reacted",
           "torque": {
            "auto": true,
@@ -12148,11 +12057,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": {
-           "kind": "of",
-           "stage": 1,
-           "shaft": 2
-          },
+          "at": 3,
           "actuations": 1000,
           "reversing": false
          }
@@ -12163,11 +12068,7 @@
         "enabled": true,
         "loads": [
          {
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 1
-          },
+          "at": 1,
           "role": "load",
           "torque": {
            "auto": false,
@@ -12182,11 +12083,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": {
-           "kind": "of",
-           "stage": 1,
-           "shaft": 2
-          },
+          "at": 3,
           "actuations": 1000,
           "reversing": false
          }
@@ -12212,17 +12109,19 @@
           "count": 1
          }
         ],
-        "shafts": [
+        "bodies": [
          {
+          "body": 1,
           "axis": 0
          },
          {
+          "body": 4,
           "axis": 1
          }
         ],
         "members": [
          {
-          "shaft": 1,
+          "body": 1,
           "gear": {
            "teeth": 17,
            "profile_shift": {
@@ -12280,7 +12179,7 @@
           }
          },
          {
-          "shaft": 2,
+          "body": 4,
           "gear": {
            "teeth": 43,
            "profile_shift": {
@@ -12387,27 +12286,31 @@
           "count": 1
          },
          {
-          "carried_by": 2,
+          "carried_by": 3,
           "count": 3
          }
         ],
-        "shafts": [
+        "bodies": [
          {
+          "body": 2,
           "axis": 0
          },
          {
+          "body": 3,
           "axis": 0
          },
          {
+          "body": 4,
           "axis": 0
          },
          {
+          "body": 5,
           "axis": 1
          }
         ],
         "members": [
          {
-          "shaft": 1,
+          "body": 2,
           "gear": {
            "teeth": 12,
            "profile_shift": {
@@ -12465,7 +12368,7 @@
           }
          },
          {
-          "shaft": 4,
+          "body": 5,
           "gear": {
            "teeth": 30,
            "profile_shift": {
@@ -12523,7 +12426,7 @@
           }
          },
          {
-          "shaft": 3,
+          "body": 4,
           "gear": {
            "teeth": 72,
            "profile_shift": {
@@ -12633,37 +12536,11 @@
         ]
        }
       ],
-      "couplings": [
-       {
-        "a": {
-         "kind": "of",
-         "stage": 0,
-         "shaft": 2
-        },
-        "b": {
-         "kind": "of",
-         "stage": 1,
-         "shaft": 1
-        }
-       },
-       {
-        "a": {
-         "kind": "of",
-         "stage": 0,
-         "shaft": 2
-        },
-        "b": {
-         "kind": "of",
-         "stage": 1,
-         "shaft": 3
-        }
-       }
-      ],
       "constraints": []
      }
     ],
     [
-     "uncouple",
+     "move_end",
      {
       "load_cases": [
        {
@@ -12671,11 +12548,7 @@
         "enabled": true,
         "loads": [
          {
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 1
-          },
+          "at": 1,
           "role": "load",
           "torque": {
            "auto": false,
@@ -12690,11 +12563,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": {
-           "kind": "of",
-           "stage": 1,
-           "shaft": 2
-          },
+          "at": 3,
           "actuations": 1000,
           "reversing": false
          }
@@ -12705,11 +12574,7 @@
         "enabled": true,
         "loads": [
          {
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 1
-          },
+          "at": 1,
           "role": "reacted",
           "torque": {
            "auto": true,
@@ -12724,11 +12589,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": {
-           "kind": "of",
-           "stage": 1,
-           "shaft": 2
-          },
+          "at": 3,
           "actuations": 1000,
           "reversing": false
          }
@@ -12739,11 +12600,7 @@
         "enabled": true,
         "loads": [
          {
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 1
-          },
+          "at": 1,
           "role": "load",
           "torque": {
            "auto": false,
@@ -12758,11 +12615,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": {
-           "kind": "of",
-           "stage": 1,
-           "shaft": 2
-          },
+          "at": 3,
           "actuations": 1000,
           "reversing": false
          }
@@ -12788,17 +12641,19 @@
           "count": 1
          }
         ],
-        "shafts": [
+        "bodies": [
          {
+          "body": 1,
           "axis": 0
          },
          {
+          "body": 2,
           "axis": 1
          }
         ],
         "members": [
          {
-          "shaft": 1,
+          "body": 1,
           "gear": {
            "teeth": 17,
            "profile_shift": {
@@ -12856,7 +12711,7 @@
           }
          },
          {
-          "shaft": 2,
+          "body": 2,
           "gear": {
            "teeth": 43,
            "profile_shift": {
@@ -12963,27 +12818,31 @@
           "count": 1
          },
          {
-          "carried_by": 2,
+          "carried_by": 3,
           "count": 3
          }
         ],
-        "shafts": [
+        "bodies": [
          {
+          "body": 2,
           "axis": 0
          },
          {
+          "body": 3,
           "axis": 0
          },
          {
+          "body": 4,
           "axis": 0
          },
          {
+          "body": 5,
           "axis": 1
          }
         ],
         "members": [
          {
-          "shaft": 1,
+          "body": 2,
           "gear": {
            "teeth": 12,
            "profile_shift": {
@@ -13041,7 +12900,7 @@
           }
          },
          {
-          "shaft": 4,
+          "body": 5,
           "gear": {
            "teeth": 30,
            "profile_shift": {
@@ -13099,7 +12958,7 @@
           }
          },
          {
-          "shaft": 3,
+          "body": 4,
           "gear": {
            "teeth": 72,
            "profile_shift": {
@@ -13207,20 +13066,6 @@
           "axial_clearance": 0
          }
         ]
-       }
-      ],
-      "couplings": [
-       {
-        "a": {
-         "kind": "of",
-         "stage": 0,
-         "shaft": 2
-        },
-        "b": {
-         "kind": "of",
-         "stage": 1,
-         "shaft": 1
-        }
        }
       ],
       "constraints": []
@@ -13235,11 +13080,7 @@
         "enabled": true,
         "loads": [
          {
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 1
-          },
+          "at": 1,
           "role": "load",
           "torque": {
            "auto": false,
@@ -13254,11 +13095,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": {
-           "kind": "of",
-           "stage": 1,
-           "shaft": 2
-          },
+          "at": 3,
           "actuations": 1000,
           "reversing": false
          }
@@ -13269,11 +13106,7 @@
         "enabled": true,
         "loads": [
          {
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 1
-          },
+          "at": 1,
           "role": "reacted",
           "torque": {
            "auto": true,
@@ -13288,11 +13121,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": {
-           "kind": "of",
-           "stage": 1,
-           "shaft": 2
-          },
+          "at": 3,
           "actuations": 1000,
           "reversing": false
          }
@@ -13303,11 +13132,7 @@
         "enabled": true,
         "loads": [
          {
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 1
-          },
+          "at": 1,
           "role": "load",
           "torque": {
            "auto": false,
@@ -13322,11 +13147,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": {
-           "kind": "of",
-           "stage": 1,
-           "shaft": 2
-          },
+          "at": 3,
           "actuations": 1000,
           "reversing": false
          }
@@ -13337,11 +13158,7 @@
         "enabled": false,
         "loads": [
          {
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 1
-          },
+          "at": 1,
           "role": "load",
           "torque": {
            "auto": false,
@@ -13353,11 +13170,7 @@
           }
          },
          {
-          "at": {
-           "kind": "of",
-           "stage": 1,
-           "shaft": 2
-          },
+          "at": 3,
           "role": "reacted",
           "torque": {
            "auto": true,
@@ -13372,11 +13185,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": {
-           "kind": "of",
-           "stage": 1,
-           "shaft": 2
-          },
+          "at": 3,
           "actuations": 1000,
           "reversing": false
          }
@@ -13387,11 +13196,7 @@
         "enabled": false,
         "loads": [
          {
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 1
-          },
+          "at": 1,
           "role": "load",
           "torque": {
            "auto": false,
@@ -13403,11 +13208,7 @@
           }
          },
          {
-          "at": {
-           "kind": "of",
-           "stage": 1,
-           "shaft": 2
-          },
+          "at": 3,
           "role": "reacted",
           "torque": {
            "auto": true,
@@ -13422,11 +13223,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": {
-           "kind": "of",
-           "stage": 1,
-           "shaft": 2
-          },
+          "at": 3,
           "actuations": 1000,
           "reversing": false
          }
@@ -13452,17 +13249,19 @@
           "count": 1
          }
         ],
-        "shafts": [
+        "bodies": [
          {
+          "body": 1,
           "axis": 0
          },
          {
+          "body": 2,
           "axis": 1
          }
         ],
         "members": [
          {
-          "shaft": 1,
+          "body": 1,
           "gear": {
            "teeth": 17,
            "profile_shift": {
@@ -13520,7 +13319,7 @@
           }
          },
          {
-          "shaft": 2,
+          "body": 2,
           "gear": {
            "teeth": 43,
            "profile_shift": {
@@ -13627,27 +13426,31 @@
           "count": 1
          },
          {
-          "carried_by": 2,
+          "carried_by": 3,
           "count": 3
          }
         ],
-        "shafts": [
+        "bodies": [
          {
+          "body": 2,
           "axis": 0
          },
          {
+          "body": 3,
           "axis": 0
          },
          {
+          "body": 4,
           "axis": 0
          },
          {
+          "body": 5,
           "axis": 1
          }
         ],
         "members": [
          {
-          "shaft": 1,
+          "body": 2,
           "gear": {
            "teeth": 12,
            "profile_shift": {
@@ -13705,7 +13508,7 @@
           }
          },
          {
-          "shaft": 4,
+          "body": 5,
           "gear": {
            "teeth": 30,
            "profile_shift": {
@@ -13763,7 +13566,7 @@
           }
          },
          {
-          "shaft": 3,
+          "body": 4,
           "gear": {
            "teeth": 72,
            "profile_shift": {
@@ -13871,20 +13674,6 @@
           "axial_clearance": 0
          }
         ]
-       }
-      ],
-      "couplings": [
-       {
-        "a": {
-         "kind": "of",
-         "stage": 0,
-         "shaft": 2
-        },
-        "b": {
-         "kind": "of",
-         "stage": 1,
-         "shaft": 1
-        }
        }
       ],
       "constraints": []
@@ -13899,11 +13688,7 @@
         "enabled": true,
         "loads": [
          {
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 1
-          },
+          "at": 1,
           "role": "load",
           "torque": {
            "auto": false,
@@ -13918,11 +13703,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": {
-           "kind": "of",
-           "stage": 1,
-           "shaft": 2
-          },
+          "at": 3,
           "actuations": 1000,
           "reversing": false
          }
@@ -13933,11 +13714,7 @@
         "enabled": true,
         "loads": [
          {
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 1
-          },
+          "at": 1,
           "role": "reacted",
           "torque": {
            "auto": true,
@@ -13952,11 +13729,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": {
-           "kind": "of",
-           "stage": 1,
-           "shaft": 2
-          },
+          "at": 3,
           "actuations": 1000,
           "reversing": false
          }
@@ -13967,11 +13740,7 @@
         "enabled": true,
         "loads": [
          {
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 1
-          },
+          "at": 1,
           "role": "load",
           "torque": {
            "auto": false,
@@ -13986,11 +13755,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 1
-          },
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -14001,11 +13766,7 @@
         "enabled": false,
         "loads": [
          {
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 1
-          },
+          "at": 1,
           "role": "load",
           "torque": {
            "auto": false,
@@ -14017,11 +13778,7 @@
           }
          },
          {
-          "at": {
-           "kind": "of",
-           "stage": 1,
-           "shaft": 2
-          },
+          "at": 3,
           "role": "reacted",
           "torque": {
            "auto": true,
@@ -14036,11 +13793,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": {
-           "kind": "of",
-           "stage": 1,
-           "shaft": 2
-          },
+          "at": 3,
           "actuations": 1000,
           "reversing": false
          }
@@ -14051,11 +13804,7 @@
         "enabled": false,
         "loads": [
          {
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 1
-          },
+          "at": 1,
           "role": "load",
           "torque": {
            "auto": false,
@@ -14067,11 +13816,7 @@
           }
          },
          {
-          "at": {
-           "kind": "of",
-           "stage": 1,
-           "shaft": 2
-          },
+          "at": 3,
           "role": "reacted",
           "torque": {
            "auto": true,
@@ -14109,17 +13854,19 @@
           "count": 1
          }
         ],
-        "shafts": [
+        "bodies": [
          {
+          "body": 1,
           "axis": 0
          },
          {
+          "body": 2,
           "axis": 1
          }
         ],
         "members": [
          {
-          "shaft": 1,
+          "body": 1,
           "gear": {
            "teeth": 17,
            "profile_shift": {
@@ -14177,7 +13924,7 @@
           }
          },
          {
-          "shaft": 2,
+          "body": 2,
           "gear": {
            "teeth": 43,
            "profile_shift": {
@@ -14284,27 +14031,31 @@
           "count": 1
          },
          {
-          "carried_by": 2,
+          "carried_by": 3,
           "count": 3
          }
         ],
-        "shafts": [
+        "bodies": [
          {
+          "body": 2,
           "axis": 0
          },
          {
+          "body": 3,
           "axis": 0
          },
          {
+          "body": 4,
           "axis": 0
          },
          {
+          "body": 5,
           "axis": 1
          }
         ],
         "members": [
          {
-          "shaft": 1,
+          "body": 2,
           "gear": {
            "teeth": 12,
            "profile_shift": {
@@ -14362,7 +14113,7 @@
           }
          },
          {
-          "shaft": 4,
+          "body": 5,
           "gear": {
            "teeth": 30,
            "profile_shift": {
@@ -14420,7 +14171,7 @@
           }
          },
          {
-          "shaft": 3,
+          "body": 4,
           "gear": {
            "teeth": 72,
            "profile_shift": {
@@ -14530,20 +14281,6 @@
         ]
        }
       ],
-      "couplings": [
-       {
-        "a": {
-         "kind": "of",
-         "stage": 0,
-         "shaft": 2
-        },
-        "b": {
-         "kind": "of",
-         "stage": 1,
-         "shaft": 1
-        }
-       }
-      ],
       "constraints": []
      }
     ],
@@ -14556,11 +14293,7 @@
         "enabled": true,
         "loads": [
          {
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 1
-          },
+          "at": 1,
           "role": "load",
           "torque": {
            "auto": false,
@@ -14575,11 +14308,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": {
-           "kind": "of",
-           "stage": 1,
-           "shaft": 2
-          },
+          "at": 3,
           "actuations": 1000,
           "reversing": false
          }
@@ -14590,11 +14319,7 @@
         "enabled": true,
         "loads": [
          {
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 1
-          },
+          "at": 1,
           "role": "reacted",
           "torque": {
            "auto": true,
@@ -14609,11 +14334,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": {
-           "kind": "of",
-           "stage": 1,
-           "shaft": 2
-          },
+          "at": 3,
           "actuations": 1000,
           "reversing": false
          }
@@ -14624,11 +14345,7 @@
         "enabled": true,
         "loads": [
          {
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 1
-          },
+          "at": 1,
           "role": "load",
           "torque": {
            "auto": false,
@@ -14643,11 +14360,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 1
-          },
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -14658,11 +14371,7 @@
         "enabled": false,
         "loads": [
          {
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 1
-          },
+          "at": 1,
           "role": "load",
           "torque": {
            "auto": false,
@@ -14674,11 +14383,7 @@
           }
          },
          {
-          "at": {
-           "kind": "of",
-           "stage": 1,
-           "shaft": 2
-          },
+          "at": 3,
           "role": "reacted",
           "torque": {
            "auto": true,
@@ -14693,11 +14398,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": {
-           "kind": "of",
-           "stage": 1,
-           "shaft": 2
-          },
+          "at": 3,
           "actuations": 1000,
           "reversing": false
          }
@@ -14708,11 +14409,7 @@
         "enabled": false,
         "loads": [
          {
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 1
-          },
+          "at": 1,
           "role": "load",
           "torque": {
            "auto": false,
@@ -14724,11 +14421,7 @@
           }
          },
          {
-          "at": {
-           "kind": "of",
-           "stage": 1,
-           "shaft": 2
-          },
+          "at": 3,
           "role": "reacted",
           "torque": {
            "auto": true,
@@ -14766,17 +14459,19 @@
           "count": 1
          }
         ],
-        "shafts": [
+        "bodies": [
          {
+          "body": 1,
           "axis": 0
          },
          {
+          "body": 2,
           "axis": 1
          }
         ],
         "members": [
          {
-          "shaft": 1,
+          "body": 1,
           "gear": {
            "teeth": 17,
            "profile_shift": {
@@ -14834,7 +14529,7 @@
           }
          },
          {
-          "shaft": 2,
+          "body": 2,
           "gear": {
            "teeth": 43,
            "profile_shift": {
@@ -14941,30 +14636,35 @@
           "count": 1
          },
          {
-          "carried_by": 2,
+          "carried_by": 3,
           "count": 3
          }
         ],
-        "shafts": [
+        "bodies": [
          {
+          "body": 2,
           "axis": 0
          },
          {
+          "body": 3,
           "axis": 0
          },
          {
+          "body": 4,
           "axis": 1
          },
          {
+          "body": 5,
           "axis": 0
          },
          {
+          "body": 6,
           "axis": 0
          }
         ],
         "members": [
          {
-          "shaft": 1,
+          "body": 2,
           "gear": {
            "teeth": 12,
            "profile_shift": {
@@ -15022,7 +14722,7 @@
           }
          },
          {
-          "shaft": 3,
+          "body": 4,
           "gear": {
            "teeth": 30,
            "profile_shift": {
@@ -15080,7 +14780,7 @@
           }
          },
          {
-          "shaft": 3,
+          "body": 4,
           "gear": {
            "teeth": 30,
            "profile_shift": {
@@ -15138,7 +14838,7 @@
           }
          },
          {
-          "shaft": 4,
+          "body": 5,
           "gear": {
            "teeth": 71,
            "profile_shift": {
@@ -15200,7 +14900,7 @@
           }
          },
          {
-          "shaft": 5,
+          "body": 6,
           "gear": {
            "teeth": 11,
            "profile_shift": {
@@ -15315,20 +15015,6 @@
           "axial_clearance": 0
          }
         ]
-       }
-      ],
-      "couplings": [
-       {
-        "a": {
-         "kind": "of",
-         "stage": 0,
-         "shaft": 2
-        },
-        "b": {
-         "kind": "of",
-         "stage": 1,
-         "shaft": 1
-        }
        }
       ],
       "constraints": []
@@ -15343,11 +15029,7 @@
         "enabled": true,
         "loads": [
          {
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 1
-          },
+          "at": 1,
           "role": "load",
           "torque": {
            "auto": false,
@@ -15362,11 +15044,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": {
-           "kind": "of",
-           "stage": 2,
-           "shaft": 2
-          },
+          "at": 7,
           "actuations": 1000,
           "reversing": false
          }
@@ -15377,11 +15055,7 @@
         "enabled": true,
         "loads": [
          {
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 1
-          },
+          "at": 1,
           "role": "reacted",
           "torque": {
            "auto": true,
@@ -15396,11 +15070,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": {
-           "kind": "of",
-           "stage": 2,
-           "shaft": 2
-          },
+          "at": 7,
           "actuations": 1000,
           "reversing": false
          }
@@ -15411,11 +15081,7 @@
         "enabled": true,
         "loads": [
          {
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 1
-          },
+          "at": 1,
           "role": "load",
           "torque": {
            "auto": false,
@@ -15430,11 +15096,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 1
-          },
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -15445,11 +15107,7 @@
         "enabled": false,
         "loads": [
          {
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 1
-          },
+          "at": 1,
           "role": "load",
           "torque": {
            "auto": false,
@@ -15461,11 +15119,7 @@
           }
          },
          {
-          "at": {
-           "kind": "of",
-           "stage": 2,
-           "shaft": 2
-          },
+          "at": 7,
           "role": "reacted",
           "torque": {
            "auto": true,
@@ -15480,11 +15134,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": {
-           "kind": "of",
-           "stage": 2,
-           "shaft": 2
-          },
+          "at": 7,
           "actuations": 1000,
           "reversing": false
          }
@@ -15495,11 +15145,7 @@
         "enabled": false,
         "loads": [
          {
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 1
-          },
+          "at": 1,
           "role": "load",
           "torque": {
            "auto": false,
@@ -15511,11 +15157,7 @@
           }
          },
          {
-          "at": {
-           "kind": "of",
-           "stage": 2,
-           "shaft": 2
-          },
+          "at": 7,
           "role": "reacted",
           "torque": {
            "auto": true,
@@ -15553,17 +15195,19 @@
           "count": 1
          }
         ],
-        "shafts": [
+        "bodies": [
          {
+          "body": 1,
           "axis": 0
          },
          {
+          "body": 2,
           "axis": 1
          }
         ],
         "members": [
          {
-          "shaft": 1,
+          "body": 1,
           "gear": {
            "teeth": 17,
            "profile_shift": {
@@ -15621,7 +15265,7 @@
           }
          },
          {
-          "shaft": 2,
+          "body": 2,
           "gear": {
            "teeth": 43,
            "profile_shift": {
@@ -15728,30 +15372,35 @@
           "count": 1
          },
          {
-          "carried_by": 2,
+          "carried_by": 3,
           "count": 3
          }
         ],
-        "shafts": [
+        "bodies": [
          {
+          "body": 2,
           "axis": 0
          },
          {
+          "body": 3,
           "axis": 0
          },
          {
+          "body": 4,
           "axis": 1
          },
          {
+          "body": 5,
           "axis": 0
          },
          {
+          "body": 6,
           "axis": 0
          }
         ],
         "members": [
          {
-          "shaft": 1,
+          "body": 2,
           "gear": {
            "teeth": 12,
            "profile_shift": {
@@ -15809,7 +15458,7 @@
           }
          },
          {
-          "shaft": 3,
+          "body": 4,
           "gear": {
            "teeth": 30,
            "profile_shift": {
@@ -15867,7 +15516,7 @@
           }
          },
          {
-          "shaft": 3,
+          "body": 4,
           "gear": {
            "teeth": 30,
            "profile_shift": {
@@ -15925,7 +15574,7 @@
           }
          },
          {
-          "shaft": 4,
+          "body": 5,
           "gear": {
            "teeth": 71,
            "profile_shift": {
@@ -15987,7 +15636,7 @@
           }
          },
          {
-          "shaft": 5,
+          "body": 6,
           "gear": {
            "teeth": 11,
            "profile_shift": {
@@ -16124,29 +15773,35 @@
           "count": 1
          }
         ],
-        "shafts": [
+        "bodies": [
          {
+          "body": 3,
           "axis": 0
          },
          {
+          "body": 7,
           "axis": 0
          },
          {
+          "body": 8,
           "axis": 1
          },
          {
+          "body": 9,
           "axis": 0
          },
          {
+          "body": 10,
           "axis": 0
          },
          {
+          "body": 11,
           "axis": 2
          }
         ],
         "members": [
          {
-          "shaft": 1,
+          "body": 3,
           "gear": {
            "teeth": 17,
            "profile_shift": {
@@ -16204,7 +15859,7 @@
           }
          },
          {
-          "shaft": 3,
+          "body": 8,
           "gear": {
            "teeth": 43,
            "profile_shift": {
@@ -16262,7 +15917,7 @@
           }
          },
          {
-          "shaft": 3,
+          "body": 8,
           "gear": {
            "teeth": 19,
            "profile_shift": {
@@ -16320,7 +15975,7 @@
           }
          },
          {
-          "shaft": 4,
+          "body": 9,
           "gear": {
            "teeth": 41,
            "profile_shift": {
@@ -16378,7 +16033,7 @@
           }
          },
          {
-          "shaft": 3,
+          "body": 8,
           "gear": {
            "teeth": 31,
            "profile_shift": {
@@ -16436,7 +16091,7 @@
           }
          },
          {
-          "shaft": 2,
+          "body": 7,
           "gear": {
            "teeth": 29,
            "profile_shift": {
@@ -16494,7 +16149,7 @@
           }
          },
          {
-          "shaft": 3,
+          "body": 8,
           "gear": {
            "teeth": 43,
            "profile_shift": {
@@ -16552,7 +16207,7 @@
           }
          },
          {
-          "shaft": 5,
+          "body": 10,
           "gear": {
            "teeth": 17,
            "profile_shift": {
@@ -16610,7 +16265,7 @@
           }
          },
          {
-          "shaft": 6,
+          "body": 11,
           "gear": {
            "teeth": 43,
            "profile_shift": {
@@ -16769,32 +16424,6 @@
         ]
        }
       ],
-      "couplings": [
-       {
-        "a": {
-         "kind": "of",
-         "stage": 0,
-         "shaft": 2
-        },
-        "b": {
-         "kind": "of",
-         "stage": 1,
-         "shaft": 1
-        }
-       },
-       {
-        "a": {
-         "kind": "of",
-         "stage": 1,
-         "shaft": 2
-        },
-        "b": {
-         "kind": "of",
-         "stage": 2,
-         "shaft": 1
-        }
-       }
-      ],
       "constraints": []
      }
     ],
@@ -16807,11 +16436,7 @@
         "enabled": true,
         "loads": [
          {
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 1
-          },
+          "at": 1,
           "role": "load",
           "torque": {
            "auto": false,
@@ -16826,11 +16451,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": {
-           "kind": "of",
-           "stage": 2,
-           "shaft": 2
-          },
+          "at": 7,
           "actuations": 1000,
           "reversing": false
          }
@@ -16841,11 +16462,7 @@
         "enabled": true,
         "loads": [
          {
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 1
-          },
+          "at": 1,
           "role": "reacted",
           "torque": {
            "auto": true,
@@ -16860,11 +16477,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": {
-           "kind": "of",
-           "stage": 2,
-           "shaft": 2
-          },
+          "at": 7,
           "actuations": 1000,
           "reversing": false
          }
@@ -16875,11 +16488,7 @@
         "enabled": true,
         "loads": [
          {
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 1
-          },
+          "at": 1,
           "role": "load",
           "torque": {
            "auto": false,
@@ -16894,11 +16503,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 1
-          },
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -16909,11 +16514,7 @@
         "enabled": false,
         "loads": [
          {
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 1
-          },
+          "at": 1,
           "role": "load",
           "torque": {
            "auto": false,
@@ -16925,11 +16526,7 @@
           }
          },
          {
-          "at": {
-           "kind": "of",
-           "stage": 2,
-           "shaft": 2
-          },
+          "at": 7,
           "role": "reacted",
           "torque": {
            "auto": true,
@@ -16944,11 +16541,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": {
-           "kind": "of",
-           "stage": 2,
-           "shaft": 2
-          },
+          "at": 7,
           "actuations": 1000,
           "reversing": false
          }
@@ -16959,11 +16552,7 @@
         "enabled": false,
         "loads": [
          {
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 1
-          },
+          "at": 1,
           "role": "load",
           "torque": {
            "auto": false,
@@ -16975,11 +16564,7 @@
           }
          },
          {
-          "at": {
-           "kind": "of",
-           "stage": 2,
-           "shaft": 2
-          },
+          "at": 7,
           "role": "reacted",
           "torque": {
            "auto": true,
@@ -17017,17 +16602,19 @@
           "count": 1
          }
         ],
-        "shafts": [
+        "bodies": [
          {
+          "body": 1,
           "axis": 0
          },
          {
+          "body": 2,
           "axis": 1
          }
         ],
         "members": [
          {
-          "shaft": 1,
+          "body": 1,
           "gear": {
            "teeth": 17,
            "profile_shift": {
@@ -17085,7 +16672,7 @@
           }
          },
          {
-          "shaft": 2,
+          "body": 2,
           "gear": {
            "teeth": 43,
            "profile_shift": {
@@ -17192,30 +16779,35 @@
           "count": 1
          },
          {
-          "carried_by": 2,
+          "carried_by": 3,
           "count": 3
          }
         ],
-        "shafts": [
+        "bodies": [
          {
+          "body": 2,
           "axis": 0
          },
          {
+          "body": 3,
           "axis": 0
          },
          {
+          "body": 4,
           "axis": 1
          },
          {
+          "body": 5,
           "axis": 0
          },
          {
+          "body": 6,
           "axis": 0
          }
         ],
         "members": [
          {
-          "shaft": 1,
+          "body": 2,
           "gear": {
            "teeth": 12,
            "profile_shift": {
@@ -17273,7 +16865,7 @@
           }
          },
          {
-          "shaft": 3,
+          "body": 4,
           "gear": {
            "teeth": 30,
            "profile_shift": {
@@ -17331,7 +16923,7 @@
           }
          },
          {
-          "shaft": 3,
+          "body": 4,
           "gear": {
            "teeth": 30,
            "profile_shift": {
@@ -17389,7 +16981,7 @@
           }
          },
          {
-          "shaft": 4,
+          "body": 5,
           "gear": {
            "teeth": 71,
            "profile_shift": {
@@ -17451,7 +17043,7 @@
           }
          },
          {
-          "shaft": 5,
+          "body": 6,
           "gear": {
            "teeth": 11,
            "profile_shift": {
@@ -17584,23 +17176,27 @@
           "count": 1
          }
         ],
-        "shafts": [
+        "bodies": [
          {
+          "body": 3,
           "axis": 0
          },
          {
+          "body": 7,
           "axis": 0
          },
          {
+          "body": 8,
           "axis": 1
          },
          {
+          "body": 9,
           "axis": 0
          }
         ],
         "members": [
          {
-          "shaft": 1,
+          "body": 3,
           "gear": {
            "teeth": 17,
            "profile_shift": {
@@ -17658,7 +17254,7 @@
           }
          },
          {
-          "shaft": 3,
+          "body": 8,
           "gear": {
            "teeth": 43,
            "profile_shift": {
@@ -17716,7 +17312,7 @@
           }
          },
          {
-          "shaft": 3,
+          "body": 8,
           "gear": {
            "teeth": 19,
            "profile_shift": {
@@ -17774,7 +17370,7 @@
           }
          },
          {
-          "shaft": 4,
+          "body": 9,
           "gear": {
            "teeth": 41,
            "profile_shift": {
@@ -17832,7 +17428,7 @@
           }
          },
          {
-          "shaft": 3,
+          "body": 8,
           "gear": {
            "teeth": 31,
            "profile_shift": {
@@ -17890,7 +17486,7 @@
           }
          },
          {
-          "shaft": 2,
+          "body": 7,
           "gear": {
            "teeth": 29,
            "profile_shift": {
@@ -18007,32 +17603,6 @@
         ]
        }
       ],
-      "couplings": [
-       {
-        "a": {
-         "kind": "of",
-         "stage": 0,
-         "shaft": 2
-        },
-        "b": {
-         "kind": "of",
-         "stage": 1,
-         "shaft": 1
-        }
-       },
-       {
-        "a": {
-         "kind": "of",
-         "stage": 1,
-         "shaft": 2
-        },
-        "b": {
-         "kind": "of",
-         "stage": 2,
-         "shaft": 1
-        }
-       }
-      ],
       "constraints": []
      }
     ]
@@ -18046,16 +17616,8 @@
       "result": {
        "paths": [
         {
-         "from": {
-          "kind": "of",
-          "stage": 0,
-          "shaft": 1
-         },
-         "to": {
-          "kind": "of",
-          "stage": 0,
-          "shaft": 2
-         },
+         "from": 1,
+         "to": 2,
          "ratio": "-2.5294117647058827",
          "efficiency": {
           "forward": "0.98344976317774946",
@@ -18078,11 +17640,9 @@
        "cases": [
         {
          "case": 0,
-         "shafts": [
+         "bodies": [
           {
-           "at": {
-            "kind": "ground"
-           },
+           "at": 0,
            "label": {
             "kind": "ground"
            },
@@ -18091,11 +17651,7 @@
            "torque": "-0.34875494009790137"
           },
           {
-           "at": {
-            "kind": "of",
-            "stage": 0,
-            "shaft": 1
-           },
+           "at": 1,
            "label": {
             "kind": "member",
             "member": 0
@@ -18105,11 +17661,7 @@
            "torque": "0.10000000000000001"
           },
           {
-           "at": {
-            "kind": "of",
-            "stage": 0,
-            "shaft": 2
-           },
+           "at": 2,
            "label": {
             "kind": "member",
             "member": 1
@@ -18124,11 +17676,9 @@
         },
         {
          "case": 1,
-         "shafts": [
+         "bodies": [
           {
-           "at": {
-            "kind": "ground"
-           },
+           "at": 0,
            "label": {
             "kind": "ground"
            },
@@ -18137,11 +17687,7 @@
            "torque": "-4.1664171609782610"
           },
           {
-           "at": {
-            "kind": "of",
-            "stage": 0,
-            "shaft": 1
-           },
+           "at": 1,
            "label": {
             "kind": "member",
             "member": 0
@@ -18151,11 +17697,7 @@
            "torque": "1.1664171609782612"
           },
           {
-           "at": {
-            "kind": "of",
-            "stage": 0,
-            "shaft": 2
-           },
+           "at": 2,
            "label": {
             "kind": "member",
             "member": 1
@@ -18170,11 +17712,9 @@
         },
         {
          "case": 2,
-         "shafts": [
+         "bodies": [
           {
-           "at": {
-            "kind": "ground"
-           },
+           "at": 0,
            "label": {
             "kind": "ground"
            },
@@ -18183,11 +17723,7 @@
            "torque": "-0.069750988019580282"
           },
           {
-           "at": {
-            "kind": "of",
-            "stage": 0,
-            "shaft": 1
-           },
+           "at": 1,
            "label": {
             "kind": "member",
             "member": 0
@@ -18197,11 +17733,7 @@
            "torque": "0.020000000000000000"
           },
           {
-           "at": {
-            "kind": "of",
-            "stage": 0,
-            "shaft": 2
-           },
+           "at": 2,
            "label": {
             "kind": "member",
             "member": 1
@@ -18845,6 +18377,7 @@
         "ports": [
          {
           "shaft": 1,
+          "body": 1,
           "label": {
            "kind": "member",
            "member": 0
@@ -18853,6 +18386,7 @@
          },
          {
           "shaft": 2,
+          "body": 2,
           "label": {
            "kind": "member",
            "member": 1
@@ -18883,14 +18417,10 @@
        "mobility": 1,
        "constrained": 1,
        "untouched": [],
-       "shafts": [
+       "speeds": [
         {
-         "at": {
-          "kind": "ground"
-         },
-         "label": {
-          "kind": "ground"
-         },
+         "body": 0,
+         "ends": [],
          "speed": {
           "value": 0,
           "text": "0"
@@ -18898,15 +18428,16 @@
          "terms": []
         },
         {
-         "at": {
-          "kind": "of",
-          "stage": 0,
-          "shaft": 1
-         },
-         "label": {
-          "kind": "member",
-          "member": 0
-         },
+         "body": 1,
+         "ends": [
+          {
+           "stage": 0,
+           "label": {
+            "kind": "member",
+            "member": 0
+           }
+          }
+         ],
          "speed": {
           "value": 1,
           "text": "1"
@@ -18914,15 +18445,16 @@
          "terms": []
         },
         {
-         "at": {
-          "kind": "of",
-          "stage": 0,
-          "shaft": 2
-         },
-         "label": {
-          "kind": "member",
-          "member": 1
-         },
+         "body": 2,
+         "ends": [
+          {
+           "stage": 0,
+           "label": {
+            "kind": "member",
+            "member": 1
+           }
+          }
+         ],
          "speed": {
           "value": "-0.39534883720930231",
           "text": "-17/43"
@@ -18944,22 +18476,16 @@
        "redundant": [],
        "ports": [
         {
-         "at": {
-          "kind": "of",
-          "stage": 0,
-          "shaft": 1
-         },
+         "body": 1,
+         "stage": 0,
          "label": {
           "kind": "member",
           "member": 0
          }
         },
         {
-         "at": {
-          "kind": "of",
-          "stage": 0,
-          "shaft": 2
-         },
+         "body": 2,
+         "stage": 0,
          "label": {
           "kind": "member",
           "member": 1
@@ -18968,13 +18494,10 @@
        ],
        "bodies": [
         {
-         "shafts": [
+         "body": 1,
+         "ends": [
           [
-           {
-            "kind": "of",
-            "stage": 0,
-            "shaft": 1
-           },
+           0,
            {
             "kind": "member",
             "member": 0
@@ -18984,13 +18507,10 @@
          "held": false
         },
         {
-         "shafts": [
+         "body": 2,
+         "ends": [
           [
-           {
-            "kind": "of",
-            "stage": 0,
-            "shaft": 2
-           },
+           0,
            {
             "kind": "member",
             "member": 1
@@ -19009,16 +18529,8 @@
       "result": {
        "paths": [
         {
-         "from": {
-          "kind": "of",
-          "stage": 0,
-          "shaft": 1
-         },
-         "to": {
-          "kind": "of",
-          "stage": 1,
-          "shaft": 2
-         },
+         "from": 1,
+         "to": 3,
          "ratio": "-17.705882352941178",
          "efficiency": {
           "forward": "0.96065153358380018",
@@ -19041,11 +18553,9 @@
        "cases": [
         {
          "case": 0,
-         "shafts": [
+         "bodies": [
           {
-           "at": {
-            "kind": "ground"
-           },
+           "at": 0,
            "label": {
             "kind": "ground"
            },
@@ -19054,11 +18564,7 @@
            "torque": "-0.34875494009790142"
           },
           {
-           "at": {
-            "kind": "of",
-            "stage": 0,
-            "shaft": 1
-           },
+           "at": 1,
            "label": {
             "kind": "member",
             "member": 0
@@ -19068,11 +18574,7 @@
            "torque": "0.10000000000000002"
           },
           {
-           "at": {
-            "kind": "of",
-            "stage": 0,
-            "shaft": 2
-           },
+           "at": 2,
            "label": {
             "kind": "member",
             "member": 1
@@ -19082,25 +18584,7 @@
            "torque": 0
           },
           {
-           "at": {
-            "kind": "of",
-            "stage": 1,
-            "shaft": 1
-           },
-           "label": {
-            "kind": "member",
-            "member": 0
-           },
-           "role": "free",
-           "speed": "-11860.465116279069",
-           "torque": 0
-          },
-          {
-           "at": {
-            "kind": "of",
-            "stage": 1,
-            "shaft": 2
-           },
+           "at": 3,
            "label": {
             "kind": "carrier",
             "index": 0
@@ -19110,11 +18594,7 @@
            "torque": "1.7009183035807283"
           },
           {
-           "at": {
-            "kind": "of",
-            "stage": 1,
-            "shaft": 3
-           },
+           "at": 4,
            "label": {
             "kind": "member",
             "member": 2
@@ -19124,11 +18604,7 @@
            "torque": "-1.4521633634828268"
           },
           {
-           "at": {
-            "kind": "of",
-            "stage": 1,
-            "shaft": 4
-           },
+           "at": 5,
            "label": {
             "kind": "member",
             "member": 1
@@ -19143,11 +18619,9 @@
         },
         {
          "case": 1,
-         "shafts": [
+         "bodies": [
           {
-           "at": {
-            "kind": "ground"
-           },
+           "at": 0,
            "label": {
             "kind": "ground"
            },
@@ -19156,11 +18630,7 @@
            "torque": "-0.58135101346394558"
           },
           {
-           "at": {
-            "kind": "of",
-            "stage": 0,
-            "shaft": 1
-           },
+           "at": 1,
            "label": {
             "kind": "member",
             "member": 0
@@ -19170,11 +18640,7 @@
            "torque": "0.16275321756240921"
           },
           {
-           "at": {
-            "kind": "of",
-            "stage": 0,
-            "shaft": 2
-           },
+           "at": 2,
            "label": {
             "kind": "member",
             "member": 1
@@ -19184,25 +18650,7 @@
            "torque": 0
           },
           {
-           "at": {
-            "kind": "of",
-            "stage": 1,
-            "shaft": 1
-           },
-           "label": {
-            "kind": "member",
-            "member": 0
-           },
-           "role": "free",
-           "speed": 0,
-           "torque": 0
-          },
-          {
-           "at": {
-            "kind": "of",
-            "stage": 1,
-            "shaft": 2
-           },
+           "at": 3,
            "label": {
             "kind": "carrier",
             "index": 0
@@ -19212,11 +18660,7 @@
            "torque": 3
           },
           {
-           "at": {
-            "kind": "of",
-            "stage": 1,
-            "shaft": 3
-           },
+           "at": 4,
            "label": {
             "kind": "member",
             "member": 2
@@ -19226,11 +18670,7 @@
            "torque": "-2.5814022040984641"
           },
           {
-           "at": {
-            "kind": "of",
-            "stage": 1,
-            "shaft": 4
-           },
+           "at": 5,
            "label": {
             "kind": "member",
             "member": 1
@@ -19245,11 +18685,9 @@
         },
         {
          "case": 2,
-         "shafts": [
+         "bodies": [
           {
-           "at": {
-            "kind": "ground"
-           },
+           "at": 0,
            "label": {
             "kind": "ground"
            },
@@ -19258,11 +18696,7 @@
            "torque": "-0.069750988019580268"
           },
           {
-           "at": {
-            "kind": "of",
-            "stage": 0,
-            "shaft": 1
-           },
+           "at": 1,
            "label": {
             "kind": "member",
             "member": 0
@@ -19272,11 +18706,7 @@
            "torque": "0.019999999999999997"
           },
           {
-           "at": {
-            "kind": "of",
-            "stage": 0,
-            "shaft": 2
-           },
+           "at": 2,
            "label": {
             "kind": "member",
             "member": 1
@@ -19286,25 +18716,7 @@
            "torque": 0
           },
           {
-           "at": {
-            "kind": "of",
-            "stage": 1,
-            "shaft": 1
-           },
-           "label": {
-            "kind": "member",
-            "member": 0
-           },
-           "role": "free",
-           "speed": "-11860.465116279069",
-           "torque": 0
-          },
-          {
-           "at": {
-            "kind": "of",
-            "stage": 1,
-            "shaft": 2
-           },
+           "at": 3,
            "label": {
             "kind": "carrier",
             "index": 0
@@ -19314,11 +18726,7 @@
            "torque": "0.34018366071614559"
           },
           {
-           "at": {
-            "kind": "of",
-            "stage": 1,
-            "shaft": 3
-           },
+           "at": 4,
            "label": {
             "kind": "member",
             "member": 2
@@ -19328,11 +18736,7 @@
            "torque": "-0.29043267269656531"
           },
           {
-           "at": {
-            "kind": "of",
-            "stage": 1,
-            "shaft": 4
-           },
+           "at": 5,
            "label": {
             "kind": "member",
             "member": 1
@@ -20942,6 +20346,7 @@
         "ports": [
          {
           "shaft": 1,
+          "body": 1,
           "label": {
            "kind": "member",
            "member": 0
@@ -20950,6 +20355,7 @@
          },
          {
           "shaft": 2,
+          "body": 2,
           "label": {
            "kind": "member",
            "member": 1
@@ -20979,6 +20385,7 @@
         "ports": [
          {
           "shaft": 1,
+          "body": 2,
           "label": {
            "kind": "member",
            "member": 0
@@ -20987,6 +20394,7 @@
          },
          {
           "shaft": 2,
+          "body": 3,
           "label": {
            "kind": "carrier",
            "index": 0
@@ -20995,6 +20403,7 @@
          },
          {
           "shaft": 3,
+          "body": 4,
           "label": {
            "kind": "member",
            "member": 2
@@ -21030,14 +20439,10 @@
        "mobility": 2,
        "constrained": 2,
        "untouched": [],
-       "shafts": [
+       "speeds": [
         {
-         "at": {
-          "kind": "ground"
-         },
-         "label": {
-          "kind": "ground"
-         },
+         "body": 0,
+         "ends": [],
          "speed": {
           "value": 0,
           "text": "0"
@@ -21045,15 +20450,16 @@
          "terms": []
         },
         {
-         "at": {
-          "kind": "of",
-          "stage": 0,
-          "shaft": 1
-         },
-         "label": {
-          "kind": "member",
-          "member": 0
-         },
+         "body": 1,
+         "ends": [
+          {
+           "stage": 0,
+           "label": {
+            "kind": "member",
+            "member": 0
+           }
+          }
+         ],
          "speed": {
           "value": 1,
           "text": "1"
@@ -21061,15 +20467,23 @@
          "terms": []
         },
         {
-         "at": {
-          "kind": "of",
-          "stage": 0,
-          "shaft": 2
-         },
-         "label": {
-          "kind": "member",
-          "member": 1
-         },
+         "body": 2,
+         "ends": [
+          {
+           "stage": 0,
+           "label": {
+            "kind": "member",
+            "member": 1
+           }
+          },
+          {
+           "stage": 1,
+           "label": {
+            "kind": "member",
+            "member": 0
+           }
+          }
+         ],
          "speed": {
           "value": "-0.39534883720930231",
           "text": "-17/43"
@@ -21077,31 +20491,16 @@
          "terms": []
         },
         {
-         "at": {
-          "kind": "of",
-          "stage": 1,
-          "shaft": 1
-         },
-         "label": {
-          "kind": "member",
-          "member": 0
-         },
-         "speed": {
-          "value": "-0.39534883720930231",
-          "text": "-17/43"
-         },
-         "terms": []
-        },
-        {
-         "at": {
-          "kind": "of",
-          "stage": 1,
-          "shaft": 2
-         },
-         "label": {
-          "kind": "carrier",
-          "index": 0
-         },
+         "body": 3,
+         "ends": [
+          {
+           "stage": 1,
+           "label": {
+            "kind": "carrier",
+            "index": 0
+           }
+          }
+         ],
          "speed": {
           "value": "-0.056478405315614620",
           "text": "-17/301"
@@ -21109,15 +20508,16 @@
          "terms": []
         },
         {
-         "at": {
-          "kind": "of",
-          "stage": 1,
-          "shaft": 3
-         },
-         "label": {
-          "kind": "member",
-          "member": 2
-         },
+         "body": 4,
+         "ends": [
+          {
+           "stage": 1,
+           "label": {
+            "kind": "member",
+            "member": 2
+           }
+          }
+         ],
          "speed": {
           "value": 0,
           "text": "0"
@@ -21125,15 +20525,16 @@
          "terms": []
         },
         {
-         "at": {
-          "kind": "of",
-          "stage": 1,
-          "shaft": 4
-         },
-         "label": {
-          "kind": "member",
-          "member": 1
-         },
+         "body": 5,
+         "ends": [
+          {
+           "stage": 1,
+           "label": {
+            "kind": "member",
+            "member": 1
+           }
+          }
+         ],
          "speed": {
           "value": "0.079069767441860464",
           "text": "17/215"
@@ -21159,33 +20560,24 @@
        "redundant": [],
        "ports": [
         {
-         "at": {
-          "kind": "of",
-          "stage": 0,
-          "shaft": 1
-         },
+         "body": 1,
+         "stage": 0,
          "label": {
           "kind": "member",
           "member": 0
          }
         },
         {
-         "at": {
-          "kind": "of",
-          "stage": 0,
-          "shaft": 2
-         },
+         "body": 2,
+         "stage": 0,
          "label": {
           "kind": "member",
           "member": 1
          }
         },
         {
-         "at": {
-          "kind": "of",
-          "stage": 1,
-          "shaft": 2
-         },
+         "body": 3,
+         "stage": 1,
          "label": {
           "kind": "carrier",
           "index": 0
@@ -21194,13 +20586,10 @@
        ],
        "bodies": [
         {
-         "shafts": [
+         "body": 1,
+         "ends": [
           [
-           {
-            "kind": "of",
-            "stage": 0,
-            "shaft": 1
-           },
+           0,
            {
             "kind": "member",
             "member": 0
@@ -21210,24 +20599,17 @@
          "held": false
         },
         {
-         "shafts": [
+         "body": 2,
+         "ends": [
           [
-           {
-            "kind": "of",
-            "stage": 0,
-            "shaft": 2
-           },
+           0,
            {
             "kind": "member",
             "member": 1
            }
           ],
           [
-           {
-            "kind": "of",
-            "stage": 1,
-            "shaft": 1
-           },
+           1,
            {
             "kind": "member",
             "member": 0
@@ -21237,13 +20619,10 @@
          "held": false
         },
         {
-         "shafts": [
+         "body": 3,
+         "ends": [
           [
-           {
-            "kind": "of",
-            "stage": 1,
-            "shaft": 2
-           },
+           1,
            {
             "kind": "carrier",
             "index": 0
@@ -21253,13 +20632,10 @@
          "held": false
         },
         {
-         "shafts": [
+         "body": 4,
+         "ends": [
           [
-           {
-            "kind": "of",
-            "stage": 1,
-            "shaft": 3
-           },
+           1,
            {
             "kind": "member",
             "member": 2
@@ -21280,11 +20656,7 @@
     "enabled": true,
     "loads": [
      {
-      "at": {
-       "kind": "of",
-       "stage": 0,
-       "shaft": 1
-      },
+      "at": 1,
       "role": "load",
       "torque": {
        "auto": false,
@@ -21296,11 +20668,7 @@
       }
      },
      {
-      "at": {
-       "kind": "of",
-       "stage": 0,
-       "shaft": 2
-      },
+      "at": 2,
       "role": "load",
       "torque": {
        "auto": true,
@@ -21315,11 +20683,7 @@
     "duty": {
      "intermittent": {
       "range_degrees": 25,
-      "at": {
-       "kind": "of",
-       "stage": 0,
-       "shaft": 2
-      },
+      "at": 2,
       "actuations": 1000,
       "reversing": false
      }
@@ -21327,7 +20691,7 @@
    }
   },
   "export_train": {
-   "ok": "# Geartrain.\n#\n# Inputs only — every ratio, stress, efficiency and backlash is recomputed from\n# these, so nothing here can go stale. Units: mm, degrees, rpm, N·m.\n#\n# Materials are named; the library that defines them is a separate document.\n# Editing this file by hand is expected.\n\nname = \"probe\"\n\n[train]\nreversed_bending = false\ncouplings = []\nconstraints = []\n\n[[train.load_cases]]\nkind = \"ultimate\"\nenabled = true\n\n[[train.load_cases.loads]]\nrole = \"load\"\n\n[train.load_cases.loads.at]\nkind = \"of\"\nstage = 0\nshaft = 1\n\n[train.load_cases.loads.torque]\nauto = false\nmanual = 0.1\n\n[train.load_cases.loads.speed]\nauto = false\nmanual = 30000.0\n\n[[train.load_cases.loads]]\nrole = \"reacted\"\n\n[train.load_cases.loads.at]\nkind = \"of\"\nstage = 0\nshaft = 2\n\n[train.load_cases.loads.torque]\nauto = true\nmanual = 0.0\n\n[train.load_cases.loads.speed]\nauto = true\nmanual = 0.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nactuations = 1000\nreversing = false\n\n[train.load_cases.duty.intermittent.at]\nkind = \"of\"\nstage = 0\nshaft = 2\n\n[[train.load_cases]]\nkind = \"ultimate\"\nenabled = true\n\n[[train.load_cases.loads]]\nrole = \"load\"\n\n[train.load_cases.loads.at]\nkind = \"of\"\nstage = 0\nshaft = 2\n\n[train.load_cases.loads.torque]\nauto = false\nmanual = 3.0\n\n[train.load_cases.loads.speed]\nauto = false\nmanual = 0.0\n\n[[train.load_cases.loads]]\nrole = \"reacted\"\n\n[train.load_cases.loads.at]\nkind = \"of\"\nstage = 0\nshaft = 1\n\n[train.load_cases.loads.torque]\nauto = true\nmanual = 0.0\n\n[train.load_cases.loads.speed]\nauto = true\nmanual = 0.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nactuations = 1000\nreversing = false\n\n[train.load_cases.duty.intermittent.at]\nkind = \"of\"\nstage = 0\nshaft = 2\n\n[[train.load_cases]]\nkind = \"fatigue\"\nenabled = true\n\n[[train.load_cases.loads]]\nrole = \"load\"\n\n[train.load_cases.loads.at]\nkind = \"of\"\nstage = 0\nshaft = 1\n\n[train.load_cases.loads.torque]\nauto = false\nmanual = 0.02\n\n[train.load_cases.loads.speed]\nauto = false\nmanual = 30000.0\n\n[[train.load_cases.loads]]\nrole = \"reacted\"\n\n[train.load_cases.loads.at]\nkind = \"of\"\nstage = 0\nshaft = 2\n\n[train.load_cases.loads.torque]\nauto = true\nmanual = 0.0\n\n[train.load_cases.loads.speed]\nauto = true\nmanual = 0.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nactuations = 1000\nreversing = false\n\n[train.load_cases.duty.intermittent.at]\nkind = \"of\"\nstage = 0\nshaft = 2\n\n[[train.stages]]\nkind = \"shape\"\nload_sharing = \"none\"\nmin_planet_clearance = 0.3\n\n[train.stages.optimisation]\nenabled = false\n\n[[train.stages.axes]]\ncarried_by = 0\ncount = 1\n\n[[train.stages.axes]]\ncarried_by = 0\ncount = 1\n\n[[train.stages.shafts]]\naxis = 0\n\n[[train.stages.shafts]]\naxis = 1\n\n[[train.stages.members]]\nshaft = 1\nmodule = 1.0\npressure_angle = 20.0\n\n[train.stages.members.gear]\nteeth = 17\nno_undercut = true\naddendum = 1.0\nno_sharp_tip = true\nmin_tip_width = 0.1\ndedendum = 1.25\nroot_radius = 0.38\nmaterial = \"4340 Hardened Steel\"\n\n[train.stages.members.gear.profile_shift]\nauto = true\nmanual = 0.0\n\n[train.stages.members.gear.working_depth]\nauto = true\nmanual = 1.0\n\n[train.stages.members.gear.helix_angle]\nauto = true\nmanual = 0.0\n\n[train.stages.members.gear.face_width]\nauto = true\nmanual = 5.0\n\n[train.stages.members.gear.face_sources.bending]\nultimate = true\nfatigue = true\n\n[train.stages.members.gear.face_sources.contact]\nultimate = false\nfatigue = false\n\n[train.stages.members.gear.material_overrides]\n\n[train.stages.members.thickness_mod]\nauto = false\nmanual = 1.0\n\n[train.stages.members.pitch_diameter]\nauto = true\nmanual = 17.0\n\n[[train.stages.members]]\nshaft = 2\nmodule = 1.0\npressure_angle = 20.0\n\n[train.stages.members.gear]\nteeth = 43\nno_undercut = true\naddendum = 1.0\nno_sharp_tip = true\nmin_tip_width = 0.1\ndedendum = 1.25\nroot_radius = 0.38\nmaterial = \"4340 Hardened Steel\"\n\n[train.stages.members.gear.profile_shift]\nauto = true\nmanual = 0.0\n\n[train.stages.members.gear.working_depth]\nauto = true\nmanual = 1.0\n\n[train.stages.members.gear.helix_angle]\nauto = true\nmanual = 0.0\n\n[train.stages.members.gear.face_width]\nauto = true\nmanual = 5.0\n\n[train.stages.members.gear.face_sources.bending]\nultimate = true\nfatigue = true\n\n[train.stages.members.gear.face_sources.contact]\nultimate = false\nfatigue = false\n\n[train.stages.members.gear.material_overrides]\n\n[train.stages.members.thickness_mod]\nauto = true\nmanual = 1.0\n\n[train.stages.members.pitch_diameter]\nauto = true\nmanual = 0.0\n\n[[train.stages.meshes]]\na = 0\nb = 1\nsliding_friction = 0.08\nstatic_friction = 0.16\nmin_contact_ratio = 1.2\n\n[train.stages.meshes.overlap]\nauto = true\nmanual = 1.0\n\n[[train.stages.distances]]\naxes = [\n    0,\n    1,\n]\nangle = 0.0\nworm = false\ntip_clearance = 0.0\ntolerance_plus = 0.02\ntolerance_minus = 0.02\naxial_clearance = 0.0\n\n[train.stages.distances.distance]\nauto = true\nmanual = 0.0\n\n[train.stages.distances.clearance]\nauto = false\nmanual = 0.02\n"
+   "ok": "# Geartrain.\n#\n# Inputs only — every ratio, stress, efficiency and backlash is recomputed from\n# these, so nothing here can go stale. Units: mm, degrees, rpm, N·m.\n#\n# Materials are named; the library that defines them is a separate document.\n# Editing this file by hand is expected.\n\nname = \"probe\"\n\n[train]\nreversed_bending = false\nconstraints = []\n\n[[train.load_cases]]\nkind = \"ultimate\"\nenabled = true\n\n[[train.load_cases.loads]]\nat = 1\nrole = \"load\"\n\n[train.load_cases.loads.torque]\nauto = false\nmanual = 0.1\n\n[train.load_cases.loads.speed]\nauto = false\nmanual = 30000.0\n\n[[train.load_cases.loads]]\nat = 2\nrole = \"reacted\"\n\n[train.load_cases.loads.torque]\nauto = true\nmanual = 0.0\n\n[train.load_cases.loads.speed]\nauto = true\nmanual = 0.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nat = 2\nactuations = 1000\nreversing = false\n\n[[train.load_cases]]\nkind = \"ultimate\"\nenabled = true\n\n[[train.load_cases.loads]]\nat = 2\nrole = \"load\"\n\n[train.load_cases.loads.torque]\nauto = false\nmanual = 3.0\n\n[train.load_cases.loads.speed]\nauto = false\nmanual = 0.0\n\n[[train.load_cases.loads]]\nat = 1\nrole = \"reacted\"\n\n[train.load_cases.loads.torque]\nauto = true\nmanual = 0.0\n\n[train.load_cases.loads.speed]\nauto = true\nmanual = 0.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nat = 2\nactuations = 1000\nreversing = false\n\n[[train.load_cases]]\nkind = \"fatigue\"\nenabled = true\n\n[[train.load_cases.loads]]\nat = 1\nrole = \"load\"\n\n[train.load_cases.loads.torque]\nauto = false\nmanual = 0.02\n\n[train.load_cases.loads.speed]\nauto = false\nmanual = 30000.0\n\n[[train.load_cases.loads]]\nat = 2\nrole = \"reacted\"\n\n[train.load_cases.loads.torque]\nauto = true\nmanual = 0.0\n\n[train.load_cases.loads.speed]\nauto = true\nmanual = 0.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nat = 2\nactuations = 1000\nreversing = false\n\n[[train.stages]]\nkind = \"shape\"\nload_sharing = \"none\"\nmin_planet_clearance = 0.3\n\n[train.stages.optimisation]\nenabled = false\n\n[[train.stages.axes]]\ncarried_by = 0\ncount = 1\n\n[[train.stages.axes]]\ncarried_by = 0\ncount = 1\n\n[[train.stages.bodies]]\nbody = 1\naxis = 0\n\n[[train.stages.bodies]]\nbody = 2\naxis = 1\n\n[[train.stages.members]]\nbody = 1\nmodule = 1.0\npressure_angle = 20.0\n\n[train.stages.members.gear]\nteeth = 17\nno_undercut = true\naddendum = 1.0\nno_sharp_tip = true\nmin_tip_width = 0.1\ndedendum = 1.25\nroot_radius = 0.38\nmaterial = \"4340 Hardened Steel\"\n\n[train.stages.members.gear.profile_shift]\nauto = true\nmanual = 0.0\n\n[train.stages.members.gear.working_depth]\nauto = true\nmanual = 1.0\n\n[train.stages.members.gear.helix_angle]\nauto = true\nmanual = 0.0\n\n[train.stages.members.gear.face_width]\nauto = true\nmanual = 5.0\n\n[train.stages.members.gear.face_sources.bending]\nultimate = true\nfatigue = true\n\n[train.stages.members.gear.face_sources.contact]\nultimate = false\nfatigue = false\n\n[train.stages.members.gear.material_overrides]\n\n[train.stages.members.thickness_mod]\nauto = false\nmanual = 1.0\n\n[train.stages.members.pitch_diameter]\nauto = true\nmanual = 17.0\n\n[[train.stages.members]]\nbody = 2\nmodule = 1.0\npressure_angle = 20.0\n\n[train.stages.members.gear]\nteeth = 43\nno_undercut = true\naddendum = 1.0\nno_sharp_tip = true\nmin_tip_width = 0.1\ndedendum = 1.25\nroot_radius = 0.38\nmaterial = \"4340 Hardened Steel\"\n\n[train.stages.members.gear.profile_shift]\nauto = true\nmanual = 0.0\n\n[train.stages.members.gear.working_depth]\nauto = true\nmanual = 1.0\n\n[train.stages.members.gear.helix_angle]\nauto = true\nmanual = 0.0\n\n[train.stages.members.gear.face_width]\nauto = true\nmanual = 5.0\n\n[train.stages.members.gear.face_sources.bending]\nultimate = true\nfatigue = true\n\n[train.stages.members.gear.face_sources.contact]\nultimate = false\nfatigue = false\n\n[train.stages.members.gear.material_overrides]\n\n[train.stages.members.thickness_mod]\nauto = true\nmanual = 1.0\n\n[train.stages.members.pitch_diameter]\nauto = true\nmanual = 0.0\n\n[[train.stages.meshes]]\na = 0\nb = 1\nsliding_friction = 0.08\nstatic_friction = 0.16\nmin_contact_ratio = 1.2\n\n[train.stages.meshes.overlap]\nauto = true\nmanual = 1.0\n\n[[train.stages.distances]]\naxes = [\n    0,\n    1,\n]\nangle = 0.0\nworm = false\ntip_clearance = 0.0\ntolerance_plus = 0.02\ntolerance_minus = 0.02\naxial_clearance = 0.0\n\n[train.stages.distances.distance]\nauto = true\nmanual = 0.0\n\n[train.stages.distances.clearance]\nauto = false\nmanual = 0.02\n"
   },
   "import_train": {
    "ok": {
@@ -21340,11 +20704,7 @@
         "enabled": true,
         "loads": [
          {
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 1
-          },
+          "at": 1,
           "role": "load",
           "torque": {
            "auto": false,
@@ -21356,11 +20716,7 @@
           }
          },
          {
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 2
-          },
+          "at": 2,
           "role": "reacted",
           "torque": {
            "auto": true,
@@ -21375,11 +20731,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 2
-          },
+          "at": 2,
           "actuations": 1000,
           "reversing": false
          }
@@ -21390,11 +20742,7 @@
         "enabled": true,
         "loads": [
          {
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 2
-          },
+          "at": 2,
           "role": "load",
           "torque": {
            "auto": false,
@@ -21406,11 +20754,7 @@
           }
          },
          {
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 1
-          },
+          "at": 1,
           "role": "reacted",
           "torque": {
            "auto": true,
@@ -21425,11 +20769,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 2
-          },
+          "at": 2,
           "actuations": 1000,
           "reversing": false
          }
@@ -21440,11 +20780,7 @@
         "enabled": true,
         "loads": [
          {
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 1
-          },
+          "at": 1,
           "role": "load",
           "torque": {
            "auto": false,
@@ -21456,11 +20792,7 @@
           }
          },
          {
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 2
-          },
+          "at": 2,
           "role": "reacted",
           "torque": {
            "auto": true,
@@ -21475,11 +20807,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": {
-           "kind": "of",
-           "stage": 0,
-           "shaft": 2
-          },
+          "at": 2,
           "actuations": 1000,
           "reversing": false
          }
@@ -21505,17 +20833,19 @@
           "count": 1
          }
         ],
-        "shafts": [
+        "bodies": [
          {
+          "body": 1,
           "axis": 0
          },
          {
+          "body": 2,
           "axis": 1
          }
         ],
         "members": [
          {
-          "shaft": 1,
+          "body": 1,
           "gear": {
            "teeth": 17,
            "profile_shift": {
@@ -21573,7 +20903,7 @@
           }
          },
          {
-          "shaft": 2,
+          "body": 2,
           "gear": {
            "teeth": 43,
            "profile_shift": {
@@ -21668,7 +20998,6 @@
         ]
        }
       ],
-      "couplings": [],
       "constraints": []
      }
     },

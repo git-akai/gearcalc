@@ -5,7 +5,7 @@ import type { StageFamily } from "./StageFamily";
 
 /**
  * **A stage's ports and its conventional holds**, so a panel can offer
- * exactly the shafts a train may constrain or couple — read from the
+ * exactly the bodies a train may constrain or share — read from the
  * stage's own wiring rather than written into the front end a second time.
  */
 export type StagePorts = { ports: Array<PortSpec>, 

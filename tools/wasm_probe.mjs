@@ -119,23 +119,28 @@ const out = {
     }),
   ),
   // **The train's graph edited by the core's rules**, each edit recorded:
-  // a set pushed behind the default pair and coupled onward, its cases
-  // carried to the new end; the set's carrier held, which uncouples it, and
-  // released again; the pair's output coupled to the set's ring instead,
-  // and uncoupled; and a case of each kind added between the ends.
+  // a set pushed behind the default pair and joined onward by its sun —
+  // one body, the pair's second gear and the sun — its cases carried to
+  // the new end, the carrier; the carrier held and released again; the
+  // pair's end of the sun's body split off and joined to the set's ring
+  // instead, then moved back onto the sun by the select's one rule; and a
+  // case of each kind added between the ends. A body is its number, read
+  // off the stage's list by slot: the set's sun, carrier and ring are
+  // slots 1, 2 and 3.
   edit_train: call("edit_train", () => {
     const edit = (train, e) => JSON.parse(w.edit_train(JSON.stringify({ train, edit: e })));
-    const of = (stage, shaft) => ({ kind: "of", stage, shaft });
+    const body = (train, stage, slot) => train.stages[stage].bodies[slot - 1].body;
     let t = edit(structuredClone(defaults.train), { push_stage: preset("planetary") });
     const out = [["push_stage", structuredClone(t)]];
-    t = edit(t, { hold: of(1, 2) });
+    t = edit(t, { hold: body(t, 1, 2) });
     out.push(["hold", structuredClone(t)]);
-    t = edit(t, { release: of(1, 2) });
+    t = edit(t, { release: body(t, 1, 2) });
     out.push(["release", structuredClone(t)]);
-    t = edit(t, { couple: { a: of(0, 2), b: of(1, 3) } });
-    out.push(["couple", structuredClone(t)]);
-    t = edit(t, { uncouple: of(1, 3) });
-    out.push(["uncouple", structuredClone(t)]);
+    t = edit(t, { split: { stage: 0, body: body(t, 1, 1) } });
+    t = edit(t, { join: { a: body(t, 0, 2), b: body(t, 1, 3) } });
+    out.push(["split_join", structuredClone(t)]);
+    t = edit(t, { move_end: { stage: 0, body: body(t, 0, 2), to: body(t, 1, 1) } });
+    out.push(["move_end", structuredClone(t)]);
     t = edit(t, { add_case: "ultimate" });
     t = edit(t, { add_case: "fatigue" });
     out.push(["add_case", structuredClone(t)]);
@@ -143,16 +148,16 @@ const out = {
     t = edit(t, { duty: { case: 2, intermittent: true } });
     out.push(["duty", structuredClone(t)]);
     // **A stage edited on its card**: the set at stage 1 gains a step (a
-    // second planet gear and a ring on it), loses its first ring — which
-    // renumbers the shafts, and the coupling and the case entries at the
-    // set's carrier and ring follow — gains a sun on the new step, and has
-    // its sun moved to a shaft of its own; then a layshaft pushed behind
-    // gains a pair and an idler axis and loses them again.
+    // second planet gear and a ring on it), loses its first ring — whose
+    // body leaves the train and the rest close up, the case entries at the
+    // set's carrier following — gains a sun on the new step, and has its
+    // sun moved to a body of its own; then a layshaft pushed behind gains
+    // a pair and an idler axis and loses them again.
     const stage = (k, e) => edit(t, { stage: { stage: k, edit: e } });
     t = stage(1, { add_step: { axis: 1 } });
     t = stage(1, { remove_member: { member: 2 } });
     t = stage(1, { add_central: { gear: 2, ring: false } });
-    t = stage(1, { move_shaft: { member: 0, shaft: null } });
+    t = stage(1, { move_body: { member: 0, body: null } });
     out.push(["stage_epicyclic", structuredClone(t)]);
     t = edit(t, { push_stage: preset("layshaft") });
     t = stage(2, { add_pair: { distance: 0 } });
@@ -183,7 +188,7 @@ const out = {
   relieve_case: call("relieve_case", () => {
     const train = structuredClone(defaults.train);
     const given = (v) => ({ auto: false, manual: v });
-    train.load_cases[0].loads[1] = { at: { kind: "of", stage: 0, shaft: 2 }, role: "load", torque: given(1), speed: given(100) };
+    train.load_cases[0].loads[1] = { at: 2, role: "load", torque: given(1), speed: given(100) };
     const just = { load: 1, which: "speed" };
     return JSON.parse(w.relieve_case(JSON.stringify({ train, library, case: 0, just })));
   }),

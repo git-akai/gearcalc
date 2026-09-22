@@ -2,20 +2,21 @@
 
 /**
  * An axis gears turn about: fixed in ground, or carried round another axis
- * by a shaft — a planet's, riding the carrier.
+ * by a body — a planet's, riding the carrier.
  */
 export type Axis = { 
 /**
- * The shaft whose frame this axis stands still in: a carrier, or
- * **ground** (shaft 0) for an axis fixed in it — a spur pair's axes
+ * The body whose frame this axis stands still in: a carrier, or
+ * **ground** (body 0) for an axis fixed in it — a spur pair's axes
  * are carried by ground, which is what makes a pair the epicyclic
- * family with its carrier held. Absent in a file, ground — and `null`
+ * family with its carrier held. A train body, not a slot. Absent in a
+ * file, ground — and `null`
  * too, which is how a browser's stored train wrote it when this was an
  * `Option`, so that state keeps loading.
  */
 carried_by: number, 
 /**
- * How many times this axis, its shafts and their gears are replicated
+ * How many times this axis, its bodies and their gears are replicated
  * about the axis it is carried round — `N` planets. One elsewhere.
  */
 count: number, };

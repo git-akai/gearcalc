@@ -175,8 +175,8 @@ struct HulaView<'a> {
     /// The two meshes alone, crank held: their efficiencies multiplied.
     fixed_carrier_efficiency: f64,
     backlash: gear_core::contact::Directional<gear_core::train::Backlash>,
-    /// Speeds and torques per case on the grounded gear's shaft, the crank
-    /// and the output — the shape's shafts 2, 1 and 3.
+    /// Speeds and torques per case on the grounded gear's body, the crank
+    /// and the output — the shape's bodies 2, 1 and 3.
     cases: Vec<(usize, [f64; 3], [f64; 3])>,
     /// Each member with whether it is a ring, in the stage's order.
     gears: Vec<(&'a gear_core::train::GearResult, bool)>,
@@ -1293,17 +1293,12 @@ fn hula_sweep(n: u32, clearance: f64, mesh_index: usize) {
 fn train_file_report(path: Option<&str>) {
     use gear_core::params::Auto;
     use gear_core::train::{
-        solve_train, Duty, Load, LoadCase, LoadRole, PairStage, PlanetaryStage, ShaftRef, Stage,
-        StageGear, Train,
+        solve_train, Duty, Load, LoadCase, LoadRole, PairStage, PlanetaryStage, Stage, StageGear,
+        Train,
     };
     use gear_io::TrainDocument;
 
     let lib = gear_io::default_library();
-    // The chain's two ends: the pair's first gear and the set's carrier.
-    let (start, end) = (
-        ShaftRef::Of { stage: 0, shaft: 1 },
-        ShaftRef::Of { stage: 2, shaft: 2 },
-    );
     let doc = TrainDocument {
         name: "Elevation drive".to_string(),
         train: Train::chained(
@@ -1330,25 +1325,29 @@ fn train_file_report(path: Option<&str>) {
             ],
             // Both case kinds, both ends, both duties, every role: everything
             // the document can carry for a load, so the round trip is asked
-            // of all of it.
-            vec![
-                LoadCase::ultimate(start, end, 2.0, 3000.0),
-                LoadCase::back_driving(start, end, 0.5),
-                LoadCase {
-                    duty: Duty::Continuous {
-                        runtime_hours: 1000.0,
+            // of all of it. The chain's two ends: the pair's first gear and
+            // the set's carrier.
+            |t| {
+                let (start, end) = (t.port(0, 1), t.port(2, 2));
+                vec![
+                    LoadCase::ultimate(start, end, 2.0, 3000.0),
+                    LoadCase::back_driving(start, end, 0.5),
+                    LoadCase {
+                        duty: Duty::Continuous {
+                            runtime_hours: 1000.0,
+                        },
+                        ..LoadCase::fatigue(start, end, 2.0, 2400.0)
                     },
-                    ..LoadCase::fatigue(start, end, 2.0, 2400.0)
-                },
-                LoadCase {
-                    loads: vec![
-                        Load::given(end, 0.2, 30.0),
-                        Load::declared(start, LoadRole::Free),
-                    ],
-                    enabled: false,
-                    ..LoadCase::fatigue(start, end, 0.2, 30.0)
-                },
-            ],
+                    LoadCase {
+                        loads: vec![
+                            Load::given(end, 0.2, 30.0),
+                            Load::declared(start, LoadRole::Free),
+                        ],
+                        enabled: false,
+                        ..LoadCase::fatigue(start, end, 0.2, 30.0)
+                    },
+                ]
+            },
         ),
     };
 
@@ -1392,6 +1391,7 @@ fn train_file_report(path: Option<&str>) {
     match (a, b) {
         (Ok(a), Ok(b)) => {
             println!("\n  quantity                 exported            re-imported   same");
+            let end = doc.train.port(2, 2);
             let at_end = |r: &gear_core::train::TrainResult| -> (f64, f64) {
                 r.cases[0]
                     .shaft(end)
@@ -1676,17 +1676,9 @@ fn epicyclic_shifts_report() {
 
 fn train_report(mode: Option<&str>) {
     use gear_core::params::Auto;
-    use gear_core::train::{
-        solve_train, Duty, LoadCase, PairStage, ShaftRef, Stage, StageGear, Train,
-    };
+    use gear_core::train::{solve_train, Duty, LoadCase, PairStage, Stage, StageGear, Train};
 
     let lib = gear_io::default_library();
-    // Every mode's train is two stages, so its ends are the first stage's
-    // first gear and the second stage's second.
-    let (start, end) = (
-        ShaftRef::Of { stage: 0, shaft: 1 },
-        ShaftRef::Of { stage: 1, shaft: 2 },
-    );
     let auto_width = |teeth: u32| StageGear {
         teeth,
         face_width: Auto::automatic(0.0),
@@ -1765,47 +1757,55 @@ fn train_report(mode: Option<&str>) {
         // free beside it, so the load is held only by a stage that locks —
         // the other thing a case can be asked, and one the core answers by
         // name.
-        vec![
-            LoadCase::ultimate(start, end, 2.0, 3000.0),
-            {
-                let torque = match mode {
-                    Some("held") => 400.0,
-                    Some("mixed") => 0.6,
-                    Some("toggles") => 5.0,
-                    _ => 0.0,
-                };
-                let mut case = LoadCase::back_driving(start, end, torque);
-                if mode != Some("toggles") {
-                    case.loads[1] =
-                        gear_core::train::Load::declared(start, gear_core::train::LoadRole::Free);
-                }
-                case
-            },
-            LoadCase {
-                duty: if mode == Some("toggles") {
-                    Duty::Intermittent {
-                        range_degrees: 90.0,
-                        at: end,
-                        actuations: 600_000,
-                        reversing: true,
+        //
+        // Every mode's train is two stages, so its ends are the first
+        // stage's first gear and the second stage's second.
+        |t| {
+            let (start, end) = (t.port(0, 1), t.port(1, 2));
+            vec![
+                LoadCase::ultimate(start, end, 2.0, 3000.0),
+                {
+                    let torque = match mode {
+                        Some("held") => 400.0,
+                        Some("mixed") => 0.6,
+                        Some("toggles") => 5.0,
+                        _ => 0.0,
+                    };
+                    let mut case = LoadCase::back_driving(start, end, torque);
+                    if mode != Some("toggles") {
+                        case.loads[1] = gear_core::train::Load::declared(
+                            start,
+                            gear_core::train::LoadRole::Free,
+                        );
                     }
-                } else {
-                    Duty::Continuous {
-                        runtime_hours: 1000.0,
-                    }
+                    case
                 },
-                ..LoadCase::fatigue(
-                    start,
-                    end,
-                    2.0,
-                    if mode == Some("toggles") {
-                        3000.0
+                LoadCase {
+                    duty: if mode == Some("toggles") {
+                        Duty::Intermittent {
+                            range_degrees: 90.0,
+                            at: end,
+                            actuations: 600_000,
+                            reversing: true,
+                        }
                     } else {
-                        2400.0
+                        Duty::Continuous {
+                            runtime_hours: 1000.0,
+                        }
                     },
-                )
-            },
-        ],
+                    ..LoadCase::fatigue(
+                        start,
+                        end,
+                        2.0,
+                        if mode == Some("toggles") {
+                            3000.0
+                        } else {
+                            2400.0
+                        },
+                    )
+                },
+            ]
+        },
     );
     // **Every optional control, engaged.** The corpus turned three of a
     // gear's eleven and left the rest at their defaults, so the constants
@@ -1921,12 +1921,13 @@ fn print_train_cases(train: &gear_core::train::Train, r: &gear_core::train::Trai
         for n in &c.notes {
             println!("              note: {}", words().render(n));
         }
-        // Every shaft: what it is in this case and what it carries.
-        for s in &c.shafts {
+        // Every body: what it is in this case and what it carries.
+        for s in &c.bodies {
             println!(
-                "              {:<8} {:<24} {:>12}  {:>12.4} Nm",
+                "              {:<8} {:<3} {:<20} {:>12}  {:>12.4} Nm",
                 format!("{:?}", s.role).to_lowercase(),
-                kinematics::named(&train.stages, s.at, s.label),
+                port(s.at),
+                kinematics::named(train, s.at),
                 s.speed
                     .map_or_else(|| "-".to_string(), |v| format!("{v:.2} rpm")),
                 s.torque
@@ -1955,7 +1956,7 @@ fn print_gear_cases(cases: &[gear_core::train::GearCase]) {
     }
 }
 
-/// A pair with its shafts parallel: line contact, a bending rating.
+/// A pair with its bodies parallel: line contact, a bending rating.
 fn print_line_pair(k: usize, kind: &str, s: &Pair, line: &gear_core::train::LineContact) {
     let mesh = s.mesh;
     let helix = s.gears[0].helix_angle;

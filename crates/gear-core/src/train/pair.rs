@@ -146,10 +146,10 @@ impl ShiftAsked {
     }
 }
 
-/// A stage of two gears on shafts at any angle.
+/// A stage of two gears on bodies at any angle.
 ///
 /// Spur when nothing is angled, helical when the teeth are, a **crossed gear
-/// pair** when the shafts are, and a **worm stage** when the first member's
+/// pair** when the bodies are, and a **worm stage** when the first member's
 /// size is a diameter someone chose — one stage, as the specification has it,
 /// with the shaft angle and which reading of the size is given as the inputs
 /// that distinguish them. It
@@ -206,7 +206,7 @@ pub struct PairStage {
     /// Normal pressure angle, degrees. Shared.
     pub pressure_angle: f64,
     /// Shaft angle `Σ`, degrees. **Zero is a parallel-axis pair**; anything else
-    /// crosses the shafts.
+    /// crosses the bodies.
     #[cfg_attr(feature = "serde", serde(default))]
     pub shaft_angle: f64,
     /// **A worm and its wheel**, to a designer — one bit, carried on the
@@ -332,7 +332,7 @@ impl Default for PairStage {
             tolerance_minus: 0.02,
             load_sharing: shape.load_sharing,
             axial_clearance: 0.0,
-            // Neither member states a helix, so the two share the shaft
+            // Neither member states a helix, so the two share the body
             // angle evenly — straight teeth on parallel shafts.
             gears: [
                 StageGear::default(),
@@ -439,7 +439,7 @@ impl PairStage {
         self
     }
 
-    /// Whether the shafts cross. The parallel case is the zero of the shaft
+    /// Whether the shafts cross. The parallel case is the zero of the body
     /// angle, and it is the *mesh* that differs, not the stage.
     #[must_use]
     pub fn is_crossed(&self) -> bool {

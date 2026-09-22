@@ -1,4 +1,4 @@
-wrote /tmp/gear-cli-train.toml  (738 lines, 11751 bytes)
+wrote /tmp/gear-cli-train.toml  (678 lines, 10932 bytes)
 name   "Elevation drive" -> "Elevation drive"
 stages 3 -> 3
 

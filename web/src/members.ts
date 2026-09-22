@@ -8,16 +8,13 @@
 // so they are written once here and both panels read them.
 
 import {
-  portKey,
   solveTrain,
   t,
   type MemberName,
   type Shape,
-  type ShaftRef,
   type Stage,
   type StagePorts,
   type Train,
-  type TrainBody,
 } from "./core";
 
 /** One member of a train, as a list can show it. */
@@ -59,10 +56,22 @@ export function memberListName(train: Train, topology: StagePorts[], stage: numb
     : t("ui.train_member_numbered", { name: role, number });
 }
 
+/** The axis a body turns about in a shape, or `undefined` where the shape
+ *  does not list the body. */
+export function axisOfBody(shape: Shape, body: number): number | undefined {
+  return shape.bodies.find((b) => b.body === body)?.axis;
+}
+
+/** A body's slot in a stage — the stage's own numbering of it, ground 0
+ *  and the first listed 1 — or 0 where the stage does not list it. */
+export function slotOf(shape: Shape, body: number): number {
+  return shape.bodies.findIndex((b) => b.body === body) + 1;
+}
+
 /** Whether a member's axis is carried — turns in a frame that is not the
  *  ground's — which is what makes it a planet. */
 export function carried(shape: Shape, member: number): boolean {
-  const axis = shape.axes[shape.shafts[shape.members[member].shaft - 1]?.axis];
+  const axis = shape.axes[axisOfBody(shape, shape.members[member].body) ?? -1];
   return axis !== undefined && axis.carried_by !== 0;
 }
 
@@ -108,52 +117,37 @@ function roleName(topology: StagePorts[], stage: number, member: number): string
   return roleLabel(topology[stage]?.members[member]);
 }
 
-/** **A shaft is a body of the train**, not a stage's: the ports the
- *  couplings join into one thing that turns — a pair's output and the next
- *  set's sun on one shaft — numbered across the train in the order the
- *  core lists its bodies, as a gear is numbered. A held body is the
- *  ground and has no number. What a stage calls a shaft is that body's
- *  port on the stage. */
-export interface TrainShaft {
-  /** The body's number among the unheld bodies, `null` for one held. */
-  number: number | null;
-  body: TrainBody;
+/** **A body's own name**: "Body 4", numbered across the train as the core
+ *  numbers it — the same number a file writes and a case names — or the
+ *  ground's word for body 0. */
+export function bodyName(body: number): string {
+  return body === 0 ? t("ui.train_ground") : t("ui.train_body_name", { number: String(body) });
 }
 
-/** The train's shafts, off the bodies the core sent. */
-export function trainShafts(bodies: TrainBody[]): TrainShaft[] {
-  let n = 0;
-  return bodies.map((body) => ({ number: body.held ? null : ++n, body }));
+/** **The stages a body is listed on**, with its slot in each, in stage
+ *  order — read off the stages themselves, so a name needs no motion. */
+export function endsOf(train: Train, body: number): { stage: number; slot: number }[] {
+  return train.stages
+    .map((shape, stage) => ({ stage, slot: slotOf(shape, body) }))
+    .filter((e) => e.slot > 0);
 }
 
-/** The shaft a port is on, if the core listed one for it — a replicated
- *  shaft is no port and has none. */
-export function shaftOfPort(shafts: TrainShaft[], at: ShaftRef): TrainShaft | undefined {
-  return shafts.find((s) => s.body.shafts.some(([p]) => portKey(p) === portKey(at)));
-}
-
-/** A shaft's own name: "Shaft 4", or the ground's word for one held. */
-export function trainShaftName(shaft: TrainShaft | undefined): string {
-  return shaft === undefined || shaft.number === null
-    ? t("ui.train_ground")
-    : t("ui.train_shaft_name", { number: String(shaft.number) });
-}
-
-/** **What sits on a port** of a stage, for the line under its name: the
+/** **What sits on a slot** of a stage, for the line under its name: the
  *  members on it by their list names, or the carrier where it carries an
  *  axis and no gear. Read off the shape; the core's label names the first
  *  of them. */
-export function onShaft(
+export function onSlot(
   train: Train,
   topology: StagePorts[],
   stage: number,
-  shaft: number,
+  slot: number,
   numbered = true,
 ): string {
   const shape = train.stages[stage];
+  const body = shape.bodies[slot - 1]?.body;
   const gears = shape.members
     .map((m, j) =>
-      m.shaft === shaft
+      m.body === body
         ? numbered
           ? memberListName(train, topology, stage, j)
           : memberName(train, topology, stage, j)
@@ -161,41 +155,30 @@ export function onShaft(
     )
     .filter((x) => x !== null);
   if (gears.length > 0) return gears.join(" · ");
-  return shape.axes.some((a) => a.carried_by === shaft) ? t("ui.train_carrier") : "";
+  return shape.axes.some((a) => a.carried_by === body) ? t("ui.train_carrier") : "";
 }
 
-/** **Everything on a shaft, across the train**: each port's stage and what
+/** **Everything on a body, across the train**: each end's stage and what
  *  it carries — "Stage 1 Gear 2 · Stage 2 Sun" — which is what says at a
  *  glance what is linked to what. */
-export function acrossShaft(train: Train, topology: StagePorts[], shaft: TrainShaft): string {
-  return shaft.body.shafts
-    .map(([p]) =>
-      p.kind === "of"
-        ? t("ui.train_port_at", {
-            stage: t("ui.train_stage_heading", { number: String(p.stage + 1) }),
-            shaft: onShaft(train, topology, p.stage, p.shaft, false),
-          })
-        : t("ui.train_ground"),
+export function acrossBody(train: Train, topology: StagePorts[], body: number): string {
+  if (body === 0) return t("ui.train_ground");
+  return endsOf(train, body)
+    .map((e) =>
+      t("ui.train_port_at", {
+        stage: t("ui.train_stage_heading", { number: String(e.stage + 1) }),
+        on: onSlot(train, topology, e.stage, e.slot, false),
+      }),
     )
     .join(" · ");
 }
 
-/** **A port in a reference**: the shaft it is on and, in parentheses, the
- *  port's own stage and member — "Shaft 2 (Stage 2 Sun)" — since a shaft
- *  bridges stages and a reference has to say which end. */
-export function shaftRefName(
-  train: Train,
-  topology: StagePorts[],
-  shafts: TrainShaft[],
-  at: ShaftRef,
-): string {
-  if (at.kind === "ground") return t("ui.train_ground");
-  const name = trainShaftName(shaftOfPort(shafts, at));
-  const on = t("ui.train_port_at", {
-    stage: t("ui.train_stage_heading", { number: String(at.stage + 1) }),
-    shaft: onShaft(train, topology, at.stage, at.shaft, false),
-  });
-  return t("ui.train_shaft_with", { shaft: name, on });
+/** **A body in a reference**: its name and, in parentheses, every end of
+ *  it — "Body 2 (Stage 1 Gear 2 · Stage 2 Sun)" — since a body bridges
+ *  stages and a reference has to say what it is on each. */
+export function bodyRefName(train: Train, topology: StagePorts[], body: number): string {
+  if (body === 0) return t("ui.train_ground");
+  return t("ui.train_body_with", { body: bodyName(body), on: acrossBody(train, topology, body) });
 }
 
 /** The name a member's card carries: "gear 3" on a pair, the role elsewhere. */

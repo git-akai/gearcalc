@@ -1,9 +1,9 @@
-//! **The stage every preset is a tick pattern of** — axes, shafts on them,
-//! members on the shafts, meshes between members, and one distance per pair
+//! **The stage every preset is a tick pattern of** — axes, bodies on them,
+//! members on the bodies, meshes between members, and one distance per pair
 //! of axes that mesh.
 //!
 //! A spur pair is two axes fixed in ground with one mesh between them. A
-//! planetary set is a central axis and a planet axis carried by a shaft on
+//! planetary set is a central axis and a planet axis carried by a body on
 //! the central one, replicated `N` times, with two meshes on the one
 //! distance between the axes. A hula stage is the same with `N = 1`, both
 //! meshes internal and a compound planet. A layshaft transmission is two
@@ -35,14 +35,14 @@
 //! members is one — the sign of a mesh is derived from its members, never
 //! stated.
 
-use super::wiring::{MeshSpec, Mount, ShaftLabel, Wiring};
+use super::wiring::{BodyLabel, MeshSpec, Mount, Wiring};
 use super::{
     Constrained, ContactRatios, Freedom, FreedomGroup, GearResult, Loading, MemberFacts,
     MemberFreedom, MemberRating, MeshReport, Optimisation, Ports, Reading, StageGear, TrainError,
     PROBE,
 };
 use crate::contact::{efficiency, ContactPath, Directional, Drive, LoadSharing};
-use crate::kinematics::{Shaft, GROUND};
+use crate::kinematics::{Body, GROUND};
 use crate::material::{contact_modulus, Material, MaterialLibrary};
 use crate::mesh::{operating_geometry, shift_sum_for, Mesh, MeshKind, MeshSide};
 use crate::note::{key, Note};
@@ -54,7 +54,7 @@ use crate::strength::{bending_stress, contact_stress, Load, RootStressModel, PAR
 use crate::tooth::Tooth;
 
 /// An axis gears turn about: fixed in ground, or carried round another axis
-/// by a shaft — a planet's, riding the carrier.
+/// by a body — a planet's, riding the carrier.
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
@@ -64,15 +64,16 @@ use crate::tooth::Tooth;
     ts(export, export_to = "core/")
 )]
 pub struct Axis {
-    /// The shaft whose frame this axis stands still in: a carrier, or
-    /// **ground** (shaft 0) for an axis fixed in it — a spur pair's axes
+    /// The body whose frame this axis stands still in: a carrier, or
+    /// **ground** (body 0) for an axis fixed in it — a spur pair's axes
     /// are carried by ground, which is what makes a pair the epicyclic
-    /// family with its carrier held. Absent in a file, ground — and `null`
+    /// family with its carrier held. A train body, not a slot. Absent in a
+    /// file, ground — and `null`
     /// too, which is how a browser's stored train wrote it when this was an
     /// `Option`, so that state keeps loading.
     #[cfg_attr(feature = "serde", serde(default, deserialize_with = "ground_if_null"))]
-    pub carried_by: Shaft,
-    /// How many times this axis, its shafts and their gears are replicated
+    pub carried_by: Body,
+    /// How many times this axis, its bodies and their gears are replicated
     /// about the axis it is carried round — `N` planets. One elsewhere.
     pub count: u32,
 }
@@ -86,13 +87,13 @@ fn default_pressure_angle() -> f64 {
 /// `carried_by` as a stored train wrote it while it was an `Option`: `null`
 /// reads as ground.
 #[cfg(feature = "serde")]
-fn ground_if_null<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Shaft, D::Error> {
-    let s: Option<Shaft> = serde::Deserialize::deserialize(d)?;
+fn ground_if_null<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Body, D::Error> {
+    let s: Option<Body> = serde::Deserialize::deserialize(d)?;
     Ok(s.unwrap_or(GROUND))
 }
 
-/// A shaft, by the axis it turns about. Shaft `i` here is shaft `i + 1` of
-/// the wiring; ground is shaft 0 and is not listed.
+/// A body of the train on one of this stage's axes. The `i`th listed is
+/// slot `i + 1` of the wiring; ground is slot 0 and is not listed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
@@ -101,11 +102,16 @@ fn ground_if_null<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Shaft, D::Er
     derive(ts_rs::TS),
     ts(export, export_to = "core/")
 )]
-pub struct ShaftOn {
+pub struct BodyOn {
+    /// The train's body — one number across the train, ground being 0 —
+    /// that turns on this axis in this stage. Its position in the list is
+    /// the stage's own numbering of it for the kinematics, ground 0 and
+    /// the first listed 1.
+    pub body: usize,
     pub axis: usize,
 }
 
-/// A gear, on a shaft.
+/// A gear, on a body.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
@@ -115,8 +121,8 @@ pub struct ShaftOn {
     ts(export, export_to = "core/")
 )]
 pub struct Member {
-    /// The shaft it spins with, numbered as [`ShaftOn`] is.
-    pub shaft: Shaft,
+    /// The train's body it spins with, one of this stage's [`BodyOn`]s.
+    pub body: usize,
     pub gear: StageGear,
     /// Normal module, mm. Every mesh a member is in shares it.
     pub module: f64,
@@ -243,7 +249,12 @@ pub struct Shape {
     /// anywhere in the stage.
     pub min_planet_clearance: f64,
     pub axes: Vec<Axis>,
-    pub shafts: Vec<ShaftOn>,
+    /// **The bodies on this stage's axes**, in the stage's order — what a
+    /// stage has of the train's bodies: a body that runs on into another
+    /// stage is listed there too, on that stage's axis. Nothing here is a
+    /// stage's own; the train numbers bodies once, and a stage's members
+    /// and carriers name them.
+    pub bodies: Vec<BodyOn>,
     pub members: Vec<Member>,
     pub meshes: Vec<MeshInput>,
     pub distances: Vec<Distance>,
@@ -261,7 +272,7 @@ impl Default for Shape {
             load_sharing: LoadSharing::None,
             min_planet_clearance: 0.3,
             axes: Vec::new(),
-            shafts: Vec::new(),
+            bodies: Vec::new(),
             members: Vec::new(),
             meshes: Vec::new(),
             distances: Vec::new(),
@@ -272,47 +283,97 @@ impl Default for Shape {
 // ------------------------------------------------------------ the shape ---
 
 impl Shape {
-    /// The wiring shaft a member spins with.
-    pub(crate) fn shaft_of(&self, member: usize) -> Shaft {
-        self.members[member].shaft
+    /// **A body's slot in this stage** — the stage's own numbering of the
+    /// bodies on its axes, ground 0 and the first listed 1, which is what
+    /// the stage's kinematics and its conventions count in. Ground for a
+    /// body the stage does not have.
+    pub(crate) fn slot(&self, body: usize) -> Body {
+        self.bodies
+            .iter()
+            .position(|b| b.body == body)
+            .map_or(GROUND, |i| i + 1)
     }
 
-    /// The axis a wiring shaft turns about.
-    pub(crate) fn axis_of_shaft(&self, shaft: Shaft) -> Option<usize> {
-        (shaft != GROUND).then(|| self.shafts[shaft - 1].axis)
+    /// The train's body at one of this stage's slots; ground at 0.
+    pub(crate) fn body_at(&self, slot: Body) -> usize {
+        if slot == GROUND {
+            GROUND
+        } else {
+            self.bodies[slot - 1].body
+        }
+    }
+
+    /// The slot a member spins with.
+    pub(crate) fn slot_of_member(&self, member: usize) -> Body {
+        self.slot(self.members[member].body)
+    }
+
+    /// The axis a slot turns about — a slot, not a body: a body's is
+    /// `axis_of_slot(slot(body))`.
+    pub(crate) fn axis_of_slot(&self, shaft: Body) -> Option<usize> {
+        (shaft != GROUND).then(|| self.bodies[shaft - 1].axis)
+    }
+
+    /// The slot that carries an axis, where a body does.
+    fn carrier_slot(&self, axis: usize) -> Body {
+        self.slot(self.axes[axis].carried_by)
+    }
+
+    /// The largest body number this stage names, ground where it names
+    /// none — what a fresh body is numbered after.
+    #[must_use]
+    pub fn max_body(&self) -> usize {
+        self.bodies.iter().map(|b| b.body).max().unwrap_or(GROUND)
+    }
+
+    /// **Every body renumbered** by `map` — the bodies on the axes, the
+    /// members' and the carriers' — as the train renumbers when a body goes
+    /// or a stage's bodies are given train numbers.
+    pub fn renumber_bodies(&mut self, map: impl Fn(usize) -> usize) {
+        for b in &mut self.bodies {
+            b.body = map(b.body);
+        }
+        for m in &mut self.members {
+            m.body = map(m.body);
+        }
+        for a in &mut self.axes {
+            if a.carried_by != GROUND {
+                a.carried_by = map(a.carried_by);
+            }
+        }
     }
 
     /// **The frame a member's axis stands still in for meshing purposes**:
     /// its carrier where it rides one, and the carrier on its own axis where
     /// it is central to one, and ground otherwise ([`super::wiring`]).
-    fn frame_of_member(&self, member: usize) -> Shaft {
-        let shaft = self.shaft_of(member);
-        let Some(axis) = self.axis_of_shaft(shaft) else {
+    fn frame_of_member(&self, member: usize) -> Body {
+        let shaft = self.slot_of_member(member);
+        let Some(axis) = self.axis_of_slot(shaft) else {
             return GROUND;
         };
-        let c = self.axes[axis].carried_by;
+        let c = self.carrier_slot(axis);
         if c != GROUND {
             return c;
         }
-        // A carrier on this axis: the first shaft here that carries an axis.
-        self.shafts
+        // A carrier on this axis: the first slot here that carries an axis.
+        self.bodies
             .iter()
             .enumerate()
             .filter(|(_, s)| s.axis == axis)
             .map(|(i, _)| i + 1)
-            .find(|&s| self.axes.iter().any(|a| a.carried_by == s))
+            .find(|&s| self.axes.iter().any(|a| self.slot(a.carried_by) == s))
             .unwrap_or(GROUND)
     }
 
-    /// Whether a shaft's axis is one of `N` alike.
-    fn replicated(&self, shaft: Shaft) -> bool {
-        self.axis_of_shaft(shaft)
+    /// Whether a body's axis is one of `N` alike.
+    fn replicated(&self, shaft: Body) -> bool {
+        self.axis_of_slot(shaft)
             .is_some_and(|a| self.axes[a].count > 1)
     }
 
-    /// How many instances of a shaft's axis there are.
-    fn count_of(&self, shaft: Shaft) -> u32 {
-        self.axis_of_shaft(shaft)
+    /// How many instances of a body's axis there are.
+    fn count_of(&self, shaft: Body) -> u32 {
+        self.axis_of_slot(shaft)
             .map_or(1, |a| self.axes[a].count.max(1))
     }
 
@@ -413,8 +474,8 @@ impl Shape {
     pub(crate) fn distance_of(&self, mesh: usize) -> Option<usize> {
         let m = self.meshes[mesh];
         let (a, b) = (
-            self.axis_of_shaft(self.shaft_of(m.a))?,
-            self.axis_of_shaft(self.shaft_of(m.b))?,
+            self.axis_of_slot(self.slot_of_member(m.a))?,
+            self.axis_of_slot(self.slot_of_member(m.b))?,
         );
         self.distances
             .iter()
@@ -525,7 +586,7 @@ impl Shape {
         // count, the axis gear's count).
         let mut pairs: Vec<(i64, i64)> = Vec::new();
         for (k, m) in self.meshes.iter().enumerate() {
-            let on = |i: usize| self.axis_of_shaft(self.shaft_of(i)) == Some(axis);
+            let on = |i: usize| self.axis_of_slot(self.slot_of_member(i)) == Some(axis);
             let (planet, central) = match (on(m.a), on(m.b)) {
                 (true, false) => (m.a, m.b),
                 (false, true) => (m.b, m.a),
@@ -534,7 +595,7 @@ impl Shape {
             // A central member that is itself carried is another planet's,
             // and the rule does not reach it.
             if self
-                .axis_of_shaft(self.shaft_of(central))
+                .axis_of_slot(self.slot_of_member(central))
                 .is_some_and(|a| self.axes[a].carried_by != GROUND)
             {
                 return None;
@@ -622,24 +683,24 @@ impl Shape {
             .collect()
     }
 
-    /// The label a wiring gives a shaft: a carrier where it carries an axis,
+    /// The label a wiring gives a body: a carrier where it carries an axis,
     /// the first member on it otherwise.
-    fn label_of(&self, shaft: Shaft) -> ShaftLabel {
+    fn label_of(&self, shaft: Body) -> BodyLabel {
         if shaft == GROUND {
-            return ShaftLabel::Ground;
+            return BodyLabel::Ground;
         }
-        let carriers: Vec<Shaft> = (1..=self.shafts.len())
-            .filter(|&s| self.axes.iter().any(|a| a.carried_by == s))
+        let carriers: Vec<Body> = (1..=self.bodies.len())
+            .filter(|&s| self.axes.iter().any(|a| self.slot(a.carried_by) == s))
             .collect();
         if let Some(index) = carriers.iter().position(|&c| c == shaft) {
-            return ShaftLabel::Carrier { index };
+            return BodyLabel::Carrier { index };
         }
         let member = self
             .members
             .iter()
-            .position(|m| m.shaft == shaft)
+            .position(|m| self.slot(m.body) == shaft)
             .unwrap_or(0);
-        ShaftLabel::Member { member }
+        BodyLabel::Member { member }
     }
 
     // ---------------------------------------------------------- helices ---
@@ -717,7 +778,7 @@ impl Shape {
                 }
                 Some(target) => self.size_reaching(k, target, &at),
             };
-            // A crossed mesh with nothing stating its size shares the shaft
+            // A crossed mesh with nothing stating its size shares the body
             // angle evenly, which at a right angle is a 45°/45° crossed pair;
             // a parallel one has straight teeth.
             if let Some(beta) = sized.or_else(|| (angle != 0.0).then_some(angle / 2.0)) {
@@ -2276,7 +2337,7 @@ impl PointBuilt {
     /// number. Without the line the crossed rating was the elliptical
     /// solution alone, which assumes half-spaces of unlimited extent: at a
     /// worm's 90° the patch is a small fraction of the face and the
-    /// assumption costs nothing; as the shafts come parallel the ellipse
+    /// assumption costs nothing; as the bodies come parallel the ellipse
     /// lengthens without bound and the pressure it reports falls toward
     /// zero, while the real pair is carrying its load on a line that has not
     /// grown at all (`docs/corrections.md`).
@@ -2761,7 +2822,7 @@ pub struct LayoutReport {
     pub clearance_ok: bool,
 }
 
-/// Every shaft's speed and torque in one load case.
+/// Every body's speed and torque in one load case.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(
@@ -2769,9 +2830,9 @@ pub struct LayoutReport {
     derive(ts_rs::TS),
     ts(export, export_to = "core/")
 )]
-pub struct ShaftCase {
+pub struct SlotCase {
     pub case: usize,
-    /// Per local shaft, ground first.
+    /// Per local body, ground first.
     pub speeds: Vec<f64>,
     pub torques: Vec<f64>,
 }
@@ -2807,13 +2868,13 @@ pub struct ShapeResult {
     /// where power circulates ([`super::flow::Flow::circulation`]). Zero
     /// where the stage does not turn that way; `None` with the ratio.
     pub circulation: Option<Directional<f64>>,
-    /// Play at the output shaft driven forward, at the input driven back.
+    /// Play at the output body driven forward, at the input driven back.
     /// `None` with the ratio.
     pub backlash: Option<Directional<super::Backlash>>,
     pub distances: Vec<DistanceReport>,
     /// One per replicated axis, in axis order.
     pub layouts: Vec<LayoutReport>,
-    pub cases: Vec<ShaftCase>,
+    pub cases: Vec<SlotCase>,
     pub members: Vec<GearResult>,
     pub meshes: Vec<MeshReport>,
     pub notes: Vec<Note>,
@@ -2871,7 +2932,7 @@ pub fn solve_shape_after(
     let speed: Option<Vec<f64>> = motion
         .as_ref()
         .map(|_| solution.values.iter().map(|r| r.to_f64()).collect());
-    let held: Vec<Shaft> = boundary.held();
+    let held: Vec<Body> = boundary.held();
     // A stage driven at two of its ports is one motion and no arrangement
     // to rate under: the second input's torque is nobody's to know.
     if boundary
@@ -2980,8 +3041,8 @@ pub fn solve_shape_after(
             .iter()
             .enumerate()
             .map(|(k, m)| super::flow::MeshFlow {
-                a: shape.shaft_of(m.a),
-                b: shape.shaft_of(m.b),
+                a: shape.slot_of_member(m.a),
+                b: shape.slot_of_member(m.b),
                 frame: wiring.frame(k).unwrap_or(GROUND),
                 za: f64::from(shape.members[m.a].gear.teeth),
                 zb: built.meshes[k].kind.sign() * f64::from(shape.members[m.b].gear.teeth),
@@ -3300,7 +3361,7 @@ pub fn solve_shape_after(
         .map(|k| point_contact(k, face_of(k, &final_width)))
         .collect::<Result<_, _>>()?;
 
-    // ---- backlash: each mesh's play, and where it shows on each shaft.
+    // ---- backlash: each mesh's play, and where it shows on each body.
     let play_of = |k: usize, a: f64| -> f64 {
         let bm = &built.meshes[k];
         let m = shape.meshes[k];
@@ -3326,9 +3387,9 @@ pub fn solve_shape_after(
             }
         }
     };
-    // Play at a shaft per unit of play in mesh `k`, with the input and the
-    // held shafts standing still.
-    let coefficient = |k: usize, at: Shaft, input: Shaft| -> f64 {
+    // Play at a body per unit of play in mesh `k`, with the input and the
+    // held bodies standing still.
+    let coefficient = |k: usize, at: Body, input: Body| -> f64 {
         let mut conditions = boundary.conditions.clone();
         for c in conditions.iter_mut() {
             if matches!(c, crate::kinematics::Condition::Drive(_)) {
@@ -3358,7 +3419,7 @@ pub fn solve_shape_after(
                 0.0
             }
     };
-    let backlash_at = |at: Shaft, input: Shaft| -> super::Backlash {
+    let backlash_at = |at: Body, input: Body| -> super::Backlash {
         super::Backlash::banded(0.0, 1.0, 1.0, |t| {
             (0..shape.meshes.len())
                 .map(|k| coefficient(k, at, input) * play_of(k, at_band(k, t)))
@@ -3443,12 +3504,12 @@ pub fn solve_shape_after(
         .filter_map(|(axis, a)| {
             let count = a.count;
             let on_axis: Vec<usize> = (0..n)
-                .filter(|&i| shape.axis_of_shaft(shape.shaft_of(i)) == Some(axis))
+                .filter(|&i| shape.axis_of_slot(shape.slot_of_member(i)) == Some(axis))
                 .collect();
             // The radius the instances stand at: the distance from the axis
             // the carrier turns about, not whatever mesh comes first — a
             // planet meshing another planet has a distance that is neither.
-            let central = shape.axis_of_shaft(a.carried_by)?;
+            let central = shape.axis_of_slot(shape.slot(a.carried_by))?;
             let d = shape
                 .distances
                 .iter()
@@ -3536,8 +3597,8 @@ pub fn solve_shape_after(
     // **A member's torque is the torque its teeth carry** — the mesh force at
     // its reference cylinder, which is the driver's torque read across the
     // mesh and the one number every stress on the member is proportional to.
-    // What a member's *shaft* delivers, `η` less on the driven side, is the
-    // shaft's figure (`ShapeResult::cases`), not the gear's. A member in two
+    // What a member's *body* delivers, `η` less on the driven side, is the
+    // body's figure (`ShapeResult::cases`), not the gear's. A member in two
     // meshes reports the larger.
     let member_torque = |i: usize, c: &super::CaseLoad| -> f64 {
         meshes_of[i]
@@ -3556,7 +3617,7 @@ pub fn solve_shape_after(
     };
     let members: Vec<GearResult> = (0..n)
         .map(|i| {
-            let shaft = shape.shaft_of(i);
+            let shaft = shape.slot_of_member(i);
             let frame = shape.frame_of_member(i);
             let rated_cases = rating(i, &mesh_widths)
                 .rated()
@@ -3681,7 +3742,8 @@ pub fn solve_shape_after(
                         first_speed: cases
                             .iter()
                             .map(|c| {
-                                c.speeds[shape.shaft_of(m.a)] - c.speeds[shape.frame_of_member(m.a)]
+                                c.speeds[shape.slot_of_member(m.a)]
+                                    - c.speeds[shape.frame_of_member(m.a)]
                             })
                             .collect(),
                     },
@@ -3711,7 +3773,7 @@ pub fn solve_shape_after(
         layouts,
         cases: cases
             .iter()
-            .map(|c| ShaftCase {
+            .map(|c| SlotCase {
                 case: c.case,
                 speeds: c.speeds.clone(),
                 torques: c.torques.clone(),
@@ -3899,16 +3961,16 @@ impl Constrained for Shape {
         groups
     }
 
-    /// The shape *is* the topology: each member spins with its shaft in the
+    /// The shape *is* the topology: each member spins with its body in the
     /// frame its axis stands still in, and a mesh's sign is its members'.
     fn wiring(&self) -> Wiring {
         Wiring {
-            shafts: (0..=self.shafts.len()).map(|s| self.label_of(s)).collect(),
+            slots: (0..=self.bodies.len()).map(|s| self.label_of(s)).collect(),
             mounts: (0..self.members.len())
                 .map(|i| Mount {
-                    spins_with: self.shaft_of(i),
+                    spins_with: self.slot_of_member(i),
                     axis_fixed_in: self.frame_of_member(i),
-                    replicated: self.replicated(self.shaft_of(i)),
+                    replicated: self.replicated(self.slot_of_member(i)),
                 })
                 .collect(),
             meshes: (0..self.meshes.len())
@@ -3921,32 +3983,32 @@ impl Constrained for Shape {
                         // refuses it as it refuses a member meshing itself.
                         kind: self.kind_of(k).unwrap_or(MeshKind::External),
                         paths: self
-                            .count_of(self.shaft_of(m.a))
-                            .max(self.count_of(self.shaft_of(m.b))),
+                            .count_of(self.slot_of_member(m.a))
+                            .max(self.count_of(self.slot_of_member(m.b))),
                     }
                 })
                 .collect(),
         }
     }
 
-    /// **Every shaft that is not replicated is a port**, in shaft order — a
+    /// **Every body that is not replicated is a port**, in body order — a
     /// pair's two members, a set's sun, carrier and ring, a layshaft, and a
     /// single orbiting member: a planocentric reducer's output *is* its
     /// planet, taken off through an Oldham coupling, and a hula's wobble
-    /// body is the same shaft with four gears on it. (For a while a shaft
+    /// body is the same body with four gears on it. (For a while a body
     /// on a carried axis was no port, because a case reacted every open
     /// port it did not load and so held the wobble body; a case declares
     /// what it reacts now, and an orbiting port is a port.) What is held by
-    /// convention is the first ring's shaft, where there is a ring.
+    /// convention is the first ring's body, where there is a ring.
     fn ports(&self) -> Ports {
-        let ports: Vec<Shaft> = (1..=self.shafts.len())
+        let ports: Vec<Body> = (1..=self.bodies.len())
             .filter(|&s| !self.replicated(s))
             .collect();
-        let held: Vec<Shaft> = self
+        let held: Vec<Body> = self
             .members
             .iter()
             .filter(|m| m.ring.is_some())
-            .map(|m| m.shaft)
+            .map(|m| self.slot(m.body))
             .find(|s| ports.contains(s))
             .into_iter()
             .collect();
@@ -4001,7 +4063,7 @@ impl From<&super::PairStage> for Shape {
 
 impl From<&super::PlanetaryStage> for Shape {
     /// **The set's vocabulary over the epicyclic list** — sun, carrier,
-    /// ring, so the shafts are numbered as the set's own solver numbered
+    /// ring, so the bodies are numbered as the set's own solver numbered
     /// them (sun 1, carrier 2, ring 3, planet 4) and the members read sun,
     /// planet, ring — with the set's words written on it: each member's
     /// gear, the shared module and pressure angle, the sun's thickness
@@ -4149,7 +4211,7 @@ mod tests {
 
     /// **Every arrangement of a set solves through the shape** and reports a
     /// ratio the graph gives, an efficiency below one both ways, and a play
-    /// at whichever shaft is the output.
+    /// at whichever body is the output.
     /// A set as the closure's laws ask it: the shifts as typed, no
     /// undercut floor, zero backlash, the planet closing it.
     fn closure_set(sun: u32, planet: u32, ring: u32) -> Shape {
@@ -4495,7 +4557,7 @@ mod tests {
                 )
                 .unwrap()
             };
-            // The shafts: ground, sun, carrier, ring, planet. The sun's torque
+            // The bodies: ground, sun, carrier, ring, planet. The sun's torque
             // per planet path read across the sun mesh presses the planet;
             // the ring's, per path, is `η` less than the planet pressed it
             // with, read back across the ring mesh.
@@ -5016,14 +5078,14 @@ mod tests {
 
     /// **The backlash referral, against the kinematics.**
     ///
-    /// The same play measured at two different output shafts must differ by
+    /// The same play measured at two different output bodies must differ by
     /// exactly the ratio between them — and those ratios come from
     /// `planetary::power`, which shares none of the referral's algebra. That is
     /// what makes this a check rather than a restatement.
     ///
     /// It is also the law the train-level test uses on a multi-stage train
     /// ("backlash at the two ends differs by exactly the total ratio"), asked of
-    /// one stage with three shafts instead of a line of two-shaft ones.
+    /// one stage with three bodies instead of a line of two-body ones.
     #[test]
     fn backlash_referred_to_two_shafts_differs_by_exactly_their_ratio() {
         let lib = test_library();
@@ -5048,7 +5110,7 @@ mod tests {
                 "z={s}/{p}/{r}: {at_sun} vs {at_carrier} x {}",
                 a.ratio.unwrap()
             );
-            // ...and the shaft that turns faster carries the looser play.
+            // ...and the body that turns faster carries the looser play.
             assert!(at_sun > at_carrier);
         }
     }
@@ -5508,7 +5570,7 @@ mod hula_recorded {
     //! two side by side lived at `2b71654` and found them the same to 1e-6
     //! — ratio, crank offset and the mesh that held it open, every shift
     //! and width, every mesh's figures, the stage's efficiency both ways and
-    //! its backlash at both shafts — apart from the two differences the
+    //! its backlash at both bodies — apart from the two differences the
     //! set's retirement had already recorded (`docs/corrections.md`): a
     //! driven member pressed with its driver's force, and a case from the
     //! output entered at the output rather than read as the crank's
@@ -5538,7 +5600,7 @@ mod hula_recorded {
     }
 
     /// The hula's own boundary: crank driven, grounded gear held, output
-    /// out — shafts 1, 2 and 3 of the shape.
+    /// out — bodies 1, 2 and 3 of the shape.
     fn solve(shape: &Shape, loads: StageLoads) -> ShapeResult {
         let boundary = super::super::StageBoundary::holding(5, &[2], 1, 3);
         solve_loads(

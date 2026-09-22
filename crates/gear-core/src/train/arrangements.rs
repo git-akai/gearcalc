@@ -10,16 +10,16 @@
 //! textbook gives.
 //!
 //! [`Builder`] is the whole vocabulary: an axis, carried or not and
-//! replicated or not; a shaft on an axis; a gear or a ring on a shaft; a
-//! mesh between two members; a distance between two axes. Shafts are
+//! replicated or not; a body on an axis; a gear or a ring on a body; a
+//! mesh between two members; a distance between two axes. Bodies are
 //! numbered as the wiring numbers them, ground being 0, so the numbers a
 //! builder hands back are the ones a train's constraints address.
 
 use super::shape::{
-    default_min_contact_ratio, default_overlap, Axis, Distance, Member, MeshInput, ShaftOn, Shape,
+    default_min_contact_ratio, default_overlap, Axis, BodyOn, Distance, Member, MeshInput, Shape,
 };
 use super::StageGear;
-use crate::kinematics::{Shaft, GROUND};
+use crate::kinematics::{Body, GROUND};
 use crate::params::Auto;
 use crate::ring::Cutter;
 
@@ -50,27 +50,29 @@ impl Builder {
     }
 
     /// An axis carried round by `carrier`, `count` times.
-    pub fn carried_axis(&mut self, carrier: Shaft, count: u32) -> usize {
+    pub fn carried_axis(&mut self, carrier: Body, count: u32) -> usize {
         self.shape.push_axis(carrier, count)
     }
 
-    /// A shaft on an axis, numbered as the wiring numbers it.
-    pub fn shaft(&mut self, axis: usize) -> Shaft {
-        self.shape.push_shaft(axis)
+    /// A body on an axis — the train's number for it, which on a stage
+    /// built alone is its slot in the stage's own numbering.
+    pub fn body(&mut self, axis: usize) -> usize {
+        let next = self.shape.max_body() + 1;
+        self.shape.push_body(axis, next)
     }
 
-    /// An external gear on a shaft; the member's index.
-    pub fn gear(&mut self, shaft: Shaft, teeth: u32) -> usize {
-        self.shape.push_member(shaft, teeth, self.module, None)
+    /// An external gear on a body; the member's index.
+    pub fn gear(&mut self, body: usize, teeth: u32) -> usize {
+        self.shape.push_member(body, teeth, self.module, None)
     }
 
-    /// A ring on a shaft, cut by the shipped cutter, its shift automatic
+    /// A ring on a body, cut by the shipped cutter, its shift automatic
     /// like every other member's here — a second ring at one carrier radius
     /// is closed by its shift, which a ring given at zero could not do; the
     /// member's index.
-    pub fn ring(&mut self, shaft: Shaft, teeth: u32) -> usize {
+    pub fn ring(&mut self, body: usize, teeth: u32) -> usize {
         self.shape
-            .push_member(shaft, teeth, self.module, Some(Cutter::default()))
+            .push_member(body, teeth, self.module, Some(Cutter::default()))
     }
 
     /// Two members in mesh. On an internal mesh the ring goes second, as
@@ -98,15 +100,15 @@ impl Builder {
     }
 }
 
-/// **A layshaft transmission**: an input shaft and an output shaft on one
+/// **A layshaft transmission**: an input body and an output body on one
 /// centreline, a layshaft beside them, and a pair of gears per ratio at the
 /// one distance between the two axes. The input's gear drives the layshaft;
-/// the engaged pair drives the output shaft; every other pair's output-side
-/// gear idles on a shaft of its own, coaxial with the output. `pairs` are
+/// the engaged pair drives the output body; every other pair's output-side
+/// gear idles on a body of its own, coaxial with the output. `pairs` are
 /// `(on the layshaft, on the output side)` in order, `engaged` the index of
 /// the one driving; the first pair is the input's constant mesh.
 ///
-/// Shafts: input 1, output 2, layshaft 3, then one idler per disengaged
+/// Bodies: input 1, output 2, layshaft 3, then one idler per disengaged
 /// pair — the output before the layshaft so that the convention's "first
 /// free port after the input" is the output and not the layshaft.
 #[must_use]
@@ -114,18 +116,14 @@ pub fn layshaft(input: (u32, u32), pairs: &[(u32, u32)], engaged: usize) -> Shap
     let mut b = Builder::new(1.0);
     let centre = b.axis();
     let lay = b.axis();
-    let input_shaft = b.shaft(centre);
-    let output = b.shaft(centre);
-    let layshaft = b.shaft(lay);
+    let input_shaft = b.body(centre);
+    let output = b.body(centre);
+    let layshaft = b.body(lay);
     let driving = b.gear(input_shaft, input.0);
     let driven = b.gear(layshaft, input.1);
     b.mesh(driving, driven);
     for (i, &(on_lay, on_out)) in pairs.iter().enumerate() {
-        let shaft = if i == engaged {
-            output
-        } else {
-            b.shaft(centre)
-        };
+        let shaft = if i == engaged { output } else { b.body(centre) };
         let a = b.gear(layshaft, on_lay);
         let z = b.gear(shaft, on_out);
         b.mesh(a, z);
@@ -137,14 +135,14 @@ pub fn layshaft(input: (u32, u32), pairs: &[(u32, u32)], engaged: usize) -> Shap
 /// **A member on the central axis of an epicyclic stage**, or the carrier —
 /// what sits on the axis the planets go round, in the order it is listed.
 ///
-/// The order is the shaft order, and the shaft order is what a stage's
+/// The order is the body order, and the body order is what a stage's
 /// conventions read (`Shape::ports`): the first ring listed is held, the
-/// first shaft not held is the input and the next the output. So a list
+/// first body not held is the input and the next the output. So a list
 /// is an arrangement *and* the way it is conventionally used, and every
 /// textbook arrangement below is one list with nothing else stated.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Central {
-    /// The carrier, on its own shaft. One per stage.
+    /// The carrier, on its own body. One per stage.
     Carrier,
     /// An external gear meshing the planet gear `on` (an index into the
     /// planet gears as [`epicyclic`] flattens them, axis by axis).
@@ -155,14 +153,14 @@ pub enum Central {
 
 /// **The one epicyclic stage**: a carrier, `planets` carried axes each
 /// replicated `count` times and each carrying the gears it lists (a step
-/// each, on one shaft — a negative count a ring, the crate's own sign for
+/// each, on one body — a negative count a ring, the crate's own sign for
 /// one), the central members and the carrier in [`Central`]'s order, and
 /// `planet_meshes` between planet gears on different axes. A simple set, a
 /// Wolfrom, a stepped planet, a planocentric, meshed planets and a
 /// Ravigneaux are lists; so is a hula stage, at one planet with two steps
 /// and a ring on each.
 ///
-/// Shafts: the centrals in list order (the carrier among them), then one
+/// Bodies: the centrals in list order (the carrier among them), then one
 /// per carried axis. Members: the list's order too, **the planet gears
 /// standing where the carrier is listed**, axis by axis — so a simple set
 /// listed sun, carrier, ring reads sun, planet, ring, the first ring listed
@@ -182,9 +180,9 @@ pub fn epicyclic(
 ) -> Shape {
     let mut b = Builder::new(1.0);
     let centre = b.axis();
-    // Every central shaft first, in the order listed; the carrier's number
+    // Every central body first, in the order listed; the carrier's number
     // is what the carried axes are hung from.
-    let shafts: Vec<Shaft> = centrals.iter().map(|_| b.shaft(centre)).collect();
+    let shafts: Vec<Body> = centrals.iter().map(|_| b.body(centre)).collect();
     let carrier = centrals
         .iter()
         .position(|c| *c == Central::Carrier)
@@ -194,7 +192,7 @@ pub fn epicyclic(
         .iter()
         .map(|_| b.carried_axis(carrier, count))
         .collect();
-    let planet_shafts: Vec<Shaft> = axes.iter().map(|&a| b.shaft(a)).collect();
+    let planet_shafts: Vec<Body> = axes.iter().map(|&a| b.body(a)).collect();
     // Members in the list's order, the planets at the carrier's place, so
     // the ordinals a name carries follow the list.
     let mut planet_members: Vec<usize> = Vec::new();
@@ -245,7 +243,7 @@ pub fn epicyclic(
 
 /// **A line of gears on parallel axes**, each meshing the next: two are a
 /// pair, three a pair with an idler, and the ratio is the ends' whatever
-/// stands between. Shafts and members in the order given.
+/// stands between. Bodies and members in the order given.
 ///
 /// # Panics
 ///
@@ -258,7 +256,7 @@ pub fn line(teeth: &[u32]) -> Shape {
         .iter()
         .map(|&z| {
             let axis = b.axis();
-            let shaft = b.shaft(axis);
+            let shaft = b.body(axis);
             b.gear(shaft, z)
         })
         .collect();
@@ -270,17 +268,21 @@ pub fn line(teeth: &[u32]) -> Shape {
 
 /// **Growing a shape a piece at a time** — what [`Builder`] does to a new
 /// one and the card's edits (`train/edits.rs`) do to one that exists, so
-/// the two add a shaft, a member, a mesh or a distance by one rule. Every
+/// the two add a body, a member, a mesh or a distance by one rule. Every
 /// push appends and hands back the index the wiring gives the piece.
 impl Shape {
-    pub(crate) fn push_axis(&mut self, carried_by: Shaft, count: u32) -> usize {
+    pub(crate) fn push_axis(&mut self, carried_by: Body, count: u32) -> usize {
         self.axes.push(Axis { carried_by, count });
         self.axes.len() - 1
     }
 
-    pub(crate) fn push_shaft(&mut self, axis: usize) -> Shaft {
-        self.shafts.push(ShaftOn { axis });
-        self.shafts.len()
+    /// **A new body on an axis**, numbered after every body the stage
+    /// names — which on a stage built alone is its slot, and in a train is
+    /// whatever the train hands down (`next`, the first number free).
+    pub(crate) fn push_body(&mut self, axis: usize, next: usize) -> usize {
+        let body = next.max(self.max_body() + 1);
+        self.bodies.push(BodyOn { body, axis });
+        body
     }
 
     /// A member at the crate's default tooth, its thickness coefficient
@@ -289,7 +291,7 @@ impl Shape {
     /// a ring where a cutter is given.
     pub(crate) fn push_member(
         &mut self,
-        shaft: Shaft,
+        body: usize,
         teeth: u32,
         module: f64,
         ring: Option<Cutter>,
@@ -299,7 +301,7 @@ impl Shape {
             |m| m.pressure_angle,
         );
         self.members.push(Member {
-            shaft,
+            body,
             gear: StageGear {
                 teeth,
                 ..StageGear::default()
@@ -373,7 +375,7 @@ fn external(teeth: u32) -> i32 {
 /// meet. Each mesh's module is its own; the pinion of each states the
 /// thickness coefficient and its ring follows.
 ///
-/// Shafts: carrier, grounded gear, output, then the wobble body — the
+/// Bodies: carrier, grounded gear, output, then the wobble body — the
 /// grounded gear held by convention, the crank in, the output out. Members:
 /// the two wobble gears, then the grounded gear and the output; each mesh
 /// is a wobble gear and the central of the same index.
@@ -447,7 +449,7 @@ pub fn wolfrom(planet: u32, rings: [u32; 2], count: u32) -> Shape {
     )
 }
 
-/// **A stepped-planet set**: two gears on each planet shaft, the first
+/// **A stepped-planet set**: two gears on each planet body, the first
 /// meshing the sun and the first ring, the second the second ring — a
 /// compound set at one carrier radius, which the second ring's shift
 /// closes.
@@ -481,7 +483,7 @@ pub fn stepped(sun: u32, planets: [u32; 2], rings: [u32; 2], count: u32) -> Shap
 /// the carrier the input, the planet's own rotation the output. The ratio
 /// is `−z_p / (z_r − z_p)`.
 ///
-/// Carrier, ring, then the planet's own shaft — the output, an orbiting
+/// Carrier, ring, then the planet's own body — the output, an orbiting
 /// port.
 #[must_use]
 pub fn planocentric(planet: u32, ring: u32) -> Shape {
@@ -498,7 +500,7 @@ pub fn planocentric(planet: u32, ring: u32) -> Shape {
 /// their own carried axes. It reverses the simple set's sense: with the
 /// ring held the carrier turns against the sun, at `1 − z_r/z_s`.
 ///
-/// Sun, carrier, ring, then planet A's shaft and planet B's.
+/// Sun, carrier, ring, then planet A's body and planet B's.
 #[must_use]
 pub fn meshed_planets(sun: u32, planets: [u32; 2], ring: u32, count: u32) -> Shape {
     epicyclic(
@@ -518,7 +520,7 @@ pub fn meshed_planets(sun: u32, planets: [u32; 2], ring: u32, count: u32) -> Sha
 /// ones — two planet axes on one carrier, and the planet–planet mesh a
 /// distance between two carried axes.
 ///
-/// Small sun, carrier, large sun, ring, then the long planet's shaft and
+/// Small sun, carrier, large sun, ring, then the long planet's body and
 /// the short's — the carrier the output by convention, whichever sun
 /// drives and whichever is held.
 #[must_use]
@@ -543,21 +545,21 @@ pub fn ravigneaux(suns: [u32; 2], planets: [u32; 2], ring: u32, count: u32) -> S
 }
 
 /// **A worm feeding a spur pair in one stage**: the worm on its own axis at
-/// a right angle to a wheel shaft that also carries a pinion, and the gear
+/// a right angle to a wheel body that also carries a pinion, and the gear
 /// the pinion drives on a third axis parallel to it. Two distances, one at
 /// an angle; a point contact and a line contact in one shape, which is what
 /// a crossed distance being a mesh like any other buys.
 ///
-/// Shafts: worm 1, output 2, wheel 3; members: worm, wheel, pinion, gear.
+/// Bodies: worm 1, output 2, wheel 3; members: worm, wheel, pinion, gear.
 #[must_use]
 pub fn worm_and_pair(worm: (u32, u32), pair: (u32, u32)) -> Shape {
     let mut b = Builder::new(1.0);
     let worm_axis = b.axis();
     let wheel_axis = b.axis();
     let out_axis = b.axis();
-    let worm_shaft = b.shaft(worm_axis);
-    let output = b.shaft(out_axis);
-    let wheel_shaft = b.shaft(wheel_axis);
+    let worm_shaft = b.body(worm_axis);
+    let output = b.body(out_axis);
+    let wheel_shaft = b.body(wheel_axis);
     let w = b.gear(worm_shaft, worm.0);
     let wheel = b.gear(wheel_shaft, worm.1);
     let pinion = b.gear(wheel_shaft, pair.0);
@@ -648,7 +650,7 @@ pub enum StagePreset {
     Layshaft,
     /// A worm and its wheel ([`super::PairStage::worm`]).
     Worm,
-    /// A helical pair on shafts at a right angle: a point contact.
+    /// A helical pair on bodies at a right angle: a point contact.
     Crossed,
     /// A simple set ([`super::PlanetaryStage`]).
     Planetary,
@@ -747,13 +749,13 @@ mod tests {
     use super::super::{test_library as library, Constrained, Reversal, StageBoundary, StageLoads};
     use super::*;
 
-    fn solve(shape: &Shape, held: &[Shaft], input: Shaft, output: Shaft) -> ShapeResult {
-        let boundary = StageBoundary::holding(shape.shafts.len() + 1, held, input, output);
+    fn solve(shape: &Shape, held: &[Body], input: Body, output: Body) -> ShapeResult {
+        let boundary = StageBoundary::holding(shape.bodies.len() + 1, held, input, output);
         under(shape, boundary)
     }
 
     /// The arrangement as its list reads: the first ring held, the first
-    /// shaft not held driven, the next the output — what a stage does with
+    /// body not held driven, the next the output — what a stage does with
     /// nothing stated, which is the claim each list's doc makes.
     fn conventionally(shape: &Shape) -> ShapeResult {
         under(
@@ -806,7 +808,7 @@ mod tests {
             let r = solve(&shape, &[held], input, 2);
             let sun = 0;
             for (i, m) in shape.members.iter().enumerate() {
-                let axis = shape.shafts[m.shaft - 1].axis;
+                let axis = shape.axis_of_slot(shape.slot_of_member(i)).unwrap();
                 if shape.axes[axis].carried_by == GROUND {
                     continue;
                 }
@@ -826,7 +828,7 @@ mod tests {
     /// **A point contact and a line contact in one stage** multiply as any
     /// two meshes do: the ratio is the worm's times the pair's, the
     /// efficiency the product of the two meshes' own, the wheel is rated by
-    /// contact alone and the pinion on its shaft by bending as well, and
+    /// contact alone and the pinion on its body by bending as well, and
     /// the stage locks backward exactly where the worm does.
     #[test]
     fn a_worm_and_a_spur_pair_share_one_stage() {
@@ -853,7 +855,7 @@ mod tests {
         assert!(r.members[1].cases[0].bending_stress.is_none());
         assert!(r.members[2].cases[0].bending_stress.is_some());
         assert!(r.members[1].cases[0].contact_stress > 0.0);
-        // The wheel and the pinion turn as one: the same shaft.
+        // The wheel and the pinion turn as one: the same body.
         assert_eq!(r.members[1].cases[0].speed, r.members[2].cases[0].speed);
     }
 
@@ -876,7 +878,7 @@ mod tests {
             assert_eq!(r.distances.len(), 1);
             assert_eq!(r.distances[0].nominal.len(), 4);
             // The idlers turn and carry nothing.
-            let idlers: Vec<Shaft> = (4..=shape.shafts.len()).collect();
+            let idlers: Vec<Body> = (4..=shape.bodies.len()).collect();
             for c in &r.cases {
                 for &s in &idlers {
                     assert!(c.speeds[s] != 0.0 || c.case == 2, "idler {s} stands still");
@@ -1135,7 +1137,7 @@ mod hula {
         }
 
         /// The hula's own arrangement: crank driven, grounded gear held,
-        /// output out — the shape's shafts 1, 2 and 3.
+        /// output out — the shape's bodies 1, 2 and 3.
         fn solve(&self, speed: f64) -> Result<ShapeResult, TrainError> {
             solve_loads(
                 &self.shape(),
@@ -1541,7 +1543,7 @@ mod hula {
         assert!(last < 0.2, "2500:1 should be dear: {last}");
     }
 
-    /// **The play at the two shafts differs by the reduction**, and the
+    /// **The play at the two bodies differs by the reduction**, and the
     /// output's play is the two meshes' plays referred through the body —
     /// mesh A's at the wobble gear, carried through mesh B by `z₃/z₄`, plus
     /// mesh B's own at the output.

@@ -1139,14 +1139,10 @@ mod tests {
         // through the geometry — the case has to be live, not merely
         // constructible.
         {
-            use gear_core::train::{LoadCase, PairStage, ShaftRef, Stage, Train};
-            let (start, end) = (
-                ShaftRef::Of { stage: 0, shaft: 1 },
-                ShaftRef::Of { stage: 0, shaft: 2 },
-            );
+            use gear_core::train::{LoadCase, PairStage, Stage, Train};
             let train = |stages| {
-                Train::chained(
-                    stages,
+                Train::chained(stages, |t| {
+                    let (start, end) = (t.port(0, 1), t.port(0, 2));
                     vec![
                         LoadCase::ultimate(start, end, 2.0, 3000.0),
                         // A load from the end that nothing is asked to hold:
@@ -1161,8 +1157,8 @@ mod tests {
                             ],
                             ..LoadCase::back_driving(start, end, 5.0)
                         },
-                    ],
-                )
+                    ]
+                })
             };
             // A load nothing reacts...
             if let Ok(r) =
@@ -1189,6 +1185,7 @@ mod tests {
                 use gear_core::params::Auto;
                 use gear_core::train::{Load, LoadRole};
                 let mut t = train(vec![Stage::pair(PairStage::default())]);
+                let (start, end) = (t.port(0, 1), t.port(0, 2));
                 t.load_cases = vec![
                     LoadCase {
                         loads: Vec::new(),
@@ -1433,50 +1430,41 @@ mod tests {
             err(TrainError::UnknownMaterial("nothing by that name".into()).note());
             err(TrainError::NoRootSection.note());
             if let Err(e) = gear_core::train::solve_train(
-                &Train::chained(
-                    Vec::new(),
-                    vec![gear_core::train::LoadCase::ultimate(
-                        gear_core::train::ShaftRef::Ground,
-                        gear_core::train::ShaftRef::Ground,
-                        2.0,
-                        3000.0,
-                    )],
-                ),
+                &Train::chained(Vec::new(), |_| {
+                    vec![gear_core::train::LoadCase::ultimate(1, 2, 2.0, 3000.0)]
+                }),
                 &lib,
             ) {
                 err(e.note());
             }
-            // **A load case that names a shaft it cannot enter by, and one
+            // **A load case that names a body it cannot enter by, and one
             // that enters between two stages** — both fired from the model,
             // on a two-pair chain: a load on the held ground, and a load on
-            // the shaft the two pairs share.
+            // the body the two pairs share.
             {
-                use gear_core::train::{
-                    Load, LoadCase, LoadRole, PairStage, ShaftRef, Stage, Train,
-                };
-                let (start, end) = (
-                    ShaftRef::Of { stage: 0, shaft: 1 },
-                    ShaftRef::Of { stage: 1, shaft: 2 },
-                );
-                let at = |port| {
+                use gear_core::train::{Load, LoadCase, LoadRole, PairStage, Stage, Train};
+                let at = |port: usize| {
                     Train::chained(
                         vec![
                             Stage::pair(PairStage::default()),
                             Stage::pair(PairStage::default()),
                         ],
-                        vec![LoadCase {
-                            loads: vec![
-                                Load::given(port, 2.0, 3000.0),
-                                Load::declared(start, LoadRole::Reacted),
-                                Load::declared(end, LoadRole::Reacted),
-                            ],
-                            ..LoadCase::ultimate(start, end, 2.0, 3000.0)
-                        }],
+                        |t| {
+                            let (start, end) = (t.port(0, 1), t.port(1, 2));
+                            vec![LoadCase {
+                                loads: vec![
+                                    Load::given(port, 2.0, 3000.0),
+                                    Load::declared(start, LoadRole::Reacted),
+                                    Load::declared(end, LoadRole::Reacted),
+                                ],
+                                ..LoadCase::ultimate(start, end, 2.0, 3000.0)
+                            }]
+                        },
                     )
                 };
                 // A load on ground is refused by name; one on the shared
-                // shaft, held at both ends, is a case that says so.
-                let out = gear_core::train::solve_train(&at(ShaftRef::Ground), &lib);
+                // body, held at both ends, is a case that says so.
+                let out = gear_core::train::solve_train(&at(gear_core::kinematics::GROUND), &lib);
                 assert!(
                     matches!(out, Err(TrainError::LoadPort { case: 0 })),
                     "a load at ground is refused by name, not solved: {out:?}"
@@ -1484,34 +1472,27 @@ mod tests {
                 if let Err(e) = out {
                     err(e.note());
                 }
-                if let Ok(r) =
-                    gear_core::train::solve_train(&at(ShaftRef::Of { stage: 1, shaft: 1 }), &lib)
-                {
+                // The chain's shared body is the first pair's second, 2.
+                if let Ok(r) = gear_core::train::solve_train(&at(2), &lib) {
                     for n in r.every_note() {
                         err(n);
                     }
                 }
             }
             // **Every way the train's own conditions can fail to give one
-            // motion**, each fired from the model on a set whose shafts are
+            // motion**, each fired from the model on a set whose bodies are
             // sun 1, carrier 2, ring 3: the carrier and the ring both held
-            // (the sun cannot turn); a constraint on a shaft no stage has;
+            // (the sun cannot turn); a constraint on a body no stage has;
             // and a chain whose tooth counts multiply past `i128`.
             {
                 use gear_core::train::{
-                    LoadCase, PairStage, PlanetaryStage, ShaftConstraint, ShaftRef, Stage,
-                    StageGear, Train,
+                    BodyConstraint, LoadCase, PairStage, PlanetaryStage, Stage, StageGear, Train,
                 };
                 let set = |constraints| {
-                    let mut t = Train::chained(
-                        vec![Stage::planetary(PlanetaryStage::default())],
-                        vec![LoadCase::ultimate(
-                            ShaftRef::Of { stage: 0, shaft: 1 },
-                            ShaftRef::Of { stage: 0, shaft: 2 },
-                            2.0,
-                            3000.0,
-                        )],
-                    );
+                    let mut t =
+                        Train::chained(vec![Stage::planetary(PlanetaryStage::default())], |t| {
+                            vec![LoadCase::ultimate(t.port(0, 1), t.port(0, 2), 2.0, 3000.0)]
+                        });
                     t.constraints = constraints;
                     t
                 };
@@ -1519,8 +1500,8 @@ mod tests {
                     teeth,
                     ..StageGear::default()
                 };
-                let wide = Train {
-                    stages: (0..6)
+                let wide = Train::chained(
+                    (0..6)
                         .map(|k| {
                             Stage::pair(PairStage {
                                 gears: [huge(4_000_000_000 + k), huge(4_000_000_001 + k)],
@@ -1528,17 +1509,14 @@ mod tests {
                             })
                         })
                         .collect(),
-                    ..set(Vec::new())
-                };
+                    |t| vec![LoadCase::ultimate(t.port(0, 1), t.port(5, 2), 2.0, 3000.0)],
+                );
                 let trains = [
                     (
-                        set(vec![
-                            ShaftConstraint::held(0, 2),
-                            ShaftConstraint::held(0, 3),
-                        ]),
+                        set(vec![BodyConstraint::held(2), BodyConstraint::held(3)]),
                         "overdetermined",
                     ),
-                    (set(vec![ShaftConstraint::held(7, 1)]), "no such shaft"),
+                    (set(vec![BodyConstraint::held(7)]), "no such body"),
                     (wide, "overflow"),
                 ];
                 for (train, what) in trains {
@@ -1547,7 +1525,7 @@ mod tests {
                         matches!(
                             e,
                             TrainError::Overdetermined { .. }
-                                | TrainError::NoSuchShaft { .. }
+                                | TrainError::NoSuchBody { .. }
                                 | TrainError::Overflow
                                 | TrainError::InStage { .. }
                         ),

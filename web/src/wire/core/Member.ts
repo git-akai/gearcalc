@@ -4,13 +4,13 @@ import type { Cutter } from "./Cutter";
 import type { StageGear } from "./StageGear";
 
 /**
- * A gear, on a shaft.
+ * A gear, on a body.
  */
 export type Member = { 
 /**
- * The shaft it spins with, numbered as [`ShaftOn`] is.
+ * The train's body it spins with, one of this stage's [`BodyOn`]s.
  */
-shaft: number, gear: StageGear, 
+body: number, gear: StageGear, 
 /**
  * Normal module, mm. Every mesh a member is in shares it.
  */

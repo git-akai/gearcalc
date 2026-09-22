@@ -259,7 +259,7 @@ location: where a boundary is drawn, and what a directory is not for.
 | `crates/gear-core` | All mathematics. No I/O, no UI, no wasm. `serde` and `ts-rs`, both optional and both about the shape a type takes when it leaves. |
 | `gear-core/src/gear.rs` | `Gear` — the assembly, and the only place a gear is drawn. An ordinary gear is `Δx = 0`. |
 | `gear-core/src/strength.rs` | The bending model: the critical section both kinds of member share, the notch factors and which fillet radius each reads, and the Hertz contact beside it. |
-| `gear-core/src/train/mod.rs` | What every stage shares: the load cases, each solved as one flow across every stage with what it puts on each stage's shafts handed down, `MemberRating` — every mesh a member is in, in every case, and the worst mesh — `Bending`, `MeshReport`, the engagement rule, and the train that strings the stages together. |
+| `gear-core/src/train/mod.rs` | What every stage shares: the load cases, each solved as one flow across every stage with what it puts on each stage's bodies handed down, `MemberRating` — every mesh a member is in, in every case, and the worst mesh — `Bending`, `MeshReport`, the engagement rule, and the train that strings the stages together. |
 | `crates/gear-io` | File formats: DXF export, the TOML material library and geartrain documents, and the string catalogue. |
 | `crates/gear-wasm` | The WebAssembly boundary. JSON in, JSON out. |
 | `crates/gear-cli` | Development harness — drive the mathematics without a browser. |
@@ -295,8 +295,8 @@ designed, below the standard only in the regime `mesh.overlap_below_one`
 already flags. `tools/iso_6336_3_stack.py` multiplies the set out
 ([rationale](rationale.md#the-helix-factors-are-a-pair-and-this-tool-can-take-neither)).
 
-**One stage shape.** Every stage is one `Shape` — axes, the shafts on
-them, members, meshes, distances — and every menu entry (`StagePreset`:
+**One stage shape.** Every stage is one `Shape` — axes, the train's
+bodies on them, members, meshes, distances — and every menu entry (`StagePreset`:
 a spur pair, an idler, a layshaft; a worm, a crossed pair; a planetary set,
 a Wolfrom, a compound set, a planocentric, meshed planets) is a *preset*
 over it: a list in `arrangements.rs` at sensible teeth, which `defaults`
@@ -305,7 +305,7 @@ arrangement `arrangements::hula`, a stepped Wolfrom at one planet, and no
 preset. There is no
 type in the core to branch on; `Stage` has one variant and keeps its tag.
 What a stage is, the solve reads off the shape — a mesh is internal because a member has a cutter, a set is an axis
-carried by a shaft and replicated, a worm is a distance marked as one — and
+carried by a body and replicated, a worm is a distance marked as one — and
 the panel names the members the same way (`members.ts`). Closing the
 distances is one plan over every member's role (given, free, reaches,
 absorbs), the power flow is followed mesh by mesh with each mesh's loss in
@@ -538,10 +538,13 @@ axes (spur/helical, idler, layshaft), skew shafts (worm, crossed), epicyclic
 (planetary, Wolfrom, compound, planocentric, meshed planets), all one shape,
 the hula an arrangement of the epicyclic family the harness names · a stage
 edited on its card — a step, a sun or a ring, an axis, a pair, a member's
-shaft — by the core's rules, the cases and couplings following, the cards
-dealt by step and by mesh group, the train's shafts — its bodies —
-numbered across the train as the gears are and listed with what each
-carries · stages and load cases start collapsed ·
+body — by the core's rules, the cases following, the cards dealt by step
+and by mesh group · **a train's bodies are its one vocabulary for what
+turns**: numbered across the train as the gears are, a stage listing the
+bodies on its axes and a body on two stages being what a coupling used to
+say, listed with what each carries, and the select beside a port moving
+the stage's end of a body to ground, to another body or to one of its own
+· stages and load cases start collapsed ·
 geartrains
 exported and imported as TOML, inputs only · gear tabs with external and internal
 kinds, and eccentric in the same developer mode.

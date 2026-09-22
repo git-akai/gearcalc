@@ -1531,8 +1531,8 @@ one of its open ports, and a load case says so.
 
 ### One stage, one result
 
-A stage is a `Shape` — axes, shafts on them, members on the shafts, meshes
-between members, one distance per pair of axes that mesh — and its result is
+A stage is a `Shape` — axes, the train's bodies on them, members on the
+bodies, meshes between members, one distance per pair of axes that mesh — and its result is
 one `ShapeResult`: a `GearResult` per member, a `MeshReport` per mesh, a
 `DistanceReport` per distance, `MemberRating` over the meshes each member is
 in. A spur pair, a worm and a planetary set are **vocabularies** — the words
@@ -1802,7 +1802,7 @@ that made the next stage type cost the same again.
 So a stage answers six questions, in `train::Constrained`, and nothing
 else: which members it has; every input relief may turn, by name; how its
 helix may be *stated* — the readings, in relief order; which of its inputs
-argue with each other; where its shafts and meshes sit; and which shafts a
+argue with each other; where its bodies and meshes sit; and which of them a
 train may address. Everything that walks those — counting, relieving, seeding
 a box from what it showed, reading the helix the readings state, lining a
 stage's inputs up against its result — is written once above the shape. A

@@ -175,10 +175,10 @@ const SHAFT_RING: usize = 3;
 
 impl PlanetaryStage {
     /// **An arrangement as a boundary** — the set's own vocabulary for its
-    /// three central shafts, turned into what its solver takes.
+    /// three central bodies, turned into what its solver takes.
     ///
     /// For a set asked about alone: the harness, a test, the sweep. In a train
-    /// the same thing is two [`super::ShaftConstraint`]s on the train, and the
+    /// the same thing is two [`super::BodyConstraint`]s on the train, and the
     /// set never sees the words.
     #[must_use]
     pub fn boundary_for(arrangement: Arrangement) -> super::StageBoundary {

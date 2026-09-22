@@ -1,23 +1,20 @@
-train  path 1.1 -> 2.2   ratio 101.1765:1   efficiency 60.782 % forward / 0.000 % backward  (cannot be back-driven)
-       backlash at 2.2  0.15610 deg  (min 0.11342, max 0.19878)   at 1.1  15.79344 deg  (min 11.47505, max 20.11231)
-       case 1  ultimate 2.000 Nm / 3000 rpm at 1.1 + reacted at 2.2
-              fixed    ground                              -      120.9936 Nm
-              load     first                     3000.00 rpm        2.0000 Nm
-              free     second                   -1186.05 rpm        0.0000 Nm
-              free     first                    -1186.05 rpm        0.0000 Nm
-              reacted  second                      29.65 rpm     -122.9936 Nm
-       case 2  ultimate 400.000 Nm / 0 rpm at 2.2 + free at 1.1
-              fixed    ground                              -     -400.0000 Nm
-              free     first                        0.00 rpm        0.0000 Nm
-              free     second                       0.00 rpm        0.0000 Nm
-              free     first                        0.00 rpm        0.0000 Nm
-              load     second                       0.00 rpm      400.0000 Nm
-       case 3  fatigue  2.000 Nm / 2400 rpm at 1.1 + reacted at 2.2   1000 h
-              fixed    ground                              -      120.9936 Nm
-              load     first                     2400.00 rpm        2.0000 Nm
-              free     second                    -948.84 rpm        0.0000 Nm
-              free     first                     -948.84 rpm        0.0000 Nm
-              reacted  second                      23.72 rpm     -122.9936 Nm
+train  path b1 -> b3   ratio 101.1765:1   efficiency 60.782 % forward / 0.000 % backward  (cannot be back-driven)
+       backlash at b3   0.15610 deg  (min 0.11342, max 0.19878)   at b1   15.79344 deg  (min 11.47505, max 20.11231)
+       case 1  ultimate 2.000 Nm / 3000 rpm at b1 + reacted at b3
+              fixed    ground ground                          -      120.9936 Nm
+              load     b1  first                 3000.00 rpm        2.0000 Nm
+              free     b2  second               -1186.05 rpm        0.0000 Nm
+              reacted  b3  second                  29.65 rpm     -122.9936 Nm
+       case 2  ultimate 400.000 Nm / 0 rpm at b3 + free at b1
+              fixed    ground ground                          -     -400.0000 Nm
+              free     b1  first                    0.00 rpm        0.0000 Nm
+              free     b2  second                   0.00 rpm        0.0000 Nm
+              load     b3  second                   0.00 rpm      400.0000 Nm
+       case 3  fatigue  2.000 Nm / 2400 rpm at b1 + reacted at b3   1000 h
+              fixed    ground ground                          -      120.9936 Nm
+              load     b1  first                 2400.00 rpm        2.0000 Nm
+              free     b2  second                -948.84 rpm        0.0000 Nm
+              reacted  b3  second                  23.72 rpm     -122.9936 Nm
 
 stage 1  spur  z 17/43  beta 0 deg  ratio -2.5294  a_w 30.0257 mm  coprime
   contact ratio  transverse 1.5993   overlap 0.0000   total 1.5993

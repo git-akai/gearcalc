@@ -211,8 +211,8 @@ pub mod key {
     pub const ERROR_TRAIN_NO_ROOT_SECTION: &str = "error.train_no_root_section";
     /// `error.train_overdetermined`
     pub const ERROR_TRAIN_OVERDETERMINED: &str = "error.train_overdetermined";
-    /// `error.train_no_such_shaft`
-    pub const ERROR_TRAIN_NO_SUCH_SHAFT: &str = "error.train_no_such_shaft";
+    /// `error.train_no_such_body`
+    pub const ERROR_TRAIN_NO_SUCH_BODY: &str = "error.train_no_such_body";
     /// `error.train_overflow`
     pub const ERROR_TRAIN_OVERFLOW: &str = "error.train_overflow";
     /// `error.train_stage_undetermined`
@@ -292,7 +292,7 @@ pub mod key {
         ERROR_TRAIN_UNKNOWN_MATERIAL,
         ERROR_TRAIN_NO_ROOT_SECTION,
         ERROR_TRAIN_OVERDETERMINED,
-        ERROR_TRAIN_NO_SUCH_SHAFT,
+        ERROR_TRAIN_NO_SUCH_BODY,
         ERROR_TRAIN_OVERFLOW,
         ERROR_TRAIN_STAGE_UNDETERMINED,
         ERROR_TRAIN_LOAD_PORT,

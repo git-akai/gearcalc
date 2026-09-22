@@ -37,7 +37,7 @@ patch_length: number, patch_width: number,
 /**
  * Relative curvature along the contact, 1/mm. **Zero is line contact** —
  * the degenerate value, and every parallel mesh's — and that it is not
- * zero is what crossing the shafts did.
+ * zero is what crossing the bodies did.
  */
 curvature_along: number, 
 /**

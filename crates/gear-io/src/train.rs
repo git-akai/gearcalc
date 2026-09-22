@@ -183,6 +183,17 @@
 //!   writing a mesh group's together, so a pair that must stay continuous
 //!   by more than its neighbour does not hold its neighbour to the same. A
 //!   mesh that omits it is at 1.2, which is what every older file meant.
+//! - **A shaft is a body of the train.** `[[train.stages.shafts]]` is gone
+//!   and `[[train.stages.bodies]]` stands in its place, each `body = n,
+//!   axis = i` — a body numbered **across the train**, ground 0 and the
+//!   rest from one, rather than within the stage — and a member's `shaft`
+//!   is its `body`, an axis's `carried_by` a body's number. A body two
+//!   stages list is what `[[train.couplings]]` said, so the couplings are
+//!   gone; a constraint is `body = n, constraint = "held"`; a load's `at`
+//!   and a duty's `at` are the body's number. A file that writes any of
+//!   the old spellings — a `shafts` table, a member's `shaft`, a
+//!   `couplings` table, a `{ kind = "of", stage, shaft }` reference — is
+//!   refused by name.
 //!
 //! No compatibility shim, deliberately. Accepting both shapes means carrying two
 //! readers for one format and testing both forever, and the thing that would go
@@ -328,23 +339,42 @@ mod tests {
     use super::*;
     use gear_core::params::Auto;
     use gear_core::train::{
-        Constraint, Coupling, Duty, Load, LoadCase, LoadRole, PairStage, PlanetaryStage,
-        ShaftConstraint, ShaftRef, Stage,
+        BodyConstraint, Duty, Load, LoadCase, LoadRole, PairStage, PlanetaryStage, Stage,
     };
 
     /// One of every preset, so the `kind` tag and every preset's layout are
     /// exercised in both directions and none can quietly stop round-tripping.
     fn document() -> TrainDocument {
-        let (start, end) = (
-            ShaftRef::Of { stage: 0, shaft: 1 },
-            ShaftRef::Of { stage: 4, shaft: 4 },
-        );
-        TrainDocument {
-            name: "Test train".into(),
-            train: Train {
-                // One of every preset at every port, and both duties, so the
+        // Chained, so a body two stages share is written once under one
+        // number; a set at stage 3 with its carrier held instead of its
+        // ring, and its ring said free, so both constraint values are
+        // exercised both ways.
+        let mut train = Train::chained(
+            vec![
+                Stage::pair(
+                    PairStage {
+                        ..PairStage::default()
+                    }
+                    .with_additional_helix(15.0),
+                ),
+                Stage::pair(PairStage::worm()),
+                Stage::pair(
+                    PairStage {
+                        ..PairStage::worm()
+                    }
+                    .with_first_helix(45.0),
+                ),
+                Stage::planetary(PlanetaryStage::default()),
+                Stage::Shape(Box::new(gear_core::train::arrangements::hula(
+                    [65, 61, 57, 61],
+                    [1.0, 1.0],
+                ))),
+            ],
+            |t| {
+                let (start, end) = (t.port(0, 1), t.port(4, 4));
+                // One of every case at every port, and both duties, so the
                 // tags and the nested tables are exercised in both directions.
-                load_cases: vec![
+                vec![
                     LoadCase::ultimate(start, end, 0.25, 12_000.0),
                     LoadCase {
                         enabled: false,
@@ -363,7 +393,7 @@ mod tests {
                         loads: vec![
                             Load::given(end, 0.05, 100.0),
                             Load::derived(start),
-                            Load::declared(ShaftRef::Of { stage: 3, shaft: 3 }, LoadRole::Free),
+                            Load::declared(t.port(3, 3), LoadRole::Free),
                         ],
                         duty: Duty::Intermittent {
                             range_degrees: 90.0,
@@ -373,44 +403,16 @@ mod tests {
                         },
                         ..LoadCase::fatigue(start, end, 0.05, 100.0)
                     },
-                ],
-                reversed_bending: false,
-                stages: vec![
-                    Stage::pair(
-                        PairStage {
-                            ..PairStage::default()
-                        }
-                        .with_additional_helix(15.0),
-                    ),
-                    Stage::pair(PairStage::worm()),
-                    Stage::pair(
-                        PairStage {
-                            ..PairStage::worm()
-                        }
-                        .with_first_helix(45.0),
-                    ),
-                    Stage::planetary(PlanetaryStage::default()),
-                    Stage::Shape(Box::new(gear_core::train::arrangements::hula(
-                        [65, 61, 57, 61],
-                        [1.0, 1.0],
-                    ))),
-                ],
-                // One coupling and one of each constraint, so the tagged
-                // `ShaftRef` and the `Constraint` values are exercised both
-                // ways — a set at stage 3 with its carrier held instead of its
-                // ring, and its ring said free.
-                couplings: vec![Coupling {
-                    a: ShaftRef::Of { stage: 0, shaft: 2 },
-                    b: ShaftRef::Of { stage: 1, shaft: 1 },
-                }],
-                constraints: vec![
-                    ShaftConstraint::held(3, 2),
-                    ShaftConstraint {
-                        at: ShaftRef::Of { stage: 3, shaft: 3 },
-                        constraint: Constraint::Free,
-                    },
-                ],
+                ]
             },
+        );
+        train.constraints = vec![
+            BodyConstraint::held(train.port(3, 2)),
+            BodyConstraint::free(train.port(3, 3)),
+        ];
+        TrainDocument {
+            name: "Test train".into(),
+            train,
         }
     }
 
@@ -450,21 +452,18 @@ mod tests {
         assert!(text.starts_with("# Geartrain."), "no header:\n{text}");
         assert!(text.contains("Inputs only"));
         assert!(text.contains("name = \"Test train\""));
-        // One tag a stage, one a load case — and one on each end of a
-        // coupling, on each constraint's shaft, and on every shaft a case
-        // names, at each of its entries and at its duty's sweep, since a
-        // `ShaftRef` says which kind of place it names: the four cases name
-        // 2 + 1, 2 + 1, 2 and 3 + 1.
+        // One tag a stage, one a load case — and none on a body, which is
+        // a number of the train's.
         assert_eq!(
             text.matches("kind = ").count(),
-            5 + 4 + 2 + 2 + 12,
-            "one tag a stage, a load case, a coupling end, a constraint and a named shaft:\n{text}"
+            5 + 4,
+            "one tag a stage and a load case:\n{text}"
         );
         for kind in ["shape", "ultimate", "fatigue"] {
             assert!(text.contains(&format!("kind = \"{kind}\"")), "no {kind}");
         }
         // ...and the shapes say what they are made of, by name.
-        for table in ["axes", "shafts", "members", "meshes", "distances"] {
+        for table in ["axes", "bodies", "members", "meshes", "distances"] {
             assert!(
                 text.contains(&format!("[[train.stages.{table}]]")),
                 "no {table}"
@@ -501,7 +500,6 @@ mod tests {
     fn a_train_without_stages_reads_as_written() {
         let mut doc = document();
         doc.train.stages.clear();
-        doc.train.couplings.clear();
         doc.train.constraints.clear();
         let text = to_toml(&doc).unwrap();
         let back = from_toml(&text).unwrap().document;
@@ -615,18 +613,17 @@ mod tests {
         );
         // A load case the same: a speed given at each end of a pair — one
         // degree of freedom — is one too many, and the last gives way with
-        // its number kept. (The document above couples its first two stages
-        // only, so its five are four bodies and four degrees.)
+        // its number kept.
         let mut doc = document();
         doc.train.stages.truncate(1);
-        doc.train.couplings.clear();
         doc.train.constraints.clear();
         doc.train.load_cases.truncate(1);
         // The reaction at the pair's second gear made a load with both
         // figures given.
+        let (first, second) = (doc.train.port(0, 1), doc.train.port(0, 2));
         doc.train.load_cases[0].loads = vec![
-            gear_core::train::Load::given(ShaftRef::Of { stage: 0, shaft: 1 }, 0.25, 12_000.0),
-            gear_core::train::Load::given(ShaftRef::Of { stage: 0, shaft: 2 }, 1.0, 100.0),
+            gear_core::train::Load::given(first, 0.25, 12_000.0),
+            gear_core::train::Load::given(second, 1.0, 100.0),
         ];
         let back = from_toml(&to_toml(&doc).unwrap()).unwrap();
         assert!(back.adjusted);

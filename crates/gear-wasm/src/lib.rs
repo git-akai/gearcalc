@@ -783,12 +783,12 @@ pub struct TrainOutcome {
     /// this list back with the stage, and never learns which field is which.
     pub figures: Vec<Vec<gear_core::train::Figure>>,
     /// **Every stage's ports**, with the label the panel names each by — so a
-    /// designer is offered exactly the shafts a train may hold, drive or
+    /// designer is offered exactly the bodies a train may hold, drive or
     /// couple, read from the stage's wiring rather than written into the front
     /// end a second time. Present on success and failure alike: it needs no
     /// geometry.
     pub topology: Vec<gear_core::train::StagePorts>,
-    /// **The train's motion** — exact ratios, every shaft's speed, mobility —
+    /// **The train's motion** — exact ratios, every body's speed, mobility —
     /// present whenever the tooth counts and topology give one, which is
     /// whether or not the geometry solved. A train mid-edit whose stage will
     /// not close still turns, and this is what says at what.
@@ -1150,18 +1150,14 @@ fn defaults_impl() -> Result<String, String> {
             // and a fatigue load a fifth of the peak — a running load rather
             // than the stall the ultimate case is, so a fresh tab shows the
             // two ratings answering different questions.
-            let (input, output) = (
-                gear_core::train::ShaftRef::Of { stage: 0, shaft: 1 },
-                gear_core::train::ShaftRef::Of { stage: 0, shaft: 2 },
-            );
-            Train::chained(
-                vec![spur],
+            Train::chained(vec![spur], |t| {
+                let (input, output) = (t.port(0, 1), t.port(0, 2));
                 vec![
                     LoadCase::ultimate(input, output, 0.1, 30_000.0),
                     LoadCase::back_driving(input, output, 3.0),
                     LoadCase::fatigue(input, output, 0.02, 30_000.0),
-                ],
-            )
+                ]
+            })
         },
         stages: StagePreset::ALL
             .into_iter()
@@ -1466,7 +1462,7 @@ fn relieve_stage_impl(input: &str) -> Result<String, String> {
 /// materials, the case by index and the figure the designer has this moment
 /// pinned (`null` where what changed was not a toggle) — and the case out,
 /// with exactly the train's mobility of its speeds given and the torques one
-/// statics equation short of the shafts that carry one, every figure relief
+/// statics equation short of the bodies that carry one, every figure relief
 /// turned derived seeded from what the case comes to
 /// ([`Train::relieve_case`]). The same relation [`relieve_stage`] keeps on a
 /// stage's geometry, kept on a case's loads: a pair with a speed at each end
@@ -1476,7 +1472,7 @@ fn relieve_stage_impl(input: &str) -> Result<String, String> {
 ///
 /// # Errors
 ///
-/// A malformed request, or a train whose shafts cannot be counted, which
+/// A malformed request, or a train whose bodies cannot be counted, which
 /// [`solve_train`] would refuse the same way.
 #[wasm_bindgen]
 pub fn relieve_case(input: &str) -> Result<String, JsError> {
@@ -1508,31 +1504,38 @@ fn relieve_case_impl(input: &str) -> Result<String, String> {
 /// **A train's graph edited by the core's rules.**
 ///
 /// `{ train, edit }` JSON in — the train as it stands and one edit — and the
-/// train out. The edits are what a shaft's select and the panel's buttons
+/// train out. The edits are what a body's select and the panel's buttons
 /// mean, each a rule the core owns rather than the panel:
 ///
-/// - `{ "couple": { "a", "b" } }` — two shafts tied ([`Train::couple`]): a
-///   reaction a case declared at either becomes an inline take-off;
-/// - `{ "uncouple": at }` — a shaft released from every coupling;
-/// - `{ "hold": at }` — held to ground, and uncoupled, since a held shaft
-///   turns nothing;
-/// - `{ "release": at }` — neither held nor coupled, a hold its stage's
-///   convention puts on it written off;
-/// - `{ "push_stage": stage }` — appended and coupled onward from the last
-///   stage's open output, every case entry there carried to the new
-///   stage's output ([`Train::push_stage`]);
-/// - `{ "remove_stage": k }` — removed, everything naming a stage by index
-///   moved with the stages it belongs to ([`Train::remove_stage`]);
+/// - `{ "join": { "a", "b" } }` — two bodies made one ([`Train::join`]),
+///   the lower number kept: a reaction a case declared at either becomes
+///   an inline take-off;
+/// - `{ "split": { "stage", "body" } }` — a stage's end of a body split
+///   off as a body of its own ([`Train::split`]);
+/// - `{ "hold": body }` — held to ground, every end of it;
+/// - `{ "release": body }` — not held, a hold its stage's convention puts
+///   on it written off;
+/// - `{ "move_end": { "stage", "body", "to" } }` — a stage's end of a body
+///   moved to another: split off where the body ran on, then held (`to`
+///   ground, 0), joined (`to` another body) or left its own (`to` null)
+///   ([`Train::move_end`]) — what the select beside a port means;
+/// - `{ "push_stage": stage }` — appended, its bodies numbered after the
+///   train's, and joined onward from the last stage's open output, every
+///   case entry there carried to the new stage's output
+///   ([`Train::push_stage`]);
+/// - `{ "remove_stage": k }` — removed, its bodies with it where no other
+///   stage has them, and the rest numbered densely again
+///   ([`Train::remove_stage`]);
 /// - `{ "add_case": kind }` — a fresh case of that kind between the train's
 ///   two ends ([`Train::fresh_case`]);
 /// - `{ "duty": { "case", "intermittent" } }` — a case's duty switched,
 ///   seeded as a fresh case's is ([`Train::set_duty`]);
 /// - `{ "stage": { "stage", "edit" } }` — one stage edited on its card
 ///   ([`gear_core::train::StageEdit`]: a step, a sun or a ring, an axis, a
-///   pair added or removed, a member moved to another shaft), and every
-///   case entry, coupling and hold on that stage repointed by what the
-///   shape renumbered ([`Train::edit_stage`]). A refused edit is an error
-///   and the train is returned unchanged.
+///   pair added or removed, a member moved to another body), a body it
+///   adds numbered after the train's and one it takes off the stage leaving
+///   the train where no other stage has it ([`Train::edit_stage`]). A
+///   refused edit is an error and the train is returned unchanged.
 ///
 /// # Errors
 ///
@@ -1546,13 +1549,21 @@ pub fn edit_train(input: &str) -> Result<String, JsError> {
 #[derive(Deserialize)]
 #[serde(rename_all = "snake_case")]
 enum TrainEdit {
-    Couple {
-        a: gear_core::train::ShaftRef,
-        b: gear_core::train::ShaftRef,
+    Join {
+        a: usize,
+        b: usize,
     },
-    Uncouple(gear_core::train::ShaftRef),
-    Hold(gear_core::train::ShaftRef),
-    Release(gear_core::train::ShaftRef),
+    Split {
+        stage: usize,
+        body: usize,
+    },
+    Hold(usize),
+    Release(usize),
+    MoveEnd {
+        stage: usize,
+        body: usize,
+        to: Option<usize>,
+    },
     PushStage(gear_core::train::Stage),
     RemoveStage(usize),
     AddCase(gear_core::train::CaseKind),
@@ -1575,10 +1586,13 @@ struct EditRequest {
 fn edit_train_impl(input: &str) -> Result<String, String> {
     let EditRequest { mut train, edit } = serde_json::from_str(input).map_err(|e| e.to_string())?;
     match edit {
-        TrainEdit::Couple { a, b } => train.couple(a, b),
-        TrainEdit::Uncouple(at) => train.uncouple(at),
-        TrainEdit::Hold(at) => train.hold(at),
-        TrainEdit::Release(at) => train.release(at),
+        TrainEdit::Join { a, b } => train.join(a, b),
+        TrainEdit::Split { stage, body } => {
+            train.split(stage, body);
+        }
+        TrainEdit::Hold(body) => train.hold(body),
+        TrainEdit::Release(body) => train.release(body),
+        TrainEdit::MoveEnd { stage, body, to } => train.move_end(stage, body, to),
         TrainEdit::PushStage(stage) => train.push_stage(stage),
         TrainEdit::RemoveStage(k) => train.remove_stage(k),
         // The figures a fresh case starts at are the shipped train's.
@@ -1613,8 +1627,8 @@ mod tests {
     /// **A chain of these stages as JSON**, with the three classic cases
     /// written between its two ends by the core's own constructors — a
     /// peak, a load from the far end held still, and a fatigue case — so a
-    /// fixture here says which shafts it loads the way a file does, and the
-    /// chain's couplings are listed rather than assumed.
+    /// fixture here says which bodies it loads the way a file does, and the
+    /// chain's bodies are numbered rather than assumed.
     /// The stage a preset starts as, by the preset's name on the wire.
     fn preset(d: &serde_json::Value, name: &str) -> serde_json::Value {
         d["stages"]
@@ -1648,7 +1662,7 @@ mod tests {
             .iter()
             .map(|v| serde_json::from_value(v.clone()).expect("a stage"))
             .collect();
-        let mut t = Train::chained(stages, Vec::new());
+        let mut t = Train::chained(stages, |_| Vec::new());
         let (start, end) = t
             .boundaries()
             .ok()
@@ -1830,9 +1844,9 @@ mod tests {
         let empty = serde_json::json!({
             "name": "no stages",
             "train": { "load_cases": [
-                { "kind": "ultimate", "enabled": true, "loads": [{ "at": { "kind": "of", "stage": 0, "shaft": 1 }, "torque": { "auto": false, "manual": 1.0 }, "speed": { "auto": false, "manual": 1.0 } }], "duty": { "intermittent": { "range_degrees": 25.0, "at": { "kind": "of", "stage": 0, "shaft": 2 }, "actuations": 10, "reversing": false } } },
-                { "kind": "ultimate", "enabled": true, "loads": [{ "at": { "kind": "of", "stage": 0, "shaft": 2 }, "torque": { "auto": false, "manual": 0.0 }, "speed": { "auto": false, "manual": 0.0 } }], "duty": { "intermittent": { "range_degrees": 25.0, "at": { "kind": "of", "stage": 0, "shaft": 2 }, "actuations": 10, "reversing": false } } },
-                { "kind": "fatigue", "enabled": true, "loads": [{ "at": { "kind": "of", "stage": 0, "shaft": 1 }, "torque": { "auto": false, "manual": 1.0 }, "speed": { "auto": false, "manual": 1.0 } }], "duty": { "intermittent": { "range_degrees": 25.0, "at": { "kind": "of", "stage": 0, "shaft": 2 }, "actuations": 10, "reversing": false } } }
+                { "kind": "ultimate", "enabled": true, "loads": [{ "at": 1, "torque": { "auto": false, "manual": 1.0 }, "speed": { "auto": false, "manual": 1.0 } }], "duty": { "intermittent": { "range_degrees": 25.0, "at": 2, "actuations": 10, "reversing": false } } },
+                { "kind": "ultimate", "enabled": true, "loads": [{ "at": 2, "torque": { "auto": false, "manual": 0.0 }, "speed": { "auto": false, "manual": 0.0 } }], "duty": { "intermittent": { "range_degrees": 25.0, "at": 2, "actuations": 10, "reversing": false } } },
+                { "kind": "fatigue", "enabled": true, "loads": [{ "at": 1, "torque": { "auto": false, "manual": 1.0 }, "speed": { "auto": false, "manual": 1.0 } }], "duty": { "intermittent": { "range_degrees": 25.0, "at": 2, "actuations": 10, "reversing": false } } }
             ],
                        "stages": [] }
         });
@@ -2338,7 +2352,7 @@ mod tests {
     /// The request is the shipped set put through `defaults`, so the fields
     /// this asserts on are the fields a front end actually sends. The
     /// assertions look for what a set has and a pair does not: five local
-    /// shafts (the ground, then sun, carrier, ring, planet), a *solved* planet
+    /// bodies (the ground, then sun, carrier, ring, planet), a *solved* planet
     /// shift, and two meshes each with their own answers.
     #[test]
     fn a_planetary_stage_crosses_the_boundary_with_its_own_shape() {
@@ -2348,13 +2362,11 @@ mod tests {
         set["members"][1]["gear"]["teeth"] = 18.into();
         set["members"][2]["gear"]["teeth"] = 60.into();
         set["distances"][0]["clearance"] = serde_json::json!({"auto": false, "manual": 0.02});
-        // **The arrangement is the train's**: a hold on the set's ring (3),
-        // written in so many words, and the loads between its sun and its
-        // carrier. The set carries none of its own.
+        // **The arrangement is the train's**: a hold on the set's ring (body
+        // 3), written in so many words, and the loads between its sun and
+        // its carrier. The set carries none of its own.
         let mut train = train_json(&[set], (2.0, 3000.0), 0.0, (1.6, 2400.0), 1000.0);
-        train["constraints"] = serde_json::json!([
-            { "at": { "kind": "of", "stage": 0, "shaft": 3 }, "constraint": "held" }
-        ]);
+        train["constraints"] = serde_json::json!([{ "body": 3, "constraint": "held" }]);
         let req = serde_json::json!({ "train": train });
 
         let v = solved(&req.to_string());
@@ -2364,7 +2376,7 @@ mod tests {
         // Ring held, sun driving: the classical 1 + z_r/z_s.
         assert!((v["paths"][0]["ratio"].as_f64().unwrap() - 3.5).abs() < 1e-12);
 
-        // Five local shafts, the held one exactly still, and the torques
+        // Five local bodies, the held one exactly still, and the torques
         // balancing — in the first load case, at its own speed.
         let shafts = &stage["cases"][0];
         let speeds = shafts["speeds"].as_array().unwrap();
@@ -2447,7 +2459,7 @@ mod tests {
             .find(|n| n["key"] == "stage.planets_share_load_equally")
             .unwrap_or_else(|| panic!("the load-sharing assumption must be reported: {notes:?}"));
         assert_eq!(sharing["values"]["planets"], "3");
-        // ...and the output-shaft backlash is a real figure now, not a placeholder.
+        // ...and the output-body backlash is a real figure now, not a placeholder.
         assert!(stage["backlash"]["forward"]["nominal"].as_f64().unwrap() > 0.0);
     }
 
@@ -2517,7 +2529,7 @@ mod tests {
         }
         // The crank offset was sized by one of the meshes' tips.
         assert!(stage["distances"][0]["sized_by"].is_number());
-        // The shafts are in equilibrium, and the drive says so in the
+        // The bodies are in equilibrium, and the drive says so in the
         // vocabulary a stage says anything in.
         let sum: f64 = stage["cases"][0]["torques"]
             .as_array()
@@ -2647,7 +2659,7 @@ mod tests {
         // formula measures (docs/rationale.md#a-worm-stage-reports-no-bending-stress).
         // An ultimate case is survived once and counts no cycles.
         "cycles",
-        // A shaft the train fixes has no speed to report.
+        // A body the train fixes has no speed to report.
         "speed",
         // Nothing held the crank open at the clearance minimum.
         "binding_mesh",
@@ -2774,10 +2786,7 @@ mod tests {
         // A fresh train: a small motor, and no derating nobody asked for —
         // the three cases a train used to hold as fields, in that order,
         // each between the pair's two gears with the far one declared.
-        let (first, second) = (
-            serde_json::json!({ "kind": "of", "stage": 0, "shaft": 1 }),
-            serde_json::json!({ "kind": "of", "stage": 0, "shaft": 2 }),
-        );
+        let (first, second) = (1, 2);
         let cases = d["train"]["load_cases"].as_array().unwrap();
         assert_eq!(cases.len(), 3);
         assert_eq!(cases[0]["kind"], "ultimate");
@@ -2801,8 +2810,11 @@ mod tests {
         for c in cases {
             assert_eq!(c["enabled"], true);
         }
-        // ...and a one-stage train has no coupling to list.
-        assert_eq!(d["train"]["couplings"].as_array().unwrap().len(), 0);
+        // ...and its two bodies are the pair's two gears, numbered from one.
+        let bodies = d["train"]["stages"][0]["bodies"].as_array().unwrap();
+        assert_eq!(bodies.len(), 2);
+        assert_eq!(bodies[0]["body"], 1);
+        assert_eq!(bodies[1]["body"], 2);
         assert_eq!(d["train"]["reversed_bending"], false);
 
         // **The face width a panel seeds, on every gear of every preset it
@@ -2939,13 +2951,13 @@ mod tests {
         // says so now: it is read off the graph rather than multiplied out of
         // the stage ratios, and a pair reports its own as a magnitude.
         assert!((v["paths"][0]["ratio"].as_f64().unwrap() + 43.0 / 17.0).abs() < 1e-12);
-        // Every shaft of the case, with what it is: the pair's second member
+        // Every body of the case, with what it is: the pair's second member
         // is the reacted end and carries the load stepped up.
-        let shafts = v["cases"][0]["shafts"].as_array().unwrap();
-        let end = shafts.iter().find(|s| s["role"] == "reacted").unwrap();
+        let bodies = v["cases"][0]["bodies"].as_array().unwrap();
+        let end = bodies.iter().find(|s| s["role"] == "reacted").unwrap();
         assert!(end["torque"].as_f64().unwrap().abs() > 2.0);
-        assert_eq!(shafts[0]["role"], "fixed");
-        assert!(shafts[0]["speed"].is_null(), "ground reports no speed");
+        assert_eq!(bodies[0]["role"], "fixed");
+        assert!(bodies[0]["speed"].is_null(), "ground reports no speed");
         assert_eq!(v["cases"][0]["solved"], true);
 
         let g0 = &v["stages"][0]["members"][0];
@@ -2990,9 +3002,9 @@ mod tests {
     #[test]
     fn a_train_that_cannot_be_solved_says_why() {
         let bad = r#"{"train":{"load_cases": [
-                { "kind": "ultimate", "enabled": true, "loads": [{ "at": { "kind": "of", "stage": 0, "shaft": 1 }, "torque": { "auto": false, "manual": 1.0 }, "speed": { "auto": false, "manual": 1.0 } }], "duty": { "intermittent": { "range_degrees": 25.0, "at": { "kind": "of", "stage": 0, "shaft": 2 }, "actuations": 1000, "reversing": false } } },
-                { "kind": "ultimate", "enabled": true, "loads": [{ "at": { "kind": "of", "stage": 0, "shaft": 2 }, "torque": { "auto": false, "manual": 0.0 }, "speed": { "auto": false, "manual": 0.0 } }], "duty": { "intermittent": { "range_degrees": 25.0, "at": { "kind": "of", "stage": 0, "shaft": 2 }, "actuations": 1000, "reversing": false } } },
-                { "kind": "fatigue", "enabled": true, "loads": [{ "at": { "kind": "of", "stage": 0, "shaft": 1 }, "torque": { "auto": false, "manual": 1.0 }, "speed": { "auto": false, "manual": 1.0 } }], "duty": { "intermittent": { "range_degrees": 25.0, "at": { "kind": "of", "stage": 0, "shaft": 2 }, "actuations": 1000, "reversing": false } } }
+                { "kind": "ultimate", "enabled": true, "loads": [{ "at": 1, "torque": { "auto": false, "manual": 1.0 }, "speed": { "auto": false, "manual": 1.0 } }], "duty": { "intermittent": { "range_degrees": 25.0, "at": 2, "actuations": 1000, "reversing": false } } },
+                { "kind": "ultimate", "enabled": true, "loads": [{ "at": 2, "torque": { "auto": false, "manual": 0.0 }, "speed": { "auto": false, "manual": 0.0 } }], "duty": { "intermittent": { "range_degrees": 25.0, "at": 2, "actuations": 1000, "reversing": false } } },
+                { "kind": "fatigue", "enabled": true, "loads": [{ "at": 1, "torque": { "auto": false, "manual": 1.0 }, "speed": { "auto": false, "manual": 1.0 } }], "duty": { "intermittent": { "range_degrees": 25.0, "at": 2, "actuations": 1000, "reversing": false } } }
             ],
             "stages":[]}}"#;
         let v: serde_json::Value = serde_json::from_str(&solve_train_impl(bad).unwrap()).unwrap();

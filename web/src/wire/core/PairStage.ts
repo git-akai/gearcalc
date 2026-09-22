@@ -5,10 +5,10 @@ import type { Optimisation } from "./Optimisation";
 import type { StageGear } from "./StageGear";
 
 /**
- * A stage of two gears on shafts at any angle.
+ * A stage of two gears on bodies at any angle.
  *
  * Spur when nothing is angled, helical when the teeth are, a **crossed gear
- * pair** when the shafts are, and a **worm stage** when the first member's
+ * pair** when the bodies are, and a **worm stage** when the first member's
  * size is a diameter someone chose — one stage, as the specification has it,
  * with the shaft angle and which reading of the size is given as the inputs
  * that distinguish them. It
@@ -63,7 +63,7 @@ module: number,
 pressure_angle: number, 
 /**
  * Shaft angle `Σ`, degrees. **Zero is a parallel-axis pair**; anything else
- * crosses the shafts.
+ * crosses the bodies.
  */
 shaft_angle: number, 
 /**

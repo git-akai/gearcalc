@@ -20,8 +20,8 @@ import type {
   Load,
   CaseFreedom,
   LoadFreedom,
-  CaseShaft,
-  ShaftRole,
+  CaseBody,
+  BodyRole,
   OpenPort,
   TrainBody,
   LoadRole,
@@ -69,9 +69,9 @@ import type {
   Distance,
   DistanceReport,
   LayoutReport,
-  ShaftCase,
+  SlotCase,
   Axis,
-  ShaftOn,
+  BodyOn,
   Stage,
   StageGear,
   StageResult,
@@ -84,14 +84,13 @@ import type {
   TrainFailure,
   Variation,
   Constraint,
-  ShaftConstraint,
+  BodyConstraint,
   PortSpec,
   StagePorts,
   MemberName,
   MemberRole,
   MotionReport,
-  ShaftLabel,
-  ShaftRef,
+  BodyLabel,
   Exact,
   StageFamily,
   StagePreset,
@@ -107,8 +106,8 @@ export type {
   Load,
   CaseFreedom,
   LoadFreedom,
-  CaseShaft,
-  ShaftRole,
+  CaseBody,
+  BodyRole,
   OpenPort,
   TrainBody,
   LoadRole,
@@ -159,9 +158,9 @@ export type {
   Distance,
   DistanceReport,
   LayoutReport,
-  ShaftCase,
+  SlotCase,
   Axis,
-  ShaftOn,
+  BodyOn,
   Stage,
   StageGear,
   StageResult,
@@ -174,14 +173,13 @@ export type {
   TrainFailure,
   Variation,
   Constraint,
-  ShaftConstraint,
+  BodyConstraint,
   PortSpec,
   StagePorts,
   MemberName,
   MemberRole,
   MotionReport,
-  ShaftLabel,
-  ShaftRef,
+  BodyLabel,
   Exact,
   StageFamily,
   StagePreset,
@@ -317,7 +315,7 @@ export const KINDS: KindSpec[] = [
 ];
 
 /** **A preset over the one stage shape.** A stage is a `Shape` — axes,
- *  shafts, members, meshes and distances — and a preset is a shape the core
+ *  bodies, members, meshes and distances — and a preset is a shape the core
  *  pre-assembled at sensible teeth, listed under its family: the core's
  *  `StagePreset::ALL`, crossing in `defaults().stages` with the family and
  *  the catalogue key of its name, so the menu renders from that list and a
@@ -344,25 +342,19 @@ export interface CaseKindSpec {
  *  load case" buttons and the kind select render from this, and a kind decides
  *  which allowable the core judges against and which inputs are put in front
  *  of the designer — nothing else. A fresh case of a kind is the core's
- *  ({@link editTrain} with `add_case`), since which shafts it is written
+ *  ({@link editTrain} with `add_case`), since which bodies it is written
  *  between is the train's to say. */
 export const CASE_KINDS: CaseKindSpec[] = [
   { key: "ultimate", label: "ui.train_case_ultimate", add: "ui.train_add_ultimate_case" },
   { key: "fatigue", label: "ui.train_case_fatigue", add: "ui.train_add_fatigue_case" },
 ];
 
-/** **A shaft as a select's value.** A `<select>` binds to strings, so each
- *  shaft is keyed by a string that round-trips through {@link portOptions}
- *  — the list the core sent — rather than being parsed back. */
-export function portKey(p: ShaftRef): string {
-  return p.kind === "ground" ? "ground" : `${p.stage}.${p.shaft}`;
-}
-
 /** **Where a load can enter**, in the order the chain runs: the open ports
- *  the core reports with the motion, or none where the train has no motion
- *  to report. */
-export function portOptions(motion: MotionReport | null): { key: string; port: ShaftRef }[] {
-  return (motion?.ports ?? []).map((p) => ({ key: portKey(p.at), port: p.at }));
+ *  the core reports with the motion — each a body, by number — or none
+ *  where the train has no motion to report. A `<select>` binds to strings,
+ *  so a body's number is its key. */
+export function portOptions(motion: MotionReport | null): OpenPort[] {
+  return motion?.ports ?? [];
 }
 
 export interface FieldSpec {
@@ -728,7 +720,7 @@ export function relieveStage(stage: Stage, just: Freedom | null, figures: Figure
  *  relation `relieveStage` keeps on a stage's geometry kept on a case's
  *  loads: the train has some mobility, exactly that many of the case's
  *  speeds stand given and the torques one statics equation short of the
- *  shafts that carry one, and the figure just touched is the one that
+ *  bodies that carry one, and the figure just touched is the one that
  *  survives. Every figure relief turns derived is seeded by the core from
  *  what the case comes to, so a box shows the number rather than a stale
  *  one — this side copies the case back and never learns which is which.
@@ -830,31 +822,30 @@ export function solveTrain(train: Train, materials?: MaterialLibrary): TrainOutc
   }
 }
 
-/** **What a train asks of one of a stage's shafts**, as it stands: the
- *  constraint the train states, or `null` where it states none and the
- *  stage's convention holds. Read here, never decided here — what that
- *  convention comes to is the core's, and arrives as each port's
- *  `by_convention` in `topology`. */
-export function constraintOn(train: Train, stage: number, shaft: number): Constraint | null {
-  const c = train.constraints.find(
-    (c) => c.at.kind === "of" && c.at.stage === stage && c.at.shaft === shaft,
-  );
-  return c ? c.constraint : null;
+/** **What a train asks of a body**, as it stands: the constraint the train
+ *  states, or `null` where it states none and the stage's convention holds.
+ *  Read here, never decided here — what that convention comes to is the
+ *  core's, and arrives as each port's `by_convention` in `topology`. */
+export function constraintOn(train: Train, body: number): Constraint | null {
+  return train.constraints.find((c) => c.body === body)?.constraint ?? null;
 }
 
-/** **One edit to a train's graph, by the core's rules** — what a shaft's
- *  select and the panel's buttons mean: a shaft held, released, coupled to
- *  another or uncoupled, a stage pushed and coupled onward with the cases
- *  carried to its far port, a fresh case added between the train's ends.
- *  Each is a rule about what else has to change — a hold uncouples, a
- *  coupling turns a reaction into a take-off — and the rules are the
- *  core's, so this side hands the train over and copies the answer back.
- *  A train that will not cross the boundary is left as it stands. */
+/** **One edit to a train's graph, by the core's rules** — what a port's
+ *  select and the panel's buttons mean: two bodies joined, a stage's end of
+ *  a body split off, a body held or released, an end moved to another body
+ *  (split, then held, joined or its own — the select's one rule), a stage
+ *  pushed and joined onward with the cases carried to its far port, a fresh
+ *  case added between the train's ends. Each is a rule about what else has
+ *  to change — a join turns a reaction into a take-off, a body taken off
+ *  its last stage leaves the train — and the rules are the core's, so this
+ *  side hands the train over and copies the answer back. A train that will
+ *  not cross the boundary is left as it stands. */
 export type TrainEdit =
-  | { couple: { a: ShaftRef; b: ShaftRef } }
-  | { uncouple: ShaftRef }
-  | { hold: ShaftRef }
-  | { release: ShaftRef }
+  | { join: { a: number; b: number } }
+  | { split: { stage: number; body: number } }
+  | { hold: number }
+  | { release: number }
+  | { move_end: { stage: number; body: number; to: number | null } }
   | { push_stage: Stage }
   | { remove_stage: number }
   | { add_case: CaseKind }
@@ -873,7 +864,6 @@ export function editTrain(train: Train, edit: TrainEdit): string | null {
     return message.startsWith("ui.") ? message : null;
   }
   train.stages = edited.stages;
-  train.couplings = edited.couplings;
   train.constraints = edited.constraints;
   train.load_cases = edited.load_cases;
   return null;

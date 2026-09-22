@@ -6,7 +6,7 @@ import type { GearResult } from "./GearResult";
 import type { LayoutReport } from "./LayoutReport";
 import type { MeshReport } from "./MeshReport";
 import type { Note } from "./Note";
-import type { ShaftCase } from "./ShaftCase";
+import type { SlotCase } from "./SlotCase";
 
 /**
  * What a shape produces.
@@ -43,11 +43,11 @@ efficiency: Directional<number> | null,
  */
 circulation: Directional<number> | null, 
 /**
- * Play at the output shaft driven forward, at the input driven back.
+ * Play at the output body driven forward, at the input driven back.
  * `None` with the ratio.
  */
 backlash: Directional<Backlash> | null, distances: Array<DistanceReport>, 
 /**
  * One per replicated axis, in axis order.
  */
-layouts: Array<LayoutReport>, cases: Array<ShaftCase>, members: Array<GearResult>, meshes: Array<MeshReport>, notes: Array<Note>, };
+layouts: Array<LayoutReport>, cases: Array<SlotCase>, members: Array<GearResult>, meshes: Array<MeshReport>, notes: Array<Note>, };

@@ -30,8 +30,8 @@ enabled: boolean,
  * **The loads on the train's open ports.** The chain's two ends, where
  * the case does not load them, are *reacted*: each turns as the motion
  * says and carries the torque the flow puts on it, and both are
- * reported — a reaction the designer cares about, where a shaft the
- * train fixes is ground and reports no speed ([`ShaftRole`]). Every
+ * reported — a reaction the designer cares about, where a body the
+ * train fixes is ground and reports no speed ([`BodyRole`]). Every
  * other open port the case does not load is *free* — it turns and
  * carries nothing, since a reaction there is a thing a designer
  * attaches and says so by loading it. A load carries a torque and a

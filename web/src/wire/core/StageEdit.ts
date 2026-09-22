@@ -2,7 +2,7 @@
 
 /**
  * What a card asks of a stage. Indices are the shape's own: a member, a
- * mesh, a distance by position; a shaft as the wiring numbers it, ground
- * being 0 and the first listed shaft 1.
+ * mesh, a distance by position; a body as the wiring numbers it, ground
+ * being 0 and the first listed body 1.
  */
-export type StageEdit = { "add_step": { axis: number, } } | { "remove_step": { gear: number, } } | { "add_central": { gear: number, ring: boolean, } } | { "remove_member": { member: number, } } | "add_axis" | "remove_axis" | { "add_pair": { distance: number, } } | { "remove_pair": { mesh: number, } } | { "move_shaft": { member: number, shaft: number | null, } };
+export type StageEdit = { "add_step": { axis: number, } } | { "remove_step": { gear: number, } } | { "add_central": { gear: number, ring: boolean, } } | { "remove_member": { member: number, } } | "add_axis" | "remove_axis" | { "add_pair": { distance: number, } } | { "remove_pair": { mesh: number, } } | { "move_body": { member: number, body: number | null, } };

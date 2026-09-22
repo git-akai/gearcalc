@@ -3,7 +3,7 @@
 //!
 //! The ideal answer is the rowspace of the kinematic matrix
 //! ([`crate::kinematics::System::torques`]): every mesh transmits its torque
-//! whole, and the torques on the shafts follow from which of them are known.
+//! whole, and the torques on the bodies follow from which of them are known.
 //! Loss makes that non-linear in exactly one way — a mesh charges its
 //! efficiency in the direction power crosses it, and which direction that is
 //! depends on the answer. So the lossy solve is the ideal one with each mesh's
@@ -20,10 +20,10 @@
 //!
 //! # What a mesh row says about torque
 //!
-//! A mesh between member `a` on shaft `A` and member `b` on shaft `B`, in
+//! A mesh between member `a` on body `A` and member `b` on body `B`, in
 //! frame `F`, is the kinematic row `z_a(ω_A − ω_F) + z_b(ω_B − ω_F) = 0` with
 //! the tooth counts signed. Virtual work over that row puts the torques on the
-//! three shafts in the ratio `z_a : z_b : −(z_a + z_b)` — one tangential force
+//! three bodies in the ratio `z_a : z_b : −(z_a + z_b)` — one tangential force
 //! `F` at the two reference cylinders and its reaction at the carrier radius.
 //! With loss, the driven member's torque is `η` of what the row says: the
 //! mesh is parametrised by its **driver's** torque `t` at its own count, so
@@ -37,22 +37,22 @@
 //!
 //! # No gear here
 //!
-//! This module takes shafts, signed counts, speeds and efficiencies, and
+//! This module takes bodies, signed counts, speeds and efficiencies, and
 //! returns torques. The stage that calls it knows which member is a ring and
 //! how many planets there are; this knows only that a count is negative and a
 //! mesh is one of `paths` alike.
 
 use crate::contact::{Directional, Drive};
-use crate::kinematics::{Shaft, GROUND};
+use crate::kinematics::{Body, GROUND};
 
 /// One mesh as the power-flow solve sees it.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct MeshFlow {
-    /// The shaft member `a` spins with, and `b`'s.
-    pub a: Shaft,
-    pub b: Shaft,
-    /// The shaft both axes stand still in.
-    pub frame: Shaft,
+    /// The body member `a` spins with, and `b`'s.
+    pub a: Body,
+    pub b: Body,
+    /// The body both axes stand still in.
+    pub frame: Body,
     /// Signed tooth counts, a ring's negative.
     pub za: f64,
     pub zb: f64,
@@ -68,45 +68,45 @@ pub struct MeshFlow {
     pub paths: f64,
 }
 
-/// What is asked of the flow: **which shafts' external torques are known**,
+/// What is asked of the flow: **which bodies' external torques are known**,
 /// which are to be found, and — by omission — which carry none.
 ///
 /// A load whose torque a designer gave is known; a load whose torque is
-/// derived, a shaft held to ground, and ground itself are unknown; every
-/// other shaft — an idler, a planet, a coupling inside the train — carries
+/// derived, a body held to ground, and ground itself are unknown; every
+/// other body — an idler, a planet, a coupling inside the train — carries
 /// no external torque. One input and one output is the case of one known
 /// and one unknown ([`Asked::through`]); a differential with two inputs is
 /// two known, and the flow is the same solve.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Asked {
-    /// Per shaft: `Some(torque)` where it is known, `None` where it is to be
-    /// found. Shafts past the end of the list carry none.
+    /// Per body: `Some(torque)` where it is known, `None` where it is to be
+    /// found. Bodies past the end of the list carry none.
     pub known: Vec<Option<f64>>,
-    /// Shafts whose torque is to be found: the loads whose torque is
-    /// derived, the held shafts, and ground.
-    pub unknown: Vec<Shaft>,
+    /// Bodies whose torque is to be found: the loads whose torque is
+    /// derived, the held bodies, and ground.
+    pub unknown: Vec<Body>,
 }
 
 impl Asked {
-    /// One shaft driving at `torque`, one taking the power out, the rest
+    /// One body driving at `torque`, one taking the power out, the rest
     /// held or carrying nothing.
     #[must_use]
     pub fn through(
-        shafts: usize,
-        input: Shaft,
+        bodies: usize,
+        input: Body,
         torque: f64,
-        output: Shaft,
-        reactions: &[Shaft],
+        output: Body,
+        reactions: &[Body],
     ) -> Self {
-        let mut known: Vec<Option<f64>> = (0..shafts)
+        let mut known: Vec<Option<f64>> = (0..bodies)
             .map(|s| (s != GROUND && s != output && !reactions.contains(&s)).then_some(0.0))
             .collect();
         known[input] = Some(torque);
-        let unknown = (0..shafts).filter(|&s| known[s].is_none()).collect();
+        let unknown = (0..bodies).filter(|&s| known[s].is_none()).collect();
         Self { known, unknown }
     }
 
-    fn known_at(&self, s: Shaft) -> Option<f64> {
+    fn known_at(&self, s: Body) -> Option<f64> {
         if self.unknown.contains(&s) {
             None
         } else {
@@ -129,12 +129,12 @@ pub struct Flow {
     /// Per mesh, the factor the driven member's torque stands under — its
     /// efficiency that way, nought where it holds.
     pub factors: Vec<f64>,
-    /// Per shaft, the external torque it carries: the input's as given, the
+    /// Per body, the external torque it carries: the input's as given, the
     /// output's and each reaction as found, and zero elsewhere. Ground's is
     /// the sum of what meshes against it.
     pub shaft_torques: Vec<f64>,
-    /// `|P_out| / P_in` — the power the shafts delivering it take out over
-    /// the power the shafts driving it put in.
+    /// `|P_out| / P_in` — the power the bodies delivering it take out over
+    /// the power the bodies driving it put in.
     pub efficiency: f64,
     /// **The power crossing each mesh, over the power in** — the driving
     /// side's `|τ (ω − ω_frame)|` per unit of what the input delivers, so
@@ -154,10 +154,10 @@ impl Flow {
         self.mesh_powers.iter().sum()
     }
 
-    /// **What mesh `k` puts on its three shafts** — `a`'s, `b`'s and the
+    /// **What mesh `k` puts on its three bodies** — `a`'s, `b`'s and the
     /// frame's — the driver's whole, the driven member's under `η`, and the
     /// frame's the negative sum: the moment balance of the three bodies. Summed
-    /// over a stage's meshes, a shaft's is the torque that stage delivers on
+    /// over a stage's meshes, a body's is the torque that stage delivers on
     /// it — the external load at a port, what it passes on at a coupling.
     #[must_use]
     pub fn on_shafts(&self, k: usize, mesh: &MeshFlow) -> [f64; 3] {
@@ -181,10 +181,10 @@ const ZERO: f64 = 1e-12;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Refused {
     /// No known torque does any work — every one is nought or on a still
-    /// shaft — so there is no power to follow.
+    /// body — so there is no power to follow.
     NothingDrives,
     /// The known torques do not determine the mesh torques — more unknown
-    /// reactions than the meshes can tell apart, a load between two shafts
+    /// reactions than the meshes can tell apart, a load between two bodies
     /// both of which hold it, which is a division by stiffness this model
     /// does not make.
     Undetermined,
@@ -193,12 +193,12 @@ pub enum Refused {
     Inconsistent,
 }
 
-/// **The power flow**, given every shaft's speed.
+/// **The power flow**, given every body's speed.
 ///
 /// `None` where no known torque does any work, where no assignment of
 /// directions is self-consistent, or
 /// where the known torques do not determine the mesh torques, which is a
-/// stage with more free shafts than a rating can be taken under. A stage
+/// stage with more free bodies than a rating can be taken under. A stage
 /// that locks in this direction is **not** `None`: its locked mesh holds,
 /// the flow through it stops there, and the efficiency is nought.
 ///
@@ -206,24 +206,24 @@ pub enum Refused {
 ///
 /// [`Refused`] says which of the three.
 pub fn solve(
-    shafts: usize,
+    bodies: usize,
     meshes: &[MeshFlow],
     speed: &[f64],
     asked: &Asked,
 ) -> Result<Flow, Refused> {
     // The work the known torques do, either way: the scale a power is
-    // nought against. A known torque that works *against* its shaft is a
+    // nought against. A known torque that works *against* its body is a
     // load absorbing, and who drives it is one of the unknowns — a derived
     // load, or a reacted port — so a known driver is not required; a case
     // with no work known at all has nothing to follow.
-    let input_power: f64 = (0..shafts)
+    let input_power: f64 = (0..bodies)
         .filter_map(|s| asked.known_at(s).map(|t| (t * speed[s]).abs()))
         .sum();
     if input_power <= 0.0 || !input_power.is_finite() {
         return Err(Refused::NothingDrives);
     }
     let mut why = Refused::Inconsistent;
-    let known = |s: Shaft| -> Option<f64> { asked.known_at(s) };
+    let known = |s: Body| -> Option<f64> { asked.known_at(s) };
     let m = meshes.len();
     let mut best: Option<Flow> = None;
     for assignment in 0..(1u32 << m) {
@@ -247,9 +247,9 @@ pub fn solve(
             })
             .collect();
         let Some(factor) = factor else { continue };
-        // The torque each mesh puts on each shaft per unit of its driver's
+        // The torque each mesh puts on each body per unit of its driver's
         // `t`: the driver's count whole, the driven member's under `η`.
-        let per_unit = |k: usize, s: Shaft| -> f64 {
+        let per_unit = |k: usize, s: Body| -> f64 {
             let mesh = &meshes[k];
             let (on_a, on_b) = match directions[k] {
                 Drive::Forward => (mesh.za, factor[k] * mesh.zb),
@@ -267,8 +267,8 @@ pub fn solve(
             }
             t
         };
-        // One equation per shaft whose torque is known.
-        let rows: Vec<Vec<f64>> = (1..shafts)
+        // One equation per body whose torque is known.
+        let rows: Vec<Vec<f64>> = (1..bodies)
             .filter_map(|s| {
                 known(s).map(|t| {
                     let mut row: Vec<f64> = (0..m).map(|k| per_unit(k, s)).collect();
@@ -286,7 +286,7 @@ pub fn solve(
                 continue;
             }
         };
-        let shaft_torques: Vec<f64> = (0..shafts)
+        let shaft_torques: Vec<f64> = (0..bodies)
             .map(|s| (0..m).map(|k| per_unit(k, s) * c[k]).sum())
             .collect();
         // The power the assumed driver puts into each mesh: its torque
@@ -309,12 +309,12 @@ pub fn solve(
             continue;
         }
         // ...and the train as a whole must lose power, not make it: what
-        // every shaft puts in, less what every shaft takes out, is the loss,
+        // every body puts in, less what every body takes out, is the loss,
         // and a branch that has it negative is the spurious one — an output
         // delivering power while the input delivers too, with friction
         // making up the difference. One input and one output reads as "the
         // output absorbs what the input delivers".
-        let powers: Vec<f64> = (0..shafts).map(|s| shaft_torques[s] * speed[s]).collect();
+        let powers: Vec<f64> = (0..bodies).map(|s| shaft_torques[s] * speed[s]).collect();
         let loss: f64 = powers.iter().sum();
         if loss < -ZERO * input_power {
             continue;
@@ -403,12 +403,12 @@ mod tests {
     use super::*;
     use crate::planetary::{self, Arrangement, PlanetaryShaft, Teeth};
 
-    /// Shafts `[ground, sun, carrier, ring, planet]`, as the wiring numbers a
+    /// Bodies `[ground, sun, carrier, ring, planet]`, as the wiring numbers a
     /// set; the planet is the fourth.
-    const SUN: Shaft = 1;
-    const CARRIER: Shaft = 2;
-    const RING: Shaft = 3;
-    const PLANET: Shaft = 4;
+    const SUN: Body = 1;
+    const CARRIER: Body = 2;
+    const RING: Body = 3;
+    const PLANET: Body = 4;
 
     fn set(t: Teeth, eta_sp: f64, eta_pr: f64, planets: f64) -> Vec<MeshFlow> {
         let same = |e: f64| Directional {
@@ -437,7 +437,7 @@ mod tests {
         ]
     }
 
-    /// Willis at the held shaft, per turn of the input.
+    /// Willis at the held body, per turn of the input.
     fn speeds(t: Teeth, arrangement: Arrangement) -> [f64; 5] {
         let p = planetary::power(planetary::basic_ratio(t), arrangement, 1.0, 1.0, 1.0).unwrap();
         let s = p.speeds;
@@ -446,7 +446,7 @@ mod tests {
         [0.0, s[0], s[1], s[2], planet]
     }
 
-    fn shaft(p: PlanetaryShaft) -> Shaft {
+    fn shaft(p: PlanetaryShaft) -> Body {
         match p {
             PlanetaryShaft::Sun => SUN,
             PlanetaryShaft::Carrier => CARRIER,
@@ -455,7 +455,7 @@ mod tests {
     }
 
     /// **The per-mesh model reproduces Pennestrì on every arrangement**: the
-    /// efficiency to a part in `10¹²`, and every shaft's torque — with the
+    /// efficiency to a part in `10¹²`, and every body's torque — with the
     /// planet, which Pennestrì has no torque for, carrying none.
     #[test]
     fn the_per_mesh_flow_is_pennestri_on_a_simple_set() {

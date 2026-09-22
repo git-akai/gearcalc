@@ -9,7 +9,7 @@ import type { TipRoom } from "./TipRoom";
 
 /**
  * **What one mesh reports**, whatever stage it is in and whichever way its
- * shafts run.
+ * bodies run.
  *
  * One type, because the physics is one model with the shaft angle as a
  * parameter and not two models: the Hertz answer is general contact of which a
@@ -17,7 +17,7 @@ import type { TipRoom } from "./TipRoom";
  * efficiency is one friction balance the parallel loss integral is the limit
  * of, the backlash is one gap projected onto one normal, and the interference
  * verdict is one relation asked in the transverse plane or along the line —
- * each of which a test holds at the limit. So a designer turning a shaft
+ * each of which a test holds at the limit. So a designer turning a body
  * angle from zero sees the same rows with the numbers moving, not a readout
  * changing shape. What a line contact has that a point does not, and the other
  * way, is the little in [`LineContact`] and [`PointContact`]: the transverse
@@ -61,7 +61,7 @@ coprime: boolean,
  * The two are the same *count* and not the same measure, which is the
  * one place the two contacts do not meet continuously: a line counts
  * lines across the face, a point counts points along one line, and the
- * point's limit as the shafts straighten is the normal-plane `ε_α / cos²β_b`
+ * point's limit as the bodies straighten is the normal-plane `ε_α / cos²β_b`
  * rather than the total. The decomposition each has is in [`Self::line`]
  * and [`Self::point`].
  */
@@ -69,7 +69,7 @@ contact_ratio: number,
 /**
  * Mesh efficiency, both drive senses. Equal for a parallel-axis mesh — the
  * mirror flank is the same integral — and genuinely different on crossed
- * shafts, where **either** can be zero or negative: backward is what
+ * bodies, where **either** can be zero or negative: backward is what
  * self-locking is, forward a steep helix split that cannot drive at all.
  * [`Directional::locked`] reads them rather than a separate flag that
  * could disagree.
@@ -112,7 +112,7 @@ backlash: [Backlash, Backlash],
  * **The mesh's play as its row in the kinematics sees it**, radians of
  * the row — `j |Σz| / a` on a line contact, plus the axial float's — at
  * its distance's minus, running and plus tolerance in turn. What a
- * play referred to any shaft of the train is read from
+ * play referred to any body of the train is read from
  * ([`kinematics::System::play`]), so a path's backlash sums every mesh
  * it crosses and none it does not ([`PathReport`]).
  */
