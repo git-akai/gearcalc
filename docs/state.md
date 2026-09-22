@@ -1119,10 +1119,13 @@ Not a queue with a head; this is what a next session would pick from.
 - **Arrangements that need more than the shape has.** `MemberRating` and
   `MeshReport` are per member and per mesh rather than per named role, and
   every stage is one shape — so an arrangement is a list of what sits where,
-  and the six in `train/arrangements.rs` cost no rating machinery. What an
-  arrangement can still want that the shape has not got is a second relieved
-  distance (`Freedom` names one), a crossed distance sharing a member with a
-  parallel one, and a planet meshing a planet on a *given* spacing.
+  every menu preset is one, and a designer permutes one on its card. What
+  an arrangement can still want that the shape has not got is a crossed
+  distance sharing a member with a parallel one on the menu (the harness's
+  `worm_and_pair` builds it), a planet meshing a planet on a *given*
+  spacing, a second planet axis added by a control (the meshed-planets
+  preset supplies its two), and the two verifications in *Not built*
+  above: the triangle of two carried axes, and a stepped planet's timing.
 - **The transverse rack round at a steep helix**, in the ledger above. The
   honest transverse tool is a normal round's elliptical section, which neither
   circle is; until then a worm's fillet is the cap's and its interference
