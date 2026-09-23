@@ -222,11 +222,13 @@ with its conventional input, output and holds named in it. Inserting one:
 the preset's *afterlife*: once inserted, a planetary set is gears on axes like
 everything else, and can be edited into anything the graph admits.
 
-**Old files convert, and keep their answers.** The reader concatenates a
-stage-shaped file into one graph — axes merged where a body is shared — and
-writes each stage's convention as explicit holds; its cases already name the
-paths it reports. A law holds every converted fixture's figures to the stage-shaped
-solve it came from (§6).
+**Old files are converted once, not read for ever.** The format refuses a
+shape it no longer has, by name, and says how to convert — its own argued
+policy, which a second reader would break. A `gear-cli convert` does the
+conversion: concatenates a stage-shaped file into one graph, axes merged
+where a body is shared, and writes each stage's convention as explicit
+holds; its cases already name the paths it reports. A law holds every
+converted fixture's figures to the stage-shaped solve it came from (§6).
 
 ### 2.6 One edit set
 
@@ -369,12 +371,10 @@ member, per mesh, per distance and per body for every case; the
 three-stage train the canvas draws, in full. `gear-cli train` gains the train-wide printing. *Diff:
 additive only.*
 
-**Phase 1 — the graph beside the stages.** `Train::graph()` flattens today's
-stages into one `Shape`, axes merged wherever a body is shared, with no
-caller. Two laws: its motion is `train.system()`'s, and its geometry — per
-distance, per component — is the per-stage geometry, over every preset pair.
-This is the phase that finds a merge rule that is wrong, while nothing
-depends on it. *Diff: none.*
+**Phase 1 — the graph beside the stages.** Folded into 3d: a flattening
+with no caller proves less than the corpus proves when the solve runs on
+it, and its motion law (the flattened graph's motion is `train.system()`'s)
+lands with the solve that uses it.
 
 **Phase 2 — the inputs find their homes.** Module and pressure angle become
 `Auto` with their freedoms; load sharing and the search move onto the meshes;
@@ -382,19 +382,42 @@ the planet gap onto the axis. Change-log entries and conversion for files
 that write the old fields; defaults that reproduce today's behaviour exactly.
 *Diff: none in any figure; the wasm record's shapes change.*
 
-**Phase 3 — one solve.** `solve_train` solves the flattened graph once:
-geometry, flow, ratings, one pass. Today's per-stage results are *rebuilt*
-from it, under each stage's convention, for the panel still in place. The
-two-pass solve, `CaseLoad`'s hand-down and the lone-stage motion go. *Diff:
-none* — this is the null diff that proves the solve, and the phase most
-likely to find a stage-local assumption the geometry was leaning on.
+**Phase 3 — a stage stops being a thing that has figures, then one
+solve.** Re-sequenced once Phase 2 was in and `solve_shape_after` had been
+read end to end: a stage's own figures — ratio, efficiency, backlash, power
+through the teeth, one more tooth — come from a *second*, lone-stage motion
+solved under the stage's convention and threaded through the geometry, and
+nothing else in the stage reads it: the ratings use the train's flow,
+handed down per case. So the lone motion goes first, and the flattening
+after it is close to concatenation.
+
+- **3a — paths carry what stage figures carried.** `PathReport` gains the
+  power through the teeth and what one more tooth on each gear does to it;
+  a mesh's power through it is reported per case, from the train's flow.
+  *Diff: additive.*
+- **3b — the lone stage retires from its callers.** Every test helper and
+  harness command that asked a stage alone (`StageLoads`, `solve_any`)
+  asks a train with one preset inserted and a case at its conventional
+  ends, and reads its path. *Diff: none in any figure.*
+- **3c — the lone motion goes.** `solve_shape_after` loses its boundary,
+  `ShapeResult` its five figures, `MeshReport` its lone-motion power, and
+  `StageLoads`/`solve_any` are deleted. The panel's stage header and results
+  read the paths instead. *Diff: every file that printed stage figures
+  changes form; `graph.txt`, which never printed them, not at all.*
+- **3d — one solve over the graph.** `Train::graph()` flattens the stages,
+  axes merged wherever a body is shared, and `solve_train` solves it once;
+  per-stage results are sliced back out for the result still shaped by
+  stage. *Diff: none* — the null diff that proves the solve.
 
 **Phase 4 — storage flips.** `Train` holds the graph. Conventions are written
 as holds at insertion, and a fresh train's default cases at its first
-preset's ends; `Train::ends` and its row go; the reader converts
-stage-shaped files, and a law holds every converted fixture's figures to its
-Phase-3 answer. *Diff: the corpus's train fixtures change form — stage
-figures become path rows — and no number moves.*
+preset's ends; `Train::ends` and its row go. **The reader does not convert**:
+the format's own policy is one reader and a loud refusal (`gear-io`'s
+change log), and it is argued there — a second reader for an old shape is
+carried and tested for ever. A stage-shaped file is refused by name, and a
+one-off `gear-cli convert` rewrites it, with a law holding every converted
+fixture's figures to its Phase-3 answer. *Diff: the corpus's train fixtures
+change form and no number moves.*
 
 **Phase 5 — one edit set.** §2.6. `every_add_on_every_preset_solves`,
 `every_add_undoes` and `a_refused_edit_changes_nothing` sweep every preset
