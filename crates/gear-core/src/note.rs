@@ -166,6 +166,38 @@ pub mod key {
     /// `train.load_shared`
     pub const TRAIN_LOAD_SHARED: &str = "train.load_shared";
 
+    // ---- a preview ------------------------------------------------ //
+    //
+    // What an edit would do, said before it is made: a count of each kind
+    // of piece that moves, and what the headline path would come to
+    // (`train::preview`).
+    /// `preview.nothing`
+    pub const PREVIEW_NOTHING: &str = "preview.nothing";
+    /// `preview.gears`
+    pub const PREVIEW_GEARS: &str = "preview.gears";
+    /// `preview.meshes`
+    pub const PREVIEW_MESHES: &str = "preview.meshes";
+    /// `preview.axes`
+    pub const PREVIEW_AXES: &str = "preview.axes";
+    /// `preview.bodies`
+    pub const PREVIEW_BODIES: &str = "preview.bodies";
+    /// `preview.distances`
+    pub const PREVIEW_DISTANCES: &str = "preview.distances";
+    /// `preview.couplings`
+    pub const PREVIEW_COUPLINGS: &str = "preview.couplings";
+    /// `preview.cards`
+    pub const PREVIEW_CARDS: &str = "preview.cards";
+    /// `preview.holds`
+    pub const PREVIEW_HOLDS: &str = "preview.holds";
+    /// `preview.case_entries`
+    pub const PREVIEW_CASE_ENTRIES: &str = "preview.case_entries";
+    /// `preview.path`
+    pub const PREVIEW_PATH: &str = "preview.path";
+    /// `preview.path_gone`
+    pub const PREVIEW_PATH_GONE: &str = "preview.path_gone";
+    /// `preview.path_new`
+    pub const PREVIEW_PATH_NEW: &str = "preview.path_new";
+
     // ---- errors --------------------------------------------------- //
     //
     // The reason a result does not exist, said the same way a clamp says what
@@ -221,6 +253,19 @@ pub mod key {
 
     /// Every key above, for the catalogue coverage tests.
     pub const ALL: &[&str] = &[
+        PREVIEW_NOTHING,
+        PREVIEW_GEARS,
+        PREVIEW_MESHES,
+        PREVIEW_AXES,
+        PREVIEW_BODIES,
+        PREVIEW_DISTANCES,
+        PREVIEW_COUPLINGS,
+        PREVIEW_CARDS,
+        PREVIEW_HOLDS,
+        PREVIEW_CASE_ENTRIES,
+        PREVIEW_PATH,
+        PREVIEW_PATH_GONE,
+        PREVIEW_PATH_NEW,
         CLAMP_CUTTER_NO_TIP_CORNER,
         CLAMP_CUTTER_TEETH_REDUCED,
         CLAMP_DEDENDUM_CAPPED,

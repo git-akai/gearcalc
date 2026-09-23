@@ -1595,6 +1595,19 @@ struct EditRequest {
 
 fn edit_train_impl(input: &str) -> Result<String, String> {
     let EditRequest { mut train, edit } = serde_json::from_str(input).map_err(|e| e.to_string())?;
+    // **A refusal crosses as its catalogue key**, which is what the panel
+    // says under the card; its `Display` is English for a log.
+    apply_edit(&mut train, edit).map_err(|e| e.key().to_string())?;
+    serde_json::to_string(&train).map_err(|e| e.to_string())
+}
+
+/// **One edit made by the core's rules** — the one match [`edit_train`] and
+/// [`preview_edit`] share, so a preview is made by the rule that would make
+/// the edit.
+fn apply_edit(
+    train: &mut gear_core::train::Train,
+    edit: TrainEdit,
+) -> Result<(), gear_core::train::EditRefused> {
     match edit {
         TrainEdit::Join { a, b } => train.join(a, b),
         TrainEdit::Split { stage, body } => {
@@ -1615,14 +1628,51 @@ fn edit_train_impl(input: &str) -> Result<String, String> {
             train.load_cases.push(case);
         }
         TrainEdit::Duty { case, intermittent } => train.set_duty(case, intermittent),
-        // **A refusal crosses as its catalogue key**, which is what the
-        // panel says under the card; its `Display` is English for a log.
-        TrainEdit::Stage { stage, edit } => train
-            .edit_stage(stage, edit)
-            .map_err(|e| e.key().to_string())?,
-        TrainEdit::Graph(edit) => train.edit(edit).map_err(|e| e.key().to_string())?,
+        TrainEdit::Stage { stage, edit } => train.edit_stage(stage, edit)?,
+        TrainEdit::Graph(edit) => train.edit(edit)?,
     }
-    serde_json::to_string(&train).map_err(|e| e.to_string())
+    Ok(())
+}
+
+/// **What an edit would do, before it is made.**
+///
+/// `{ train, materials, edit }` JSON in — the train as it stands, the
+/// library it is rated against (omitted, the shipped one) and one edit, as
+/// [`edit_train`] takes it — and a [`gear_core::train::Preview`] out: the
+/// refusal where the edit would be refused, and otherwise what it would
+/// change and what the headline path would come to, each as a key and its
+/// values, with why the train would not solve after it where it would not.
+/// The edit is made on a copy by the rule [`edit_train`] makes it by, and
+/// both trains are solved here; nothing is kept.
+///
+/// # Errors
+///
+/// A malformed request, which would be a defect on this side of the
+/// boundary.
+#[wasm_bindgen]
+pub fn preview_edit(input: &str) -> Result<String, JsError> {
+    preview_edit_impl(input).map_err(|e| JsError::new(&e))
+}
+
+#[derive(Deserialize)]
+struct PreviewRequest {
+    train: gear_core::train::Train,
+    #[serde(default)]
+    materials: Option<gear_core::MaterialLibrary>,
+    edit: TrainEdit,
+}
+
+fn preview_edit_impl(input: &str) -> Result<String, String> {
+    let PreviewRequest {
+        train,
+        materials,
+        edit,
+    } = serde_json::from_str(input).map_err(|e| e.to_string())?;
+    let lib = materials.unwrap_or_else(gear_io::default_library);
+    let mut after = train.clone();
+    let made = apply_edit(&mut after, edit);
+    let preview = gear_core::train::preview(&train, made.map(|()| &after), &lib);
+    serde_json::to_string(&preview).map_err(|e| e.to_string())
 }
 
 /// Version of the core, so the UI can show what it is actually running.
@@ -3012,6 +3062,36 @@ mod tests {
             v["failure"]
         );
         v["result"].clone()
+    }
+
+    /// **A preview is the edit, made on a copy, and nothing kept**: a gear
+    /// on a new axis previews as the pieces it adds, counted, and a join of
+    /// a pair's two bodies as its refusal — and the train sent is the train
+    /// the request came with.
+    #[test]
+    fn a_preview_is_the_edit_on_a_copy() {
+        let d: serde_json::Value = serde_json::from_str(&defaults_impl().unwrap()).unwrap();
+        let preview = |edit: serde_json::Value| -> serde_json::Value {
+            serde_json::from_str(
+                &preview_edit_impl(
+                    &serde_json::json!({ "train": d["train"], "edit": edit }).to_string(),
+                )
+                .unwrap(),
+            )
+            .unwrap()
+        };
+        let made = preview(
+            serde_json::json!({ "graph": { "add_gear": { "mate": 1, "on": "new_axis", "ring": false } } }),
+        );
+        assert!(made["refused"].is_null(), "{made}");
+        assert_eq!(made["changes"][0]["key"], "preview.gears");
+        assert_eq!(made["changes"][0]["values"]["after"], "3");
+        let refused = preview(serde_json::json!({ "graph": { "join": { "a": 1, "b": 2 } } }));
+        assert_eq!(
+            refused["refused"]["key"],
+            gear_core::train::EditRefused::OneCard.key()
+        );
+        assert!(refused["changes"].as_array().unwrap().is_empty());
     }
 
     /// **A refused edit crosses as its catalogue key**, which is what the

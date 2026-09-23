@@ -12,6 +12,7 @@
   "import_materials",
   "import_train",
   "languages",
+  "preview_edit",
   "relieve_case",
   "relieve_stage",
   "resolve_language",
@@ -3443,23 +3444,23 @@
    "ok": [
     [
      "en",
-     500
+     513
     ],
     [
      "de",
-     500
+     513
     ],
     [
      "pt",
-     500
+     513
     ],
     [
      "zh-Hans",
-     500
+     513
     ],
     [
      "zh-Hant",
-     500
+     513
     ]
    ]
   },
@@ -27158,6 +27159,153 @@
       "ui.train_edit_refused_no_such"
      ]
     ]
+   ]
+  },
+  "preview_edit": {
+   "ok": [
+    {
+     "refused": null,
+     "changes": [
+      {
+       "key": "preview.gears",
+       "values": {
+        "after": "3",
+        "before": "2"
+       }
+      },
+      {
+       "key": "preview.meshes",
+       "values": {
+        "after": "2",
+        "before": "1"
+       }
+      },
+      {
+       "key": "preview.axes",
+       "values": {
+        "after": "3",
+        "before": "2"
+       }
+      },
+      {
+       "key": "preview.bodies",
+       "values": {
+        "after": "3",
+        "before": "2"
+       }
+      },
+      {
+       "key": "preview.distances",
+       "values": {
+        "after": "2",
+        "before": "1"
+       }
+      }
+     ],
+     "paths": [
+      {
+       "key": "preview.path",
+       "values": {
+        "efficiency_after": "98.34",
+        "efficiency_before": "98.34",
+        "from": "1",
+        "ratio_after": "-2.5294",
+        "ratio_before": "-2.5294",
+        "to": "2"
+       }
+      }
+     ],
+     "unsolved": null
+    },
+    {
+     "refused": null,
+     "changes": [
+      {
+       "key": "preview.gears",
+       "values": {
+        "after": "0",
+        "before": "2"
+       }
+      },
+      {
+       "key": "preview.meshes",
+       "values": {
+        "after": "0",
+        "before": "1"
+       }
+      },
+      {
+       "key": "preview.axes",
+       "values": {
+        "after": "0",
+        "before": "2"
+       }
+      },
+      {
+       "key": "preview.bodies",
+       "values": {
+        "after": "0",
+        "before": "2"
+       }
+      },
+      {
+       "key": "preview.distances",
+       "values": {
+        "after": "0",
+        "before": "1"
+       }
+      },
+      {
+       "key": "preview.cards",
+       "values": {
+        "after": "0",
+        "before": "1"
+       }
+      }
+     ],
+     "paths": [
+      {
+       "key": "preview.path_gone",
+       "values": {
+        "from": "1",
+        "to": "2"
+       }
+      }
+     ],
+     "unsolved": null
+    },
+    {
+     "refused": null,
+     "changes": [
+      {
+       "key": "preview.nothing",
+       "values": {}
+      }
+     ],
+     "paths": [
+      {
+       "key": "preview.path",
+       "values": {
+        "efficiency_after": "98.34",
+        "efficiency_before": "98.34",
+        "from": "1",
+        "ratio_after": "-2.5294",
+        "ratio_before": "-2.5294",
+        "to": "2"
+       }
+      }
+     ],
+     "unsolved": null
+    },
+    {
+     "refused": {
+      "key": "ui.train_edit_refused_one_card",
+      "values": {}
+     },
+     "changes": [],
+     "paths": [],
+     "unsolved": null
+    }
    ]
   },
   "solve_train": {

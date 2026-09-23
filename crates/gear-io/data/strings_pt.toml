@@ -81,6 +81,21 @@ case_underdetermined = "movimento indefinido: falta(m) {short} velocidade(s), ou
 case_nothing_drives = "nenhum binário dado realiza trabalho — cada carga é nula ou está num eixo parado: nada aciona este caso"
 load_shared = "suportado em ambas as extremidades: como a carga se divide é uma questão de rigidez que este modelo não define — suporte apenas uma extremidade, ou deixe um estágio autobloqueante suportá-la"
 
+[preview]
+nothing = "não altera nada"
+gears = "engrenagens: {before} → {after}"
+meshes = "engrenamentos: {before} → {after}"
+axes = "eixos geométricos: {before} → {after}"
+bodies = "corpos: {before} → {after}"
+distances = "distâncias entre eixos: {before} → {after}"
+couplings = "acoplamentos desalinhados: {before} → {after}"
+cards = "cartões: {before} → {after}"
+holds = "fixações: {before} → {after}"
+case_entries = "entradas de casos: {before} → {after}"
+path = "Corpo {from} a Corpo {to}: relação {ratio_before} → {ratio_after}, rendimento {efficiency_before} → {efficiency_after} %"
+path_gone = "Corpo {from} a Corpo {to}: deixa de ser um caminho"
+path_new = "Corpo {from} a Corpo {to}: um caminho, relação {ratio}, rendimento {efficiency} %"
+
 [error]
 mesh_incompatible = "as engrenagens não podem engrenar: módulo, ângulo de pressão ou hélice diferem"
 mesh_ring_too_small = "um engrenamento interno precisa de mais dentes na anular do que no pinhão"

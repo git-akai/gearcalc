@@ -80,6 +80,21 @@ case_underdetermined = "Bewegung unbestimmt: {short} Drehzahl(en) fehlen, oder e
 case_nothing_drives = "kein vorgegebenes Drehmoment verrichtet Arbeit — jede Last ist null oder liegt an einer stehenden Welle: nichts treibt diesen Lastfall"
 load_shared = "an beiden Enden abgestützt: wie sich die Last aufteilt, ist eine Frage der Steifigkeit, die dieses Modell nicht beantwortet — nur ein Ende abstützen, oder eine selbsthemmende Stufe halten lassen"
 
+[preview]
+nothing = "ändert nichts"
+gears = "Räder: {before} → {after}"
+meshes = "Eingriffe: {before} → {after}"
+axes = "Achsen: {before} → {after}"
+bodies = "Körper: {before} → {after}"
+distances = "Achsabstände: {before} → {after}"
+couplings = "Versatzkupplungen: {before} → {after}"
+cards = "Karten: {before} → {after}"
+holds = "Festhaltungen: {before} → {after}"
+case_entries = "Lastfalleinträge: {before} → {after}"
+path = "Körper {from} zu Körper {to}: Übersetzung {ratio_before} → {ratio_after}, Wirkungsgrad {efficiency_before} → {efficiency_after} %"
+path_gone = "Körper {from} zu Körper {to}: kein Pfad mehr"
+path_new = "Körper {from} zu Körper {to}: ein Pfad, Übersetzung {ratio}, Wirkungsgrad {efficiency} %"
+
 [error]
 mesh_incompatible = "die Räder können nicht kämmen: Modul, Eingriffswinkel oder Schrägungswinkel unterscheiden sich"
 mesh_ring_too_small = "eine Innenverzahnung braucht mehr Zähne am Hohlrad als am Ritzel"

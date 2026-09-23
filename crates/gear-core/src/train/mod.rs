@@ -50,6 +50,7 @@ pub mod flow;
 pub mod graph;
 mod pair;
 mod planetary;
+mod preview;
 pub mod shape;
 mod wiring;
 
@@ -63,6 +64,7 @@ pub use arrangements::{StageFamily, StagePreset};
 pub use edits::{Edit, EditRefused, Piece, Place, StageEdit};
 pub(crate) use pair::ShiftAsked;
 pub use planetary::boundary_for as planetary_boundary;
+pub use preview::{preview, Preview};
 pub use shape::{Shape, ShapeResult};
 pub(crate) use wiring::teeth_of;
 pub use wiring::{BodyLabel, MeshSpec, Mount, Wiring, WiringError};

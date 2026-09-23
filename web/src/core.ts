@@ -91,6 +91,7 @@ import type {
   Edit,
   Place,
   Piece,
+  Preview,
 } from "./wire";
 export type { CaseKind, LoadCase };
 export type {
@@ -175,6 +176,7 @@ export type {
   Edit,
   Place,
   Piece,
+  Preview,
 } from "./wire";
 
 import init, {
@@ -197,6 +199,7 @@ import init, {
   export_train,
   relieve_stage,
   relieve_case,
+  preview_edit,
   edit_train,
   adopt_member,
 } from "./wasm/gear_wasm.js";
@@ -856,6 +859,21 @@ export function editTrain(train: Train, edit: TrainEdit): string | null {
   train.held = edited.held;
   train.load_cases = edited.load_cases;
   return null;
+}
+
+/** **What an edit would do, before it is made** — the core makes it on a
+ *  copy by the rule `editTrain` would, solves both trains and says the
+ *  refusal, or what would change and what the headline path would come
+ *  to, as notes for the catalogue. Nothing is kept. `null` where the
+ *  boundary failed, which is a defect on this side of it. */
+export function previewEdit(train: Train, edit: TrainEdit, materials?: MaterialLibrary): Preview | null {
+  try {
+    return JSON.parse(
+      preview_edit(JSON.stringify({ train, materials: materials ?? null, edit })),
+    ) as Preview;
+  } catch {
+    return null;
+  }
 }
 
 // The words live in `strings.svelte.ts` — it has to be a rune module, because

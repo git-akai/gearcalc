@@ -219,6 +219,21 @@ const out = {
     ]]);
     return out;
   }),
+  // **What an edit would do**, previewed on the default train: a gear on a
+  // new axis at its second gear (counted, the path kept), its first gear
+  // removed (the pair with it, the path lost), a release of nothing held
+  // (nothing), and a join of its two bodies (refused, by its key).
+  preview_edit: call("preview_edit", () => {
+    const train = structuredClone(defaults.train);
+    const preview = (edit) =>
+      JSON.parse(w.preview_edit(JSON.stringify({ train, materials: library, edit })));
+    return [
+      preview({ graph: { add_gear: { mate: 1, on: "new_axis", ring: false } } }),
+      preview({ graph: { remove: { member: 0 } } }),
+      preview({ graph: { release: 1 } }),
+      preview({ graph: { join: { a: 1, b: 2 } } }),
+    ];
+  }),
   // The default train, and the same train with a set pushed behind its pair
   // by the core — a chain of two, its cases at the set's carrier.
   solve_train: call("solve_train", () => {

@@ -540,6 +540,17 @@ each rule run against broken code first. Found by them: a gear taken off a
 coupled shaft took the shaft, a hold outlived an emptied train, and an
 edit's refusal had never crossed the boundary as its key (`corrections.md`).
 
+**Phase 5, step 2 — `preview_edit`.** Done: `train::preview` makes nothing
+of its own — the edit is made on a copy by the rule `edit_train` makes it
+by (one `apply_edit` behind both entry points), both trains are solved,
+and the difference is said as notes (`preview.*`): each kind of piece whose
+count moves, the cards, the holds and the case entries, before and after;
+the headline path kept, lost or found, ratio and efficiency before and
+after; the refusal by its key; why the edited train would not solve. A
+path is compared where the headline case keeps its entries, which is when
+it is the same path whatever the edit numbered again. The interface's
+hover is Phase 7's; the wrapper waits in `core.ts` (`previewEdit`).
+
 **Phase 6 — results and the boundary.** `TrainResult` per member, mesh,
 distance, axis and path, with `topology` carrying the groupings;
 `relieve_stage` → `relieve`; `adopt_member` by member; bindings; the probe.

@@ -154,6 +154,21 @@ case_underdetermined = "motion undecided: {short} more speed(s) to give, or one 
 case_nothing_drives = "no given torque does any work — every load is nought or on a still port: nothing drives this case"
 load_shared = "held at both ends: how the load divides is a matter of stiffness this model does not state — hold one end only, or let a self-locking stage hold it"
 
+[preview]
+nothing = "changes nothing"
+gears = "gears: {before} → {after}"
+meshes = "meshes: {before} → {after}"
+axes = "axes: {before} → {after}"
+bodies = "bodies: {before} → {after}"
+distances = "axis distances: {before} → {after}"
+couplings = "offset couplings: {before} → {after}"
+cards = "cards: {before} → {after}"
+holds = "holds: {before} → {after}"
+case_entries = "case entries: {before} → {after}"
+path = "Body {from} to Body {to}: ratio {ratio_before} → {ratio_after}, efficiency {efficiency_before} → {efficiency_after} %"
+path_gone = "Body {from} to Body {to}: no longer a path"
+path_new = "Body {from} to Body {to}: a path, ratio {ratio}, efficiency {efficiency} %"
+
 # ---------------------------------------------------------------- the application
 #
 # The chrome: what the application calls things. Nothing here has a `Note`

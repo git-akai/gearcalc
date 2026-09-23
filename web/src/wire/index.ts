@@ -70,6 +70,7 @@ export type { Piece } from "./core/Piece";
 export type { Place } from "./core/Place";
 export type { PointContact } from "./core/PointContact";
 export type { PortSpec } from "./core/PortSpec";
+export type { Preview } from "./core/Preview";
 export type { Ranges } from "./core/Ranges";
 export type { Shape } from "./core/Shape";
 export type { ShapeResult } from "./core/ShapeResult";

@@ -1513,6 +1513,57 @@ mod tests {
             }
         }
 
+        // ---- a preview ------------------------------------------------ //
+        //
+        // What an edit would do, fired through the edits that say each part
+        // of it: a gear on a new axis (gears, meshes, axes, bodies,
+        // distances, and the path kept), a stage laid in at a body (cards),
+        // a release of nothing held (nothing), a chain's last gear taken
+        // (case entries, and the path lost), a coupling taken off
+        // (couplings), and a set's ring held (holds, and a path found).
+        {
+            use gear_core::train::arrangements::StagePreset;
+            use gear_core::train::{preview, Edit, LoadCase, Piece, Place, Train};
+            let chain = |n: usize| {
+                Train::chained(vec![StagePreset::Spur.build(); n], |t| {
+                    vec![LoadCase::ultimate(
+                        t.port(0, 1),
+                        t.port(n - 1, 2),
+                        1.0,
+                        1000.0,
+                    )]
+                })
+            };
+            let mut fire = |t: &Train, edit: Edit| {
+                let mut u = t.clone();
+                let made = u.edit(edit);
+                let p = preview(t, made.map(|()| &u), &lib);
+                record(&p.changes);
+                record(&p.paths);
+            };
+            let gear = Edit::AddGear {
+                mate: 1,
+                on: Place::NewAxis,
+                ring: false,
+            };
+            fire(&chain(1), gear);
+            fire(
+                &chain(1),
+                Edit::Insert {
+                    stage: StagePreset::Spur.build(),
+                    at: Some(1),
+                },
+            );
+            fire(&chain(1), Edit::Release(1));
+            fire(&chain(2), Edit::Remove(Piece::Member(3)));
+            let plano = Train::chained(vec![StagePreset::Planocentric.build()], |_| Vec::new());
+            fire(&plano, Edit::Remove(Piece::Coupling(0)));
+            let mut set = Train::chained(vec![StagePreset::Planetary.build()], |_| Vec::new());
+            set.release(3);
+            set.load_cases = vec![LoadCase::ultimate(1, 2, 1.0, 1000.0)];
+            fire(&set, Edit::Hold(3));
+        }
+
         seen
     }
 
