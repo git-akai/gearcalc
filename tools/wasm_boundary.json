@@ -571,11 +571,11 @@
         },
         {
          "body": 2,
-         "axis": 1
+         "axis": 2
         },
         {
          "body": 3,
-         "axis": 2
+         "axis": 1
         }
        ],
        "members": [
@@ -638,7 +638,7 @@
          }
         },
         {
-         "body": 2,
+         "body": 3,
          "gear": {
           "teeth": 25,
           "profile_shift": {
@@ -696,7 +696,7 @@
          }
         },
         {
-         "body": 3,
+         "body": 2,
          "gear": {
           "teeth": 43,
           "profile_shift": {
@@ -7691,11 +7691,11 @@
        },
        {
         "body": 2,
-        "axis": 1
+        "axis": 2
        },
        {
         "body": 3,
-        "axis": 2
+        "axis": 1
        }
       ],
       "members": [
@@ -7758,7 +7758,7 @@
         }
        },
        {
-        "body": 2,
+        "body": 3,
         "gear": {
          "teeth": 25,
          "profile_shift": {
@@ -7816,7 +7816,7 @@
         }
        },
        {
-        "body": 3,
+        "body": 2,
         "gear": {
          "teeth": 43,
          "profile_shift": {

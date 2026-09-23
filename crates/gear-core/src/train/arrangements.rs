@@ -253,7 +253,14 @@ pub fn epicyclic(
 
 /// **A line of gears on parallel axes**, each meshing the next: two are a
 /// pair, three a pair with an idler, and the ratio is the ends' whatever
-/// stands between. Bodies and members in the order given.
+/// stands between. Axes and members in the order given.
+///
+/// **The bodies are the ends' first** — the first gear's, then the last's,
+/// then whatever stands between — because the convention reads the first
+/// free body as the input and *the next* as the output. Listed in chain
+/// order, the next was the idler's, and a pair with an idler reported and
+/// chained at the idler (`docs/corrections.md`); the layshaft lists its
+/// output before its layshaft for the same reason.
 ///
 /// # Panics
 ///
@@ -261,16 +268,15 @@ pub fn epicyclic(
 #[must_use]
 pub fn line(teeth: &[u32]) -> Shape {
     assert!(teeth.len() >= 2, "a line of gears is at least a pair");
+    let n = teeth.len();
     let mut b = Builder::new(1.0);
-    let members: Vec<usize> = teeth
-        .iter()
-        .map(|&z| {
-            let axis = b.axis();
-            let shaft = b.body(axis);
-            b.gear(shaft, z)
-        })
-        .collect();
-    for k in 1..members.len() {
+    let axes: Vec<usize> = teeth.iter().map(|_| b.axis()).collect();
+    let mut bodies = vec![0; n];
+    for k in [0, n - 1].into_iter().chain(1..n - 1) {
+        bodies[k] = b.body(axes[k]);
+    }
+    let members: Vec<usize> = (0..n).map(|k| b.gear(bodies[k], teeth[k])).collect();
+    for k in 1..n {
         b.mesh(members[k - 1], members[k]).distance([k - 1, k]);
     }
     b.build()
@@ -1016,6 +1022,32 @@ mod tests {
         assert!(r.members[1].cases[0].contact_stress > 0.0);
         // The wheel and the pinion turn as one: the same body.
         assert_eq!(r.members[1].cases[0].speed, r.members[2].cases[0].speed);
+    }
+
+    /// **A line's conventional ratio is its ends'**, whatever stands
+    /// between: `(−1)^(n−1) z_last / z_first` — the idlers change the sense
+    /// and never the size. Its first run found the idler preset reporting
+    /// at the idler, −25/17, where its doc promises the pair's ratio with
+    /// the other sense.
+    #[test]
+    fn a_line_reports_between_its_ends() {
+        for teeth in [
+            vec![17, 43],
+            vec![17, 25, 43],
+            vec![17, 20, 25, 43],
+            vec![31, 19, 23, 29, 13],
+        ] {
+            let r = conventionally(&line(&teeth));
+            let n = teeth.len();
+            let sense = if n % 2 == 0 { -1.0 } else { 1.0 };
+            let want = sense * f64::from(teeth[n - 1]) / f64::from(teeth[0]);
+            assert!(
+                (r.ratio.unwrap() - want).abs() < 1e-12,
+                "{teeth:?}: {} vs {want}",
+                r.ratio.unwrap()
+            );
+            every_distance_closes(&r);
+        }
     }
 
     #[test]

@@ -24,35 +24,35 @@
   distance 1  running 30.025653  clearance 0.020000
 
 == idler ==
-  path b1 -> b2  ratio -1.470588  efficiency 98.084422 / 98.084422 %  backlash 0.067106 / 0.098686 deg
+  path b1 -> b2  ratio 2.529412  efficiency 96.796847 / 96.796847 %  backlash 0.077899 / 0.197040 deg
   case 1
-    b0   fixed    speed              -  torque -4.884836
+    b0   fixed    speed              -  torque 2.896782
     b1   load     speed      3000.0000  torque 2.000000
-    b2   reacted  speed     -2040.0000  torque 2.884836
-    b3   free     speed      1186.0465  torque 0.000000
+    b2   reacted  speed      1186.0465  torque -4.896782
+    b3   free     speed     -2040.0000  torque 0.000000
   case 2
-    b0   fixed    speed              -  torque -1.000184
-    b1   reacted  speed         0.0000  torque 0.400184
+    b0   fixed    speed              -  torque -0.370389
+    b1   reacted  speed         0.0000  torque -0.229611
     b2   load     speed         0.0000  torque 0.600000
     b3   free     speed         0.0000  torque 0.000000
   case 3
-    b0   fixed    speed              -  torque -4.884836
+    b0   fixed    speed              -  torque 2.896782
     b1   load     speed      2400.0000  torque 2.000000
-    b2   reacted  speed     -1632.0000  torque 2.884836
-    b3   free     speed       948.8372  torque 0.000000
+    b2   reacted  speed       948.8372  torque -4.896782
+    b3   free     speed     -1632.0000  torque 0.000000
   member 1  z 17  m 1  alpha 20  x 0.005657  b 10.000000  beta 0.000000  d 17.000000
     case 1  T 2.000000  n 3000.0000  vs frame 3000.0000  sF 69.118  sH 734.202  cycles -  widths 0.506357 / 2.893118
-    case 2  T 0.408000  n 0.0000  vs frame 0.0000  sF 14.100  sH 331.612  cycles -  widths 0.103297 / 0.590196
+    case 2  T 0.234095  n 0.0000  vs frame 0.0000  sF 8.090  sH 251.187  cycles -  widths 0.059268 / 0.338633
     case 3  T 2.000000  n 2400.0000  vs frame 2400.0000  sF 69.118  sH 734.202  cycles 1.440000e8 / 1.440000e8  widths 0.921570 / 9.583165
   member 2  z 25  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 25.000000
     ! gear.reversed_bending_uncorrected
     case 1  T 2.941176  n -2040.0000  vs frame -2040.0000  sF 63.192  sH 687.621  cycles -  widths 0.462947 / 2.537660
-    case 2  T 0.600000  n 0.0000  vs frame 0.0000  sF 12.891  sH 310.574  cycles -  widths 0.094441 / 0.517683
+    case 2  T 0.348837  n 0.0000  vs frame 0.0000  sF 7.397  sH 235.251  cycles -  widths 0.054187 / 0.297027
     case 3  T 2.941176  n -1632.0000  vs frame -1632.0000  sF 63.192  sH 687.621  cycles 9.792000e7 / 9.792000e7  widths 0.842563 / 8.405745
   member 3  z 43  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 43.000000
-    case 1  T 0.000000  n 1186.0465  vs frame 1186.0465  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
-    case 2  T 0.000000  n 0.0000  vs frame 0.0000  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
-    case 3  T 0.000000  n 948.8372  vs frame 948.8372  sF 0.000  sH 0.000  cycles 5.693023e7 / 5.693023e7  widths 0.000000 / 0.000000
+    case 1  T 4.961918  n 1186.0465  vs frame 1186.0465  sF 53.836  sH 546.296  cycles -  widths 0.394404 / 1.601735
+    case 2  T 0.600000  n 0.0000  vs frame 0.0000  sF 6.510  sH 189.967  cycles -  widths 0.047692 / 0.193683
+    case 3  T 4.961918  n 948.8372  vs frame 948.8372  sF 53.836  sH 546.296  cycles 5.693023e7 / 5.693023e7  widths 0.717815 / 5.305589
   mesh 1  members 1 2  alpha_w 20.191171  eps 1.541474 / 0.000000 / 1.541474  efficiency 98.084422 / 98.084422 %  play 0.098686 / 0.067106 deg  coprime
   mesh 2  members 2 3  alpha_w 20.092340  eps 1.649758 / 0.000000 / 1.649758  efficiency 98.687279 / 98.687279 %  play 0.066881 / 0.038884 deg  coprime
   distance 1  running 21.025651  clearance 0.020000
@@ -401,48 +401,48 @@
   distance 2  running 30.025653  clearance 0.020000
 
 == spur then idler ==
-  path b1 -> b3  ratio 3.719723  efficiency 96.461102 / 96.461102 %  backlash 0.093593 / 0.348139 deg
+  path b1 -> b3  ratio -6.397924  efficiency 95.194836 / 95.194836 %  backlash 0.093298 / 0.596916 deg
   case 1
-    b0   fixed    speed              -  torque 5.176172
+    b0   fixed    speed              -  torque -14.180986
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed     -1186.0465  torque 0.000000
-    b3   reacted  speed       806.5116  torque -7.176172
-    b4   free     speed      -468.9021  torque 0.000000
+    b3   reacted  speed      -468.9021  torque 12.180986
+    b4   free     speed       806.5116  torque 0.000000
   case 2
-    b0   fixed    speed              -  torque -0.444406
-    b1   reacted  speed         0.0000  torque -0.155594
+    b0   fixed    speed              -  torque -0.689274
+    b1   reacted  speed         0.0000  torque 0.089274
     b2   free     speed         0.0000  torque 0.000000
     b3   load     speed         0.0000  torque 0.600000
     b4   free     speed         0.0000  torque 0.000000
   case 3
-    b0   fixed    speed              -  torque 5.176172
+    b0   fixed    speed              -  torque -14.180986
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed      -948.8372  torque 0.000000
-    b3   reacted  speed       645.2093  torque -7.176172
-    b4   free     speed      -375.1217  torque 0.000000
+    b3   reacted  speed      -375.1217  torque 12.180986
+    b4   free     speed       645.2093  torque 0.000000
   member 1  z 17  m 1  alpha 20  x 0.005657  b 10.000000  beta 0.000000  d 17.000000
     case 1  T 2.000000  n 3000.0000  vs frame 3000.0000  sF 67.148  sH 690.774  cycles -  widths 0.491925 / 2.560982
-    case 2  T 0.158212  n 0.0000  vs frame 0.0000  sF 5.312  sH 194.286  cycles -  widths 0.038914 / 0.202590
+    case 2  T 0.090776  n 0.0000  vs frame 0.0000  sF 3.048  sH 147.166  cycles -  widths 0.022328 / 0.116238
     case 3  T 2.000000  n 2400.0000  vs frame 2400.0000  sF 67.148  sH 690.774  cycles 1.440000e8 / 1.440000e8  widths 0.895304 / 8.482996
   member 2  z 43  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 43.000000
     case 1  T 5.058824  n -1186.0465  vs frame -1186.0465  sF 56.848  sH 627.632  cycles -  widths 0.416468 / 2.114194
-    case 2  T 0.400184  n 0.0000  vs frame 0.0000  sF 4.497  sH 176.527  cycles -  widths 0.032945 / 0.167246
+    case 2  T 0.229611  n 0.0000  vs frame 0.0000  sF 2.580  sH 133.714  cycles -  widths 0.018903 / 0.095960
     case 3  T 5.058824  n -948.8372  vs frame -948.8372  sF 56.848  sH 627.632  cycles 5.693023e7 / 5.693023e7  widths 0.757973 / 7.003056
   mesh 1  members 1 2  alpha_w 20.134061  eps 1.599309 / 0.000000 / 1.599309  efficiency 98.344976 / 98.344976 %  play 0.098522 / 0.038950 deg  coprime
   distance 1  running 30.025653  clearance 0.020000
   member 3  z 17  m 1  alpha 20  x 0.005657  b 10.000000  beta 0.000000  d 17.000000
     case 1  T 4.975099  n -1186.0465  vs frame -1186.0465  sF 171.934  sH 1157.981  cycles -  widths 1.259589 / 7.196774
-    case 2  T 0.408000  n 0.0000  vs frame 0.0000  sF 14.100  sH 331.612  cycles -  widths 0.103297 / 0.590196
+    case 2  T 0.234095  n 0.0000  vs frame 0.0000  sF 8.090  sH 251.187  cycles -  widths 0.059268 / 0.338633
     case 3  T 4.975099  n -948.8372  vs frame -948.8372  sF 171.934  sH 1157.981  cycles 5.693023e7 / 5.693023e7  widths 2.292452 / 23.838595
   member 4  z 25  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 25.000000
     ! gear.reversed_bending_uncorrected
     case 1  T 7.316322  n 806.5116  vs frame 806.5116  sF 157.194  sH 1084.514  cycles -  widths 1.151603 / 6.312555
-    case 2  T 0.600000  n 0.0000  vs frame 0.0000  sF 12.891  sH 310.574  cycles -  widths 0.094441 / 0.517683
+    case 2  T 0.348837  n 0.0000  vs frame 0.0000  sF 7.397  sH 235.251  cycles -  widths 0.054187 / 0.297027
     case 3  T 7.316322  n 645.2093  vs frame 645.2093  sF 157.194  sH 1084.514  cycles 3.871256e7 / 3.871256e7  widths 2.095918 / 20.909706
   member 5  z 43  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 43.000000
-    case 1  T 0.000000  n -468.9021  vs frame -468.9021  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
-    case 2  T 0.000000  n 0.0000  vs frame 0.0000  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
-    case 3  T 0.000000  n -375.1217  vs frame -375.1217  sF 0.000  sH 0.000  cycles 2.250730e7 / 2.250730e7  widths 0.000000 / 0.000000
+    case 1  T 12.343016  n -468.9021  vs frame -468.9021  sF 133.920  sH 861.616  cycles -  widths 0.981098 / 3.984396
+    case 2  T 0.600000  n 0.0000  vs frame 0.0000  sF 6.510  sH 189.967  cycles -  widths 0.047692 / 0.193683
+    case 3  T 12.343016  n -375.1217  vs frame -375.1217  sF 133.920  sH 861.616  cycles 2.250730e7 / 2.250730e7  widths 1.785599 / 13.197914
   mesh 2  members 3 4  alpha_w 20.191171  eps 1.541474 / 0.000000 / 1.541474  efficiency 98.084422 / 98.084422 %  play 0.098686 / 0.067106 deg  coprime
   mesh 3  members 4 5  alpha_w 20.092340  eps 1.649758 / 0.000000 / 1.649758  efficiency 98.687279 / 98.687279 %  play 0.066881 / 0.038884 deg  coprime
   distance 2  running 21.025651  clearance 0.020000
@@ -857,191 +857,191 @@
   distance 4  running 18.020000  clearance 0.020000
 
 == idler then spur ==
-  path b1 -> b4  ratio 3.719723  efficiency 96.461102 / 96.461102 %  backlash 0.065481 / 0.243571 deg
+  path b1 -> b4  ratio -6.397924  efficiency 95.194836 / 95.194836 %  backlash 0.069748 / 0.446241 deg
   case 1
-    b0   fixed    speed              -  torque 5.176172
+    b0   fixed    speed              -  torque -14.180986
     b1   load     speed      3000.0000  torque 2.000000
-    b2   free     speed     -2040.0000  torque 0.000000
-    b3   free     speed      1186.0465  torque 0.000000
-    b4   reacted  speed       806.5116  torque -7.176172
+    b2   free     speed      1186.0465  torque 0.000000
+    b3   free     speed     -2040.0000  torque 0.000000
+    b4   reacted  speed      -468.9021  torque 12.180986
   case 2
-    b0   fixed    speed              -  torque -0.444406
-    b1   reacted  speed         0.0000  torque -0.155594
+    b0   fixed    speed              -  torque -0.689274
+    b1   reacted  speed         0.0000  torque 0.089274
     b2   free     speed         0.0000  torque 0.000000
     b3   free     speed         0.0000  torque 0.000000
     b4   load     speed         0.0000  torque 0.600000
   case 3
-    b0   fixed    speed              -  torque 5.176172
+    b0   fixed    speed              -  torque -14.180986
     b1   load     speed      2400.0000  torque 2.000000
-    b2   free     speed     -1632.0000  torque 0.000000
-    b3   free     speed       948.8372  torque 0.000000
-    b4   reacted  speed       645.2093  torque -7.176172
+    b2   free     speed       948.8372  torque 0.000000
+    b3   free     speed     -1632.0000  torque 0.000000
+    b4   reacted  speed      -375.1217  torque 12.180986
   member 1  z 17  m 1  alpha 20  x 0.005657  b 10.000000  beta 0.000000  d 17.000000
     case 1  T 2.000000  n 3000.0000  vs frame 3000.0000  sF 69.118  sH 734.202  cycles -  widths 0.506357 / 2.893118
-    case 2  T 0.158633  n 0.0000  vs frame 0.0000  sF 5.482  sH 206.775  cycles -  widths 0.040162 / 0.229472
+    case 2  T 0.091018  n 0.0000  vs frame 0.0000  sF 3.145  sH 156.626  cycles -  widths 0.023044 / 0.131662
     case 3  T 2.000000  n 2400.0000  vs frame 2400.0000  sF 69.118  sH 734.202  cycles 1.440000e8 / 1.440000e8  widths 0.921570 / 9.583165
   member 2  z 25  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 25.000000
     ! gear.reversed_bending_uncorrected
     case 1  T 2.941176  n -2040.0000  vs frame -2040.0000  sF 63.192  sH 687.621  cycles -  widths 0.462947 / 2.537660
-    case 2  T 0.233283  n 0.0000  vs frame 0.0000  sF 5.012  sH 193.656  cycles -  widths 0.036719 / 0.201278
+    case 2  T 0.135630  n 0.0000  vs frame 0.0000  sF 2.876  sH 146.689  cycles -  widths 0.021068 / 0.115486
     case 3  T 2.941176  n -1632.0000  vs frame -1632.0000  sF 63.192  sH 687.621  cycles 9.792000e7 / 9.792000e7  widths 0.842563 / 8.405745
   member 3  z 43  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 43.000000
-    case 1  T 0.000000  n 1186.0465  vs frame 1186.0465  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
-    case 2  T 0.000000  n 0.0000  vs frame 0.0000  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
-    case 3  T 0.000000  n 948.8372  vs frame 948.8372  sF 0.000  sH 0.000  cycles 5.693023e7 / 5.693023e7  widths 0.000000 / 0.000000
+    case 1  T 4.961918  n 1186.0465  vs frame 1186.0465  sF 53.836  sH 546.296  cycles -  widths 0.394404 / 1.601735
+    case 2  T 0.233283  n 0.0000  vs frame 0.0000  sF 2.531  sH 118.453  cycles -  widths 0.018543 / 0.075305
+    case 3  T 4.961918  n 948.8372  vs frame 948.8372  sF 53.836  sH 546.296  cycles 5.693023e7 / 5.693023e7  widths 0.717815 / 5.305589
   mesh 1  members 1 2  alpha_w 20.191171  eps 1.541474 / 0.000000 / 1.541474  efficiency 98.084422 / 98.084422 %  play 0.098686 / 0.067106 deg  coprime
   mesh 2  members 2 3  alpha_w 20.092340  eps 1.649758 / 0.000000 / 1.649758  efficiency 98.687279 / 98.687279 %  play 0.066881 / 0.038884 deg  coprime
   distance 1  running 21.025651  clearance 0.020000
   distance 2  running 34.020000  clearance 0.020000
   member 4  z 17  m 1  alpha 20  x 0.005657  b 10.000000  beta 0.000000  d 17.000000
-    case 1  T 2.884836  n -2040.0000  vs frame -2040.0000  sF 96.855  sH 829.624  cycles -  widths 0.709562 / 3.694006
+    case 1  T 4.896782  n 1186.0465  vs frame 1186.0465  sF 164.404  sH 1080.877  cycles -  widths 1.204426 / 6.270284
     case 2  T 0.237209  n 0.0000  vs frame 0.0000  sF 7.964  sH 237.896  cycles -  widths 0.058345 / 0.303744
-    case 3  T 2.884836  n -1632.0000  vs frame -1632.0000  sF 96.855  sH 829.624  cycles 9.792000e7 / 9.792000e7  widths 1.291403 / 12.236025
+    case 3  T 4.896782  n 948.8372  vs frame 948.8372  sF 164.404  sH 1080.877  cycles 5.693023e7 / 5.693023e7  widths 2.192055 / 20.769689
   member 5  z 43  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 43.000000
-    case 1  T 7.296938  n 806.5116  vs frame 806.5116  sF 81.998  sH 753.790  cycles -  widths 0.600722 / 3.049552
+    case 1  T 12.385977  n -468.9021  vs frame -468.9021  sF 139.186  sH 982.077  cycles -  widths 1.019677 / 5.176373
     case 2  T 0.600000  n 0.0000  vs frame 0.0000  sF 6.742  sH 216.150  cycles -  widths 0.049395 / 0.250753
-    case 3  T 7.296938  n 645.2093  vs frame 645.2093  sF 81.998  sH 753.790  cycles 3.871256e7 / 3.871256e7  widths 1.093313 / 10.101334
+    case 3  T 12.385977  n -375.1217  vs frame -375.1217  sF 139.186  sH 982.077  cycles 2.250730e7 / 2.250730e7  widths 1.855813 / 17.146219
   mesh 3  members 4 5  alpha_w 20.134061  eps 1.599309 / 0.000000 / 1.599309  efficiency 98.344976 / 98.344976 %  play 0.098522 / 0.038950 deg  coprime
   distance 3  running 30.025653  clearance 0.020000
 
 == idler then idler ==
-  path b1 -> b4  ratio 2.162630  efficiency 96.205539 / 96.205539 %  backlash 0.112739 / 0.243812 deg
+  path b1 -> b4  ratio 6.397924  efficiency 93.696296 / 93.696296 %  backlash 0.108697 / 0.695434 deg
   case 1
-    b0   fixed    speed              -  torque 2.161139
+    b0   fixed    speed              -  torque 9.989235
     b1   load     speed      3000.0000  torque 2.000000
-    b2   free     speed     -2040.0000  torque 0.000000
-    b3   free     speed      1186.0465  torque 0.000000
-    b4   reacted  speed      1387.2000  torque -4.161139
+    b2   free     speed      1186.0465  torque 0.000000
+    b3   free     speed     -2040.0000  torque 0.000000
+    b4   reacted  speed       468.9021  torque -11.989235
     b5   free     speed      -806.5116  torque 0.000000
   case 2
-    b0   fixed    speed              -  torque -0.333087
-    b1   reacted  speed         0.0000  torque -0.266913
+    b0   fixed    speed              -  torque -0.512131
+    b1   reacted  speed         0.0000  torque -0.087869
     b2   free     speed         0.0000  torque 0.000000
     b3   free     speed         0.0000  torque 0.000000
     b4   load     speed         0.0000  torque 0.600000
     b5   free     speed         0.0000  torque 0.000000
   case 3
-    b0   fixed    speed              -  torque 2.161139
+    b0   fixed    speed              -  torque 9.989235
     b1   load     speed      2400.0000  torque 2.000000
-    b2   free     speed     -1632.0000  torque 0.000000
-    b3   free     speed       948.8372  torque 0.000000
-    b4   reacted  speed      1109.7600  torque -4.161139
+    b2   free     speed       948.8372  torque 0.000000
+    b3   free     speed     -1632.0000  torque 0.000000
+    b4   reacted  speed       375.1217  torque -11.989235
     b5   free     speed      -645.2093  torque 0.000000
   member 1  z 17  m 1  alpha 20  x 0.005657  b 10.000000  beta 0.000000  d 17.000000
     case 1  T 2.000000  n 3000.0000  vs frame 3000.0000  sF 69.118  sH 734.202  cycles -  widths 0.506357 / 2.893118
-    case 2  T 0.272125  n 0.0000  vs frame 0.0000  sF 9.404  sH 270.823  cycles -  widths 0.068896 / 0.393645
+    case 2  T 0.089585  n 0.0000  vs frame 0.0000  sF 3.096  sH 155.388  cycles -  widths 0.022681 / 0.129590
     case 3  T 2.000000  n 2400.0000  vs frame 2400.0000  sF 69.118  sH 734.202  cycles 1.440000e8 / 1.440000e8  widths 0.921570 / 9.583165
   member 2  z 25  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 25.000000
     ! gear.reversed_bending_uncorrected
     case 1  T 2.941176  n -2040.0000  vs frame -2040.0000  sF 63.192  sH 687.621  cycles -  widths 0.462947 / 2.537660
-    case 2  T 0.400184  n 0.0000  vs frame 0.0000  sF 8.598  sH 253.641  cycles -  widths 0.062990 / 0.345281
+    case 2  T 0.133495  n 0.0000  vs frame 0.0000  sF 2.831  sH 145.530  cycles -  widths 0.020737 / 0.113668
     case 3  T 2.941176  n -1632.0000  vs frame -1632.0000  sF 63.192  sH 687.621  cycles 9.792000e7 / 9.792000e7  widths 0.842563 / 8.405745
   member 3  z 43  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 43.000000
-    case 1  T 0.000000  n 1186.0465  vs frame 1186.0465  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
-    case 2  T 0.000000  n 0.0000  vs frame 0.0000  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
-    case 3  T 0.000000  n 948.8372  vs frame 948.8372  sF 0.000  sH 0.000  cycles 5.693023e7 / 5.693023e7  widths 0.000000 / 0.000000
+    case 1  T 4.961918  n 1186.0465  vs frame 1186.0465  sF 53.836  sH 546.296  cycles -  widths 0.394404 / 1.601735
+    case 2  T 0.229611  n 0.0000  vs frame 0.0000  sF 2.491  sH 117.517  cycles -  widths 0.018251 / 0.074120
+    case 3  T 4.961918  n 948.8372  vs frame 948.8372  sF 53.836  sH 546.296  cycles 5.693023e7 / 5.693023e7  widths 0.717815 / 5.305589
   mesh 1  members 1 2  alpha_w 20.191171  eps 1.541474 / 0.000000 / 1.541474  efficiency 98.084422 / 98.084422 %  play 0.098686 / 0.067106 deg  coprime
   mesh 2  members 2 3  alpha_w 20.092340  eps 1.649758 / 0.000000 / 1.649758  efficiency 98.687279 / 98.687279 %  play 0.066881 / 0.038884 deg  coprime
   distance 1  running 21.025651  clearance 0.020000
   distance 2  running 34.020000  clearance 0.020000
   member 4  z 17  m 1  alpha 20  x 0.005657  b 10.000000  beta 0.000000  d 17.000000
-    case 1  T 2.884836  n -2040.0000  vs frame -2040.0000  sF 99.697  sH 881.782  cycles -  widths 0.730379 / 4.173086
-    case 2  T 0.408000  n 0.0000  vs frame 0.0000  sF 14.100  sH 331.612  cycles -  widths 0.103297 / 0.590196
-    case 3  T 2.884836  n -1632.0000  vs frame -1632.0000  sF 99.697  sH 881.782  cycles 9.792000e7 / 9.792000e7  widths 1.329290 / 13.822929
+    case 1  T 4.896782  n 1186.0465  vs frame 1186.0465  sF 169.227  sH 1148.831  cycles -  widths 1.239761 / 7.083484
+    case 2  T 0.234095  n 0.0000  vs frame 0.0000  sF 8.090  sH 251.187  cycles -  widths 0.059268 / 0.338633
+    case 3  T 4.896782  n 948.8372  vs frame 948.8372  sF 169.227  sH 1148.831  cycles 5.693023e7 / 5.693023e7  widths 2.256365 / 23.463332
   member 5  z 25  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 25.000000
     ! gear.reversed_bending_uncorrected
-    case 1  T 4.242406  n 1387.2000  vs frame 1387.2000  sF 91.150  sH 825.838  cycles -  widths 0.667763 / 3.660366
-    case 2  T 0.600000  n 0.0000  vs frame 0.0000  sF 12.891  sH 310.574  cycles -  widths 0.094441 / 0.517683
-    case 3  T 4.242406  n 1109.7600  vs frame 1109.7600  sF 91.150  sH 825.838  cycles 6.658560e7 / 6.658560e7  widths 1.215328 / 12.124598
+    case 1  T 7.201150  n -806.5116  vs frame -806.5116  sF 154.719  sH 1075.944  cycles -  widths 1.133475 / 6.213184
+    case 2  T 0.348837  n 0.0000  vs frame 0.0000  sF 7.397  sH 235.251  cycles -  widths 0.054187 / 0.297027
+    case 3  T 7.201150  n -645.2093  vs frame -645.2093  sF 154.719  sH 1075.944  cycles 3.871256e7 / 3.871256e7  widths 2.062924 / 20.580549
   member 6  z 43  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 43.000000
-    case 1  T 0.000000  n -806.5116  vs frame -806.5116  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
-    case 2  T 0.000000  n 0.0000  vs frame 0.0000  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
-    case 3  T 0.000000  n -645.2093  vs frame -645.2093  sF 0.000  sH 0.000  cycles 3.871256e7 / 3.871256e7  widths 0.000000 / 0.000000
+    case 1  T 12.148714  n 468.9021  vs frame 468.9021  sF 131.812  sH 854.808  cycles -  widths 0.965654 / 3.921675
+    case 2  T 0.600000  n 0.0000  vs frame 0.0000  sF 6.510  sH 189.967  cycles -  widths 0.047692 / 0.193683
+    case 3  T 12.148714  n 375.1217  vs frame 375.1217  sF 131.812  sH 854.808  cycles 2.250730e7 / 2.250730e7  widths 1.757491 / 12.990155
   mesh 3  members 4 5  alpha_w 20.191171  eps 1.541474 / 0.000000 / 1.541474  efficiency 98.084422 / 98.084422 %  play 0.098686 / 0.067106 deg  coprime
   mesh 4  members 5 6  alpha_w 20.092340  eps 1.649758 / 0.000000 / 1.649758  efficiency 98.687279 / 98.687279 %  play 0.066881 / 0.038884 deg  coprime
   distance 3  running 21.025651  clearance 0.020000
   distance 4  running 34.020000  clearance 0.020000
 
 == idler then layshaft ==
-  path b1 -> b4  ratio -3.479741  efficiency 95.140768 / 95.140768 %  backlash 0.127751 / 0.444540 deg
+  path b1 -> b4  ratio 5.985155  efficiency 93.891835 / 93.891835 %  backlash 0.132312 / 0.791908 deg
   case 1
-    b0   fixed    speed              -  torque -8.621305
+    b0   fixed    speed              -  torque 9.239143
     b1   load     speed      3000.0000  torque 2.000000
-    b2   free     speed     -2040.0000  torque 0.000000
-    b3   free     speed      1186.0465  torque 0.000000
-    b4   reacted  speed      -862.1331  torque 6.621305
-    b5   free     speed       806.5116  torque 0.000000
-    b6   free     speed      -373.7493  torque 0.000000
+    b2   free     speed      1186.0465  torque 0.000000
+    b3   free     speed     -2040.0000  torque 0.000000
+    b4   reacted  speed       501.2402  torque -11.239143
+    b5   free     speed      -468.9021  torque 0.000000
+    b6   free     speed       217.2961  torque 0.000000
   case 2
-    b0   fixed    speed              -  torque -0.764048
-    b1   reacted  speed         0.0000  torque 0.164048
+    b0   fixed    speed              -  torque -0.505875
+    b1   reacted  speed         0.0000  torque -0.094125
     b2   free     speed         0.0000  torque 0.000000
     b3   free     speed         0.0000  torque 0.000000
     b4   load     speed         0.0000  torque 0.600000
     b5   free     speed         0.0000  torque 0.000000
     b6   free     speed         0.0000  torque 0.000000
   case 3
-    b0   fixed    speed              -  torque -8.621305
+    b0   fixed    speed              -  torque 9.239143
     b1   load     speed      2400.0000  torque 2.000000
-    b2   free     speed     -1632.0000  torque 0.000000
-    b3   free     speed       948.8372  torque 0.000000
-    b4   reacted  speed      -689.7065  torque 6.621305
-    b5   free     speed       645.2093  torque 0.000000
-    b6   free     speed      -298.9994  torque 0.000000
+    b2   free     speed       948.8372  torque 0.000000
+    b3   free     speed     -1632.0000  torque 0.000000
+    b4   reacted  speed       400.9921  torque -11.239143
+    b5   free     speed      -375.1217  torque 0.000000
+    b6   free     speed       173.8369  torque 0.000000
   member 1  z 17  m 1  alpha 20  x 0.005657  b 10.000000  beta 0.000000  d 17.000000
     case 1  T 2.000000  n 3000.0000  vs frame 3000.0000  sF 69.118  sH 734.202  cycles -  widths 0.506357 / 2.893118
-    case 2  T 0.167252  n 0.0000  vs frame 0.0000  sF 5.780  sH 212.318  cycles -  widths 0.042345 / 0.241940
+    case 2  T 0.095963  n 0.0000  vs frame 0.0000  sF 3.316  sH 160.825  cycles -  widths 0.024296 / 0.138816
     case 3  T 2.000000  n 2400.0000  vs frame 2400.0000  sF 69.118  sH 734.202  cycles 1.440000e8 / 1.440000e8  widths 0.921570 / 9.583165
   member 2  z 25  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 25.000000
     ! gear.reversed_bending_uncorrected
     case 1  T 2.941176  n -2040.0000  vs frame -2040.0000  sF 63.192  sH 687.621  cycles -  widths 0.462947 / 2.537660
-    case 2  T 0.245959  n 0.0000  vs frame 0.0000  sF 5.285  sH 198.847  cycles -  widths 0.038714 / 0.212214
+    case 2  T 0.142999  n 0.0000  vs frame 0.0000  sF 3.032  sH 150.621  cycles -  widths 0.022213 / 0.121761
     case 3  T 2.941176  n -1632.0000  vs frame -1632.0000  sF 63.192  sH 687.621  cycles 9.792000e7 / 9.792000e7  widths 0.842563 / 8.405745
   member 3  z 43  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 43.000000
-    case 1  T 0.000000  n 1186.0465  vs frame 1186.0465  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
-    case 2  T 0.000000  n 0.0000  vs frame 0.0000  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
-    case 3  T 0.000000  n 948.8372  vs frame 948.8372  sF 0.000  sH 0.000  cycles 5.693023e7 / 5.693023e7  widths 0.000000 / 0.000000
+    case 1  T 4.961918  n 1186.0465  vs frame 1186.0465  sF 53.836  sH 546.296  cycles -  widths 0.394404 / 1.601735
+    case 2  T 0.245959  n 0.0000  vs frame 0.0000  sF 2.669  sH 121.628  cycles -  widths 0.019550 / 0.079397
+    case 3  T 4.961918  n 948.8372  vs frame 948.8372  sF 53.836  sH 546.296  cycles 5.693023e7 / 5.693023e7  widths 0.717815 / 5.305589
   mesh 1  members 1 2  alpha_w 20.191171  eps 1.541474 / 0.000000 / 1.541474  efficiency 98.084422 / 98.084422 %  play 0.098686 / 0.067106 deg  coprime
   mesh 2  members 2 3  alpha_w 20.092340  eps 1.649758 / 0.000000 / 1.649758  efficiency 98.687279 / 98.687279 %  play 0.066881 / 0.038884 deg  coprime
   distance 1  running 21.025651  clearance 0.020000
   distance 2  running 34.020000  clearance 0.020000
   member 4  z 17  m 1  alpha 20  x 0.005657  b 10.000000  beta 0.000000  d 17.000000
-    case 1  T 2.884836  n -2040.0000  vs frame -2040.0000  sF 96.855  sH 829.624  cycles -  widths 0.709562 / 3.694006
+    case 1  T 4.896782  n 1186.0465  vs frame 1186.0465  sF 164.404  sH 1080.877  cycles -  widths 1.204426 / 6.270284
     case 2  T 0.250098  n 0.0000  vs frame 0.0000  sF 8.397  sH 244.273  cycles -  widths 0.061515 / 0.320248
-    case 3  T 2.884836  n -1632.0000  vs frame -1632.0000  sF 96.855  sH 829.624  cycles 9.792000e7 / 9.792000e7  widths 1.291403 / 12.236025
+    case 3  T 4.896782  n 948.8372  vs frame 948.8372  sF 164.404  sH 1080.877  cycles 5.693023e7 / 5.693023e7  widths 2.192055 / 20.769689
   member 5  z 43  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 43.000000
-    case 1  T 7.296938  n 806.5116  vs frame 806.5116  sF 81.998  sH 753.790  cycles -  widths 0.600722 / 3.049552
+    case 1  T 12.385977  n -468.9021  vs frame -468.9021  sF 139.186  sH 982.077  cycles -  widths 1.019677 / 5.176373
     case 2  T 0.632600  n 0.0000  vs frame 0.0000  sF 7.109  sH 221.945  cycles -  widths 0.052079 / 0.264378
-    case 3  T 7.296938  n 645.2093  vs frame 645.2093  sF 81.998  sH 753.790  cycles 3.871256e7 / 3.871256e7  widths 1.093313 / 10.101334
+    case 3  T 12.385977  n -375.1217  vs frame -375.1217  sF 139.186  sH 982.077  cycles 2.250730e7 / 2.250730e7  widths 1.855813 / 17.146219
   member 6  z 41  m 1  alpha 20  x 0.005657  b 10.000000  beta 0.000000  d 41.000000
-    case 1  T 0.000000  n -373.7493  vs frame -373.7493  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
+    case 1  T 0.000000  n 217.2961  vs frame 217.2961  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
     case 2  T 0.000000  n 0.0000  vs frame 0.0000  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
-    case 3  T 0.000000  n -298.9994  vs frame -298.9994  sF 0.000  sH 0.000  cycles 1.793997e7 / 1.793997e7  widths 0.000000 / 0.000000
+    case 3  T 0.000000  n 173.8369  vs frame 173.8369  sF 0.000  sH 0.000  cycles 1.043021e7 / 1.043021e7  widths 0.000000 / 0.000000
   member 7  z 19  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 19.000000
-    case 1  T 0.000000  n 806.5116  vs frame 806.5116  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
+    case 1  T 0.000000  n -468.9021  vs frame -468.9021  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
     case 2  T 0.000000  n 0.0000  vs frame 0.0000  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
-    case 3  T 0.000000  n 645.2093  vs frame 645.2093  sF 0.000  sH 0.000  cycles 3.871256e7 / 3.871256e7  widths 0.000000 / 0.000000
+    case 3  T 0.000000  n -375.1217  vs frame -375.1217  sF 0.000  sH 0.000  cycles 2.250730e7 / 2.250730e7  widths 0.000000 / 0.000000
   member 8  z 29  m 1  alpha 20  x 0.005657  b 10.000000  beta 0.000000  d 29.000000
-    case 1  T 6.713193  n -862.1331  vs frame -862.1331  sF 114.208  sH 801.243  cycles -  widths 0.836692 / 3.445584
+    case 1  T 11.395116  n 501.2402  vs frame 501.2402  sF 193.860  sH 1043.900  cycles -  widths 1.420218 / 5.848607
     case 2  T 0.600000  n 0.0000  vs frame 0.0000  sF 10.208  sH 239.538  cycles -  widths 0.074780 / 0.307953
-    case 3  T 6.713193  n -689.7065  vs frame -689.7065  sF 114.208  sH 801.243  cycles 4.138239e7 / 4.138239e7  widths 1.522779 / 11.413151
+    case 3  T 11.395116  n 400.9921  vs frame 400.9921  sF 193.860  sH 1043.900  cycles 2.405953e7 / 2.405953e7  widths 2.584798 / 19.372924
   member 9  z 31  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 31.000000
-    case 1  T 7.176172  n 806.5116  vs frame 806.5116  sF 113.446  sH 795.456  cycles -  widths 0.831108 / 3.395998
+    case 1  T 12.180986  n -468.9021  vs frame -468.9021  sF 192.566  sH 1036.361  cycles -  widths 1.410740 / 5.764439
     case 2  T 0.641379  n 0.0000  vs frame 0.0000  sF 10.139  sH 237.809  cycles -  widths 0.074281 / 0.303522
-    case 3  T 7.176172  n 645.2093  vs frame 645.2093  sF 113.446  sH 795.456  cycles 3.871256e7 / 3.871256e7  widths 1.512616 / 11.248905
+    case 3  T 12.180986  n -375.1217  vs frame -375.1217  sF 192.566  sH 1036.361  cycles 2.250730e7 / 2.250730e7  widths 2.567547 / 19.094129
   mesh 3  members 4 5  alpha_w 20.134061  eps 1.599309 / 0.000000 / 1.599309  efficiency 98.344976 / 98.344976 %  play 0.098522 / 0.038950 deg  coprime
   mesh 4  members 6 7  alpha_w 20.134061  eps 1.610021 / 0.000000 / 1.610021  efficiency 98.437612 / 98.437612 %  play 0.040850 / 0.088151 deg  coprime
   mesh 5  members 8 9  alpha_w 20.134061  eps 1.632034 / 0.000000 / 1.632034  efficiency 98.631227 / 98.631227 %  play 0.057754 / 0.054028 deg  coprime
   distance 3  running 30.025653  clearance 0.020000
 
 == idler then worm ==
-  path b1 -> b4  ratio 58.823529  efficiency 60.620693 / 0.000000 %  backlash 0.156802 / 9.223636 deg
+  path b1 -> b4  ratio -101.176471  efficiency 59.824913 / 0.000000 %  backlash 0.157072 / 15.891953 deg
   case 1
-    b0   fixed    speed              -  torque 69.318463
+    b0   fixed    speed              -  torque -123.057470
     b1   load     speed      3000.0000  torque 2.000000
-    b2   free     speed     -2040.0000  torque 0.000000
-    b3   free     speed      1186.0465  torque 0.000000
-    b4   reacted  speed        51.0000  torque -71.318463
+    b2   free     speed      1186.0465  torque 0.000000
+    b3   free     speed     -2040.0000  torque 0.000000
+    b4   reacted  speed       -29.6512  torque 121.057470
   case 2
     b0   fixed    speed              -  torque -0.600000
     b1   reacted  speed         0.0000  torque 0.000000
@@ -1049,11 +1049,11 @@
     b3   free     speed         0.0000  torque 0.000000
     b4   load     speed         0.0000  torque 0.600000
   case 3
-    b0   fixed    speed              -  torque 69.318463
+    b0   fixed    speed              -  torque -123.057470
     b1   load     speed      2400.0000  torque 2.000000
-    b2   free     speed     -1632.0000  torque 0.000000
-    b3   free     speed       948.8372  torque 0.000000
-    b4   reacted  speed        40.8000  torque -71.318463
+    b2   free     speed       948.8372  torque 0.000000
+    b3   free     speed     -1632.0000  torque 0.000000
+    b4   reacted  speed       -23.7209  torque 121.057470
   member 1  z 17  m 1  alpha 20  x 0.005657  b 10.000000  beta 0.000000  d 17.000000
     case 1  T 2.000000  n 3000.0000  vs frame 3000.0000  sF 69.118  sH 734.202  cycles -  widths 0.506357 / 2.893118
     case 2  T 0.000000  n 0.0000  vs frame 0.0000  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
@@ -1064,209 +1064,209 @@
     case 2  T 0.000000  n 0.0000  vs frame 0.0000  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
     case 3  T 2.941176  n -1632.0000  vs frame -1632.0000  sF 63.192  sH 687.621  cycles 9.792000e7 / 9.792000e7  widths 0.842563 / 8.405745
   member 3  z 43  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 43.000000
-    case 1  T 0.000000  n 1186.0465  vs frame 1186.0465  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
+    case 1  T 4.961918  n 1186.0465  vs frame 1186.0465  sF 53.836  sH 546.296  cycles -  widths 0.394404 / 1.601735
     case 2  T 0.000000  n 0.0000  vs frame 0.0000  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
-    case 3  T 0.000000  n 948.8372  vs frame 948.8372  sF 0.000  sH 0.000  cycles 5.693023e7 / 5.693023e7  widths 0.000000 / 0.000000
+    case 3  T 4.961918  n 948.8372  vs frame 948.8372  sF 53.836  sH 546.296  cycles 5.693023e7 / 5.693023e7  widths 0.717815 / 5.305589
   mesh 1  members 1 2  alpha_w 20.191171  eps 1.541474 / 0.000000 / 1.541474  efficiency 98.084422 / 98.084422 %  play 0.098686 / 0.067106 deg  coprime
   mesh 2  members 2 3  alpha_w 20.092340  eps 1.649758 / 0.000000 / 1.649758  efficiency 98.687279 / 98.687279 %  play 0.066881 / 0.038884 deg  coprime
   distance 1  running 21.025651  clearance 0.020000
   distance 2  running 34.020000  clearance 0.020000
   member 4  z 1  m 1  alpha 20  x 0.000000  b 13.538864  beta 81.786789  d 7.000000
-    case 1  T 2.884836  n -2040.0000  vs frame -2040.0000  sF -  sH 3814.560  cycles -  widths - / -
+    case 1  T 4.896782  n 1186.0465  vs frame 1186.0465  sF -  sH 4550.310  cycles -  widths - / -
     case 2  T 0.015000  n 0.0000  vs frame 0.0000  sF -  sH 771.953  cycles -  widths - / -
-    case 3  T 2.884836  n -1632.0000  vs frame -1632.0000  sF -  sH 3814.560  cycles 9.792000e7 / 9.792000e7  widths - / -
+    case 3  T 4.896782  n 948.8372  vs frame 948.8372  sF -  sH 4550.310  cycles 5.693023e7 / 5.693023e7  widths - / -
   member 5  z 40  m 1  alpha 20  x 0.000000  b 4.690000  beta 8.213211  d 40.414519
-    case 1  T 115.393438  n 51.0000  vs frame 51.0000  sF -  sH 3814.560  cycles -  widths - / -
+    case 1  T 195.871267  n -29.6512  vs frame -29.6512  sF -  sH 4550.310  cycles -  widths - / -
     case 2  T 0.600000  n 0.0000  vs frame 0.0000  sF -  sH 771.953  cycles -  widths - / -
-    case 3  T 115.393438  n 40.8000  vs frame 40.8000  sF -  sH 3814.560  cycles 2.448001e6 / 2.448001e6  widths - / -
+    case 3  T 195.871267  n -23.7209  vs frame -23.7209  sF -  sH 4550.310  cycles 1.423256e6 / 1.423256e6  widths - / -
   mesh 3  members 4 5  point contact  efficiency 61.804609 / 0.000000 %  play 6.204966 / 0.155124 deg  coprime
     ! mesh.self_locking
   distance 3  running 23.727259  clearance 0.020000
 
 == idler then crossed ==
-  path b1 -> b4  ratio 3.719723  efficiency 82.641323 / 82.639651 %  backlash 0.065329 / 0.243004 deg
+  path b1 -> b4  ratio -6.397924  efficiency 81.556472 / 81.554822 %  backlash 0.069595 / 0.445267 deg
   case 1
-    b0   fixed    speed              -  torque 4.148057
+    b0   fixed    speed              -  torque -12.435842
     b1   load     speed      3000.0000  torque 2.000000
-    b2   free     speed     -2040.0000  torque 0.000000
-    b3   free     speed      1186.0465  torque 0.000000
-    b4   reacted  speed       806.5116  torque -6.148057
+    b2   free     speed      1186.0465  torque 0.000000
+    b3   free     speed     -2040.0000  torque 0.000000
+    b4   reacted  speed      -468.9021  torque 10.435842
   case 2
-    b0   fixed    speed              -  torque -0.466700
-    b1   reacted  speed         0.0000  torque -0.133300
+    b0   fixed    speed              -  torque -0.676482
+    b1   reacted  speed         0.0000  torque 0.076482
     b2   free     speed         0.0000  torque 0.000000
     b3   free     speed         0.0000  torque 0.000000
     b4   load     speed         0.0000  torque 0.600000
   case 3
-    b0   fixed    speed              -  torque 4.148057
+    b0   fixed    speed              -  torque -12.435842
     b1   load     speed      2400.0000  torque 2.000000
-    b2   free     speed     -1632.0000  torque 0.000000
-    b3   free     speed       948.8372  torque 0.000000
-    b4   reacted  speed       645.2093  torque -6.148057
+    b2   free     speed       948.8372  torque 0.000000
+    b3   free     speed     -1632.0000  torque 0.000000
+    b4   reacted  speed      -375.1217  torque 10.435842
   member 1  z 17  m 1  alpha 20  x 0.005657  b 10.000000  beta 0.000000  d 17.000000
     case 1  T 2.000000  n 3000.0000  vs frame 3000.0000  sF 69.118  sH 734.202  cycles -  widths 0.506357 / 2.893118
-    case 2  T 0.135903  n 0.0000  vs frame 0.0000  sF 4.697  sH 191.388  cycles -  widths 0.034408 / 0.196592
+    case 2  T 0.077976  n 0.0000  vs frame 0.0000  sF 2.695  sH 144.971  cycles -  widths 0.019742 / 0.112797
     case 3  T 2.000000  n 2400.0000  vs frame 2400.0000  sF 69.118  sH 734.202  cycles 1.440000e8 / 1.440000e8  widths 0.921570 / 9.583165
   member 2  z 25  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 25.000000
     ! gear.reversed_bending_uncorrected
     case 1  T 2.941176  n -2040.0000  vs frame -2040.0000  sF 63.192  sH 687.621  cycles -  widths 0.462947 / 2.537660
-    case 2  T 0.199857  n 0.0000  vs frame 0.0000  sF 4.294  sH 179.246  cycles -  widths 0.031458 / 0.172438
+    case 2  T 0.116196  n 0.0000  vs frame 0.0000  sF 2.464  sH 135.774  cycles -  widths 0.018049 / 0.098938
     case 3  T 2.941176  n -1632.0000  vs frame -1632.0000  sF 63.192  sH 687.621  cycles 9.792000e7 / 9.792000e7  widths 0.842563 / 8.405745
   member 3  z 43  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 43.000000
-    case 1  T 0.000000  n 1186.0465  vs frame 1186.0465  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
-    case 2  T 0.000000  n 0.0000  vs frame 0.0000  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
-    case 3  T 0.000000  n 948.8372  vs frame 948.8372  sF 0.000  sH 0.000  cycles 5.693023e7 / 5.693023e7  widths 0.000000 / 0.000000
+    case 1  T 4.961918  n 1186.0465  vs frame 1186.0465  sF 53.836  sH 546.296  cycles -  widths 0.394404 / 1.601735
+    case 2  T 0.199857  n 0.0000  vs frame 0.0000  sF 2.168  sH 109.639  cycles -  widths 0.015886 / 0.064515
+    case 3  T 4.961918  n 948.8372  vs frame 948.8372  sF 53.836  sH 546.296  cycles 5.693023e7 / 5.693023e7  widths 0.717815 / 5.305589
   mesh 1  members 1 2  alpha_w 20.191171  eps 1.541474 / 0.000000 / 1.541474  efficiency 98.084422 / 98.084422 %  play 0.098686 / 0.067106 deg  coprime
   mesh 2  members 2 3  alpha_w 20.092340  eps 1.649758 / 0.000000 / 1.649758  efficiency 98.687279 / 98.687279 %  play 0.066881 / 0.038884 deg  coprime
   distance 1  running 21.025651  clearance 0.020000
   distance 2  running 34.020000  clearance 0.020000
   member 4  z 17  m 1  alpha 20  x 0.000000  b 10.000000  beta 45.000000  d 24.041631
-    case 1  T 2.884836  n -2040.0000  vs frame -2040.0000  sF -  sH 1443.581  cycles -  widths - / -
+    case 1  T 4.896782  n 1186.0465  vs frame 1186.0465  sF -  sH 1722.018  cycles -  widths - / -
     case 2  T 0.237209  n 0.0000  vs frame 0.0000  sF -  sH 627.249  cycles -  widths - / -
-    case 3  T 2.884836  n -1632.0000  vs frame -1632.0000  sF -  sH 1443.581  cycles 9.792000e7 / 9.792000e7  widths - / -
+    case 3  T 4.896782  n 948.8372  vs frame 948.8372  sF -  sH 1722.018  cycles 5.693023e7 / 5.693023e7  widths - / -
   member 5  z 43  m 1  alpha 20  x 0.000000  b 10.000000  beta 45.000000  d 60.811183
-    case 1  T 7.296938  n 806.5116  vs frame 806.5116  sF -  sH 1443.581  cycles -  widths - / -
+    case 1  T 12.385977  n -468.9021  vs frame -468.9021  sF -  sH 1722.018  cycles -  widths - / -
     case 2  T 0.600000  n 0.0000  vs frame 0.0000  sF -  sH 627.249  cycles -  widths - / -
-    case 3  T 7.296938  n 645.2093  vs frame 645.2093  sF -  sH 1443.581  cycles 3.871256e7 / 3.871256e7  widths - / -
+    case 3  T 12.385977  n -375.1217  vs frame -375.1217  sF -  sH 1722.018  cycles 2.250730e7 / 2.250730e7  widths - / -
   mesh 3  members 4 5  point contact  efficiency 84.255298 / 84.253594 %  play 0.098136 / 0.038798 deg  coprime
   distance 3  running 42.446407  clearance 0.020000
 
 == idler then planetary ==
-  path b1 -> b4  ratio -10.294118  efficiency 95.810640 / 95.801820 %  backlash 0.051311 / 0.528197 deg
+  path b1 -> b4  ratio 17.705882  efficiency 94.552913 / 94.544209 %  backlash 0.052852 / 0.935799 deg
   case 1
-    b0   fixed    speed              -  torque -4.884836
+    b0   fixed    speed              -  torque 2.896782
     b1   load     speed      3000.0000  torque 2.000000
-    b2   free     speed     -2040.0000  torque 0.000000
-    b3   free     speed      1186.0465  torque 0.000000
-    b4   reacted  speed      -291.4286  torque 19.725720
-    b5   fixed    speed              -  torque -16.840884
-    b6   free     speed       408.0000  torque 0.000000
+    b2   free     speed      1186.0465  torque 0.000000
+    b3   free     speed     -2040.0000  torque 0.000000
+    b4   reacted  speed       169.4352  torque -33.482855
+    b5   fixed    speed              -  torque 28.586073
+    b6   free     speed      -237.2093  torque 0.000000
   case 2
-    b0   fixed    speed              -  torque -0.139558
-    b1   reacted  speed         0.0000  torque 0.055839
+    b0   fixed    speed              -  torque -0.051681
+    b1   reacted  speed         0.0000  torque -0.032038
     b2   free     speed         0.0000  torque 0.000000
     b3   free     speed         0.0000  torque 0.000000
     b4   load     speed         0.0000  torque 0.600000
     b5   fixed    speed              -  torque -0.516280
     b6   free     speed         0.0000  torque 0.000000
   case 3
-    b0   fixed    speed              -  torque -4.884836
+    b0   fixed    speed              -  torque 2.896782
     b1   load     speed      2400.0000  torque 2.000000
-    b2   free     speed     -1632.0000  torque 0.000000
-    b3   free     speed       948.8372  torque 0.000000
-    b4   reacted  speed      -233.1429  torque 19.725720
-    b5   fixed    speed              -  torque -16.840884
-    b6   free     speed       326.4000  torque 0.000000
+    b2   free     speed       948.8372  torque 0.000000
+    b3   free     speed     -1632.0000  torque 0.000000
+    b4   reacted  speed       135.5482  torque -33.482855
+    b5   fixed    speed              -  torque 28.586073
+    b6   free     speed      -189.7674  torque 0.000000
   member 1  z 17  m 1  alpha 20  x 0.005657  b 10.000000  beta 0.000000  d 17.000000
     case 1  T 2.000000  n 3000.0000  vs frame 3000.0000  sF 69.118  sH 734.202  cycles -  widths 0.506357 / 2.893118
-    case 2  T 0.056929  n 0.0000  vs frame 0.0000  sF 1.967  sH 123.871  cycles -  widths 0.014413 / 0.082352
+    case 2  T 0.032664  n 0.0000  vs frame 0.0000  sF 1.129  sH 93.829  cycles -  widths 0.008270 / 0.047250
     case 3  T 2.000000  n 2400.0000  vs frame 2400.0000  sF 69.118  sH 734.202  cycles 1.440000e8 / 1.440000e8  widths 0.921570 / 9.583165
   member 2  z 25  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 25.000000
     ! gear.reversed_bending_uncorrected
     case 1  T 2.941176  n -2040.0000  vs frame -2040.0000  sF 63.192  sH 687.621  cycles -  widths 0.462947 / 2.537660
-    case 2  T 0.083720  n 0.0000  vs frame 0.0000  sF 1.799  sH 116.012  cycles -  widths 0.013178 / 0.072234
+    case 2  T 0.048674  n 0.0000  vs frame 0.0000  sF 1.032  sH 87.876  cycles -  widths 0.007561 / 0.041445
     case 3  T 2.941176  n -1632.0000  vs frame -1632.0000  sF 63.192  sH 687.621  cycles 9.792000e7 / 9.792000e7  widths 0.842563 / 8.405745
   member 3  z 43  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 43.000000
-    case 1  T 0.000000  n 1186.0465  vs frame 1186.0465  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
-    case 2  T 0.000000  n 0.0000  vs frame 0.0000  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
-    case 3  T 0.000000  n 948.8372  vs frame 948.8372  sF 0.000  sH 0.000  cycles 5.693023e7 / 5.693023e7  widths 0.000000 / 0.000000
+    case 1  T 4.961918  n 1186.0465  vs frame 1186.0465  sF 53.836  sH 546.296  cycles -  widths 0.394404 / 1.601735
+    case 2  T 0.083720  n 0.0000  vs frame 0.0000  sF 0.908  sH 70.961  cycles -  widths 0.006655 / 0.027025
+    case 3  T 4.961918  n 948.8372  vs frame 948.8372  sF 53.836  sH 546.296  cycles 5.693023e7 / 5.693023e7  widths 0.717815 / 5.305589
   mesh 1  members 1 2  alpha_w 20.191171  eps 1.541474 / 0.000000 / 1.541474  efficiency 98.084422 / 98.084422 %  play 0.098686 / 0.067106 deg  coprime
   mesh 2  members 2 3  alpha_w 20.092340  eps 1.649758 / 0.000000 / 1.649758  efficiency 98.687279 / 98.687279 %  play 0.066881 / 0.038884 deg  coprime
   distance 1  running 21.025651  clearance 0.020000
   distance 2  running 34.020000  clearance 0.020000
   member 4  z 12  m 1  alpha 20  x 0.298101  b 10.000000  beta 0.000000  d 12.000000
-    case 1  T 0.961612  n -2040.0000  vs frame -1748.5714  sF 42.006  sH 655.759  cycles -  widths 0.307736 / 2.307932
+    case 1  T 1.632261  n 1186.0465  vs frame 1016.6113  sF 71.302  sH 854.356  cycles -  widths 0.522357 / 3.917533
     case 2  T 0.028523  n 0.0000  vs frame 0.0000  sF 1.246  sH 112.939  cycles -  widths 0.009128 / 0.068457
-    case 3  T 0.961612  n -1632.0000  vs frame -1398.8571  sF 42.006  sH 655.759  cycles 2.517943e8 / 2.517943e8  widths 0.560079 / 7.644795
+    case 3  T 1.632261  n 948.8372  vs frame 813.2890  sF 71.302  sH 854.356  cycles 1.463920e8 / 1.463920e8  widths 0.950690 / 12.976437
   member 5  z 30  m 1  alpha 20  x -0.170059  b 10.000000  beta 0.000000  d 30.000000
     ! gear.reversed_bending_uncorrected
-    case 1  T 2.404030  n 408.0000  vs frame 699.4286  sF 48.823  sH 602.670  cycles -  widths 0.357675 / 1.949367
+    case 1  T 4.080651  n -237.2093  vs frame -406.6445  sF 82.873  sH 785.189  cycles -  widths 0.607125 / 3.308897
     case 2  T 0.071706  n 0.0000  vs frame 0.0000  sF 1.448  sH 103.795  cycles -  widths 0.010609 / 0.057822
-    case 3  T 2.404030  n 326.4000  vs frame 559.5429  sF 48.823  sH 602.670  cycles 3.357257e7 / 3.357257e7  widths 0.650969 / 6.457084
+    case 3  T 4.080651  n -189.7674  vs frame -325.3156  sF 82.873  sH 785.189  cycles 1.951894e7 / 1.951894e7  widths 1.104968 / 10.960391
   member 6  z 72  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 72.000000
-    case 1  T 5.644959  n 0.0000  vs frame 291.4286  sF 27.449  sH 284.530  cycles -  widths 0.201089 / 0.434502
+    case 1  T 9.581872  n 0.0000  vs frame -169.4352  sF 46.592  sH 370.701  cycles -  widths 0.341332 / 0.737533
     case 2  T 0.172093  n 0.0000  vs frame 0.0000  sF 0.837  sH 49.680  cycles -  widths 0.006130 / 0.013246
-    case 3  T 5.644959  n 0.0000  vs frame 233.1429  sF 27.449  sH 284.530  cycles 4.196572e7 / 4.196572e7  widths 0.365982 / 1.439245
+    case 3  T 9.581872  n 0.0000  vs frame -135.5482  sF 46.592  sH 370.701  cycles 2.439867e7 / 2.439867e7  widths 0.621225 / 2.443006
   mesh 3  members 4 5  alpha_w 21.054925  eps 1.436891 / 0.000000 / 1.436891  efficiency 97.838469 / 97.838469 %  play 0.145568 / 0.058227 deg  shares a factor
   mesh 4  members 5 6  alpha_w 21.054925  eps 1.972621 / 0.000000 / 1.972621  efficiency 99.444980 / 99.444980 %  play 0.058600 / 0.024417 deg  shares a factor
   distance 3  running 21.145279  clearance 0.020000
 
 == idler then wolfrom ==
-  path b1 -> b5  ratio -89.705882  efficiency 44.487352 / 0.000000 %  backlash 0.050037 / 4.488583 deg
+  path b1 -> b5  ratio 154.294118  efficiency 43.903357 / 0.000000 %  backlash 0.050214 / 7.747663 deg
   case 1
-    b0   fixed    speed              -  torque -4.884836
+    b0   fixed    speed              -  torque 2.896782
     b1   load     speed      3000.0000  torque 2.000000
-    b2   free     speed     -2040.0000  torque 0.000000
-    b3   free     speed      1186.0465  torque 0.000000
-    b4   fixed    speed              -  torque -76.930707
-    b5   reacted  speed       -33.4426  torque 79.815543
-    b6   free     speed      4760.0000  torque 0.000000
+    b2   free     speed      1186.0465  torque 0.000000
+    b3   free     speed     -2040.0000  torque 0.000000
+    b4   fixed    speed              -  torque 130.583812
+    b5   reacted  speed        19.4434  torque -135.480593
+    b6   free     speed     -2767.4419  torque 0.000000
   case 2
-    b0   fixed    speed              -  torque 0.003822
-    b1   reacted  speed         0.0000  torque -0.001565
+    b0   fixed    speed              -  torque 0.001335
+    b1   reacted  speed         0.0000  torque 0.000922
     b2   free     speed         0.0000  torque 0.000000
     b3   free     speed         0.0000  torque 0.000000
     b4   fixed    speed              -  torque -0.602257
     b5   load     speed         0.0000  torque 0.600000
     b6   free     speed         0.0000  torque 0.000000
   case 3
-    b0   fixed    speed              -  torque -4.884836
+    b0   fixed    speed              -  torque 2.896782
     b1   load     speed      2400.0000  torque 2.000000
-    b2   free     speed     -1632.0000  torque 0.000000
-    b3   free     speed       948.8372  torque 0.000000
-    b4   fixed    speed              -  torque -76.930707
-    b5   reacted  speed       -26.7541  torque 79.815543
-    b6   free     speed      3808.0000  torque 0.000000
+    b2   free     speed       948.8372  torque 0.000000
+    b3   free     speed     -1632.0000  torque 0.000000
+    b4   fixed    speed              -  torque 130.583812
+    b5   reacted  speed        15.5547  torque -135.480593
+    b6   free     speed     -2213.9535  torque 0.000000
   member 1  z 17  m 1  alpha 20  x 0.005657  b 10.000000  beta 0.000000  d 17.000000
     case 1  T 2.000000  n 3000.0000  vs frame 3000.0000  sF 69.118  sH 734.202  cycles -  widths 0.506357 / 2.893118
-    case 2  T 0.001565  n 0.0000  vs frame 0.0000  sF 0.054  sH 20.536  cycles -  widths 0.000396 / 0.002263
+    case 2  T 0.000922  n 0.0000  vs frame 0.0000  sF 0.032  sH 15.762  cycles -  widths 0.000233 / 0.001333
     case 3  T 2.000000  n 2400.0000  vs frame 2400.0000  sF 69.118  sH 734.202  cycles 1.440000e8 / 1.440000e8  widths 0.921570 / 9.583165
   member 2  z 25  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 25.000000
     ! gear.reversed_bending_uncorrected
     case 1  T 2.941176  n -2040.0000  vs frame -2040.0000  sF 63.192  sH 687.621  cycles -  widths 0.462947 / 2.537660
-    case 2  T 0.002301  n 0.0000  vs frame 0.0000  sF 0.049  sH 19.233  cycles -  widths 0.000362 / 0.001985
+    case 2  T 0.001356  n 0.0000  vs frame 0.0000  sF 0.029  sH 14.762  cycles -  widths 0.000213 / 0.001170
     case 3  T 2.941176  n -1632.0000  vs frame -1632.0000  sF 63.192  sH 687.621  cycles 9.792000e7 / 9.792000e7  widths 0.842563 / 8.405745
   member 3  z 43  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 43.000000
-    case 1  T 0.000000  n 1186.0465  vs frame 1186.0465  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
-    case 2  T 0.000000  n 0.0000  vs frame 0.0000  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
-    case 3  T 0.000000  n 948.8372  vs frame 948.8372  sF 0.000  sH 0.000  cycles 5.693023e7 / 5.693023e7  widths 0.000000 / 0.000000
+    case 1  T 4.961918  n 1186.0465  vs frame 1186.0465  sF 53.836  sH 546.296  cycles -  widths 0.394404 / 1.601735
+    case 2  T 0.002287  n 0.0000  vs frame 0.0000  sF 0.025  sH 11.728  cycles -  widths 0.000182 / 0.000738
+    case 3  T 4.961918  n 948.8372  vs frame 948.8372  sF 53.836  sH 546.296  cycles 5.693023e7 / 5.693023e7  widths 0.717815 / 5.305589
   mesh 1  members 1 2  alpha_w 20.191171  eps 1.541474 / 0.000000 / 1.541474  efficiency 98.084422 / 98.084422 %  play 0.098686 / 0.067106 deg  coprime
   mesh 2  members 2 3  alpha_w 20.092340  eps 1.649758 / 0.000000 / 1.649758  efficiency 98.687279 / 98.687279 %  play 0.066881 / 0.038884 deg  coprime
   distance 1  running 21.025651  clearance 0.020000
   distance 2  running 34.020000  clearance 0.020000
   member 4  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
     ! gear.reversed_bending_uncorrected
-    case 1  T 7.850709  n 4760.0000  vs frame 6800.0000  sF 211.641  sH 976.271  cycles -  widths 1.550482 / 5.115354
+    case 1  T 13.325960  n -2767.4419  vs frame -3953.4884  sF 359.244  sH 1271.936  cycles -  widths 2.631821 / 8.682911
     case 2  T 0.060226  n 0.0000  vs frame 0.0000  sF 1.641  sH 85.959  cycles -  widths 0.012020 / 0.039657
-    case 3  T 7.850709  n 3808.0000  vs frame 5440.0000  sF 211.641  sH 976.271  cycles 3.264000e8 / 3.264000e8  widths 2.821877 / 16.944099
+    case 3  T 13.325960  n -2213.9535  vs frame -3162.7907  sF 359.244  sH 1271.936  cycles 1.897674e8 / 1.897674e8  widths 4.789914 / 28.761273
   member 5  z 60  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 60.000000
     ! clamp.ring_flank_ungenerated
-    case 1  T 25.895078  n 0.0000  vs frame 2040.0000  sF 163.916  sH 917.420  cycles -  widths 1.200848 / 4.517221
+    case 1  T 43.954854  n 0.0000  vs frame -1186.0465  sF 278.234  sH 1195.262  cycles -  widths 2.038345 / 7.667626
     case 2  T 0.200752  n 0.0000  vs frame 0.0000  sF 1.271  sH 80.777  cycles -  widths 0.009310 / 0.035020
-    case 3  T 25.895078  n 0.0000  vs frame 1632.0000  sF 163.916  sH 917.420  cycles 2.937600e8 / 2.937600e8  widths 2.185543 / 14.962842
+    case 3  T 43.954854  n 0.0000  vs frame -948.8372  sF 278.234  sH 1195.262  cycles 1.707907e8 / 1.707907e8  widths 3.709787 / 25.398245
   member 6  z 61  m 1  alpha 20  x -0.451906  b 10.000000  beta 0.000000  d 61.000000
     ! clamp.ring_flank_ungenerated
-    case 1  T 26.605181  n -33.4426  vs frame 2006.5574  sF 187.479  sH 1055.538  cycles -  widths 1.373472 / 5.979737
+    case 1  T 45.160198  n 19.4434  vs frame -1166.6031  sF 318.231  sH 1375.208  cycles -  widths 2.331360 / 10.150132
     case 2  T 0.202116  n 0.0000  vs frame 0.0000  sF 1.424  sH 92.001  cycles -  widths 0.010434 / 0.045427
-    case 3  T 26.605181  n -26.7541  vs frame 1605.2459  sF 187.479  sH 1055.538  cycles 2.889443e8 / 2.889443e8  widths 2.499719 / 19.807281
+    case 3  T 45.160198  n 15.5547  vs frame -933.2825  sF 318.231  sH 1375.208  cycles 1.679909e8 / 1.679909e8  widths 4.243076 / 33.621299
   mesh 3  members 4 5  alpha_w 19.849390  eps 1.916246 / 0.000000 / 1.916246  efficiency 99.028738 / 99.028738 %  play 0.092350 / 0.027705 deg  shares a factor
   mesh 4  members 4 6  alpha_w 15.638132  eps 2.121494 / 0.000000 / 2.121494  efficiency 98.953143 / 98.953143 %  play 0.073491 / 0.021686 deg  coprime
   distance 3  running 20.980000  clearance 0.020000
 
 == idler then compound ==
-  path b1 -> b5  ratio -130.147059  efficiency 64.292834 / 47.584655 %  backlash 0.057507 / 7.484351 deg
+  path b1 -> b5  ratio 223.852941  efficiency 63.448849 / 46.960001 %  backlash 0.057629 / 12.900384 deg
   case 1
-    b0   fixed    speed              -  torque -4.884836
+    b0   fixed    speed              -  torque 2.896782
     b1   load     speed      3000.0000  torque 2.000000
-    b2   free     speed     -2040.0000  torque 0.000000
-    b3   free     speed      1186.0465  torque 0.000000
-    b4   fixed    speed              -  torque -164.465630
-    b5   reacted  speed       -23.0508  torque 167.350466
-    b6   free     speed      -582.8571  torque 0.000000
-    b7   free     speed      1360.0000  torque 0.000000
+    b2   free     speed      1186.0465  torque 0.000000
+    b3   free     speed     -2040.0000  torque 0.000000
+    b4   fixed    speed              -  torque 279.167445
+    b5   reacted  speed        13.4017  torque -284.064227
+    b6   free     speed       338.8704  torque 0.000000
+    b7   free     speed      -790.6977  torque 0.000000
   case 2
-    b0   fixed    speed              -  torque -0.005483
-    b1   reacted  speed         0.0000  torque 0.002194
+    b0   fixed    speed              -  torque -0.002030
+    b1   reacted  speed         0.0000  torque -0.001259
     b2   free     speed         0.0000  torque 0.000000
     b3   free     speed         0.0000  torque 0.000000
     b4   fixed    speed              -  torque -0.596711
@@ -1274,125 +1274,125 @@
     b6   free     speed         0.0000  torque 0.000000
     b7   free     speed         0.0000  torque 0.000000
   case 3
-    b0   fixed    speed              -  torque -4.884836
+    b0   fixed    speed              -  torque 2.896782
     b1   load     speed      2400.0000  torque 2.000000
-    b2   free     speed     -1632.0000  torque 0.000000
-    b3   free     speed       948.8372  torque 0.000000
-    b4   fixed    speed              -  torque -164.465630
-    b5   reacted  speed       -18.4407  torque 167.350466
-    b6   free     speed      -466.2857  torque 0.000000
-    b7   free     speed      1088.0000  torque 0.000000
+    b2   free     speed       948.8372  torque 0.000000
+    b3   free     speed     -1632.0000  torque 0.000000
+    b4   fixed    speed              -  torque 279.167445
+    b5   reacted  speed        10.7213  torque -284.064227
+    b6   free     speed       271.0963  torque 0.000000
+    b7   free     speed      -632.5581  torque 0.000000
   member 1  z 17  m 1  alpha 20  x 0.005657  b 10.000000  beta 0.000000  d 17.000000
     case 1  T 2.000000  n 3000.0000  vs frame 3000.0000  sF 69.118  sH 734.202  cycles -  widths 0.506357 / 2.893118
-    case 2  T 0.002237  n 0.0000  vs frame 0.0000  sF 0.077  sH 24.552  cycles -  widths 0.000566 / 0.003235
+    case 2  T 0.001283  n 0.0000  vs frame 0.0000  sF 0.044  sH 18.598  cycles -  widths 0.000325 / 0.001856
     case 3  T 2.000000  n 2400.0000  vs frame 2400.0000  sF 69.118  sH 734.202  cycles 1.440000e8 / 1.440000e8  widths 0.921570 / 9.583165
   member 2  z 25  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 25.000000
     ! gear.reversed_bending_uncorrected
     case 1  T 2.941176  n -2040.0000  vs frame -2040.0000  sF 63.192  sH 687.621  cycles -  widths 0.462947 / 2.537660
-    case 2  T 0.003289  n 0.0000  vs frame 0.0000  sF 0.071  sH 22.995  cycles -  widths 0.000518 / 0.002838
+    case 2  T 0.001912  n 0.0000  vs frame 0.0000  sF 0.041  sH 17.418  cycles -  widths 0.000297 / 0.001628
     case 3  T 2.941176  n -1632.0000  vs frame -1632.0000  sF 63.192  sH 687.621  cycles 9.792000e7 / 9.792000e7  widths 0.842563 / 8.405745
   member 3  z 43  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 43.000000
-    case 1  T 0.000000  n 1186.0465  vs frame 1186.0465  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
-    case 2  T 0.000000  n 0.0000  vs frame 0.0000  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
-    case 3  T 0.000000  n 948.8372  vs frame 948.8372  sF 0.000  sH 0.000  cycles 5.693023e7 / 5.693023e7  widths 0.000000 / 0.000000
+    case 1  T 4.961918  n 1186.0465  vs frame 1186.0465  sF 53.836  sH 546.296  cycles -  widths 0.394404 / 1.601735
+    case 2  T 0.003289  n 0.0000  vs frame 0.0000  sF 0.036  sH 14.065  cycles -  widths 0.000261 / 0.001062
+    case 3  T 4.961918  n 948.8372  vs frame 948.8372  sF 53.836  sH 546.296  cycles 5.693023e7 / 5.693023e7  widths 0.717815 / 5.305589
   mesh 1  members 1 2  alpha_w 20.191171  eps 1.541474 / 0.000000 / 1.541474  efficiency 98.084422 / 98.084422 %  play 0.098686 / 0.067106 deg  coprime
   mesh 2  members 2 3  alpha_w 20.092340  eps 1.649758 / 0.000000 / 1.649758  efficiency 98.687279 / 98.687279 %  play 0.066881 / 0.038884 deg  coprime
   distance 1  running 21.025651  clearance 0.020000
   distance 2  running 34.020000  clearance 0.020000
   member 4  z 24  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 24.000000
-    case 1  T 0.961612  n -2040.0000  vs frame -1457.1429  sF 21.535  sH 400.090  cycles -  widths 0.157763 / 0.859112
+    case 1  T 1.632261  n 1186.0465  vs frame 847.1761  sF 36.553  sH 521.258  cycles -  widths 0.267791 / 1.458275
     case 2  T 0.001118  n 0.0000  vs frame 0.0000  sF 0.025  sH 13.640  cycles -  widths 0.000183 / 0.000998
-    case 3  T 0.961612  n -1632.0000  vs frame -1165.7143  sF 21.535  sH 400.090  cycles 2.098286e8 / 2.098286e8  widths 0.287129 / 2.845722
+    case 3  T 1.632261  n 948.8372  vs frame 677.7409  sF 36.553  sH 521.258  cycles 1.219934e8 / 1.219934e8  widths 0.487379 / 4.830389
   member 5  z 60  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 60.000000
     ! clamp.ring_flank_ungenerated
-    case 1  T 55.366972  n 0.0000  vs frame 582.8571  sF 348.103  sH 1362.199  cycles -  widths 2.550203 / 9.959002
+    case 1  T 93.981071  n 0.0000  vs frame -338.8704  sF 590.877  sH 1774.743  cycles -  widths 4.328768 / 16.904622
     case 2  T 0.198904  n 0.0000  vs frame 0.0000  sF 1.251  sH 81.646  cycles -  widths 0.009162 / 0.035777
-    case 3  T 55.366972  n 0.0000  vs frame 466.2857  sF 348.103  sH 1362.199  cycles 8.393143e7 / 8.393143e7  widths 4.641369 / 32.988199
+    case 3  T 93.981071  n 0.0000  vs frame -271.0963  sF 590.877  sH 1774.743  cycles 4.879734e7 / 4.879734e7  widths 7.878358 / 55.994869
   member 6  z 59  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 59.000000
     ! clamp.ring_flank_ungenerated
-    case 1  T 55.783489  n -23.0508  vs frame 559.8063  sF 358.553  sH 1444.958  cycles -  widths 2.626762 / 11.205853
+    case 1  T 94.688076  n 13.4017  vs frame -325.4688  sF 608.615  sH 1882.565  cycles -  widths 4.458721 / 19.021052
     case 2  T 0.202146  n 0.0000  vs frame 0.0000  sF 1.299  sH 86.983  cycles -  widths 0.009519 / 0.040607
-    case 3  T 55.783489  n -18.4407  vs frame 447.8450  sF 358.553  sH 1444.958  cycles 8.061211e7 / 8.061211e7  widths 4.780706 / 37.118268
+    case 3  T 94.688076  n 10.7213  vs frame -260.3750  sF 608.615  sH 1882.565  cycles 4.686750e7 / 4.686750e7  widths 8.114872 / 63.005334
   member 7  z 18  m 1  alpha 20  x -0.019999  b 10.000000  beta 0.000000  d 18.000000
     ! gear.reversed_bending_uncorrected
-    case 1  T 16.610092  n 1360.0000  vs frame 1942.8571  sF 461.291  sH 1443.229  cycles -  widths 3.379423 / 11.179051
+    case 1  T 28.194321  n -790.6977  vs frame -1129.5681  sF 783.005  sH 1880.312  cycles -  widths 5.736304 / 18.975558
     case 2  T 0.059671  n 0.0000  vs frame 0.0000  sF 1.657  sH 86.503  cycles -  widths 0.012140 / 0.040160
-    case 3  T 16.610092  n 1088.0000  vs frame 1554.2857  sF 461.291  sH 1443.229  cycles 9.325714e7 / 9.325714e7  widths 6.150550 / 37.029488
+    case 3  T 28.194321  n -632.5581  vs frame -903.6545  sF 783.005  sH 1880.312  cycles 5.421927e7 / 5.421927e7  widths 10.440073 / 62.854637
   member 8  z 17  m 1  alpha 20  x -0.019999  b 10.000000  beta 0.000000  d 17.000000
     ! clamp.tooth_undercut
-    case 1  T 16.073209  n 1360.0000  vs frame 1942.8571  sF 487.577  sH 1540.419  cycles -  widths 3.571994 / 12.735402
+    case 1  T 27.283005  n -790.6977  vs frame -1129.5681  sF 827.624  sH 2006.937  cycles -  widths 6.063179 / 21.617341
     case 2  T 0.058245  n 0.0000  vs frame 0.0000  sF 1.767  sH 92.730  cycles -  widths 0.012944 / 0.046150
-    case 3  T 16.073209  n 1088.0000  vs frame 1554.2857  sF 487.577  sH 1540.419  cycles 9.325714e7 / 9.325714e7  widths 6.501029 / 42.184745
+    case 3  T 27.283005  n -632.5581  vs frame -903.6545  sF 827.624  sH 2006.937  cycles 5.421927e7 / 5.421927e7  widths 11.034985 / 71.605281
   mesh 3  members 4 7  alpha_w 19.999461  eps 1.553178 / 0.000000 / 1.553178  efficiency 98.100561 / 98.100561 %  play 0.069261 / 0.092348 deg  shares a factor
   mesh 4  members 7 5  alpha_w 19.999461  eps 1.923327 / 0.000000 / 1.923327  efficiency 99.015487 / 99.015487 %  play 0.093014 / 0.027904 deg  shares a factor
   mesh 5  members 8 6  alpha_w 19.999461  eps 1.920695 / 0.000000 / 1.920695  efficiency 98.938438 / 98.938438 %  play 0.098485 / 0.028377 deg  coprime
   distance 3  running 20.999928  clearance 0.020000
 
 == idler then planocentric ==
-  path b1 -> b5  ratio 14.705882  efficiency 95.294837 / 95.220797 %  backlash 0.102473 / 1.506949 deg
+  path b1 -> b5  ratio -25.294118  efficiency 94.043881 / 93.970814 %  backlash 0.103552 / 2.619253 deg
   case 1
-    b0   fixed    speed              -  torque -4.884836
+    b0   fixed    speed              -  torque 2.896782
     b1   load     speed      3000.0000  torque 2.000000
-    b2   free     speed     -2040.0000  torque 0.000000
-    b3   free     speed      1186.0465  torque 0.000000
-    b4   fixed    speed              -  torque 30.912729
-    b5   reacted  speed       204.0000  torque -28.027893
+    b2   free     speed      1186.0465  torque 0.000000
+    b3   free     speed     -2040.0000  torque 0.000000
+    b4   fixed    speed              -  torque -52.471922
+    b5   reacted  speed      -118.6047  torque 47.575140
   case 2
-    b0   fixed    speed              -  torque 0.097098
-    b1   reacted  speed         0.0000  torque -0.038850
+    b0   fixed    speed              -  torque 0.035958
+    b1   reacted  speed         0.0000  torque 0.022291
     b2   free     speed         0.0000  torque 0.000000
     b3   free     speed         0.0000  torque 0.000000
     b4   fixed    speed              -  torque -0.658248
     b5   load     speed         0.0000  torque 0.600000
   case 3
-    b0   fixed    speed              -  torque -4.884836
+    b0   fixed    speed              -  torque 2.896782
     b1   load     speed      2400.0000  torque 2.000000
-    b2   free     speed     -1632.0000  torque 0.000000
-    b3   free     speed       948.8372  torque 0.000000
-    b4   fixed    speed              -  torque 30.912729
-    b5   reacted  speed       163.2000  torque -28.027893
+    b2   free     speed       948.8372  torque 0.000000
+    b3   free     speed     -1632.0000  torque 0.000000
+    b4   fixed    speed              -  torque -52.471922
+    b5   reacted  speed       -94.8837  torque 47.575140
   member 1  z 17  m 1  alpha 20  x 0.005657  b 10.000000  beta 0.000000  d 17.000000
     case 1  T 2.000000  n 3000.0000  vs frame 3000.0000  sF 69.118  sH 734.202  cycles -  widths 0.506357 / 2.893118
-    case 2  T 0.039609  n 0.0000  vs frame 0.0000  sF 1.369  sH 103.323  cycles -  widths 0.010028 / 0.057297
+    case 2  T 0.022726  n 0.0000  vs frame 0.0000  sF 0.785  sH 78.264  cycles -  widths 0.005754 / 0.032875
     case 3  T 2.000000  n 2400.0000  vs frame 2400.0000  sF 69.118  sH 734.202  cycles 1.440000e8 / 1.440000e8  widths 0.921570 / 9.583165
   member 2  z 25  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 25.000000
     ! gear.reversed_bending_uncorrected
     case 1  T 2.941176  n -2040.0000  vs frame -2040.0000  sF 63.192  sH 687.621  cycles -  widths 0.462947 / 2.537660
-    case 2  T 0.058248  n 0.0000  vs frame 0.0000  sF 1.251  sH 96.768  cycles -  widths 0.009168 / 0.050257
+    case 2  T 0.033865  n 0.0000  vs frame 0.0000  sF 0.718  sH 73.299  cycles -  widths 0.005260 / 0.028836
     case 3  T 2.941176  n -1632.0000  vs frame -1632.0000  sF 63.192  sH 687.621  cycles 9.792000e7 / 9.792000e7  widths 0.842563 / 8.405745
   member 3  z 43  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 43.000000
-    case 1  T 0.000000  n 1186.0465  vs frame 1186.0465  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
-    case 2  T 0.000000  n 0.0000  vs frame 0.0000  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
-    case 3  T 0.000000  n 948.8372  vs frame 948.8372  sF 0.000  sH 0.000  cycles 5.693023e7 / 5.693023e7  widths 0.000000 / 0.000000
+    case 1  T 4.961918  n 1186.0465  vs frame 1186.0465  sF 53.836  sH 546.296  cycles -  widths 0.394404 / 1.601735
+    case 2  T 0.058248  n 0.0000  vs frame 0.0000  sF 0.632  sH 59.190  cycles -  widths 0.004630 / 0.018803
+    case 3  T 4.961918  n 948.8372  vs frame 948.8372  sF 53.836  sH 546.296  cycles 5.693023e7 / 5.693023e7  widths 0.717815 / 5.305589
   mesh 1  members 1 2  alpha_w 20.191171  eps 1.541474 / 0.000000 / 1.541474  efficiency 98.084422 / 98.084422 %  play 0.098686 / 0.067106 deg  coprime
   mesh 2  members 2 3  alpha_w 20.092340  eps 1.649758 / 0.000000 / 1.649758  efficiency 98.687279 / 98.687279 %  play 0.066881 / 0.038884 deg  coprime
   distance 1  running 21.025651  clearance 0.020000
   distance 2  running 34.020000  clearance 0.020000
   member 4  z 30  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 30.000000
-    case 1  T 28.102481  n 204.0000  vs frame 2244.0000  sF 421.420  sH 505.732  cycles -  widths 3.087328 / 1.372702
+    case 1  T 47.701747  n -118.6047  vs frame -1304.6512  sF 715.328  sH 658.894  cycles -  widths 5.240495 / 2.330053
     case 2  T 0.600000  n 0.0000  vs frame 0.0000  sF 8.998  sH 73.897  cycles -  widths 0.065916 / 0.029308
-    case 3  T 28.102481  n 163.2000  vs frame 1795.2000  sF 421.420  sH 505.732  cycles 1.077120e8 / 1.077120e8  widths 5.618936 / 4.546937
+    case 3  T 47.701747  n -94.8837  vs frame -1043.7209  sF 715.328  sH 658.894  cycles 6.262326e7 / 6.262326e7  widths 9.537702 / 7.718067
   member 5  z 33  m 1  alpha 20  x 0.363947  b 10.000000  beta 0.000000  d 33.000000
-    case 1  T 30.912729  n 0.0000  vs frame 2040.0000  sF 314.138  sH 446.081  cycles -  widths 2.301377 / 1.067978
+    case 1  T 52.471922  n 0.0000  vs frame -1186.0465  sF 533.224  sH 581.177  cycles -  widths 3.906406 / 1.812809
     case 2  T 0.660000  n 0.0000  vs frame 0.0000  sF 6.707  sH 65.180  cycles -  widths 0.049135 / 0.022802
-    case 3  T 30.912729  n 0.0000  vs frame 1632.0000  sF 314.138  sH 446.081  cycles 9.792000e7 / 9.792000e7  widths 4.188506 / 3.537571
+    case 3  T 52.471922  n 0.0000  vs frame -948.8372  sF 533.224  sH 581.177  cycles 5.693023e7 / 5.693023e7  widths 7.109659 / 6.004748
   mesh 3  members 4 5  alpha_w 35.629676  eps 1.770022 / 0.000000 / 1.770022  efficiency 99.734586 / 99.734586 %  play 0.095762 / 0.087056 deg  shares a factor
   distance 3  running 1.734179  clearance 0.020000
 
 == idler then meshedplanets ==
-  path b1 -> b4  ratio 4.411765  efficiency 91.569830 / 91.676235 %  backlash 0.092017 / 0.405957 deg
+  path b1 -> b4  ratio -7.588235  efficiency 90.367774 / 90.472782 %  backlash 0.095615 / 0.725546 deg
   case 1
-    b0   fixed    speed              -  torque -4.884836
+    b0   fixed    speed              -  torque 2.896782
     b1   load     speed      3000.0000  torque 2.000000
-    b2   free     speed     -2040.0000  torque 0.000000
-    b3   free     speed      1186.0465  torque 0.000000
-    b4   reacted  speed       680.0000  torque -8.079691
-    b5   fixed    speed              -  torque 10.964527
-    b6   free     speed      4306.6667  torque 0.000000
-    b7   free     speed     -2946.6667  torque 0.000000
+    b2   free     speed      1186.0465  torque 0.000000
+    b3   free     speed     -2040.0000  torque 0.000000
+    b4   reacted  speed      -395.3488  torque 13.714639
+    b5   fixed    speed              -  torque -18.611420
+    b6   free     speed     -2503.8760  torque 0.000000
+    b7   free     speed      1713.1783  torque 0.000000
   case 2
-    b0   fixed    speed              -  torque 0.311613
-    b1   reacted  speed         0.0000  torque -0.124680
+    b0   fixed    speed              -  torque 0.115397
+    b1   reacted  speed         0.0000  torque 0.071537
     b2   free     speed         0.0000  torque 0.000000
     b3   free     speed         0.0000  torque 0.000000
     b4   load     speed         0.0000  torque 0.600000
@@ -1400,49 +1400,49 @@
     b6   free     speed         0.0000  torque 0.000000
     b7   free     speed         0.0000  torque 0.000000
   case 3
-    b0   fixed    speed              -  torque -4.884836
+    b0   fixed    speed              -  torque 2.896782
     b1   load     speed      2400.0000  torque 2.000000
-    b2   free     speed     -1632.0000  torque 0.000000
-    b3   free     speed       948.8372  torque 0.000000
-    b4   reacted  speed       544.0000  torque -8.079691
-    b5   fixed    speed              -  torque 10.964527
-    b6   free     speed      3445.3333  torque 0.000000
-    b7   free     speed     -2357.3333  torque 0.000000
+    b2   free     speed       948.8372  torque 0.000000
+    b3   free     speed     -1632.0000  torque 0.000000
+    b4   reacted  speed      -316.2791  torque 13.714639
+    b5   fixed    speed              -  torque -18.611420
+    b6   free     speed     -2003.1008  torque 0.000000
+    b7   free     speed      1370.5426  torque 0.000000
   member 1  z 17  m 1  alpha 20  x 0.005657  b 10.000000  beta 0.000000  d 17.000000
     case 1  T 2.000000  n 3000.0000  vs frame 3000.0000  sF 69.118  sH 734.202  cycles -  widths 0.506357 / 2.893118
-    case 2  T 0.127115  n 0.0000  vs frame 0.0000  sF 4.393  sH 185.097  cycles -  widths 0.032183 / 0.183879
+    case 2  T 0.072934  n 0.0000  vs frame 0.0000  sF 2.521  sH 140.205  cycles -  widths 0.018465 / 0.105503
     case 3  T 2.000000  n 2400.0000  vs frame 2400.0000  sF 69.118  sH 734.202  cycles 1.440000e8 / 1.440000e8  widths 0.921570 / 9.583165
   member 2  z 25  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 25.000000
     ! gear.reversed_bending_uncorrected
     case 1  T 2.941176  n -2040.0000  vs frame -2040.0000  sF 63.192  sH 687.621  cycles -  widths 0.462947 / 2.537660
-    case 2  T 0.186933  n 0.0000  vs frame 0.0000  sF 4.016  sH 173.353  cycles -  widths 0.029424 / 0.161287
+    case 2  T 0.108682  n 0.0000  vs frame 0.0000  sF 2.304  sH 131.310  cycles -  widths 0.016882 / 0.092540
     case 3  T 2.941176  n -1632.0000  vs frame -1632.0000  sF 63.192  sH 687.621  cycles 9.792000e7 / 9.792000e7  widths 0.842563 / 8.405745
   member 3  z 43  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 43.000000
-    case 1  T 0.000000  n 1186.0465  vs frame 1186.0465  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
-    case 2  T 0.000000  n 0.0000  vs frame 0.0000  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
-    case 3  T 0.000000  n 948.8372  vs frame 948.8372  sF 0.000  sH 0.000  cycles 5.693023e7 / 5.693023e7  widths 0.000000 / 0.000000
+    case 1  T 4.961918  n 1186.0465  vs frame 1186.0465  sF 53.836  sH 546.296  cycles -  widths 0.394404 / 1.601735
+    case 2  T 0.186933  n 0.0000  vs frame 0.0000  sF 2.028  sH 106.034  cycles -  widths 0.014859 / 0.060343
+    case 3  T 4.961918  n 948.8372  vs frame 948.8372  sF 53.836  sH 546.296  cycles 5.693023e7 / 5.693023e7  widths 0.717815 / 5.305589
   mesh 1  members 1 2  alpha_w 20.191171  eps 1.541474 / 0.000000 / 1.541474  efficiency 98.084422 / 98.084422 %  play 0.098686 / 0.067106 deg  coprime
   mesh 2  members 2 3  alpha_w 20.092340  eps 1.649758 / 0.000000 / 1.649758  efficiency 98.687279 / 98.687279 %  play 0.066881 / 0.038884 deg  coprime
   distance 1  running 21.025651  clearance 0.020000
   distance 2  running 34.020000  clearance 0.020000
   member 4  z 24  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 24.000000
-    case 1  T 0.961612  n -2040.0000  vs frame -2720.0000  sF 21.626  sH 398.471  cycles -  widths 0.158433 / 0.852173
+    case 1  T 1.632261  n 1186.0465  vs frame 1581.3953  sF 36.709  sH 519.148  cycles -  widths 0.268928 / 1.446497
     case 2  T 0.063511  n 0.0000  vs frame 0.0000  sF 1.428  sH 102.405  cycles -  widths 0.010464 / 0.056283
-    case 3  T 0.961612  n -1632.0000  vs frame -2176.0000  sF 21.626  sH 398.471  cycles 3.916800e8 / 3.916800e8  widths 0.288348 / 2.822739
+    case 3  T 1.632261  n 948.8372  vs frame 1265.1163  sF 36.709  sH 519.148  cycles 2.277209e8 / 2.277209e8  widths 0.489448 / 4.791378
   member 5  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
     ! gear.reversed_bending_uncorrected
-    case 1  T 0.721209  n 4306.6667  vs frame 3626.6667  sF 23.186  sH 433.564  cycles -  widths 0.169860 / 1.008886
+    case 1  T 1.224195  n -2503.8760  vs frame -2108.5271  sF 39.356  sH 564.870  cycles -  widths 0.288324 / 1.712504
     case 2  T 0.048659  n 0.0000  vs frame 0.0000  sF 1.594  sH 113.697  cycles -  widths 0.011681 / 0.069380
-    case 3  T 0.721209  n 3445.3333  vs frame 2901.3333  sF 23.186  sH 433.564  cycles 1.740800e8 / 1.740800e8  widths 0.309145 / 3.341832
+    case 3  T 1.224195  n -2003.1008  vs frame -1686.8217  sF 39.356  sH 564.870  cycles 1.012093e8 / 1.012093e8  widths 0.524750 / 5.672497
   member 6  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
     ! gear.reversed_bending_uncorrected
-    case 1  T 0.707580  n -2946.6667  vs frame -3626.6667  sF 23.186  sH 433.564  cycles -  widths 0.169858 / 1.008886
+    case 1  T 1.201061  n 1713.1783  vs frame 2108.5271  sF 39.356  sH 564.870  cycles -  widths 0.288320 / 1.712504
     case 2  T 0.049183  n 0.0000  vs frame 0.0000  sF 1.594  sH 113.697  cycles -  widths 0.011681 / 0.069380
-    case 3  T 0.707580  n -2357.3333  vs frame -2901.3333  sF 23.186  sH 433.564  cycles 1.740800e8 / 1.740800e8  widths 0.309141 / 3.341832
+    case 3  T 1.201061  n 1370.5426  vs frame 1686.8217  sF 39.356  sH 564.870  cycles 1.012093e8 / 1.012093e8  widths 0.524742 / 5.672497
   member 7  z 96  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 96.000000
-    case 1  T 3.694192  n 0.0000  vs frame -680.0000  sF 15.179  sH 277.637  cycles -  widths 0.111201 / 0.413703
+    case 1  T 6.270600  n 0.0000  vs frame 395.3488  sF 25.765  sH 361.720  cycles -  widths 0.188754 / 0.702229
     case 2  T 0.262311  n 0.0000  vs frame 0.0000  sF 1.078  sH 73.982  cycles -  widths 0.007896 / 0.029376
-    case 3  T 3.694192  n 0.0000  vs frame -544.0000  sF 15.179  sH 277.637  cycles 9.792000e7 / 9.792000e7  widths 0.202385 / 1.370351
+    case 3  T 6.270600  n 0.0000  vs frame 316.2791  sF 25.765  sH 361.720  cycles 5.693023e7 / 5.693023e7  widths 0.343533 / 2.326062
   mesh 3  members 4 5  alpha_w 20.149246  eps 1.546097 / 0.000000 / 1.546097  efficiency 98.110213 / 98.110213 %  play 0.069762 / 0.093016 deg  shares a factor
   mesh 4  members 6 7  alpha_w 19.919074  eps 1.831196 / 0.000000 / 1.831196  efficiency 98.934827 / 98.934827 %  play 0.092505 / 0.017345 deg  shares a factor
   mesh 5  members 5 6  alpha_w 20.173990  eps 1.510040 / 0.000000 / 1.510040  efficiency 97.891587 / 97.891587 %  play 0.093071 / 0.093071 deg  shares a factor
@@ -1513,38 +1513,38 @@
   distance 2  running 30.025653  clearance 0.020000
 
 == layshaft then idler ==
-  path b1 -> b5  ratio -3.479741  efficiency 95.140768 / 95.140768 %  backlash 0.134692 / 0.468694 deg
+  path b1 -> b5  ratio 5.985155  efficiency 93.891835 / 93.891835 %  backlash 0.117193 / 0.701420 deg
   case 1
-    b0   fixed    speed              -  torque -8.621305
+    b0   fixed    speed              -  torque 9.239143
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed      1267.8428  torque 0.000000
     b3   free     speed     -1186.0465  torque 0.000000
     b4   free     speed       549.6313  torque 0.000000
-    b5   reacted  speed      -862.1331  torque 6.621305
-    b6   free     speed       501.2402  torque 0.000000
+    b5   reacted  speed       501.2402  torque -11.239143
+    b6   free     speed      -862.1331  torque 0.000000
   case 2
-    b0   fixed    speed              -  torque -0.764048
-    b1   reacted  speed         0.0000  torque 0.164048
+    b0   fixed    speed              -  torque -0.505875
+    b1   reacted  speed         0.0000  torque -0.094125
     b2   free     speed         0.0000  torque 0.000000
     b3   free     speed         0.0000  torque 0.000000
     b4   free     speed         0.0000  torque 0.000000
     b5   load     speed         0.0000  torque 0.600000
     b6   free     speed         0.0000  torque 0.000000
   case 3
-    b0   fixed    speed              -  torque -8.621305
+    b0   fixed    speed              -  torque 9.239143
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed      1014.2743  torque 0.000000
     b3   free     speed      -948.8372  torque 0.000000
     b4   free     speed       439.7050  torque 0.000000
-    b5   reacted  speed      -689.7065  torque 6.621305
-    b6   free     speed       400.9921  torque 0.000000
+    b5   reacted  speed       400.9921  torque -11.239143
+    b6   free     speed      -689.7065  torque 0.000000
   member 1  z 17  m 1  alpha 20  x 0.005657  b 10.000000  beta 0.000000  d 17.000000
     case 1  T 2.000000  n 3000.0000  vs frame 3000.0000  sF 67.148  sH 690.774  cycles -  widths 0.491925 / 2.560982
-    case 2  T 0.166809  n 0.0000  vs frame 0.0000  sF 5.600  sH 199.494  cycles -  widths 0.041029 / 0.213597
+    case 2  T 0.095709  n 0.0000  vs frame 0.0000  sF 3.213  sH 151.111  cycles -  widths 0.023541 / 0.122554
     case 3  T 2.000000  n 2400.0000  vs frame 2400.0000  sF 67.148  sH 690.774  cycles 1.440000e8 / 1.440000e8  widths 0.895304 / 8.482996
   member 2  z 43  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 43.000000
     case 1  T 5.058824  n -1186.0465  vs frame -1186.0465  sF 56.848  sH 627.632  cycles -  widths 0.416468 / 2.114194
-    case 2  T 0.421928  n 0.0000  vs frame 0.0000  sF 4.741  sH 181.259  cycles -  widths 0.034735 / 0.176333
+    case 2  T 0.242087  n 0.0000  vs frame 0.0000  sF 2.720  sH 137.299  cycles -  widths 0.019930 / 0.101173
     case 3  T 5.058824  n -948.8372  vs frame -948.8372  sF 56.848  sH 627.632  cycles 5.693023e7 / 5.693023e7  widths 0.757973 / 7.003056
   member 3  z 41  m 1  alpha 20  x 0.005657  b 10.000000  beta 0.000000  d 41.000000
     case 1  T 0.000000  n 549.6313  vs frame 549.6313  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
@@ -1556,11 +1556,11 @@
     case 3  T 0.000000  n -948.8372  vs frame -948.8372  sF 0.000  sH 0.000  cycles 5.693023e7 / 5.693023e7  widths 0.000000 / 0.000000
   member 5  z 29  m 1  alpha 20  x 0.005657  b 10.000000  beta 0.000000  d 29.000000
     case 1  T 4.654125  n 1267.8428  vs frame 1267.8428  sF 79.178  sH 667.142  cycles -  widths 0.580062 / 2.388755
-    case 2  T 0.400184  n 0.0000  vs frame 0.0000  sF 6.808  sH 195.627  cycles -  widths 0.049877 / 0.205397
+    case 2  T 0.229611  n 0.0000  vs frame 0.0000  sF 3.906  sH 148.182  cycles -  widths 0.028617 / 0.117849
     case 3  T 4.654125  n 1014.2743  vs frame 1014.2743  sF 79.178  sH 667.142  cycles 6.085646e7 / 6.085646e7  widths 1.055713 / 7.912513
   member 6  z 31  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 31.000000
     case 1  T 4.975099  n -1186.0465  vs frame -1186.0465  sF 78.650  sH 662.324  cycles -  widths 0.576191 / 2.354379
-    case 2  T 0.427783  n 0.0000  vs frame 0.0000  sF 6.763  sH 194.215  cycles -  widths 0.049544 / 0.202441
+    case 2  T 0.245446  n 0.0000  vs frame 0.0000  sF 3.880  sH 147.112  cycles -  widths 0.028426 / 0.116153
     case 3  T 4.975099  n -948.8372  vs frame -948.8372  sF 78.650  sH 662.324  cycles 5.693023e7 / 5.693023e7  widths 1.048667 / 7.798644
   mesh 1  members 1 2  alpha_w 20.134061  eps 1.599309 / 0.000000 / 1.599309  efficiency 98.344976 / 98.344976 %  play 0.098522 / 0.038950 deg  coprime
   mesh 2  members 3 4  alpha_w 20.134061  eps 1.610021 / 0.000000 / 1.610021  efficiency 98.437612 / 98.437612 %  play 0.040850 / 0.088151 deg  coprime
@@ -1568,17 +1568,17 @@
   distance 1  running 30.025653  clearance 0.020000
   member 7  z 17  m 1  alpha 20  x 0.005657  b 10.000000  beta 0.000000  d 17.000000
     case 1  T 4.590420  n 1267.8428  vs frame 1267.8428  sF 158.640  sH 1112.313  cycles -  widths 1.162197 / 6.640314
-    case 2  T 0.408000  n 0.0000  vs frame 0.0000  sF 14.100  sH 331.612  cycles -  widths 0.103297 / 0.590196
+    case 2  T 0.234095  n 0.0000  vs frame 0.0000  sF 8.090  sH 251.187  cycles -  widths 0.059268 / 0.338633
     case 3  T 4.590420  n 1014.2743  vs frame 1014.2743  sF 158.640  sH 1112.313  cycles 6.085646e7 / 6.085646e7  widths 2.115198 / 21.995376
   member 8  z 25  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 25.000000
     ! gear.reversed_bending_uncorrected
     case 1  T 6.750618  n -862.1331  vs frame -862.1331  sF 145.039  sH 1041.743  cycles -  widths 1.062560 / 5.824463
-    case 2  T 0.600000  n 0.0000  vs frame 0.0000  sF 12.891  sH 310.574  cycles -  widths 0.094441 / 0.517683
+    case 2  T 0.348837  n 0.0000  vs frame 0.0000  sF 7.397  sH 235.251  cycles -  widths 0.054187 / 0.297027
     case 3  T 6.750618  n -689.7065  vs frame -689.7065  sF 145.039  sH 1041.743  cycles 4.138239e7 / 4.138239e7  widths 1.933860 / 19.292951
   member 9  z 43  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 43.000000
-    case 1  T 0.000000  n 501.2402  vs frame 501.2402  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
-    case 2  T 0.000000  n 0.0000  vs frame 0.0000  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
-    case 3  T 0.000000  n 400.9921  vs frame 400.9921  sF 0.000  sH 0.000  cycles 2.405953e7 / 2.405953e7  widths 0.000000 / 0.000000
+    case 1  T 11.388644  n 501.2402  vs frame 501.2402  sF 123.565  sH 827.636  cycles -  widths 0.905239 / 3.676320
+    case 2  T 0.600000  n 0.0000  vs frame 0.0000  sF 6.510  sH 189.967  cycles -  widths 0.047692 / 0.193683
+    case 3  T 11.388644  n 400.9921  vs frame 400.9921  sF 123.565  sH 827.636  cycles 2.405953e7 / 2.405953e7  widths 1.647535 / 12.177441
   mesh 4  members 7 8  alpha_w 20.191171  eps 1.541474 / 0.000000 / 1.541474  efficiency 98.084422 / 98.084422 %  play 0.098686 / 0.067106 deg  coprime
   mesh 5  members 8 9  alpha_w 20.092340  eps 1.649758 / 0.000000 / 1.649758  efficiency 98.687279 / 98.687279 %  play 0.066881 / 0.038884 deg  coprime
   distance 2  running 21.025651  clearance 0.020000
@@ -2224,13 +2224,13 @@
   distance 2  running 30.025653  clearance 0.020000
 
 == worm then idler ==
-  path b1 -> b3  ratio 58.823529  efficiency 60.620693 / 0.000000 %  backlash 0.172591 / 10.152403 deg
+  path b1 -> b3  ratio -101.176471  efficiency 59.824913 / 0.000000 %  backlash 0.139228 / 14.086551 deg
   case 1
-    b0   fixed    speed              -  torque 69.318463
+    b0   fixed    speed              -  torque -123.057470
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed       -75.0000  torque 0.000000
-    b3   reacted  speed        51.0000  torque -71.318463
-    b4   free     speed       -29.6512  torque 0.000000
+    b3   reacted  speed       -29.6512  torque 121.057470
+    b4   free     speed        51.0000  torque 0.000000
   case 2
     b0   fixed    speed              -  torque -0.600000
     b1   reacted  speed         0.0000  torque 0.000000
@@ -2238,35 +2238,35 @@
     b3   load     speed         0.0000  torque 0.600000
     b4   free     speed         0.0000  torque 0.000000
   case 3
-    b0   fixed    speed              -  torque 69.318463
+    b0   fixed    speed              -  torque -123.057470
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed       -60.0000  torque 0.000000
-    b3   reacted  speed        40.8000  torque -71.318463
-    b4   free     speed       -23.7209  torque 0.000000
+    b3   reacted  speed       -23.7209  torque 121.057470
+    b4   free     speed        40.8000  torque 0.000000
   member 1  z 1  m 1  alpha 20  x 0.000000  b 13.538864  beta 81.786789  d 7.000000
     case 1  T 2.000000  n 3000.0000  vs frame 3000.0000  sF -  sH 3376.091  cycles -  widths - / -
-    case 2  T 0.010005  n 0.0000  vs frame 0.0000  sF -  sH 674.466  cycles -  widths - / -
+    case 2  T 0.005740  n 0.0000  vs frame 0.0000  sF -  sH 560.451  cycles -  widths - / -
     case 3  T 2.000000  n 2400.0000  vs frame 2400.0000  sF -  sH 3376.091  cycles 1.440000e8 / 1.440000e8  widths - / -
   member 2  z 40  m 1  alpha 20  x 0.000000  b 4.690000  beta 8.213211  d 40.414519
     case 1  T 80.000000  n -75.0000  vs frame -75.0000  sF -  sH 3376.091  cycles -  widths - / -
-    case 2  T 0.400184  n 0.0000  vs frame 0.0000  sF -  sH 674.466  cycles -  widths - / -
+    case 2  T 0.229611  n 0.0000  vs frame 0.0000  sF -  sH 560.451  cycles -  widths - / -
     case 3  T 80.000000  n -60.0000  vs frame -60.0000  sF -  sH 3376.091  cycles 3.600000e6 / 3.600000e6  widths - / -
   mesh 1  members 1 2  point contact  efficiency 61.804609 / 0.000000 %  play 6.204966 / 0.155124 deg  coprime
     ! mesh.self_locking
   distance 1  running 23.727259  clearance 0.020000
   member 3  z 17  m 1  alpha 20  x 0.005657  b 10.000000  beta 0.000000  d 17.000000
     case 1  T 49.443687  n -75.0000  vs frame -75.0000  sF 1708.719  sH 3650.532  cycles -  widths 12.518087 / 71.523214
-    case 2  T 0.408000  n 0.0000  vs frame 0.0000  sF 14.100  sH 331.612  cycles -  widths 0.103297 / 0.590196
+    case 2  T 0.234095  n 0.0000  vs frame 0.0000  sF 8.090  sH 251.187  cycles -  widths 0.059268 / 0.338633
     case 3  T 49.443687  n -60.0000  vs frame -60.0000  sF 1708.719  sH 3650.532  cycles 3.600000e6 / 3.600000e6  widths 22.782919 / 236.913494
   member 4  z 25  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 25.000000
     ! gear.reversed_bending_uncorrected
     case 1  T 72.711304  n 51.0000  vs frame 51.0000  sF 1562.229  sH 3418.927  cycles -  widths 11.444898 / 62.735634
-    case 2  T 0.600000  n 0.0000  vs frame 0.0000  sF 12.891  sH 310.574  cycles -  widths 0.094441 / 0.517683
+    case 2  T 0.348837  n 0.0000  vs frame 0.0000  sF 7.397  sH 235.251  cycles -  widths 0.054187 / 0.297027
     case 3  T 72.711304  n 40.8000  vs frame 40.8000  sF 1562.229  sH 3418.927  cycles 2.448001e6 / 2.448001e6  widths 20.829715 / 207.805514
   member 5  z 43  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 43.000000
-    case 1  T 0.000000  n -29.6512  vs frame -29.6512  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
-    case 2  T 0.000000  n 0.0000  vs frame 0.0000  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
-    case 3  T 0.000000  n -23.7209  vs frame -23.7209  sF 0.000  sH 0.000  cycles 1.423256e6 / 1.423256e6  widths 0.000000 / 0.000000
+    case 1  T 122.667756  n -29.6512  vs frame -29.6512  sF 1330.927  sH 2716.242  cycles -  widths 9.750384 / 39.597854
+    case 2  T 0.600000  n 0.0000  vs frame 0.0000  sF 6.510  sH 189.967  cycles -  widths 0.047692 / 0.193683
+    case 3  T 122.667756  n -23.7209  vs frame -23.7209  sF 1330.927  sH 2716.242  cycles 1.423256e6 / 1.423256e6  widths 17.745699 / 131.163932
   mesh 2  members 3 4  alpha_w 20.191171  eps 1.541474 / 0.000000 / 1.541474  efficiency 98.084422 / 98.084422 %  play 0.098686 / 0.067106 deg  coprime
   mesh 3  members 4 5  alpha_w 20.092340  eps 1.649758 / 0.000000 / 1.649758  efficiency 98.687279 / 98.687279 %  play 0.066881 / 0.038884 deg  coprime
   distance 2  running 21.025651  clearance 0.020000
@@ -2727,48 +2727,48 @@
   distance 2  running 30.025653  clearance 0.020000
 
 == crossed then idler ==
-  path b1 -> b3  ratio 3.719723  efficiency 82.641323 / 82.639651 %  backlash 0.093489 / 0.347754 deg
+  path b1 -> b3  ratio -6.397924  efficiency 81.556472 / 81.554822 %  backlash 0.093238 / 0.596531 deg
   case 1
-    b0   fixed    speed              -  torque 4.148057
+    b0   fixed    speed              -  torque -12.435842
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed     -1186.0465  torque 0.000000
-    b3   reacted  speed       806.5116  torque -6.148057
-    b4   free     speed      -468.9021  torque 0.000000
+    b3   reacted  speed      -468.9021  torque 10.435842
+    b4   free     speed       806.5116  torque 0.000000
   case 2
-    b0   fixed    speed              -  torque -0.466700
-    b1   reacted  speed         0.0000  torque -0.133300
+    b0   fixed    speed              -  torque -0.676482
+    b1   reacted  speed         0.0000  torque 0.076482
     b2   free     speed         0.0000  torque 0.000000
     b3   load     speed         0.0000  torque 0.600000
     b4   free     speed         0.0000  torque 0.000000
   case 3
-    b0   fixed    speed              -  torque 4.148057
+    b0   fixed    speed              -  torque -12.435842
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed      -948.8372  torque 0.000000
-    b3   reacted  speed       645.2093  torque -6.148057
-    b4   free     speed      -375.1217  torque 0.000000
+    b3   reacted  speed      -375.1217  torque 10.435842
+    b4   free     speed       645.2093  torque 0.000000
   member 1  z 17  m 1  alpha 20  x 0.000000  b 10.000000  beta 45.000000  d 24.041631
     case 1  T 2.000000  n 3000.0000  vs frame 3000.0000  sF -  sH 1277.647  cycles -  widths - / -
-    case 2  T 0.158212  n 0.0000  vs frame 0.0000  sF -  sH 548.037  cycles -  widths - / -
+    case 2  T 0.090776  n 0.0000  vs frame 0.0000  sF -  sH 455.394  cycles -  widths - / -
     case 3  T 2.000000  n 2400.0000  vs frame 2400.0000  sF -  sH 1277.647  cycles 1.440000e8 / 1.440000e8  widths - / -
   member 2  z 43  m 1  alpha 20  x 0.000000  b 10.000000  beta 45.000000  d 60.811183
     case 1  T 5.058824  n -1186.0465  vs frame -1186.0465  sF -  sH 1277.647  cycles -  widths - / -
-    case 2  T 0.400184  n 0.0000  vs frame 0.0000  sF -  sH 548.037  cycles -  widths - / -
+    case 2  T 0.229611  n 0.0000  vs frame 0.0000  sF -  sH 455.394  cycles -  widths - / -
     case 3  T 5.058824  n -948.8372  vs frame -948.8372  sF -  sH 1277.647  cycles 5.693023e7 / 5.693023e7  widths - / -
   mesh 1  members 1 2  point contact  efficiency 84.255298 / 84.253594 %  play 0.098136 / 0.038798 deg  coprime
   distance 1  running 42.446407  clearance 0.020000
   member 3  z 17  m 1  alpha 20  x 0.005657  b 10.000000  beta 0.000000  d 17.000000
     case 1  T 4.262327  n -1186.0465  vs frame -1186.0465  sF 147.301  sH 1071.826  cycles -  widths 1.079130 / 6.165708
-    case 2  T 0.408000  n 0.0000  vs frame 0.0000  sF 14.100  sH 331.612  cycles -  widths 0.103297 / 0.590196
+    case 2  T 0.234095  n 0.0000  vs frame 0.0000  sF 8.090  sH 251.187  cycles -  widths 0.059268 / 0.338633
     case 3  T 4.262327  n -948.8372  vs frame -948.8372  sF 147.301  sH 1071.826  cycles 5.693023e7 / 5.693023e7  widths 1.964017 / 20.423290
   member 4  z 25  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 25.000000
     ! gear.reversed_bending_uncorrected
     case 1  T 6.268128  n 806.5116  vs frame 806.5116  sF 134.673  sH 1003.824  cycles -  widths 0.986615 / 5.408168
-    case 2  T 0.600000  n 0.0000  vs frame 0.0000  sF 12.891  sH 310.574  cycles -  widths 0.094441 / 0.517683
+    case 2  T 0.348837  n 0.0000  vs frame 0.0000  sF 7.397  sH 235.251  cycles -  widths 0.054187 / 0.297027
     case 3  T 6.268128  n 645.2093  vs frame 645.2093  sF 134.673  sH 1003.824  cycles 3.871256e7 / 3.871256e7  widths 1.795640 / 17.914017
   member 5  z 43  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 43.000000
-    case 1  T 0.000000  n -468.9021  vs frame -468.9021  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
-    case 2  T 0.000000  n 0.0000  vs frame 0.0000  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
-    case 3  T 0.000000  n -375.1217  vs frame -375.1217  sF 0.000  sH 0.000  cycles 2.250730e7 / 2.250730e7  widths 0.000000 / 0.000000
+    case 1  T 10.574658  n -468.9021  vs frame -468.9021  sF 114.734  sH 797.511  cycles -  widths 0.840539 / 3.413560
+    case 2  T 0.600000  n 0.0000  vs frame 0.0000  sF 6.510  sH 189.967  cycles -  widths 0.047692 / 0.193683
+    case 3  T 10.574658  n -375.1217  vs frame -375.1217  sF 114.734  sH 797.511  cycles 2.250730e7 / 2.250730e7  widths 1.529780 / 11.307076
   mesh 2  members 3 4  alpha_w 20.191171  eps 1.541474 / 0.000000 / 1.541474  efficiency 98.084422 / 98.084422 %  play 0.098686 / 0.067106 deg  coprime
   mesh 3  members 4 5  alpha_w 20.092340  eps 1.649758 / 0.000000 / 1.649758  efficiency 98.687279 / 98.687279 %  play 0.066881 / 0.038884 deg  coprime
   distance 2  running 21.025651  clearance 0.020000
@@ -3233,60 +3233,60 @@
   distance 2  running 30.025653  clearance 0.020000
 
 == planetary then idler ==
-  path b1 -> b5  ratio -10.294118  efficiency 95.810640 / 95.801820 %  backlash 0.095479 / 0.982869 deg
+  path b1 -> b5  ratio 17.705882  efficiency 94.552913 / 94.544209 %  backlash 0.094395 / 1.671345 deg
   case 1
-    b0   fixed    speed              -  torque -33.401173
+    b0   fixed    speed              -  torque 19.807402
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed       428.5714  torque 0.000000
     b3   fixed    speed              -  torque 11.675453
     b4   free     speed      -600.0000  torque 0.000000
-    b5   reacted  speed      -291.4286  torque 19.725720
-    b6   free     speed       169.4352  torque 0.000000
+    b5   reacted  speed       169.4352  torque -33.482855
+    b6   free     speed      -291.4286  torque 0.000000
   case 2
-    b0   fixed    speed              -  torque -1.000184
-    b1   reacted  speed         0.0000  torque 0.055839
+    b0   fixed    speed              -  torque -0.370389
+    b1   reacted  speed         0.0000  torque -0.032038
     b2   free     speed         0.0000  torque 0.000000
-    b3   fixed    speed              -  torque 0.344346
+    b3   fixed    speed              -  torque -0.197573
     b4   free     speed         0.0000  torque 0.000000
     b5   load     speed         0.0000  torque 0.600000
     b6   free     speed         0.0000  torque 0.000000
   case 3
-    b0   fixed    speed              -  torque -33.401173
+    b0   fixed    speed              -  torque 19.807402
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed       342.8571  torque 0.000000
     b3   fixed    speed              -  torque 11.675453
     b4   free     speed      -480.0000  torque 0.000000
-    b5   reacted  speed      -233.1429  torque 19.725720
-    b6   free     speed       135.5482  torque 0.000000
+    b5   reacted  speed       135.5482  torque -33.482855
+    b6   free     speed      -233.1429  torque 0.000000
   member 1  z 12  m 1  alpha 20  x 0.298101  b 10.000000  beta 0.000000  d 12.000000
     case 1  T 0.666667  n 3000.0000  vs frame 2571.4286  sF 29.122  sH 546.008  cycles -  widths 0.213347 / 1.600044
-    case 2  T 0.019024  n 0.0000  vs frame 0.0000  sF 0.831  sH 92.235  cycles -  widths 0.006088 / 0.045659
+    case 2  T 0.010915  n 0.0000  vs frame 0.0000  sF 0.477  sH 69.866  cycles -  widths 0.003493 / 0.026198
     case 3  T 0.666667  n 2400.0000  vs frame 2057.1429  sF 29.122  sH 546.008  cycles 3.702857e8 / 3.702857e8  widths 0.388292 / 5.299986
   member 2  z 30  m 1  alpha 20  x -0.170059  b 10.000000  beta 0.000000  d 30.000000
     ! gear.reversed_bending_uncorrected
     case 1  T 1.666667  n -600.0000  vs frame -1028.5714  sF 33.848  sH 501.804  cycles -  widths 0.247969 / 1.351458
-    case 2  T 0.047826  n 0.0000  vs frame 0.0000  sF 0.966  sH 84.768  cycles -  widths 0.007076 / 0.038565
+    case 2  T 0.027441  n 0.0000  vs frame 0.0000  sF 0.554  sH 64.209  cycles -  widths 0.004060 / 0.022127
     case 3  T 1.666667  n -480.0000  vs frame -822.8571  sF 33.848  sH 501.804  cycles 4.937143e7 / 4.937143e7  widths 0.451304 / 4.476569
   member 3  z 72  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 72.000000
     case 1  T 3.913539  n 0.0000  vs frame -428.5714  sF 19.030  sH 236.910  cycles -  widths 0.139411 / 0.301232
-    case 2  T 0.114782  n 0.0000  vs frame 0.0000  sF 0.558  sH 40.573  cycles -  widths 0.004089 / 0.008835
+    case 2  T 0.065858  n 0.0000  vs frame 0.0000  sF 0.320  sH 30.733  cycles -  widths 0.002346 / 0.005069
     case 3  T 3.913539  n 0.0000  vs frame -342.8571  sF 19.030  sH 236.910  cycles 6.171429e7 / 6.171429e7  widths 0.253728 / 0.997801
   mesh 1  members 1 2  alpha_w 21.054925  eps 1.436891 / 0.000000 / 1.436891  efficiency 97.838469 / 97.838469 %  play 0.145568 / 0.058227 deg  shares a factor
   mesh 2  members 2 3  alpha_w 21.054925  eps 1.972621 / 0.000000 / 1.972621  efficiency 99.444980 / 99.444980 %  play 0.058600 / 0.024417 deg  shares a factor
   distance 1  running 21.145279  clearance 0.020000
   member 4  z 17  m 1  alpha 20  x 0.005657  b 10.000000  beta 0.000000  d 17.000000
     case 1  T 13.675453  n 428.5714  vs frame 428.5714  sF 472.608  sH 1919.869  cycles -  widths 3.462333 / 19.782351
-    case 2  T 0.408000  n 0.0000  vs frame 0.0000  sF 14.100  sH 331.612  cycles -  widths 0.103297 / 0.590196
+    case 2  T 0.234095  n 0.0000  vs frame 0.0000  sF 8.090  sH 251.187  cycles -  widths 0.059268 / 0.338633
     case 3  T 13.675453  n 342.8571  vs frame 342.8571  sF 472.608  sH 1919.869  cycles 2.057143e7 / 2.057143e7  widths 6.301447 / 65.527061
   member 5  z 25  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 25.000000
     ! gear.reversed_bending_uncorrected
     case 1  T 20.110961  n -291.4286  vs frame -291.4286  sF 432.091  sH 1798.064  cycles -  widths 3.165504 / 17.351826
-    case 2  T 0.600000  n 0.0000  vs frame 0.0000  sF 12.891  sH 310.574  cycles -  widths 0.094441 / 0.517683
+    case 2  T 0.348837  n 0.0000  vs frame 0.0000  sF 7.397  sH 235.251  cycles -  widths 0.054187 / 0.297027
     case 3  T 20.110961  n -233.1429  vs frame -233.1429  sF 432.091  sH 1798.064  cycles 1.398857e7 / 1.398857e7  widths 5.761217 / 57.476188
   member 6  z 43  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 43.000000
-    case 1  T 0.000000  n 169.4352  vs frame 169.4352  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
-    case 2  T 0.000000  n 0.0000  vs frame 0.0000  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
-    case 3  T 0.000000  n 135.5482  vs frame 135.5482  sF 0.000  sH 0.000  cycles 8.132891e6 / 8.132891e6  widths 0.000000 / 0.000000
+    case 1  T 33.928238  n 169.4352  vs frame 169.4352  sF 368.116  sH 1428.512  cycles -  widths 2.696824 / 10.952230
+    case 2  T 0.600000  n 0.0000  vs frame 0.0000  sF 6.510  sH 189.967  cycles -  widths 0.047692 / 0.193683
+    case 3  T 33.928238  n 135.5482  vs frame 135.5482  sF 368.116  sH 1428.512  cycles 8.132891e6 / 8.132891e6  widths 4.908220 / 36.278165
   mesh 3  members 4 5  alpha_w 20.191171  eps 1.541474 / 0.000000 / 1.541474  efficiency 98.084422 / 98.084422 %  play 0.098686 / 0.067106 deg  coprime
   mesh 4  members 5 6  alpha_w 20.092340  eps 1.649758 / 0.000000 / 1.649758  efficiency 98.687279 / 98.687279 %  play 0.066881 / 0.038884 deg  coprime
   distance 2  running 21.025651  clearance 0.020000
@@ -3849,62 +3849,62 @@
   distance 2  running 30.025653  clearance 0.020000
 
 == wolfrom then idler ==
-  path b1 -> b5  ratio -89.705882  efficiency 44.487352 / 0.000000 %  backlash 0.100383 / 9.004972 deg
+  path b1 -> b5  ratio 154.294118  efficiency 43.903357 / 0.000000 %  backlash 0.097246 / 15.004548 deg
   case 1
-    b0   fixed    speed              -  torque -135.150088
+    b0   fixed    speed              -  torque 80.146048
     b1   load     speed      3000.0000  torque 2.000000
     b2   fixed    speed              -  torque 53.334545
     b3   free     speed        49.1803  torque 0.000000
     b4   free     speed     -7000.0000  torque 0.000000
-    b5   reacted  speed       -33.4426  torque 79.815543
-    b6   free     speed        19.4434  torque 0.000000
+    b5   reacted  speed        19.4434  torque -135.480593
+    b6   free     speed       -33.4426  torque 0.000000
   case 2
-    b0   fixed    speed              -  torque -1.000184
-    b1   reacted  speed         0.0000  torque -0.001505
-    b2   fixed    speed              -  torque 0.401690
+    b0   fixed    speed              -  torque -0.370389
+    b1   reacted  speed         0.0000  torque 0.000864
+    b2   fixed    speed              -  torque -0.230475
     b3   free     speed         0.0000  torque 0.000000
     b4   free     speed         0.0000  torque 0.000000
     b5   load     speed         0.0000  torque 0.600000
     b6   free     speed         0.0000  torque 0.000000
   case 3
-    b0   fixed    speed              -  torque -135.150088
+    b0   fixed    speed              -  torque 80.146048
     b1   load     speed      2400.0000  torque 2.000000
     b2   fixed    speed              -  torque 53.334545
     b3   free     speed        39.3443  torque 0.000000
     b4   free     speed     -5600.0000  torque 0.000000
-    b5   reacted  speed       -26.7541  torque 79.815543
-    b6   free     speed        15.5547  torque 0.000000
+    b5   reacted  speed        15.5547  torque -135.480593
+    b6   free     speed       -26.7541  torque 0.000000
   member 1  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
     ! gear.reversed_bending_uncorrected
     case 1  T 5.442742  n -7000.0000  vs frame -10000.0000  sF 146.726  sH 812.877  cycles -  widths 1.074919 / 3.546374
-    case 2  T 0.040169  n 0.0000  vs frame 0.0000  sF 1.094  sH 70.202  cycles -  widths 0.008017 / 0.026450
+    case 2  T 0.023047  n 0.0000  vs frame 0.0000  sF 0.628  sH 53.176  cycles -  widths 0.004600 / 0.015176
     case 3  T 5.442742  n -5600.0000  vs frame -8000.0000  sF 146.726  sH 812.877  cycles 4.800000e8 / 4.800000e8  widths 1.956352 / 11.747011
   member 2  z 60  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 60.000000
     ! clamp.ring_flank_ungenerated
     case 1  T 17.952548  n 0.0000  vs frame -3000.0000  sF 113.640  sH 763.876  cycles -  widths 0.832524 / 3.131700
-    case 2  T 0.133897  n 0.0000  vs frame 0.0000  sF 0.848  sH 65.970  cycles -  widths 0.006209 / 0.023357
+    case 2  T 0.076825  n 0.0000  vs frame 0.0000  sF 0.486  sH 49.970  cycles -  widths 0.003563 / 0.013402
     case 3  T 17.952548  n 0.0000  vs frame -2400.0000  sF 113.640  sH 763.876  cycles 4.320000e8 / 4.320000e8  widths 1.515194 / 10.373444
   member 3  z 61  m 1  alpha 20  x -0.451906  b 10.000000  beta 0.000000  d 61.000000
     ! clamp.ring_flank_ungenerated
     case 1  T 18.444848  n 49.1803  vs frame -2950.8197  sF 129.975  sH 878.877  cycles -  widths 0.952201 / 4.145634
-    case 2  T 0.134806  n 0.0000  vs frame 0.0000  sF 0.950  sH 75.136  cycles -  widths 0.006959 / 0.030299
+    case 2  T 0.077347  n 0.0000  vs frame 0.0000  sF 0.545  sH 56.913  cycles -  widths 0.003993 / 0.017384
     case 3  T 18.444848  n 39.3443  vs frame -2360.6557  sF 129.975  sH 878.877  cycles 4.249180e8 / 4.249180e8  widths 1.733006 / 13.731998
   mesh 1  members 1 2  alpha_w 19.849390  eps 1.916246 / 0.000000 / 1.916246  efficiency 99.028738 / 99.028738 %  play 0.092350 / 0.027705 deg  shares a factor
   mesh 2  members 1 3  alpha_w 15.638132  eps 2.121494 / 0.000000 / 2.121494  efficiency 98.953143 / 98.953143 %  play 0.073491 / 0.021686 deg  coprime
   distance 1  running 20.980000  clearance 0.020000
   member 4  z 17  m 1  alpha 20  x 0.005657  b 10.000000  beta 0.000000  d 17.000000
     case 1  T 55.334545  n 49.1803  vs frame 49.1803  sF 1912.300  sH 3861.881  cycles -  widths 14.009527 / 80.044688
-    case 2  T 0.408000  n 0.0000  vs frame 0.0000  sF 14.100  sH 331.612  cycles -  widths 0.103297 / 0.590196
+    case 2  T 0.234095  n 0.0000  vs frame 0.0000  sF 8.090  sH 251.187  cycles -  widths 0.059268 / 0.338633
     case 3  T 55.334545  n 39.3443  vs frame 39.3443  sF 1912.300  sH 3861.881  cycles 2.360656e6 / 2.360656e6  widths 25.497339 / 265.140026
   member 5  z 25  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 25.000000
     ! gear.reversed_bending_uncorrected
     case 1  T 81.374331  n -33.4426  vs frame -33.4426  sF 1748.357  sH 3616.867  cycles -  widths 12.808475 / 70.210132
-    case 2  T 0.600000  n 0.0000  vs frame 0.0000  sF 12.891  sH 310.574  cycles -  widths 0.094441 / 0.517683
+    case 2  T 0.348837  n 0.0000  vs frame 0.0000  sF 7.397  sH 235.251  cycles -  widths 0.054187 / 0.297027
     case 3  T 81.374331  n -26.7541  vs frame -26.7541  sF 1748.357  sH 3616.867  cycles 1.605246e6 / 1.605246e6  widths 23.311425 / 232.564040
   member 6  z 43  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 43.000000
-    case 1  T 0.000000  n 19.4434  vs frame 19.4434  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
-    case 2  T 0.000000  n 0.0000  vs frame 0.0000  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
-    case 3  T 0.000000  n 15.5547  vs frame 15.5547  sF 0.000  sH 0.000  cycles 9.332830e5 / 9.332830e5  widths 0.000000 / 0.000000
+    case 1  T 137.282733  n 19.4434  vs frame 19.4434  sF 1489.498  sH 2873.500  cycles -  widths 10.912072 / 44.315652
+    case 2  T 0.600000  n 0.0000  vs frame 0.0000  sF 6.510  sH 189.967  cycles -  widths 0.047692 / 0.193683
+    case 3  T 137.282733  n 15.5547  vs frame 15.5547  sF 1489.498  sH 2873.500  cycles 9.332830e5 / 9.332830e5  widths 19.859971 / 146.791167
   mesh 3  members 4 5  alpha_w 20.191171  eps 1.541474 / 0.000000 / 1.541474  efficiency 98.084422 / 98.084422 %  play 0.098686 / 0.067106 deg  coprime
   mesh 4  members 5 6  alpha_w 20.092340  eps 1.649758 / 0.000000 / 1.649758  efficiency 98.687279 / 98.687279 %  play 0.066881 / 0.038884 deg  coprime
   distance 2  running 21.025651  clearance 0.020000
@@ -4496,57 +4496,57 @@
   distance 2  running 30.025653  clearance 0.020000
 
 == compound then idler ==
-  path b1 -> b6  ratio -130.147059  efficiency 64.292834 / 47.584655 %  backlash 0.105695 / 13.755957 deg
+  path b1 -> b6  ratio 223.852941  efficiency 63.448849 / 46.960001 %  backlash 0.100335 / 22.460260 deg
   case 1
-    b0   fixed    speed              -  torque -283.371251
+    b0   fixed    speed              -  torque 168.043442
     b1   load     speed      3000.0000  torque 2.000000
     b2   fixed    speed              -  torque 114.020785
     b3   free     speed        33.8983  torque 0.000000
     b4   free     speed       857.1429  torque 0.000000
     b5   free     speed     -2000.0000  torque 0.000000
-    b6   reacted  speed       -23.0508  torque 167.350466
-    b7   free     speed        13.4017  torque 0.000000
+    b6   reacted  speed        13.4017  torque -284.064227
+    b7   free     speed       -23.0508  torque 0.000000
   case 2
-    b0   fixed    speed              -  torque -1.000184
-    b1   reacted  speed         0.0000  torque 0.002194
-    b2   fixed    speed              -  torque 0.397991
+    b0   fixed    speed              -  torque -0.370389
+    b1   reacted  speed         0.0000  torque -0.001259
+    b2   fixed    speed              -  torque -0.228352
     b3   free     speed         0.0000  torque 0.000000
     b4   free     speed         0.0000  torque 0.000000
     b5   free     speed         0.0000  torque 0.000000
     b6   load     speed         0.0000  torque 0.600000
     b7   free     speed         0.0000  torque 0.000000
   case 3
-    b0   fixed    speed              -  torque -283.371251
+    b0   fixed    speed              -  torque 168.043442
     b1   load     speed      2400.0000  torque 2.000000
     b2   fixed    speed              -  torque 114.020785
     b3   free     speed        27.1186  torque 0.000000
     b4   free     speed       685.7143  torque 0.000000
     b5   free     speed     -1600.0000  torque 0.000000
-    b6   reacted  speed       -18.4407  torque 167.350466
-    b7   free     speed        10.7213  torque 0.000000
+    b6   reacted  speed        10.7213  torque -284.064227
+    b7   free     speed       -18.4407  torque 0.000000
   member 1  z 24  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 24.000000
     case 1  T 0.666667  n 3000.0000  vs frame 2142.8571  sF 14.930  sH 333.129  cycles -  widths 0.109374 / 0.595605
-    case 2  T 0.000745  n 0.0000  vs frame 0.0000  sF 0.017  sH 11.139  cycles -  widths 0.000122 / 0.000666
+    case 2  T 0.000428  n 0.0000  vs frame 0.0000  sF 0.010  sH 8.438  cycles -  widths 0.000070 / 0.000382
     case 3  T 0.666667  n 2400.0000  vs frame 1714.2857  sF 14.930  sH 333.129  cycles 3.085714e8 / 3.085714e8  widths 0.199061 / 1.972883
   member 2  z 60  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 60.000000
     ! clamp.ring_flank_ungenerated
     case 1  T 38.384832  n 0.0000  vs frame -857.1429  sF 241.333  sH 1134.214  cycles -  widths 1.768005 / 6.904380
-    case 2  T 0.132664  n 0.0000  vs frame 0.0000  sF 0.834  sH 66.679  cycles -  widths 0.006110 / 0.023863
+    case 2  T 0.076117  n 0.0000  vs frame 0.0000  sF 0.479  sH 50.508  cycles -  widths 0.003506 / 0.013691
     case 3  T 38.384832  n 0.0000  vs frame -685.7143  sF 241.333  sH 1134.214  cycles 1.234286e8 / 1.234286e8  widths 3.217770 / 22.870070
   member 3  z 59  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 59.000000
     ! clamp.ring_flank_ungenerated
     case 1  T 38.673595  n 33.8983  vs frame -823.2446  sF 248.578  sH 1203.122  cycles -  widths 1.821082 / 7.768797
-    case 2  T 0.134826  n 0.0000  vs frame 0.0000  sF 0.867  sH 71.038  cycles -  widths 0.006349 / 0.027084
+    case 2  T 0.077358  n 0.0000  vs frame 0.0000  sF 0.497  sH 53.809  cycles -  widths 0.003643 / 0.015540
     case 3  T 38.673595  n 27.1186  vs frame -658.5956  sF 248.578  sH 1203.122  cycles 1.185472e8 / 1.185472e8  widths 3.314369 / 25.733365
   member 4  z 18  m 1  alpha 20  x -0.019999  b 10.000000  beta 0.000000  d 18.000000
     ! gear.reversed_bending_uncorrected
     case 1  T 11.515450  n -2000.0000  vs frame -2857.1429  sF 319.804  sH 1201.682  cycles -  widths 2.342887 / 7.750216
-    case 2  T 0.039799  n 0.0000  vs frame 0.0000  sF 1.105  sH 70.646  cycles -  widths 0.008097 / 0.026786
+    case 2  T 0.022835  n 0.0000  vs frame 0.0000  sF 0.634  sH 53.512  cycles -  widths 0.004646 / 0.015369
     case 3  T 11.515450  n -1600.0000  vs frame -2285.7143  sF 319.804  sH 1201.682  cycles 1.371429e8 / 1.371429e8  widths 4.264055 / 25.671815
   member 5  z 17  m 1  alpha 20  x -0.019999  b 10.000000  beta 0.000000  d 17.000000
     ! clamp.tooth_undercut
     case 1  T 11.143239  n -2000.0000  vs frame -2857.1429  sF 338.028  sH 1282.606  cycles -  widths 2.476393 / 8.829204
-    case 2  T 0.038848  n 0.0000  vs frame 0.0000  sF 1.178  sH 75.731  cycles -  widths 0.008633 / 0.030781
+    case 2  T 0.022290  n 0.0000  vs frame 0.0000  sF 0.676  sH 57.364  cycles -  widths 0.004953 / 0.017661
     case 3  T 11.143239  n -1600.0000  vs frame -2285.7143  sF 338.028  sH 1282.606  cycles 1.371429e8 / 1.371429e8  widths 4.507036 / 29.245854
   mesh 1  members 1 4  alpha_w 19.999461  eps 1.553178 / 0.000000 / 1.553178  efficiency 98.100561 / 98.100561 %  play 0.069261 / 0.092348 deg  shares a factor
   mesh 2  members 4 2  alpha_w 19.999461  eps 1.923327 / 0.000000 / 1.923327  efficiency 99.015487 / 99.015487 %  play 0.093014 / 0.027904 deg  shares a factor
@@ -4554,17 +4554,17 @@
   distance 1  running 20.999928  clearance 0.020000
   member 6  z 17  m 1  alpha 20  x 0.005657  b 10.000000  beta 0.000000  d 17.000000
     case 1  T 116.020785  n 33.8983  vs frame 33.8983  sF 4009.550  sH 5592.019  cycles -  widths 29.373989 / 167.830919
-    case 2  T 0.408000  n 0.0000  vs frame 0.0000  sF 14.100  sH 331.612  cycles -  widths 0.103297 / 0.590196
+    case 2  T 0.234095  n 0.0000  vs frame 0.0000  sF 8.090  sH 251.187  cycles -  widths 0.059268 / 0.338633
     case 3  T 116.020785  n 27.1186  vs frame 27.1186  sF 4009.550  sH 5592.019  cycles 1.627119e6 / 1.627119e6  widths 53.460660 / 555.923138
   member 7  z 25  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 25.000000
     ! gear.reversed_bending_uncorrected
     case 1  T 170.618801  n -23.0508  vs frame -23.0508  sF 3665.807  sH 5237.238  cycles -  widths 26.855726 / 147.210654
-    case 2  T 0.600000  n 0.0000  vs frame 0.0000  sF 12.891  sH 310.574  cycles -  widths 0.094441 / 0.517683
+    case 2  T 0.348837  n 0.0000  vs frame 0.0000  sF 7.397  sH 235.251  cycles -  widths 0.054187 / 0.297027
     case 3  T 170.618801  n -18.4407  vs frame -18.4407  sF 3665.807  sH 5237.238  cycles 1.106441e6 / 1.106441e6  widths 48.877421 / 487.620571
   member 8  z 43  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 43.000000
-    case 1  T 0.000000  n 13.4017  vs frame 13.4017  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
-    case 2  T 0.000000  n 0.0000  vs frame 0.0000  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
-    case 3  T 0.000000  n 10.7213  vs frame 10.7213  sF 0.000  sH 0.000  cycles 6.432800e5 / 6.432800e5  widths 0.000000 / 0.000000
+    case 1  T 287.842801  n 13.4017  vs frame 13.4017  sF 3123.053  sH 4160.839  cycles -  widths 22.879508 / 92.917305
+    case 2  T 0.600000  n 0.0000  vs frame 0.0000  sF 6.510  sH 189.967  cycles -  widths 0.047692 / 0.193683
+    case 3  T 287.842801  n 10.7213  vs frame 10.7213  sF 3123.053  sH 4160.839  cycles 6.432800e5 / 6.432800e5  widths 41.640704 / 307.779280
   mesh 4  members 6 7  alpha_w 20.191171  eps 1.541474 / 0.000000 / 1.541474  efficiency 98.084422 / 98.084422 %  play 0.098686 / 0.067106 deg  coprime
   mesh 5  members 7 8  alpha_w 20.092340  eps 1.649758 / 0.000000 / 1.649758  efficiency 98.687279 / 98.687279 %  play 0.066881 / 0.038884 deg  coprime
   distance 2  running 21.025651  clearance 0.020000
@@ -5236,51 +5236,51 @@
   distance 2  running 30.025653  clearance 0.020000
 
 == planocentric then idler ==
-  path b1 -> b4  ratio 14.705882  efficiency 95.294837 / 95.220797 %  backlash 0.132225 / 1.944478 deg
+  path b1 -> b4  ratio -25.294118  efficiency 94.043881 / 93.970814 %  backlash 0.115759 / 2.928016 deg
   case 1
-    b0   fixed    speed              -  torque 47.459080
+    b0   fixed    speed              -  torque -28.143953
     b1   load     speed      3000.0000  torque 2.000000
     b2   fixed    speed              -  torque -21.431187
     b3   free     speed      -300.0000  torque 0.000000
-    b4   reacted  speed       204.0000  torque -28.027893
-    b5   free     speed      -118.6047  torque 0.000000
+    b4   reacted  speed      -118.6047  torque 47.575140
+    b5   free     speed       204.0000  torque 0.000000
   case 2
-    b0   fixed    speed              -  torque -1.000184
-    b1   reacted  speed         0.0000  torque -0.038850
-    b2   fixed    speed              -  torque 0.439035
+    b0   fixed    speed              -  torque -0.370389
+    b1   reacted  speed         0.0000  torque 0.022291
+    b2   fixed    speed              -  torque -0.251902
     b3   free     speed         0.0000  torque 0.000000
     b4   load     speed         0.0000  torque 0.600000
     b5   free     speed         0.0000  torque 0.000000
   case 3
-    b0   fixed    speed              -  torque 47.459080
+    b0   fixed    speed              -  torque -28.143953
     b1   load     speed      2400.0000  torque 2.000000
     b2   fixed    speed              -  torque -21.431187
     b3   free     speed      -240.0000  torque 0.000000
-    b4   reacted  speed       163.2000  torque -28.027893
-    b5   free     speed       -94.8837  torque 0.000000
+    b4   reacted  speed       -94.8837  torque 47.575140
+    b5   free     speed       163.2000  torque 0.000000
   member 1  z 30  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 30.000000
     case 1  T 19.482897  n -300.0000  vs frame -3300.0000  sF 292.162  sH 421.090  cycles -  widths 2.140384 / 0.951667
-    case 2  T 0.400184  n 0.0000  vs frame 0.0000  sF 6.001  sH 60.350  cycles -  widths 0.043964 / 0.019548
+    case 2  T 0.229611  n 0.0000  vs frame 0.0000  sF 3.443  sH 45.714  cycles -  widths 0.025225 / 0.011216
     case 3  T 19.482897  n -240.0000  vs frame -2640.0000  sF 292.162  sH 421.090  cycles 1.584000e8 / 1.584000e8  widths 3.895498 / 3.152302
   member 2  z 33  m 1  alpha 20  x 0.363947  b 10.000000  beta 0.000000  d 33.000000
     case 1  T 21.431187  n 0.0000  vs frame -3000.0000  sF 217.786  sH 371.423  cycles -  widths 1.595499 / 0.740408
-    case 2  T 0.440203  n 0.0000  vs frame 0.0000  sF 4.473  sH 53.232  cycles -  widths 0.032772 / 0.015208
+    case 2  T 0.252572  n 0.0000  vs frame 0.0000  sF 2.567  sH 40.322  cycles -  widths 0.018803 / 0.008726
     case 3  T 21.431187  n 0.0000  vs frame -2400.0000  sF 217.786  sH 371.423  cycles 1.440000e8 / 1.440000e8  widths 2.903809 / 2.452528
   mesh 1  members 1 2  alpha_w 35.629676  eps 1.770022 / 0.000000 / 1.770022  efficiency 99.734586 / 99.734586 %  play 0.095762 / 0.087056 deg  shares a factor
   distance 1  running 1.734179  clearance 0.020000
   member 3  z 17  m 1  alpha 20  x 0.005657  b 10.000000  beta 0.000000  d 17.000000
     case 1  T 19.431187  n -300.0000  vs frame -300.0000  sF 671.520  sH 2288.497  cycles -  widths 4.919562 / 28.108360
-    case 2  T 0.408000  n 0.0000  vs frame 0.0000  sF 14.100  sH 331.612  cycles -  widths 0.103297 / 0.590196
+    case 2  T 0.234095  n 0.0000  vs frame 0.0000  sF 8.090  sH 251.187  cycles -  widths 0.059268 / 0.338633
     case 3  T 19.431187  n -240.0000  vs frame -240.0000  sF 671.520  sH 2288.497  cycles 1.440000e7 / 1.440000e7  widths 8.953603 / 93.106131
   member 4  z 25  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 25.000000
     ! gear.reversed_bending_uncorrected
     case 1  T 28.575275  n 204.0000  vs frame 204.0000  sF 613.950  sH 2143.305  cycles -  widths 4.497803 / 24.654873
-    case 2  T 0.600000  n 0.0000  vs frame 0.0000  sF 12.891  sH 310.574  cycles -  widths 0.094441 / 0.517683
+    case 2  T 0.348837  n 0.0000  vs frame 0.0000  sF 7.397  sH 235.251  cycles -  widths 0.054187 / 0.297027
     case 3  T 28.575275  n 163.2000  vs frame 163.2000  sF 613.950  sH 2143.305  cycles 9.792001e6 / 9.792001e6  widths 8.186001 / 81.666802
   member 5  z 43  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 43.000000
-    case 1  T 0.000000  n -118.6047  vs frame -118.6047  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
-    case 2  T 0.000000  n 0.0000  vs frame 0.0000  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
-    case 3  T 0.000000  n -94.8837  vs frame -94.8837  sF 0.000  sH 0.000  cycles 5.693024e6 / 5.693024e6  widths 0.000000 / 0.000000
+    case 1  T 48.207976  n -118.6047  vs frame -118.6047  sF 523.050  sH 1702.796  cycles -  widths 3.831865 / 15.561811
+    case 2  T 0.600000  n 0.0000  vs frame 0.0000  sF 6.510  sH 189.967  cycles -  widths 0.047692 / 0.193683
+    case 3  T 48.207976  n -94.8837  vs frame -94.8837  sF 523.050  sH 1702.796  cycles 5.693024e6 / 5.693024e6  widths 6.973994 / 51.546942
   mesh 2  members 3 4  alpha_w 20.191171  eps 1.541474 / 0.000000 / 1.541474  efficiency 98.084422 / 98.084422 %  play 0.098686 / 0.067106 deg  coprime
   mesh 3  members 4 5  alpha_w 20.092340  eps 1.649758 / 0.000000 / 1.649758  efficiency 98.687279 / 98.687279 %  play 0.066881 / 0.038884 deg  coprime
   distance 2  running 21.025651  clearance 0.020000
@@ -5780,51 +5780,51 @@
   distance 4  running 30.025653  clearance 0.020000
 
 == meshedplanets then idler ==
-  path b1 -> b6  ratio 4.411765  efficiency 91.569830 / 91.676235 %  backlash 0.114467 / 0.505002 deg
+  path b1 -> b6  ratio -7.588235  efficiency 90.367774 / 90.472782 %  backlash 0.105435 / 0.800063 deg
   case 1
-    b0   fixed    speed              -  torque 13.681182
+    b0   fixed    speed              -  torque -8.113148
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed     -1000.0000  torque 0.000000
     b3   fixed    speed              -  torque -7.601491
     b4   free     speed     -6333.3333  torque 0.000000
     b5   free     speed      4333.3333  torque 0.000000
-    b6   reacted  speed       680.0000  torque -8.079691
-    b7   free     speed      -395.3488  torque 0.000000
+    b6   reacted  speed      -395.3488  torque 13.714639
+    b7   free     speed       680.0000  torque 0.000000
   case 2
-    b0   fixed    speed              -  torque -1.000184
-    b1   reacted  speed         0.0000  torque -0.124680
+    b0   fixed    speed              -  torque -0.370389
+    b1   reacted  speed         0.0000  torque 0.071537
     b2   free     speed         0.0000  torque 0.000000
-    b3   fixed    speed              -  torque 0.524864
+    b3   fixed    speed              -  torque -0.301148
     b4   free     speed         0.0000  torque 0.000000
     b5   free     speed         0.0000  torque 0.000000
     b6   load     speed         0.0000  torque 0.600000
     b7   free     speed         0.0000  torque 0.000000
   case 3
-    b0   fixed    speed              -  torque 13.681182
+    b0   fixed    speed              -  torque -8.113148
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed      -800.0000  torque 0.000000
     b3   fixed    speed              -  torque -7.601491
     b4   free     speed     -5066.6667  torque 0.000000
     b5   free     speed      3466.6667  torque 0.000000
-    b6   reacted  speed       544.0000  torque -8.079691
-    b7   free     speed      -316.2791  torque 0.000000
+    b6   reacted  speed      -316.2791  torque 13.714639
+    b7   free     speed       544.0000  torque 0.000000
   member 1  z 24  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 24.000000
     case 1  T 0.666667  n 3000.0000  vs frame 4000.0000  sF 14.993  sH 331.781  cycles -  widths 0.109839 / 0.590795
-    case 2  T 0.042360  n 0.0000  vs frame 0.0000  sF 0.953  sH 83.633  cycles -  widths 0.006979 / 0.037539
+    case 2  T 0.024305  n 0.0000  vs frame 0.0000  sF 0.547  sH 63.350  cycles -  widths 0.004004 / 0.021539
     case 3  T 0.666667  n 2400.0000  vs frame 3200.0000  sF 14.993  sH 331.781  cycles 5.760000e8 / 5.760000e8  widths 0.199906 / 1.956950
   member 2  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
     ! gear.reversed_bending_uncorrected
     case 1  T 0.500000  n -6333.3333  vs frame -5333.3333  sF 16.074  sH 361.001  cycles -  widths 0.117761 / 0.699440
-    case 2  T 0.032455  n 0.0000  vs frame 0.0000  sF 1.063  sH 92.855  cycles -  widths 0.007791 / 0.046275
+    case 2  T 0.018621  n 0.0000  vs frame 0.0000  sF 0.610  sH 70.335  cycles -  widths 0.004470 / 0.026551
     case 3  T 0.500000  n -5066.6667  vs frame -4266.6667  sF 16.074  sH 361.001  cycles 2.560000e8 / 2.560000e8  widths 0.214324 / 2.316827
   member 3  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
     ! gear.reversed_bending_uncorrected
     case 1  T 0.490551  n 4333.3333  vs frame 5333.3333  sF 16.074  sH 361.001  cycles -  widths 0.117759 / 0.699440
-    case 2  T 0.032804  n 0.0000  vs frame 0.0000  sF 1.063  sH 92.855  cycles -  widths 0.007791 / 0.046275
+    case 2  T 0.018822  n 0.0000  vs frame 0.0000  sF 0.610  sH 70.335  cycles -  widths 0.004470 / 0.026551
     case 3  T 0.490551  n 3466.6667  vs frame 4266.6667  sF 16.074  sH 361.001  cycles 2.560000e8 / 2.560000e8  widths 0.214321 / 2.316827
   member 4  z 96  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 96.000000
     case 1  T 2.561111  n 0.0000  vs frame 1000.0000  sF 10.523  sH 231.170  cycles -  widths 0.077093 / 0.286812
-    case 2  T 0.174955  n 0.0000  vs frame 0.0000  sF 0.719  sH 60.420  cycles -  widths 0.005266 / 0.019593
+    case 2  T 0.100383  n 0.0000  vs frame 0.0000  sF 0.412  sH 45.766  cycles -  widths 0.003022 / 0.011242
     case 3  T 2.561111  n 0.0000  vs frame 800.0000  sF 10.523  sH 231.170  cycles 1.440000e8 / 1.440000e8  widths 0.140310 / 0.950037
   mesh 1  members 1 2  alpha_w 20.149246  eps 1.546097 / 0.000000 / 1.546097  efficiency 98.110213 / 98.110213 %  play 0.069762 / 0.093016 deg  shares a factor
   mesh 2  members 3 4  alpha_w 19.919074  eps 1.831196 / 0.000000 / 1.831196  efficiency 98.934827 / 98.934827 %  play 0.092505 / 0.017345 deg  shares a factor
@@ -5834,17 +5834,17 @@
   distance 3  running 18.020000  clearance 0.020000
   member 5  z 17  m 1  alpha 20  x 0.005657  b 10.000000  beta 0.000000  d 17.000000
     case 1  T 5.601491  n -1000.0000  vs frame -1000.0000  sF 193.581  sH 1228.719  cycles -  widths 1.418178 / 8.102887
-    case 2  T 0.408000  n 0.0000  vs frame 0.0000  sF 14.100  sH 331.612  cycles -  widths 0.103297 / 0.590196
+    case 2  T 0.234095  n 0.0000  vs frame 0.0000  sF 8.090  sH 251.187  cycles -  widths 0.059268 / 0.338633
     case 3  T 5.601491  n -800.0000  vs frame -800.0000  sF 193.581  sH 1228.719  cycles 4.800000e7 / 4.800000e7  widths 2.581084 / 26.840004
   member 6  z 25  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 25.000000
     ! gear.reversed_bending_uncorrected
     case 1  T 8.237486  n 680.0000  vs frame 680.0000  sF 176.985  sH 1150.764  cycles -  widths 1.296596 / 7.107340
-    case 2  T 0.600000  n 0.0000  vs frame 0.0000  sF 12.891  sH 310.574  cycles -  widths 0.094441 / 0.517683
+    case 2  T 0.348837  n 0.0000  vs frame 0.0000  sF 7.397  sH 235.251  cycles -  widths 0.054187 / 0.297027
     case 3  T 8.237486  n 544.0000  vs frame 544.0000  sF 176.985  sH 1150.764  cycles 3.264000e7 / 3.264000e7  widths 2.359805 / 23.542352
   member 7  z 43  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 43.000000
-    case 1  T 0.000000  n -395.3488  vs frame -395.3488  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
-    case 2  T 0.000000  n 0.0000  vs frame 0.0000  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
-    case 3  T 0.000000  n -316.2791  vs frame -316.2791  sF 0.000  sH 0.000  cycles 1.897674e7 / 1.897674e7  widths 0.000000 / 0.000000
+    case 1  T 13.897068  n -395.3488  vs frame -395.3488  sF 150.781  sH 914.250  cycles -  widths 1.104624 / 4.486053
+    case 2  T 0.600000  n 0.0000  vs frame 0.0000  sF 6.510  sH 189.967  cycles -  widths 0.047692 / 0.193683
+    case 3  T 13.897068  n -316.2791  vs frame -316.2791  sF 150.781  sH 914.250  cycles 1.897674e7 / 1.897674e7  widths 2.010416 / 14.859603
   mesh 4  members 5 6  alpha_w 20.191171  eps 1.541474 / 0.000000 / 1.541474  efficiency 98.084422 / 98.084422 %  play 0.098686 / 0.067106 deg  coprime
   mesh 5  members 6 7  alpha_w 20.092340  eps 1.649758 / 0.000000 / 1.649758  efficiency 98.687279 / 98.687279 %  play 0.066881 / 0.038884 deg  coprime
   distance 4  running 21.025651  clearance 0.020000
