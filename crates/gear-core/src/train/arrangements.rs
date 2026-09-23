@@ -934,11 +934,11 @@ mod tests {
     //! closed — the laws the set's tests hold, asked of the arrangements
     //! the set's kind could not name.
 
-    use super::super::shape::{solve_loads, ShapeResult};
-    use super::super::{test_library as library, Reversal, StageBoundary, StageLoads};
+    use super::super::shape::ShapeResult;
+    use super::super::{test_library as library, StageBoundary};
     use super::*;
 
-    fn solve(shape: &Shape, held: &[Body], input: Body, output: Body) -> ShapeResult {
+    fn solve(shape: &Shape, held: &[Body], input: Body, output: Body) -> crate::train::Alone {
         let boundary = StageBoundary::holding(shape.bodies.len() + 1, held, input, output);
         under(shape, boundary)
     }
@@ -946,19 +946,17 @@ mod tests {
     /// The arrangement as its list reads: the first ring held, the first
     /// body not held driven, the next the output — what a stage does with
     /// nothing stated, which is the claim each list's doc makes.
-    fn conventionally(shape: &Shape) -> ShapeResult {
+    fn conventionally(shape: &Shape) -> crate::train::Alone {
         under(
             shape,
             StageBoundary::conventional(&shape.wiring(), &shape.ports()),
         )
     }
 
-    fn under(shape: &Shape, boundary: StageBoundary) -> ShapeResult {
-        solve_loads(
-            shape,
-            &StageLoads::at(2.0, 3000.0).under(boundary),
+    fn under(shape: &Shape, boundary: StageBoundary) -> crate::train::Alone {
+        crate::train::solve_alone(
+            &crate::train::Train::alone(shape, 2.0, 3000.0).under(&boundary),
             &library(),
-            Reversal::default(),
         )
         .unwrap()
     }
@@ -1287,8 +1285,8 @@ mod hula {
     //! makes. Written against the hula's own preset once; the preset is
     //! gone and the shape is the list, and every figure held.
 
-    use super::super::shape::{solve_loads, Shape, ShapeResult};
-    use super::super::{test_library, Reversal, StageBoundary, StageLoads, TrainError};
+    use super::super::shape::{Shape, ShapeResult};
+    use super::super::{test_library, TrainError};
     use super::*;
     use crate::planetary::carrier_driven_efficiency;
 
@@ -1355,12 +1353,10 @@ mod hula {
 
         /// The hula's own arrangement: crank driven, grounded gear held,
         /// output out — the shape's bodies 1, 2 and 3.
-        fn solve(&self, speed: f64) -> Result<ShapeResult, TrainError> {
-            solve_loads(
-                &self.shape(),
-                &StageLoads::at(2.0, speed).under(StageBoundary::holding(5, &[2], 1, 3)),
+        fn solve(&self, speed: f64) -> Result<crate::train::Alone, TrainError> {
+            crate::train::solve_alone(
+                &crate::train::Train::alone(&self.shape(), 2.0, speed).arranged(&[2], 1, 3),
                 &test_library(),
-                Reversal::default(),
             )
         }
     }

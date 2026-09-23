@@ -319,9 +319,17 @@ pub fn solve(
         if loss < -ZERO * input_power {
             continue;
         }
-        let p_in: f64 = powers.iter().filter(|p| **p > 0.0).sum();
-        let p_out: f64 = powers.iter().filter(|p| **p < 0.0).sum();
-        if p_in <= ZERO * input_power {
+        // **A power within the solve's zero is nought**, on either side. A
+        // body the case leaves free carries a torque of rounding's size,
+        // and counted as power out it made a drive that cannot move
+        // deliver a few parts in 10¹⁵ — which is positive, and so broke
+        // away at rest ([`crate::contact::Directional::once_moving`]) by
+        // the width of a rounding: a compound back-driven at its static
+        // friction did, alone and after a spur, and did not after an idler.
+        let zero = ZERO * input_power;
+        let p_in: f64 = powers.iter().filter(|p| **p > zero).sum();
+        let p_out: f64 = powers.iter().filter(|p| **p < -zero).sum();
+        if p_in <= zero {
             continue;
         }
         let efficiency = p_out.abs() / p_in;

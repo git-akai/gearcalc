@@ -593,25 +593,20 @@ mod tests {
     //! it refuses whole, and what it renumbers the train follows.
 
     use super::super::arrangements::{self as arr, StagePreset};
-    use super::super::shape::{solve_loads, ShapeResult};
-    use super::super::{
-        test_library as library, LoadCase, Reversal, Shape, StageBoundary, StageLoads, Train,
-    };
+    use super::super::{test_library as library, LoadCase, Shape, StageBoundary, Train};
     use super::*;
 
-    fn conventionally(shape: &Shape) -> ShapeResult {
+    fn conventionally(shape: &Shape) -> crate::train::Alone {
         under(
             shape,
             StageBoundary::conventional(&shape.wiring(), &shape.ports()),
         )
     }
 
-    fn under(shape: &Shape, boundary: StageBoundary) -> ShapeResult {
-        solve_loads(
-            shape,
-            &StageLoads::at(2.0, 3000.0).under(boundary),
+    fn under(shape: &Shape, boundary: StageBoundary) -> crate::train::Alone {
+        crate::train::solve_alone(
+            &crate::train::Train::alone(shape, 2.0, 3000.0).under(&boundary),
             &library(),
-            Reversal::default(),
         )
         .unwrap_or_else(|e| panic!("{e}: {shape:?}"))
     }

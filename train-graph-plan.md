@@ -398,12 +398,22 @@ after it is close to concatenation.
 - **3b — the lone stage retires from its callers.** Every test helper and
   harness command that asked a stage alone (`StageLoads`, `solve_any`)
   asks a train with one preset inserted and a case at its conventional
-  ends, and reads its path. *Diff: none in any figure.*
+  ends, and reads its path. *Diff: none in any figure.* **Done**, and
+  `StageLoads`, `solve_any` and `StageBoundary::of` deleted with their
+  last callers: `Train::alone` (a stage's bodies numbered by its slots,
+  which closes the numbers up on a shape edited in place), `arranged`,
+  `under` (the lone-stage vocabulary's adapter) and `solve_alone`, whose
+  `Alone` carries the figures under the names a stage had. **It moved one
+  figure, rightly**: a path never asked its whole flow whether it breaks
+  away, and the flow read a drive that cannot start as nought plus
+  rounding, so the compound back-driven broke away by 3 × 10⁻¹⁵ — 48.5 %
+  where it holds. Now nought, alone and in every chain; `corrections.md`
+  has the row, and `tools/breakaway.py` the derivation that keeps the sign.
 - **3c — the lone motion goes.** `solve_shape_after` loses its boundary,
-  `ShapeResult` its five figures, `MeshReport` its lone-motion power, and
-  `StageLoads`/`solve_any` are deleted. The panel's stage header and results
-  read the paths instead. *Diff: every file that printed stage figures
-  changes form; `graph.txt`, which never printed them, not at all.*
+  `ShapeResult` its five figures, and `MeshReport` its lone-motion power.
+  The panel's stage header and results read the paths instead. *Diff:
+  every file that printed stage figures changes form; `graph.txt`, which
+  never printed them, not at all.*
 - **3d — one solve over the graph.** `Train::graph()` flattens the stages,
   axes merged wherever a body is shared, and `solve_train` solves it once;
   per-stage results are sliced back out for the result still shaped by

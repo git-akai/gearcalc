@@ -136,6 +136,7 @@ python3 tools/worm_flank_curvature.py              # ZI vs ZN vs ZA, from the su
 python3 tools/crossed_path.py                      # the crossed path, from the surfaces
 python3 tools/hula_kinematics.py                   # the hula ratio, from the rolling circles
 python3 tools/train_kinematics.py                  # every topology's speeds and torques, from rigid-body velocities
+python3 tools/breakaway.py                         # whether a preset breaks away, each way, with the sign kept
 python3 tools/iso_6336_3_stack.py                  # where this tool stands against ISO 6336-3, factor by factor
 python3 tools/line_census.py                       # the prose-to-code ratio, at this tree or between two
 ```
@@ -169,6 +170,13 @@ close — at one instant, on any topology: a pair, an epicyclic set in all six
 arrangements, a compound planet, a Wolfrom, meshed planets, a Ravigneaux, a
 hula stage; and adds torque from virtual work. Instantaneous over everything, and integrated over the one
 case where standing still is worth doubting.
+
+`breakaway.py` is the lossy side of the same set of questions, which
+`train_kinematics.py` does not ask: each mesh's driven side is at its `η`,
+running and at rest, and the efficiency keeps its **sign**. The crate's flow
+counts only the power that leaves, so a drive that cannot start reads as
+nought there and below nought here. That is the difference the breakaway rule
+turns on, and rounding once decided it.
 
 `crossed_path.py` builds both flanks as parametric surfaces and reaches the line
 of action through differential geometry; the crate reaches it through a
@@ -624,6 +632,21 @@ whose size is unmeasured is a debt still owed, and is marked as one.
   0.95, 11.4 % at 0.8, 29.4 % at 0.5. The shipped hula stage's meshes sit at
   0.998 and 0.996, so its figures move −0.12 % and −0.25 %.
 - **A ZN worm's contact stress is 1–15 % below the reported ZI figure.**
+- **A load case resolves at sliding friction, even held at rest.** A path asks
+  its flow at rest whether it breaks away, so a train that holds only through
+  its whole flow — the compound and Wolfrom presets, back-driven — reports that
+  it cannot be back-driven. The back-driving *case* on the same train still
+  splits its load as a moving drive would, so the input is given a torque that
+  a train that holds does not need:
+  - the compound's sun holds back **0.55 %** of the load, and the held ring
+    takes 0.55 % less than the load;
+  - the Wolfrom cannot be back-driven even running, so its carrier is instead
+    pushed **0.38 %** *with* the load, and the held ring takes 0.38 % more.
+
+  How a train that holds shares a load between the things holding it is
+  statically indeterminate, since friction can supply anything within its cone.
+  A rule for it is a decision not yet taken. A worm that locks does so mesh by
+  mesh, which the case already honours, so no worm is affected.
 - **The rack round is the coefficient times the *transverse* module**, so a
   helical tooth's transverse fillet is `1/cos β` larger than the normal round
   a hob has — 6 % at 20°, and seven normal modules at a worm's 82°, where it

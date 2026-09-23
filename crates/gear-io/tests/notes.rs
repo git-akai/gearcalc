@@ -10,7 +10,7 @@
 //! that owns the sentence owns the check on it.
 
 use gear_core::contact::LoadSharing;
-use gear_core::train::{arrangements, solve_any, StageGear, StageLoads};
+use gear_core::train::{arrangements, solve_alone, StageGear, Train};
 
 /// **The sharing note's number, and its lack of a sign.**
 ///
@@ -36,7 +36,7 @@ fn the_sharing_note_quotes_a_number_the_sweep_still_produces() {
             s.members[1].gear = g;
             s
         };
-        solve_any(&stage, &StageLoads::just(2.0), &lib)
+        solve_alone(&Train::alone(&stage, 2.0, 0.0), &lib)
             .ok()
             .and_then(|r| r.members()[0].cases[0].bending_stress)
     };

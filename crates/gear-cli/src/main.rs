@@ -142,10 +142,11 @@ fn set_view(r: &gear_core::train::ShapeResult) -> Option<SetView<'_>> {
 /// A set through the shape, as the commands here build one.
 fn solve_set(
     stage: &gear_core::train::Shape,
-    loads: &gear_core::train::StageLoads,
+    torque: f64,
+    speed: f64,
     lib: &gear_core::material::MaterialLibrary,
-) -> Result<gear_core::train::ShapeResult, gear_core::train::TrainError> {
-    gear_core::train::solve_any(stage, loads, lib)
+) -> Result<gear_core::train::Alone, gear_core::train::TrainError> {
+    gear_core::train::solve_alone(&gear_core::train::Train::alone(stage, torque, speed), lib)
 }
 
 /// **A stage of four members on a crank, read as the hula stage it is** —
@@ -246,22 +247,24 @@ fn ring_cutter_teeth(shape: &gear_core::train::shape::Shape, mesh: usize) -> u32
 /// grounded gear held, output out — whatever its counts make the rings.
 fn solve_hula(
     shape: &gear_core::train::shape::Shape,
-    loads: &gear_core::train::StageLoads,
+    torque: f64,
+    speed: f64,
     lib: &gear_core::material::MaterialLibrary,
-) -> Result<(gear_core::train::Shape, gear_core::train::ShapeResult), gear_core::train::TrainError>
-{
-    let boundary = gear_core::train::StageBoundary::holding(5, &[2], 1, 3);
-    let r = gear_core::train::solve_any(shape, &loads.clone().under(boundary), lib)?;
+) -> Result<(gear_core::train::Shape, gear_core::train::Alone), gear_core::train::TrainError> {
+    // The crank driven, the fixed ring held, the output ring out.
+    let train = gear_core::train::Train::alone(shape, torque, speed).arranged(&[2], 1, 3);
+    let r = gear_core::train::solve_alone(&train, lib)?;
     Ok((shape.clone(), r))
 }
 
 /// A pair through the shape, as the commands here build one.
 fn solve_pair(
     stage: &gear_core::train::Shape,
-    loads: &gear_core::train::StageLoads,
+    torque: f64,
+    speed: f64,
     lib: &gear_core::material::MaterialLibrary,
-) -> Result<gear_core::train::ShapeResult, gear_core::train::TrainError> {
-    gear_core::train::solve_any(stage, loads, lib)
+) -> Result<gear_core::train::Alone, gear_core::train::TrainError> {
+    gear_core::train::solve_alone(&gear_core::train::Train::alone(stage, torque, speed), lib)
 }
 
 /// The mesh a pair reports, checked to be the point contact these commands
@@ -686,8 +689,6 @@ fn main() {
 /// would be a second answer to the same question — which is how the two start
 /// disagreeing.
 fn hula_report(n: u32, clearance: f64, m_outer: f64, m_inner: f64, cutter_teeth: Option<u32>) {
-    use gear_core::train::StageLoads;
-
     let lib = gear_io::default_library();
     let teeth = [n + 1, n, n - 1, n];
     let mut stage = hula_stage(teeth, [m_outer, m_inner], clearance);
@@ -706,7 +707,7 @@ fn hula_report(n: u32, clearance: f64, m_outer: f64, m_inner: f64, cutter_teeth:
         }
     }
 
-    let (as_stage, solved) = match solve_hula(&stage, &StageLoads::at(2.0, 1000.0), &lib) {
+    let (as_stage, solved) = match solve_hula(&stage, 2.0, 1000.0, &lib) {
         Ok(r) => r,
         Err(e) => {
             eprintln!("that stage has no geometry: {e}");
@@ -1102,8 +1103,6 @@ fn roll_pair(ring: &gear_core::ring::Ring, pinion: &gear_core::Gear, a: f64, tit
 /// out — the useful statement is which bound stops it, and that is what these
 /// rows are.
 fn hula_band(z0: u32, clearance_in_modules: f64) {
-    use gear_core::train::StageLoads;
-
     let lib = gear_io::default_library();
 
     println!(
@@ -1123,7 +1122,7 @@ fn hula_band(z0: u32, clearance_in_modules: f64) {
             u32,
             f64,
             gear_core::train::Shape,
-            gear_core::train::ShapeResult,
+            gear_core::train::Alone,
         )> = None;
         for addendum in [0.8, 0.7, 0.6, 0.5, 0.4] {
             for cutter in [10u32, 14, 20, 28] {
@@ -1148,8 +1147,7 @@ fn hula_band(z0: u32, clearance_in_modules: f64) {
                             m.gear.profile_shift = gear_core::params::Auto::fixed(x);
                         }
                     }
-                    let Ok((as_stage, r)) = solve_hula(&stage, &StageLoads::at(2.0, 1000.0), &lib)
-                    else {
+                    let Ok((as_stage, r)) = solve_hula(&stage, 2.0, 1000.0, &lib) else {
                         continue;
                     };
                     // **The whole question**, through the one method that asks
@@ -1234,12 +1232,11 @@ fn mesh_sweep(z_ring: u32, z_pinion: u32, ring_addendum: f64, pinion_addendum: f
 /// a pair before that bound was applied would be measuring one nobody builds.
 fn hula_sweep(n: u32, clearance: f64, mesh_index: usize) {
     use gear_core::ring::Ring;
-    use gear_core::train::StageLoads;
 
     let lib = gear_io::default_library();
     let teeth = [n + 1, n, n - 1, n];
     let stage = hula_stage(teeth, [1.0, 1.0], clearance);
-    let (as_stage, solved) = match solve_hula(&stage, &StageLoads::at(2.0, 1000.0), &lib) {
+    let (as_stage, solved) = match solve_hula(&stage, 2.0, 1000.0, &lib) {
         Ok(r) => r,
         Err(e) => {
             eprintln!("that stage has no geometry: {e}");
@@ -1447,7 +1444,7 @@ fn train_file_report(path: Option<&str>) {
 /// that cost.
 fn shifts_report(z1: u32, z2: u32) {
     use gear_core::params::Auto;
-    use gear_core::train::{StageGear, StageLoads};
+    use gear_core::train::StageGear;
 
     let lib = gear_io::default_library();
     let stage = |on: bool, at: Option<f64>| {
@@ -1462,8 +1459,7 @@ fn shifts_report(z1: u32, z2: u32) {
         s.set_search(on);
         s
     };
-    let solved =
-        |on: bool, at: Option<f64>| solve_pair(&stage(on, at), &StageLoads::just(2.0), &lib);
+    let solved = |on: bool, at: Option<f64>| solve_pair(&stage(on, at), 2.0, 0.0, &lib);
 
     println!("pair z {z1}/{z2}  module 1  alpha 20 deg  mu 0.06\n");
     println!(
@@ -1570,7 +1566,6 @@ fn shifts_report(z1: u32, z2: u32) {
 /// for — 26 of 30 sets swept came back with a ring the cutter had to alter.
 fn epicyclic_shifts_report() {
     use gear_core::params::Auto;
-    use gear_core::train::{solve_any, StageLoads};
 
     let lib = gear_io::default_library();
 
@@ -1594,7 +1589,7 @@ fn epicyclic_shifts_report() {
             0.30 / f64::from(d),
         );
         hula.set_search(true);
-        match solve_hula(&hula, &StageLoads::at(2.0, 1000.0), &lib) {
+        match solve_hula(&hula, 2.0, 1000.0, &lib) {
             Err(e) => println!("{d:<12} {e}"),
             Ok((as_stage, r)) => {
                 let v = hula_view(&as_stage, &r).expect("a hula stage");
@@ -1622,7 +1617,7 @@ fn epicyclic_shifts_report() {
         set.set_search(true);
         set.members[0].gear.profile_shift = Auto::automatic(0.0);
         set.members[2].gear.profile_shift = Auto::automatic(0.0);
-        match solve_any(&set, &StageLoads::just(2.0), &lib) {
+        match gear_core::train::solve_alone(&gear_core::train::Train::alone(&set, 2.0, 0.0), &lib) {
             Ok(r) => {
                 let members = &r.members;
                 let meshes = r.meshes();
@@ -1652,7 +1647,7 @@ fn epicyclic_shifts_report() {
     for n in [12u32, 18, 30] {
         let mut stage = hula_stage([n + 1, n, n - 1, n], [1.0, 1.0], 0.3);
         stage.set_search(true);
-        match solve_hula(&stage, &StageLoads::at(2.0, 1000.0), &lib) {
+        match solve_hula(&stage, 2.0, 1000.0, &lib) {
             Ok((_, r)) => {
                 // The two wobble gears' shifts: the list's members 0 and 1.
                 let members = &r.members;
@@ -3073,11 +3068,9 @@ fn worm_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, shaft_angle_de
 
 /// A worm stage end to end: geometry, both directions, contact and backlash.
 fn worm_stage_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, torque: f64) {
-    use gear_core::train::StageLoads;
-
     let stage = worm_stage(starts, wheel_teeth, worm_diameter);
     let lib = gear_io::default_library();
-    let solved = match solve_pair(&stage, &StageLoads::just(torque), &lib) {
+    let solved = match solve_pair(&stage, torque, 0.0, &lib) {
         Ok(r) => r,
         Err(e) => {
             eprintln!("cannot solve that stage: {e}");
@@ -3143,7 +3136,7 @@ fn worm_stage_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, torque: 
 /// row a count does not admit says why in the stage's own words.
 fn planetary_report(sun: u32, planet: u32, planets: u32, sun_shift: f64, ring_shift: f64) {
     use gear_core::params::Auto;
-    use gear_core::train::{solve_any, StageLoads, TrainError};
+    use gear_core::train::TrainError;
 
     let lib = gear_io::default_library();
     let module = 1.0;
@@ -3158,7 +3151,7 @@ fn planetary_report(sun: u32, planet: u32, planets: u32, sun_shift: f64, ring_sh
     // planets up to four times the ideal — the "what is possible" listing.
     // The counts a set can reach are asked at zero backlash; a running
     // clearance moves every row's shift by the same small amount.
-    let at = |ring: u32| -> Result<gear_core::train::ShapeResult, TrainError> {
+    let at = |ring: u32| -> Result<gear_core::train::Alone, TrainError> {
         let mut set = arr::planetary(sun, planet, ring, planets);
         for m in &mut set.members {
             m.module.manual = module;
@@ -3172,7 +3165,7 @@ fn planetary_report(sun: u32, planet: u32, planets: u32, sun_shift: f64, ring_sh
         for m in &mut set.members {
             m.gear.no_undercut = false;
         }
-        solve_any(&set, &StageLoads::just(2.0), &lib)
+        gear_core::train::solve_alone(&gear_core::train::Train::alone(&set, 2.0, 0.0), &lib)
     };
     let mut rows = Vec::new();
     let mut below: Option<(u32, TrainError)> = None;
@@ -3275,9 +3268,8 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
                 .copied()
                 .find(|&m| m != input && m != fixed)
                 .unwrap_or(input);
-            match solve_set(
-                &base,
-                &gear_core::train::StageLoads::at(2.0, 3000.0).under(asked),
+            match gear_core::train::solve_alone(
+                &gear_core::train::Train::alone(&base, 2.0, 3000.0).under(&asked),
                 &lib,
             ) {
                 Err(e) => println!("  {:>7} in, {:>7} held: {e}", name(input), name(fixed)),
@@ -3369,7 +3361,7 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
         return;
     }
     let stage = base.clone();
-    if let Ok(solved) = solve_set(&stage, &gear_core::train::StageLoads::at(2.0, 3000.0), &lib) {
+    if let Ok(solved) = solve_set(&stage, 2.0, 3000.0, &lib) {
         let r = set_view(&solved).expect("a set");
         println!();
         for (which, mesh) in [("sun-planet", r.sun_planet), ("planet-ring", r.planet_ring)] {
@@ -3390,7 +3382,7 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
     //
     // Here rather than nowhere because a path the harness never walks is a path
     // the change detector cannot see, which this project has recorded six times.
-    let free = solve_set(&base, &gear_core::train::StageLoads::at(2.0, 3000.0), &lib);
+    let free = solve_set(&base, 2.0, 3000.0, &lib);
     if let Ok(free) = free {
         let free = set_view(&free).expect("a set");
         println!("\ncentre distance given, shifts chosen to reach it");
@@ -3402,7 +3394,7 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
             let asked = free.centre_distance + 0.1 * f64::from(step);
             let mut stage = base.clone();
             stage.distances[0].distance = gear_core::Auto::fixed(asked);
-            match solve_set(&stage, &gear_core::train::StageLoads::at(2.0, 3000.0), &lib) {
+            match solve_set(&stage, 2.0, 3000.0, &lib) {
                 Err(e) => println!("{asked:<12.4} {e}"),
                 Ok(solved) => {
                     let r = set_view(&solved).expect("a set");
@@ -3429,8 +3421,6 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
 /// by tooth count and helix, so `β₁` is what there is to choose. Nothing else
 /// about the pair changes — it is the same screw geometry either way.
 fn crossed_report(z1: u32, z2: u32, shaft_angle: f64) {
-    use gear_core::train::StageLoads;
-
     let lib = gear_io::default_library();
     println!(
         "crossed gear pair  z {z1}/{z2}  shaft angle {shaft_angle} deg  module 1  alpha 20 deg  \
@@ -3464,7 +3454,7 @@ fn crossed_report(z1: u32, z2: u32, shaft_angle: f64) {
             println!("{beta1:>7.1} {:>7} — no such pair", shaft_angle - beta1);
             continue;
         };
-        match solve_pair(&stage, &StageLoads::just(2.0), &lib) {
+        match solve_pair(&stage, 2.0, 0.0, &lib) {
             Err(e) => println!(
                 "{beta1:>7.1} {:>7.1}  {e}",
                 g.wheel_helix_angle_rad.to_degrees()
@@ -3545,7 +3535,7 @@ fn crossed_report(z1: u32, z2: u32, shaft_angle: f64) {
         ("least shift that clears undercut", &even),
         ("least loss", &free),
     ] {
-        match solve_pair(stage, &StageLoads::just(2.0), &lib).map(|solved| {
+        match solve_pair(stage, 2.0, 0.0, &lib).map(|solved| {
             let r = pair(&solved).expect("a pair");
             (
                 r.gears[0].profile_shift,

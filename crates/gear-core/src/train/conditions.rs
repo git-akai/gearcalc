@@ -174,9 +174,8 @@ impl Ports {
 /// **What one stage is asked**, as its solver needs it: a condition per local
 /// body, and which body power comes in and leaves by.
 ///
-/// Assembled by the train from its constraints and couplings — the same way a
-/// [`super::StageLoads`] is assembled from its load cases — or from the
-/// stage's own [`Ports`] where it is solved alone.
+/// Assembled by the train from its holds, or from the stage's own [`Ports`]
+/// where it is asked alone.
 #[derive(Clone, Debug, PartialEq)]
 pub struct StageBoundary {
     /// One per local body, ground first.
@@ -188,17 +187,6 @@ pub struct StageBoundary {
 }
 
 impl StageBoundary {
-    /// **The boundary a stage solves under**: the one the train handed it with
-    /// its loads, or its own convention where it is being asked alone. One
-    /// helper because three stage types once wrote the same `unwrap_or`.
-    #[must_use]
-    pub fn of(loads: &super::StageLoads, wiring: &Wiring, ports: &Ports) -> Self {
-        loads
-            .boundary
-            .clone()
-            .unwrap_or_else(|| Self::conventional(wiring, ports))
-    }
-
     /// A stage on its own, under its own conventions: ground held, the
     /// conventional bodies held, the conventional input driven at one turn.
     #[must_use]

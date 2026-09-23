@@ -254,7 +254,7 @@
   distance 1  running 20.980000  clearance 0.020000
 
 == compound ==
-  path b1 -> b3  ratio 88.500000  efficiency 65.548466 / 48.513978 %  backlash 0.056749 / 5.022252 deg
+  path b1 -> b3  ratio 88.500000  efficiency 65.548466 / 0.000000 %  backlash 0.056749 / 5.022252 deg
     power through the teeth 33.083841 / 50.046629   one more tooth: 85.971429 150.450000 63.000000 38.846535 -206.500000
   case 1
     b0   fixed    speed              -  torque 0.000000
@@ -745,7 +745,7 @@
   distance 2  running 20.980000  clearance 0.020000
 
 == spur then compound ==
-  path b1 -> b4  ratio -223.852941  efficiency 64.463623 / 47.711060 %  backlash 0.057189 / 12.801866 deg
+  path b1 -> b4  ratio -223.852941  efficiency 64.463623 / 0.000000 %  backlash 0.057189 / 12.801866 deg
     power through the teeth 33.536296 / 50.531769   one more tooth: -211.416667 -229.058824 -217.457143 -380.550000 -159.352941 -98.258882 522.323529
   case 1
     b0   fixed    speed              -  torque -6.975099
@@ -1355,7 +1355,7 @@
   distance 3  running 20.980000  clearance 0.020000
 
 == idler then compound ==
-  path b1 -> b5  ratio 223.852941  efficiency 63.448849 / 46.960001 %  backlash 0.057629 / 12.900384 deg
+  path b1 -> b5  ratio 223.852941  efficiency 63.448849 / 0.000000 %  backlash 0.057629 / 12.900384 deg
     power through the teeth 34.004959 / 51.010540   one more tooth: 211.416667 223.852941 229.058824 217.457143 380.550000 159.352941 98.258882 -522.323529
   case 1
     b0   fixed    speed              -  torque 2.896782
@@ -2103,7 +2103,7 @@
   distance 2  running 20.980000  clearance 0.020000
 
 == layshaft then compound ==
-  path b1 -> b6  ratio 209.410816  efficiency 63.581263 / 47.058004 %  backlash 0.057872 / 12.118954 deg
+  path b1 -> b6  ratio 209.410816  efficiency 63.581263 / 0.000000 %  backlash 0.057872 / 12.118954 deg
     power through the teeth 34.074397 / 51.010268   one more tooth: 197.776882 214.280835 209.410816 209.410816 216.631879 202.866728 203.427650 355.998387 149.072106 91.919599 -488.625237
   case 1
     b0   fixed    speed              -  torque 2.590420
@@ -3257,7 +3257,7 @@
   distance 2  running 20.980000  clearance 0.020000
 
 == crossed then compound ==
-  path b1 -> b4  ratio -223.852941  efficiency 55.228056 / 40.874770 %  backlash 0.057187 / 12.801480 deg
+  path b1 -> b4  ratio -223.852941  efficiency 55.228056 / 0.000000 %  backlash 0.057187 / 12.801480 deg
     power through the teeth 28.874889 / 50.531769   one more tooth: -211.416667 -229.058824 -217.457143 -380.550000 -159.352941 -98.258882 522.323529
   case 1
     b0   fixed    speed              -  torque -6.262327
@@ -3881,7 +3881,7 @@
   distance 2  running 20.980000  clearance 0.020000
 
 == planetary then compound ==
-  path b1 -> b6  ratio 619.500000  efficiency 64.028928 / 47.384970 %  backlash 0.057220 / 35.447834 deg
+  path b1 -> b6  ratio 619.500000  efficiency 64.028928 / 0.000000 %  backlash 0.057220 / 35.447834 deg
     power through the teeth 34.012653 / 50.879206   one more tooth: 578.653846 619.500000 626.875000 601.800000 1053.150000 441.000000 271.925743 -1445.500000
   case 1
     b0   fixed    speed              -  torque 0.000000
@@ -4783,7 +4783,7 @@
   distance 4  running 18.020000  clearance 0.020000
 
 == compound then spur ==
-  path b1 -> b6  ratio -223.852941  efficiency 64.463623 / 47.711060 %  backlash 0.061386 / 13.741412 deg
+  path b1 -> b6  ratio -223.852941  efficiency 64.463623 / 0.000000 %  backlash 0.061386 / 13.741412 deg
     power through the teeth 33.739326 / 50.218346   one more tooth: -217.457143 -380.550000 -159.352941 -98.258882 522.323529 -211.416667 -229.058824
   case 1
     b0   fixed    speed              -  torque -404.628219
@@ -4853,7 +4853,7 @@
   distance 2  running 30.025653  clearance 0.020000
 
 == compound then idler ==
-  path b1 -> b6  ratio 223.852941  efficiency 63.448849 / 46.960001 %  backlash 0.100335 / 22.460260 deg
+  path b1 -> b6  ratio 223.852941  efficiency 63.448849 / 0.000000 %  backlash 0.100335 / 22.460260 deg
     power through the teeth 34.382254 / 50.430432   one more tooth: 217.457143 380.550000 159.352941 98.258882 -522.323529 211.416667 223.852941 229.058824
   case 1
     b0   fixed    speed              -  torque 168.043442
@@ -4934,7 +4934,7 @@
   distance 3  running 34.020000  clearance 0.020000
 
 == compound then layshaft ==
-  path b1 -> b6  ratio 209.410816  efficiency 63.581263 / 47.058004 %  backlash 0.123373 / 25.835731 deg
+  path b1 -> b6  ratio 209.410816  efficiency 63.581263 / 0.000000 %  backlash 0.123373 / 25.835731 deg
     power through the teeth 34.383962 / 50.530970   one more tooth: 203.427650 355.998387 149.072106 91.919599 -488.625237 197.776882 214.280835 209.410816 209.410816 216.631879 202.866728
   case 1
     b0   fixed    speed              -  torque 150.271296
@@ -5101,7 +5101,7 @@
   distance 2  running 23.727259  clearance 0.020000
 
 == compound then crossed ==
-  path b1 -> b6  ratio -223.852941  efficiency 55.228056 / 40.874770 %  backlash 0.061234 / 13.707313 deg
+  path b1 -> b6  ratio -223.852941  efficiency 55.228056 / 0.000000 %  backlash 0.061234 / 13.707313 deg
     power through the teeth 33.739326 / 43.166084   one more tooth: -217.457143 -380.550000 -159.352941 -98.258882 522.323529 -211.416667 -229.058824
   case 1
     b0   fixed    speed              -  torque -363.280039
@@ -5171,7 +5171,7 @@
   distance 2  running 42.446407  clearance 0.020000
 
 == compound then planetary ==
-  path b1 -> b6  ratio 619.500000  efficiency 64.028928 / 47.384970 %  backlash 0.049831 / 30.870240 deg
+  path b1 -> b6  ratio 619.500000  efficiency 64.028928 / 0.000000 %  backlash 0.049831 / 30.870240 deg
     power through the teeth 34.195385 / 50.598113   one more tooth: 601.800000 1053.150000 441.000000 271.925743 -1445.500000 578.653846 619.500000 626.875000
   case 1
     b0   fixed    speed              -  torque 0.000000
@@ -5339,7 +5339,7 @@
   distance 2  running 20.980000  clearance 0.020000
 
 == compound then compound ==
-  path b1 -> b7  ratio 7832.250000  efficiency 42.966014 / 23.536061 %  backlash 0.057390 / 449.491584 deg
+  path b1 -> b7  ratio 7832.250000  efficiency 42.966014 / 0.000000 %  backlash 0.057390 / 449.491584 deg
     power through the teeth 54.769792 / 74.326240   one more tooth: 7608.471429 13314.825000 5575.500000 3437.918317 -18275.250000 7608.471429 13314.825000 5575.500000 3437.918317 -18275.250000
   case 1
     b0   fixed    speed              -  torque 0.000000
@@ -5438,7 +5438,7 @@
   distance 2  running 20.999928  clearance 0.020000
 
 == compound then planocentric ==
-  path b1 -> b7  ratio -885.000000  efficiency 63.684225 / 47.097588 %  backlash 0.101437 / 89.771553 deg
+  path b1 -> b7  ratio -885.000000  efficiency 63.684225 / 0.000000 %  backlash 0.101437 / 89.771553 deg
     power through the teeth 40.107748 / 59.585492   one more tooth: -859.714286 -1504.500000 -630.000000 -388.465347 2065.000000 -1371.750000 -663.750000
   case 1
     b0   fixed    speed              -  torque 0.000000
@@ -5511,7 +5511,7 @@
   distance 2  running 1.734179  clearance 0.020000
 
 == compound then meshedplanets ==
-  path b1 -> b6  ratio -265.500000  efficiency 61.194854 / 45.344396 %  backlash 0.088564 / 23.513816 deg
+  path b1 -> b6  ratio -265.500000  efficiency 61.194854 / 0.000000 %  backlash 0.088564 / 23.513816 deg
     power through the teeth 35.654668 / 50.656281   one more tooth: -257.914286 -451.350000 -189.000000 -116.539604 619.500000 -251.340000 -265.500000 -265.500000 -269.187500
   case 1
     b0   fixed    speed              -  torque 0.000000
@@ -5980,7 +5980,7 @@
   distance 2  running 20.980000  clearance 0.020000
 
 == planocentric then compound ==
-  path b1 -> b5  ratio -885.000000  efficiency 63.684225 / 47.097588 %  backlash 0.057831 / 51.180143 deg
+  path b1 -> b5  ratio -885.000000  efficiency 63.684225 / 0.000000 %  backlash 0.057831 / 51.180143 deg
     power through the teeth 42.858508 / 55.383167   one more tooth: -1371.750000 -663.750000 -859.714286 -1504.500000 -630.000000 -388.465347 2065.000000
   case 1
     b0   fixed    speed              -  torque 0.000000
@@ -6697,7 +6697,7 @@
   distance 4  running 20.980000  clearance 0.020000
 
 == meshedplanets then compound ==
-  path b1 -> b7  ratio -265.500000  efficiency 61.194854 / 45.344396 %  backlash 0.057536 / 15.275701 deg
+  path b1 -> b7  ratio -265.500000  efficiency 61.194854 / 0.000000 %  backlash 0.057536 / 15.275701 deg
     power through the teeth 34.808496 / 51.928665   one more tooth: -251.340000 -265.500000 -265.500000 -269.187500 -257.914286 -451.350000 -189.000000 -116.539604 619.500000
   case 1
     b0   fixed    speed              -  torque 0.000000
@@ -6952,7 +6952,7 @@
   distance 6  running 18.020000  clearance 0.020000
 
 == spur then layshaft then compound ==
-  path b1 -> b7  ratio -529.686181  efficiency 62.528978 / 46.279183 %  backlash 0.058058 / 30.752347 deg
+  path b1 -> b7  ratio -529.686181  efficiency 62.528978 / 0.000000 %  backlash 0.058058 / 30.752347 deg
     power through the teeth 34.510458 / 51.480848   one more tooth: -500.259171 -542.004465 -500.259171 -542.004465 -529.686181 -529.686181 -547.951222 -513.133488 -514.552291 -900.466509 -377.064739 -232.502515 1235.934423
   case 1
     b0   fixed    speed              -  torque -13.418897

@@ -801,10 +801,25 @@ how well it turns once moving is decided against the **sliding** one.
 `Directional::once_moving` is the whole rule, and the static figure is never
 itself reported — its only job is the sign.
 
-Applied to every mesh although only a worm is ever near its threshold, for
+Applied to every mesh although only a worm's is ever near its threshold, for
 the same reason `PARALLEL_AXES` is a named zero: the rule is general and the
 geometry decides whether it bites. The default worm stage is self-locking, which
 is the answer a handbook gives.
+
+**And applied to a path's whole flow, not mesh by mesh**, because a train can
+hold at rest where none of its meshes does. Power that circulates multiplies
+every mesh's loss: the compound preset back-driven passes fifty times its input
+through its teeth, which leaves 48.5 % once it turns and −2.6 % at rest, where
+static friction doubles every loss. So it cannot start, and its figure is
+nought. The Wolfrom preset cannot be back-driven even running.
+
+**The sign is the part that is easy to lose.** The flow counts only the power
+that leaves, so a drive that cannot start reads as nought rather than below it,
+and a test of whether nought is positive is decided by rounding. The compound
+broke away by three parts in 10¹⁵ alone and after a spur, and did not after an
+idler, until the flow read a power within its own zero as nought.
+`tools/breakaway.py` keeps the sign, from a moment balance on every body, and
+holds the crate's figures to it.
 
 **A number quoted in a warning is the number the reader will go and change**, so
 the self-locking note names the *static* coefficient — the one that actually

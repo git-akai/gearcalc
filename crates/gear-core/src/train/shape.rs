@@ -2637,6 +2637,7 @@ struct PointMesh {
     power_through: Directional<f64>,
     coprime: bool,
     efficiency: Directional<f64>,
+    efficiency_at_rest: Directional<f64>,
     locking_friction: Directional<f64>,
     /// One contact per load case, in the loads' order.
     contact: Vec<super::ContactPatch>,
@@ -2726,6 +2727,7 @@ fn point_mesh_report(
         contact_ratio,
         locking_friction: m.locking_friction,
         efficiency: m.efficiency,
+        efficiency_at_rest: m.efficiency_at_rest,
         sliding_ratio: s.sliding_ratio,
         cases: cases
             .iter()
@@ -2946,18 +2948,6 @@ pub struct MemberName {
     pub role: MemberRole,
     /// `1`, `2`, … where the role is shared, `None` where it is not.
     pub ordinal: Option<usize>,
-}
-
-/// **The tests' door**: a shape solved for loads asked of it as a lone
-/// stage — through the train of one every lone stage is solved as.
-#[cfg(test)]
-pub(crate) fn solve_loads(
-    shape: &Shape,
-    loads: &super::StageLoads,
-    lib: &MaterialLibrary,
-    reversal: super::Reversal,
-) -> Result<ShapeResult, TrainError> {
-    super::solve_any_with(shape, loads, lib, reversal)
 }
 
 // ------------------------------------------------------------ the result ---
@@ -3878,6 +3868,7 @@ pub fn solve_shape_after(
                         ),
                         operating_pressure_angle: l.operating.alpha_w.to_degrees(),
                         efficiency,
+                        efficiency_at_rest: at_rest[k],
                         // Every line contact was rated above; the map is
                         // over the option so nothing here can panic.
                         contact: rated_contact[k].as_ref().map_or_else(Vec::new, |stress| {
@@ -3918,6 +3909,7 @@ pub fn solve_shape_after(
                         power_through,
                         coprime,
                         efficiency,
+                        efficiency_at_rest: at_rest[k],
                         locking_friction: p.locking_friction(face_of(k, &final_width)),
                         contact: rated_point[k].clone().unwrap_or_default(),
                         case_power,
@@ -4272,20 +4264,7 @@ mod tests {
     use super::*;
     use crate::planetary::{Arrangement, PlanetaryShaft};
     use crate::train::arrangements as arr;
-    use crate::train::{planetary_boundary, test_library, StageLoad, StageLoads};
-
-    /// Both directions and both case kinds, at a torque and a speed.
-    fn loads() -> StageLoads {
-        let mut l = StageLoads::at(2.0, 3000.0);
-        l.cases.push(StageLoad {
-            kind: super::super::CaseKind::Ultimate,
-            drive: Drive::Backward,
-            torque: 0.5,
-            speed: 0.0,
-            turns: None,
-        });
-        l
-    }
+    use crate::train::{planetary_boundary, test_library};
 
     /// How far a set's two meshes disagree about the one distance, from the
     /// zero-backlash distances it reports, each opened by the clearance its
@@ -4298,10 +4277,11 @@ mod tests {
     /// A set through the shape, under its convention or a boundary.
     fn solve_set(
         set: &Shape,
-        loads: &StageLoads,
+        torque: f64,
+        speed: f64,
         lib: &MaterialLibrary,
-    ) -> Result<ShapeResult, TrainError> {
-        solve_loads(set, loads, lib, super::super::Reversal::default())
+    ) -> Result<crate::train::Alone, TrainError> {
+        crate::train::solve_alone(&crate::train::Train::alone(set, torque, speed), lib)
     }
 
     /// **A crossed distance is built as the point-contact model**, and the
@@ -4314,13 +4294,7 @@ mod tests {
             s
         }] {
             assert!(shape.is_crossed(0) && shape.screw(0).is_ok());
-            let r = solve_loads(
-                &shape,
-                &loads(),
-                &test_library(),
-                super::super::Reversal::default(),
-            )
-            .unwrap();
+            let r = solve_set(&shape, 2.0, 3000.0, &test_library()).unwrap();
             assert!(r.meshes[0].point.is_some());
             assert_eq!(r.members.len(), 2);
             assert!(
@@ -4431,7 +4405,7 @@ mod tests {
     fn one_more_tooth_moves_the_ratio_as_the_graph_says() {
         let lib = test_library();
         let pair = arr::pair([17, 43]);
-        let r = solve_loads(&pair, &loads(), &lib, super::super::Reversal::default()).unwrap();
+        let r = solve_set(&pair, 2.0, 3000.0, &lib).unwrap();
         let per = |i: usize| r.ratio_per_tooth.as_ref().unwrap()[i].unwrap();
         assert!((per(1) + 44.0 / 17.0).abs() < 1e-12);
         assert!((per(0) + 43.0 / 18.0).abs() < 1e-12);
@@ -4440,7 +4414,7 @@ mod tests {
             "a pair passes it all once"
         );
         let set = arr::planetary(12, 30, 72, 3);
-        let r = solve_set(&set, &loads(), &lib).unwrap();
+        let r = solve_set(&set, 2.0, 3000.0, &lib).unwrap();
         assert!((r.ratio.unwrap() - 7.0).abs() < 1e-12);
         let per = |i: usize| r.ratio_per_tooth.as_ref().unwrap()[i].unwrap();
         assert!(
@@ -4457,11 +4431,11 @@ mod tests {
         );
         // A tooth that locks the stage is no figure: a Wolfrom's held ring
         // brought level with its output ring stops the output.
-        let wolfrom = solve_loads(
+        let wolfrom = solve_set(
             &super::super::arrangements::wolfrom(18, [60, 61], 3),
-            &loads(),
+            2.0,
+            3000.0,
             &lib,
-            super::super::Reversal::default(),
         )
         .unwrap();
         // Members: the planet, ring 1, ring 2.
@@ -4501,7 +4475,11 @@ mod tests {
                 }
                 let arrangement = Arrangement { input, fixed };
                 let boundary = planetary_boundary(arrangement);
-                let r = solve_set(&set, &loads().under(boundary), &test_library()).unwrap();
+                let r = crate::train::solve_alone(
+                    &crate::train::Train::alone(&set, 2.0, 3000.0).under(&boundary),
+                    &test_library(),
+                )
+                .unwrap();
                 let want = crate::planetary::power(
                     crate::planetary::basic_ratio(crate::planetary::Teeth {
                         sun: 12,
@@ -4565,8 +4543,8 @@ mod tests {
                 }
                 s
             };
-            let r = solve_set(&stage, &StageLoads::just(2.0), &lib)
-                .unwrap_or_else(|e| panic!("face {face}: {e}"));
+            let r =
+                solve_set(&stage, 2.0, 0.0, &lib).unwrap_or_else(|e| panic!("face {face}: {e}"));
             let b = stage
                 .build_at(
                     &r.members
@@ -4635,7 +4613,7 @@ mod tests {
                 s.members[2].gear.face_width = Auto::fixed(ring_face);
                 s
             };
-            let r = solve_set(&stage, &StageLoads::just(2.0), &lib)
+            let r = solve_set(&stage, 2.0, 0.0, &lib)
                 .unwrap_or_else(|e| panic!("ring face {ring_face}: {e}"));
             let got = r.members[1].cases[0]
                 .bending_stress
@@ -4728,7 +4706,7 @@ mod tests {
                 }
                 s
             };
-            let r = solve_set(&stage, &StageLoads::just(2.0), &lib)
+            let r = solve_set(&stage, 2.0, 0.0, &lib)
                 .unwrap_or_else(|e| panic!("k={k}: the set should still solve, got {e}"));
 
             assert!(
@@ -4764,10 +4742,11 @@ mod tests {
         s
     }
 
-    fn solved(sun: u32, planet: u32, ring: u32) -> ShapeResult {
+    fn solved(sun: u32, planet: u32, ring: u32) -> crate::train::Alone {
         solve_set(
             &stage_of(sun, planet, ring, 0.0),
-            &StageLoads::at(2.0, 3000.0),
+            2.0,
+            3000.0,
             &test_library(),
         )
         .unwrap()
@@ -4791,14 +4770,14 @@ mod tests {
     fn a_given_distance_leaves_a_set_one_free_shift() {
         let lib = super::super::test_library();
         let base = arr::planetary(12, 30, 72, 3);
-        let free = solve_set(&base, &StageLoads::just(2.0), &lib).expect("the shipped set solves");
+        let free = solve_set(&base, 2.0, 0.0, &lib).expect("the shipped set solves");
         let asked = free.distances[0].running + 0.1;
 
         // One shift given — the ring's, as the shipped set has it — and every
         // given number stands.
         let mut one = base.clone();
         one.distances[0].distance = Auto::fixed(asked);
-        let r = solve_set(&one, &StageLoads::just(2.0), &lib).expect("one free shift is enough");
+        let r = solve_set(&one, 2.0, 0.0, &lib).expect("one free shift is enough");
         assert!((r.distances[0].running - asked).abs() < 1e-9);
         assert!(
             (r.members[2].profile_shift - one.members[2].gear.profile_shift.manual).abs() < 1e-12
@@ -4813,7 +4792,7 @@ mod tests {
         // and the planet both decided.
         let mut two = one.clone();
         two.members[0].gear.profile_shift = Auto::fixed(r.members[0].profile_shift + 0.25);
-        let over = solve_set(&two, &StageLoads::just(2.0), &lib)
+        let over = solve_set(&two, 2.0, 0.0, &lib)
             .expect("it still builds; it just cannot honour everything");
         assert!((over.distances[0].running - asked).abs() < 1e-9);
         assert!(
@@ -4881,14 +4860,14 @@ mod tests {
     fn a_set_runs_at_the_centre_distance_it_was_given() {
         let lib = super::super::test_library();
         let base = arr::planetary(12, 30, 72, 3);
-        let free = solve_set(&base, &StageLoads::just(2.0), &lib).expect("the shipped set solves");
+        let free = solve_set(&base, 2.0, 0.0, &lib).expect("the shipped set solves");
 
         let mut checked = 0u32;
         for step in -2..=4 {
             let asked = free.distances[0].running + 0.2 * f64::from(step);
             let mut stage = base.clone();
             stage.distances[0].distance = Auto::fixed(asked);
-            let Ok(r) = solve_set(&stage, &StageLoads::just(2.0), &lib) else {
+            let Ok(r) = solve_set(&stage, 2.0, 0.0, &lib) else {
                 // A distance no set can reach is refused, not answered — which
                 // is the honest end of the range rather than a gap in it.
                 continue;
@@ -4959,7 +4938,7 @@ mod tests {
         let lib = test_library();
         let mut exact = stage_of(24, 18, 60, 0.0);
         exact.distances[0].clearance = Auto::fixed(0.0);
-        let exact = solve_set(&exact, &StageLoads::just(2.0), &lib).unwrap();
+        let exact = solve_set(&exact, 2.0, 0.0, &lib).unwrap();
         assert!(exact.members[1].profile_shift.abs() < 1e-12);
         assert!(exact.distances[0]
             .nominal
@@ -5014,7 +4993,7 @@ mod tests {
                 Role::Absorbs(0),
                 "the member left automatic should be the one that absorbs"
             );
-            let r = solve_set(&s, &StageLoads::just(2.0), &lib)
+            let r = solve_set(&s, 2.0, 0.0, &lib)
                 .unwrap_or_else(|e| panic!("{absorber:?} could not close the set: {e:?}"));
 
             // The equality actually closed...
@@ -5065,7 +5044,7 @@ mod tests {
         // this state is refused with the distances' own reason.
         assert!(role_of(&s).iter().all(|r| *r == Role::Given));
         assert_eq!(
-            solve_set(&s, &StageLoads::just(2.0), &test_library()).err(),
+            solve_set(&s, 2.0, 0.0, &test_library()).err(),
             Some(TrainError::NoCommonDistance)
         );
         s.members[2].gear.profile_shift = Auto::automatic(0.0);
@@ -5102,8 +5081,11 @@ mod tests {
             // The same stage, asked six things.
             let stage = stage_of(24, 18, 60, 0.0);
             let asked = planetary_boundary(Arrangement { input, fixed });
-            let r =
-                solve_set(&stage, &StageLoads::just(2.0).under(asked), &test_library()).unwrap();
+            let r = crate::train::solve_alone(
+                &crate::train::Train::alone(&stage, 2.0, 0.0).under(&asked),
+                &test_library(),
+            )
+            .unwrap();
             let _ = output;
             assert!(
                 (r.ratio.unwrap() - ratio).abs() < 1e-12,
@@ -5123,9 +5105,8 @@ mod tests {
             input: PlanetaryShaft::Sun,
             fixed: PlanetaryShaft::Carrier,
         });
-        let r = solve_set(
-            &stage,
-            &StageLoads::just(2.0).under(carrier_held),
+        let r = crate::train::solve_alone(
+            &crate::train::Train::alone(&stage, 2.0, 0.0).under(&carrier_held),
             &test_library(),
         )
         .unwrap();
@@ -5194,13 +5175,18 @@ mod tests {
             // Ring held: the sun and the carrier are the two possible outputs.
             let stage = stage_of(s, p, r, 0.0);
             let asked = |input| {
-                StageLoads::just(2.0).under(planetary_boundary(Arrangement {
+                let boundary = planetary_boundary(Arrangement {
                     input,
                     fixed: PlanetaryShaft::Ring,
-                }))
+                });
+                crate::train::solve_alone(
+                    &crate::train::Train::alone(&stage, 2.0, 0.0).under(&boundary),
+                    &lib,
+                )
+                .unwrap()
             };
-            let a = solve_set(&stage, &asked(PlanetaryShaft::Sun), &lib).unwrap();
-            let b = solve_set(&stage, &asked(PlanetaryShaft::Carrier), &lib).unwrap();
+            let a = asked(PlanetaryShaft::Sun);
+            let b = asked(PlanetaryShaft::Carrier);
 
             // `a` outputs at the carrier, `b` at the sun.
             let at_carrier = a.backlash.unwrap().forward.nominal;
@@ -5225,7 +5211,7 @@ mod tests {
     fn both_meshes_contribute_to_the_output_backlash() {
         let lib = test_library();
         let base = stage_of(24, 18, 60, 0.0);
-        let tight = solve_set(&base, &StageLoads::just(2.0), &lib).unwrap();
+        let tight = solve_set(&base, 2.0, 0.0, &lib).unwrap();
 
         // More clearance opens both meshes, so the output must loosen.
         let loose = {
@@ -5233,7 +5219,7 @@ mod tests {
             s.distances[0].clearance = Auto::fixed(base.distances[0].clearance.manual + 0.05);
             s
         };
-        let loose = solve_set(&loose, &StageLoads::just(2.0), &lib).unwrap();
+        let loose = solve_set(&loose, 2.0, 0.0, &lib).unwrap();
         assert!(
             loose.backlash.unwrap().forward.nominal > tight.backlash.unwrap().forward.nominal,
             "{} should exceed {}",
@@ -5251,7 +5237,7 @@ mod tests {
         let b = &tight.backlash.unwrap().forward;
         assert!(b.minimum <= b.nominal && b.nominal <= b.maximum);
         let off = stage_of(24, 18, 61, 0.0);
-        let off = solve_set(&off, &StageLoads::just(2.0), &lib).unwrap();
+        let off = solve_set(&off, 2.0, 0.0, &lib).unwrap();
         let b = &off.backlash.unwrap().forward;
         assert!(
             b.minimum < b.nominal && b.nominal < b.maximum,
@@ -5269,7 +5255,7 @@ mod tests {
             s.distances[0].tolerance_minus = 0.0;
             s
         };
-        let exact = solve_set(&exact, &StageLoads::just(2.0), &lib).unwrap();
+        let exact = solve_set(&exact, 2.0, 0.0, &lib).unwrap();
         assert!(
             exact.backlash.unwrap().forward.nominal < 1e-12,
             "zero clearance must give zero play, got {}",
@@ -5299,15 +5285,19 @@ mod tests {
     fn a_reversed_root_is_corrected_only_when_the_train_asks() {
         let lib = test_library();
         let stage = arr::planetary(12, 30, 72, 3);
-        // `StageLoads::just` reverses nothing; the reversing duty is the
-        // fatigue case's own, so the second solve hands the stage one.
+        // A plain case reverses nothing; the reversing duty is the fatigue
+        // case's own, so the second solve hands the stage one — a whole turn
+        // of its input, back and forth once.
         let solve = |reversal: crate::train::Reversal, reversing: bool| {
-            let mut loads = StageLoads::just(2.0);
-            loads.cases[1].turns = Some(crate::train::Turns {
-                revolutions: 1.0,
-                reversing_actuations: reversing.then_some(1.0),
-            });
-            solve_loads(&stage, &loads, &lib, reversal).unwrap()
+            let mut train = crate::train::Train::alone(&stage, 2.0, 0.0).with_reversal(reversal);
+            let input = train.load_cases[1].loads[0].at;
+            train.load_cases[1].duty = crate::train::Duty::Intermittent {
+                range_degrees: 360.0,
+                at: input,
+                actuations: 1,
+                reversing,
+            };
+            crate::train::solve_alone(&train, &lib).unwrap()
         };
         // **On the member, not the stage.** Three members raising one note is
         // exactly what a stage-level list could not carry: one key, three
@@ -5385,7 +5375,7 @@ mod tests {
             s.axes[1].count = 1;
             s
         };
-        let r = solve_set(&one, &StageLoads::just(2.0), &test_library()).unwrap();
+        let r = solve_set(&one, 2.0, 0.0, &test_library()).unwrap();
         assert!(r.layouts.is_empty(), "one planet has no layout to check");
     }
 
@@ -5396,7 +5386,7 @@ mod tests {
     fn a_helical_set_reports_everything_a_spur_one_does() {
         for helix in [10.0, 20.0, 30.0] {
             let stage = stage_of(24, 18, 60, helix);
-            let r = solve_set(&stage, &StageLoads::just(2.0), &test_library())
+            let r = solve_set(&stage, 2.0, 0.0, &test_library())
                 .unwrap_or_else(|e| panic!("helix={helix}: {e}"));
             assert!(
                 r.members[0].cases[0].bending_stress.is_some(),
@@ -5423,12 +5413,7 @@ mod tests {
     /// case rather than an exceptional one.
     #[test]
     fn an_impossible_set_is_refused() {
-        assert!(solve_set(
-            &stage_of(24, 18, 200, 0.0),
-            &StageLoads::just(2.0),
-            &test_library()
-        )
-        .is_err());
+        assert!(solve_set(&stage_of(24, 18, 200, 0.0), 2.0, 0.0, &test_library()).is_err());
     }
 
     /// The thickness invariants differ between the two meshes and both hold from
@@ -5458,7 +5443,7 @@ mod tests {
                 assert!((ks[given] - k).abs() < 1e-15, "the given one is the given");
             }
             // ...and it still solves.
-            assert!(solve_set(&shape, &StageLoads::just(2.0), &test_library()).is_ok());
+            assert!(solve_set(&shape, 2.0, 0.0, &test_library()).is_ok());
         }
     }
     /// **The set's shifts follow the same rule as a pair's**: off, the sun sits
@@ -5486,7 +5471,8 @@ mod tests {
                     s.set_search(on);
                     s
                 },
-                &StageLoads::just(2.0),
+                2.0,
+                0.0,
                 &lib,
             )
             .expect("the set solves")
@@ -5532,7 +5518,7 @@ mod tests {
         stage.set_search(true);
         stage.members[0].gear.profile_shift = Auto::automatic(0.0);
         stage.members[2].gear.profile_shift = Auto::fixed(0.25);
-        let r = solve_set(&stage, &StageLoads::just(2.0), &test_library()).expect("solves");
+        let r = solve_set(&stage, 2.0, 0.0, &test_library()).expect("solves");
         assert!((r.members[2].profile_shift - 0.25).abs() < 1e-9);
     }
 }
@@ -5545,16 +5531,13 @@ mod pressure_angle {
     //! and two members in mesh at two are refused.
 
     use super::super::arrangements::{layshaft, StagePreset};
-    use super::super::{test_library, Reversal, StageBoundary, StageLoads, TrainError};
+    use super::super::{test_library, TrainError};
     use super::*;
 
-    fn solve(shape: &Shape) -> Result<ShapeResult, TrainError> {
-        solve_loads(
-            shape,
-            &StageLoads::at(2.0, 3000.0)
-                .under(StageBoundary::conventional(&shape.wiring(), &shape.ports())),
+    fn solve(shape: &Shape) -> Result<crate::train::Alone, TrainError> {
+        crate::train::solve_alone(
+            &crate::train::Train::alone(shape, 2.0, 3000.0),
             &test_library(),
-            Reversal::default(),
         )
     }
 
@@ -5603,16 +5586,13 @@ mod overlap_per_group {
     //! under that mesh's own widths.
 
     use super::super::arrangements::layshaft;
-    use super::super::{helix_for_overlap, test_library, Reversal, StageBoundary, StageLoads};
+    use super::super::{helix_for_overlap, test_library};
     use super::*;
 
-    fn solve(shape: &Shape) -> ShapeResult {
-        solve_loads(
-            shape,
-            &StageLoads::at(2.0, 3000.0)
-                .under(StageBoundary::conventional(&shape.wiring(), &shape.ports())),
+    fn solve(shape: &Shape) -> crate::train::Alone {
+        crate::train::solve_alone(
+            &crate::train::Train::alone(shape, 2.0, 3000.0),
             &test_library(),
-            Reversal::default(),
         )
         .unwrap()
     }
@@ -5674,7 +5654,7 @@ mod hula_recorded {
     //! quotes for the shipped stage, to the digits they print.
 
     use super::super::arrangements::hula;
-    use super::super::{test_library, Reversal, StageLoads};
+    use super::super::test_library;
     use super::*;
 
     /// The harness's fixture: 19/18/17/18, shapers of 14 and 13 teeth for
@@ -5696,13 +5676,10 @@ mod hula_recorded {
 
     /// The hula's own boundary: crank driven, grounded gear held, output
     /// out — bodies 1, 2 and 3 of the shape.
-    fn solve(shape: &Shape, loads: StageLoads) -> ShapeResult {
-        let boundary = super::super::StageBoundary::holding(5, &[2], 1, 3);
-        solve_loads(
-            shape,
-            &loads.under(boundary),
+    fn solve(shape: &Shape, torque: f64, speed: f64) -> crate::train::Alone {
+        crate::train::solve_alone(
+            &crate::train::Train::alone(shape, torque, speed).arranged(&[2], 1, 3),
             &test_library(),
-            Reversal::default(),
         )
         .unwrap()
     }
@@ -5713,7 +5690,7 @@ mod hula_recorded {
 
     #[test]
     fn the_harness_hula_is_what_the_corpus_recorded() {
-        let r = solve(&hula_18(0.2), StageLoads::at(2.0, 1000.0));
+        let r = solve(&hula_18(0.2), 2.0, 1000.0);
         close(324.0, r.ratio.unwrap(), 1e-9, "ratio");
         let d = &r.distances[0];
         close(0.726_026, d.running, 1e-6, "crank offset, running");
@@ -5827,7 +5804,7 @@ mod hula_recorded {
 
     #[test]
     fn the_shipped_hula_stage_reports_the_figures_the_documents_quote() {
-        let r = solve(&shipped(), StageLoads::at(2.0, 1000.0));
+        let r = solve(&shipped(), 2.0, 1000.0);
         close(3721.0 / 16.0, r.ratio.unwrap(), 1e-9, "the reduction");
         close(
             81.92,
@@ -5843,22 +5820,21 @@ mod hula_recorded {
         );
     }
 
-    /// A case from the output enters at the output at the torque times the
-    /// ratio, and the crank delivers that over `η_backward`.
+    /// **A load at the output reaches the crank cut by the backward
+    /// efficiency.** Stated where it enters — at the output, as a train's
+    /// case states it — the output carries it and the crank delivers it
+    /// over `η_backward`, once the ratio has referred it.
     #[test]
-    fn a_case_from_the_output_is_entered_at_the_output() {
-        let mut loads = StageLoads::at(2.0, 3000.0);
-        loads.cases.push(super::super::StageLoad {
-            kind: super::super::CaseKind::Ultimate,
-            drive: crate::contact::Drive::Backward,
-            torque: 0.5,
-            speed: 0.0,
-            turns: None,
-        });
-        let r = solve(&shipped(), loads);
+    fn a_load_at_the_output_reaches_the_crank_over_its_backward_efficiency() {
+        let ratio = solve(&shipped(), 2.0, 3000.0).ratio.unwrap();
+        let mut train = crate::train::Train::alone(&shipped(), 2.0, 3000.0).arranged(&[2], 1, 3);
+        train
+            .load_cases
+            .push(crate::train::LoadCase::back_driving(1, 3, 0.5 * ratio));
+        let r = crate::train::solve_alone(&train, &test_library()).unwrap();
         let c = &r.cases[2];
         close(
-            0.5 * r.ratio.unwrap(),
+            0.5 * ratio,
             c.torques[3].abs(),
             1e-9,
             "the output carries the case",
@@ -6040,20 +6016,18 @@ mod the_pieces_own {
     //! could not make.
 
     use super::super::arrangements::{self as arr, Builder};
-    use super::super::{test_library, Reversal, StageBoundary, StageLoads};
+    use super::super::{test_library, StageBoundary};
     use super::*;
 
-    fn under(shape: &Shape, boundary: StageBoundary) -> ShapeResult {
-        solve_loads(
-            shape,
-            &StageLoads::at(2.0, 3000.0).under(boundary),
+    fn under(shape: &Shape, boundary: StageBoundary) -> crate::train::Alone {
+        crate::train::solve_alone(
+            &crate::train::Train::alone(shape, 2.0, 3000.0).under(&boundary),
             &test_library(),
-            Reversal::default(),
         )
         .unwrap()
     }
 
-    fn conventionally(shape: &Shape) -> ShapeResult {
+    fn conventionally(shape: &Shape) -> crate::train::Alone {
         under(
             shape,
             StageBoundary::conventional(&shape.wiring(), &shape.ports()),
@@ -6204,16 +6178,13 @@ mod one_module_per_group {
     //! the helix's rule with the relation made equality.
 
     use super::super::arrangements::{self as arr, layshaft};
-    use super::super::{test_library, Freedom, MemberFreedom, Reversal, StageBoundary, StageLoads};
+    use super::super::{test_library, Freedom, MemberFreedom};
     use super::*;
 
-    fn solve(shape: &Shape) -> ShapeResult {
-        solve_loads(
-            shape,
-            &StageLoads::at(2.0, 3000.0)
-                .under(StageBoundary::conventional(&shape.wiring(), &shape.ports())),
+    fn solve(shape: &Shape) -> crate::train::Alone {
+        crate::train::solve_alone(
+            &crate::train::Train::alone(shape, 2.0, 3000.0),
             &test_library(),
-            Reversal::default(),
         )
         .unwrap()
     }

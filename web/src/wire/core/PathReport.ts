@@ -17,7 +17,11 @@ ratio: number,
  * free, and the reverse — the train's flow at unit load, so a path
  * that crosses one stage of three is rated on that stage alone. A path
  * through a self-locking stage cannot be back-driven at all, and
- * [`Directional::locked`] on this pair says so.
+ * [`Directional::locked`] on this pair says so. **Whether it breaks
+ * away** is the same flow against every mesh's static friction
+ * ([`MeshReport::efficiency_at_rest`], [`Directional::once_moving`]):
+ * a path that cannot start delivers nothing, and one that can runs on
+ * sliding friction.
  */
 efficiency: Directional<number>, 
 /**

@@ -1026,7 +1026,9 @@ it is a value, not a missing one.
 **Two friction coefficients.** Whether a stage turns at all is decided at rest
 against a **static** coefficient; how well it turns once moving is decided
 against the **sliding** one. `Directional::once_moving` is the whole rule, and
-the static figure is never itself reported.
+the static figure is never itself reported. A path asks it of its **whole
+flow**, since a train can hold at rest where none of its meshes does
+([rationale](rationale.md#two-friction-coefficients-because-there-are-two-questions)).
 
 **The flank load comes from the torque the stage was given**, on the member it
 was given on, in the direction that gives it. `T₁` and `T₂` above are one

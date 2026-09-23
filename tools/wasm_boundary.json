@@ -19305,7 +19305,7 @@
          "to": 3,
          "ratio": "-17.705882352941178",
          "efficiency": {
-          "forward": "0.96065153358380018",
+          "forward": "0.96065153358380007",
           "backward": "0.96056310757421903"
          },
          "backlash": {
@@ -19908,7 +19908,7 @@
               "curvature_along": 0,
               "curvature_across": "0.57719271777557857"
              },
-             "power_through": "0.99999999999999989",
+             "power_through": 1,
              "sliding_velocity": 0
             },
             {
@@ -19936,7 +19936,7 @@
               "curvature_along": 0,
               "curvature_across": "0.57719271777557857"
              },
-             "power_through": "0.99999999999999978",
+             "power_through": 1,
              "sliding_velocity": 0
             }
            ],
@@ -20614,7 +20614,7 @@
               "curvature_along": 0,
               "curvature_across": "0.76365975913284279"
              },
-             "power_through": "0.84295693986664222",
+             "power_through": "0.84295693986664233",
              "sliding_velocity": 0
             },
             {
@@ -20642,7 +20642,7 @@
               "curvature_along": 0,
               "curvature_across": "0.76365975913284279"
              },
-             "power_through": "0.84295693986664233",
+             "power_through": "0.84295693986664255",
              "sliding_velocity": 0
             }
            ],
@@ -20707,7 +20707,7 @@
               "curvature_along": 0,
               "curvature_across": "0.15076087484409292"
              },
-             "power_through": "0.82473616218587276",
+             "power_through": "0.82473616218587287",
              "sliding_velocity": 0
             },
             {
@@ -20735,7 +20735,7 @@
               "curvature_along": 0,
               "curvature_across": "0.15076087484409292"
              },
-             "power_through": "0.82473616218587287",
+             "power_through": "0.82473616218587298",
              "sliding_velocity": 0
             }
            ],

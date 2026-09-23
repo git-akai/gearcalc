@@ -701,16 +701,20 @@ mod tests {
         // the names here say which preset the case is about.
         let lib = crate::default_library();
         let solve_spur = |stage: &gear_core::train::Shape,
-                          loads: &gear_core::train::StageLoads,
+                          torque: f64,
+                          speed: f64,
                           lib: &gear_core::material::MaterialLibrary| {
-            gear_core::train::solve_any(stage, loads, lib)
+            gear_core::train::solve_alone(
+                &gear_core::train::Train::alone(stage, torque, speed),
+                lib,
+            )
         };
         let solve_crossed = solve_spur;
         let solve_worm = solve_spur;
         for helix in [0.0_f64, 3.0, 20.0] {
             for teeth in [(17_u32, 43_u32), (9, 11)] {
                 let stage = arr::pair([teeth.0, teeth.1]).with_additional_helix(helix);
-                if let Ok(r) = solve_spur(&stage, &gear_core::train::StageLoads::just(2.0), &lib) {
+                if let Ok(r) = solve_spur(&stage, 2.0, 0.0, &lib) {
                     record(&r.every_note());
                 }
                 for sigma in [0.5_f64, 90.0] {
@@ -726,9 +730,7 @@ mod tests {
                         for m in &mut crossed.members {
                             m.gear.face_width = face;
                         }
-                        if let Ok(r) =
-                            solve_crossed(&crossed, &gear_core::train::StageLoads::just(2.0), &lib)
-                        {
+                        if let Ok(r) = solve_crossed(&crossed, 2.0, 0.0, &lib) {
                             record(&r.every_note());
                         }
                     }
@@ -756,9 +758,9 @@ mod tests {
                 s.members[1].gear = gear;
                 s
             };
-            if let Ok(r) = solve_spur(&stage, &gear_core::train::StageLoads::just(2.0), &lib) {
+            if let Ok(r) = solve_spur(&stage, 2.0, 0.0, &lib) {
                 record(&r.every_note());
-                for g in r.members {
+                for g in &r.members {
                     record(&g.notes);
                 }
             }
@@ -780,9 +782,9 @@ mod tests {
                 s.members[1].gear = gear;
                 s
             };
-            if let Ok(r) = solve_spur(&stage, &gear_core::train::StageLoads::just(2.0), &lib) {
+            if let Ok(r) = solve_spur(&stage, 2.0, 0.0, &lib) {
                 record(&r.every_note());
-                for g in r.members {
+                for g in &r.members {
                     record(&g.notes);
                 }
             }
@@ -803,9 +805,9 @@ mod tests {
                 s.members[1].gear = gear;
                 s
             };
-            if let Ok(r) = solve_spur(&stage, &gear_core::train::StageLoads::just(2.0), &lib) {
+            if let Ok(r) = solve_spur(&stage, 2.0, 0.0, &lib) {
                 record(&r.every_note());
-                for g in r.members {
+                for g in &r.members {
                     record(&g.notes);
                 }
             }
@@ -826,10 +828,10 @@ mod tests {
                 s.members[1].gear = gear(43);
                 s
             };
-            if let Ok(r) = solve_spur(&stage, &gear_core::train::StageLoads::just(2.0), &lib) {
+            if let Ok(r) = solve_spur(&stage, 2.0, 0.0, &lib) {
                 record(&r.every_note());
                 // A bound that moved a gear's own number rides that gear.
-                for g in r.members {
+                for g in &r.members {
                     record(&g.notes);
                 }
             }
@@ -848,23 +850,22 @@ mod tests {
                 s
             };
             stage.members[0].gear.teeth = starts;
-            if let Ok(r) = solve_worm(&stage, &gear_core::train::StageLoads::just(2.0), &lib) {
+            if let Ok(r) = solve_worm(&stage, 2.0, 0.0, &lib) {
                 record(&r.every_note());
             }
         }
         // A planet's root is loaded both ways whatever the drive does, so the
         // correction switched on is what fires the "applied" half of the pair;
         // switched off — every other case here — fires the disclosure.
-        if let Ok(r) = gear_core::train::solve_any_with(
-            &arr::planetary(12, 30, 72, 3),
-            &gear_core::train::StageLoads::just(2.0),
+        if let Ok(r) = gear_core::train::solve_alone(
+            &gear_core::train::Train::alone(&arr::planetary(12, 30, 72, 3), 2.0, 0.0)
+                .with_reversal(gear_core::train::Reversal { correct: true }),
             &lib,
-            gear_core::train::Reversal { correct: true },
         ) {
             record(&r.every_note());
             // ...and what the members themselves say, which is where a note
             // about one gear belongs.
-            for g in r.members {
+            for g in &r.members {
                 record(&g.notes);
             }
         }
@@ -876,11 +877,12 @@ mod tests {
                 }
                 s
             };
-            if let Ok(r) =
-                gear_core::train::solve_any(&stage, &gear_core::train::StageLoads::just(2.0), &lib)
-            {
+            if let Ok(r) = gear_core::train::solve_alone(
+                &gear_core::train::Train::alone(&stage, 2.0, 0.0),
+                &lib,
+            ) {
                 record(&r.every_note());
-                for g in r.members {
+                for g in &r.members {
                     record(&g.notes);
                 }
             }
@@ -920,9 +922,9 @@ mod tests {
                 }
                 s
             };
-            if let Ok(r) = solve_spur(&stage, &gear_core::train::StageLoads::just(2.0), &lib) {
+            if let Ok(r) = solve_spur(&stage, 2.0, 0.0, &lib) {
                 record(&r.every_note());
-                for g in r.members {
+                for g in &r.members {
                     record(&g.notes);
                 }
             }
@@ -942,9 +944,7 @@ mod tests {
                     };
                     s
                 };
-                if let Ok(r) =
-                    solve_crossed(&crossed, &gear_core::train::StageLoads::just(2.0), &lib)
-                {
+                if let Ok(r) = solve_crossed(&crossed, 2.0, 0.0, &lib) {
                     record(&r.every_note());
                 }
             }
@@ -960,7 +960,7 @@ mod tests {
             s.meshes[0].sliding_friction = friction;
             s.meshes[0].static_friction = friction;
             let stage = s.with_first_helix(45.0);
-            if let Ok(r) = solve_crossed(&stage, &gear_core::train::StageLoads::just(2.0), &lib) {
+            if let Ok(r) = solve_crossed(&stage, 2.0, 0.0, &lib) {
                 record(&r.every_note());
             }
             // ...the optimiser asked of a crossed mesh, whose search has its
@@ -971,7 +971,8 @@ mod tests {
                     s.set_search(true);
                     s
                 }),
-                &gear_core::train::StageLoads::just(2.0),
+                2.0,
+                0.0,
                 &lib,
             ) {
                 record(&r.every_note());
@@ -984,7 +985,8 @@ mod tests {
                     s.meshes[0].static_friction = friction;
                     s
                 }),
-                &gear_core::train::StageLoads::just(2.0),
+                2.0,
+                0.0,
                 &lib,
             ) {
                 record(&r.every_note());
@@ -1000,9 +1002,10 @@ mod tests {
         {
             let mut hula = gear_core::train::arrangements::hula([18, 19, 19, 20], [1.0, 1.0]);
             hula.set_search(true);
-            if let Ok(r) =
-                gear_core::train::solve_any(&hula, &gear_core::train::StageLoads::just(2.0), &lib)
-            {
+            if let Ok(r) = gear_core::train::solve_alone(
+                &gear_core::train::Train::alone(&hula, 2.0, 0.0),
+                &lib,
+            ) {
                 record(&r.every_note());
             }
         }
@@ -1016,7 +1019,7 @@ mod tests {
         for distance in [23.0_f64, 23.46, 25.0] {
             let mut sp = arr::pair([9, 37]);
             sp.distances[0].distance = gear_core::params::Auto::fixed(distance);
-            if let Ok(r) = solve_spur(&sp, &gear_core::train::StageLoads::just(2.0), &lib) {
+            if let Ok(r) = solve_spur(&sp, 2.0, 0.0, &lib) {
                 record(&r.every_note());
             }
         }
@@ -1039,7 +1042,8 @@ mod tests {
                     s
                 })
                 .with_first_helix(3.0),
-                &gear_core::train::StageLoads::just(2.0),
+                2.0,
+                0.0,
                 &lib,
             ) {
                 record(&r.every_note());
@@ -1075,14 +1079,13 @@ mod tests {
                 s.members[2].gear.profile_shift = gear_core::params::Auto::fixed(shift);
                 s
             };
-            match gear_core::train::solve_any(
-                &stage,
-                &gear_core::train::StageLoads::just(2.0),
+            match gear_core::train::solve_alone(
+                &gear_core::train::Train::alone(&stage, 2.0, 0.0),
                 &lib,
             ) {
                 Ok(r) => {
                     record(&r.every_note());
-                    for g in r.members {
+                    for g in &r.members {
                         record(&g.notes);
                     }
                     ring_cases_solved += 1;
@@ -1192,7 +1195,7 @@ mod tests {
                 for m in &mut narrow.members {
                     m.gear.face_width = gear_core::params::Auto::fixed(2.0);
                 }
-                if let Ok(r) = solve_spur(&narrow, &gear_core::train::StageLoads::just(2.0), &lib) {
+                if let Ok(r) = solve_spur(&narrow, 2.0, 0.0, &lib) {
                     record(&r.every_note());
                 }
             }
@@ -1205,8 +1208,7 @@ mod tests {
                     s
                 };
                 straight.members[0].gear.face_width = gear_core::params::Auto::automatic(5.0);
-                if let Ok(r) = solve_spur(&straight, &gear_core::train::StageLoads::just(2.0), &lib)
-                {
+                if let Ok(r) = solve_spur(&straight, 2.0, 0.0, &lib) {
                     record(&r.every_note());
                 }
             }
@@ -1232,11 +1234,12 @@ mod tests {
                     s.members[1].gear = no_source;
                     s
                 }),
-                &gear_core::train::StageLoads::just(2.0),
+                2.0,
+                0.0,
                 &lib,
             ) {
                 record(&r.every_note());
-                for g in r.members {
+                for g in &r.members {
                     record(&g.notes);
                 }
             }
@@ -1360,9 +1363,8 @@ mod tests {
             {
                 let mut st = arr::pair([17, 43]);
                 st.members[1].gear.teeth = 0;
-                let out = gear_core::train::solve_any(
-                    &st,
-                    &gear_core::train::StageLoads::just(1.0),
+                let out = gear_core::train::solve_alone(
+                    &gear_core::train::Train::alone(&st, 1.0, 0.0),
                     &lib,
                 );
                 assert!(
@@ -1381,9 +1383,8 @@ mod tests {
             // and look at the teeth.
             {
                 let set = arr::planetary(17, 17, 80, 3);
-                let out = gear_core::train::solve_any(
-                    &set,
-                    &gear_core::train::StageLoads::just(1.0),
+                let out = gear_core::train::solve_alone(
+                    &gear_core::train::Train::alone(&set, 1.0, 0.0),
                     &lib,
                 );
                 assert!(
@@ -1499,9 +1500,8 @@ mod tests {
             {
                 let mut shape = gear_core::train::arrangements::planocentric(40, 41);
                 shape.distances[0].tip_clearance = 1000.0;
-                match gear_core::train::solve_any(
-                    &shape,
-                    &gear_core::train::StageLoads::just(2.0),
+                match gear_core::train::solve_alone(
+                    &gear_core::train::Train::alone(&shape, 2.0, 0.0),
                     &lib,
                 ) {
                     Err(e) => {
@@ -1617,11 +1617,12 @@ mod tests {
     ///   its motion undetermined. A train no longer produces one: a boundary
     ///   that is a family is a stage with no figures of its own rather than
     ///   a refusal, and a boundary that contradicts itself is named at the
-    ///   hold that closed it (`Train::boundaries`). What still raises it is
-    ///   `Wiring::unit_motion` asked directly — a lone stage asked for a
-    ///   backward load through `solve_any` with two of its ports free, which
-    ///   the harness can do and no panel can. Live, and kept for the
-    ///   harness.
+    ///   hold that closed it (`Train::boundaries`) — a stage asked alone
+    ///   included, since that is a train of one now (`Train::alone`) and its
+    ///   contradictions are the train's to name. What still raises it is
+    ///   `Wiring::unit_motion` asked directly, and its one caller is the
+    ///   stage's own no-load motion, once that motion is known to be unique.
+    ///   Live, and kept until that motion goes.
     const UNFIRED: &[&str] = &[
         "clamp.ring_fully_filleted",
         "error.train_no_power_flow",

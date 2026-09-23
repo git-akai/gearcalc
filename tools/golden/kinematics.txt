@@ -700,7 +700,7 @@
     b4     planet    of stage 1 speed -7/3
 
 == stepped ==
-  path b1    -> b3    ratio      88.500000   efficiency  65.548466 / 48.513978  %   backlash   0.056749 / 5.022252   deg
+  path b1    -> b3    ratio      88.500000   efficiency  65.548466 / 0.000000   %   backlash   0.056749 / 5.022252   deg
   case 1       2.0000 Nm /   3000.00 rpm at b1     +reacted at b3   
     fixed    ground ground                          -  torque     0.000000
     load     b1  sun                    3000.0000 rpm  torque     2.000000
@@ -722,7 +722,7 @@
     reacted  b3  ring 2                 27.1186 rpm  torque  -116.020785
     free     b4  carrier                685.7143 rpm  torque     0.000000
     free     b5  planet 1               -1600.0000 rpm  torque     0.000000
-  stage 1  ratio      88.500000   efficiency  65.548466 / 48.513978  %   backlash   0.056749 / 5.022252   deg
+  stage 1  ratio      88.500000   efficiency  65.548466 / 0.000000   %   backlash   0.056749 / 5.022252   deg
     power through the teeth  33.083841 / 50.046629    one more tooth on each member: 85.971429 150.450000 63.000000 38.846535 -206.500000
     slot sun       case 1  speed    3000.000000  torque       2.000000
     slot sun       case 2  speed       0.000000  torque      -0.003289
@@ -993,7 +993,7 @@
   stage 1  ratio      -0.240000   efficiency  90.611620 / 90.948043  %   backlash   0.695140 / 0.166833   deg
     power through the teeth   5.707116 / 5.475753     one more tooth on each member: -0.250206 -0.240000 -0.240000 -0.225000 -0.244444
     slot sun 1     case 1  speed  -12500.000000  torque       0.000000
-    slot sun 1     case 2  speed       0.000000  torque      -0.000000
+    slot sun 1     case 2  speed       0.000000  torque       0.000000
     slot sun 1     case 3  speed  -10000.000000  torque       0.000000
     slot carrier   case 1  speed   -2812.500000  torque       1.951604
     slot carrier   case 2  speed       0.000000  torque       0.600000
