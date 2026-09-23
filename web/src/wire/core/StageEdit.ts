@@ -5,4 +5,4 @@
  * mesh, a distance by position; a body as the wiring numbers it, ground
  * being 0 and the first listed body 1.
  */
-export type StageEdit = { "add_step": { axis: number, } } | { "remove_step": { gear: number, } } | { "add_central": { gear: number, ring: boolean, } } | { "remove_member": { member: number, } } | "add_axis" | "remove_axis" | { "add_mesh": { distance: number, } } | { "remove_mesh": { mesh: number, } } | { "move_body": { member: number, body: number | null, } } | { "couple": { body: number, } } | { "uncouple": { coupling: number, } };
+export type StageEdit = { "add_step": { axis: number, } } | { "remove_step": { gear: number, } } | { "add_central": { gear: number, ring: boolean, } } | { "remove_member": { member: number, } } | { "add_axis": { mate: number, } } | { "remove_axis": { axis: number, } } | { "add_mesh": { distance: number, } } | { "remove_mesh": { mesh: number, } } | { "move_body": { member: number, body: number | null, } } | { "couple": { body: number, } } | { "uncouple": { coupling: number, } };

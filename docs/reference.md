@@ -2254,7 +2254,10 @@ pair, which is what a preset is for.
 an arrangement by adding and removing, never by flipping: on an epicyclic
 stage a **step** (one more gear on the planet's body, with a ring on it), a
 **sun or a ring on a planet gear**, a step or a central member removed; on
-a parallel one an **axis** at the end of the chain (an idler) and a
+a parallel one an **axis** at a gear — a gear on a new axis meshing it,
+which at the chain's end is an idler behind the last, the panel's default —
+or an axis taken away with everything on it, refused where a gear left
+behind would mesh nothing, and a
 **mesh** on a distance (a layshaft's next ratio, one gear on the body the
 meshes share and the other on a body of its own — which ratio is engaged
 is which gear sits on the output's body). *Pair* named that edit for a

@@ -161,9 +161,15 @@ const out = {
     out.push(["stage_epicyclic", structuredClone(t)]);
     t = edit(t, { push_stage: preset("layshaft") });
     t = stage(2, { add_mesh: { distance: 0 } });
-    t = stage(2, { add_axis: null });
+    // At the chain's end: the last gear on the stage's last axis.
+    const last = t.stages[2].axes.length - 1;
+    const onLast = t.stages[2].members
+      .map((m, j) => [t.stages[2].bodies.find((b) => b.body === m.body).axis, j])
+      .filter(([a]) => a === last)
+      .map(([, j]) => j);
+    t = stage(2, { add_axis: { mate: onLast[onLast.length - 1] } });
     out.push(["stage_parallel_added", structuredClone(t)]);
-    t = stage(2, "remove_axis");
+    t = stage(2, { remove_axis: { axis: t.stages[2].axes.length - 1 } });
     t = stage(2, { remove_mesh: { mesh: t.stages[2].meshes.length - 1 } });
     out.push(["stage_parallel_removed", structuredClone(t)]);
     // **A coupling taken off a planocentric and put back**: its shaft goes

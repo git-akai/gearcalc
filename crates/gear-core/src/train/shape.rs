@@ -419,7 +419,7 @@ impl Shape {
     /// answer — every central member of a set meshes its planets — and on
     /// a graph is not: a gear on a sun's shaft meshing a pinion on a fixed
     /// axis turns about the same line as the carrier and meshes in ground.
-    fn frame_of_member(&self, member: usize) -> Body {
+    pub(crate) fn frame_of_member(&self, member: usize) -> Body {
         let shaft = self.slot_of_member(member);
         let Some(axis) = self.axis_of_slot(shaft) else {
             return GROUND;

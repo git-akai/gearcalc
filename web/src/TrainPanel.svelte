@@ -326,6 +326,12 @@
   /** The axis a member turns about; whether a carrier carries it is
    *  `members.ts`'s `carried`, the one reading the gear tab shares. */
   const axisOf = (shape: Shape, j: number) => axisOfBody(shape, shape.members[j].body);
+  /** The last gear on a shape's last axis — a chain's end. */
+  const chainEnd = (shape: Shape): number => {
+    const last = shape.axes.length - 1;
+    const on = shape.members.map((_, j) => j).filter((j) => axisOf(shape, j) === last);
+    return on.length > 0 ? on[on.length - 1] : shape.members.length - 1;
+  };
   const isPlanetGear = carried;
   /** The members a member meshes with. */
   const mates = (shape: Shape, j: number) =>
@@ -2176,8 +2182,11 @@
               <!-- The axes at the end of the bodies they carry: one more
                    axis is one more shaft in series. -->
               <div class="edits">
-                <button class="action add" onclick={() => editStage(i, "add_axis")}>{t("ui.train_add_axis")}</button>
-                <button class="action danger" disabled={stage.axes.length < 3} onclick={() => editStage(i, "remove_axis")}>{t("ui.train_remove_axis")}</button>
+                <!-- At the chain's end: the last gear on its last axis, which is
+                     what "one more axis at the end" meant before a new axis
+                     could mesh any gear. -->
+                <button class="action add" onclick={() => editStage(i, { add_axis: { mate: chainEnd(stage) } })}>{t("ui.train_add_axis")}</button>
+                <button class="action danger" disabled={stage.axes.length < 3} onclick={() => editStage(i, { remove_axis: { axis: stage.axes.length - 1 } })}>{t("ui.train_remove_axis")}</button>
                 <small class="edit-note">{t("ui.train_note_add_axis")}</small>
               </div>
             {/if}

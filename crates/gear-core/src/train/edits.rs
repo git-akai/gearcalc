@@ -53,12 +53,16 @@ pub enum StageEdit {
     /// planet gear — remove the step instead — and for a planet gear, which
     /// is a step.
     RemoveMember { member: usize },
-    /// **An axis at the end of a parallel chain**: a body, a gear copying
-    /// the last member, a mesh with it, a distance to its axis.
-    AddAxis,
-    /// **The last axis of a parallel chain removed**, with everything on it.
-    /// Refused where two would be left short.
-    RemoveAxis,
+    /// **An axis at a gear**: a body on a new axis fixed in ground, a gear
+    /// on it copying `mate`, a mesh with it, a distance between the two
+    /// axes. Refused for a mate that does not mesh in ground — a planet, or
+    /// a sun or a ring meshing planets — whose frame the new axis cannot
+    /// share.
+    AddAxis { mate: usize },
+    /// **An axis removed**, with every gear on it, their meshes, its bodies
+    /// and its distances. Refused for an axis a carrier turns or one that
+    /// is carried, and where a gear left behind would mesh nothing.
+    RemoveAxis { axis: usize },
     /// **One more mesh on a distance**, copying the first mesh there and
     /// bringing the two gears it needs: one on the body the distance's
     /// meshes share — a layshaft — or on the first mesh's second gear's
@@ -166,8 +170,8 @@ impl Shape {
             StageEdit::RemoveStep { gear } => self.remove_step(gear),
             StageEdit::AddCentral { gear, ring } => self.add_central(gear, ring, next),
             StageEdit::RemoveMember { member } => self.remove_member(member),
-            StageEdit::AddAxis => self.add_axis(next),
-            StageEdit::RemoveAxis => self.remove_axis(),
+            StageEdit::AddAxis { mate } => self.add_axis(mate, next),
+            StageEdit::RemoveAxis { axis } => self.remove_axis(axis),
             StageEdit::AddMesh { distance } => self.add_mesh_on(distance, next),
             StageEdit::RemoveMesh { mesh } => self.remove_mesh(mesh),
             StageEdit::MoveBody { member, body } => self.move_body(member, body, next),
@@ -416,44 +420,59 @@ impl Shape {
 
     // ----------------------------------------------------------- parallel ---
 
-    fn add_axis(&mut self, next: usize) -> Result<(), EditRefused> {
-        if self.axes.iter().any(|a| a.carried_by != GROUND) {
+    fn add_axis(&mut self, mate: usize, next: usize) -> Result<(), EditRefused> {
+        if mate >= self.members.len() {
+            return Err(EditRefused::NoSuchIndex);
+        }
+        let from = self
+            .axis_of_slot(self.slot_of_member(mate))
+            .ok_or(EditRefused::NoSuchIndex)?;
+        if self.frame_of_member(mate) != GROUND {
             return Err(EditRefused::WrongFamily);
         }
-        let last_axis = self.axes.len() - 1;
-        let last = (0..self.members.len())
-            .rev()
-            .find(|&i| self.axis_of_slot(self.slot_of_member(i)) == Some(last_axis))
-            .ok_or(EditRefused::NoSuchIndex)?;
         let axis = self.push_axis(GROUND, 1);
         let body = self.push_body(axis, next);
         self.members.push(Member {
             body,
             ring: None,
-            ..self.members[last].clone()
+            ..self.members[mate].clone()
         });
         let new = self.members.len() - 1;
-        self.push_mesh(last, new);
-        self.push_distance([last_axis, axis], 0.0);
+        self.push_mesh(mate, new);
+        self.push_distance([from, axis], 0.0);
         Ok(())
     }
 
-    fn remove_axis(&mut self) -> Result<(), EditRefused> {
-        if self.axes.iter().any(|a| a.carried_by != GROUND) {
+    fn remove_axis(&mut self, axis: usize) -> Result<(), EditRefused> {
+        if axis >= self.axes.len() {
+            return Err(EditRefused::NoSuchIndex);
+        }
+        let turns_a_carrier = self
+            .axes
+            .iter()
+            .any(|a| a.carried_by != GROUND && self.axis_of_body(a.carried_by) == Some(axis));
+        if self.carried(axis) || turns_a_carrier {
             return Err(EditRefused::WrongFamily);
         }
-        if self.axes.len() < 3 {
-            return Err(EditRefused::LastOfItsKind);
-        }
-        let axis = self.axes.len() - 1;
-        let mut on_axis: Vec<usize> = (0..self.members.len())
+        let on_axis: Vec<usize> = (0..self.members.len())
             .filter(|&i| self.axis_of_slot(self.slot_of_member(i)) == Some(axis))
             .collect();
-        on_axis.sort_unstable();
-        for i in on_axis.into_iter().rev() {
+        // **A gear left behind meshing nothing** is no mechanism: the
+        // idler of a chain goes with the chain's end, not before it.
+        let stranded = (0..self.members.len())
+            .filter(|i| !on_axis.contains(i))
+            .any(|i| {
+                let meshes = self.meshes_of_member(i);
+                !meshes.is_empty() && meshes.iter().all(|&k| on_axis.contains(&self.mate(k, i)))
+            });
+        if stranded {
+            return Err(EditRefused::LastOfItsKind);
+        }
+        for &i in on_axis.iter().rev() {
             self.drop_member(i);
         }
-        // Any body left on it, and its distances, and the axis.
+        // Any body left on it, and its distances, and the axis — the axes
+        // after it renumbered down.
         let gone: Vec<usize> = self
             .bodies
             .iter()
@@ -464,7 +483,19 @@ impl Shape {
             .retain(|c| !c.iter().any(|b| gone.contains(b)));
         self.bodies.retain(|b| b.axis != axis);
         self.distances.retain(|d| !d.axes.contains(&axis));
-        self.axes.pop();
+        self.axes.remove(axis);
+        for b in &mut self.bodies {
+            if b.axis > axis {
+                b.axis -= 1;
+            }
+        }
+        for d in &mut self.distances {
+            for a in &mut d.axes {
+                if *a > axis {
+                    *a -= 1;
+                }
+            }
+        }
         Ok(())
     }
 
@@ -713,7 +744,9 @@ mod tests {
                     out.push(StageEdit::AddCentral { gear, ring: false });
                 }
             }
-            None => out.push(StageEdit::AddAxis),
+            None => out.push(StageEdit::AddAxis {
+                mate: shape.members.len() - 1,
+            }),
         }
         out
     }
@@ -800,8 +833,8 @@ mod tests {
         }
         let idler = StagePreset::Idler.build();
         let mut shape = idler.clone();
-        edit(&mut shape, StageEdit::AddAxis).unwrap();
-        edit(&mut shape, StageEdit::RemoveAxis).unwrap();
+        edit(&mut shape, StageEdit::AddAxis { mate: 2 }).unwrap();
+        edit(&mut shape, StageEdit::RemoveAxis { axis: 3 }).unwrap();
         assert!(same(&shape, &idler), "an axis added and removed");
         let layshaft = StagePreset::Layshaft.build();
         let mut shape = layshaft.clone();
@@ -852,8 +885,20 @@ mod tests {
             ),
             (
                 StagePreset::Spur.build(),
-                StageEdit::RemoveAxis,
+                StageEdit::RemoveAxis { axis: 1 },
                 EditRefused::LastOfItsKind,
+            ),
+            // An idler goes with its chain's end, not before it: its two
+            // mates would mesh nothing.
+            (
+                StagePreset::Idler.build(),
+                StageEdit::RemoveAxis { axis: 1 },
+                EditRefused::LastOfItsKind,
+            ),
+            (
+                StagePreset::Planetary.build(),
+                StageEdit::RemoveAxis { axis: 0 },
+                EditRefused::WrongFamily,
             ),
             (
                 StagePreset::Spur.build(),
@@ -865,9 +910,11 @@ mod tests {
                 StageEdit::AddStep { axis: 0 },
                 EditRefused::WrongFamily,
             ),
+            // A sun meshes its planets in the carrier, and a gear on an axis
+            // fixed in ground cannot share that frame.
             (
                 StagePreset::Planetary.build(),
-                StageEdit::AddAxis,
+                StageEdit::AddAxis { mate: 0 },
                 EditRefused::WrongFamily,
             ),
             (
