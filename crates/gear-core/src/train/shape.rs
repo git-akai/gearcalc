@@ -2081,31 +2081,6 @@ impl Shape {
             .collect()
     }
 
-    /// **The ratio with one more tooth on each member**, off the graph
-    /// alone; `None` where the changed counts are no mechanism, or lock it
-    /// — a Wolfrom's rings brought level stop its output, and a ratio of
-    /// infinity is not a figure a designer can compare. (It used to answer
-    /// the ratio itself for the no-mechanism case, which said a tooth
-    /// changed nothing where in fact it broke everything.)
-    fn ratio_per_tooth(
-        &self,
-        wiring: &Wiring,
-        teeth: &[u32],
-        boundary: &super::StageBoundary,
-    ) -> Vec<Option<f64>> {
-        (0..teeth.len())
-            .map(|i| {
-                let mut more = teeth.to_vec();
-                more[i] += 1;
-                wiring
-                    .unit_motion(&more, boundary)
-                    .ok()
-                    .map(|m| m.ratio())
-                    .filter(|r| r.is_finite())
-            })
-            .collect()
-    }
-
     /// The shifts the closure settles on, or why it could not — what the
     /// laws of the set's closure ask, with no rating in the way.
     #[cfg(test)]
@@ -2634,7 +2609,6 @@ const PATH_SAMPLES: usize = 2048;
 /// **What a point contact's builder has in hand** — the crossed-axis
 /// counterpart of [`super::LineMesh`], gathered for the same reason.
 struct PointMesh {
-    power_through: Directional<f64>,
     coprime: bool,
     efficiency: Directional<f64>,
     efficiency_at_rest: Directional<f64>,
@@ -2722,7 +2696,6 @@ fn point_mesh_report(
     }
     MeshReport {
         notes,
-        power_through: m.power_through,
         coprime: m.coprime,
         contact_ratio,
         locking_friction: m.locking_friction,
@@ -3011,7 +2984,14 @@ pub struct SlotCase {
     pub torques: Vec<f64>,
 }
 
-/// What a shape produces.
+/// What a shape produces: its geometry, and its members and meshes rated
+/// for the train's cases.
+///
+/// **No figures of its own.** A ratio, an efficiency, a play and what one
+/// more tooth does are a path's ([`super::PathReport`]), read between two
+/// bodies a case names. A stage's were a second motion solved under a
+/// convention of its own, and a law held them to the path across its ends
+/// until nothing read them but the stage.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(
@@ -3020,31 +3000,6 @@ pub struct SlotCase {
     ts(export, export_to = "core/")
 )]
 pub struct ShapeResult {
-    /// Input turns per output turn, signed — and `None`, with the three
-    /// figures under it, where the stage's boundary leaves its motion a
-    /// **family**: a set with two of its three members free is a
-    /// differential, and a differential has no ratio, no efficiency and no
-    /// play of its own, since each is read under one motion. What it rates
-    /// is the case's motion, which the train decides; what it reports of
-    /// itself is the geometry alone.
-    pub ratio: Option<f64>,
-    /// **The ratio one more tooth on each member would give**, in member
-    /// order — the graph's exact answer at `z_i + 1`, which is what a
-    /// designer choosing counts wants beside the ratio: where a tooth
-    /// moves it a lot, and where it moves it not at all. `None` with the
-    /// ratio; an entry `None` where that one tooth leaves no mechanism or
-    /// locks it.
-    pub ratio_per_tooth: Option<Vec<Option<f64>>>,
-    /// `None` with the ratio.
-    pub efficiency: Option<Directional<f64>>,
-    /// **The power crossing the teeth, over the power in**, in each
-    /// direction: one on a pair, under one on a set, and many times one
-    /// where power circulates ([`super::flow::Flow::circulation`]). Zero
-    /// where the stage does not turn that way; `None` with the ratio.
-    pub circulation: Option<Directional<f64>>,
-    /// Play at the output body driven forward, at the input driven back.
-    /// `None` with the ratio.
-    pub backlash: Option<Directional<super::Backlash>>,
     pub distances: Vec<DistanceReport>,
     /// One per replicated axis, in axis order.
     pub layouts: Vec<LayoutReport>,
@@ -3056,17 +3011,16 @@ pub struct ShapeResult {
 
 /// # Errors
 ///
-/// A mesh that cannot mesh, no contact, a
-/// distance no shift reaches, a material not in the library, a member whose
-/// root cannot be rated, or a boundary that leaves the motion undetermined.
+/// A wiring that describes no mechanism, a mesh that cannot mesh, no
+/// contact, a distance no shift reaches, a material not in the library, or a
+/// member whose root cannot be rated.
 pub fn solve_shape(
     shape: &Shape,
     cases: &[super::CaseLoad],
-    boundary: &super::StageBoundary,
     lib: &MaterialLibrary,
     reversal: super::Reversal,
 ) -> Result<ShapeResult, TrainError> {
-    solve_shape_after(shape, cases, boundary, lib, reversal, None).map(|(r, _)| r)
+    solve_shape_after(shape, cases, lib, reversal, None).map(|(r, _)| r)
 }
 
 /// [`solve_shape`], **with the shifts a prior solve of the same shape
@@ -3077,7 +3031,6 @@ pub fn solve_shape(
 pub fn solve_shape_after(
     shape: &Shape,
     cases: &[super::CaseLoad],
-    boundary: &super::StageBoundary,
     lib: &MaterialLibrary,
     reversal: super::Reversal,
     prior: Option<Chosen>,
@@ -3089,39 +3042,11 @@ pub fn solve_shape_after(
     let n = shape.members.len();
     let helix = shape.helix_angles();
 
-    // ---- motion first: tooth counts and topology, before any geometry.
+    // ---- the wiring describes a mechanism before anything is built at it:
+    // a member with no teeth is refused by name here, and not as a tooth
+    // too undercut to have a root ([`super::WiringError::MemberWithoutTeeth`]).
     let wiring = shape.wiring();
-    let boundary = boundary.clone();
-    let teeth = super::teeth_of(shape.gears());
-    let system = wiring.alone(&teeth)?;
-    let solution = system
-        .motion(&boundary.conditions)
-        .map_err(|_| super::WiringError::Unsolvable)?;
-    // **A boundary that leaves the motion a family** — a differential — is
-    // a stage with no ratio, efficiency or play of its own: each is read
-    // under one motion, and a family has none. Everything that reads the
-    // no-load motion is `None` then; the geometry, the meshes and the cases
-    // — which carry the train's motion — are what they always are.
-    let motion = if solution.is_unique() {
-        Some(wiring.unit_motion(&teeth, &boundary)?)
-    } else {
-        None
-    };
-    let speed: Option<Vec<f64>> = motion
-        .as_ref()
-        .map(|_| solution.values.iter().map(|r| r.to_f64()).collect());
-    let held: Vec<Body> = boundary.held();
-    // A stage driven at two of its ports is one motion and no arrangement
-    // to rate under: the second input's torque is nobody's to know.
-    if boundary
-        .conditions
-        .iter()
-        .filter(|c| matches!(c, crate::kinematics::Condition::Drive(_)))
-        .count()
-        > 1
-    {
-        return Err(TrainError::Wiring(super::WiringError::Unsolvable));
-    }
+    wiring.alone(&super::teeth_of(shape.gears()))?;
 
     // ---- the shifts, and every member and mesh built at them.
     let chosen = match prior {
@@ -3211,59 +3136,6 @@ pub fn solve_shape_after(
     let at_rest: Vec<Directional<f64>> = (0..shape.meshes.len())
         .map(|k| mesh_efficiency(k, shape.meshes[k].static_friction))
         .collect();
-
-    // ---- where the power goes, in each direction, at unit torque.
-    let flows = |etas: &[Directional<f64>]| -> Directional<Option<super::flow::Flow>> {
-        let meshes: Vec<super::flow::MeshFlow> = shape
-            .meshes
-            .iter()
-            .enumerate()
-            .map(|(k, m)| super::flow::MeshFlow {
-                a: shape.slot_of_member(m.a),
-                b: shape.slot_of_member(m.b),
-                frame: wiring.frame(k).unwrap_or(GROUND),
-                za: f64::from(shape.members[m.a].gear.teeth),
-                zb: built.meshes[k].kind.sign() * f64::from(shape.members[m.b].gear.teeth),
-                efficiency: etas[k],
-                paths: f64::from(wiring.meshes[k].paths),
-            })
-            .collect();
-        Directional::of(|d| {
-            let speed = speed.as_ref()?;
-            let (input, output) = match d {
-                Drive::Forward => (boundary.input, boundary.output),
-                Drive::Backward => (boundary.output, boundary.input),
-            };
-            super::flow::solve(
-                speed.len(),
-                &meshes,
-                speed,
-                &super::flow::Asked::through(
-                    speed.len(),
-                    input,
-                    speed[input].signum(),
-                    output,
-                    &held,
-                ),
-            )
-            .ok()
-        })
-    };
-    let moving = flows(&sliding);
-    let resting = flows(&at_rest);
-    if speed.is_some() && moving.forward.is_none() {
-        return Err(TrainError::NoPowerFlow);
-    }
-    let stage_efficiency = moving.forward.as_ref().map(|forward| {
-        Directional {
-            forward: forward.efficiency,
-            backward: moving.backward.as_ref().map_or(0.0, |b| b.efficiency),
-        }
-        .once_moving(&Directional {
-            forward: resting.forward.as_ref().map_or(0.0, |f| f.efficiency),
-            backward: resting.backward.as_ref().map_or(0.0, |b| b.efficiency),
-        })
-    });
 
     // **A case's torques are the train's** ([`super::solve_train`]): one
     // flow across every stage's meshes, read off for this stage's — which
@@ -3538,7 +3410,8 @@ pub fn solve_shape_after(
         .map(|k| point_contact(k, face_of(k, &final_width)))
         .collect::<Result<_, _>>()?;
 
-    // ---- backlash: each mesh's play, and where it shows on each body.
+    // ---- backlash: each mesh's play, as its row and at each member. Where
+    // it shows on a body is a path's to say ([`super::PathReport`]).
     let play_of = |k: usize, a: f64| -> f64 {
         let bm = &built.meshes[k];
         let m = shape.meshes[k];
@@ -3564,21 +3437,6 @@ pub fn solve_shape_after(
             }
         }
     };
-    // Play at a body per unit of play in mesh `k`, with the input and the
-    // held bodies standing still.
-    let coefficient = |k: usize, at: Body, input: Body| -> f64 {
-        let mut conditions = boundary.conditions.clone();
-        for c in conditions.iter_mut() {
-            if matches!(c, crate::kinematics::Condition::Drive(_)) {
-                *c = crate::kinematics::Condition::Free;
-            }
-        }
-        conditions[input] = crate::kinematics::Condition::Ground;
-        system
-            .play(k, &conditions)
-            .and_then(Result::ok)
-            .map_or(0.0, |s| s.values[at].to_f64().abs())
-    };
     // **Each mesh's play at its own distance**, and the band is every
     // distance at the same end of its own tolerance at once: `t` is −1, 0
     // or +1 and each mesh reads its distance's minus, running or plus. A
@@ -3596,18 +3454,6 @@ pub fn solve_shape_after(
                 0.0
             }
     };
-    let backlash_at = |at: Body, input: Body| -> super::Backlash {
-        super::Backlash::banded(0.0, 1.0, 1.0, |t| {
-            (0..shape.meshes.len())
-                .map(|k| coefficient(k, at, input) * play_of(k, at_band(k, t)))
-                .sum::<f64>()
-                .to_degrees()
-        })
-    };
-    let backlash = motion.as_ref().map(|_| Directional {
-        forward: backlash_at(boundary.output, boundary.input),
-        backward: backlash_at(boundary.input, boundary.output),
-    });
     let member_backlash = |k: usize, side: MeshSide| -> super::Backlash {
         let m = shape.meshes[k];
         let z = f64::from(match side {
@@ -3801,9 +3647,18 @@ pub fn solve_shape_after(
                 .into_iter()
                 .zip(cases)
                 .map(|(r, c)| {
-                    // How often this member's teeth are engaged over the
-                    // duty: its turns against the frame its mesh stands
-                    // still in, once for each parallel path it sees.
+                    // **How often this member's teeth are engaged** over
+                    // the duty: once per turn against the frame its mesh
+                    // stands still in, once for each parallel path it sees.
+                    // In the carrier's frame the arm stands still and
+                    // everything else turns past it, and it is one rule for
+                    // a sun, a ring, a planet, a grounded gear and a wobble
+                    // body. It had been three: a sun and a ring counted the
+                    // input body's turns — a held ring, loaded while it does
+                    // not turn at all, three and a half times over on the
+                    // shipped counts — and a planet was referred to the
+                    // sun's speed rather than the input's, right only where
+                    // those are the same body.
                     let cycles = c.turns.as_ref().map(|t| {
                         super::loaded_cycles(super::Turns {
                             revolutions: (t[shaft] - t[frame]).abs()
@@ -3842,10 +3697,6 @@ pub fn solve_shape_after(
                 .map(|c| c.mesh_powers.get(k).copied().unwrap_or(0.0))
                 .collect();
             let (a, b) = (&built.members[m.a], &built.members[m.b]);
-            let power_through = Directional {
-                forward: moving.forward.as_ref().map_or(0.0, |f| f.mesh_powers[k]),
-                backward: moving.backward.as_ref().map_or(0.0, |b| b.mesh_powers[k]),
-            };
             let coprime =
                 super::gcd(shape.members[m.a].gear.teeth, shape.members[m.b].gear.teeth) == 1;
             let efficiency = sliding[k].once_moving(&at_rest[k]);
@@ -3858,7 +3709,6 @@ pub fn solve_shape_after(
                 BuiltContact::Line(l) => super::line_mesh_report(
                     cases,
                     super::LineMesh {
-                        power_through,
                         coprime,
                         contact_ratios: ContactRatios::of(
                             l.path.contact_ratio,
@@ -3906,7 +3756,6 @@ pub fn solve_shape_after(
                     face_of(k, &final_width),
                     m.static_friction,
                     PointMesh {
-                        power_through,
                         coprime,
                         efficiency,
                         efficiency_at_rest: at_rest[k],
@@ -3938,22 +3787,6 @@ pub fn solve_shape_after(
         .collect();
 
     let result = ShapeResult {
-        ratio: motion.as_ref().map(super::wiring::UnitMotion::ratio),
-        ratio_per_tooth: motion
-            .as_ref()
-            .map(|_| shape.ratio_per_tooth(&wiring, &teeth, &boundary)),
-        efficiency: stage_efficiency,
-        circulation: motion.as_ref().map(|_| Directional {
-            forward: moving
-                .forward
-                .as_ref()
-                .map_or(0.0, super::flow::Flow::circulation),
-            backward: moving
-                .backward
-                .as_ref()
-                .map_or(0.0, super::flow::Flow::circulation),
-        }),
-        backlash,
         distances,
         layouts,
         cases: cases
@@ -4450,14 +4283,14 @@ mod tests {
         // fraction the sun turns against the carrier — and the same power,
         // less that mesh's loss, crosses the ring mesh after it.
         let (sun_mesh, ring_mesh) = (&r.meshes[0], &r.meshes[1]);
-        assert!((sun_mesh.power_through.forward - 6.0 / 7.0).abs() < 1e-9);
+        assert!((sun_mesh.cases[0].power_through - 6.0 / 7.0).abs() < 1e-9);
         assert!(
-            (ring_mesh.power_through.forward - 6.0 / 7.0 * sun_mesh.efficiency.forward).abs()
+            (ring_mesh.cases[0].power_through - 6.0 / 7.0 * sun_mesh.efficiency.forward).abs()
                 < 1e-9
         );
         assert!(
             (r.circulation.unwrap().forward
-                - (sun_mesh.power_through.forward + ring_mesh.power_through.forward))
+                - (sun_mesh.cases[0].power_through + ring_mesh.cases[0].power_through))
                 .abs()
                 < 1e-12
         );

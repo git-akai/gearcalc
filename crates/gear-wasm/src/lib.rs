@@ -2458,8 +2458,13 @@ mod tests {
             .find(|n| n["key"] == "stage.planets_share_load_equally")
             .unwrap_or_else(|| panic!("the load-sharing assumption must be reported: {notes:?}"));
         assert_eq!(sharing["values"]["planets"], "3");
-        // ...and the output-body backlash is a real figure now, not a placeholder.
-        assert!(stage["backlash"]["forward"]["nominal"].as_f64().unwrap() > 0.0);
+        // ...and the play at the output is a real figure, the path's.
+        assert!(
+            v["paths"][0]["backlash"]["forward"]["nominal"]
+                .as_f64()
+                .unwrap()
+                > 0.0
+        );
     }
 
     /// **A hula stage crosses the boundary carrying its ratings.**
@@ -2689,12 +2694,10 @@ mod tests {
         "pointed",
         // A material value with nothing to say beyond its number.
         "note",
-        // One tooth more on this member leaves no mechanism, or locks it — a
-        // Wolfrom's rings brought level — and a ratio of infinity is no figure.
-        "ratio_per_tooth",
-        // ...and a path's, the same question asked of the train: one more
-        // tooth on a gear another stage shares a body with can lock that
-        // stage and take the path's motion with it.
+        // One tooth more on a gear leaves no mechanism, or locks the path —
+        // a Wolfrom's rings brought level, or a gear another stage shares a
+        // body with locking that stage and the path's motion with it — and a
+        // ratio of infinity is no figure.
         "per_tooth",
         // An **external** mesh's tips meet on the line of centres or not at
         // all, so the three ways an internal mesh's teeth can foul are not

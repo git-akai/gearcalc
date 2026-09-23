@@ -201,8 +201,6 @@ pub mod key {
     pub const ERROR_TRAIN_NO_CONTACT: &str = "error.train_no_contact";
     /// `error.train_no_common_distance`
     pub const ERROR_TRAIN_NO_COMMON_DISTANCE: &str = "error.train_no_common_distance";
-    /// `error.train_no_power_flow`
-    pub const ERROR_TRAIN_NO_POWER_FLOW: &str = "error.train_no_power_flow";
     /// `error.train_wiring`
     pub const ERROR_TRAIN_WIRING: &str = "error.train_wiring";
     /// `error.train_unknown_material`
@@ -215,8 +213,6 @@ pub mod key {
     pub const ERROR_TRAIN_NO_SUCH_BODY: &str = "error.train_no_such_body";
     /// `error.train_overflow`
     pub const ERROR_TRAIN_OVERFLOW: &str = "error.train_overflow";
-    /// `error.train_stage_undetermined`
-    pub const ERROR_TRAIN_STAGE_UNDETERMINED: &str = "error.train_stage_undetermined";
     /// `error.train_load_port`
     pub const ERROR_TRAIN_LOAD_PORT: &str = "error.train_load_port";
     /// `error.train_load_shared`
@@ -287,14 +283,12 @@ pub mod key {
         ERROR_SCREW_AXES_ARE_PARALLEL,
         ERROR_TRAIN_NO_CONTACT,
         ERROR_TRAIN_NO_COMMON_DISTANCE,
-        ERROR_TRAIN_NO_POWER_FLOW,
         ERROR_TRAIN_WIRING,
         ERROR_TRAIN_UNKNOWN_MATERIAL,
         ERROR_TRAIN_NO_ROOT_SECTION,
         ERROR_TRAIN_OVERDETERMINED,
         ERROR_TRAIN_NO_SUCH_BODY,
         ERROR_TRAIN_OVERFLOW,
-        ERROR_TRAIN_STAGE_UNDETERMINED,
         ERROR_TRAIN_LOAD_PORT,
         ERROR_TRAIN_TIPS_UNCLEARABLE,
     ];

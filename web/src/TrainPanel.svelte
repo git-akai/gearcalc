@@ -52,6 +52,7 @@
     onSlot,
     memberName,
     memberListName,
+    memberRefs,
     isWorm,
     carried,
   } from "./members";
@@ -203,6 +204,9 @@
    *  tab's adopt list names a member** — "Body 2 (Shape 1 Gear 2 · Stage 2
    *  Sun)" — so a body is one name wherever a list has it. */
   const refLabel = (body: number): string => bodyRefName(tab.train, result.topology, body);
+  /** Every gear of the train in the order a path numbers them — stage by
+   *  stage, member by member — with the name a list gives it. */
+  const gears = $derived(memberRefs(tab.train, result.topology));
   /** The ports a duty's select offers — bodies, by number, which is the
    *  select's key. */
   const portOptionsNow = $derived(portOptions(result.motion));
@@ -678,8 +682,15 @@
       <small class="warn">{note(n)}</small>
     {/each}
   </dd>
+  <!-- The power crossing the mesh over the power into the train, in each
+       case, from the train's own flow: a mesh a case leaves unloaded
+       passes nothing. -->
   <dt>{t("ui.train_mesh_power_through")}</dt>
-  <dd>{m ? t("ui.train_circulation_both", { forward: num(m.power_through.forward, 2), backward: num(m.power_through.backward, 2) }) : BLANK}</dd>
+  <dd>
+    {#each m?.cases ?? [] as c (c.case)}
+      <span class="line">{caseName(c.case)}: {num(c.power_through, 2)}×</span>
+    {/each}
+  </dd>
   <dt>{t("ui.train_mesh_efficiency")}</dt>
   <dd>
     {bothWays(m?.efficiency)}
@@ -1738,42 +1749,55 @@
          train whose holds leave its motion a family has no row and says so
          once, and each load case decides its own. -->
     <h4 class="section-heading">{t("ui.train_paths")}</h4>
-    <div class="caselist">
-      <table class="cases">
-        <thead>
-          <tr>
-            <th>{t("ui.train_path_from")}</th>
-            <th>{t("ui.train_path_to")}</th>
-            <th>{t("ui.train_ratio")}</th>
-            <th>{t("ui.train_efficiency")}<small>{t("ui.train_path_forward_backward")}</small></th>
-            <th>{t("ui.train_backlash")}<small>{t("ui.train_path_at_to_at_from")}</small></th>
-          </tr>
-        </thead>
-        <tbody>
-          {#each solved?.paths ?? [] as p (`${p.from}>${p.to}`)}
-            <tr>
-              <td class="name">{refLabel(p.from)}</td>
-              <td class="name">{refLabel(p.to)}</td>
-              <!-- Signed, since a ratio is read off the graph and an external
-                   pair reverses; the magnitude decides which way round the
-                   two numbers are written, so a reduction reads as one
-                   whichever way it turns. -->
-              <td>{Math.abs(p.ratio) >= 1 ? `${num(p.ratio, 4)} : 1` : `1 : ${num(1 / p.ratio, 4)}`}</td>
-              <td>
-                {pct(p.efficiency.forward)} / {pct(p.efficiency.backward)}
-                {#if lockedWays(p.efficiency)}
-                  <small class="warn">{lockedWays(p.efficiency)}</small>
-                {/if}
-              </td>
-              <td>
-                {num(p.backlash.forward.nominal, 5)}° / {num(p.backlash.backward.nominal, 5)}°
-                <small>{range(num(p.backlash.forward.minimum, 5), num(p.backlash.forward.maximum, 5))} / {range(num(p.backlash.backward.minimum, 5), num(p.backlash.backward.maximum, 5))}</small>
-              </td>
-            </tr>
+    {#each solved?.paths ?? [] as p (`${p.from}>${p.to}`)}
+      <h4 class="path section-heading">{t("ui.train_path_between", { from: refLabel(p.from), to: refLabel(p.to) })}</h4>
+      <dl class="out indent">
+        <!-- Signed, since a ratio is read off the graph and an external
+             pair reverses; the magnitude decides which way round the two
+             numbers are written, so a reduction reads as one whichever way
+             it turns. -->
+        <dt>{t("ui.train_ratio")}</dt>
+        <dd>{Math.abs(p.ratio) >= 1 ? `${num(p.ratio, 4)} : 1` : `1 : ${num(1 / p.ratio, 4)}`}</dd>
+        <dt>{t("ui.train_efficiency")}</dt>
+        <dd>
+          {bothWays(p.efficiency)}
+          {#if lockedWays(p.efficiency)}
+            <small class="warn">{lockedWays(p.efficiency)}</small>
+          {/if}
+        </dd>
+        <!-- The play at each end, driven from the other: at the far end
+             driving forward, and at the near end driving back. -->
+        <dt>{t("ui.train_backlash")}</dt>
+        <dd>
+          <span class="line">
+            {t("ui.train_backlash_at", { angle: num(p.backlash.forward.nominal, 5), member: refLabel(p.to) })}
+            <small>{range(num(p.backlash.forward.minimum, 5), num(p.backlash.forward.maximum, 5))}</small>
+          </span>
+          <span class="line">
+            {t("ui.train_backlash_at", { angle: num(p.backlash.backward.nominal, 5), member: refLabel(p.from) })}
+            <small>{range(num(p.backlash.backward.minimum, 5), num(p.backlash.backward.maximum, 5))}</small>
+          </span>
+        </dd>
+        <!-- The power the teeth pass, as a multiple of the power in: one
+             across a pair, and where it is many the path's loss is the
+             meshes' loss that many times over. -->
+        <dt>{t("ui.train_circulation")}</dt>
+        <dd>
+          {t("ui.train_circulation_both", { forward: num(p.circulation.forward, 2), backward: num(p.circulation.backward, 2) })}
+          <small>{t("ui.train_note_circulation")}</small>
+        </dd>
+        <!-- What one more tooth on each gear would make the ratio: the
+             graph's exact answer, so a designer choosing counts sees where
+             a tooth tells and where it does not — and where it locks the
+             path, which a gear of another stage can. -->
+        <dt>{t("ui.train_ratio_per_tooth")}</dt>
+        <dd>
+          {#each p.per_tooth as r, j (j)}
+            <span class="line">{gears[j]?.label ?? BLANK}: {r === null ? t("ui.train_ratio_per_tooth_locked") : num(r, 4)}</span>
           {/each}
-        </tbody>
-      </table>
-    </div>
+        </dd>
+      </dl>
+    {/each}
     {#if solved && solved.paths.length === 0 && tab.train.stages.length > 0}
       <p class="notice">{t("ui.train_family_no_figure")}</p>
     {/if}
@@ -2087,10 +2111,6 @@
           <span class="kind aside">{t("ui.train_epicyclic")}</span>
         {/if}
         <span class="teeth aside">z {stage.members.map((m) => m.gear.teeth).join(" / ")}</span>
-        {#if res && res.ratio !== null}
-          <span class="ratio aside">{res.ratio.toFixed(4)} : 1</span>
-          <span class="eff aside">{pct(res.efficiency?.forward)} %</span>
-        {/if}
       </button>
 
       {#if tab.open[i]}
@@ -2374,21 +2394,10 @@
 
           <!-- No centre-distance row: the distance each pair of axes runs at
                and the clearance it runs with are the two inputs above, each
-               showing its solved value. -->
+               showing its solved value. And no figure of the stage's own: a
+               ratio, an efficiency, a play and what one more tooth does are a
+               path's, listed under the train. -->
           <dl class="out">
-            <dt>{t("ui.train_ratio")}</dt>
-            <dd>
-              {res?.ratio == null ? BLANK : `${num(res.ratio, 4)} : 1`}
-              <!-- What one more tooth on each member would make it: the
-                   graph's exact answer, so a designer choosing counts sees
-                   where a tooth tells and where it does not. A stage whose
-                   boundary is a family has neither, and says so once. -->
-              {#if res?.ratio_per_tooth}
-                <small>{t("ui.train_ratio_per_tooth")}: {res.ratio_per_tooth.map((r, j) => `${name(j)} ${r === null ? t("ui.train_ratio_per_tooth_locked") : num(r, 4)}`).join(" · ")}</small>
-              {:else if res}
-                <small>{t("ui.train_family_no_figure")}</small>
-              {/if}
-            </dd>
             {#if worm && res}
               <dt>{t("ui.train_lead_angle")}</dt>
               <dd>
@@ -2396,30 +2405,6 @@
                 <small>{t("ui.train_lead")} {num(res.members[0].lead, 4)} mm</small>
               </dd>
             {/if}
-            <dt>{t("ui.train_efficiency")}</dt>
-            <dd>
-              {bothWays(res?.efficiency ?? undefined)}
-              {#if lockedWays(res?.efficiency ?? undefined)}
-                <small class="warn">{lockedWays(res?.efficiency ?? undefined)}</small>
-              {/if}
-            </dd>
-            <!-- The power the teeth pass, as a multiple of the power in:
-                 one on a pair, and where it is many the stage's loss is
-                 the meshes' loss that many times over. -->
-            <dt>{t("ui.train_circulation")}</dt>
-            <dd>
-              {res?.circulation ? t("ui.train_circulation_both", { forward: num(res.circulation.forward, 2), backward: num(res.circulation.backward, 2) }) : BLANK}
-              <small>{t("ui.train_note_circulation")}</small>
-            </dd>
-            <!-- The two bodies the same two plays are seen from: driving
-                 forward the play is read at the output, and driving backward
-                 at the shaft that was the input. -->
-            <dt>{t("ui.train_backlash")}</dt>
-            <dd>
-              {t("ui.train_backlash_at_output_shaft")}: {num(res?.backlash?.forward.nominal, 5)}{res?.backlash ? "°" : BLANK}
-              <small>{range(num(res?.backlash?.forward.minimum, 5), num(res?.backlash?.forward.maximum, 5))}</small>
-              · {t("ui.train_backlash_at_input_shaft")}: {num(res?.backlash?.backward.nominal, 5)}{res?.backlash ? "°" : BLANK}
-            </dd>
             <!-- **The bodies that are not gears.** A member's card prints its
                  own speed and torque; a carrier is the one body a reader can
                  see nothing of, and it is regularly the input or the output. -->
@@ -2586,12 +2571,8 @@
   .train .paths h4 {
     margin: 0;
   }
-  .train .paths td.name {
-    text-align: left;
-    color: var(--muted);
-  }
-  .train .paths table.cases {
-    margin-top: 0.3rem;
+  .train .paths h4.path {
+    margin-top: 0.75rem;
   }
   .grid {
     display: grid;
@@ -2874,8 +2855,9 @@
     width: max-content;
     max-width: 12rem;
   }
-  /* One mesh's readout, sitting under its heading. */
-  h4.mesh {
+  /* One mesh's readout, or one path's, sitting under its heading. */
+  h4.mesh,
+  h4.path {
     margin: 0.75rem 0 0;
   }
   .out.indent {
@@ -2885,7 +2867,8 @@
      section keeps the standard gap. Written as the adjacency it is, rather than
      folded into `.indent`, which is about the inset and says nothing about what
      comes above. */
-  h4.mesh + .out {
+  h4.mesh + .out,
+  h4.path + .out {
     margin-top: 0.2rem;
   }
   .out dt {
@@ -3058,7 +3041,6 @@
     margin-left: 0;
   }
   .teeth,
-  .ratio,
   .eff {
     color: var(--muted);
     font-size: 0.8rem;

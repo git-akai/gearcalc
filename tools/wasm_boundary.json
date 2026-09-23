@@ -3425,23 +3425,23 @@
    "ok": [
     [
      "en",
-     499
+     492
     ],
     [
      "de",
-     499
+     492
     ],
     [
      "pt",
-     499
+     492
     ],
     [
      "zh-Hans",
-     499
+     492
     ],
     [
      "zh-Hant",
-     499
+     492
     ]
    ]
   },
@@ -18539,31 +18539,6 @@
        ],
        "stages": [
         {
-         "ratio": "-2.5294117647058822",
-         "ratio_per_tooth": [
-          "-2.3888888888888888",
-          "-2.5882352941176472"
-         ],
-         "efficiency": {
-          "forward": "0.98344976317774946",
-          "backward": "0.98344976317774968"
-         },
-         "circulation": {
-          "forward": 1,
-          "backward": 1
-         },
-         "backlash": {
-          "forward": {
-           "nominal": "0.038950392978169060",
-           "minimum": 0,
-           "maximum": "0.078094292479929425"
-          },
-          "backward": {
-           "nominal": "0.098521582238898203",
-           "minimum": 0,
-           "maximum": "0.19753262215511561"
-          }
-         },
          "distances": [
           {
            "nominal": [
@@ -18954,10 +18929,6 @@
          ],
          "meshes": [
           {
-           "power_through": {
-            "forward": 1,
-            "backward": 1
-           },
            "coprime": true,
            "contact_ratio": "1.5993089920130348",
            "efficiency": {
@@ -19466,31 +19437,6 @@
        ],
        "stages": [
         {
-         "ratio": "-2.5294117647058822",
-         "ratio_per_tooth": [
-          "-2.3888888888888888",
-          "-2.5882352941176472"
-         ],
-         "efficiency": {
-          "forward": "0.98344976317774946",
-          "backward": "0.98344976317774968"
-         },
-         "circulation": {
-          "forward": 1,
-          "backward": 1
-         },
-         "backlash": {
-          "forward": {
-           "nominal": "0.038950392978169060",
-           "minimum": 0,
-           "maximum": "0.078094292479929425"
-          },
-          "backward": {
-           "nominal": "0.098521582238898203",
-           "minimum": 0,
-           "maximum": "0.19753262215511561"
-          }
-         },
          "distances": [
           {
            "nominal": [
@@ -19881,10 +19827,6 @@
          ],
          "meshes": [
           {
-           "power_through": {
-            "forward": 1,
-            "backward": 1
-           },
            "coprime": true,
            "contact_ratio": "1.5993089920130348",
            "efficiency": {
@@ -19977,32 +19919,6 @@
          "notes": []
         },
         {
-         "ratio": 7,
-         "ratio_per_tooth": [
-          "6.5384615384615383",
-          7,
-          "7.0833333333333330"
-         ],
-         "efficiency": {
-          "forward": "0.97681810454630269",
-          "backward": "0.97672819043691805"
-         },
-         "circulation": {
-          "forward": "1.6957583035698947",
-          "backward": "1.7161590352405902"
-         },
-         "backlash": {
-          "forward": {
-           "nominal": "0.041723951389364244",
-           "minimum": "0.041723951389364244",
-           "maximum": "0.041723951389364244"
-          },
-          "backward": {
-           "nominal": "0.29206765972554971",
-           "minimum": "0.29206765972554971",
-           "maximum": "0.29206765972554971"
-          }
-         },
          "distances": [
           {
            "nominal": [
@@ -20587,10 +20503,6 @@
          ],
          "meshes": [
           {
-           "power_through": {
-            "forward": "0.85714285714285721",
-            "backward": "0.85569163387443548"
-           },
            "coprime": false,
            "contact_ratio": "1.4368913435664123",
            "efficiency": {
@@ -20680,10 +20592,6 @@
            "point": null
           },
           {
-           "power_through": {
-            "forward": "0.83861544642703745",
-            "backward": "0.86046740136615463"
-           },
            "coprime": false,
            "contact_ratio": "1.9726210851406283",
            "efficiency": {

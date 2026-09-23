@@ -1585,14 +1585,15 @@ mod hula {
         let by_mesh: f64 = r
             .meshes
             .iter()
-            .map(|m| (1.0 - m.efficiency.forward) * m.power_through.forward)
+            .map(|m| (1.0 - m.efficiency.forward) * m.cases[0].power_through)
             .sum();
         assert!(
             (lost - by_mesh).abs() < 1e-9,
             "loss {lost} against the meshes' {by_mesh}"
         );
         assert!(
-            (r.meshes[0].power_through.forward + r.meshes[1].power_through.forward - through).abs()
+            (r.meshes[0].cases[0].power_through + r.meshes[1].cases[0].power_through - through)
+                .abs()
                 < 1e-12
         );
         // ...and each mesh passes about `R η` times the input, on the
@@ -1608,7 +1609,7 @@ mod hula {
         for r in [&r, &plain] {
             let expect = (r.ratio.unwrap() - 1.0).abs() * r.efficiency.unwrap().forward;
             for m in &r.meshes {
-                let got = m.power_through.forward;
+                let got = m.cases[0].power_through;
                 assert!(
                     (got - expect).abs() / expect < 0.05,
                     "{} : 1 keeping {}: a mesh passes {got}× against about {expect}×",

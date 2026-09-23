@@ -413,7 +413,13 @@ after it is close to concatenation.
   `ShapeResult` its five figures, and `MeshReport` its lone-motion power.
   The panel's stage header and results read the paths instead. *Diff:
   every file that printed stage figures changes form; `graph.txt`, which
-  never printed them, not at all.*
+  never printed them, not at all.* **Done**: `unit_motion`, `UnitMotion`,
+  `engagements` and the two notes only the lone motion raised went with
+  it; the stage cards show no figure, and the paths list each path's
+  figures down the page, one more tooth named gear by gear across the
+  train. `a_stage_is_a_path` became `a_path_is_what_it_crosses` — a stage
+  in a chain is the same stage alone — and tests that read a stage's
+  figures in a train ask the path across its ends (`tests::across`).
 - **3d — one solve over the graph.** `Train::graph()` flattens the stages,
   axes merged wherever a body is shared, and `solve_train` solves it once;
   per-stage results are sliced back out for the result still shaped by

@@ -451,6 +451,19 @@ fn report(name: &str, train: &Train, r: &TrainResult) {
             p.backlash.forward.nominal,
             p.backlash.backward.nominal,
         );
+        // What the teeth pass over what comes in, both ways, and what one
+        // more tooth on each gear would make the ratio, gears numbered
+        // across the train.
+        println!(
+            "    power through the teeth {:>10.6} / {:<10.6}   one more tooth: {}",
+            p.circulation.forward,
+            p.circulation.backward,
+            p.per_tooth
+                .iter()
+                .map(|r| r.map_or_else(|| "locked".to_string(), |r| format!("{r:.6}")))
+                .collect::<Vec<_>>()
+                .join(" ")
+        );
     }
     if r.paths.is_empty() {
         println!("  no path: the train's holds leave its motion a family");
@@ -486,33 +499,7 @@ fn report(name: &str, train: &Train, r: &TrainResult) {
         }
     }
     for (k, s) in r.stages.iter().enumerate() {
-        println!(
-            "  stage {}  ratio {:>14.6}   efficiency {:>10.6} / {:<10.6} %   backlash {:>10.6} / {:<10.6} deg",
-            k + 1,
-            crate::or_nan(s.ratio()),
-            100.0 * crate::ways_or_nan(s.efficiency()).forward,
-            100.0 * crate::ways_or_nan(s.efficiency()).backward,
-            crate::play_or_nan(s.backlash()).forward.nominal,
-            crate::play_or_nan(s.backlash()).backward.nominal,
-        );
-        // What the teeth pass over what comes in, both ways, and what one
-        // more tooth on each member would make the ratio — the two figures
-        // Phase 7 added, recorded so their path is known to be walked.
-        {
-            let shape = s;
-            println!(
-                "    power through the teeth {:>10.6} / {:<10.6}   one more tooth on each member: {}",
-                crate::ways_or_nan(shape.circulation).forward,
-                crate::ways_or_nan(shape.circulation).backward,
-                shape
-                    .ratio_per_tooth
-                    .iter()
-                    .flatten()
-                    .map(|r| r.map_or_else(|| "locked".to_string(), |r| format!("{r:.6}")))
-                    .collect::<Vec<_>>()
-                    .join(" ")
-            );
-        }
+        println!("  stage {}", k + 1);
         for (label, cases) in slot_cases(&train.stages[k], s) {
             for (case, speed, torque) in cases {
                 println!(

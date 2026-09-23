@@ -1297,7 +1297,7 @@ A load entering at a port is not a sign on the other port's torque. It enters
 at its own end, and the question it raises is not "how big is it" but "what
 holds it".
 
-The flow that answers it is the one the stage's efficiency is read from
+The flow that answers it is the one a path's efficiency is read from
 (`train::flow`): every mesh's driver is whichever side the power comes across
 it from, its driven side carries the driver's torque under that direction's
 `η`, and a mesh that cannot be driven that way — a self-locking worm from its
@@ -1492,7 +1492,7 @@ replicated axis rather than left in a document.
 
 A ring whose cut leaves no fillet has no notch, so no `ρ_f`, so no bending
 number. Its geometry is not in doubt — it draws, it exports and it meshes — and
-neither is anything else the stage reports: the ratio, both contact stresses,
+neither is anything else reported: the ratios, both contact stresses,
 the efficiencies, the cycles, and the other members' bending are all still
 answerable. So the missing input costs the one figure that needed it.
 

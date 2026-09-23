@@ -1568,7 +1568,7 @@ mod tests {
     ///
     /// It is live code with a live message, so it is not deleted on suspicion.
     ///
-    /// # One left this list, and how it got on it
+    /// # Those that left this list, and how one got on it
     ///
     /// `ring_addendum_clamped` was here on the reading that "the set
     /// solves its ring's addendum, so it does not normally hand it one that
@@ -1587,47 +1587,14 @@ mod tests {
     ///
     /// *A case that cannot solve is not a case*, and an `if let Ok` around one
     /// is how it stays that way quietly.
-    /// - `error.train_no_power_flow` — a stage with no self-consistent power
-    ///   flow. The site is live (`train::shape`, the **forward** flow) and the
-    ///   message is right; what no design reaches is that flow refusing.
     ///
-    ///   `flow::solve` is asked twice by a stage: once forward at unit speed
-    ///   and unit torque, and once backward with the output as the input. Only
-    ///   the first is a refusal; the second is a `map_or(0.0, …)`, because a
-    ///   stage that cannot be back-driven is self-locking and that is an
-    ///   *answer* rather than a refusal (`docs/reference.md#the-stage`). A
-    ///   genuinely driving input appears never to refuse: the flow is held to
-    ///   Pennestrì's closed form on every arrangement (`flow::tests`), and
-    ///   that form was swept over **1.1 million** combinations — sun 1…119
-    ///   against ring 1…249, `η₀` from 0.999 down to 0.3, all six arrangements
-    ///   — with no refusal at all, which
-    ///   `planetary::tests::a_driving_input_always_has_a_flow` holds in the
-    ///   crate rather than in a note. The one mesh that can lock, the
-    ///   crossed-axis one, does not refuse the flow either: a mesh with no
-    ///   efficiency in a direction **holds** — its driver presses the flanks
-    ///   and its driven side takes nothing — which is a flow with an
-    ///   efficiency of nought rather than none (`train::flow`).
-    ///
-    ///   So it is an exemption with a reason rather than a hole: the ways the
-    ///   flow can refuse are an input that does not turn, which the motion
-    ///   solve has already refused as undetermined, and no assignment of
-    ///   directions confirming itself, which is the back-driven case the other
-    ///   call site already treats as an answer.
-    /// - `error.train_stage_undetermined` — a stage whose boundary leaves
-    ///   its motion undetermined. A train no longer produces one: a boundary
-    ///   that is a family is a stage with no figures of its own rather than
-    ///   a refusal, and a boundary that contradicts itself is named at the
-    ///   hold that closed it (`Train::boundaries`) — a stage asked alone
-    ///   included, since that is a train of one now (`Train::alone`) and its
-    ///   contradictions are the train's to name. What still raises it is
-    ///   `Wiring::unit_motion` asked directly, and its one caller is the
-    ///   stage's own no-load motion, once that motion is known to be unique.
-    ///   Live, and kept until that motion goes.
-    const UNFIRED: &[&str] = &[
-        "clamp.ring_fully_filleted",
-        "error.train_no_power_flow",
-        "error.train_stage_undetermined",
-    ];
+    /// Two more left by losing their sites rather than by firing.
+    /// `error.train_no_power_flow` and `error.train_stage_undetermined` were
+    /// each raised by a stage's own motion — its flow under its convention,
+    /// and a boundary that left it undetermined — and a stage has had no
+    /// motion of its own since its figures became a path's. A note with no
+    /// site is not live code, so they went with the sites, not onto this list.
+    const UNFIRED: &[&str] = &["clamp.ring_fully_filleted"];
 
     #[test]
     fn a_document_that_is_not_a_catalogue_is_refused() {

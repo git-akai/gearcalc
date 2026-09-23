@@ -335,9 +335,12 @@ mesh's tips would cross at it — or, where a far-side gap was asked, the least
 distance that gives it, the shifts following: the hula stage's crank, sized
 by the shape for every arrangement with an internal mesh, and held to the
 figures its own solver recorded before it retired.
-Two figures the graph makes free are reported beside the ratio and the
-efficiency: what one more tooth on each member would make the ratio, and
-the power through the teeth over the power in, per mesh and summed. A load
+Two figures the graph makes free are reported on every path beside its
+ratio and efficiency: what one more tooth on each gear would make the
+ratio, and the power through the teeth over the power in — summed on the
+path, and per mesh in each case. A stage has no figure of its own: what it
+had was a second motion under its own convention, and it went once a law
+held it to the path across the stage's ends. A load
 on a body two stages share goes the way that holds it, and is refused only
 where it would be held at both ends.
 Retiring the stage types into it moved four figures, each recorded in
@@ -511,7 +514,7 @@ stresses; the shared pitch-point figure is reported at the mesh. An automatic
 width answers to the mesh, not to one gear, and so does the width a member is
 *rated* at — the narrower face carries the pair, so that is the width the load
 is spread over. A load from either port is carried toward the other by one
-walk, attenuated by each stage's efficiency in the direction it travels, and
+walk, attenuated by each mesh's efficiency in the direction it travels, and
 finds the stage that holds it — a self-locking worm from the end, a
 forward-locked crossed pair from the start — or the far end, or reports that
 nothing does. A reversing intermittent duty rounds its cycles within one
@@ -735,26 +738,26 @@ whose size is unmeasured is a debt still owed, and is marked as one.
 
 ---
 
-## Two notes nothing can fire
+## A note nothing can fire
 
-Live code with a live message, so neither is deleted on suspicion. Both are
-named in `strings.rs`'s `UNFIRED` with their evidence.
+Live code with a live message, so it is not deleted on suspicion. It is
+named in `strings.rs`'s `UNFIRED` with its evidence.
 
 - `clamp.ring_fully_filleted` — searched for over 71 750 ring/cutter
   combinations and never fired. `ShaperCut` already refuses a tool whose rounds
   overlap, which may shadow it entirely.
-- `error.train_no_power_flow` — a stage with no self-consistent power flow.
-  The site is live (the shape's forward flow) and the message is right; what
-  no design reaches is that flow refusing. A stage asks `flow::solve` twice,
-  and only the forward call is a refusal — the backward one treats a stage
-  that cannot be back-driven as an answer, and a mesh with no efficiency in
-  a direction *holds* rather than refusing. The flow is held to Pennestrì's
-  closed form on every arrangement, and that form never refused a driving
-  input across **1.1 million** combinations;
-  `planetary::tests::a_driving_input_always_has_a_flow` holds that in the
-  crate rather than in this sentence.
 
-A second used to be listed here — `ring_addendum_clamped`, on the reading that
+Two more were listed here and left with their sites. `error.train_no_power_flow`
+was raised when a stage's forward flow refused, and
+`error.train_stage_undetermined` when a stage's boundary left its motion
+undetermined. Both belonged to a stage's own motion, which went when a stage's
+figures became a path's. The first was never fired: the flow is held to
+Pennestrì's closed form on every arrangement, and that form never refused a
+driving input across **1.1 million** combinations, which
+`planetary::tests::a_driving_input_always_has_a_flow` still holds for the flow
+every path and case asks.
+
+One more used to be listed here — `ring_addendum_clamped`, on the reading that
 a set solves its own ring addendum — and it fires on 441 of the 1 482 sets a
 sweep can solve ([corrections](corrections.md)). The sweep that was cited had
 five cases aimed at it, every one of which failed to solve inside an `if let

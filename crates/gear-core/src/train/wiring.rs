@@ -64,7 +64,6 @@
 use super::StageGear;
 use crate::kinematics::{Body, MeshRow, System};
 use crate::mesh::MeshKind;
-use crate::ratio::Ratio;
 
 /// **What a body is**, structurally — which is the only thing `gear-core` may
 /// say about it, a name being a word the application shows.
@@ -150,7 +149,7 @@ pub struct MeshSpec {
     /// How many parallel instances of this mesh the stage has — the planet
     /// count. It changes no speed and no ratio, every instance being identical;
     /// it is what a member's engagements are counted over
-    /// ([`super::engagements`]).
+    /// (a member's cycles, in [`super::shape::solve_shape`]).
     pub paths: u32,
 }
 
@@ -182,12 +181,6 @@ pub enum WiringError {
     /// A member or body index a wiring names and does not have, or a gear
     /// meshing itself. A preset's defect rather than a design's.
     NotAMesh(usize),
-    /// **The stage's boundary does not determine its motion**, or contradicts
-    /// it: too few of its bodies held or driven for one answer, or two
-    /// conditions that cannot both hold. A train with mobility above one is
-    /// answered with a family at the train level; a *stage* solve wants one
-    /// motion to rate under, and this says the boundary did not give it one.
-    Unsolvable,
 }
 
 impl Wiring {
@@ -283,55 +276,6 @@ impl Wiring {
         Ok(())
     }
 
-    /// **Every member's motion at one turn of this stage's input**, from the
-    /// topology, the tooth counts and what the stage is asked
-    /// ([`super::StageBoundary`]) — and nothing else.
-    ///
-    /// No module, no shift, no material: a stage that will not close still
-    /// turns, and this is what can be asked of it either way.
-    ///
-    /// # Errors
-    ///
-    /// As [`Self::alone`], or [`WiringError::Unsolvable`] where the boundary
-    /// leaves the stage's motion undetermined or contradicts its structure.
-    pub fn unit_motion(
-        &self,
-        teeth: &[u32],
-        boundary: &super::StageBoundary,
-    ) -> Result<UnitMotion, WiringError> {
-        let system = self.alone(teeth)?;
-        let solution = system
-            .motion(&boundary.conditions)
-            .map_err(|_| WiringError::Unsolvable)?;
-        if !solution.is_unique() {
-            return Err(WiringError::Unsolvable);
-        }
-        let input = solution.values[boundary.input].to_f64();
-        let members = self
-            .mounts
-            .iter()
-            .enumerate()
-            .map(|(i, mount)| {
-                let speed = solution.values[mount.spins_with];
-                let frame = solution.values[mount.axis_fixed_in];
-                MemberMotion {
-                    speed,
-                    against_frame: speed.checked_sub(frame).unwrap_or(Ratio::ZERO),
-                    engagements: crate::train::engagements(
-                        speed.to_f64(),
-                        frame.to_f64(),
-                        input,
-                        f64::from(self.paths_seen(i)),
-                    ),
-                }
-            })
-            .collect();
-        Ok(UnitMotion {
-            members,
-            output: solution.values[boundary.output],
-        })
-    }
-
     /// The system for this stage on its own, against its own ground.
     ///
     /// # Errors
@@ -341,62 +285,6 @@ impl Wiring {
         let mut system = System::new(self.slots.len());
         self.add_to(&mut system, teeth, |slot| slot)?;
         Ok(system)
-    }
-}
-
-/// **What one member does at one turn of its stage's input body.**
-///
-/// The one place a stage's speeds come from. Three stage types each worked these out
-/// for themselves — a pair from its tooth-count ratio, a set from
-/// `planetary::power`, a hula stage from the two products — and between them
-/// they disagreed about *sign*: a pair's second member came back positive while
-/// turning backwards, so the output member of one stage and the input member of
-/// the next reported opposite signs for one physical body.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct MemberMotion {
-    /// Turns per turn of the stage's input — **signed**, so a member that runs
-    /// backwards says so, and **exact**, so a case's speed is rounded once
-    /// when it is scaled by it ([`Ratio::scale`]) rather than twice.
-    pub speed: Ratio,
-    /// ...against the frame of its mesh, which is what its teeth see. A pair's
-    /// frame is ground and this is its own speed; a held ring's is **not zero**
-    /// while its speed is.
-    pub against_frame: Ratio,
-    /// How often it is engaged per turn of the stage's input — its motion
-    /// against its frame, over the paths its own teeth meet
-    /// ([`Wiring::paths_seen`]).
-    pub engagements: f64,
-}
-
-/// **Everything a stage's motion comes to at one turn of its input**: each
-/// member's, and the stage's own reduction.
-///
-/// The reduction is here rather than derived from the members because a
-/// stage's output is a **body**, and a body need not carry a gear — an
-/// epicyclic set's output is its carrier, which no member spins with. Reading
-/// "the last member's speed" for it is right on a pair and wrong on a set, and
-/// this type exists because that was written twice before it was noticed.
-#[derive(Clone, Debug, PartialEq)]
-pub struct UnitMotion {
-    /// One per member, in [`super::ShapeResult::members`] order.
-    pub members: Vec<MemberMotion>,
-    /// The output body's speed, turns per turn of the input — the wiring's
-    /// `output`, whatever sits on it.
-    pub output: Ratio,
-}
-
-impl UnitMotion {
-    /// **The stage's reduction**: input turns per output turn, signed. An
-    /// external pair's output turns the other way and its ratio says so;
-    /// infinity where the output does not turn, which is what two meshes
-    /// cancelling is.
-    ///
-    /// One reading, where `ShapeResult::ratio()` used to mean three: `z₂/z₁`
-    /// on a pair, a magnitude; the Willis answer on a set, signed; the two
-    /// products on a hula stage.
-    #[must_use]
-    pub fn ratio(&self) -> f64 {
-        self.output.recip().map_or(f64::INFINITY, Ratio::to_f64)
     }
 }
 

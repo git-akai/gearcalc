@@ -68,7 +68,9 @@ fn play_or_nan(
 /// print them by the names a pair has. Nothing in the core has this shape
 /// any more; a stage's result is a shape's ([`gear_core::train::shape`]).
 struct Pair<'a> {
-    ratio: f64,
+    /// The path's across it, where the pair is asked alone; a stage of a
+    /// longer train has none of its own, and its paths are the train's.
+    ratio: Option<f64>,
     centre_distance: f64,
     clearance: f64,
     mesh: &'a gear_core::train::MeshReport,
@@ -76,15 +78,15 @@ struct Pair<'a> {
     notes: &'a [gear_core::note::Note],
 }
 
-/// The pair a shape's result is, where it is one.
-fn pair(r: &gear_core::train::ShapeResult) -> Option<Pair<'_>> {
-    let s = r;
+/// The pair a shape's result is, where it is one, with the ratio of the path
+/// across it where there is one.
+fn pair(s: &gear_core::train::ShapeResult, ratio: Option<f64>) -> Option<Pair<'_>> {
     if s.members.len() != 2 || s.meshes.len() != 1 {
         return None;
     }
     let d = s.distances.first()?;
     Some(Pair {
-        ratio: or_nan(s.ratio),
+        ratio,
         centre_distance: d.running,
         clearance: d.clearance,
         mesh: &s.meshes[0],
@@ -115,7 +117,7 @@ struct SetView<'a> {
 }
 
 /// The set a shape's result is, where it is one.
-fn set_view(r: &gear_core::train::ShapeResult) -> Option<SetView<'_>> {
+fn set_view(r: &gear_core::train::Alone) -> Option<SetView<'_>> {
     let s = r;
     if s.members.len() != 3 || s.meshes.len() != 2 {
         return None;
@@ -182,7 +184,7 @@ struct HulaView<'a> {
 /// The hula stage a shape's result is.
 fn hula_view<'a>(
     stage: &'a gear_core::train::Shape,
-    r: &'a gear_core::train::ShapeResult,
+    r: &'a gear_core::train::Alone,
 ) -> Option<HulaView<'a>> {
     let shape = stage;
     let s = r;
@@ -1163,7 +1165,7 @@ fn hula_band(z0: u32, clearance_in_modules: f64) {
                         continue;
                     }
                     if best.as_ref().is_none_or(|(_, _, _, _, b)| {
-                        ways_or_nan(r.efficiency()).forward > ways_or_nan(b.efficiency()).forward
+                        ways_or_nan(r.efficiency).forward > ways_or_nan(b.efficiency).forward
                     }) {
                         best = Some((x, cutter, addendum, as_stage, r));
                     }
@@ -1480,7 +1482,7 @@ fn shifts_report(z1: u32, z2: u32) {
         eprintln!("that pair has no answer");
         return;
     };
-    let (Some(floor), Some(best)) = (pair(&floor), pair(&best)) else {
+    let (Some(floor), Some(best)) = (pair(&floor, floor.ratio), pair(&best, best.ratio)) else {
         eprintln!("that stage is not a pair");
         return;
     };
@@ -1519,7 +1521,7 @@ fn shifts_report(z1: u32, z2: u32) {
         let a = tight + (free_at - tight) * f64::from(k) / 6.0;
         match solved(true, Some(a)) {
             Ok(r) => {
-                let p = pair(&r).expect("a pair");
+                let p = pair(&r, r.ratio).expect("a pair");
                 row(&format!("{a:.4}"), &p);
                 said(&p);
             }
@@ -1547,7 +1549,7 @@ fn shifts_report(z1: u32, z2: u32) {
         let a = tight + (free_at - tight) * f64::from(k) / 3.0;
         match solved(false, Some(a)) {
             Ok(r) => {
-                let p = pair(&r).expect("a pair");
+                let p = pair(&r, r.ratio).expect("a pair");
                 row(&format!("{a:.4}"), &p);
                 said(&p);
             }
@@ -1656,7 +1658,7 @@ fn epicyclic_shifts_report() {
                     n,
                     members[0].profile_shift,
                     members[1].profile_shift,
-                    100.0 * ways_or_nan(r.efficiency()).forward,
+                    100.0 * ways_or_nan(r.efficiency).forward,
                     members.iter().all(|g| g.clamps.is_empty())
                 );
             }
@@ -1853,7 +1855,7 @@ fn train_report(mode: Option<&str>) {
     for (k, s) in r.stages.iter().enumerate() {
         // One report, and which contact it is decides the rows — the same
         // rows for every line contact and for every point.
-        match pair(s) {
+        match pair(s, None) {
             Some(res) => match res.mesh.line {
                 Some(line) => print_line_pair(k, kind_name(&train.stages[k]), &res, &line),
                 None => print_point_pair(k, kind_name(&train.stages[k]), &res, res.mesh),
@@ -1954,18 +1956,24 @@ fn print_gear_cases(cases: &[gear_core::train::GearCase]) {
 }
 
 /// A pair with its bodies parallel: line contact, a bending rating.
+/// A pair's ratio where it has one of its own, as the stage line prints it.
+fn ratio_of(s: &Pair) -> String {
+    s.ratio
+        .map_or_else(String::new, |r| format!("  ratio {r:.4}"))
+}
+
 fn print_line_pair(k: usize, kind: &str, s: &Pair, line: &gear_core::train::LineContact) {
     let mesh = s.mesh;
     let helix = s.gears[0].helix_angle;
     let ratios = &line.contact_ratios;
     println!(
-        "\nstage {}  {}  z {}/{}  beta {} deg  ratio {:.4}  a_w {:.4} mm{}",
+        "\nstage {}  {}  z {}/{}  beta {} deg{}  a_w {:.4} mm{}",
         k + 1,
         kind,
         s.gears[0].params.teeth,
         s.gears[1].params.teeth,
         helix,
-        s.ratio,
+        ratio_of(s),
         s.centre_distance,
         if mesh.coprime { "  coprime" } else { "" }
     );
@@ -2025,12 +2033,12 @@ fn kind_name(stage: &gear_core::train::Shape) -> &'static str {
 /// A pair with its shafts crossed: point contact, two efficiencies.
 fn print_point_pair(k: usize, kind: &str, s: &Pair, m: &gear_core::train::MeshReport) {
     println!(
-        "\nstage {}  {}  z {}/{}  ratio {:.4}  a {:.4} mm  lead angle {:.4} deg",
+        "\nstage {}  {}  z {}/{}{}  a {:.4} mm  lead angle {:.4} deg",
         k + 1,
         kind,
         s.gears[0].params.teeth,
         s.gears[1].params.teeth,
-        s.ratio,
+        ratio_of(s),
         s.centre_distance,
         s.gears[0].lead_angle
     );
@@ -3077,12 +3085,12 @@ fn worm_stage_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, torque: 
             return;
         }
     };
-    let r = pair(&solved).expect("a worm stage is a pair");
+    let r = pair(&solved, solved.ratio).expect("a worm stage is a pair");
 
     println!(
         "worm stage  z {starts}/{wheel_teeth}  module {}  ratio {:.4}:1  a {:.4} mm",
         stage.members[0].normal_module(),
-        r.ratio,
+        or_nan(r.ratio),
         r.centre_distance
     );
     let m = point(&r);
@@ -3460,7 +3468,7 @@ fn crossed_report(z1: u32, z2: u32, shaft_angle: f64) {
                 g.wheel_helix_angle_rad.to_degrees()
             ),
             Ok(solved) => {
-                let r = pair(&solved).expect("a pair");
+                let r = pair(&solved, solved.ratio).expect("a pair");
                 any = true;
                 // **What a locked row says, in words**, printed under it rather
                 // than left to the reader to infer from a blank efficiency.
@@ -3536,7 +3544,7 @@ fn crossed_report(z1: u32, z2: u32, shaft_angle: f64) {
         ("least loss", &free),
     ] {
         match solve_pair(stage, 2.0, 0.0, &lib).map(|solved| {
-            let r = pair(&solved).expect("a pair");
+            let r = pair(&solved, solved.ratio).expect("a pair");
             (
                 r.gears[0].profile_shift,
                 r.gears[1].profile_shift,

@@ -2335,11 +2335,11 @@ angle, a given first pitch diameter, or a given overlap on the first mesh;
 propagated across each mesh as `β_b = −sign·β_a`; and sized from a given
 distance when every shift is pinned.
 
-**Loads.** Motion is solved first, on the tooth counts and topology alone,
-then the flow of power mesh by mesh with each mesh's loss in the direction it
-turns ([efficiency](#efficiency-parallel-axes) reproduces Pennestrì's
-`η₀^w` on every arrangement). Under a load case the stage is handed what the
-train's one flow put on its meshes and its bodies ([load
+**Loads.** The train's motion is solved first, on the tooth counts and
+topology alone, then its flow of power mesh by mesh with each mesh's loss in
+the direction it turns ([efficiency](#efficiency-parallel-axes) reproduces
+Pennestrì's `η₀^w` on every arrangement). Under a load case the stage is
+handed what that one flow put on its meshes and its bodies ([load
 cases](#load-cases)); a lone stage asked with a torque at its input or its
 output is a one-stage train with that load. Every mesh is pressed with its **driver's** force: where the
 driven member's torque is the one the row states, the flank sees it over
@@ -2350,25 +2350,18 @@ times the forward speed is positive where power enters, are the stage's
 `cases`. A backward case's signs follow that rule and not the forward case's:
 the body it enters by is the one whose product is positive.
 
-**What it reports.** The ratio, signed, and **the ratio one more tooth on
-each member would give** — the graph's exact answer at `z_i + 1`, which is
-where a tooth tells and where it does not: a planet's moves a set's ratio
-by nothing; the efficiency both ways, and **the power through the teeth**
-over the power in, per mesh and summed — one on a pair's mesh, `6/7` on a
-set's sun mesh with the ring held (the carrier carrying the rest bodily),
-and `η |R − 1|` on each of a hula's, which is where its efficiency goes:
-a stage's loss is each mesh's loss on the power crossing it, exactly, and
-the driving side's power is what the figure counts so that it is; the play
-at the output driven forward and at the input driven back, from the
-mechanism's play coefficients over every mesh's angular backlash at **its
-own** distance plus a helical member's axial slide, the band being every
-distance at the same end of its own tolerance; each distance's nominal per
-mesh, running and clearance; the layout of every replicated axis — count,
-even spacing, simultaneous meshing, tip clearance between neighbours at the
-radius the carrier holds it at; every body's speed and torque per case; and
-the members and meshes as any stage reports them. Every mesh's operating
-angle is the **running** mesh's, opened by the clearance, not the
-zero-backlash one.
+**What it reports.** Its geometry and its ratings, and **no figure of its
+own**: a ratio, an efficiency, a play and what one more tooth does are a
+path's ([trains](#trains)), read between two bodies a case names. A stage's
+were a second motion solved under a convention of its own, and a law held
+them to the path across its ends until nothing read them but the stage. So:
+each distance's nominal per mesh, running and clearance; the layout of every
+replicated axis — count, even spacing, simultaneous meshing, tip clearance
+between neighbours at the radius the carrier holds it at; every body's speed
+and torque per case; and the members and meshes as any stage reports them,
+each mesh with the power through it per case, over the power into the train.
+Every mesh's operating angle is the **running** mesh's, opened by the
+clearance, not the zero-backlash one.
 
 **The arrangements it reaches** with no code of their own are written down
 in `train/arrangements.rs` as lists of what sits where, through a builder
@@ -2480,7 +2473,21 @@ three is that stage's alone, where a product over the stages could not say
 so; and the **play** at the second driven from the first and the reverse,
 each mesh's own play through the kinematics' coefficients
 (`MeshReport::row_play`, `System::play`), so a mesh the path does not cross
-adds nothing. The two conventional ends — the first stage's input and the
+adds nothing — each mesh's angular backlash at **its own** distance plus a
+helical member's axial slide, the band being every distance at the same end
+of its own tolerance. Beside them, two figures the graph makes free: **the
+power through the teeth** over the power in, both ways — one across a
+pair, `6/7` across a set's sun mesh with the ring held (the carrier carrying
+the rest bodily), and `η |R − 1|` across each of a hula's, which is where its
+efficiency goes: a path's loss is each mesh's loss on the power crossing it,
+exactly, and the driving side's power is what the figure counts so that it
+is; and **the ratio one more tooth on each gear would give**, gears numbered
+across the train — the graph's exact answer at `z + 1`, which is where a
+tooth tells and where it does not: a planet's moves a set's ratio by
+nothing, and a gear off the path moves it only by locking it. **Whether a
+path breaks away** is its own flow against every mesh's static friction
+([the friction balance](#the-friction-balance)), since a train can hold at
+rest where none of its meshes does. The two conventional ends — the first stage's input and the
 last stage's output, where each is open — are the first row whether or not
 a case loads them, and are what a chain's total was; every other pair of
 open bodies is a path the graph could answer and nobody asked about, and

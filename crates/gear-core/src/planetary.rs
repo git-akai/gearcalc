@@ -364,14 +364,15 @@ mod tests {
     ///
     /// [`power`] returns `None` three ways: a degenerate Willis coefficient, an
     /// input that is not driving (`T ω ≤ 0`), and neither sign of the rolling
-    /// power confirming itself. A stage asks it twice — forward at unit speed
-    /// and unit torque, and backward with the output's own reaction — and only
-    /// the second can refuse, which is self-locking and is an *answer*.
+    /// power confirming itself. A path asks the flow both ways — forward, and
+    /// backward with the output driving — and only the second can refuse,
+    /// which is self-locking and is an *answer*.
     ///
-    /// This is the standing evidence for that, and for
-    /// `gear_io::strings::UNFIRED`'s exemption of `error.train_no_power_flow`:
-    /// **an absence has a date**, and a note claiming one is worth less than a
-    /// sweep that fails if it stops being true. Sun against ring across the
+    /// This is the standing evidence for that. It was also the evidence for
+    /// a note a stage raised when its forward flow refused, which never fired
+    /// and went with the stage's own motion: **an absence has a date**, and
+    /// a note claiming one is worth less than a sweep that fails if it stops
+    /// being true. Sun against ring across the
     /// whole plausible range, `η₀` from near-lossless down to 0.3 — far below
     /// anything two involute meshes produce — and every arrangement.
     #[test]
