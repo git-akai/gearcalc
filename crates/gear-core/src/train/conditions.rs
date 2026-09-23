@@ -528,12 +528,33 @@ impl Train {
     /// [`MotionError::Empty`], or a stage whose wiring does not describe
     /// meshes.
     pub fn system(&self) -> Result<System, MotionError> {
+        self.system_counting(|_, _, z| z)
+    }
+
+    /// **The system with one gear a tooth larger** — gear `member` of stage
+    /// `stage` — which is what a path's *one more tooth* asks.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::system`].
+    pub fn system_raising(&self, stage: usize, member: usize) -> Result<System, MotionError> {
+        self.system_counting(|k, i, z| if (k, i) == (stage, member) { z + 1 } else { z })
+    }
+
+    fn system_counting(
+        &self,
+        count: impl Fn(usize, usize, u32) -> u32,
+    ) -> Result<System, MotionError> {
         if self.stages.is_empty() {
             return Err(MotionError::Empty);
         }
         let mut system = System::new(self.stage_bodies());
         for (k, stage) in self.stages.iter().enumerate() {
-            let teeth = super::teeth_of(stage.gears());
+            let teeth: Vec<u32> = super::teeth_of(stage.gears())
+                .into_iter()
+                .enumerate()
+                .map(|(i, z)| count(k, i, z))
+                .collect();
             stage
                 .wiring()
                 .add_to(&mut system, &teeth, |slot| self.port(k, slot))

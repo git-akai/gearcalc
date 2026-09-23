@@ -10,12 +10,14 @@
 //! would change form at that step, and a changed record cannot say whether
 //! a number moved with it. So this prints only what exists on both sides:
 //!
-//! - per path — each case's, from its load to its reaction;
+//! - per path — each case's, from its load to its reaction, with the power
+//!   through its teeth and what one more tooth on each gear does to it;
 //! - per case — every body's role, speed and torque;
 //! - per member, numbered across the train — its size and shift, and in
 //!   every case its torque, speed, cycles, stresses and least widths;
 //! - per mesh, numbered across the train — its operating angle, contact
-//!   ratios, efficiency both ways, play at each member, whether it hunts;
+//!   ratios, efficiency both ways, play at each member, whether it hunts,
+//!   and the power through it in every case;
 //! - per distance — where it runs and with what clearance;
 //! - the notes, by key.
 //!
@@ -102,6 +104,16 @@ fn report(name: &str, train: &Train, r: &TrainResult) {
             100.0 * p.efficiency.backward,
             p.backlash.forward.nominal,
             p.backlash.backward.nominal,
+        );
+        println!(
+            "    power through the teeth {:.6} / {:.6}   one more tooth: {}",
+            p.circulation.forward,
+            p.circulation.backward,
+            p.per_tooth
+                .iter()
+                .map(|r| opt(*r, 6))
+                .collect::<Vec<_>>()
+                .join(" "),
         );
     }
     for c in &r.cases {
@@ -192,6 +204,14 @@ fn report(name: &str, train: &Train, r: &TrainResult) {
             for n in &m.notes {
                 println!("    ! {}", n.key);
             }
+            println!(
+                "    power through, by case: {}",
+                m.cases
+                    .iter()
+                    .map(|c| format!("{:.6}", c.power_through))
+                    .collect::<Vec<_>>()
+                    .join(" / ")
+            );
         }
         for d in &s.distances {
             distance += 1;

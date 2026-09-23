@@ -2640,6 +2640,8 @@ struct PointMesh {
     locking_friction: Directional<f64>,
     /// One contact per load case, in the loads' order.
     contact: Vec<super::ContactPatch>,
+    /// The power through the mesh per load case, in the loads' order.
+    case_power: Vec<f64>,
     backlash: [super::Backlash; 2],
     row_play: [f64; 3],
     flank_interference: [bool; 2],
@@ -2729,9 +2731,11 @@ fn point_mesh_report(
             .iter()
             .zip(m.contact)
             .zip(&m.first_speed)
-            .map(|((c, contact), speed)| super::MeshCase {
+            .zip(m.case_power)
+            .map(|(((c, contact), speed), power_through)| super::MeshCase {
                 case: c.case,
                 contact,
+                power_through,
                 // **How fast the surfaces slide past each other**, which is a
                 // speed with no sign to it: a pair rubbing at 3 m/s rubs at
                 // 3 m/s whichever way round it is turning.
@@ -3843,6 +3847,10 @@ pub fn solve_shape_after(
         .map(|k| {
             let m = shape.meshes[k];
             let bm = &built.meshes[k];
+            let case_power: Vec<f64> = cases
+                .iter()
+                .map(|c| c.mesh_powers.get(k).copied().unwrap_or(0.0))
+                .collect();
             let (a, b) = (&built.members[m.a], &built.members[m.b]);
             let power_through = Directional {
                 forward: moving.forward.as_ref().map_or(0.0, |f| f.mesh_powers[k]),
@@ -3881,6 +3889,7 @@ pub fn solve_shape_after(
                                 })
                                 .collect()
                         }),
+                        case_power,
                         backlash,
                         row_play,
                         flank_interference: l
@@ -3911,6 +3920,7 @@ pub fn solve_shape_after(
                         efficiency,
                         locking_friction: p.locking_friction(face_of(k, &final_width)),
                         contact: rated_point[k].clone().unwrap_or_default(),
+                        case_power,
                         backlash,
                         row_play,
                         flank_interference: p.path.as_ref().map_or([true, true], |path| {

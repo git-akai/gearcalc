@@ -10,6 +10,15 @@ export type MeshCase = {
  */
 case: number, contact: ContactPatch, 
 /**
+ * **The power crossing this mesh, over the power the case puts in** —
+ * the train's flow's own figure ([`flow::Flow::mesh_powers`]): one on a
+ * pair's mesh, under one where a carrier carries part of it bodily,
+ * many times one where power circulates. A case's, since which power
+ * crosses a mesh is a question about where the load goes in, and a
+ * case is what says.
+ */
+power_through: number, 
+/**
  * Sliding speed at the pitch point, mm/s, at this case's speed — exactly
  * zero on parallel shafts, where [`MeshReport::sliding_ratio`] is.
  */

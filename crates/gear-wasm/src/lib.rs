@@ -2692,6 +2692,10 @@ mod tests {
         // One tooth more on this member leaves no mechanism, or locks it — a
         // Wolfrom's rings brought level — and a ratio of infinity is no figure.
         "ratio_per_tooth",
+        // ...and a path's, the same question asked of the train: one more
+        // tooth on a gear another stage shares a body with can lock that
+        // stage and take the path's motion with it.
+        "per_tooth",
         // An **external** mesh's tips meet on the line of centres or not at
         // all, so the three ways an internal mesh's teeth can foul are not
         // three answers of `false` there — they are questions that do not

@@ -25,4 +25,20 @@ efficiency: Directional<number>,
  * driving from `to`: every mesh's play through the kinematics' own
  * coefficients, so a mesh the path does not cross adds nothing.
  */
-backlash: Directional<Backlash>, };
+backlash: Directional<Backlash>, 
+/**
+ * **The power crossing the teeth, over the power in**, each way — the
+ * sum over the meshes the path loads of what each passes: one across a
+ * pair, under one where a carrier takes part of it bodily, many times
+ * one where power circulates, which is where such a path's efficiency
+ * goes ([`flow::Flow::circulation`]).
+ */
+circulation: Directional<number>, 
+/**
+ * **The ratio one more tooth on each gear would give**, gears numbered
+ * across the train — the graph's exact answer at `z_i + 1`, which is
+ * what a designer choosing counts wants beside the ratio: where a tooth
+ * moves it a lot, and where not at all. `None` where that one tooth
+ * leaves the path no motion or locks it.
+ */
+per_tooth: Array<number | null>, };

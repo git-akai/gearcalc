@@ -299,6 +299,13 @@ pub struct MeshCase {
     /// Index into the train's list of load cases.
     pub case: usize,
     pub contact: ContactPatch,
+    /// **The power crossing this mesh, over the power the case puts in** —
+    /// the train's flow's own figure ([`flow::Flow::mesh_powers`]): one on a
+    /// pair's mesh, under one where a carrier carries part of it bodily,
+    /// many times one where power circulates. A case's, since which power
+    /// crosses a mesh is a question about where the load goes in, and a
+    /// case is what says.
+    pub power_through: f64,
     /// Sliding speed at the pitch point, mm/s, at this case's speed — exactly
     /// zero on parallel shafts, where [`MeshReport::sliding_ratio`] is.
     pub sliding_velocity: f64,
@@ -431,6 +438,8 @@ pub(crate) struct LineMesh {
     pub efficiency: Directional<f64>,
     /// One contact per load case, in the loads' order.
     pub contact: Vec<ContactPatch>,
+    /// The power through the mesh per load case, in the loads' order.
+    pub case_power: Vec<f64>,
     pub backlash: [Backlash; 2],
     pub row_play: [f64; 3],
     pub flank_interference: [bool; 2],
@@ -468,9 +477,11 @@ pub(crate) fn line_mesh_report(cases: &[CaseLoad], m: LineMesh) -> MeshReport {
         cases: cases
             .iter()
             .zip(m.contact)
-            .map(|(l, contact)| MeshCase {
+            .zip(m.case_power)
+            .map(|((l, contact), power_through)| MeshCase {
                 case: l.case,
                 contact,
+                power_through,
                 sliding_velocity: 0.0,
             })
             .collect(),
@@ -3107,6 +3118,9 @@ pub struct CaseLoad {
     /// ([`flow::Flow::mesh_torques`]); and which member drives.
     pub mesh_torques: Vec<f64>,
     pub directions: Vec<Drive>,
+    /// Per mesh: the power crossing it over the power the case puts in —
+    /// the flow's [`flow::Flow::mesh_powers`].
+    pub mesh_powers: Vec<f64>,
     /// Per local body, ground first: rpm, and the torque this stage's
     /// meshes put on it — the external load at a port, what the stage
     /// delivers onward at a coupling.
@@ -3134,6 +3148,7 @@ impl CaseLoad {
             kind,
             mesh_torques: vec![0.0; meshes],
             directions: vec![Drive::Forward; meshes],
+            mesh_powers: vec![0.0; meshes],
             speeds: vec![0.0; shafts],
             torques: vec![0.0; shafts],
             turns: None,
@@ -3531,14 +3546,37 @@ fn paths_of(
         .iter()
         .flat_map(|s| s.meshes().iter().map(|m| m.row_play).collect::<Vec<_>>())
         .collect();
-    let efficiency = |from: Body, to: Body, speed: &[f64]| -> f64 {
+    // The flow driving `from` against `to`: its efficiency, and the power
+    // its meshes pass over the power in.
+    let flowing = |from: Body, to: Body, speed: &[f64]| -> (f64, f64) {
         flow::solve(
             shafts,
             body_meshes,
             speed,
             &flow::Asked::through(shafts, rep[from], speed[from].signum(), rep[to], &held),
         )
-        .map_or(0.0, |f| f.efficiency)
+        .map_or((0.0, 0.0), |f| (f.efficiency, f.circulation()))
+    };
+    // **One more tooth on each gear**, gears numbered across the train:
+    // the same motion asked of the system with that one count raised.
+    let per_tooth = |from: Body, to: Body| -> Vec<Option<f64>> {
+        let mut out = Vec::new();
+        for (k, stage) in train.stages.iter().enumerate() {
+            for i in 0..stage.members.len() {
+                let raised = train.system_raising(k, i).ok().and_then(|sys| {
+                    let mut c: Vec<Condition> = base.to_vec();
+                    c[from] = Condition::Drive(crate::ratio::Ratio::ONE);
+                    let s = sys.motion_in(&c, &[from]).ok()?;
+                    if !s.is_unique() {
+                        return None;
+                    }
+                    let (a, b) = (s.values[from].to_f64(), s.values[to].to_f64());
+                    (b != 0.0).then(|| a / b).filter(|r| r.is_finite())
+                });
+                out.push(raised);
+            }
+        }
+        out
     };
     // Play at `read` per unit of play in mesh `k`, with `from` and the held
     // bodies standing still — the stage's own construction, on the graph.
@@ -3579,18 +3617,24 @@ fn paths_of(
         if forward[b] == 0.0 || backward[a] == 0.0 {
             continue;
         }
+        let (ahead, astern) = (flowing(a, b, &forward), flowing(b, a, &backward));
         out.push(PathReport {
             from,
             to,
             ratio: forward[a] / forward[b],
             efficiency: Directional {
-                forward: efficiency(a, b, &forward),
-                backward: efficiency(b, a, &backward),
+                forward: ahead.0,
+                backward: astern.0,
             },
             backlash: Directional {
                 forward: backlash_at(b, a),
                 backward: backlash_at(a, b),
             },
+            circulation: Directional {
+                forward: ahead.1,
+                backward: astern.1,
+            },
+            per_tooth: per_tooth(a, b),
         });
     }
     out
@@ -3945,6 +3989,18 @@ pub struct PathReport {
     /// driving from `to`: every mesh's play through the kinematics' own
     /// coefficients, so a mesh the path does not cross adds nothing.
     pub backlash: Directional<Backlash>,
+    /// **The power crossing the teeth, over the power in**, each way — the
+    /// sum over the meshes the path loads of what each passes: one across a
+    /// pair, under one where a carrier takes part of it bodily, many times
+    /// one where power circulates, which is where such a path's efficiency
+    /// goes ([`flow::Flow::circulation`]).
+    pub circulation: Directional<f64>,
+    /// **The ratio one more tooth on each gear would give**, gears numbered
+    /// across the train — the graph's exact answer at `z_i + 1`, which is
+    /// what a designer choosing counts wants beside the ratio: where a tooth
+    /// moves it a lot, and where not at all. `None` where that one tooth
+    /// leaves the path no motion or locks it.
+    pub per_tooth: Vec<Option<f64>>,
 }
 
 /// What a train produces.
@@ -4429,6 +4485,7 @@ fn solve_train_under(
                 kind: case.kind,
                 mesh_torques: mine.iter().map(|&g| flow.mesh_torques[g]).collect(),
                 directions: mine.iter().map(|&g| flow.directions[g]).collect(),
+                mesh_powers: mine.iter().map(|&g| flow.mesh_powers[g]).collect(),
                 speeds: (0..w.slots.len())
                     .map(|l| speeds[train.port(k, l)])
                     .collect(),
@@ -10853,6 +10910,109 @@ mod tests {
             }
             for g in &spur(&r.stages[0]).members {
                 assert_eq!(g.face_width, 7.0);
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod a_stage_is_a_path {
+    //! **A stage's own figures are the path between its ends** — the law
+    //! that lets the lone-stage motion go (`train-graph-plan.md`, Phase 3).
+    //!
+    //! A stage reported its ratio, efficiency, backlash, the power through
+    //! its teeth and what one more tooth does, all from a second motion
+    //! solved under its own convention. The train reports the same five for
+    //! any path a case walks. So put a case on each stage's conventional
+    //! ends, alone and in every chain of two, and hold the two to each
+    //! other: where they agree everywhere, the second motion says nothing
+    //! the train does not.
+
+    use super::arrangements::StagePreset;
+    use super::*;
+
+    fn close(a: f64, b: f64) -> bool {
+        (a - b).abs() <= 1e-9 * a.abs().max(b.abs()).max(1.0)
+    }
+
+    /// Stage `k`'s figures against the path its conventional ends walk.
+    fn check(name: &str, stages: Vec<Shape>, k: usize, lib: &MaterialLibrary) {
+        let mut train = Train::chained(stages, |_| Vec::new());
+        let boundaries = train.boundaries().unwrap();
+        let (input, output) = (
+            train.port(k, boundaries[k].input),
+            train.port(k, boundaries[k].output),
+        );
+        train.load_cases = vec![LoadCase::ultimate(input, output, 2.0, 3000.0)];
+        let r = solve_train(&train, lib).unwrap();
+        let s = &r.stages[k];
+        let Some(ratio) = s.ratio else {
+            return; // a family: no figure on either side to hold
+        };
+        let path = r
+            .paths
+            .iter()
+            .find(|p| (p.from, p.to) == (input, output))
+            .unwrap_or_else(|| panic!("{name}: no path {input} -> {output}"));
+        assert!(
+            close(path.ratio, ratio),
+            "{name}: ratio {} vs {ratio}",
+            path.ratio
+        );
+        let (e, pe) = (s.efficiency.unwrap(), path.efficiency);
+        assert!(
+            close(pe.forward, e.forward) && close(pe.backward, e.backward),
+            "{name}: efficiency {pe:?} vs {e:?}"
+        );
+        let (b, pb) = (s.backlash.unwrap(), path.backlash);
+        assert!(
+            close(pb.forward.nominal, b.forward.nominal)
+                && close(pb.backward.nominal, b.backward.nominal),
+            "{name}: backlash {pb:?} vs {b:?}"
+        );
+        let (c, pc) = (s.circulation.unwrap(), path.circulation);
+        assert!(
+            close(pc.forward, c.forward) && close(pc.backward, c.backward),
+            "{name}: circulation {pc:?} vs {c:?}"
+        );
+        let offset: usize = train.stages[..k].iter().map(|s| s.members.len()).sum();
+        let mine = s.ratio_per_tooth.as_ref().unwrap();
+        for (i, want) in mine.iter().enumerate() {
+            let got = path.per_tooth[offset + i];
+            assert!(
+                match (got, *want) {
+                    (Some(a), Some(b)) => close(a, b),
+                    (None, None) => true,
+                    _ => false,
+                },
+                "{name}: one more tooth on member {i}: {got:?} vs {want:?}"
+            );
+        }
+        // ...and a gear of another stage leaves this path's ratio where it
+        // was — or takes its motion away altogether, which the stage alone
+        // could not see: one more tooth on a Wolfrom's ring can bring its
+        // two rings' counts together and lock it, and a stage after it
+        // shares the body it locks.
+        for (j, got) in path.per_tooth.iter().enumerate() {
+            if j < offset || j >= offset + mine.len() {
+                assert!(
+                    got.is_none_or(|g| close(g, ratio)),
+                    "{name}: gear {j} moved {got:?} from {ratio}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn every_stage_alone_and_in_every_pair_is_the_path_across_it() {
+        let lib = test_library();
+        for a in StagePreset::ALL {
+            check(&format!("{a:?}"), vec![a.build()], 0, &lib);
+            for b in StagePreset::ALL {
+                let name = format!("{a:?} then {b:?}");
+                check(&name, vec![a.build(), b.build()], 0, &lib);
+                check(&name, vec![a.build(), b.build()], 1, &lib);
             }
         }
     }
