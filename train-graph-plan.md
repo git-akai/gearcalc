@@ -581,6 +581,19 @@ drawn. Laws: every mesh at one centre, every body on one axis, and every
 body and every mesh said once in every case's flow, entered at the case's
 load.
 
+**Phase 7, step 2 — the list and the workspace.** Done, beside the cards
+until the workspace does all they do: the case strip (a chip per case; the
+one chosen is the case the flow and the workspace are shown for) and the
+path it walks; the list in its three groupings, the flow drawn down as the
+mockups draw it; and the workspace for the selection — a mesh as its two
+gears either side of the mesh and its axis distance, with what it comes to
+running down under them; a centre, a body (held and released there), an
+axis (its planets and their gap), a junction. The selection and the
+grouping are the tab's (decision 4). The workspace stands on the whole
+graph as one card (`wholePart`), so every field and relief hook it shares
+with the cards takes the graph's pieces by the graph's numbers; it lays
+itself out by its own width, three columns where there is room.
+
 **Phase 6 — results and the boundary.** `TrainResult` per member, mesh,
 distance, axis and path, with `topology` carrying the groupings;
 `relieve_stage` → `relieve`; `adopt_member` by member; bindings; the probe.

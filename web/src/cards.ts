@@ -69,6 +69,23 @@ export function relieveStage(view: Shape, just: Freedom | null, figures: Figure[
   relieveTrain(owner.train, just === null ? null : toGraph(owner.part, just), figures);
 }
 
+/** **The whole graph as one part** — every index its own — which is what
+ *  the workspace stands on: a selection is by the graph's index, so the
+ *  card view over this part hands every field snippet and relief hook the
+ *  graph's pieces under the graph's numbers. */
+export function wholePart(train: Train): Part {
+  const s = train.shape;
+  const upTo = (n: number) => Array.from({ length: n }, (_, i) => i);
+  return {
+    shape: s,
+    members: upTo(s.members.length),
+    meshes: upTo(s.meshes.length),
+    distances: upTo(s.distances.length),
+    axes: upTo(s.axes.length),
+    couplings: upTo(s.couplings.length),
+  };
+}
+
 /** Every card of a train, in the order the core deals its parts. */
 export function cardsOf(train: Train, topology: StagePorts[]): Shape[] {
   return topology.map((s) => cardView(train, s.part));

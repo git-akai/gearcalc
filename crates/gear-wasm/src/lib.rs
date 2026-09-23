@@ -807,6 +807,10 @@ pub struct TrainOutcome {
     /// **What each gear is**, read off the whole graph — sun, planet, ring,
     /// worm, wheel, or a gear by its number — by the graph's index.
     pub names: Vec<gear_core::train::shape::MemberName>,
+    /// **The graph's mesh groups** — the gears a run of meshes joins, which
+    /// share one module, one pressure angle and one axial contact ratio —
+    /// by the graph's indices ([`gear_core::train::Shape::mesh_groups`]).
+    pub mesh_groups: Vec<Vec<usize>>,
     /// **Each card's view of the result**, in the order the topology deals
     /// them ([`gear_core::train::TrainResult::cards`]) — the result laid
     /// back out in each part's own numbering by the core's one rule, so the
@@ -840,6 +844,7 @@ fn solve_train_impl(input: &str) -> Result<String, String> {
     let motion = req.train.motion_report();
     let groupings = req.train.groupings();
     let names = req.train.shape.member_names();
+    let mesh_groups = req.train.shape.mesh_groups();
     let outcome = match gear_core::train::solve_train(&req.train, &lib) {
         Ok(result) => TrainOutcome {
             figures: req
@@ -856,6 +861,7 @@ fn solve_train_impl(input: &str) -> Result<String, String> {
             flows: req.train.flows(&result),
             groupings,
             names,
+            mesh_groups,
             result: Some(result),
             failure: None,
             topology,
@@ -881,6 +887,7 @@ fn solve_train_impl(input: &str) -> Result<String, String> {
                 flows: Vec::new(),
                 groupings,
                 names,
+                mesh_groups,
             }
         }
     };

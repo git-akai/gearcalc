@@ -816,6 +816,7 @@ export function solveTrain(train: Train, materials?: MaterialLibrary): TrainOutc
       groupings: { centres: [], axes: [] },
       flows: [],
       names: [],
+      mesh_groups: [],
     };
   }
 }

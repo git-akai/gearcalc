@@ -68,6 +68,12 @@ flows: Array<Array<FlowRow>>,
  */
 names: Array<MemberName>, 
 /**
+ * **The graph's mesh groups** — the gears a run of meshes joins, which
+ * share one module, one pressure angle and one axial contact ratio —
+ * by the graph's indices ([`gear_core::train::Shape::mesh_groups`]).
+ */
+mesh_groups: Array<Array<number>>, 
+/**
  * **Each card's view of the result**, in the order the topology deals
  * them ([`gear_core::train::TrainResult::cards`]) — the result laid
  * back out in each part's own numbering by the core's one rule, so the

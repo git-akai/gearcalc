@@ -92,7 +92,35 @@ export interface TrainTab {
   /** Which load cases are expanded, by index — the same thing as `open`, for
    *  the other list the panel draws as an accordion. */
   openCases: Record<number, boolean>;
+  /** **What the reader is looking at** — the grouping the list is drawn in,
+   *  the case it is shown for, and the piece selected — kept on the tab like
+   *  `open`, so leaving a train and coming back finds the same thing
+   *  selected. Not an input: nothing here reaches the core or a file. */
+  view: TrainView;
 }
+
+/** **A piece of the train a reader can select**, by the graph's index — a
+ *  body by its number, a junction by its part, a case by its index. */
+export type Selection =
+  | { mesh: number }
+  | { body: number }
+  | { axis: number }
+  | { centre: number }
+  | { junction: number }
+  | { case: number };
+
+/** The three groupings the list is drawn in. */
+export type Grouping = "flow" | "centres" | "axes";
+
+export interface TrainView {
+  grouping: Grouping;
+  /** The case the flow and the workspace are shown for, by index. */
+  case: number;
+  selection: Selection | null;
+}
+
+/** A fresh view: the flow, the first case, nothing selected. */
+export const freshView = (): TrainView => ({ grouping: "flow", case: 0, selection: null });
 
 let nextId = 1;
 let nextTrainId = 1;
@@ -259,7 +287,7 @@ export const workspace = new Workspace();
 function freshTrain(name = t("ui.train_default_name")): TrainTab {
   // The stages closed, as the load cases are: each heading says what its
   // stage is, and a stage added by the menu opens itself.
-  return { id: nextTrainId++, name, train: defaultTrain(), open: {}, openCases: {} };
+  return { id: nextTrainId++, name, train: defaultTrain(), open: {}, openCases: {}, view: freshView() };
 }
 
 /** The geartrain tabs.
@@ -345,6 +373,7 @@ class Trains {
       train: r.ok.document.train,
       open: {},
       openCases: {},
+      view: freshView(),
     };
     this.tabs.push(t);
     this.importError = null;

@@ -36,7 +36,7 @@
     note,
     t,
   } from "./core";
-  import { trains, library, type TrainTab } from "./state.svelte";
+  import { trains, library, type TrainTab, type Selection, type Grouping } from "./state.svelte";
   import { exportTrain, relieveCase, editTrain } from "./core";
   import FieldNote from "./FieldNote.svelte";
   import Switch from "./Switch.svelte";
@@ -55,8 +55,9 @@
     memberRefs,
     isWorm,
     carried,
+    roleLabel,
   } from "./members";
-  import { cardsOf, relieveStage } from "./cards";
+  import { cardsOf, cardView, relieveStage, wholePart } from "./cards";
 
   /** **Resolving an over-determined stage is the core's rule, not this file's.**
    *
@@ -130,6 +131,70 @@
    *  the train has not solved, and the box keeps what it had. The train's,
    *  whichever card asks: relief is asked of the whole graph. */
   const figuresOf = (_stage: Shape): Figure[] => result.figures;
+
+  // ------------------------------------------- the list and the workspace
+
+  /** **The whole graph as one card** — what the workspace stands on: a
+   *  selection is by the graph's index, so every field snippet and relief
+   *  hook takes the graph's own pieces under the graph's own numbers. */
+  const graph = $derived(cardView(tab.train, wholePart(tab.train)));
+  /** The case the flow and the workspace are shown for — the view's, held
+   *  to the cases the train has. */
+  const shownCase = $derived(Math.max(0, Math.min(tab.view.case, tab.train.load_cases.length - 1)));
+  /** The shown case's flow, as the core walks it. */
+  const flow = $derived(result.flows[shownCase] ?? []);
+  /** **A gear by the graph's index**: its role and its number — "Sun (9)" —
+   *  or, where the number is its name, "Gear 3". */
+  const gearName = (i: number): string => {
+    const role = roleLabel(result.names[i]);
+    const number = String(i + 1);
+    return role === null
+      ? t("ui.train_gear_name", { number })
+      : t("ui.train_member_numbered", { name: role, number });
+  };
+  const meshName = (k: number): string => {
+    const m = tab.train.shape.meshes[k];
+    return m === undefined ? "" : `${gearName(m.a)} ⇄ ${gearName(m.b)}`;
+  };
+  /** The gears fixed to a body, by the graph's index. */
+  const gearsOn = (body: number): number[] =>
+    tab.train.shape.members.flatMap((m, i) => (m.body === body ? [i] : []));
+  const axisLabel = (a: number) => t("ui.train_axis_name", { number: String(a + 1) });
+  /** **What a body does in the case shown**: its speed, and the torque a load
+   *  or a reaction puts on it — the core's figures, said. */
+  const bodyInCase = (body: number): string => {
+    const b = solved?.cases[shownCase]?.bodies.find((x) => x.at === body);
+    if (b === undefined) return "";
+    const speed = b.speed === null ? roleWord("fixed") : `${num(b.speed, 1)} ${t("ui.train_rpm")}`;
+    return b.role === "load" || b.role === "reacted"
+      ? `${speed} · ${roleWord(b.role)} ${num(b.torque, 4)} ${t("ui.train_nm")}`
+      : speed;
+  };
+  /** Whether a mesh carries none of the shown case's power. */
+  const idleInCase = (k: number): boolean =>
+    (solved?.meshes[k]?.cases.find((c) => c.case === shownCase)?.power_through ?? 1) === 0;
+  const select = (to: Selection) => (tab.view.selection = to);
+  const isSelected = (s: Selection): boolean =>
+    JSON.stringify(tab.view.selection) === JSON.stringify(s);
+  const groupings: { key: Grouping; label: string }[] = [
+    { key: "flow", label: "ui.train_grouping_flow" },
+    { key: "centres", label: "ui.train_grouping_centres" },
+    { key: "axes", label: "ui.train_grouping_axes" },
+  ];
+  /** **The path the shown case walks** — from its first load to its first
+   *  reaction — where the train reports one. */
+  const casePath = $derived.by(() => {
+    const c = tab.train.load_cases[shownCase];
+    const load = c?.loads.find((l) => l.role === "load")?.at;
+    const reaction = c?.loads.find((l) => l.role === "reacted")?.at;
+    return solved?.paths.find((p) => p.from === load && p.to === reaction);
+  });
+  /** The mesh after this one along the shown case's flow, where there is one. */
+  const nextAlong = (k: number): number | undefined => {
+    const at = flow.findIndex((row) => "mesh" in row && row.mesh.mesh === k);
+    const next = flow.slice(at + 1).find((row) => "mesh" in row);
+    return at >= 0 && next !== undefined && "mesh" in next ? next.mesh.mesh : undefined;
+  };
 
   /** **A stage's port is on a body of the train**, numbered across the
    *  train as gears are, ground being 0. The select beside a port says
@@ -570,6 +635,283 @@
      The number shown is Rust's — it has already chosen between the dry and
      conditioned states, which is an engineering decision and not this side's to
      make. -->
+{#snippet flowList()}
+  {#each flow as row, r (r)}
+    {#if "body" in row}
+      {@const b = row.body.body}
+      <button class="fb" class:sel={isSelected({ body: b })} onclick={() => select({ body: b })}>
+        <span class="name">{bodyName(b)}</span>
+        <span class="on">{gearsOn(b).map(gearName).join(" · ")}</span>
+        <span class="fig">{bodyInCase(b)}</span>
+      </button>
+    {:else if "mesh" in row}
+      {@const k = row.mesh.mesh}
+      <button class="fm" class:sel={isSelected({ mesh: k })} onclick={() => select({ mesh: k })}>
+        <span class="arrow">↓</span> {meshName(k)}
+      </button>
+    {:else if "idle" in row}
+      {@const k = row.idle.mesh}
+      <button class="fm idle" class:sel={isSelected({ mesh: k })} onclick={() => select({ mesh: k })}>
+        <span class="arrow">↳</span> {meshName(k)}
+        <small>{t("ui.train_idle_to", { body: bodyName(row.idle.to) })} · {bodyInCase(row.idle.to)}</small>
+      </button>
+    {:else if "junction" in row}
+      {@const j = row.junction}
+      {@const axes = (result.topology[j.part]?.part.axes ?? []).map((a) => result.groupings.axes[a]).filter((a) => a !== undefined)}
+      <div class="junction" class:sel={isSelected({ junction: j.part })}>
+        <button class="fm" onclick={() => select({ junction: j.part })}>
+          <span class="arrow">↓</span> {j.meshes.map(meshName).join(" · ")}
+        </button>
+        {#each axes.filter((a) => a.carried_by !== null) as a (a.axis)}
+          {#each a.bodies as b (b.body)}
+            <small class="line">{t("ui.train_junction_planets", { body: bodyName(b.body), count: String(a.count) })} · {bodyInCase(b.body)}</small>
+          {/each}
+        {/each}
+        {#each j.terminals.filter((tb) => !flow.some((x) => "body" in x && x.body.body === tb)) as tb (tb)}
+          {@const on = gearsOn(tb).map(gearName).join(" · ")}
+          <small class="line">
+            {#if axes.some((a) => a.carried_by === tb)}
+              {t("ui.train_junction_carrier", { body: bodyName(tb) })} · {bodyInCase(tb)}
+            {:else if isHeld(tab.train, tb)}
+              {t("ui.train_junction_fixed", { on, body: bodyName(tb) })}
+            {:else}
+              {t("ui.train_junction_end", { on, body: bodyName(tb) })} · {bodyInCase(tb)}
+            {/if}
+          </small>
+        {/each}
+      </div>
+    {:else if "coupling" in row}
+      <div class="fm"><span class="arrow">↔</span> {t("ui.train_turns_with", { on: bodyName(row.coupling.to) })}</div>
+    {/if}
+  {/each}
+{/snippet}
+
+{#snippet centresList()}
+  {#each result.groupings.centres as c (c.distance)}
+    <button class="cen" class:sel={isSelected({ centre: c.distance })} onclick={() => select({ centre: c.distance })}>
+      <span class="name">{axisLabel(c.axes[0])} ↔ {axisLabel(c.axes[1])}</span>
+      <span class="fig">{num(solved?.distances[c.distance]?.running, 4)} {t("ui.train_mm")}</span>
+    </button>
+    {#each c.meshes as k (k)}
+      <button class="gearrow" class:sel={isSelected({ mesh: k })} onclick={() => select({ mesh: k })}>
+        {meshName(k)}
+        {#if idleInCase(k)}<span class="chip">{t("ui.train_idle")}</span>{/if}
+      </button>
+    {/each}
+  {/each}
+{/snippet}
+
+{#snippet axesList()}
+  {#each result.groupings.axes as a (a.axis)}
+    <div class="axisrow">
+      <button class="axisname" class:sel={isSelected({ axis: a.axis })} onclick={() => select({ axis: a.axis })}>{axisLabel(a.axis)}</button>
+      {#if a.carried_by !== null}<span class="chip">{t("ui.train_carried_by_body", { body: bodyName(a.carried_by) })}</span>{/if}
+      {#if a.count > 1}<span class="chip">{t("ui.train_axis_count", { count: String(a.count) })}</span>{/if}
+      <span class="rule"></span>
+    </div>
+    {#each a.bodies as b (b.body)}
+      <button class="bodyrow" class:sel={isSelected({ body: b.body })} onclick={() => select({ body: b.body })}>
+        <span class="name">{bodyName(b.body)}</span>
+        {#if isHeld(tab.train, b.body)}<span class="chip held">{t("ui.train_case_fixed")}</span>{/if}
+      </button>
+      {#each b.members as i (i)}
+        {@const first = tab.train.shape.meshes.findIndex((m) => m.a === i || m.b === i)}
+        <button class="gearrow" class:sel={first >= 0 && isSelected({ mesh: first })} onclick={() => first >= 0 && select({ mesh: first })}>
+          {gearName(i)} <span class="z">z {tab.train.shape.members[i].gear.teeth}</span>
+        </button>
+      {/each}
+      {#if b.members.length === 0 && b.carries.length > 0}
+        <small class="gearrow dim">{t("ui.train_the_carrier")}</small>
+      {/if}
+    {/each}
+  {/each}
+{/snippet}
+
+{#snippet workspaceOf(sel: Selection | null)}
+  {#if sel !== null && "mesh" in sel && tab.train.shape.meshes[sel.mesh] !== undefined}
+    {@render meshWorkspace(sel.mesh)}
+  {:else if sel !== null && "centre" in sel && tab.train.shape.distances[sel.centre] !== undefined}
+    {@const d = graph.distances[sel.centre]}
+    <h4 class="section-heading">{t("ui.train_distance_between", { a: axisLabel(d.axes[0]), b: axisLabel(d.axes[1]) })}</h4>
+    {@render distanceFields(sel.centre)}
+    {#each result.groupings.centres.find((c) => c.distance === sel.centre)?.meshes ?? [] as k (k)}
+      <button class="gearrow" onclick={() => select({ mesh: k })}>{meshName(k)}</button>
+    {/each}
+  {:else if sel !== null && "body" in sel && tab.train.shape.bodies.some((b) => b.body === sel.body)}
+    {@render bodyWorkspace(sel.body)}
+  {:else if sel !== null && "axis" in sel && tab.train.shape.axes[sel.axis] !== undefined}
+    {@render axisWorkspace(sel.axis)}
+  {:else if sel !== null && "junction" in sel && result.topology[sel.junction] !== undefined}
+    {@const part = result.topology[sel.junction].part}
+    {#each part.meshes as k (k)}
+      <button class="gearrow" onclick={() => select({ mesh: k })}>{meshName(k)}</button>
+    {/each}
+  {:else}
+    <p class="hint">{t("ui.train_select_a_piece")}</p>
+  {/if}
+{/snippet}
+
+{#snippet meshWorkspace(k: number)}
+  {@const m = graph.meshes[k]}
+  {@const d = result.groupings.centres.find((c) => c.meshes.includes(k))?.distance}
+  {@const dist = d === undefined ? undefined : graph.distances[d]}
+  {@const crossed = (dist?.angle ?? 0) !== 0}
+  {@const worm = dist?.worm ?? false}
+  {@const group = result.mesh_groups.find((g) => g.includes(m.a)) ?? [m.a, m.b]}
+  {@const groupMeshes = graph.meshes.flatMap((x, kk) => (group.includes(x.a) && group.includes(x.b) ? [kk] : []))}
+  {@const next = nextAlong(k)}
+  <div class="ws-head">
+    <h4 class="section-heading">{t("ui.train_mesh_heading", { a: gearName(m.a), b: gearName(m.b) })}</h4>
+    <small>
+      {t("ui.train_gear_on_body", { gear: gearName(m.a), body: bodyName(graph.members[m.a].body) })}
+      · {t("ui.train_gear_on_body", { gear: gearName(m.b), body: bodyName(graph.members[m.b].body) })}
+    </small>
+    {#if next !== undefined}
+      <button class="link" onclick={() => select({ mesh: next })}>{t("ui.train_next_along_flow", { mesh: meshName(next) })} →</button>
+    {/if}
+  </div>
+  <div class="ws">
+    <div class="col first">{@render gearColumn(m.a, k, crossed, worm)}</div>
+    <div class="col meshcol">
+      <h4 class="section-heading">{t("ui.train_mesh_column")}</h4>
+      <div class="grid shared">
+        {@render numberField("ui.train_sliding_friction", () => m.sliding_friction, (v) => (m.sliding_friction = v), 0.01, "")}
+        {@render numberField("ui.train_static_friction", () => m.static_friction, (v) => (m.static_friction = v), 0.01, "", t("ui.train_note_static_friction"))}
+        {#if !crossed}
+          {@render loadSharing(m)}
+        {/if}
+        {@render searchToggle(m)}
+        {#if !crossed}
+          {@render overlapField(graph, groupMeshes, solved?.meshes ?? [])}
+        {/if}
+      </div>
+      {#if dist !== undefined && d !== undefined}
+        <h4 class="section-heading">{t("ui.train_distance_between", { a: axisLabel(dist.axes[0]), b: axisLabel(dist.axes[1]) })}</h4>
+        {@render distanceFields(d)}
+      {/if}
+    </div>
+    <div class="col second">{@render gearColumn(m.b, k, crossed, worm)}</div>
+  </div>
+  <!-- **What the mesh comes to, running down** under the three columns,
+       at the workspace's width: a label and a figure per row. -->
+  <h4 class="section-heading">{t("ui.train_what_mesh_comes_to")}</h4>
+  <dl class="out comes">{@render meshRows(solved?.meshes[k], [gearName(m.a), gearName(m.b)])}</dl>
+{/snippet}
+
+{#snippet gearColumn(i: number, k: number, crossed: boolean, worm: boolean)}
+  {@const mem = graph.members[i]}
+  {@const g = solved?.members[i]}
+  {@const isWormMember = worm && graph.meshes[k].a === i}
+  {@render gearCard(gearName(i), mem.gear, g, {
+    cut: mem.ring ? "shaper" : "rack",
+    cutter: mem.ring ?? undefined,
+    member: mem,
+    teethLabel: isWormMember ? "ui.train_starts" : undefined,
+    relief: { stage: graph, member: i, figures: result.figures },
+    pitchDiameter: isWormMember ? mem.pitch_diameter : undefined,
+    faceWidth: worm ? "proportion" : crossed ? "continuity" : "rating",
+    faceFromContinuity: solved?.meshes[k]?.point?.face_width_for_continuity?.[graph.meshes[k].a === i ? 0 : 1],
+    faceRecommended: g?.recommended_face_width ?? undefined,
+    faceLabel: isWormMember ? "ui.train_length" : undefined,
+    carrier: carried(graph, i) ? t("ui.train_the_carrier") : undefined,
+  })}
+{/snippet}
+
+{#snippet distanceFields(d: number)}
+  {@const dist = graph.distances[d]}
+  {@const dres = solved?.distances[d] ?? undefined}
+  <div class="grid shared">
+    <label>
+      <span>{t("ui.train_axis_angle")}</span>
+      <input
+        type="number"
+        step="5"
+        bind:value={() => dist.angle, finite((v) => (dist.angle = v))}
+        onchange={() => relieveStage(graph, null, result.figures)}
+      />
+      <em>°</em>
+      <FieldNote notes={notes(dist.angle === 0 ? t("ui.train_note_axes_parallel") : t("ui.train_note_axes_crossed"), null)} />
+    </label>
+    {#if dist.angle !== 0}
+      {@render switchField("ui.train_size_as_worm", dist.worm, (v) => (dist.worm = v), t("ui.train_note_size_as_worm"))}
+    {/if}
+    {@render autoNumber(
+      "ui.train_distance",
+      dist.distance,
+      dres?.running,
+      0.1,
+      () => relieveStage(graph, { distance: d }, result.figures),
+      dres?.sized_by == null ? undefined : t("ui.train_distance_sized_by", { mesh: meshName(dres.sized_by) }),
+      "ui.train_mm",
+    )}
+    {#if graph.meshes.some((m) => internalOn(graph, m, d))}
+      {@render numberField("ui.train_tip_gap", () => dist.tip_clearance, (v) => (dist.tip_clearance = v), 0.05, "ui.train_mm", t("ui.train_note_tip_gap"))}
+    {/if}
+    {@render autoNumber(
+      "ui.train_distance_clearance",
+      dist.clearance,
+      dres?.clearance,
+      0.01,
+      () => relieveStage(graph, { clearance: d }, result.figures),
+      undefined,
+      "ui.train_mm",
+    )}
+    {@render numberField("ui.train_distance_tolerance_plus", () => dist.tolerance_plus, (v) => (dist.tolerance_plus = v), 0.01, "ui.train_mm")}
+    {@render numberField("ui.train_distance_tolerance_minus", () => dist.tolerance_minus, (v) => (dist.tolerance_minus = v), 0.01, "ui.train_mm")}
+    {#if dist.worm}
+      {@render numberField("ui.train_worm_axial_clearance", () => dist.axial_clearance, (v) => (dist.axial_clearance = v), 0.01, "ui.train_mm")}
+    {/if}
+  </div>
+{/snippet}
+
+{#snippet bodyWorkspace(b: number)}
+  <h4 class="section-heading">{bodyName(b)}</h4>
+  <div class="edits">
+    {#if isHeld(tab.train, b)}
+      <button class="action" onclick={() => editTrain(tab.train, { release: b })}>{t("ui.train_release")}</button>
+    {:else}
+      <button class="action" onclick={() => editTrain(tab.train, { hold: b })}>{t("ui.train_hold")}</button>
+    {/if}
+  </div>
+  {#each gearsOn(b) as i (i)}
+    {@const first = tab.train.shape.meshes.findIndex((m) => m.a === i || m.b === i)}
+    <button class="gearrow" onclick={() => first >= 0 && select({ mesh: first })}>{gearName(i)}</button>
+  {/each}
+  <dl class="out">
+    {#each solved?.cases ?? [] as c (c.case)}
+      {@const x = c.bodies.find((y) => y.at === b)}
+      {#if x}
+        <dt>{caseName(c.case)}</dt>
+        <dd>{x.speed === null ? roleWord("fixed") : `${num(x.speed, 1)} ${t("ui.train_rpm")}`} · {roleWord(x.role)} {num(x.torque, 4)} {t("ui.train_nm")}</dd>
+      {/if}
+    {/each}
+  </dl>
+{/snippet}
+
+{#snippet axisWorkspace(a: number)}
+  {@const axis = graph.axes[a]}
+  {@const group = result.groupings.axes[a]}
+  <h4 class="section-heading">{axisLabel(a)}</h4>
+  {#if group?.carried_by != null}
+    <div class="grid shared">
+      <label>
+        <span>{t("ui.train_planets")}</span>
+        <input type="number" step="1" min="1" bind:value={() => axis.count, finite((v) => (axis.count = v))} />
+        <em></em>
+      </label>
+      {#if axis.count > 1}
+        {@render numberField("ui.train_minimum_planet_clearance", () => axis.min_planet_clearance, (v) => (axis.min_planet_clearance = v), 0.05, "ui.train_mm", t("ui.train_note_planet_clearance"))}
+      {/if}
+    </div>
+  {/if}
+  {#each group?.bodies ?? [] as b (b.body)}
+    <button class="bodyrow" onclick={() => select({ body: b.body })}><span class="name">{bodyName(b.body)}</span></button>
+    {#each b.members as i (i)}
+      <span class="gearrow">{gearName(i)}</span>
+    {/each}
+  {/each}
+{/snippet}
+
 {#snippet property(
   label: string,
   gear: StageGear,
@@ -1769,6 +2111,77 @@
     <button onclick={() => (confirmingDelete = false)}>{t("ui.train_cancel")}</button>
   </div>
 {/if}
+
+<!-- **The cases, one chip each, and the path the shown one walks.** The
+     chip chosen is the case the list's flow and the workspace are shown for,
+     and the path under the strip is the one that case reports: its load to
+     its reaction, with what the train comes to along it. -->
+<div class="strip">
+  <span class="lab section-heading">{t("ui.train_cases")}</span>
+  {#each tab.train.load_cases as c, i (i)}
+    <button
+      class="case"
+      class:on={i === shownCase}
+      class:off={!c.enabled}
+      onclick={() => {
+        tab.view.case = i;
+        select({ case: i });
+      }}
+    >
+      {caseName(i)} · {kindLabel(c.kind)}{caseSummary(c) ? ` · ${caseSummary(c)}` : ""}
+    </button>
+  {/each}
+</div>
+{#if casePath}
+  <dl class="out pathbox">
+    <dt>{t("ui.train_path_of", { case: caseName(shownCase) })}</dt>
+    <dd>{t("ui.train_path_between", { from: bodyName(casePath.from), to: bodyName(casePath.to) })}</dd>
+    <dt>{t("ui.train_ratio")}</dt>
+    <dd>{Math.abs(casePath.ratio) >= 1 ? `${num(casePath.ratio, 4)} : 1` : `1 : ${num(1 / casePath.ratio, 4)}`}</dd>
+    <dt>{t("ui.train_efficiency")}</dt>
+    <dd>{bothWays(casePath.efficiency)}</dd>
+    <dt>{t("ui.train_backlash")}</dt>
+    <dd>
+      <span class="line">{t("ui.train_backlash_at", { angle: num(casePath.backlash.forward.nominal, 5), member: bodyName(casePath.to) })}</span>
+      <span class="line">{t("ui.train_backlash_at", { angle: num(casePath.backlash.backward.nominal, 5), member: bodyName(casePath.from) })}</span>
+    </dd>
+  </dl>
+{:else if solved && tab.train.load_cases.length > 0}
+  <p class="notice">{t("ui.train_no_path_for_case")}</p>
+{/if}
+
+<!-- **The list and the workspace.** The list is the train grouped one of
+     three ways, each the core's (`groupings`, `flows`): the flow, drawn
+     down; the centres; the axes. Selecting a row shows that piece in the
+     workspace beside it, and the selection is the tab's, so looking away
+     and back finds it where it was. -->
+<div class="panes">
+  <section class="pane">
+    <div class="pane-head">
+      <div class="seg">
+        {#each groupings as g (g.key)}
+          <button class:on={tab.view.grouping === g.key} onclick={() => (tab.view.grouping = g.key)}>{t(g.label)}</button>
+        {/each}
+      </div>
+      {#if tab.view.grouping === "flow" && tab.train.load_cases.length > 0}
+        <small>{t("ui.train_showing_case", { case: caseName(shownCase) })}</small>
+      {/if}
+    </div>
+    <p class="hint">
+      {t({ flow: "ui.train_note_flow", centres: "ui.train_note_centres", axes: "ui.train_note_axes" }[tab.view.grouping])}
+    </p>
+    {#if tab.view.grouping === "flow"}
+      {@render flowList()}
+    {:else if tab.view.grouping === "centres"}
+      {@render centresList()}
+    {:else}
+      {@render axesList()}
+    {/if}
+  </section>
+  <section class="pane workspace">
+    {@render workspaceOf(tab.view.selection)}
+  </section>
+</div>
 
 <section class="train">
   <div class="paths">
@@ -3271,5 +3684,297 @@
   /* A stage's or a case's remove sits below its inputs, apart from them. */
   .action.danger {
     margin-top: 0.6rem;
+  }
+
+  /* **The case strip, the path box, the list and the workspace** — the
+     canvas's page: cases as chips across the top, the shown case's path
+     under them, the list on the left and the selected piece on the right. */
+  .strip {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    padding: 0.45rem 0.6rem;
+    margin: 0.5rem 0;
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    background: var(--panel);
+  }
+  .strip .lab {
+    margin: 0 0.5rem 0 0;
+  }
+  .case {
+    font: inherit;
+    font-size: 0.8rem;
+    padding: 0.2rem 0.6rem;
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    background: var(--bg);
+    color: var(--fg);
+    cursor: pointer;
+  }
+  .case.on {
+    background: var(--selected);
+    border-color: var(--accent);
+  }
+  .case.off {
+    color: var(--muted);
+  }
+  .pathbox {
+    display: inline-grid;
+    grid-template-columns: auto auto;
+    column-gap: 2rem;
+    padding: 0.45rem 0.6rem;
+    margin: 0 0 0.6rem;
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    background: var(--panel);
+  }
+  .pathbox dd {
+    text-align: right;
+  }
+  .panes {
+    display: grid;
+    grid-template-columns: minmax(16rem, 26rem) minmax(0, 1fr);
+    gap: 0.8rem;
+    align-items: start;
+    margin-bottom: 1rem;
+  }
+  @media (max-width: 900px) {
+    .panes {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+  .pane {
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 0.6rem 0.7rem;
+    min-width: 0;
+  }
+  .pane-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+  .pane-head small {
+    color: var(--muted);
+  }
+  .seg {
+    display: inline-flex;
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .seg button {
+    font: inherit;
+    font-size: 0.78rem;
+    padding: 0.2rem 0.7rem;
+    border: 0;
+    border-right: 1px solid var(--rule);
+    background: var(--bg);
+    color: var(--fg);
+    cursor: pointer;
+  }
+  .seg button:last-child {
+    border-right: 0;
+  }
+  .seg button.on {
+    background: var(--selected);
+    font-weight: 600;
+  }
+  .pane .hint {
+    font-size: 0.72rem;
+    color: var(--muted);
+    margin: 0.3rem 0 0.5rem;
+  }
+  .fb,
+  .cen,
+  .bodyrow {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: baseline;
+    gap: 0.5rem;
+    width: 100%;
+    text-align: left;
+    font: inherit;
+    font-size: 0.8rem;
+    padding: 0.3rem 0.45rem;
+    margin: 0.15rem 0;
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    background: var(--panel);
+    color: var(--fg);
+    cursor: pointer;
+  }
+  .fb .name,
+  .cen .name,
+  .bodyrow .name {
+    font-weight: 600;
+  }
+  .fb .on {
+    color: var(--muted);
+  }
+  .fb .fig,
+  .cen .fig {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .fm,
+  .gearrow {
+    display: block;
+    width: 100%;
+    text-align: left;
+    font: inherit;
+    font-size: 0.82rem;
+    padding: 0.25rem 0.45rem 0.25rem 1.2rem;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    background: none;
+    color: var(--fg);
+    cursor: pointer;
+  }
+  .fm .arrow {
+    color: var(--accent);
+    font-weight: 700;
+  }
+  .fm.idle {
+    color: var(--muted);
+  }
+  .fm small {
+    color: var(--muted);
+    margin-left: 0.4rem;
+  }
+  .gearrow .z {
+    font-size: 0.72rem;
+    color: var(--muted);
+  }
+  .junction {
+    margin: 0.1rem 0 0.1rem 1.2rem;
+    padding: 0.2rem 0.4rem 0.35rem;
+    border: 1px dashed var(--accent);
+    border-radius: 4px;
+    font-size: 0.8rem;
+  }
+  .junction .fm {
+    padding-left: 0;
+    font-weight: 600;
+  }
+  .junction .line {
+    display: block;
+    color: var(--muted);
+  }
+  .sel,
+  .fb.sel,
+  .cen.sel,
+  .bodyrow.sel,
+  .junction.sel {
+    background: var(--selected);
+    border-color: var(--accent);
+  }
+  .axisrow {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0.7rem 0 0.3rem;
+  }
+  .axisname {
+    font: inherit;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+  .axisrow .rule {
+    flex: 1 1 auto;
+    height: 1px;
+    background: var(--rule);
+  }
+  .chip {
+    font-size: 0.68rem;
+    color: var(--muted);
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    padding: 0 0.4rem;
+    white-space: nowrap;
+  }
+  .chip.held {
+    color: var(--warn);
+    border-color: var(--warn);
+  }
+  .dim {
+    color: var(--muted);
+  }
+  .ws-head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.5rem;
+  }
+  .ws-head small {
+    color: var(--muted);
+  }
+  .ws-head .link {
+    margin-left: auto;
+    font: inherit;
+    font-size: 0.8rem;
+    color: var(--accent);
+    background: none;
+    border: 0;
+    cursor: pointer;
+  }
+  /* **The workspace lays itself out by its own width**: the two gears
+     either side of the mesh where there is room for three columns, the two
+     gears side by side with the mesh under them where there is room for
+     two, and one above the other where there is not — a gear's card read
+     across to its mate's wherever it can be. */
+  .workspace {
+    container-type: inline-size;
+  }
+  .ws {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "first" "mesh" "second";
+    gap: 0.7rem;
+    align-items: start;
+  }
+  @container (min-width: 44rem) {
+    .ws {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-areas: "first second" "mesh mesh";
+    }
+  }
+  @container (min-width: 72rem) {
+    .ws {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr) minmax(0, 1fr);
+      grid-template-areas: "first mesh second";
+    }
+  }
+  .ws .col {
+    min-width: 0;
+  }
+  .ws .first {
+    grid-area: first;
+  }
+  .ws .second {
+    grid-area: second;
+  }
+  .ws .meshcol {
+    grid-area: mesh;
+  }
+  .out.comes {
+    max-width: 48rem;
+  }
+  .ws .meshcol {
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 0.4rem 0.6rem;
+    background: var(--panel);
   }
 </style>
