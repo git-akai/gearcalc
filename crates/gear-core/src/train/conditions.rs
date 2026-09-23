@@ -159,8 +159,18 @@ impl StageBoundary {
 
 // ------------------------------------------------- the train as one system ---
 
+use super::graph::Part;
 use super::wiring::BodyLabel;
 use super::{Shape, Train};
+
+/// **The parts a body is listed on**, with its slot in each, in part order.
+pub(crate) fn ends_in(parts: &[Part], body: usize) -> Vec<(usize, Body)> {
+    parts
+        .iter()
+        .enumerate()
+        .filter_map(|(k, p)| p.shape.slot_if_any(body).map(|slot| (k, slot)))
+        .collect()
+}
 use crate::kinematics::{Mobility, Refusal, Solution, System};
 
 /// Why a train's motion could not be worked out.
@@ -242,7 +252,7 @@ impl Train {
         let mut train = Self {
             load_cases: Vec::new(),
             reversed_bending: false,
-            stages: Vec::new(),
+            shape: Shape::default(),
             held: Vec::new(),
         };
         for stage in stages {
@@ -252,26 +262,52 @@ impl Train {
         train
     }
 
-    /// **The body at a stage's slot** — how a fixture or the harness names a
-    /// body by where it is, and the inverse of what the stage's own
-    /// numbering does. Ground for a slot the stage does not have.
+    /// **The train's parts** ([`Shape::parts`]) — the pieces that close,
+    /// search and rate apart, which is what a card is. Derived: the train
+    /// is one graph, and a part is how it falls apart.
     #[must_use]
-    pub fn port(&self, stage: usize, slot: Body) -> usize {
-        self.stages.get(stage).map_or(GROUND, |s| s.body_at(slot))
+    pub fn parts(&self) -> Vec<Part> {
+        self.shape.parts()
     }
 
-    /// **The slot a body has on a stage**, where the stage has it — the
+    /// **Each part's shape**, in part order — what a stage was, read off
+    /// the graph.
+    #[must_use]
+    pub fn stages(&self) -> Vec<Shape> {
+        self.parts().into_iter().map(|p| p.shape).collect()
+    }
+
+    /// **The body at a part's slot** — how a fixture or the harness names a
+    /// body by where it is, and the inverse of what the part's own
+    /// numbering does. Ground for a slot the part does not have.
+    #[must_use]
+    pub fn port(&self, part: usize, slot: Body) -> usize {
+        self.parts()
+            .get(part)
+            .map_or(GROUND, |p| p.shape.body_at(slot))
+    }
+
+    /// **The slot a body has on a part**, where the part has it — the
     /// inverse of [`Self::port`].
     #[must_use]
-    pub fn slot(&self, stage: usize, body: usize) -> Option<Body> {
-        self.stages.get(stage).and_then(|s| s.slot_if_any(body))
+    pub fn slot(&self, part: usize, body: usize) -> Option<Body> {
+        self.parts()
+            .get(part)
+            .and_then(|p| p.shape.slot_if_any(body))
     }
 
-    /// The largest body number anything in the train names — a stage, a
+    /// **A part's member by the graph's index** — how a fixture changes a
+    /// card's gear, the train being one list of them.
+    #[must_use]
+    pub fn member(&self, part: usize, member: usize) -> usize {
+        self.parts()[part].members[member]
+    }
+
+    /// The largest body number anything in the train names — the graph, a
     /// case or a hold — ground where nothing does.
     #[must_use]
     pub fn max_body(&self) -> usize {
-        let stages = self.stages.iter().map(super::shape::Shape::max_body);
+        let stages = std::iter::once(self.shape.max_body());
         let cases = self.load_cases.iter().flat_map(|c| {
             c.loads.iter().map(|l| l.at).chain(match c.duty {
                 super::Duty::Intermittent { at, .. } => Some(at),
@@ -282,19 +318,12 @@ impl Train {
         stages.chain(cases).chain(holds).max().unwrap_or(GROUND)
     }
 
-    /// **The stages a body is listed on**, with its slot in each, in stage
-    /// order: one stage for a body a stage has to itself, more for one that
-    /// runs on.
+    /// **The parts a body is listed on**, with its slot in each, in part
+    /// order: one part for a body a part has to itself, more for a shaft
+    /// two parts' gears are fixed to.
     #[must_use]
     pub fn ends_of(&self, body: usize) -> Vec<(usize, Body)> {
-        self.stages
-            .iter()
-            .enumerate()
-            .filter_map(|(k, s)| {
-                let slot = s.slot(body);
-                (slot != GROUND).then_some((k, slot))
-            })
-            .collect()
+        ends_in(&self.parts(), body)
     }
 
     /// **Every body renumbered by `map`** — on every stage, in every case
@@ -308,12 +337,10 @@ impl Train {
                 map(b).unwrap_or(GROUND)
             }
         };
-        for s in &mut self.stages {
-            s.bodies.retain(|b| keep(b.body));
-            s.members.retain(|m| keep(m.body));
-            s.couplings.retain(|c| c.iter().all(|&b| keep(b)));
-            s.renumber_bodies(to);
-        }
+        let s = &mut self.shape;
+        s.bodies.retain(|b| keep(b.body));
+        s.couplings.retain(|c| c.iter().all(|&b| keep(b)));
+        s.renumber_bodies(to);
         self.held.retain(|&b| keep(b));
         for b in &mut self.held {
             *b = to(*b);
@@ -337,10 +364,7 @@ impl Train {
         let named: Vec<bool> = (0..=max)
             .map(|b| {
                 b == GROUND
-                    || self
-                        .stages
-                        .iter()
-                        .any(|s| s.bodies.iter().any(|x| x.body == b))
+                    || self.shape.bodies.iter().any(|x| x.body == b)
                     || self.held.contains(&b)
                     || self.load_cases.iter().any(|c| {
                         c.loads.iter().any(|l| l.at == b)
@@ -372,10 +396,10 @@ impl Train {
     /// alone on it. Not on a train with no stages, where the cases wait
     /// ([`Self::push_stage`]).
     fn drop_orphans(&mut self) {
-        if self.stages.is_empty() {
+        if self.shape.members.is_empty() {
             return;
         }
-        let on_a_stage = |b: usize| b == GROUND || self.stages.iter().any(|s| s.slot(b) != GROUND);
+        let on_a_stage = |b: usize| b == GROUND || self.shape.bodies.iter().any(|x| x.body == b);
         self.held.retain(|&b| on_a_stage(b));
         for case in &mut self.load_cases {
             case.loads.retain(|l| on_a_stage(l.at));
@@ -392,12 +416,7 @@ impl Train {
     /// no node: it would turn freely, and a train with stages has none
     /// ([`Self::drop_orphans`]), so a hold at one is a hold at nothing.
     fn stage_bodies(&self) -> usize {
-        self.stages
-            .iter()
-            .map(super::shape::Shape::max_body)
-            .max()
-            .unwrap_or(GROUND)
-            + 1
+        self.shape.max_body() + 1
     }
 
     /// **The whole train as one system**: one node per body, ground shared,
@@ -410,7 +429,7 @@ impl Train {
     /// [`MotionError::Empty`], or a stage whose wiring does not describe
     /// meshes.
     pub fn system(&self) -> Result<System, MotionError> {
-        self.system_counting(|_, _, z| z)
+        self.system_counting(&self.parts(), |_, _, z| z)
     }
 
     /// **The system with one gear a tooth larger** — gear `member` of stage
@@ -420,27 +439,45 @@ impl Train {
     ///
     /// As [`Self::system`].
     pub fn system_raising(&self, stage: usize, member: usize) -> Result<System, MotionError> {
-        self.system_counting(|k, i, z| if (k, i) == (stage, member) { z + 1 } else { z })
+        self.system_counting(&self.parts(), |k, i, z| {
+            if (k, i) == (stage, member) {
+                z + 1
+            } else {
+                z
+            }
+        })
     }
 
-    fn system_counting(
+    /// The system part by part — each part's rows in its own order, which
+    /// is the order its results and a path's play read them in — and then
+    /// every coupling no part keeps: a join that could not be coaxial,
+    /// between two parts' bodies.
+    pub(crate) fn system_counting(
         &self,
+        parts: &[Part],
         count: impl Fn(usize, usize, u32) -> u32,
     ) -> Result<System, MotionError> {
-        if self.stages.is_empty() {
+        if parts.is_empty() {
             return Err(MotionError::Empty);
         }
         let mut system = System::new(self.stage_bodies());
-        for (k, stage) in self.stages.iter().enumerate() {
-            let teeth: Vec<u32> = super::teeth_of(stage.gears())
+        for (k, part) in parts.iter().enumerate() {
+            let teeth: Vec<u32> = super::teeth_of(part.shape.gears())
                 .into_iter()
                 .enumerate()
                 .map(|(i, z)| count(k, i, z))
                 .collect();
-            stage
+            part.shape
                 .wiring()
-                .add_to(&mut system, &teeth, |slot| self.port(k, slot))
+                .add_to(&mut system, &teeth, |slot| part.shape.body_at(slot))
                 .map_err(|e| MotionError::Wiring(k, e))?;
+        }
+        for (c, &[a, b]) in self.shape.couplings.iter().enumerate() {
+            if !parts.iter().any(|p| p.couplings.contains(&c)) {
+                system
+                    .couple(a, b)
+                    .ok_or(MotionError::NoSuchBody(a.max(b)))?;
+            }
         }
         Ok(system)
     }
@@ -467,8 +504,8 @@ impl Train {
     }
 
     /// Whether a body is listed on a stage before or after `k`.
-    fn shared_with(&self, body: usize, k: usize, earlier: bool) -> bool {
-        self.ends_of(body)
+    fn shared_with(parts: &[Part], body: usize, k: usize, earlier: bool) -> bool {
+        ends_in(parts, body)
             .iter()
             .any(|&(s, _)| s != k && ((s < k) == earlier))
     }
@@ -488,13 +525,19 @@ impl Train {
     ///
     /// As [`Self::system`].
     pub fn boundaries(&self) -> Result<Vec<StageBoundary>, MotionError> {
+        self.boundaries_of(&self.parts())
+    }
+
+    /// As [`Self::boundaries`], of parts already in hand.
+    pub(crate) fn boundaries_of(&self, parts: &[Part]) -> Result<Vec<StageBoundary>, MotionError> {
         let conditions = self.conditions(self.stage_bodies())?;
-        let mut out = Vec::with_capacity(self.stages.len());
-        for (k, stage) in self.stages.iter().enumerate() {
+        let mut out = Vec::with_capacity(parts.len());
+        for (k, part) in parts.iter().enumerate() {
+            let stage = &part.shape;
             let w = stage.wiring();
             let ports = stage.ports();
             let mut local: Vec<Condition> = (0..w.slots.len())
-                .map(|s| conditions[self.port(k, s)])
+                .map(|s| conditions[stage.body_at(s)])
                 .collect();
             local[GROUND] = Condition::Ground;
             let side = |earlier: bool| -> Option<Body> {
@@ -502,7 +545,7 @@ impl Train {
                     .ports
                     .iter()
                     .copied()
-                    .find(|&slot| self.shared_with(self.port(k, slot), k, earlier))
+                    .find(|&slot| Self::shared_with(parts, stage.body_at(slot), k, earlier))
             };
             let held: Vec<Body> = local
                 .iter()
@@ -531,7 +574,7 @@ impl Train {
                 .flat_map(|c| c.loads.iter())
                 .find(|l| l.is_load())
                 .and_then(|l| {
-                    let slot = self.slot(k, l.at)?;
+                    let slot = stage.slot_if_any(l.at)?;
                     ports.ports.contains(&slot).then_some(slot)
                 })
                 .filter(open);
@@ -558,14 +601,18 @@ impl Train {
             // at its sun at all, and the designer's own holds go in last so
             // the one that closed the set is the one named — the ring, not
             // the sun the convention drives.
-            let holds: Vec<Body> = self.held.iter().filter_map(|&b| self.slot(k, b)).collect();
+            let holds: Vec<Body> = self
+                .held
+                .iter()
+                .filter_map(|&b| stage.slot_if_any(b))
+                .collect();
             let first: Vec<Body> = (0..local.len()).filter(|s| !holds.contains(s)).collect();
             if let Err(Refusal::Conflicts(i)) = w
                 .alone(&super::teeth_of(stage.gears()))
                 .map_err(|e| MotionError::Wiring(k, e))?
                 .motion_in(&local, &first)
             {
-                return Err(MotionError::Conflicts(self.port(k, i)));
+                return Err(MotionError::Conflicts(stage.body_at(i)));
             }
             out.push(StageBoundary {
                 conditions: local,
@@ -583,13 +630,18 @@ impl Train {
     /// [`MotionError`] — and never a geometric one, which is the whole reason
     /// this is separate from [`super::solve_train`].
     pub fn motion(&self) -> Result<TrainMotion, MotionError> {
-        let system = self.system()?;
+        self.motion_of(&self.parts())
+    }
+
+    /// As [`Self::motion`], of the graph cut into `parts`.
+    pub(crate) fn motion_of(&self, parts: &[Part]) -> Result<TrainMotion, MotionError> {
+        let system = self.system_counting(parts, |_, _, z| z)?;
         let mut conditions = self.conditions(system.bodies())?;
         // **The motion is read along the headline case**, at one turn of its
         // load: a fresh train's reading is its first case. With no case to
         // say so nothing is driven, the motion is a family, and each case
         // decides its own.
-        let boundaries = self.boundaries()?;
+        let boundaries = self.boundaries_of(parts)?;
         let ends = self.headline();
         if let Some(a) = self.headline_load() {
             conditions[a] = Condition::Drive(Ratio::ONE);
@@ -612,10 +664,10 @@ impl Train {
         // and a planet only where no port moves with the freedom.
         let mut preferred: Vec<Body> = Vec::new();
         for open in [true, false] {
-            for (k, stage) in self.stages.iter().enumerate() {
-                for slot in stage.ports().ports {
-                    let b = self.port(k, slot);
-                    let shared = self.ends_of(b).len() > 1;
+            for part in parts {
+                for slot in part.shape.ports().ports {
+                    let b = part.shape.body_at(slot);
+                    let shared = ends_in(parts, b).len() > 1;
                     if (conditions[b] == Condition::Free && !shared) == open
                         && !preferred.contains(&b)
                     {
@@ -631,7 +683,10 @@ impl Train {
             .iter()
             .enumerate()
             .map(|(k, b)| {
-                let (i, o) = (self.port(k, b.input), self.port(k, b.output));
+                let (i, o) = (
+                    parts[k].shape.body_at(b.input),
+                    parts[k].shape.body_at(b.output),
+                );
                 // `None` where the answer is a family: the quotient of two
                 // families is not a number, and the particular values alone
                 // would print one as if it were.
@@ -766,7 +821,7 @@ pub struct PortSpec {
 /// **A stage's ports and its conventional holds**, so a panel can offer
 /// exactly the bodies a train may constrain or share — read from the
 /// stage's own wiring rather than written into the front end a second time.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(
     feature = "typescript",
@@ -790,6 +845,10 @@ pub struct StagePorts {
     /// which decides the card's structural buttons and its chip — the
     /// core's reading, so the panel does not derive it a second time.
     pub family: super::StageFamily,
+    /// **The part the card is** — its shape, in its own numbering, and
+    /// where each of its pieces is in the train's one graph, which is what
+    /// a panel binds a card's inputs through.
+    pub part: Part,
 }
 
 /// One end of a body: the stage it is listed on, and what it is there.
@@ -909,22 +968,25 @@ impl Train {
     /// Every stage's ports, for a panel to offer.
     #[must_use]
     pub fn topology(&self) -> Vec<StagePorts> {
-        self.stages
-            .iter()
-            .enumerate()
-            .map(|(k, stage)| StagePorts {
-                members: stage.member_names(),
-                mesh_groups: stage.mesh_groups(),
-                family: stage.family(),
-                ports: stage
-                    .ports()
-                    .ports
-                    .iter()
-                    .map(|&slot| PortSpec {
-                        slot,
-                        body: self.port(k, slot),
-                    })
-                    .collect(),
+        self.parts()
+            .into_iter()
+            .map(|part| {
+                let stage = &part.shape;
+                StagePorts {
+                    members: stage.member_names(),
+                    mesh_groups: stage.mesh_groups(),
+                    family: stage.family(),
+                    ports: stage
+                        .ports()
+                        .ports
+                        .iter()
+                        .map(|&slot| PortSpec {
+                            slot,
+                            body: stage.body_at(slot),
+                        })
+                        .collect(),
+                    part: part.clone(),
+                }
             })
             .collect()
     }
@@ -1010,12 +1072,18 @@ impl Train {
     /// body order, each with its ends.
     #[must_use]
     pub fn bodies(&self, boundaries: &[StageBoundary]) -> Vec<PortBody> {
+        self.bodies_of(&self.parts(), boundaries)
+    }
+
+    /// As [`Self::bodies`], of the graph cut into `parts`.
+    pub(crate) fn bodies_of(&self, parts: &[Part], boundaries: &[StageBoundary]) -> Vec<PortBody> {
         let mut out: Vec<PortBody> = Vec::new();
-        for (k, stage) in self.stages.iter().enumerate() {
+        for (k, part) in parts.iter().enumerate() {
+            let stage = &part.shape;
             let w = stage.wiring();
             let Some(b) = boundaries.get(k) else { break };
             for slot in stage.ports().ports {
-                let body = self.port(k, slot);
+                let body = stage.body_at(slot);
                 let held = b.conditions[slot] == Condition::Ground;
                 if let Some(x) = out.iter_mut().find(|x| x.body == body) {
                     x.ends.push((k, w.slots[slot]));
@@ -1034,22 +1102,54 @@ impl Train {
     }
 
     /// **Two bodies made one**: everything that named `b` names `a` now —
-    /// every stage's end of it, every case entry, every hold — and `b`'s
-    /// number is given up. A reaction declared at either becomes a load
-    /// with its torque derived — an inline take-off, the same physics —
-    /// since a body two stages share cannot be a reaction; a free entry at
-    /// either is dropped, there being nothing free about it now; and a case
-    /// with an entry at each keeps the first. Joining a body to itself
-    /// changes nothing.
+    /// every part's end of it, every case entry, every hold — and `b`'s
+    /// number is given up; the axes the two turned about are one line,
+    /// since a shaft is straight ([`Self::merge`]). A reaction declared at
+    /// either becomes a load with its torque derived — an inline take-off,
+    /// the same physics — since a body two parts share cannot be a
+    /// reaction; a free entry at either is dropped, there being nothing
+    /// free about it now; and a case with an entry at each keeps the
+    /// first. Joining a body to itself changes nothing.
+    ///
+    /// **A join that cannot be coaxial is an offset coupling**: an end on
+    /// an axis a carrier turns orbits, and no shaft on a fixed axis can be
+    /// the same body — so the two keep their numbers and turn as one
+    /// through a coupling, which is what the join meant. Two ends at an
+    /// axis distance from each other are refused, as is a part with both.
     pub fn join(&mut self, a: usize, b: usize) {
         if a == b || a == GROUND || b == GROUND {
             return;
         }
-        // A stage with both would have one body at two of its slots, which
+        // A part with both would have one body at two of its slots, which
         // is a mesh or a carrier turning against itself: not a body.
-        let both = |s: &Shape| s.slot(a) != GROUND && s.slot(b) != GROUND;
-        if self.stages.iter().any(both) {
+        let both = |p: &Part| p.shape.slot_if_any(a).is_some() && p.shape.slot_if_any(b).is_some();
+        if self.parts().iter().any(both) {
             return;
+        }
+        let axis = |body: usize| {
+            self.shape
+                .bodies
+                .iter()
+                .find(|x| x.body == body)
+                .map(|x| x.axis)
+        };
+        if let (Some(x), Some(y)) = (axis(a), axis(b)) {
+            let carried = |axis: usize| self.shape.axes[axis].carried_by != GROUND;
+            if carried(x) || carried(y) {
+                if !self
+                    .shape
+                    .couplings
+                    .iter()
+                    .any(|c| c.contains(&a) && c.contains(&b))
+                {
+                    self.shape.couplings.push([a, b]);
+                }
+                return;
+            }
+            let apart = |d: &super::shape::Distance| d.axes == [x, y] || d.axes == [y, x];
+            if x != y && self.shape.distances.iter().any(apart) {
+                return;
+            }
         }
         // The lower number survives, which is the order a chain names in.
         let (a, b) = if b < a { (b, a) } else { (a, b) };
@@ -1069,8 +1169,27 @@ impl Train {
     /// Everything that named `b` names `a`, once, and `b`'s number is given
     /// up: what [`Self::join`] does once the roles are settled, and what a
     /// parked case's body becomes when a stage takes it up.
+    ///
+    /// **Where both are on axes, the two axes are one line** — every body
+    /// and distance on the later moved to the earlier, whose reading stands
+    /// ([`Shape::merge_axes`]) — and the body is listed once, where it was
+    /// first listed, so each part keeps the order it numbers its bodies in.
     fn merge(&mut self, a: usize, b: usize) {
+        self.keep_orders(a, b);
+        let axis =
+            |s: &Shape, body: usize| s.bodies.iter().find(|x| x.body == body).map(|x| x.axis);
+        if let (Some(x), Some(y)) = (axis(&self.shape, a), axis(&self.shape, b)) {
+            self.shape.merge_axes(x.min(y), x.max(y));
+        }
         self.renumber(|x| Some(if x == b { a } else { x }));
+        let mut seen: Vec<usize> = Vec::new();
+        self.shape.bodies.retain(|x| {
+            let first = !seen.contains(&x.body);
+            seen.push(x.body);
+            first
+        });
+        // A coupling between the two couples nothing now.
+        self.shape.couplings.retain(|c| c[0] != c[1]);
         for case in &mut self.load_cases {
             let mut seen = false;
             case.loads.retain(|l| {
@@ -1087,18 +1206,92 @@ impl Train {
         self.prune();
     }
 
-    /// **A stage's end of a body split off** as a body of its own — the
-    /// body it leaves keeps its number and whatever the train wrote on it,
-    /// and the stage's members and carriers on it move to the new one,
-    /// whose number is returned. Nothing happens where the body is the
-    /// stage's alone, and the body's own number is returned.
+    /// **Every part keeps the order it numbers its bodies in** through a
+    /// merge of `a` and `b`: the body is listed once, where it was listed
+    /// first, and the bodies a part at the later listing numbers before
+    /// it — and no part at the earlier one has — move ahead of it with
+    /// it. A part's slots are the order its conventions read (a set's sun
+    /// first), so a join does not reorder a card.
+    fn keep_orders(&mut self, a: usize, b: usize) {
+        let at = |body: usize| self.shape.bodies.iter().position(|x| x.body == body);
+        let (Some(ia), Some(ib)) = (at(a), at(b)) else {
+            return;
+        };
+        let (first, last) = (ia.min(ib), ia.max(ib));
+        let (earlier, later) = (self.shape.bodies[first].body, self.shape.bodies[last].body);
+        let parts = self.parts();
+        let with = |body: usize, x: usize| {
+            parts
+                .iter()
+                .any(|p| p.shape.slot_if_any(body).is_some() && p.shape.slot_if_any(x).is_some())
+        };
+        let ahead: Vec<usize> = (first + 1..last)
+            .filter(|&i| {
+                let x = self.shape.bodies[i].body;
+                with(later, x) && !with(earlier, x)
+            })
+            .collect();
+        let moved: Vec<super::shape::BodyOn> =
+            ahead.iter().map(|&i| self.shape.bodies[i]).collect();
+        for &i in ahead.iter().rev() {
+            self.shape.bodies.remove(i);
+        }
+        for (j, entry) in moved.into_iter().enumerate() {
+            self.shape.bodies.insert(first + j, entry);
+        }
+    }
+
+    /// **A part's end of a body made its own** — split off as a body of
+    /// its own where another part has it too, the body it leaves keeping
+    /// its number and whatever the train wrote on it, and the part's
+    /// members, carriers and couplings on it moving to the new one, listed
+    /// where the body is so the part numbers its bodies as it did; and
+    /// uncoupled from another part's body, where a join that could not be
+    /// coaxial coupled it ([`Self::join`]). The end's number is returned —
+    /// the body's own where it was the part's alone.
     pub fn split(&mut self, stage: usize, body: usize) -> usize {
-        if self.ends_of(body).len() < 2 {
+        let parts = self.parts();
+        let Some(part) = parts.get(stage) else {
+            return body;
+        };
+        if part.shape.slot_if_any(body).is_none() {
+            return body;
+        }
+        let across: Vec<usize> = (0..self.shape.couplings.len())
+            .filter(|c| {
+                self.shape.couplings[*c].contains(&body)
+                    && !parts.iter().any(|p| p.couplings.contains(c))
+            })
+            .collect();
+        for &c in across.iter().rev() {
+            self.shape.couplings.remove(c);
+        }
+        if ends_in(&parts, body).len() < 2 {
             return body;
         }
         let fresh = self.max_body() + 1;
-        if let Some(s) = self.stages.get_mut(stage) {
-            s.renumber_bodies(|x| if x == body { fresh } else { x });
+        let s = &mut self.shape;
+        for &i in &part.members {
+            if s.members[i].body == body {
+                s.members[i].body = fresh;
+            }
+        }
+        for &a in &part.axes {
+            if s.axes[a].carried_by == body {
+                s.axes[a].carried_by = fresh;
+            }
+        }
+        for &c in &part.couplings {
+            for x in &mut s.couplings[c] {
+                if *x == body {
+                    *x = fresh;
+                }
+            }
+        }
+        if let Some(at) = s.bodies.iter().position(|x| x.body == body) {
+            let axis = s.bodies[at].axis;
+            s.bodies
+                .insert(at + 1, super::shape::BodyOn { body: fresh, axis });
         }
         fresh
     }
@@ -1189,19 +1382,20 @@ impl Train {
     /// another keeps their loads. The bodies left are numbered densely
     /// again.
     pub fn remove_stage(&mut self, k: usize) {
-        if k >= self.stages.len() {
+        let Some(part) = self.parts().into_iter().nth(k) else {
             return;
-        }
-        self.stages.remove(k);
+        };
+        self.shape.remove_part(&part);
         self.drop_orphans();
         self.prune();
     }
 
-    /// **A stage edited on its card** ([`super::StageEdit`]): the shape
-    /// takes the edit, numbering any body it adds after every body the
-    /// train has; a body the edit took off the stage that no other stage
-    /// has leaves the train, with every case entry and hold at it, and the
-    /// rest are numbered densely again.
+    /// **A part edited on its card** ([`super::StageEdit`]): the graph
+    /// takes the edit, read in the part's own indices
+    /// ([`Shape::edit_part`]), numbering any body it adds after every body
+    /// the train has; a body the edit took off that nothing else has
+    /// leaves the train, with every case entry and hold at it, and the rest
+    /// are numbered densely again.
     ///
     /// **A body an edit leaves empty stays while anything still names it**
     /// — another stage, a hold, a case — and is given up otherwise
@@ -1219,11 +1413,12 @@ impl Train {
         edit: super::StageEdit,
     ) -> Result<(), super::EditRefused> {
         let next = self.max_body() + 1;
-        let shape = self
-            .stages
-            .get_mut(k)
+        let part = self
+            .parts()
+            .into_iter()
+            .nth(k)
             .ok_or(super::EditRefused::NoSuchIndex)?;
-        shape.edit(edit, next)?;
+        self.shape.edit_part(&part, edit, next)?;
         self.drop_bare();
         self.drop_orphans();
         self.prune();
@@ -1232,38 +1427,31 @@ impl Train {
 
     /// **Every body with nothing on it that nothing else names, given up.**
     ///
-    /// A body a stage lists with no member and no axis to carry is a shaft
+    /// A body with no member, no axis to carry and no coupling is a shaft
     /// in neutral, which is a state worth being able to reach — but only
-    /// while something means it to be there. Another stage on it, a hold,
-    /// a case's entry: any of those is a reason. None of them, and it is a
-    /// number nothing would ever read again.
+    /// while something means it to be there. A hold or a case's entry is a
+    /// reason. Neither, and it is a number nothing would ever read again.
     fn drop_bare(&mut self) {
-        let named = |train: &Self, body: usize, except: usize| {
-            train
-                .stages
-                .iter()
-                .enumerate()
-                .any(|(k, s)| k != except && s.slot(body) != GROUND)
-                || train.held.contains(&body)
-                || train.load_cases.iter().any(|c| {
+        let named = |body: usize| {
+            self.held.contains(&body)
+                || self.load_cases.iter().any(|c| {
                     c.loads.iter().any(|l| l.at == body)
                         || matches!(c.duty, super::Duty::Intermittent { at, .. } if at == body)
                 })
         };
-        for k in 0..self.stages.len() {
-            let bare: Vec<usize> = self.stages[k]
-                .bodies
-                .iter()
-                .map(|b| b.body)
-                .filter(|&b| {
-                    self.stages[k].members_on_body(b).is_empty()
-                        && !self.stages[k].carries_an_axis(b)
-                        && !self.stages[k].couplings.iter().any(|c| c.contains(&b))
-                        && !named(self, b, k)
-                })
-                .collect();
-            self.stages[k].bodies.retain(|b| !bare.contains(&b.body));
-        }
+        let s = &self.shape;
+        let bare: Vec<usize> = s
+            .bodies
+            .iter()
+            .map(|b| b.body)
+            .filter(|&b| {
+                s.members_on_body(b).is_empty()
+                    && !s.carries_an_axis(b)
+                    && !s.couplings.iter().any(|c| c.contains(&b))
+                    && !named(b)
+            })
+            .collect();
+        self.shape.bodies.retain(|b| !bare.contains(&b.body));
     }
 
     /// **A case's duty switched**, to intermittent or continuous, seeded from
@@ -1300,30 +1488,27 @@ impl Train {
     /// saying so. **The first stage takes up the parked cases** at its
     /// conventional input and output.
     pub fn push_stage(&mut self, mut stage: Shape) {
-        let k = self.stages.len();
+        let parts = self.parts();
+        let k = parts.len();
         let next = self.max_body() + 1;
         // The stage's own numbering, moved above everything the train has:
         // its slot `i` becomes body `next + i - 1`.
         let slots: Vec<usize> = stage.bodies.iter().map(|b| b.body).collect();
         stage.renumber_bodies(|b| slots.iter().position(|&x| x == b).map_or(b, |i| next + i));
-        let input = stage.ports().input();
-        let output = stage.ports().output();
+        let ports = stage.ports();
+        let (input, output) = (ports.input(), ports.output());
         // **What the stage holds by convention is written**, in train
         // numbers: from here on the train holds it because it says so.
-        let held: Vec<usize> = stage
-            .ports()
-            .held
-            .iter()
-            .map(|&slot| stage.body_at(slot))
-            .collect();
-        let onward = self.boundaries().ok().and_then(|b| {
+        let held: Vec<usize> = ports.held.iter().map(|&slot| stage.body_at(slot)).collect();
+        let onward = self.boundaries_of(&parts).ok().and_then(|b| {
             let open = self.open_ports(&b);
             let last = k.checked_sub(1)?;
-            let conventional = self.port(last, self.stages[last].ports().output());
+            let shape = &parts[last].shape;
+            let conventional = shape.body_at(shape.ports().output());
             let mine: Vec<usize> = open
                 .iter()
                 .map(|p| p.body)
-                .filter(|&body| self.ends_of(body).iter().any(|&(s, _)| s == last))
+                .filter(|&body| ends_in(&parts, body).iter().any(|&(s, _)| s == last))
                 .collect();
             if mine.contains(&conventional) {
                 Some(conventional)
@@ -1333,7 +1518,11 @@ impl Train {
                 None
             }
         });
-        self.stages.push(stage);
+        // Where the stage's slots land in the graph's list of bodies, which
+        // no merge below reorders.
+        let at = self.shape.bodies.len();
+        self.shape.append(stage);
+        let body = |train: &Self, slot: Body| train.shape.bodies[at + slot - 1].body;
         for body in held {
             if !self.held.contains(&body) {
                 self.held.push(body);
@@ -1344,14 +1533,14 @@ impl Train {
             // reaction at the stage's, not a body two stages share. Each
             // merge closes the numbers up, so the second is read afresh.
             if let Some(&a) = self.parked().first() {
-                self.merge(self.port(0, input), a);
+                self.merge(body(self, input), a);
             }
             if let Some(&b) = self.parked().first() {
-                self.merge(self.port(0, output), b);
+                self.merge(body(self, output), b);
             }
             return;
         }
-        let (input, output) = (self.port(k, input), self.port(k, output));
+        let (input, output) = (body(self, input), body(self, output));
         if let Some(from) = onward {
             for case in &mut self.load_cases {
                 for l in &mut case.loads {

@@ -56,6 +56,7 @@
     isWorm,
     carried,
   } from "./members";
+  import { cardsOf } from "./cards";
 
   /** **Resolving an over-determined stage is the core's rule, not this file's.**
    *
@@ -120,11 +121,14 @@
    *  below as a blank rather than as a row that is not there. */
   const solved = $derived(result.result ?? undefined);
   const failure = $derived(result.failure);
-  /** What a stage's inputs last came to, by name — handed back to relief so a
-   *  box it turns given holds the number it showed. An empty list where the
-   *  train has not solved, and the box keeps what it had. */
-  const figuresOf = (stage: Shape): Figure[] =>
-    result.figures[tab.train.stages.indexOf(stage)] ?? [];
+  /** **The cards**: one per part of the train's graph, as the core deals
+   *  them, each standing on the graph's own pieces (`cards.ts`) — so a box
+   *  bound to a card's member writes the train. */
+  const cards = $derived(cardsOf(tab.train, result.topology));
+  /** What a card's inputs last came to, by name — handed back to relief so
+   *  a box it turns given holds the number it showed. An empty list where
+   *  the train has not solved, and the box keeps what it had. */
+  const figuresOf = (stage: Shape): Figure[] => result.figures[cards.indexOf(stage)] ?? [];
 
   /** **A stage's port is on a body of the train**, numbered across the
    *  train as gears are, ground being 0. The select beside a port says
@@ -151,7 +155,7 @@
     portBodies.filter(
       (q) =>
         q.body === p.body ||
-        (!heldNow(q) && !endsOf(tab.train, q.body).some((e) => e.stage === stage)),
+        (!heldNow(q) && !endsOf(result.topology, q.body).some((e) => e.stage === stage)),
     );
   /** **A stage's end moved to another body**, written back through the
    *  core's one rule (`move_end`): the end is split off where the body ran
@@ -202,7 +206,7 @@
   /** A body by reference: its number and every end of it, **as the gear
    *  tab's adopt list names a member** — "Body 2 (Shape 1 Gear 2 · Stage 2
    *  Sun)" — so a body is one name wherever a list has it. */
-  const refLabel = (body: number): string => bodyRefName(tab.train, result.topology, body);
+  const refLabel = (body: number): string => bodyRefName(result.topology, body);
   /** Every gear of the train in the order a path numbers them — stage by
    *  stage, member by member — with the name a list gives it. */
   const gears = $derived(memberRefs(tab.train, result.topology));
@@ -282,7 +286,7 @@
   /** The heading's summary of a case: each given figure at its port —
    *  none while the train has no stages and the entries are parked. */
   const caseSummary = (c: LoadCase): string =>
-    tab.train.stages.length === 0 ? "" : c.loads
+    cards.length === 0 ? "" : c.loads
       .filter((l) => l.role === "load")
       .map((l) => {
         const parts: string[] = [];
@@ -453,7 +457,7 @@
    *  and goes by the body that carries it. */
   const axisName = (shape: Shape, stage: number, axis: number): string => {
     const on = shape.members
-      .map((m, j) => (axisOfBody(shape, m.body) === axis ? memberName(tab.train, result.topology, stage, j) : null))
+      .map((m, j) => (axisOfBody(shape, m.body) === axis ? memberName(result.topology, stage, j) : null))
       .filter((x) => x !== null);
     if (on.length > 0) return on.join(" / ");
     const b = shape.bodies.find((x) => x.axis === axis);
@@ -1329,7 +1333,7 @@
      set's carrier releases its ring — which is the core's rule and is read
      back, not repeated. -->
 {#snippet bodies_of(i: number)}
-  {@const shape = tab.train.stages[i]}
+  {@const shape = cards[i]}
   {@const movable = movableGears(shape)}
   <h4 class="bodies section-heading">{t("ui.train_stage_bodies")}</h4>
   <!-- **The stage's own three levels, in the order the shape has them**: an
@@ -1366,10 +1370,10 @@
           {#if heldBodies.has(b.body)}<span class="chip held">{t("ui.train_case_fixed")}</span>{/if}
           <!-- A body another stage also lists is the same body: what it is
                over there is said here, since that is what makes it shared. -->
-          {#each endsOf(tab.train, b.body).filter((e) => e.stage !== i) as e (e.stage)}
+          {#each endsOf(result.topology, b.body).filter((e) => e.stage !== i) as e (e.stage)}
             <span class="chip">{t("ui.train_port_at", {
               stage: t("ui.train_stage_heading", { number: String(e.stage + 1) }),
-              on: onSlot(tab.train, result.topology, e.stage, e.slot, false),
+              on: onSlot(result.topology, e.stage, e.slot, false),
             })}</span>
           {/each}
           <!-- **What is done to the body, on the body's row** — held to the
@@ -1383,7 +1387,7 @@
             <span class="filler"></span>
             {@const held = heldNow(port)}
             {@const targets = joinable(i, port).filter((q) => q.body !== b.body)}
-            {@const ends = endsOf(tab.train, b.body)}
+            {@const ends = endsOf(result.topology, b.body)}
             {#if targets.length > 0 || ends.length > 1}
               <select
                 class="action move"
@@ -1437,7 +1441,7 @@
         {#each b.members as j (j)}
           {@const where = movable.find((x) => x.member === j)}
           <div class="onbody">
-            <span>{memberListName(tab.train, result.topology, i, j)}</span>
+            <span>{memberListName(result.topology, i, j)}</span>
             <!-- **A menu, not a value.** The body it is on is the row it is
                  under; a select showing it back would put a reading where
                  there is only an action. Listed only where there is
@@ -1447,7 +1451,7 @@
                 class="action move"
                 value=""
                 aria-label={t("ui.train_move_to_of", {
-                  name: memberListName(tab.train, result.topology, i, j),
+                  name: memberListName(result.topology, i, j),
                 })}
                 onchange={(e) => {
                   const v = e.currentTarget.value;
@@ -1824,7 +1828,7 @@
         </dd>
       </dl>
     {/each}
-    {#if solved && solved.paths.length === 0 && tab.train.stages.length > 0}
+    {#if solved && solved.paths.length === 0 && cards.length > 0}
       <p class="notice">{t("ui.train_family_no_figure")}</p>
     {/if}
     <!-- **The train's bodies, and what each carries across the stages** —
@@ -1838,7 +1842,7 @@
       <dl class="out bodies">
         {#each portBodies as p (p.body)}
           <dt>{bodyName(p.body)}{#if heldNow(p)} <small>{t("ui.train_case_fixed")}</small>{/if}</dt>
-          <dd>{acrossBody(tab.train, result.topology, p.body)}</dd>
+          <dd>{acrossBody(result.topology, p.body)}</dd>
         {/each}
       </dl>
     {/if}
@@ -2094,10 +2098,10 @@
 </div>
 
 <div class="stages">
-  {#if tab.train.stages.length === 0}
+  {#if cards.length === 0}
     <p class="notice">{t("ui.train_no_stages")}</p>
   {/if}
-  {#each tab.train.stages as stage, i (i)}
+  {#each cards as stage, i (i)}
     {@const res = solved?.stages[i] ?? null}
     {@const figures = figuresOf(stage)}
     {@const worm = isWorm(stage)}
@@ -2107,7 +2111,7 @@
     {@const parallel = family === "parallel"}
     {@const replicated = stage.axes.map((a, k) => (a.count > 1 ? k : -1)).filter((k) => k >= 0)}
     {@const carriedAxes = stage.axes.map((a, k) => (a.carried_by !== 0 ? k : -1)).filter((k) => k >= 0)}
-    {@const name = (j: number) => memberName(tab.train, result.topology, i, j)}
+    {@const name = (j: number) => memberName(result.topology, i, j)}
     {@const meshGroups = result.topology[i]?.mesh_groups ?? [stage.members.map((_, j) => j)]}
     {@const carriers = stage.bodies
       .map((b, s) => ({ body: b.body, slot: s + 1 }))

@@ -3152,7 +3152,7 @@ impl Train {
             ],
             reversed_bending: false,
             held: boundary.held(),
-            stages: vec![stage],
+            shape: stage,
         }
     }
 
@@ -3238,16 +3238,19 @@ impl std::ops::Deref for Alone {
 
 /// **A train of one, solved** ([`Train::alone`]) — see [`Alone`]. A lone
 /// stage's fault is its own, so it is handed back as the stage raised it
-/// rather than wrapped in which stage of one it was.
+/// rather than wrapped in which stage of one it was. **Solved as one
+/// card**, whatever parts it falls into ([`graph::Part::whole`]): a stage
+/// of two pairs through a compound shaft is asked as the stage it is.
 ///
 /// # Errors
 ///
 /// Whatever the stage reports.
 pub fn solve_alone(train: &Train, lib: &MaterialLibrary) -> Result<Alone, TrainError> {
-    if train.stages.is_empty() {
+    if train.shape.members.is_empty() {
         return Err(MotionError::Empty.into());
     }
-    let mut r = solve_train(train, lib).map_err(|e| match e {
+    let whole = [graph::Part::whole(&train.shape)];
+    let mut r = solve_parts(train, &whole, lib).map_err(|e| match e {
         TrainError::InStage { cause, .. } => *cause,
         other => other,
     })?;
@@ -3390,6 +3393,7 @@ pub fn loaded_cycles(turns: Turns) -> Cycles {
 #[allow(clippy::too_many_arguments)]
 fn paths_of(
     train: &Train,
+    parts: &[graph::Part],
     boundaries: &[StageBoundary],
     system: &crate::kinematics::System,
     [moving, resting]: [&[flow::MeshFlow]; 2],
@@ -3417,7 +3421,7 @@ fn paths_of(
         }
     };
     // An entry at a held body, or at one no stage has, is no path's end.
-    let bodies = train.bodies(boundaries);
+    let bodies = train.bodies_of(parts, boundaries);
     let open = |b: usize| -> Option<usize> {
         bodies
             .iter()
@@ -3473,9 +3477,10 @@ fn paths_of(
     // the same motion asked of the system with that one count raised.
     let per_tooth = |from: Body, to: Body| -> Vec<Option<f64>> {
         let mut out = Vec::new();
-        for (k, stage) in train.stages.iter().enumerate() {
-            for i in 0..stage.members.len() {
-                let raised = train.system_raising(k, i).ok().and_then(|sys| {
+        for (k, part) in parts.iter().enumerate() {
+            for i in 0..part.shape.members.len() {
+                let raising = |j: usize, m: usize, z: u32| if (j, m) == (k, i) { z + 1 } else { z };
+                let raised = train.system_counting(parts, raising).ok().and_then(|sys| {
                     let mut c: Vec<Condition> = base.to_vec();
                     c[from] = Condition::Drive(crate::ratio::Ratio::ONE);
                     let s = sys.motion_in(&c, &[from]).ok()?;
@@ -3587,10 +3592,12 @@ pub struct Train {
     /// [`Reversal`].
     #[cfg_attr(feature = "serde", serde(default))]
     pub reversed_bending: bool,
-    /// The stages, each naming the train's bodies on its axes: a body two
-    /// stages name is what a coupling used to say, and the bodies are the
-    /// numbers in use — nothing lists them.
-    pub stages: Vec<Shape>,
+    /// **The train as one graph** — its axes, the bodies on them, the gears
+    /// on those, the meshes and the distances between axes that mesh, and
+    /// the couplings — every preset added laid into it, a body two presets
+    /// share listed once on the one axis it turns about. Its parts are what
+    /// the cards show ([`Train::parts`]); nothing stores them.
+    pub shape: Shape,
     /// **The bodies held to ground**, every one stated. A preset's
     /// conventional hold — a set's ring — is written here when it is
     /// inserted ([`Train::push_stage`]), so a body is held exactly where
@@ -3990,11 +3997,23 @@ impl TrainResult {
 /// A train with no stages, a train whose motion is a family under its own
 /// constraints, and whatever a stage refuses.
 pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, TrainError> {
+    solve_parts(train, &train.parts(), lib)
+}
+
+/// **The train solved card by card** — each of `parts` closed, sized,
+/// searched and rated on its own, one flow and one motion across them all.
+/// The train's own parts ([`Train::parts`]), or a lone stage's whole shape
+/// ([`solve_alone`]).
+fn solve_parts(
+    train: &Train,
+    parts: &[graph::Part],
+    lib: &MaterialLibrary,
+) -> Result<TrainResult, TrainError> {
     // **A train with no stages is a train**: nothing to rate, no figure of
     // its own, and every case reported unsolved with nothing to say of it —
     // the train's own state says why — so a designer who removes the last
     // stage keeps the cases and sees them wait.
-    if train.stages.is_empty() {
+    if parts.is_empty() {
         return Ok(TrainResult {
             paths: Vec::new(),
             cases: train
@@ -4025,8 +4044,9 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
     // motion, and what a family has none of is a figure read under one.
     // **What each stage's convention says** — which of its bodies are the
     // train's ends — is read for the paths and the bodies below.
-    train.motion()?;
-    let boundaries = train.boundaries()?;
+    train.motion_of(parts)?;
+    let boundaries = train.boundaries_of(parts)?;
+    let port = |k: usize, slot: Body| parts[k].shape.body_at(slot);
 
     // Two passes: the first learns the geometry — each stage's meshes and
     // their efficiencies, which no load can move — and the second rates it.
@@ -4037,9 +4057,9 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
      -> Result<(Vec<ShapeResult>, Vec<shape::Chosen>), TrainError> {
         let mut results = Vec::new();
         let mut chosen = Vec::new();
-        for (k, stage) in train.stages.iter().enumerate() {
+        for (k, part) in parts.iter().enumerate() {
             let (r, c) = shape::solve_shape_after(
-                stage,
+                &part.shape,
                 &loads(k),
                 lib,
                 reversal,
@@ -4057,9 +4077,9 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
     let (first, chosen) = solve(&|_| Vec::new(), None)?;
 
     // ---- the train's graph, with every stage's meshes on it.
-    let system = train.system()?;
+    let system = train.system_counting(parts, |_, _, z| z)?;
     let shafts = system.bodies();
-    let wirings: Vec<Wiring> = train.stages.iter().map(Shape::wiring).collect();
+    let wirings: Vec<Wiring> = parts.iter().map(|p| p.shape.wiring()).collect();
     // Each stage's meshes as the flow sees them, in one list, with the first
     // pass's efficiencies — sliding, and locked where it locks at rest —
     // and the same list against static friction, which is what a path's
@@ -4073,9 +4093,9 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
         for (j, m) in w.meshes.iter().enumerate() {
             mine.push(meshes.len());
             let mesh = flow::MeshFlow {
-                a: train.port(k, w.mounts[m.a].spins_with),
-                b: train.port(k, w.mounts[m.b].spins_with),
-                frame: w.frame(j).map_or(GROUND, |f| train.port(k, f)),
+                a: port(k, w.mounts[m.a].spins_with),
+                b: port(k, w.mounts[m.b].spins_with),
+                frame: w.frame(j).map_or(GROUND, |f| port(k, f)),
                 za: f64::from(first[k].members[m.a].params.teeth),
                 zb: m.kind.sign() * f64::from(first[k].members[m.b].params.teeth),
                 efficiency: reports[j].efficiency,
@@ -4092,34 +4112,41 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
     // **Every offset coupling after every mesh**: a way through the flow
     // that loses nothing either way — a mesh of one tooth and minus one,
     // so the frame it would stand in carries nothing — and no teeth, so
-    // what a path says passes its teeth does not count it.
+    // what a path says passes its teeth does not count it. A part's own
+    // first, part by part, and then each between two parts' bodies — a
+    // join that could not be coaxial — which no part rates.
     let with_teeth = meshes.len();
+    let coupling = |a: Body, b: Body| flow::MeshFlow {
+        a,
+        b,
+        frame: GROUND,
+        za: 1.0,
+        zb: -1.0,
+        efficiency: Directional::of(|_| 1.0),
+        paths: 1.0,
+    };
     let mut coupling_of_stage: Vec<Vec<usize>> = Vec::new();
     for (k, w) in wirings.iter().enumerate() {
         let mut mine = Vec::new();
         for &[a, b] in &w.couplings {
             mine.push(meshes.len());
-            let coupling = flow::MeshFlow {
-                a: train.port(k, a),
-                b: train.port(k, b),
-                frame: GROUND,
-                za: 1.0,
-                zb: -1.0,
-                efficiency: Directional::of(|_| 1.0),
-                paths: 1.0,
-            };
-            meshes.push(coupling);
-            resting.push(coupling);
+            meshes.push(coupling(port(k, a), port(k, b)));
+            resting.push(coupling(port(k, a), port(k, b)));
         }
         coupling_of_stage.push(mine);
+    }
+    for (c, &[a, b]) in train.shape.couplings.iter().enumerate() {
+        if !parts.iter().any(|p| p.couplings.contains(&c)) {
+            meshes.push(coupling(a, b));
+            resting.push(coupling(a, b));
+        }
     }
     // Every body's label, ground first, as the report lists them and as the
     // case's conditions index them: what the body is on the first stage
     // that has it.
     let refs: Vec<(usize, BodyLabel)> = (0..shafts)
         .map(|b| {
-            let label = train
-                .ends_of(b)
+            let label = conditions::ends_in(parts, b)
                 .first()
                 .map_or(BodyLabel::Ground, |&(k, slot)| wirings[k].slots[slot]);
             (b, label)
@@ -4141,7 +4168,7 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
     // of a case that is off whether it could be switched on; only a case
     // that is on reaches a stage's rating.
     let mut cases = Vec::new();
-    let mut per_stage: Vec<Vec<CaseLoad>> = vec![Vec::new(); train.stages.len()];
+    let mut per_stage: Vec<Vec<CaseLoad>> = vec![Vec::new(); parts.len()];
     for (index, case) in train.load_cases.iter().enumerate() {
         let mut notes = Vec::new();
         // Every entry by the body it names, whatever it declares; the
@@ -4156,10 +4183,10 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
         // ring's — is refused by name. A body two stages share is a port
         // of both, and a load there is a load on the body they make.
         let mut ports: Vec<Body> = Vec::new();
-        for (k, stage) in train.stages.iter().enumerate() {
-            for s in stage.ports().ports {
+        for (k, part) in parts.iter().enumerate() {
+            for s in part.shape.ports().ports {
                 if boundaries[k].conditions[s] != Condition::Ground {
-                    ports.push(train.port(k, s));
+                    ports.push(port(k, s));
                 }
             }
         }
@@ -4424,13 +4451,11 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
                 mesh_torques: mine.iter().map(|&g| flow.mesh_torques[g]).collect(),
                 directions: mine.iter().map(|&g| flow.directions[g]).collect(),
                 mesh_powers: mine.iter().map(|&g| flow.mesh_powers[g]).collect(),
-                speeds: (0..w.slots.len())
-                    .map(|l| speeds[train.port(k, l)])
-                    .collect(),
+                speeds: (0..w.slots.len()).map(|l| speeds[port(k, l)]).collect(),
                 torques,
                 turns: turns
                     .as_ref()
-                    .map(|t| (0..w.slots.len()).map(|l| t[train.port(k, l)]).collect()),
+                    .map(|t| (0..w.slots.len()).map(|l| t[port(k, l)]).collect()),
                 reversing_actuations,
             });
         }
@@ -4471,6 +4496,7 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
     // none of them assumes a chain, a list order, or a head.
     let paths = paths_of(
         train,
+        parts,
         &boundaries,
         &system,
         [&body_meshes, &resting],
@@ -4763,7 +4789,7 @@ mod tests {
         // enters at the output and walks up; a worm stops it, and every stage
         // between it and the output carries it.
         {
-            let mut s = train.stages.clone();
+            let mut s = train.stages();
             s.insert(0, arr::worm(1, 40));
             restage(&mut train, s);
         }
@@ -5416,7 +5442,7 @@ mod tests {
             let mut train = two_stage();
             train.load_cases[BACK].set_torque(applied);
             {
-                let mut s = train.stages.clone();
+                let mut s = train.stages();
                 s.insert(0, arr::worm(1, 40));
                 restage(&mut train, s);
             }
@@ -5455,7 +5481,7 @@ mod tests {
                     // too, and which mesh gives it can differ by direction.
                     // The law is exact for a member in one mesh, and for a
                     // planet within the meshes' efficiencies of each other.
-                    let meshes_in = train.stages[k]
+                    let meshes_in = train.stages()[k]
                         .meshes
                         .iter()
                         .filter(|m| m.a == i || m.b == i)
@@ -5879,7 +5905,7 @@ mod tests {
         let mut train = two_stage();
         train.load_cases[BACK].set_torque(0.5);
         {
-            let mut s = train.stages.clone();
+            let mut s = train.stages();
             s.insert(0, arr::worm(1, 40));
             restage(&mut train, s);
         }
@@ -6259,7 +6285,7 @@ mod tests {
                 m.solution.redundant
             );
 
-            let ratios: Vec<f64> = (0..train.stages.len())
+            let ratios: Vec<f64> = (0..train.parts().len())
                 .map(|k| across(&train, k, &lib).ratio)
                 .collect();
             for (k, stage) in ratios.iter().enumerate() {
@@ -6437,7 +6463,7 @@ mod tests {
         let mut checked = 0u32;
         for train in [two_stage(), mixed_train()] {
             let r = solve_train(&train, &lib).expect("these trains solve");
-            let wirings: Vec<Wiring> = train.stages.iter().map(Shape::wiring).collect();
+            let wirings: Vec<Wiring> = train.stages().iter().map(Shape::wiring).collect();
             let boundaries = train.boundaries().unwrap();
             // **Which member sits on a body is the wiring's answer, not the
             // member order's.** An epicyclic set's output is its *carrier*,
@@ -6751,7 +6777,7 @@ mod tests {
     fn a_given_torque_that_works_against_its_port_is_driven_by_what_is_derived() {
         let lib = library();
         let mut t = two_stage();
-        let one = t.stages[..1].to_vec();
+        let one = t.stages()[..1].to_vec();
         restage(&mut t, one);
         let ratio = 43.0 / 17.0;
         let case = |torque: f64, speed: f64| -> (Train, TrainResult) {
@@ -6823,8 +6849,8 @@ mod tests {
         t.release(t.port(1, 3));
         let (start, end) = ends_of(&t);
         t.load_cases = vec![LoadCase::ultimate(start, end, 0.1, 30000.0)];
-        for sh in &mut t.stages {
-            for m in &mut sh.members {
+        {
+            for m in &mut t.shape.members {
                 m.gear.face_width = Auto::automatic(7.0);
             }
         }
@@ -6852,7 +6878,7 @@ mod tests {
     fn a_declared_port_is_what_it_says_and_relief_leaves_it_alone() {
         let lib = library();
         let mut t = two_stage();
-        let one = t.stages[..1].to_vec();
+        let one = t.stages()[..1].to_vec();
         restage(&mut t, one);
         t.load_cases = vec![LoadCase {
             loads: vec![
@@ -6926,7 +6952,7 @@ mod tests {
         let (start, end) = ends_of(&t);
         t.load_cases.push(LoadCase::back_driving(start, end, 3.0));
         t.remove_stage(0);
-        assert!(t.stages.is_empty());
+        assert!(t.parts().is_empty());
         let r = solve_train(&t, &lib).expect("a train with no stages solves");
         assert!(!r.cases[0].solved);
         assert_eq!(t.load_cases[0].loads[0].at, 1, "parked where it was");
@@ -7002,7 +7028,7 @@ mod tests {
         // Each pair asked alone: a path across one stage of three is rated on
         // that stage and nothing else.
         let s: Vec<Alone> = t
-            .stages
+            .stages()
             .iter()
             .map(|x| solve_alone(&Train::alone(x, 1.0, 1000.0), &lib).unwrap())
             .collect();
@@ -7262,8 +7288,8 @@ mod tests {
         assert!(t.load_cases[0].loads[1].torque.auto);
         let r = solve_train(&t, &lib).expect("a family is rated under its cases");
         assert!(r.paths.is_empty(), "a family has no path");
-        let zs = f64::from(t.stages[0].gears()[0].teeth);
-        let zr = f64::from(t.stages[0].gears()[2].teeth);
+        let zs = f64::from(t.stages()[0].gears()[0].teeth);
+        let zr = f64::from(t.stages()[0].gears()[2].teeth);
         let c = &r.cases[0];
         assert!(c.solved, "{:?}", c.notes);
         let w = |shaft| c.shaft(at(shaft)).unwrap().speed.unwrap();
@@ -7291,7 +7317,7 @@ mod tests {
             "a family has no quotient"
         );
         let (sun, carrier, ring) = (1, 2, 3);
-        let z = |k: usize| crate::ratio::Ratio::whole(i64::from(t.stages[0].gears()[k].teeth));
+        let z = |k: usize| crate::ratio::Ratio::whole(i64::from(t.stages()[0].gears()[k].teeth));
         let (zs, zr) = (z(0), z(2));
         for p in [0i64, 1, -2, 7] {
             let p = crate::ratio::Ratio::whole(p);
@@ -8583,7 +8609,7 @@ mod tests {
     fn restage(t: &mut Train, stages: Vec<Shape>) {
         let (old_start, old_end) = ends_of(t);
         let fresh = Train::chained(stages, |_| Vec::new());
-        t.stages = fresh.stages;
+        t.shape = fresh.shape;
         t.held = fresh.held;
         let (start, end) = ends_of(t);
         let carry = |at: &mut usize| {
@@ -8618,7 +8644,7 @@ mod tests {
     /// cannot exercise and which is where a coupling to the wrong body would
     /// show.
     fn mixed_train() -> Train {
-        let second = two_stage().stages.remove(1);
+        let second = two_stage().stages().remove(1);
         train_of(vec![
             arr::pair([17, 43]),
             arr::planetary(12, 30, 72, 3),
@@ -8731,9 +8757,9 @@ mod tests {
     fn efficiency_always_costs_torque() {
         let lib = library();
         let mut lossless = two_stage();
-        for s in &mut lossless.stages {
-            s.meshes[0].sliding_friction = 0.0;
-            s.meshes[0].static_friction = 0.0;
+        for m in &mut lossless.shape.meshes {
+            m.sliding_friction = 0.0;
+            m.static_friction = 0.0;
         }
         let ideal = solve_train(&lossless, &lib).unwrap();
         let real = solve_train(&two_stage(), &lib).unwrap();
@@ -8911,7 +8937,8 @@ mod tests {
 
         let loosen = |k: usize| {
             let mut t = base.clone();
-            t.stages[k].distances[0].clearance.manual *= 4.0;
+            let d = t.parts()[k].distances[0];
+            t.shape.distances[d].clearance.manual *= 4.0;
             solve_train(&t, &lib)
                 .unwrap()
                 .total()
@@ -9236,7 +9263,7 @@ mod tests {
                     let carrier = shafts.speeds[2];
                     let planets = p.layouts.first().map_or(1, |l| l.count);
                     let n = f64::from(planets);
-                    let w = train.stages[0].wiring();
+                    let w = train.stages()[0].wiring();
                     let (sun, planet, ring) = (&p.members[0], &p.members[1], &p.members[2]);
                     for (member, which, got, speed) in [
                         (0, "sun", cycles(sun).bending, shafts.speeds[1]),
@@ -9947,7 +9974,8 @@ mod tests {
         );
 
         // A centre distance of zero is not a mesh, and it is the middle stage's.
-        train.stages[1].distances[0].distance = Auto::fixed(0.0);
+        let d = train.parts()[1].distances[0];
+        train.shape.distances[d].distance = Auto::fixed(0.0);
 
         let e = solve_train(&train, &library()).expect_err("a mesh at no distance is not a train");
         let TrainError::InStage { stage, cause } = &e else {
@@ -10167,7 +10195,7 @@ mod tests {
         let t = Train {
             load_cases: vec![LoadCase::ultimate(1, 2, 1.0, 1.0)],
             reversed_bending: false,
-            stages: vec![],
+            shape: Shape::default(),
             held: Vec::new(),
         };
         let r = solve_train(&t, &library()).expect("a train with no stages is a train");
@@ -10638,7 +10666,7 @@ mod tests {
         let mut t = two_stage();
         t.load_cases[BACK].set_torque(500.0);
         {
-            let mut s = t.stages.clone();
+            let mut s = t.stages();
             s.insert(0, {
                 let mut s = arr::worm(1, 40);
                 s.meshes[0].sliding_friction = 0.3;
@@ -10766,7 +10794,7 @@ mod tests {
         let lib = library();
         let mut train = two_stage();
         {
-            let mut s = train.stages.clone();
+            let mut s = train.stages();
             s.insert(0, arr::worm(17, 23).with_first_helix(9.0));
             restage(&mut train, s);
         }
@@ -10802,8 +10830,8 @@ mod tests {
             train.push_stage(arr::worm(1, 40));
             train.push_stage(arr::planetary(12, 30, 72, 3));
             train.push_stage(hula());
-            for m in &mut train.stages[0].members {
-                m.gear.face_width = Auto::automatic(7.0);
+            for i in train.parts()[0].members.clone() {
+                train.shape.members[i].gear.face_width = Auto::automatic(7.0);
             }
             train.load_cases = if off {
                 vec![LoadCase {
@@ -10884,7 +10912,7 @@ mod a_path_is_what_it_crosses {
             close(pc.forward, c.forward) && close(pc.backward, c.backward),
             "{name}: circulation {pc:?} vs {c:?}"
         );
-        let offset: usize = train.stages[..k].iter().map(|s| s.members.len()).sum();
+        let offset: usize = train.stages()[..k].iter().map(|s| s.members.len()).sum();
         let mine = alone.ratio_per_tooth.as_ref().unwrap();
         for (i, want) in mine.iter().enumerate() {
             let got = path.per_tooth[offset + i];

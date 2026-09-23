@@ -480,6 +480,38 @@ one-off `gear-cli convert` rewrites it, with a law holding every converted
 fixture's figures to its Phase-3 answer. *Diff: the corpus's train fixtures
 change form and no number moves.*
 
+**Phase 4, step 3 — the train is one graph.** Done, in two commits. First
+the edits a parallel card needed to stand on a graph: an axis at any gear
+and any axis removed (`AddAxis { mate }`, `RemoveAxis { axis }`). Then the
+flip: `Train { load_cases, reversed_bending, shape, held }`, the cards read
+off it (`Train::parts`, dealt in `StagePorts::part`) and solved part by part
+(`solve_parts`; a stage asked alone is one card, `Part::whole`). Decided on
+the way, each held by a law run first against the code it guards:
+- **An edit is the card's**: asked in its numbering, made on the graph
+  through the part's maps (`Shape::edit_part`), reading its stage among
+  the card's gears — an axis removed from them alone, a gear alone among
+  them already on a body of its own. Every add on every preset, asked of
+  it as a train's second card, is the same add alone.
+- **A join is one body on one axis**, the axes one line, refused across an
+  axis distance, and an offset coupling where an end orbits, which a split
+  takes away; **every part keeps its own order of bodies** through it
+  (`keep_orders`), since a card's slots are what its conventions read.
+- **A card lists what it has something on**: a layshaft's output in neutral
+  is the next stage's and not on the layshaft's card until a gear is
+  engaged on it again (`state.md`).
+- **The converter** is `graph_of` behind `gear-cli convert`; its laws hold
+  the converted graph to what a chain builds now, to the stages' motion
+  and to their solves, and the elevation drive the old tool wrote converts
+  to the file the tool writes now, every figure bit for bit.
+- The panel's cards stand on the graph's own objects (`web/src/cards.ts`),
+  so binding and relief are unchanged, and the sidebar's count is the
+  core's parts.
+*Diff: as planned.* The graph corpus and every train record byte for byte;
+`trainfile` shorter by the bodies no longer listed twice; a worm feeding a
+pair in one stage reads as the two parts it is, every figure as it was; the
+wasm record's storage form, every solved number identical and the cards
+after every probe edit the old stages field for field.
+
 **Phase 5 — one edit set.** §2.6. `every_add_on_every_preset_solves`,
 `every_add_undoes` and `a_refused_edit_changes_nothing` sweep every preset
 inserted alone and after another; new laws for `Join`'s axis merge and its

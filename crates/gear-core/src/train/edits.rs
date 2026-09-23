@@ -23,9 +23,10 @@ use super::StageGear;
 use crate::kinematics::GROUND;
 use crate::params::Auto;
 
-/// What a card asks of a stage. Indices are the shape's own: a member, a
-/// mesh, a distance by position; a body as the wiring numbers it, ground
-/// being 0 and the first listed body 1.
+/// What a card asks of a stage. Indices are the card's own — a member, a
+/// mesh, a distance, an axis or a coupling by its position in the part
+/// ([`super::graph::Part`]), which on a shape asked alone is the shape's —
+/// and a body is the train's number for it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
@@ -165,16 +166,80 @@ impl Shape {
     /// [`EditRefused`] where the edit would break an invariant, with the
     /// shape untouched.
     pub fn edit(&mut self, edit: StageEdit, next: usize) -> Result<(), EditRefused> {
+        let all: Vec<usize> = (0..self.members.len()).collect();
+        self.edit_among(&all, edit, next)
+    }
+
+    /// **An edit a card asks of its part**, on the graph the part is of:
+    /// the card's indices read through the part's maps into the graph's
+    /// ([`super::graph::Part`]), and an axis removed from the card's gears
+    /// alone — a shaft another part's gears are on stays, with them.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::edit`], and [`EditRefused::NoSuchIndex`] for an index
+    /// the part does not have.
+    pub fn edit_part(
+        &mut self,
+        part: &super::graph::Part,
+        edit: StageEdit,
+        next: usize,
+    ) -> Result<(), EditRefused> {
+        let at = |v: &[usize], i: usize| v.get(i).copied().ok_or(EditRefused::NoSuchIndex);
+        let member = |i: usize| at(&part.members, i);
+        let edit = match edit {
+            StageEdit::AddStep { axis } => StageEdit::AddStep {
+                axis: at(&part.axes, axis)?,
+            },
+            StageEdit::RemoveStep { gear } => StageEdit::RemoveStep {
+                gear: member(gear)?,
+            },
+            StageEdit::AddCentral { gear, ring } => StageEdit::AddCentral {
+                gear: member(gear)?,
+                ring,
+            },
+            StageEdit::RemoveMember { member: i } => StageEdit::RemoveMember { member: member(i)? },
+            StageEdit::AddAxis { mate } => StageEdit::AddAxis {
+                mate: member(mate)?,
+            },
+            StageEdit::RemoveAxis { axis } => StageEdit::RemoveAxis {
+                axis: at(&part.axes, axis)?,
+            },
+            StageEdit::AddMesh { distance } => StageEdit::AddMesh {
+                distance: at(&part.distances, distance)?,
+            },
+            StageEdit::RemoveMesh { mesh } => StageEdit::RemoveMesh {
+                mesh: at(&part.meshes, mesh)?,
+            },
+            StageEdit::MoveBody { member: i, body } => StageEdit::MoveBody {
+                member: member(i)?,
+                body,
+            },
+            StageEdit::Couple { body } => StageEdit::Couple { body },
+            StageEdit::Uncouple { coupling } => StageEdit::Uncouple {
+                coupling: at(&part.couplings, coupling)?,
+            },
+        };
+        self.edit_among(&part.members, edit, next)
+    }
+
+    /// An edit, with `among` the gears the asking card has.
+    fn edit_among(
+        &mut self,
+        among: &[usize],
+        edit: StageEdit,
+        next: usize,
+    ) -> Result<(), EditRefused> {
         match edit {
             StageEdit::AddStep { axis } => self.add_step(axis, next),
             StageEdit::RemoveStep { gear } => self.remove_step(gear),
             StageEdit::AddCentral { gear, ring } => self.add_central(gear, ring, next),
             StageEdit::RemoveMember { member } => self.remove_member(member),
             StageEdit::AddAxis { mate } => self.add_axis(mate, next),
-            StageEdit::RemoveAxis { axis } => self.remove_axis(axis),
+            StageEdit::RemoveAxis { axis } => self.remove_axis(axis, among),
             StageEdit::AddMesh { distance } => self.add_mesh_on(distance, next),
             StageEdit::RemoveMesh { mesh } => self.remove_mesh(mesh),
-            StageEdit::MoveBody { member, body } => self.move_body(member, body, next),
+            StageEdit::MoveBody { member, body } => self.move_body(member, body, among, next),
             StageEdit::Couple { body } => self.couple(body, next),
             StageEdit::Uncouple { coupling } => self.uncouple(coupling),
         }
@@ -443,19 +508,26 @@ impl Shape {
         Ok(())
     }
 
-    fn remove_axis(&mut self, axis: usize) -> Result<(), EditRefused> {
+    /// The axis removed from the gears `among` — every gear a shape has,
+    /// asked alone; a card's, asked of a graph, where a shaft another
+    /// part's gears are on stays with them.
+    fn remove_axis(&mut self, axis: usize, among: &[usize]) -> Result<(), EditRefused> {
         if axis >= self.axes.len() {
             return Err(EditRefused::NoSuchIndex);
         }
-        let turns_a_carrier = self
-            .axes
-            .iter()
-            .any(|a| a.carried_by != GROUND && self.axis_of_body(a.carried_by) == Some(axis));
+        let axis_of = |i: usize| self.axis_of_slot(self.slot_of_member(i));
+        let turns_a_carrier = self.axes.iter().enumerate().any(|(c, a)| {
+            a.carried_by != GROUND
+                && self.axis_of_body(a.carried_by) == Some(axis)
+                && among.iter().any(|&i| axis_of(i) == Some(c))
+        });
         if self.carried(axis) || turns_a_carrier {
             return Err(EditRefused::WrongFamily);
         }
-        let on_axis: Vec<usize> = (0..self.members.len())
-            .filter(|&i| self.axis_of_slot(self.slot_of_member(i)) == Some(axis))
+        let on_axis: Vec<usize> = among
+            .iter()
+            .copied()
+            .filter(|&i| axis_of(i) == Some(axis))
             .collect();
         // **A gear left behind meshing nothing** is no mechanism: the
         // idler of a chain goes with the chain's end, not before it.
@@ -468,31 +540,47 @@ impl Shape {
         if stranded {
             return Err(EditRefused::LastOfItsKind);
         }
+        let mut on_axis = on_axis;
+        on_axis.sort_unstable();
         for &i in on_axis.iter().rev() {
             self.drop_member(i);
         }
-        // Any body left on it, and its distances, and the axis — the axes
-        // after it renumbered down.
+        // Every body left on it with nothing on it, every distance on it
+        // with no mesh left, and the axis where nothing is left on it —
+        // the axes after it renumbered down.
         let gone: Vec<usize> = self
             .bodies
             .iter()
-            .filter(|b| b.axis == axis)
+            .filter(|b| {
+                b.axis == axis
+                    && self.members_on_body(b.body).is_empty()
+                    && !self.carries_an_axis(b.body)
+            })
             .map(|b| b.body)
             .collect();
         self.couplings
             .retain(|c| !c.iter().any(|b| gone.contains(b)));
-        self.bodies.retain(|b| b.axis != axis);
-        self.distances.retain(|d| !d.axes.contains(&axis));
-        self.axes.remove(axis);
-        for b in &mut self.bodies {
-            if b.axis > axis {
-                b.axis -= 1;
-            }
+        self.bodies.retain(|b| !gone.contains(&b.body));
+        let empty: Vec<usize> = (0..self.distances.len())
+            .filter(|&d| self.distances[d].axes.contains(&axis) && self.meshes_on(d).is_empty())
+            .collect();
+        for &d in empty.iter().rev() {
+            self.distances.remove(d);
         }
-        for d in &mut self.distances {
-            for a in &mut d.axes {
-                if *a > axis {
-                    *a -= 1;
+        let left = self.bodies.iter().any(|b| b.axis == axis)
+            || self.distances.iter().any(|d| d.axes.contains(&axis));
+        if !left {
+            self.axes.remove(axis);
+            for b in &mut self.bodies {
+                if b.axis > axis {
+                    b.axis -= 1;
+                }
+            }
+            for d in &mut self.distances {
+                for a in &mut d.axes {
+                    if *a > axis {
+                        *a -= 1;
+                    }
                 }
             }
         }
@@ -577,10 +665,14 @@ impl Shape {
 
     // --------------------------------------------------------------- both ---
 
+    /// A member moved, `among` the gears of the asking card: a gear alone
+    /// among them on its body is on a body of its own already, whatever
+    /// another part has on the same shaft.
     fn move_body(
         &mut self,
         member: usize,
         body: Option<usize>,
+        among: &[usize],
         next: usize,
     ) -> Result<(), EditRefused> {
         if member >= self.members.len() {
@@ -602,7 +694,15 @@ impl Shape {
                 b
             }
             // Alone on its body, it is already on one of its own.
-            None if self.members_on_body(from).len() == 1 => return Ok(()),
+            None if self
+                .members_on_body(from)
+                .iter()
+                .filter(|i| among.contains(i))
+                .count()
+                == 1 =>
+            {
+                return Ok(())
+            }
             None => self.push_body(axis, next),
         };
         self.members[member].body = to;
@@ -689,7 +789,9 @@ mod tests {
     //! it refuses whole, and what it renumbers the train follows.
 
     use super::super::arrangements::{self as arr, StagePreset};
-    use super::super::{test_library as library, LoadCase, Shape, StageBoundary, Train};
+    use super::super::{
+        solve_train, test_library as library, LoadCase, Shape, StageBoundary, Train,
+    };
     use super::*;
 
     fn conventionally(shape: &Shape) -> crate::train::Alone {
@@ -969,7 +1071,7 @@ mod tests {
         .unwrap();
         assert_eq!(t.ends_of(shared).len(), 2, "gear 2 still runs on");
         assert_eq!(t.load_cases, before.load_cases);
-        assert!(same(&t.stages[0], &before.stages[0]));
+        assert!(same(&t.stages()[0], &before.stages()[0]));
         // The set's carrier is its slot 2; its sun may not go there.
         let carrier = t.port(1, 2);
         assert_eq!(
@@ -985,11 +1087,12 @@ mod tests {
     }
 
     /// **A gear moved off a shaft does not take the shaft with it.** A body
-    /// a stage lists is a port the train may hold, share or load, and it
-    /// stays where anything still names it — with nothing on it, which is
-    /// what a gearbox in neutral is. Dropping it took the coupling and the
-    /// case with it: a layshaft's output moved to an idler left the next
-    /// stage joined to nothing.
+    /// is a port the train may hold, share or load, and it stays while
+    /// anything names it — another part's gear on it, a hold, a case — even
+    /// with nothing of this card's on it, which is what a gearbox in neutral
+    /// is: its card has no end of the shaft until a gear is engaged on it
+    /// again. Dropping it took the shaft and the case with it: a layshaft's
+    /// output moved to an idler left the next stage joined to nothing.
     ///
     /// It is given up where nothing names it, so a stage asked about alone
     /// keeps no numbers it has no use for. And engaging another ratio is
@@ -1007,7 +1110,7 @@ mod tests {
         let output = t.port(0, 2);
         let input = t.port(0, 1);
         assert_eq!(t.ends_of(output).len(), 2, "the output runs on");
-        let shape = t.stages[0].clone();
+        let shape = t.stages()[0].clone();
         let axis = shape.axis_of_slot(shape.slot(output));
         let engaged = shape
             .members_on_body(output)
@@ -1024,8 +1127,9 @@ mod tests {
             .expect("the other pair's gear idles on a body of its own");
 
         // **The destructive move, which is not destructive now**: the
-        // engaged gear onto the idler's body. The output keeps its number,
-        // its end on the spur and the case at it, with nothing on it.
+        // engaged gear onto the idler's body. The output keeps its number
+        // and the spur's gear on it, and nothing of the layshaft's is on
+        // it: neutral.
         t.edit_stage(
             0,
             StageEdit::MoveBody {
@@ -1034,11 +1138,17 @@ mod tests {
             },
         )
         .unwrap();
-        assert_eq!(t.port(0, 2), output, "the output is where it was");
-        assert_eq!(t.ends_of(output).len(), 2, "...and still runs on");
         assert!(
-            t.stages[0].members_on_body(output).is_empty(),
-            "nothing is engaged: neutral"
+            t.shape.bodies.iter().any(|b| b.body == output),
+            "the output stays"
+        );
+        assert_eq!(
+            t.ends_of(output)
+                .iter()
+                .map(|&(k, _)| k)
+                .collect::<Vec<_>>(),
+            vec![1],
+            "the spur's, and nothing is engaged: neutral"
         );
 
         // ...and the other ratio engaged: the idle gear on, this one off —
@@ -1059,15 +1169,17 @@ mod tests {
             },
         )
         .unwrap();
-        assert_eq!(t.stages[0].members_on_body(output), vec![idle]);
+        assert_eq!(t.stages()[0].members_on_body(output), vec![idle]);
         assert_eq!(t.ends_of(output).len(), 2, "the output is the output");
+        assert_eq!(t.port(0, 2), output, "...where it was");
 
         // **A bare body nothing names is given up**: the same first move on
         // a stage of its own, with no train to mean the shaft to be there.
         let mut alone = Train::chained(vec![lay()], |_| Vec::new());
-        let was = alone.stages[0].bodies.len();
+        let was = alone.stages()[0].bodies.len();
         let (on, to) = {
-            let s = &alone.stages[0];
+            let stages = alone.stages();
+            let s = &stages[0];
             (s.members_on_body(alone.port(0, 2))[0], s.members[idle].body)
         };
         alone
@@ -1080,7 +1192,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            alone.stages[0].bodies.len(),
+            alone.stages()[0].bodies.len(),
             was - 1,
             "the shaft nothing named is given up"
         );
@@ -1104,13 +1216,13 @@ mod tests {
         t.hold(t.port(0, 2));
         t.edit_stage(0, StageEdit::RemoveMember { member: 1 })
             .unwrap();
-        assert_eq!(t.stages[0].members.len(), 2);
+        assert_eq!(t.stages()[0].members.len(), 2);
         assert_eq!(t.port(0, 2), 2, "ring 2 closed up to body 2");
         assert_eq!(
             t.ends_of(2).len(),
             2,
             "ring 2 still runs on to the spur: {:?}",
-            t.stages[1].bodies
+            t.stages()[1].bodies
         );
         assert!(
             t.held.is_empty(),
@@ -1279,5 +1391,146 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// A shape with its bodies numbered by its slots — how two shapes that
+    /// number the same bodies differently are compared.
+    fn by_slot(shape: &Shape) -> Shape {
+        let listed = shape.clone();
+        let mut out = shape.clone();
+        out.renumber_bodies(|b| listed.slot(b));
+        out
+    }
+
+    /// **An edit on a card is the edit on its stage.** Every add that
+    /// applies to a preset, asked of the preset as the second card of a
+    /// train — whose members, meshes, distances, axes and couplings are
+    /// not the graph's by the same index — leaves that card the stage the
+    /// same add leaves alone, and the first card as it was.
+    #[test]
+    fn an_edit_on_a_card_is_the_edit_on_its_stage() {
+        for preset in StagePreset::ALL {
+            let base = preset.build();
+            for edit in applicable(&base) {
+                let mut alone = base.clone();
+                if self::edit(&mut alone, edit).is_err() {
+                    continue;
+                }
+                let mut t = Train::chained(vec![StagePreset::Spur.build(), base.clone()], |_| {
+                    Vec::new()
+                });
+                let first = by_slot(&t.stages()[0]);
+                // A body is the train's number for it.
+                let body = |b: usize| t.port(1, base.slot(b));
+                let asked = match edit {
+                    StageEdit::Couple { body: b } => StageEdit::Couple { body: body(b) },
+                    StageEdit::MoveBody {
+                        member,
+                        body: Some(b),
+                    } => StageEdit::MoveBody {
+                        member,
+                        body: Some(body(b)),
+                    },
+                    other => other,
+                };
+                t.edit_stage(1, asked)
+                    .unwrap_or_else(|e| panic!("{preset:?} {edit:?}: {e}"));
+                assert!(
+                    same(&by_slot(&t.stages()[1]), &by_slot(&alone)),
+                    "{preset:?} {edit:?}: {:?}\nvs {:?}",
+                    by_slot(&t.stages()[1]),
+                    by_slot(&alone)
+                );
+                assert!(
+                    same(&by_slot(&t.stages()[0]), &first),
+                    "{preset:?} {edit:?} touched the first card"
+                );
+            }
+        }
+    }
+
+    /// **An axis removed from one card leaves another's gears on it.** Two
+    /// pairs in a chain share a shaft; the second, grown to three axes,
+    /// gives up the shared one — its gear there, that gear's mesh and the
+    /// distance nothing is left on — and the first pair keeps its gear on
+    /// the shaft, which stays. Removing every gear on the axis would strand
+    /// the first pair's other gear, and be refused.
+    #[test]
+    fn an_axis_removed_from_one_card_leaves_anothers_gears_on_it() {
+        let mut t = Train::chained(
+            vec![StagePreset::Spur.build(), StagePreset::Spur.build()],
+            |_| Vec::new(),
+        );
+        t.edit_stage(1, StageEdit::AddAxis { mate: 1 }).unwrap();
+        let before = t.stages()[0].clone();
+        let shared = t.port(0, 2);
+        assert_eq!(t.ends_of(shared).len(), 2, "the pairs share a shaft");
+        // The second card's axes, in the graph's order: the shared shaft first.
+        let part = t.parts()[1].clone();
+        let axis = t
+            .shape
+            .bodies
+            .iter()
+            .find(|b| b.body == shared)
+            .unwrap()
+            .axis;
+        assert_eq!(part.axes[0], axis);
+        t.edit_stage(1, StageEdit::RemoveAxis { axis: 0 }).unwrap();
+        assert!(same(&t.stages()[0], &before), "the first pair is as it was");
+        assert_eq!(t.ends_of(shared).len(), 1, "the shaft is the first pair's");
+        assert_eq!(t.parts().len(), 2);
+        assert_eq!(
+            t.stages()[1].members.len(),
+            2,
+            "the second card's other two"
+        );
+        assert_eq!(t.stages()[1].distances.len(), 1);
+        solve_train(&t, &library()).unwrap();
+    }
+
+    /// **A join that cannot be coaxial undoes, and one across an axis
+    /// distance is refused.** The pair after an uncoupled planocentric is
+    /// joined to its planet by a coupling; moving the pair's end to a body
+    /// of its own takes the coupling away, and joining it again brings it
+    /// back. Two ends on shafts an axis distance apart are no one body —
+    /// a shaft is straight — and the train is left as it was.
+    #[test]
+    fn a_coupled_join_undoes_and_one_across_a_distance_is_refused() {
+        let uncoupled = arr::epicyclic(
+            1,
+            &[&[arr::external(30)]],
+            &[
+                arr::Central::Carrier,
+                arr::Central::Ring { on: 0, teeth: 33 },
+            ],
+            &[],
+        );
+        let mut t = Train::chained(vec![uncoupled, StagePreset::Spur.build()], |_| Vec::new());
+        let (planet, end) = (3, t.port(1, 1));
+        assert_eq!(t.shape.couplings, vec![[planet, end]]);
+        t.move_end(1, end, None);
+        assert!(t.shape.couplings.is_empty(), "the end is its own");
+        assert_eq!(t.parts().len(), 2);
+        t.move_end(1, end, Some(planet));
+        assert_eq!(t.shape.couplings, vec![[end, planet]], "joined again");
+        // ...and power crosses it: the crank drives the pair's output.
+        t.load_cases = vec![LoadCase::ultimate(1, t.port(1, 2), 1.0, 1000.0)];
+        let r = solve_train(&t, &library()).unwrap();
+        assert!(r.cases[0].solved, "{:?}", r.cases[0].notes);
+        let e = r.paths[0].efficiency.forward;
+        assert!(e > 0.5 && e < 1.0, "through the coupling: {e}");
+
+        // Three pairs in a chain, each shared shaft split: the first pair's
+        // output and the third's input are ends on the two shafts the
+        // middle pair meshes across.
+        let pair = || StagePreset::Spur.build();
+        let mut t = Train::chained(vec![pair(), pair(), pair()], |_| Vec::new());
+        let a = t.port(0, 2);
+        t.split(1, a);
+        let b = t.split(2, t.port(1, 2));
+        assert_eq!((t.ends_of(a).len(), t.ends_of(b).len()), (1, 1));
+        let before = t.clone();
+        t.join(a, b);
+        assert_eq!(format!("{t:?}"), format!("{before:?}"), "refused");
     }
 }

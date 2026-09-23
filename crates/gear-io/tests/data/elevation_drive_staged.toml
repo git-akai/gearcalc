@@ -1,0 +1,719 @@
+# Geartrain.
+#
+# Inputs only — every ratio, stress, efficiency and backlash is recomputed from
+# these, so nothing here can go stale. Units: mm, degrees, rpm, N·m.
+#
+# Materials are named; the library that defines them is a separate document.
+# Editing this file by hand is expected.
+
+name = "Elevation drive"
+
+[train]
+reversed_bending = false
+held = [5]
+
+[[train.load_cases]]
+kind = "ultimate"
+enabled = true
+
+[[train.load_cases.loads]]
+at = 1
+role = "load"
+
+[train.load_cases.loads.torque]
+auto = false
+manual = 2.0
+
+[train.load_cases.loads.speed]
+auto = false
+manual = 3000.0
+
+[[train.load_cases.loads]]
+at = 4
+role = "reacted"
+
+[train.load_cases.loads.torque]
+auto = true
+manual = 0.0
+
+[train.load_cases.loads.speed]
+auto = true
+manual = 0.0
+
+[train.load_cases.duty.intermittent]
+range_degrees = 25.0
+at = 4
+actuations = 1000
+reversing = false
+
+[[train.load_cases]]
+kind = "ultimate"
+enabled = true
+
+[[train.load_cases.loads]]
+at = 4
+role = "load"
+
+[train.load_cases.loads.torque]
+auto = false
+manual = 0.5
+
+[train.load_cases.loads.speed]
+auto = false
+manual = 0.0
+
+[[train.load_cases.loads]]
+at = 1
+role = "reacted"
+
+[train.load_cases.loads.torque]
+auto = true
+manual = 0.0
+
+[train.load_cases.loads.speed]
+auto = true
+manual = 0.0
+
+[train.load_cases.duty.intermittent]
+range_degrees = 25.0
+at = 4
+actuations = 1000
+reversing = false
+
+[[train.load_cases]]
+kind = "fatigue"
+enabled = true
+
+[[train.load_cases.loads]]
+at = 1
+role = "load"
+
+[train.load_cases.loads.torque]
+auto = false
+manual = 2.0
+
+[train.load_cases.loads.speed]
+auto = false
+manual = 2400.0
+
+[[train.load_cases.loads]]
+at = 4
+role = "reacted"
+
+[train.load_cases.loads.torque]
+auto = true
+manual = 0.0
+
+[train.load_cases.loads.speed]
+auto = true
+manual = 0.0
+
+[train.load_cases.duty.continuous]
+runtime_hours = 1000.0
+
+[[train.load_cases]]
+kind = "fatigue"
+enabled = false
+
+[[train.load_cases.loads]]
+at = 4
+role = "load"
+
+[train.load_cases.loads.torque]
+auto = false
+manual = 0.2
+
+[train.load_cases.loads.speed]
+auto = false
+manual = 30.0
+
+[[train.load_cases.loads]]
+at = 1
+role = "free"
+
+[train.load_cases.loads.torque]
+auto = true
+manual = 0.0
+
+[train.load_cases.loads.speed]
+auto = true
+manual = 0.0
+
+[train.load_cases.duty.intermittent]
+range_degrees = 25.0
+at = 4
+actuations = 1000
+reversing = false
+
+[[train.stages]]
+couplings = []
+
+[[train.stages.axes]]
+carried_by = 0
+count = 1
+min_planet_clearance = 0.3
+
+[[train.stages.axes]]
+carried_by = 0
+count = 1
+min_planet_clearance = 0.3
+
+[[train.stages.bodies]]
+body = 1
+axis = 0
+
+[[train.stages.bodies]]
+body = 2
+axis = 1
+
+[[train.stages.members]]
+body = 1
+
+[train.stages.members.gear]
+teeth = 17
+no_undercut = true
+addendum = 1.0
+no_sharp_tip = true
+min_tip_width = 0.1
+dedendum = 1.25
+root_radius = 0.38
+material = "4340 Hardened Steel"
+
+[train.stages.members.gear.profile_shift]
+auto = true
+manual = 0.0
+
+[train.stages.members.gear.working_depth]
+auto = true
+manual = 1.0
+
+[train.stages.members.gear.helix_angle]
+auto = false
+manual = 15.0
+
+[train.stages.members.gear.face_width]
+auto = true
+manual = 0.0
+
+[train.stages.members.gear.face_sources.bending]
+ultimate = true
+fatigue = true
+
+[train.stages.members.gear.face_sources.contact]
+ultimate = false
+fatigue = false
+
+[train.stages.members.gear.material_overrides]
+
+[train.stages.members.module]
+auto = false
+manual = 1.0
+
+[train.stages.members.pressure_angle]
+auto = false
+manual = 20.0
+
+[train.stages.members.thickness_mod]
+auto = false
+manual = 1.0
+
+[train.stages.members.pitch_diameter]
+auto = true
+manual = 17.0
+
+[[train.stages.members]]
+body = 2
+
+[train.stages.members.gear]
+teeth = 43
+no_undercut = true
+addendum = 1.0
+no_sharp_tip = true
+min_tip_width = 0.1
+dedendum = 1.25
+root_radius = 0.38
+material = "4340 Hardened Steel"
+
+[train.stages.members.gear.profile_shift]
+auto = true
+manual = 0.0
+
+[train.stages.members.gear.working_depth]
+auto = true
+manual = 1.0
+
+[train.stages.members.gear.helix_angle]
+auto = true
+manual = 0.0
+
+[train.stages.members.gear.face_width]
+auto = false
+manual = 10.0
+
+[train.stages.members.gear.face_sources.bending]
+ultimate = true
+fatigue = true
+
+[train.stages.members.gear.face_sources.contact]
+ultimate = false
+fatigue = false
+
+[train.stages.members.gear.material_overrides]
+
+[train.stages.members.module]
+auto = true
+manual = 1.0
+
+[train.stages.members.pressure_angle]
+auto = true
+manual = 20.0
+
+[train.stages.members.thickness_mod]
+auto = true
+manual = 1.0
+
+[train.stages.members.pitch_diameter]
+auto = true
+manual = 0.0
+
+[[train.stages.meshes]]
+a = 0
+b = 1
+sliding_friction = 0.08
+static_friction = 0.16
+min_contact_ratio = 1.2
+load_sharing = "none"
+search = false
+
+[train.stages.meshes.overlap]
+auto = true
+manual = 1.0
+
+[[train.stages.distances]]
+axes = [
+    0,
+    1,
+]
+angle = 0.0
+worm = false
+tip_clearance = 0.0
+tolerance_plus = 0.02
+tolerance_minus = 0.02
+axial_clearance = 0.0
+
+[train.stages.distances.distance]
+auto = true
+manual = 0.0
+
+[train.stages.distances.clearance]
+auto = false
+manual = 0.02
+
+[[train.stages]]
+couplings = []
+
+[[train.stages.axes]]
+carried_by = 0
+count = 1
+min_planet_clearance = 0.3
+
+[[train.stages.axes]]
+carried_by = 0
+count = 1
+min_planet_clearance = 0.3
+
+[[train.stages.bodies]]
+body = 2
+axis = 0
+
+[[train.stages.bodies]]
+body = 3
+axis = 1
+
+[[train.stages.members]]
+body = 2
+
+[train.stages.members.gear]
+teeth = 1
+no_undercut = true
+addendum = 1.0
+no_sharp_tip = true
+min_tip_width = 0.1
+dedendum = 1.25
+root_radius = 0.0
+material = "4340 Hardened Steel"
+
+[train.stages.members.gear.profile_shift]
+auto = false
+manual = 0.0
+
+[train.stages.members.gear.working_depth]
+auto = true
+manual = 1.0
+
+[train.stages.members.gear.helix_angle]
+auto = true
+manual = 81.78678929826181
+
+[train.stages.members.gear.face_width]
+auto = true
+manual = 10.0
+
+[train.stages.members.gear.face_sources.bending]
+ultimate = true
+fatigue = true
+
+[train.stages.members.gear.face_sources.contact]
+ultimate = false
+fatigue = false
+
+[train.stages.members.gear.material_overrides]
+
+[train.stages.members.module]
+auto = false
+manual = 1.0
+
+[train.stages.members.pressure_angle]
+auto = false
+manual = 20.0
+
+[train.stages.members.thickness_mod]
+auto = false
+manual = 1.0
+
+[train.stages.members.pitch_diameter]
+auto = false
+manual = 7.0
+
+[[train.stages.members]]
+body = 3
+
+[train.stages.members.gear]
+teeth = 40
+no_undercut = true
+addendum = 1.0
+no_sharp_tip = true
+min_tip_width = 0.1
+dedendum = 1.25
+root_radius = 0.38
+material = "Brass C360"
+
+[train.stages.members.gear.profile_shift]
+auto = true
+manual = 0.0
+
+[train.stages.members.gear.working_depth]
+auto = true
+manual = 1.0
+
+[train.stages.members.gear.helix_angle]
+auto = true
+manual = 8.213210701738191
+
+[train.stages.members.gear.face_width]
+auto = true
+manual = 10.0
+
+[train.stages.members.gear.face_sources.bending]
+ultimate = true
+fatigue = true
+
+[train.stages.members.gear.face_sources.contact]
+ultimate = false
+fatigue = false
+
+[train.stages.members.gear.material_overrides]
+
+[train.stages.members.module]
+auto = true
+manual = 1.0
+
+[train.stages.members.pressure_angle]
+auto = true
+manual = 20.0
+
+[train.stages.members.thickness_mod]
+auto = true
+manual = 1.0
+
+[train.stages.members.pitch_diameter]
+auto = true
+manual = 0.0
+
+[[train.stages.meshes]]
+a = 0
+b = 1
+sliding_friction = 0.08
+static_friction = 0.16
+min_contact_ratio = 1.2
+load_sharing = "none"
+search = false
+
+[train.stages.meshes.overlap]
+auto = true
+manual = 1.0
+
+[[train.stages.distances]]
+axes = [
+    0,
+    1,
+]
+angle = 90.0
+worm = true
+tip_clearance = 0.0
+tolerance_plus = 0.02
+tolerance_minus = 0.02
+axial_clearance = 0.04
+
+[train.stages.distances.distance]
+auto = true
+manual = 0.0
+
+[train.stages.distances.clearance]
+auto = false
+manual = 0.02
+
+[[train.stages]]
+couplings = []
+
+[[train.stages.axes]]
+carried_by = 0
+count = 1
+min_planet_clearance = 0.3
+
+[[train.stages.axes]]
+carried_by = 4
+count = 3
+min_planet_clearance = 0.3
+
+[[train.stages.bodies]]
+body = 3
+axis = 0
+
+[[train.stages.bodies]]
+body = 4
+axis = 0
+
+[[train.stages.bodies]]
+body = 5
+axis = 0
+
+[[train.stages.bodies]]
+body = 6
+axis = 1
+
+[[train.stages.members]]
+body = 3
+
+[train.stages.members.gear]
+teeth = 12
+no_undercut = true
+addendum = 1.0
+no_sharp_tip = true
+min_tip_width = 0.1
+dedendum = 1.25
+root_radius = 0.38
+material = "4340 Hardened Steel"
+
+[train.stages.members.gear.profile_shift]
+auto = true
+manual = 0.0
+
+[train.stages.members.gear.working_depth]
+auto = true
+manual = 1.0
+
+[train.stages.members.gear.helix_angle]
+auto = true
+manual = 0.0
+
+[train.stages.members.gear.face_width]
+auto = false
+manual = 10.0
+
+[train.stages.members.gear.face_sources.bending]
+ultimate = true
+fatigue = true
+
+[train.stages.members.gear.face_sources.contact]
+ultimate = false
+fatigue = false
+
+[train.stages.members.gear.material_overrides]
+
+[train.stages.members.module]
+auto = false
+manual = 1.0
+
+[train.stages.members.pressure_angle]
+auto = false
+manual = 20.0
+
+[train.stages.members.thickness_mod]
+auto = false
+manual = 1.0
+
+[train.stages.members.pitch_diameter]
+auto = true
+manual = 0.0
+
+[[train.stages.members]]
+body = 6
+
+[train.stages.members.gear]
+teeth = 30
+no_undercut = true
+addendum = 1.0
+no_sharp_tip = true
+min_tip_width = 0.1
+dedendum = 1.25
+root_radius = 0.38
+material = "4340 Hardened Steel"
+
+[train.stages.members.gear.profile_shift]
+auto = true
+manual = 0.0
+
+[train.stages.members.gear.working_depth]
+auto = true
+manual = 1.0
+
+[train.stages.members.gear.helix_angle]
+auto = true
+manual = 0.0
+
+[train.stages.members.gear.face_width]
+auto = false
+manual = 10.0
+
+[train.stages.members.gear.face_sources.bending]
+ultimate = true
+fatigue = true
+
+[train.stages.members.gear.face_sources.contact]
+ultimate = false
+fatigue = false
+
+[train.stages.members.gear.material_overrides]
+
+[train.stages.members.module]
+auto = true
+manual = 1.0
+
+[train.stages.members.pressure_angle]
+auto = true
+manual = 20.0
+
+[train.stages.members.thickness_mod]
+auto = true
+manual = 1.0
+
+[train.stages.members.pitch_diameter]
+auto = true
+manual = 0.0
+
+[[train.stages.members]]
+body = 5
+
+[train.stages.members.gear]
+teeth = 72
+no_undercut = true
+addendum = 1.0
+no_sharp_tip = true
+min_tip_width = 0.1
+dedendum = 1.25
+root_radius = 0.38
+material = "4340 Hardened Steel"
+
+[train.stages.members.gear.profile_shift]
+auto = false
+manual = 0.0
+
+[train.stages.members.gear.working_depth]
+auto = true
+manual = 1.0
+
+[train.stages.members.gear.helix_angle]
+auto = true
+manual = 0.0
+
+[train.stages.members.gear.face_width]
+auto = false
+manual = 10.0
+
+[train.stages.members.gear.face_sources.bending]
+ultimate = true
+fatigue = true
+
+[train.stages.members.gear.face_sources.contact]
+ultimate = false
+fatigue = false
+
+[train.stages.members.gear.material_overrides]
+
+[train.stages.members.module]
+auto = true
+manual = 1.0
+
+[train.stages.members.pressure_angle]
+auto = true
+manual = 20.0
+
+[train.stages.members.thickness_mod]
+auto = true
+manual = 1.0
+
+[train.stages.members.ring]
+teeth = 20
+addendum = 1.25
+tip_round = 0.2
+
+[train.stages.members.pitch_diameter]
+auto = true
+manual = 0.0
+
+[[train.stages.meshes]]
+a = 0
+b = 1
+sliding_friction = 0.08
+static_friction = 0.16
+min_contact_ratio = 1.2
+load_sharing = "none"
+search = false
+
+[train.stages.meshes.overlap]
+auto = true
+manual = 1.0
+
+[[train.stages.meshes]]
+a = 1
+b = 2
+sliding_friction = 0.08
+static_friction = 0.16
+min_contact_ratio = 1.2
+load_sharing = "none"
+search = false
+
+[train.stages.meshes.overlap]
+auto = true
+manual = 1.0
+
+[[train.stages.distances]]
+axes = [
+    0,
+    1,
+]
+angle = 0.0
+worm = false
+tip_clearance = 0.0
+tolerance_plus = 0.02
+tolerance_minus = 0.02
+axial_clearance = 0.0
+
+[train.stages.distances.distance]
+auto = true
+manual = 0.0
+
+[train.stages.distances.clearance]
+auto = false
+manual = 0.02

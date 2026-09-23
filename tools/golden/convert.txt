@@ -1,12 +1,11 @@
-wrote /tmp/gear-cli-train.toml  (695 lines, 11138 bytes)
-name   "Elevation drive" -> "Elevation drive"
-parts  3 -> 3
+"Elevation drive": 3 stages as written, 3 parts as read
 
-  quantity                 exported            re-imported   same
+  quantity                converted          built now   same
   total ratio               708.235294118    708.235294118   yes
   output speed rpm            4.235880399      4.235880399   yes
   output torque Nm         -841.196877739   -841.196877739   yes
   efficiency forward          0.593868228      0.593868228   yes
   backlash out deg            0.064023422      0.064023422   yes
 
-  the file is the train: every figure identical to the last bit
+  the converted file is the drive: every figure identical to the last bit
+  and it writes the file the tool writes of the drive now

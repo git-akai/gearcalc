@@ -79,6 +79,7 @@ import type {
   Variation,
   PortSpec,
   StagePorts,
+  Part,
   MemberName,
   MemberRole,
   MotionReport,
@@ -159,6 +160,7 @@ export type {
   Variation,
   PortSpec,
   StagePorts,
+  Part,
   MemberName,
   MemberRole,
   MotionReport,
@@ -843,7 +845,7 @@ export function editTrain(train: Train, edit: TrainEdit): string | null {
     const message = e instanceof Error ? e.message : String(e);
     return message.startsWith("ui.") ? message : null;
   }
-  train.stages = edited.stages;
+  train.shape = edited.shape;
   train.held = edited.held;
   train.load_cases = edited.load_cases;
   return null;

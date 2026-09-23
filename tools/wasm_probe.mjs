@@ -44,6 +44,10 @@ const defaults = JSON.parse(w.defaults());
 // A preset's starting stage by name, off the list the menu renders from.
 const preset = (name) => structuredClone(defaults.stages.find((e) => e.preset === name).stage);
 const library = JSON.parse(w.default_materials());
+// **A train's cards**: the parts of its one graph, each in its own
+// numbering, as every solve deals them — what the panel draws a card from.
+const cards = (train) =>
+  JSON.parse(w.solve_train(JSON.stringify({ train, library }))).topology.map((s) => s.part.shape);
 
 // A plain external gear: the tab's own default, with the eccentric throw
 // dropped, since a throw is a question about a mate and this is one gear.
@@ -114,7 +118,7 @@ const out = {
       ["planetary", 2],
       ["wolfrom", 0],
     ].map(([k, member]) => {
-      const train = { ...structuredClone(defaults.train), stages: [preset(k)] };
+      const train = { ...structuredClone(defaults.train), shape: preset(k) };
       return [k, JSON.parse(w.adopt_member(JSON.stringify({ train, materials: library, stage: 0, member })))];
     }),
   ),
@@ -125,11 +129,11 @@ const out = {
   // pair's end of the sun's body split off and joined to the set's ring
   // instead, then moved back onto the sun by the select's one rule; and a
   // case of each kind added between the ends. A body is its number, read
-  // off the stage's list by slot: the set's sun, carrier and ring are
+  // off the card's list by slot: the set's sun, carrier and ring are
   // slots 1, 2 and 3.
   edit_train: call("edit_train", () => {
     const edit = (train, e) => JSON.parse(w.edit_train(JSON.stringify({ train, edit: e })));
-    const body = (train, stage, slot) => train.stages[stage].bodies[slot - 1].body;
+    const body = (train, stage, slot) => cards(train)[stage].bodies[slot - 1].body;
     let t = edit(structuredClone(defaults.train), { push_stage: preset("planetary") });
     const out = [["push_stage", structuredClone(t)]];
     t = edit(t, { hold: body(t, 1, 2) });
@@ -161,25 +165,26 @@ const out = {
     out.push(["stage_epicyclic", structuredClone(t)]);
     t = edit(t, { push_stage: preset("layshaft") });
     t = stage(2, { add_mesh: { distance: 0 } });
-    // At the chain's end: the last gear on the stage's last axis.
-    const last = t.stages[2].axes.length - 1;
-    const onLast = t.stages[2].members
-      .map((m, j) => [t.stages[2].bodies.find((b) => b.body === m.body).axis, j])
+    // At the chain's end: the last gear on the card's last axis.
+    const lay = cards(t)[2];
+    const last = lay.axes.length - 1;
+    const onLast = lay.members
+      .map((m, j) => [lay.bodies.find((b) => b.body === m.body).axis, j])
       .filter(([a]) => a === last)
       .map(([, j]) => j);
     t = stage(2, { add_axis: { mate: onLast[onLast.length - 1] } });
     out.push(["stage_parallel_added", structuredClone(t)]);
-    t = stage(2, { remove_axis: { axis: t.stages[2].axes.length - 1 } });
-    t = stage(2, { remove_mesh: { mesh: t.stages[2].meshes.length - 1 } });
+    t = stage(2, { remove_axis: { axis: cards(t)[2].axes.length - 1 } });
+    t = stage(2, { remove_mesh: { mesh: cards(t)[2].meshes.length - 1 } });
     out.push(["stage_parallel_removed", structuredClone(t)]);
     // **A coupling taken off a planocentric and put back**: its shaft goes
     // with the coupling where nothing else names it, and the planet coupled
     // again drives a new one.
     t = edit(t, { push_stage: preset("planocentric") });
-    const plano = t.stages.length - 1;
+    const plano = cards(t).length - 1;
     t = stage(plano, { uncouple: { coupling: 0 } });
     out.push(["stage_uncoupled", structuredClone(t)]);
-    t = stage(plano, { couple: { body: t.stages[plano].members[0].body } });
+    t = stage(plano, { couple: { body: cards(t)[plano].members[0].body } });
     out.push(["stage_coupled", t]);
     return out;
   }),

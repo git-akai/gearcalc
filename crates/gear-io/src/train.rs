@@ -238,6 +238,19 @@
 //!   rather than the planet itself. A stage that omits it couples nothing,
 //!   which is what every older file meant: an older planocentric still
 //!   reads, its output the planet's own body as it was.
+//! - **The train is one graph.** `[[train.stages]]` is gone, and a file that
+//!   still writes it is refused by name. `[train.shape]` holds every axis,
+//!   body, member, mesh, distance and coupling of the train once — its
+//!   `[[train.shape.axes]]`, `[[train.shape.bodies]]` and the rest, each
+//!   table what a stage's was — and what a stage was is a part the tool
+//!   reads off it: the pieces that close apart. A body two stages listed is
+//!   listed once, on one axis, the two stages' axes it turned about being
+//!   one line; a body listed on an axis a carrier turns in one stage and
+//!   another in the next is two bodies turned as one by a coupling. That
+//!   is not a thing to do by hand: `gear-cli convert <file>` reads a file
+//!   written as stages and writes the one graph ([`convert`]), and the
+//!   converted train is the train a chain of the same stages builds now,
+//!   figure for figure.
 //!
 //! No compatibility shim, deliberately. Accepting both shapes means carrying two
 //! readers for one format and testing both forever, and the thing that would go
@@ -277,7 +290,7 @@
 //! alternative — refusing the import — would lose a whole train over one
 //! material that a library import could supply a moment later.
 
-use gear_core::train::Train;
+use gear_core::train::{LoadCase, Shape, Train};
 use serde::{Deserialize, Serialize};
 
 /// A geartrain as it is exchanged: a name, and the train's inputs.
@@ -345,14 +358,21 @@ pub struct Imported {
 /// [`TrainError::Parse`] if the document is not a geartrain. A train with no
 /// stages is a train — its cases wait for one — and reads as written.
 pub fn from_toml(src: &str) -> Result<Imported, TrainError> {
-    let mut document: TrainDocument = toml::from_str(src).map_err(TrainError::Parse)?;
+    let document: TrainDocument = toml::from_str(src).map_err(TrainError::Parse)?;
+    Ok(relieved(document))
+}
+
+/// A document read, relieved of anything it asks for that nothing can
+/// honour: the graph as the panel relieves it — every group of inputs that
+/// argue is a part's, so relieving the one graph relieves each part — and
+/// every load case the same.
+fn relieved(mut document: TrainDocument) -> Imported {
     let mut adjusted = false;
-    for stage in &mut document.train.stages {
-        let relieved = stage.relieved(None);
-        if relieved.toggles() != stage.toggles() {
-            adjusted = true;
-            *stage = relieved;
-        }
+    let shape = &mut document.train.shape;
+    let relieved = shape.relieved(None);
+    if relieved.toggles() != shape.toggles() {
+        adjusted = true;
+        *shape = relieved;
     }
     // ...and every load case the same: a file that gives a speed at each
     // end of a pair has asked for a contradiction, and the last gives way.
@@ -363,7 +383,68 @@ pub fn from_toml(src: &str) -> Result<Imported, TrainError> {
             adjusted = true;
         }
     }
-    Ok(Imported { document, adjusted })
+    Imported { document, adjusted }
+}
+
+/// **A train as a file wrote it before it was one graph**: its stages, each
+/// a shape whose bodies are the train's numbers, a body two stages share
+/// listed on both — the document's old `train` table, read to be converted
+/// and never written.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Staged {
+    load_cases: Vec<LoadCase>,
+    #[serde(default)]
+    reversed_bending: bool,
+    stages: Vec<Shape>,
+    #[serde(default)]
+    held: Vec<usize>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct StagedDocument {
+    name: String,
+    train: Staged,
+}
+
+/// **A file written as stages, read as the one graph** — what `gear-cli
+/// convert` does, once, to a file [`from_toml`] refuses by name. The stages
+/// become the graph ([`gear_core::train::graph::graph_of`]), a body a join
+/// could not make coaxial numbered after every body the file names, and
+/// what the file held and loaded is kept as written; the document is then
+/// relieved as any other is.
+///
+/// # Errors
+///
+/// [`TrainError::Parse`] if the document is not a geartrain written as
+/// stages.
+pub fn convert(src: &str) -> Result<Imported, TrainError> {
+    let old: StagedDocument = toml::from_str(src).map_err(TrainError::Parse)?;
+    let train = old.train;
+    let named = train
+        .load_cases
+        .iter()
+        .flat_map(|c| {
+            c.loads.iter().map(|l| l.at).chain(match c.duty {
+                gear_core::train::Duty::Intermittent { at, .. } => Some(at),
+                gear_core::train::Duty::Continuous { .. } => None,
+            })
+        })
+        .chain(train.held.iter().copied())
+        .chain(train.stages.iter().map(Shape::max_body))
+        .max()
+        .unwrap_or(0);
+    let graph = gear_core::train::graph::graph_of(&train.stages, named + 1);
+    Ok(relieved(TrainDocument {
+        name: old.name,
+        train: Train {
+            load_cases: train.load_cases,
+            reversed_bending: train.reversed_bending,
+            shape: graph.shape,
+            held: train.held,
+        },
+    }))
 }
 
 /// Write a geartrain as TOML, in the same shape the reader accepts.
@@ -383,7 +464,7 @@ mod tests {
     use super::*;
     use gear_core::params::Auto;
     use gear_core::train::arrangements as arr;
-    use gear_core::train::{Duty, Load, LoadCase, LoadRole};
+    use gear_core::train::{Duty, Load, LoadCase, LoadRole, Shape};
 
     /// One of every preset, so the `kind` tag and every preset's layout are
     /// exercised in both directions and none can quietly stop round-tripping.
@@ -490,10 +571,10 @@ mod tests {
         for kind in ["ultimate", "fatigue"] {
             assert!(text.contains(&format!("kind = \"{kind}\"")), "no {kind}");
         }
-        // ...and the shapes say what they are made of, by name.
+        // ...and the graph says what it is made of, by name.
         for table in ["axes", "bodies", "members", "meshes", "distances"] {
             assert!(
-                text.contains(&format!("[[train.stages.{table}]]")),
+                text.contains(&format!("[[train.shape.{table}]]")),
                 "no {table}"
             );
         }
@@ -527,12 +608,45 @@ mod tests {
     #[test]
     fn a_train_without_stages_reads_as_written() {
         let mut doc = document();
-        doc.train.stages.clear();
+        doc.train.shape = Shape::default();
         doc.train.held.clear();
         let text = to_toml(&doc).unwrap();
         let back = from_toml(&text).unwrap().document;
-        assert!(back.train.stages.is_empty());
+        assert!(back.train.parts().is_empty());
         assert_eq!(back.train.load_cases.len(), doc.train.load_cases.len());
+    }
+
+    /// **A file written as stages is refused by name, and converts to the
+    /// train a chain builds now.** The file is one the tool wrote before the
+    /// train was one graph — the harness's elevation drive, a pair, a worm
+    /// and a set — and the reader names what it no longer reads rather than
+    /// loading a different gearbox. Converted, it is three parts, holds and
+    /// loads what it did, reads back unchanged, and turns at the ratio the
+    /// tool recorded of it then (`tools/golden/trainfile.txt` at the time).
+    #[test]
+    fn a_file_written_as_stages_is_refused_by_name_and_converts() {
+        let old = include_str!("../tests/data/elevation_drive_staged.toml");
+        match from_toml(old) {
+            Err(TrainError::Parse(e)) => assert!(e.to_string().contains("stages"), "{e}"),
+            other => panic!("a file of stages must be refused, not {other:?}"),
+        }
+        let converted = convert(old).unwrap();
+        assert!(!converted.adjusted, "a file the tool wrote needs no relief");
+        let train = &converted.document.train;
+        assert_eq!(
+            train
+                .parts()
+                .iter()
+                .map(|p| p.members.len())
+                .collect::<Vec<_>>(),
+            vec![2, 2, 3]
+        );
+        assert_eq!(train.held, vec![5], "the set's ring, as the file held it");
+        let text = to_toml(&converted.document).unwrap();
+        assert_eq!(text, to_toml(&from_toml(&text).unwrap().document).unwrap());
+        let r = gear_core::train::solve_train(train, &crate::default_library()).unwrap();
+        let ratio = r.total().unwrap().ratio;
+        assert!((ratio - 708.235_294_118).abs() < 1e-8, "{ratio}");
     }
 
     /// **A field the shape no longer has is refused, not dropped.**
@@ -552,11 +666,7 @@ mod tests {
         // ...on a stage — which is a shape, and a `kind` on one is itself a
         // field the shape no longer has, so the tag an older file wrote is
         // the case this starts from.
-        let stale = text.replacen(
-            "[[train.stages]]",
-            "[[train.stages]]\nsomething_old = 1.0",
-            1,
-        );
+        let stale = text.replacen("[train.shape]", "[train.shape]\nsomething_old = 1.0", 1);
         match from_toml(&stale) {
             Err(TrainError::Parse(e)) => {
                 assert!(e.to_string().contains("something_old"), "{e}")
@@ -571,7 +681,7 @@ mod tests {
             ("min_planet_clearance", "min_planet_clearance = 0.3"),
             ("optimisation", "optimisation = { enabled = true }"),
         ] {
-            let stale = text.replacen("[[train.stages]]", &format!("[[train.stages]]\n{line}"), 1);
+            let stale = text.replacen("[train.shape]", &format!("[train.shape]\n{line}"), 1);
             match from_toml(&stale) {
                 Err(TrainError::Parse(e)) => assert!(e.to_string().contains(field), "{e}"),
                 other => panic!("a stage's old {field} must be a parse error, not {other:?}"),
@@ -580,7 +690,7 @@ mod tests {
         // ...a module written as the plain number it used to be, where it
         // is stated on one member of a group and followed by the rest now.
         let mut value: toml::Value = toml::from_str(&text).unwrap();
-        value["train"]["stages"][0]["members"][0]["module"] = toml::Value::Float(1.0);
+        value["train"]["shape"]["members"][0]["module"] = toml::Value::Float(1.0);
         match from_toml(&toml::to_string(&value).unwrap()) {
             Err(TrainError::Parse(e)) => assert!(e.to_string().contains("module"), "{e}"),
             other => panic!("a plain module must be a parse error, not {other:?}"),
@@ -617,12 +727,13 @@ mod tests {
     fn an_automatic_input_survives_as_a_toggle_and_a_value() {
         let mut doc = document();
         {
-            let s = &mut doc.train.stages[0];
-            s.distances[0].distance = Auto::fixed(31.5);
-            s.members[0].gear.face_width = Auto::automatic(4.0);
+            let part = doc.train.parts()[0].clone();
+            let s = &mut doc.train.shape;
+            s.distances[part.distances[0]].distance = Auto::fixed(31.5);
+            s.members[part.members[0]].gear.face_width = Auto::automatic(4.0);
         }
         let back = from_toml(&to_toml(&doc).unwrap()).unwrap().document;
-        let s = &back.train.stages[0];
+        let s = &back.train.stages()[0];
         let d = s.distances[0].distance;
         assert!(!d.auto && (d.manual - 31.5).abs() < 1e-12);
         let w = s.members[0].gear.face_width;
@@ -638,10 +749,11 @@ mod tests {
     #[test]
     fn a_file_asking_for_what_no_stage_honours_is_adjusted_and_says_so() {
         let mut doc = document();
-        doc.train.stages[1].meshes[0].overlap = Auto::fixed(1.5);
+        let mesh = doc.train.parts()[1].meshes[0];
+        doc.train.shape.meshes[mesh].overlap = Auto::fixed(1.5);
         let back = from_toml(&to_toml(&doc).unwrap()).unwrap();
         assert!(back.adjusted);
-        let w = &back.document.train.stages[1];
+        let w = &back.document.train.stages()[1];
         assert!(
             w.meshes[0].overlap.auto,
             "a crossed pair's ratio cannot stand given"
@@ -660,7 +772,9 @@ mod tests {
         // degree of freedom — is one too many, and the last gives way with
         // its number kept.
         let mut doc = document();
-        doc.train.stages.truncate(1);
+        while doc.train.parts().len() > 1 {
+            doc.train.remove_stage(1);
+        }
         doc.train.held.clear();
         doc.train.load_cases.truncate(1);
         // The reaction at the pair's second gear made a load with both

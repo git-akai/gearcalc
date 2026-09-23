@@ -1,6 +1,7 @@
 <script lang="ts">
   import { workspace, trains, library, applyLanguage, developer } from "./state.svelte";
   import { exportLibrary, t, languages, language } from "./core";
+  import { memberNames } from "./members";
 
   let { version }: { version: string | null } = $props();
 
@@ -125,6 +126,8 @@
     <h2 class="section-heading">{t("ui.sidebar_geartrains")}</h2>
     <ul>
       {#each trains.tabs as tab (tab.id)}
+        <!-- A card is a part of the train's graph, which the core deals. -->
+        {@const cards = memberNames(tab.train).length}
         <li>
           <button
             class="tab"
@@ -133,10 +136,7 @@
           >
             <span class="name">{tab.name || "Unnamed"}</span>
             <span class="teeth">
-              {t(
-                tab.train.stages.length === 1 ? "ui.sidebar_stage_count_one" : "ui.sidebar_stage_count",
-                { count: String(tab.train.stages.length) },
-              )}
+              {t(cards === 1 ? "ui.sidebar_stage_count_one" : "ui.sidebar_stage_count", { count: String(cards) })}
             </span>
           </button>
         </li>

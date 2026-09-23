@@ -499,7 +499,7 @@ fn report(name: &str, train: &Train, r: &TrainResult) {
     }
     for (k, s) in r.stages.iter().enumerate() {
         println!("  stage {}", k + 1);
-        for (label, cases) in slot_cases(&train.stages[k], s) {
+        for (label, cases) in slot_cases(&train.stages()[k], s) {
             for (case, speed, torque) in cases {
                 println!(
                     "    slot {label:<9} case {}  speed {:>14.6}  torque {:>14.6}",
@@ -558,7 +558,8 @@ pub fn named(train: &Train, body: usize) -> String {
             }
         }
         Some(&(k, slot)) => {
-            let stage = &train.stages[k];
+            let stages = train.stages();
+            let stage = &stages[k];
             labelled(stage, stage.wiring().slots[slot])
         }
     }

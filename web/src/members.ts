@@ -1,11 +1,15 @@
 // The members of a geartrain, numbered and named the one way both panels use.
 //
-// Gear numbering runs across the whole train — stage 1's members first, then
-// stage 2's — counting every member a stage has: two on a pair, three on a
+// Gear numbering runs across the whole train — card 1's members first, then
+// card 2's — counting every member a card has: two on a pair, three on a
 // set, four on a hula stage. It used to be `stage × 2 + which + 1`, which is
 // right only while every stage before this one is a pair, and it lived in the
 // geartrain panel alone; the gear tab's *adopt* list needs the same numbers,
 // so they are written once here and both panels read them.
+//
+// A card is a part of the train's one graph, and the parts arrive with every
+// solve (`StagePorts.part`): what is read here of a card is its part's shape,
+// in the part's own numbering.
 
 import {
   solveTrain,
@@ -35,21 +39,21 @@ export function memberCount(stage: Shape): number {
   return stage.members.length;
 }
 
-/** The gear number of one member, counting every member of the stages
+/** The gear number of one member, counting every member of the cards
  *  before it — one number per gear across the train, which is what the
  *  adopt list and the case rows name a gear by. */
-export function gearNumber(train: Train, stage: number, member: number): number {
+export function gearNumber(topology: StagePorts[], stage: number, member: number): number {
   let n = member + 1;
-  for (let i = 0; i < stage; i++) n += memberCount(train.stages[i]);
+  for (let i = 0; i < stage; i++) n += topology[i]?.part.members.length ?? 0;
   return n;
 }
 
 /** **The name a member goes by in a list** — the adopt list's, and a
  *  case's rows and delivered table use the same: "Gear 3" on a pair, and
  *  the role with its number elsewhere, "Sun (5)". */
-export function memberListName(train: Train, topology: StagePorts[], stage: number, member: number): string {
+export function memberListName(topology: StagePorts[], stage: number, member: number): string {
   const role = roleName(topology, stage, member);
-  const number = String(gearNumber(train, stage, member));
+  const number = String(gearNumber(topology, stage, member));
   return role === null
     ? t("ui.train_gear_name", { number })
     : t("ui.train_member_numbered", { name: role, number });
@@ -208,11 +212,11 @@ export function bodyName(body: number): string {
   return body === 0 ? t("ui.train_ground") : t("ui.train_body_name", { number: String(body) });
 }
 
-/** **The stages a body is listed on**, with its slot in each, in stage
- *  order — read off the stages themselves, so a name needs no motion. */
-export function endsOf(train: Train, body: number): { stage: number; slot: number }[] {
-  return train.stages
-    .map((shape, stage) => ({ stage, slot: slotOf(shape, body) }))
+/** **The cards a body is listed on**, with its slot in each, in card
+ *  order — read off the parts themselves, so a name needs no motion. */
+export function endsOf(topology: StagePorts[], body: number): { stage: number; slot: number }[] {
+  return topology
+    .map((s, stage) => ({ stage, slot: slotOf(s.part.shape, body) }))
     .filter((e) => e.slot > 0);
 }
 
@@ -220,21 +224,15 @@ export function endsOf(train: Train, body: number): { stage: number; slot: numbe
  *  members on it by their list names, or the carrier where it carries an
  *  axis and no gear. Read off the shape; the core's label names the first
  *  of them. */
-export function onSlot(
-  train: Train,
-  topology: StagePorts[],
-  stage: number,
-  slot: number,
-  numbered = true,
-): string {
-  const shape = train.stages[stage];
+export function onSlot(topology: StagePorts[], stage: number, slot: number, numbered = true): string {
+  const shape = topology[stage].part.shape;
   const body = shape.bodies[slot - 1]?.body;
   const gears = shape.members
     .map((m, j) =>
       m.body === body
         ? numbered
-          ? memberListName(train, topology, stage, j)
-          : memberName(train, topology, stage, j)
+          ? memberListName(topology, stage, j)
+          : memberName(topology, stage, j)
         : null,
     )
     .filter((x) => x !== null);
@@ -244,7 +242,7 @@ export function onSlot(
   const coupled = shape.couplings.find((c) => c.includes(body));
   if (coupled !== undefined) {
     const other = coupled[0] === body ? coupled[1] : coupled[0];
-    return t("ui.train_turns_with", { on: onSlot(train, topology, stage, slotOf(shape, other), numbered) });
+    return t("ui.train_turns_with", { on: onSlot(topology, stage, slotOf(shape, other), numbered) });
   }
   return "";
 }
@@ -252,13 +250,13 @@ export function onSlot(
 /** **Everything on a body, across the train**: each end's stage and what
  *  it carries — "Stage 1 Gear 2 · Stage 2 Sun" — which is what says at a
  *  glance what is linked to what. */
-export function acrossBody(train: Train, topology: StagePorts[], body: number): string {
+export function acrossBody(topology: StagePorts[], body: number): string {
   if (body === 0) return t("ui.train_ground");
-  return endsOf(train, body)
+  return endsOf(topology, body)
     .map((e) =>
       t("ui.train_port_at", {
         stage: t("ui.train_stage_heading", { number: String(e.stage + 1) }),
-        on: onSlot(train, topology, e.stage, e.slot, false),
+        on: onSlot(topology, e.stage, e.slot, false),
       }),
     )
     .join(" · ");
@@ -267,34 +265,30 @@ export function acrossBody(train: Train, topology: StagePorts[], body: number): 
 /** **A body in a reference**: its name and, in parentheses, every end of
  *  it — "Body 2 (Shape 1 Gear 2 · Stage 2 Sun)" — since a body bridges
  *  stages and a reference has to say what it is on each. */
-export function bodyRefName(train: Train, topology: StagePorts[], body: number): string {
+export function bodyRefName(topology: StagePorts[], body: number): string {
   if (body === 0) return t("ui.train_ground");
-  return t("ui.train_body_with", { body: bodyName(body), on: acrossBody(train, topology, body) });
+  return t("ui.train_body_with", { body: bodyName(body), on: acrossBody(topology, body) });
 }
 
 /** The name a member's card carries: "gear 3" on a pair, the role elsewhere. */
-export function memberName(
-  train: Train,
-  topology: StagePorts[],
-  stage: number,
-  member: number,
-): string {
+export function memberName(topology: StagePorts[], stage: number, member: number): string {
   const role = roleName(topology, stage, member);
-  const number = String(gearNumber(train, stage, member));
+  const number = String(gearNumber(topology, stage, member));
   return role === null ? t("ui.train_gear_name", { number }) : role;
 }
 
 /** Every member of a train, in order, with the label a list shows. */
 export function memberRefs(train: Train, topology: StagePorts[] = memberNames(train)): MemberRef[] {
   const out: MemberRef[] = [];
-  train.stages.forEach((stage, i) => {
+  topology.forEach((s, i) => {
+    const stage = s.part.shape;
     for (let j = 0; j < memberCount(stage); j++) {
-      const number = gearNumber(train, i, j);
+      const number = gearNumber(topology, i, j);
       out.push({
         stage: i,
         member: j,
         number,
-        label: memberListName(train, topology, i, j),
+        label: memberListName(topology, i, j),
         // A worm is a thread with proportions of its own: the first member
         // of the first mesh on a distance marked as a worm drive.
         adoptable: !(isWorm(stage) && stage.meshes[0]?.a === j),

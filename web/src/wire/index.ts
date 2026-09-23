@@ -62,6 +62,7 @@ export type { MeshReport } from "./core/MeshReport";
 export type { MotionReport } from "./core/MotionReport";
 export type { Note } from "./core/Note";
 export type { Overrides } from "./core/Overrides";
+export type { Part } from "./core/Part";
 export type { PathReport } from "./core/PathReport";
 export type { PerToothClamps } from "./core/PerToothClamps";
 export type { PointContact } from "./core/PointContact";

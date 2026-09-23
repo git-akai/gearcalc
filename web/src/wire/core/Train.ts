@@ -24,11 +24,13 @@ load_cases: Array<LoadCase>,
  */
 reversed_bending: boolean, 
 /**
- * The stages, each naming the train's bodies on its axes: a body two
- * stages name is what a coupling used to say, and the bodies are the
- * numbers in use — nothing lists them.
+ * **The train as one graph** — its axes, the bodies on them, the gears
+ * on those, the meshes and the distances between axes that mesh, and
+ * the couplings — every preset added laid into it, a body two presets
+ * share listed once on the one axis it turns about. Its parts are what
+ * the cards show ([`Train::parts`]); nothing stores them.
  */
-stages: Array<Shape>, 
+shape: Shape, 
 /**
  * **The bodies held to ground**, every one stated. A preset's
  * conventional hold — a set's ring — is written here when it is

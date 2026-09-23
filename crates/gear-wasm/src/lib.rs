@@ -782,11 +782,13 @@ pub struct TrainOutcome {
     /// (`ShapeResult::figure`) and the panel need not know at all: it hands
     /// this list back with the stage, and never learns which field is which.
     pub figures: Vec<Vec<gear_core::train::Figure>>,
-    /// **Every stage's ports**, with the label the panel names each by — so a
-    /// designer is offered exactly the bodies a train may hold, drive or
-    /// couple, read from the stage's wiring rather than written into the front
-    /// end a second time. Present on success and failure alike: it needs no
-    /// geometry.
+    /// **Every card**: the part of the train's graph it is, in its own
+    /// numbering with where each of its pieces is in the graph — what the
+    /// panel stands a card on — and its ports, with the label the panel names
+    /// each by, so a designer is offered exactly the bodies a train may hold,
+    /// drive or couple, read from the part's wiring rather than written into
+    /// the front end a second time. Present on success and failure alike: it
+    /// needs no geometry.
     pub topology: Vec<gear_core::train::StagePorts>,
     /// **The train's motion** — exact ratios, every body's speed, mobility —
     /// present whenever the tooth counts and topology give one, which is
@@ -822,7 +824,7 @@ fn solve_train_impl(input: &str) -> Result<String, String> {
         Ok(result) => TrainOutcome {
             figures: req
                 .train
-                .stages
+                .stages()
                 .iter()
                 .zip(&result.stages)
                 .map(|(stage, solved)| {
@@ -1361,9 +1363,8 @@ fn adopt_member_impl(input: &str) -> Result<String, String> {
     // A stage or member the train does not have, or a worm, is a defect on
     // the other side of the boundary — the panel lists what can be adopted —
     // so each is a refusal rather than an outcome.
-    let stage = req
-        .train
-        .stages
+    let stages = req.train.stages();
+    let stage = stages
         .get(req.stage)
         .ok_or_else(|| format!("the train has no stage {}", req.stage + 1))?;
     if req.member >= stage.gears().len() {
@@ -1769,12 +1770,12 @@ mod tests {
         let mut stored = d["train"].clone();
         let want = solved(&serde_json::json!({ "train": stored }).to_string())["paths"][0]["ratio"]
             .clone();
-        for axis in stored["stages"][0]["axes"].as_array_mut().unwrap() {
+        for axis in stored["shape"]["axes"].as_array_mut().unwrap() {
             axis["carried_by"] = serde_json::Value::Null;
         }
         let v = solved(&serde_json::json!({ "train": stored }).to_string());
         assert_eq!(v["paths"][0]["ratio"], want, "null is ground");
-        for axis in stored["stages"][0]["axes"].as_array_mut().unwrap() {
+        for axis in stored["shape"]["axes"].as_array_mut().unwrap() {
             axis.as_object_mut().unwrap().remove("carried_by");
         }
         let v = solved(&serde_json::json!({ "train": stored }).to_string());
@@ -1844,13 +1845,13 @@ mod tests {
                 { "kind": "ultimate", "enabled": true, "loads": [{ "at": 2, "torque": { "auto": false, "manual": 0.0 }, "speed": { "auto": false, "manual": 0.0 } }], "duty": { "intermittent": { "range_degrees": 25.0, "at": 2, "actuations": 10, "reversing": false } } },
                 { "kind": "fatigue", "enabled": true, "loads": [{ "at": 1, "torque": { "auto": false, "manual": 1.0 }, "speed": { "auto": false, "manual": 1.0 } }], "duty": { "intermittent": { "range_degrees": 25.0, "at": 2, "actuations": 10, "reversing": false } } }
             ],
-                       "stages": [] }
+                       "shape": { "axes": [], "bodies": [], "members": [], "meshes": [], "distances": [] } }
         });
         let text = export_train_impl(&empty.to_string()).unwrap();
         let back: serde_json::Value =
             serde_json::from_str(&import_train_impl(&text).unwrap()).unwrap();
         assert!(
-            back["document"]["train"]["stages"]
+            back["document"]["train"]["shape"]["members"]
                 .as_array()
                 .unwrap()
                 .is_empty(),
@@ -1904,7 +1905,7 @@ mod tests {
         let d: serde_json::Value = serde_json::from_str(&defaults_impl().unwrap()).unwrap();
         let request = |kind: &str, member: usize| {
             let mut train = d["train"].clone();
-            train["stages"] = serde_json::json!([preset(&d, kind)]);
+            train["shape"] = preset(&d, kind);
             serde_json::json!({ "train": train, "stage": 0, "member": member }).to_string()
         };
         let adopt = |kind: &str, member: usize| -> serde_json::Value {
@@ -2812,7 +2813,7 @@ mod tests {
             assert_eq!(c["enabled"], true);
         }
         // ...and its two bodies are the pair's two gears, numbered from one.
-        let bodies = d["train"]["stages"][0]["bodies"].as_array().unwrap();
+        let bodies = d["train"]["shape"]["bodies"].as_array().unwrap();
         assert_eq!(bodies.len(), 2);
         assert_eq!(bodies[0]["body"], 1);
         assert_eq!(bodies[1]["body"], 2);
@@ -2830,7 +2831,7 @@ mod tests {
             .iter()
             .map(|e| e["stage"].clone())
             .collect();
-        walk.extend(d["train"]["stages"].as_array().unwrap().iter().cloned());
+        walk.push(d["train"]["shape"].clone());
         for stage in &walk {
             for m in stage["members"].as_array().unwrap() {
                 let w = &m["gear"]["face_width"];
@@ -2855,7 +2856,7 @@ mod tests {
         // Every preset the defaults can build, in one train, so the walk
         // covers every layout there is.
         let d: serde_json::Value = serde_json::from_str(&defaults_impl().unwrap()).unwrap();
-        let mut stages = d["train"]["stages"].as_array().unwrap().clone();
+        let mut stages = vec![d["train"]["shape"].clone()];
         stages.extend(
             d["stages"]
                 .as_array()
@@ -3007,7 +3008,7 @@ mod tests {
                 { "kind": "ultimate", "enabled": true, "loads": [{ "at": 2, "torque": { "auto": false, "manual": 0.0 }, "speed": { "auto": false, "manual": 0.0 } }], "duty": { "intermittent": { "range_degrees": 25.0, "at": 2, "actuations": 1000, "reversing": false } } },
                 { "kind": "fatigue", "enabled": true, "loads": [{ "at": 1, "torque": { "auto": false, "manual": 1.0 }, "speed": { "auto": false, "manual": 1.0 } }], "duty": { "intermittent": { "range_degrees": 25.0, "at": 2, "actuations": 1000, "reversing": false } } }
             ],
-            "stages":[]}}"#;
+            "shape": { "axes": [], "bodies": [], "members": [], "meshes": [], "distances": [] }}}"#;
         let v: serde_json::Value = serde_json::from_str(&solve_train_impl(bad).unwrap()).unwrap();
         assert!(
             v["failure"].is_null() && v["result"]["stages"].as_array().unwrap().is_empty(),
@@ -3019,10 +3020,17 @@ mod tests {
         // ...and where a stage is to blame, it is named — numbered as the panel
         // numbers them, so the reader is not left counting from zero.
         let sound: serde_json::Value = serde_json::from_str(&defaults_impl().unwrap()).unwrap();
-        let mut train = sound["train"].clone();
-        let stage = train["stages"][0].clone();
-        train["stages"] = serde_json::json!([stage.clone(), stage]);
-        train["stages"][1]["distances"][0]["distance"] =
+        let pushed = edit_train_impl(
+            &serde_json::json!({
+                "train": sound["train"],
+                "edit": { "push_stage": preset(&sound, "spur") },
+            })
+            .to_string(),
+        )
+        .unwrap();
+        let mut train: serde_json::Value = serde_json::from_str(&pushed).unwrap();
+        // The second part's one distance is the graph's second.
+        train["shape"]["distances"][1]["distance"] =
             serde_json::json!({"auto": false, "manual": 0.0});
         let req = serde_json::json!({ "train": train }).to_string();
         let v: serde_json::Value = serde_json::from_str(&solve_train_impl(&req).unwrap()).unwrap();

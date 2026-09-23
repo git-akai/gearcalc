@@ -506,6 +506,14 @@ const COMMANDS: &[Command] = &[
         slow: false
     },
     Command {
+        name: "convert",
+        args: "[path]",
+        summary: "a train file written as stages, rewritten as the one graph on stdout; with no path, the elevation drive as the tool wrote it before, against the same train built now",
+        run: |a| convert_report(a.get(1).map(String::as_str)),
+        record: Record::Cases(&["convert"]),
+        slow: false
+    },
+    Command {
         name: "dxf",
         args: "[z] [x] [chord tolerance]",
         summary: "a gear exported to DXF, on stdout (17, 0, 1e-3)",
@@ -1294,13 +1302,15 @@ fn hula_sweep(n: u32, clearance: f64, mesh_index: usize) {
 /// putting the two answers side by side shows it. With a path, the file is left
 /// there to be looked at and hand-edited; without one it is written to a
 /// temporary file and removed.
-fn train_file_report(path: Option<&str>) {
+/// **The elevation drive** — a helical pair, a worm and a set, with a case
+/// of every kind at both ends and every role — which `trainfile` writes
+/// and reads back, and which `convert` holds a file of it written as stages
+/// to.
+fn elevation_drive() -> gear_io::TrainDocument {
     use gear_core::params::Auto;
-    use gear_core::train::{solve_train, Duty, Load, LoadCase, LoadRole, StageGear, Train};
-    use gear_io::TrainDocument;
+    use gear_core::train::{Duty, Load, LoadCase, LoadRole, StageGear, Train};
 
-    let lib = gear_io::default_library();
-    let doc = TrainDocument {
+    gear_io::TrainDocument {
         name: "Elevation drive".to_string(),
         train: Train::chained(
             vec![
@@ -1347,7 +1357,14 @@ fn train_file_report(path: Option<&str>) {
                 ]
             },
         ),
-    };
+    }
+}
+
+fn train_file_report(path: Option<&str>) {
+    use gear_core::train::solve_train;
+
+    let lib = gear_io::default_library();
+    let doc = elevation_drive();
 
     let text = match gear_io::train::to_toml(&doc) {
         Ok(t) => t,
@@ -1377,9 +1394,9 @@ fn train_file_report(path: Option<&str>) {
     }
     println!("name   {:?} -> {:?}", doc.name, back.name);
     println!(
-        "stages {} -> {}",
-        doc.train.stages.len(),
-        back.train.stages.len()
+        "parts  {} -> {}",
+        doc.train.parts().len(),
+        back.train.parts().len()
     );
 
     let (a, b) = (
@@ -1427,6 +1444,105 @@ fn train_file_report(path: Option<&str>) {
                     "the file is the train: every figure identical to the last bit"
                 } else {
                     "SOMETHING WAS LOST IN THE FILE - see the rows marked NO"
+                }
+            );
+        }
+        (a, b) => println!("a train did not solve: {:?} / {:?}", a.err(), b.err()),
+    }
+}
+
+/// **A train file written as stages, converted** ([`gear_io::train::convert`]).
+///
+/// Given a path, the file read and written back as the one graph, on
+/// stdout, for the designer to save over it. Given none, the elevation drive
+/// as the tool wrote it before the train was one graph — the file its
+/// `trainfile` command wrote then, kept beside the reader's tests — against
+/// the same drive built now: every figure bit for bit, and the text.
+fn convert_report(path: Option<&str>) {
+    use gear_core::train::solve_train;
+
+    if let Some(path) = path {
+        let converted = std::fs::read_to_string(path)
+            .map_err(|e| e.to_string())
+            .and_then(|text| gear_io::train::convert(&text).map_err(|e| e.to_string()))
+            .and_then(|c| {
+                gear_io::train::to_toml(&c.document)
+                    .map(|t| (t, c.adjusted))
+                    .map_err(|e| e.to_string())
+            });
+        match converted {
+            Ok((text, adjusted)) => {
+                print!("{text}");
+                if adjusted {
+                    eprintln!(
+                        "relieved on the way in: an input nothing could honour went automatic"
+                    );
+                }
+            }
+            Err(e) => eprintln!("could not convert {path}: {e}"),
+        }
+        return;
+    }
+    let old = include_str!("../../gear-io/tests/data/elevation_drive_staged.toml");
+    let converted = match gear_io::train::convert(old) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("could not convert the recorded file: {e}");
+            return;
+        }
+    };
+    let now = elevation_drive();
+    let doc = &converted.document;
+    println!(
+        "{:?}: {} stages as written, {} parts as read{}",
+        doc.name,
+        old.matches("[[train.stages]]").count(),
+        doc.train.parts().len(),
+        if converted.adjusted { ", relieved" } else { "" }
+    );
+    let lib = gear_io::default_library();
+    match (solve_train(&doc.train, &lib), solve_train(&now.train, &lib)) {
+        (Ok(a), Ok(b)) => {
+            println!("\n  quantity                converted          built now   same");
+            let end = now.train.port(2, 2);
+            let at_end = |r: &gear_core::train::TrainResult| -> (f64, f64) {
+                r.cases[0]
+                    .shaft(end)
+                    .map_or((0.0, 0.0), |s| (s.speed.unwrap_or(0.0), s.torque))
+            };
+            let total = |r: &gear_core::train::TrainResult| -> (f64, f64, f64) {
+                r.total().map_or((f64::NAN, f64::NAN, f64::NAN), |p| {
+                    (p.ratio, p.efficiency.forward, p.backlash.forward.nominal)
+                })
+            };
+            let ((ta, tb), (ea, eb)) = ((total(&a), total(&b)), (at_end(&a), at_end(&b)));
+            let mut all = true;
+            for (name, x, y) in [
+                ("total ratio", ta.0, tb.0),
+                ("output speed rpm", ea.0, eb.0),
+                ("output torque Nm", ea.1, eb.1),
+                ("efficiency forward", ta.1, tb.1),
+                ("backlash out deg", ta.2, tb.2),
+            ] {
+                let same = x.to_bits() == y.to_bits();
+                all &= same;
+                println!(
+                    "  {name:<22} {x:>16.9} {y:>16.9}   {}",
+                    if same { "yes" } else { "NO" }
+                );
+            }
+            let text = |d: &gear_io::TrainDocument| gear_io::train::to_toml(d).ok();
+            println!(
+                "\n  {}\n  {}",
+                if all {
+                    "the converted file is the drive: every figure identical to the last bit"
+                } else {
+                    "THE CONVERSION MOVED A FIGURE - see the rows marked NO"
+                },
+                if text(doc) == text(&now) {
+                    "and it writes the file the tool writes of the drive now"
+                } else {
+                    "BUT IT WRITES A DIFFERENT FILE from the drive built now"
                 }
             );
         }
@@ -1857,8 +1973,8 @@ fn train_report(mode: Option<&str>) {
         // rows for every line contact and for every point.
         match pair(s, None) {
             Some(res) => match res.mesh.line {
-                Some(line) => print_line_pair(k, kind_name(&train.stages[k]), &res, &line),
-                None => print_point_pair(k, kind_name(&train.stages[k]), &res, res.mesh),
+                Some(line) => print_line_pair(k, kind_name(&train.stages()[k]), &res, &line),
+                None => print_point_pair(k, kind_name(&train.stages()[k]), &res, res.mesh),
             },
             None => println!("\nstage {}: not a pair", k + 1),
         }

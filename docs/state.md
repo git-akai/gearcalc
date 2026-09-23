@@ -120,6 +120,7 @@ cargo run --bin gear-cli -- train mixed            # ...with a worm stage in it
 cargo run --bin gear-cli -- train held             # ...that worm holding more than it drives
 cargo run --bin gear-cli -- kinematics             # motion, torque, loss and play alone, every preset and every arrangement
 cargo run --bin gear-cli -- trainfile [path]       # a train to TOML and back, answers compared
+cargo run --bin gear-cli -- convert [path]         # a file written as stages, rewritten as the one graph
 cargo run --bin gear-cli -- worm 1 40 7 90         # a worm pair, both directions
 cargo run --bin gear-cli -- wormstage 1 40 7 2     # a worm stage, end to end
 cargo run --bin gear-cli -- crossed 17 23 90       # a crossed pair, swept over the split
@@ -303,6 +304,23 @@ and 0.78–0.94× at low overlap and high helix — conservative where gears are
 designed, below the standard only in the regime `mesh.overlap_below_one`
 already flags. `tools/iso_6336_3_stack.py` multiplies the set out
 ([rationale](rationale.md#the-helix-factors-are-a-pair-and-this-tool-can-take-neither)).
+
+**The train is one graph.** A train stores one `Shape` — every axis, body,
+member, mesh, distance and coupling once — beside its holds and its cases,
+and what a stage was is a **part** of it (`Shape::parts`), read off the
+graph and dealt to the panel as its cards with every solve; `solve_train`
+solves part by part and a stage asked alone is one card (`Part::whole`). A
+join makes one body on one axis and keeps every part's own order; an edit
+on a card is read through its part's maps (`Shape::edit_part`); the panel's
+cards stand on the graph's own objects (`web/src/cards.ts`). A file written
+as stages is refused by name and converted once by `gear-cli convert`
+(`graph_of`): the elevation drive the tool wrote before converts to the file
+it writes of the drive now, every figure bit for bit. Held by laws on every
+preset alone and after every other — the converted graph is what a chain
+builds now, turns as the stages did body for body, and falls apart into
+the stages, each solving as it did — and by the probe, after whose every
+edit the cards are the old stages field for field
+([rationale](rationale.md#a-train-is-one-graph-and-a-card-is-a-part-of-it)).
 
 **One stage shape.** Every stage is one `Shape` — axes, the train's
 bodies on them, members, meshes, distances — and every menu entry (`StagePreset`:
@@ -601,6 +619,8 @@ been. They are not a backlog.
 | A ring's own bounds for a stage member | The gear card shows a rack's buildable range, which is not a ring's, so it shows nothing there and says so |
 | A coupled glass POM grade | Can be added if one is wanted; it must be *coupled*, not filled |
 | **Two carried axes placed round the carrier** | A meshed-planet or Ravigneaux set has three distances — centre to each planet axis and between them — and each closes on its own shifts; nothing checks the three form a triangle, and the planet-clearance layout places one axis's planets without the other's. A preset carries it, the figures it reports are the meshes', and a layout that does not close is a fault this tool does not yet name |
+| **A card's end of a shaft in neutral** | A card lists the bodies it has something on, so a layshaft's output with no gear engaged is not on its card — it is the next stage's input, and its gear keeps it. A gear engaged onto it brings the end back; the card offers the move while a gear is on the output, so engaging the other ratio *before* taking this one off never leaves it. The core moves a gear onto any body on its axis; the card offers its own |
+| **A part's order when two parts share two bodies** | A join keeps every part's own order of bodies (`Train::keep_orders`); two parts that share two bodies in opposite orders cannot both keep theirs, and the earlier-listed part's stands. Nothing the panel offers builds it |
 | **A stepped planet's assembly, timed** | The assembly rule (`Shape::assembly`) takes every planet identical: two gears on one planet's body at one relative phase. Planets timed individually at manufacture assemble equally spaced at any count, which the rule then under-reports as *no*; the rule's answer is the cheaper build, not the only one |
 
 ---
