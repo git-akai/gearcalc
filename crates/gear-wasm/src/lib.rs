@@ -795,6 +795,18 @@ pub struct TrainOutcome {
     /// whether or not the geometry solved. A train mid-edit whose stage will
     /// not close still turns, and this is what says at what.
     pub motion: Option<gear_core::train::MotionReport>,
+    /// **The train's centres and its axes** — two of the three groupings a
+    /// list shows the graph in, derived by the core; present whether or not
+    /// the train solved, since neither needs a solve.
+    pub groupings: gear_core::train::Groupings,
+    /// **Each case's flow** — the third grouping — the bodies in the order
+    /// the case's power reaches them, the meshes carrying it, epicyclic
+    /// parts as junctions and idle branches, by the graph's indices. Empty
+    /// where the train did not solve.
+    pub flows: Vec<Vec<gear_core::train::FlowRow>>,
+    /// **What each gear is**, read off the whole graph — sun, planet, ring,
+    /// worm, wheel, or a gear by its number — by the graph's index.
+    pub names: Vec<gear_core::train::shape::MemberName>,
     /// **Each card's view of the result**, in the order the topology deals
     /// them ([`gear_core::train::TrainResult::cards`]) — the result laid
     /// back out in each part's own numbering by the core's one rule, so the
@@ -826,6 +838,8 @@ fn solve_train_impl(input: &str) -> Result<String, String> {
     let lib = req.materials.unwrap_or_else(gear_io::default_library);
     let topology = req.train.topology();
     let motion = req.train.motion_report();
+    let groupings = req.train.groupings();
+    let names = req.train.shape.member_names();
     let outcome = match gear_core::train::solve_train(&req.train, &lib) {
         Ok(result) => TrainOutcome {
             figures: req
@@ -839,6 +853,9 @@ fn solve_train_impl(input: &str) -> Result<String, String> {
                 })
                 .collect(),
             cards: result.cards(&req.train),
+            flows: req.train.flows(&result),
+            groupings,
+            names,
             result: Some(result),
             failure: None,
             topology,
@@ -861,6 +878,9 @@ fn solve_train_impl(input: &str) -> Result<String, String> {
                 topology,
                 motion,
                 cards: Vec::new(),
+                flows: Vec::new(),
+                groupings,
+                names,
             }
         }
     };

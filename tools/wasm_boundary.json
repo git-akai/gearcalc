@@ -28361,6 +28361,116 @@
        "free": [],
        "redundant": []
       },
+      "groupings": {
+       "centres": [
+        {
+         "distance": 0,
+         "axes": [
+          0,
+          1
+         ],
+         "meshes": [
+          0
+         ]
+        }
+       ],
+       "axes": [
+        {
+         "axis": 0,
+         "carried_by": null,
+         "count": 1,
+         "bodies": [
+          {
+           "body": 1,
+           "members": [
+            0
+           ],
+           "carries": []
+          }
+         ]
+        },
+        {
+         "axis": 1,
+         "carried_by": null,
+         "count": 1,
+         "bodies": [
+          {
+           "body": 2,
+           "members": [
+            1
+           ],
+           "carries": []
+          }
+         ]
+        }
+       ]
+      },
+      "flows": [
+       [
+        {
+         "body": {
+          "body": 1
+         }
+        },
+        {
+         "mesh": {
+          "mesh": 0,
+          "to": 2
+         }
+        },
+        {
+         "body": {
+          "body": 2
+         }
+        }
+       ],
+       [
+        {
+         "body": {
+          "body": 2
+         }
+        },
+        {
+         "mesh": {
+          "mesh": 0,
+          "to": 1
+         }
+        },
+        {
+         "body": {
+          "body": 1
+         }
+        }
+       ],
+       [
+        {
+         "body": {
+          "body": 1
+         }
+        },
+        {
+         "mesh": {
+          "mesh": 0,
+          "to": 2
+         }
+        },
+        {
+         "body": {
+          "body": 2
+         }
+        }
+       ]
+      ],
+      "names": [
+       {
+        "role": "gear",
+        "ordinal": null
+       },
+       {
+        "role": "gear",
+        "ordinal": null
+       }
+      ],
       "cards": [
        {
         "distances": [
@@ -31328,6 +31438,225 @@
        "free": [],
        "redundant": []
       },
+      "groupings": {
+       "centres": [
+        {
+         "distance": 0,
+         "axes": [
+          0,
+          1
+         ],
+         "meshes": [
+          0
+         ]
+        },
+        {
+         "distance": 1,
+         "axes": [
+          1,
+          2
+         ],
+         "meshes": [
+          1,
+          2
+         ]
+        }
+       ],
+       "axes": [
+        {
+         "axis": 0,
+         "carried_by": null,
+         "count": 1,
+         "bodies": [
+          {
+           "body": 1,
+           "members": [
+            0
+           ],
+           "carries": []
+          }
+         ]
+        },
+        {
+         "axis": 1,
+         "carried_by": null,
+         "count": 1,
+         "bodies": [
+          {
+           "body": 2,
+           "members": [
+            1,
+            2
+           ],
+           "carries": []
+          },
+          {
+           "body": 3,
+           "members": [],
+           "carries": [
+            2
+           ]
+          },
+          {
+           "body": 4,
+           "members": [
+            4
+           ],
+           "carries": []
+          }
+         ]
+        },
+        {
+         "axis": 2,
+         "carried_by": 3,
+         "count": 3,
+         "bodies": [
+          {
+           "body": 5,
+           "members": [
+            3
+           ],
+           "carries": []
+          }
+         ]
+        }
+       ]
+      },
+      "flows": [
+       [
+        {
+         "body": {
+          "body": 1
+         }
+        },
+        {
+         "mesh": {
+          "mesh": 0,
+          "to": 2
+         }
+        },
+        {
+         "body": {
+          "body": 2
+         }
+        },
+        {
+         "junction": {
+          "part": 1,
+          "meshes": [
+           1,
+           2
+          ],
+          "terminals": [
+           2,
+           3,
+           4
+          ]
+         }
+        },
+        {
+         "body": {
+          "body": 3
+         }
+        }
+       ],
+       [
+        {
+         "body": {
+          "body": 3
+         }
+        },
+        {
+         "junction": {
+          "part": 1,
+          "meshes": [
+           1,
+           2
+          ],
+          "terminals": [
+           2,
+           3,
+           4
+          ]
+         }
+        },
+        {
+         "body": {
+          "body": 2
+         }
+        },
+        {
+         "mesh": {
+          "mesh": 0,
+          "to": 1
+         }
+        },
+        {
+         "body": {
+          "body": 1
+         }
+        }
+       ],
+       [
+        {
+         "body": {
+          "body": 1
+         }
+        },
+        {
+         "mesh": {
+          "mesh": 0,
+          "to": 2
+         }
+        },
+        {
+         "body": {
+          "body": 2
+         }
+        },
+        {
+         "junction": {
+          "part": 1,
+          "meshes": [
+           1,
+           2
+          ],
+          "terminals": [
+           2,
+           3,
+           4
+          ]
+         }
+        },
+        {
+         "body": {
+          "body": 3
+         }
+        }
+       ]
+      ],
+      "names": [
+       {
+        "role": "gear",
+        "ordinal": null
+       },
+       {
+        "role": "gear",
+        "ordinal": null
+       },
+       {
+        "role": "sun",
+        "ordinal": null
+       },
+       {
+        "role": "planet",
+        "ordinal": null
+       },
+       {
+        "role": "ring",
+        "ordinal": null
+       }
+      ],
       "cards": [
        {
         "distances": [

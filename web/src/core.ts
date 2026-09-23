@@ -813,6 +813,9 @@ export function solveTrain(train: Train, materials?: MaterialLibrary): TrainOutc
       topology: [],
       motion: null,
       cards: [],
+      groupings: { centres: [], axes: [] },
+      flows: [],
+      names: [],
     };
   }
 }

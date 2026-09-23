@@ -48,6 +48,7 @@ pub mod crossed;
 mod edits;
 pub mod flow;
 pub mod graph;
+mod groupings;
 mod pair;
 mod planetary;
 mod preview;
@@ -62,6 +63,7 @@ pub use conditions::{
 use crate::kinematics::{Body, Condition, GROUND};
 pub use arrangements::{StageFamily, StagePreset};
 pub use edits::{Edit, EditRefused, Piece, Place, StageEdit};
+pub use groupings::{AxisBody, AxisGroup, Centre, FlowRow, Groupings};
 pub(crate) use pair::ShiftAsked;
 pub use planetary::boundary_for as planetary_boundary;
 pub use preview::{preview, Preview};

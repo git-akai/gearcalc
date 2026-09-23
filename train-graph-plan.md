@@ -570,6 +570,17 @@ the corpus and every path, case, topology and motion byte for byte; each
 card's view equal to the stage result it replaced, and the figures the same
 values.
 
+**Phase 7, step 1 — the groupings, from the core.** Done: `Train::groupings`
+(centres and axes, which need no solve) and `Train::flows` (each case's
+flow: from the case's first load, down the meshes carrying its power, most
+first; an epicyclic part one junction whose planets, held ends and idle
+ends are said inside it; an idle mesh a branch walked after the path), with
+the graph-level member names, cross the boundary beside the result. On the
+mockups' own train — a pair, a layshaft, a compound set — the flow reads as
+drawn. Laws: every mesh at one centre, every body on one axis, and every
+body and every mesh said once in every case's flow, entered at the case's
+load.
+
 **Phase 6 — results and the boundary.** `TrainResult` per member, mesh,
 distance, axis and path, with `topology` carrying the groupings;
 `relieve_stage` → `relieve`; `adopt_member` by member; bindings; the probe.
