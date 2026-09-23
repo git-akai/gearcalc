@@ -47,6 +47,7 @@ mod conditions;
 pub mod crossed;
 mod edits;
 pub mod flow;
+pub mod graph;
 mod pair;
 mod planetary;
 pub mod shape;

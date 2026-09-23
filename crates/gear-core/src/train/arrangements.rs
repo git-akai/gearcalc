@@ -468,7 +468,7 @@ impl Shape {
 }
 
 /// A planet gear's count as [`epicyclic`] takes it: external, so positive.
-fn external(teeth: u32) -> i32 {
+pub(crate) fn external(teeth: u32) -> i32 {
     i32::try_from(teeth).unwrap_or(i32::MAX)
 }
 

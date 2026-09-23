@@ -445,7 +445,20 @@ after it is close to concatenation.
      Phase 4: the join becomes the coupled shaft's.
   4. The production switch and the slicing — notes and indices back to
      their stages — weighed once 1–3 are in: it is an adapter Phase 6
-     deletes.
+     deletes. **Dropped, for a better seam.** The graph falls apart by
+     itself into parts that close, search and rate apart (`Shape::parts`:
+     members joined by meshes, meshes by distances), and a train of stages
+     falls apart into exactly its stages, each part solving as its stage
+     does. So Phase 4 solves the stored graph part by part and deals the
+     cards from the parts: a part's result *is* a card's result, and no
+     slicing is written to be deleted.
+  **Done** (steps 1–3): the frame rule, the offset coupling, `Train::graph`
+  and `Shape::parts`, held by three laws — the graph's motion is the
+  train's, body for body and exactly; the train falls apart into its
+  stages, each part's solve its stage's; and a join off an orbiting body
+  is a coupling — on every preset alone, every ordered pair and the
+  three-stage train, each law run first against the code it guards and
+  seen to fail.
 
 **Phase 4 — storage flips.** `Train` holds the graph. Conventions are written
 as holds at insertion, and a fresh train's default cases at its first
