@@ -47,6 +47,7 @@
     axisOfBody,
     bodyName,
     endsOf,
+    acrossBody,
     bodyRefName,
     movableGears,
     onSlot,
@@ -302,11 +303,7 @@
     const entry = defaults().stages.find((e) => e.preset === preset);
     if (!entry) return;
     editTrain(tab.train, { push_stage: entry.stage });
-    tab.open[tab.train.stages.length - 1] = true;
   }
-
-
-
 
   /** Deleting the last stage leaves none. A train with no stages is a
    *  train — its cases are parked on ground with every figure kept, and
@@ -1316,6 +1313,7 @@
       <span class="rule"></span>
     </div>
     {#each g.bodies as b (b.body)}
+      {@const port = portBodies.find((q) => q.body === b.body)}
       <div class="bodygrp">
         <div class="bodyrow">
           <span class="body-name">{bodyName(b.body)}</span>
@@ -1328,6 +1326,43 @@
               on: onSlot(tab.train, result.topology, e.stage, e.slot, false),
             })}</span>
           {/each}
+          <!-- **What is done to the body, on the body's row** — held to the
+               housing, or joined to another body of the train — beside the
+               gears' own menus one level in, which move a *gear* between
+               the bodies of its axis. Two acts, two words, told apart by
+               the row they are on rather than by a heading. Only a port
+               has them: a replicated body is a planet's, with no end for
+               the train to name and nothing to hold it by. -->
+          {#if port !== undefined}
+            <span class="filler"></span>
+            {@const held = heldNow(port)}
+            {@const targets = joinable(i, port).filter((q) => q.body !== b.body)}
+            {@const ends = endsOf(tab.train, b.body)}
+            {#if targets.length > 0 || ends.length > 1}
+              <select
+                class="action move"
+                value=""
+                aria-label={t("ui.train_join_to_of", { body: bodyName(b.body) })}
+                onchange={(ev) => {
+                  const v = ev.currentTarget.value;
+                  ev.currentTarget.value = "";
+                  moveEnd(i, b.body, v);
+                }}
+              >
+                <option value="" disabled>{t("ui.train_join_to")}</option>
+                {#each targets as q (q.body)}
+                  <option value={String(q.body)}>{bodyName(q.body)}</option>
+                {/each}
+                {#if ends.length > 1}
+                  <option value="new">{t("ui.train_own_body")}</option>
+                {/if}
+              </select>
+            {/if}
+            <button
+              class="action"
+              onclick={() => editTrain(tab.train, held ? { release: b.body } : { hold: b.body })}
+            >{held ? t("ui.train_release") : t("ui.train_hold")}</button>
+          {/if}
         </div>
         {#if b.members.length === 0 && b.carries}
           <div class="onbody"><span class="dim">{t("ui.train_carrier")}</span></div>
@@ -1713,67 +1748,18 @@
     {/if}
     <!-- **The train's bodies, and what each carries across the stages** —
          every body some stage has as a port, numbered as the gears are,
-         with its ends under it. This is where a body is *wired*, because a
-         body is the train's: held to the housing, joined to another
-         stage's end, or split back onto one of its own. A stage's card
-         says which bodies it turns about and what is fixed to them, and
-         asks none of this a second time. -->
+         the held ones said so. A summary and nothing else: what is done
+         *to* a body is done on the card of a stage that has it, where the
+         body is listed with the gears on it and the axis it turns
+         about. -->
     {#if portBodies.length > 0}
       <h4 class="section-heading">{t("ui.train_bodies")}</h4>
-      <small class="edit-note">{t("ui.train_note_bodies")}</small>
-      <div class="bodylist">
-      {#each portBodies as p (p.body)}
-        {@const ends = endsOf(tab.train, p.body)}
-        {@const held = heldNow(p)}
-        <div class="bodygrp">
-          <div class="bodyrow">
-            <span class="body-name">{bodyName(p.body)}</span>
-            {#if held}<span class="chip held">{t("ui.train_case_fixed")}</span>{/if}
-            <span class="filler"></span>
-            <!-- Held is a statement about the body, so it is made on the
-                 body's row and every end of it is held at once. A hold the
-                 stage's own convention puts on reads the same and is
-                 written off in so many words when released, which is the
-                 core's rule (`Train::release`). -->
-            <button
-              class="action"
-              onclick={() => editTrain(tab.train, held ? { release: p.body } : { hold: p.body })}
-            >{held ? t("ui.train_release") : t("ui.train_hold")}</button>
-          </div>
-          {#each ends as e (e.stage)}
-            {@const targets = joinable(e.stage, p).filter((q) => q.body !== p.body)}
-            <div class="onbody">
-              <span>{t("ui.train_port_at", {
-                stage: t("ui.train_stage_heading", { number: String(e.stage + 1) }),
-                on: onSlot(tab.train, result.topology, e.stage, e.slot, false),
-              })}</span>
-              {#if targets.length > 0 || ends.length > 1}
-                <select
-                  class="action move"
-                  value=""
-                  aria-label={t("ui.train_move_to_of", {
-                    name: onSlot(tab.train, result.topology, e.stage, e.slot),
-                  })}
-                  onchange={(ev) => {
-                    const v = ev.currentTarget.value;
-                    ev.currentTarget.value = "";
-                    moveEnd(e.stage, p.body, v);
-                  }}
-                >
-                  <option value="" disabled>{t("ui.train_move_to")}</option>
-                  {#each targets as q (q.body)}
-                    <option value={String(q.body)}>{bodyName(q.body)}</option>
-                  {/each}
-                  {#if ends.length > 1}
-                    <option value="new">{t("ui.train_own_body")}</option>
-                  {/if}
-                </select>
-              {/if}
-            </div>
-          {/each}
-        </div>
-      {/each}
-      </div>
+      <dl class="out bodies">
+        {#each portBodies as p (p.body)}
+          <dt>{bodyName(p.body)}{#if heldNow(p)} <small>{t("ui.train_case_fixed")}</small>{/if}</dt>
+          <dd>{acrossBody(tab.train, result.topology, p.body)}</dd>
+        {/each}
+      </dl>
     {/if}
   </div>
   <div class="grid shared">
@@ -2582,6 +2568,9 @@
     grid-column: 1 / -1;
     min-width: 0;
   }
+  .train .paths dl.bodies {
+    margin: 0.5rem 0 0;
+  }
   .train .paths h4 {
     margin: 0;
   }
@@ -2797,10 +2786,6 @@
      in this panel are drawn from these — the train's bodies with their ends,
      a stage's with its gears — because they are the same picture at two
      levels. */
-  .bodylist {
-    max-width: 34rem;
-    margin-top: 0.3rem;
-  }
   .bodygrp {
     margin-bottom: 0.4rem;
   }

@@ -2424,13 +2424,13 @@ stage's bodies by number, and a train the panel builds writes each one:
 adding a stage numbers its bodies after every body the train has, joins
 its conventional input to the last stage's remaining open output and
 carries every case entry there to the new stage's output (`push_stage`);
-the **move to** menu on a body's end is one rule (`move_end`) — the
+the **join to** menu on a body's row is one rule (`move_end`) — this
 stage's end of the body is split off where the body ran on to another
 stage, and then joined to the body chosen (the lower number kept, `join`)
 or left a body of its own (`split`). Held is not among its entries: a hold
 is a statement about the *body*, which every end of it shares, so it is a
-button on the body's own row (`hold`, `release`, the latter writing off a
-stage convention's hold in so many words).
+button beside the menu (`hold`, `release`, the latter writing off a stage
+convention's hold in so many words).
 Joining a body to one a case had declared *reacted* turns that entry into a
 load with its torque derived — an inline take-off, the same physics — since
 a body two stages share cannot be a reaction; a hold drops every case entry
@@ -2569,20 +2569,24 @@ and nothing else — no "start", no "end".
 
 **A body, to the panel, is its number.** The panel numbers nothing of its
 own: a body is "Body 2" wherever it is named, with its ends in parentheses
-— "Body 2 (Stage 1 Gear 2 · Stage 2 Sun)". **It is wired in one place, the
-train's own list**, which is where a body belongs: every port body in
-number order, each with its ends indented under it — the stage and what it
-is there — a **hold** on the body's row and a **move to** menu on each
-end's ([Bodies and constraints](#bodies-and-constraints)). A held body
-keeps its number and is said to be fixed.
+— "Body 2 (Stage 1 Gear 2 · Stage 2 Sun)". The train's own block lists
+every port body with what it carries stage by stage, and **states, never
+asks**: a summary at the head of the page.
 
-A stage's card asks the other question, and only it: **what turns with
-what, here**. One list in the shape's own order — an axis, the bodies on
-it, the gears on each — so a gear is a row under the body it is fixed to
-and a body a row under the axis it turns about, each name written once in
-one meaning. A gear's menu moves it to another body of its own axis, or
-onto one of its own where it shares (`StageEdit::MoveBody`), and it is
-there only where there is somewhere to go. **Axes are numbered, not
+**One list is editable, and it is the stage's**, in the shape's own order
+— an axis, the bodies on it, the gears on each — so a gear is a row under
+the body it is fixed to and a body a row under the axis it turns about,
+each name written once in one meaning. The row a control sits on is what
+says what it acts on. On a **body's** row, the two things done to a body:
+**hold** it to the housing, and **join to** another body of the train —
+this stage's end of it ([Bodies and
+constraints](#bodies-and-constraints)) — both only where the body is a
+port, since a replicated body is a planet's and the train does not name
+it. On a **gear's** row, one level in, the one thing done to a gear: moved
+to another body of its own axis, or onto one of its own where it shares
+(`StageEdit::MoveBody`), and there only where there is somewhere to go. A
+held body keeps its number and is said to be fixed, on the card and in the
+summary alike. **Axes are numbered, not
 named**: a name off a preset — a layshaft, a centreline — states a
 distinction the shape does not have, and what is on the axis is the rows
 under it. What a number cannot say is written beside it: the body a

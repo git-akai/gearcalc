@@ -544,12 +544,12 @@ core's rules, the cases following, the cards dealt by step and by mesh
 group, each mesh above the distance it runs at · **a train's bodies are its one vocabulary for what
 turns**: numbered across the train as the gears are, a stage listing the
 bodies on its axes and a body on two stages being what a coupling used to
-say, listed with what each carries — **wired in one place and read in
-another**: the train's own list holds every body with its ends under it, a
-hold on the body's row and a *move to* menu on each end's, and a stage's
-card is the shape's three levels, an axis, the bodies on it and the gears
-on each, where a gear is moved to another body of its axis — which is how
-a layshaft's ratio is engaged · stages and load cases start collapsed ·
+say, listed with what each carries — **read at the train, edited at the
+stage**: the train's block states every body and what it carries, and a
+stage's card is the shape's three levels, an axis, the bodies on it and
+the gears on each, where a body's row holds it or joins it to another and
+a gear's row moves it to another body of its axis — which is how a
+layshaft's ratio is engaged · stages and load cases start collapsed ·
 geartrains
 exported and imported as TOML, inputs only · gear tabs with external and internal
 kinds, and eccentric in the same developer mode.
