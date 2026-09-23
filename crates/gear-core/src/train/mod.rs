@@ -3381,12 +3381,12 @@ pub fn loaded_cycles(turns: Turns) -> Cycles {
     }
 }
 
-/// **The train's figures, one row per path** — see [`PathReport`]: the two
-/// conventional ends, then every path an enabled case uses, from each of
-/// its loads to each of its reactions, once each. Empty where the train's
-/// holds leave its motion a family, since a ratio between two ports of a
-/// mechanism with two freedoms needs a third held, and which is the
-/// designer's to say.
+/// **The train's figures, one row per path** — see [`PathReport`]: every
+/// path an enabled case uses, from each of its loads to each of its
+/// reactions, once each, in case order — so the first is the headline
+/// case's. Empty where the train's holds leave its motion a family, since
+/// a ratio between two ports of a mechanism with two freedoms needs a
+/// third held, and which is the designer's to say.
 #[allow(clippy::too_many_arguments)]
 fn paths_of(
     train: &Train,
@@ -3399,12 +3399,13 @@ fn paths_of(
     stages: &[ShapeResult],
 ) -> Vec<PathReport> {
     let shafts = system.bodies();
-    // **Which paths are worth a row**: the two conventional ends — what a
-    // chain's total was, present whether or not any case loads it — and
-    // then, in case order, every path an enabled case actually uses, from
-    // each of its loads to each of its reactions. Every pair of open bodies
-    // is a path the graph could answer, and on a train of many stages
-    // nearly all of them are ones nobody asked about.
+    // **Which paths are worth a row**: in case order, every path an
+    // enabled case actually uses, from each of its loads to each of its
+    // reactions. Every pair of open bodies is a path the graph could
+    // answer, and on a train of many stages nearly all of them are ones
+    // nobody asked about; the way to ask is a case. (The chain's two
+    // conventional ends used to be a row of their own, present whether or
+    // not any case loaded them — a reading nobody had stated.)
     let mut wanted: Vec<(usize, usize)> = Vec::new();
     let mut want = |a: usize, b: usize| {
         if a != b
@@ -3415,9 +3416,6 @@ fn paths_of(
             wanted.push((a, b));
         }
     };
-    if let Some((a, b)) = train.ends(boundaries) {
-        want(a, b);
-    }
     // An entry at a held body, or at one no stage has, is no path's end.
     let bodies = train.bodies(boundaries);
     let open = |b: usize| -> Option<usize> {
@@ -3933,10 +3931,9 @@ pub struct PathReport {
 )]
 pub struct TrainResult {
     /// **The train's own figures, one row per path**, where its holds leave
-    /// it one motion: the two conventional ends first, where it has them —
-    /// what a chain's total was, present whether or not a case loads it —
-    /// then every path an enabled case uses, from each of its loads to each
-    /// of its reactions, once each, in case order. Empty where the motion is
+    /// it one motion: every path an enabled case uses, from each of its
+    /// loads to each of its reactions, once each, in case order — the
+    /// headline case's first. Empty where the motion is
     /// a family (a differential, an isolated stage), which is still rated:
     /// each case's loads decide its motion, and every stage rates under
     /// that; what a family has none of is a figure read under one motion.
@@ -3949,8 +3946,8 @@ pub struct TrainResult {
 }
 
 impl TrainResult {
-    /// **The train's figures between its two conventional ends** — the first
-    /// path, which is that one where the train has two ends and one motion.
+    /// **The train's headline figures** — the first path, which is the
+    /// headline case's where it has one motion.
     #[must_use]
     pub fn total(&self) -> Option<&PathReport> {
         self.paths.first()
@@ -6518,26 +6515,23 @@ mod tests {
     #[test]
     fn a_trains_ratio_carries_the_direction_its_output_turns() {
         let lib = library();
-        let one = |stage| {
-            let t = train_of(vec![stage]);
+        // Read along a case between the chain's ends, switched on.
+        let read = |mut t: Train| {
+            let mut case = t.fresh_case(CaseKind::Ultimate, 2.0, 3000.0);
+            case.enabled = true;
+            t.load_cases = vec![case];
             solve_train(&t, &lib)
                 .expect("solves")
                 .total()
                 .unwrap()
                 .ratio
         };
+        let one = |stage| read(train_of(vec![stage]));
         // One external mesh reverses; two do not.
         assert!(one(arr::pair([17, 43])) < 0.0);
         let mut two = two_stage();
         two.load_cases.clear();
-        assert!(
-            solve_train(&two, &lib)
-                .expect("solves")
-                .total()
-                .unwrap()
-                .ratio
-                > 0.0
-        );
+        assert!(read(two) > 0.0);
         // A worm is an external mesh like any other.
         assert!(one(arr::worm(1, 40)) < 0.0);
         // ...and an epicyclic set carries the sign its own kinematics gives:
@@ -7101,7 +7095,7 @@ mod tests {
         let bodies = t.bodies(&t.boundaries().unwrap());
         assert_eq!(bodies.len(), 3, "the planet is no body a case can name");
         assert!(bodies[2].held);
-        assert_eq!(t.ends(&t.boundaries().unwrap()), Some((1, 2)));
+        assert_eq!(t.chain_ends(), Some((1, 2)));
     }
 
     /// **A load between two stages is one flow across both**, and where it
@@ -7202,7 +7196,7 @@ mod tests {
             ]
         );
         assert_eq!(
-            t.ends(&b),
+            t.chain_ends(),
             Some((at(0, 1), at(3, 2))),
             "the chain's ends, with three take-offs between them"
         );
@@ -7217,7 +7211,7 @@ mod tests {
         );
         assert_eq!(ports[2].ends[0].1, BodyLabel::Member { member: 2 });
         assert_eq!(
-            t.ends(&b),
+            t.chain_ends(),
             Some((1, 2)),
             "a set's ends by convention, whatever its ring does"
         );
@@ -8538,11 +8532,10 @@ mod tests {
     fn free(at: usize) -> Load {
         Load::declared(at, LoadRole::Free)
     }
-    /// **The train's two ends**, where it has exactly two — every chain
+    /// **The chain's two ends**, where it has exactly two — every chain
     /// fixture here — which its preset cases are written between.
     fn ends_of(t: &Train) -> (usize, usize) {
-        t.ends(&t.boundaries().expect("a fixture has boundaries"))
-            .expect("a chain fixture has two ends")
+        t.chain_ends().expect("a chain fixture has two ends")
     }
     fn start_of(t: &Train) -> usize {
         ends_of(t).0
@@ -10822,14 +10815,9 @@ mod tests {
             };
             let r = solve_train(&train, &lib).expect("a shaft line solves");
             assert_eq!(r.cases.len(), train.load_cases.len());
-            // **The magnitude**, because a train's ratio is signed now: it
-            // comes off the graph and says whether the output reverses, where
-            // the product of the stage ratios could not — a pair reports its
-            // own as a magnitude. This train has an odd number of external
-            // meshes, so it turns backwards and says so.
-            assert!(
-                r.total().unwrap().ratio.abs() > 1.0 && r.total().unwrap().efficiency.forward > 0.0
-            );
+            // **A path is a case's**, and a shaft line with none switched on
+            // reports none: a reading nobody asked for is no reading.
+            assert!(r.paths.is_empty(), "{:?}", r.paths);
             for s in &r.stages {
                 for g in &s.members {
                     assert!(g.cases.is_empty());

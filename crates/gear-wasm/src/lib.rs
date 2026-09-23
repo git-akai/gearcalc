@@ -1663,11 +1663,7 @@ mod tests {
             .map(|v| serde_json::from_value(v.clone()).expect("a stage"))
             .collect();
         let mut t = Train::chained(stages, |_| Vec::new());
-        let (start, end) = t
-            .boundaries()
-            .ok()
-            .and_then(|b| t.ends(&b))
-            .expect("a chain fixture has two ends");
+        let (start, end) = t.chain_ends().expect("a chain fixture has two ends");
         let continuous = Duty::Continuous {
             runtime_hours: hours,
         };

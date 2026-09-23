@@ -465,6 +465,11 @@ preset's conventional one written at insertion; `release` takes a hold out;
 `Constraint`, `BodyConstraint` and `by_convention` are gone, and the file's
 `constraints` is refused by name. No figure moved.
 
+**Phase 4, step 2 — a path is a case's.** Done: the chain's ends row is
+gone, the motion is read along the headline case (`headline`,
+`headline_load`), and `chain_ends` is only where a case starts on a train
+with none.
+
 **Phase 4 — storage flips.** `Train` holds the graph. Conventions are written
 as holds at insertion, and a fresh train's default cases at its first
 preset's ends; `Train::ends` and its row go. **The reader does not convert**:

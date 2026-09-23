@@ -971,8 +971,6 @@
     b6     planet 2  of stage 1 speed 1
 
 == ravigneaux-large-sun ==
-  path b3    -> b1    ratio      -0.240000   efficiency  90.611620 / 90.948043  %   backlash   0.695140 / 0.166833   deg
-    power through the teeth   5.707116 / 5.475753     one more tooth: -0.250206 -0.240000 -0.240000 -0.225000 -0.244444
   path b3    -> b2    ratio      -1.066667   efficiency  91.481430 / 91.818656  %   backlash   0.156564 / 0.167001   deg
     power through the teeth   5.707116 / 5.518598     one more tooth: -1.066667 -1.066667 -1.066667 -1.000000 -1.100000
   case 1       2.0000 Nm /   3000.00 rpm at b3     +reacted at b2     +free at b1   
@@ -1042,7 +1040,7 @@
     mesh 2  efficiency  98.241874 / 98.241874  %  contact ratio   1.5719  shares a factor
     mesh 3  efficiency  99.257031 / 99.257031  %  contact ratio   1.9395  shares a factor
     mesh 4  efficiency  98.042652 / 98.042652  %  contact ratio   1.5419  shares a factor
-  graph    mobility 2 degree(s), 2 given   total ratio -6/25
+  graph    mobility 2 degree(s), 2 given   total ratio -16/15
     stage 1  ratio -6/25
     ground ground    of the train speed 0
     b1     sun 1     of stage 1 speed -25/6

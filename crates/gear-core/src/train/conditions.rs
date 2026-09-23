@@ -585,14 +585,13 @@ impl Train {
     pub fn motion(&self) -> Result<TrainMotion, MotionError> {
         let system = self.system()?;
         let mut conditions = self.conditions(system.bodies())?;
-        // **The train has a ratio between exactly two open bodies**, driven
-        // at the first: a chain's two ends, whatever stage each is on. With
-        // any other number nothing is driven, the motion is a family, and
-        // the train has no figure of its own — each stage still has, and
-        // each case decides its own.
+        // **The motion is read along the headline case**, at one turn of its
+        // load: a fresh train's reading is its first case. With no case to
+        // say so nothing is driven, the motion is a family, and each case
+        // decides its own.
         let boundaries = self.boundaries()?;
-        let ends = self.ends(&boundaries);
-        if let Some((a, _)) = ends {
+        let ends = self.headline();
+        if let Some(a) = self.headline_load() {
             conditions[a] = Condition::Drive(Ratio::ONE);
         }
         // **Conventions in first, the train's own last**, so that a conflict
@@ -668,15 +667,50 @@ impl Train {
             .collect()
     }
 
-    /// **The train's two ends**: the first stage's conventional input and
-    /// the last stage's conventional output, where each is open and no
-    /// other stage's. What the train's own ratio is read between, and what
-    /// a preset puts its load and its reaction at; a convention for
-    /// reporting and nothing more, since a case says what turns. `None`
-    /// where either is held or shared, or the train is one stage with one
-    /// open port.
+    /// **The headline case's path**: the first case switched on, from its
+    /// first load to its first reaction, where both are open bodies of the
+    /// train and not one body. What the train's motion is read along; a
+    /// train with no such case has no reading of its own, and each case
+    /// decides its own motion.
     #[must_use]
-    pub fn ends(&self, boundaries: &[StageBoundary]) -> Option<(usize, usize)> {
+    pub fn headline(&self) -> Option<(usize, usize)> {
+        let load = self.headline_load()?;
+        let reaction = self
+            .load_cases
+            .iter()
+            .find(|c| c.enabled)?
+            .loads
+            .iter()
+            .find(|l| l.role == super::LoadRole::Reacted)?
+            .at;
+        (load != reaction && self.is_open(reaction)).then_some((load, reaction))
+    }
+
+    /// **Where the headline case's first load enters**, at an open body:
+    /// what the train's motion is driven at, whether or not the case
+    /// reacts it anywhere a path could end.
+    #[must_use]
+    pub fn headline_load(&self) -> Option<usize> {
+        let case = self.load_cases.iter().find(|c| c.enabled)?;
+        let load = case.loads.iter().find(|l| l.is_load())?.at;
+        self.is_open(load).then_some(load)
+    }
+
+    /// A body some stage has that the train does not hold.
+    fn is_open(&self, body: usize) -> bool {
+        body != GROUND && !self.held.contains(&body) && !self.ends_of(body).is_empty()
+    }
+
+    /// **A chain's two ends by convention**: the first stage's conventional
+    /// input and the last stage's conventional output, where each is open
+    /// and no other stage's — where a case starts on a train that has none,
+    /// and where a fixture writes its cases. A seed for a case and nothing
+    /// the train reports: its figures are its cases'. `None` where either
+    /// is held or shared, or the train is one stage with one open port.
+    #[must_use]
+    pub fn chain_ends(&self) -> Option<(usize, usize)> {
+        let boundaries = self.boundaries().ok()?;
+        let boundaries = boundaries.as_slice();
         let (first, last) = (boundaries.first()?, boundaries.last()?);
         let a = self.port(0, first.input);
         let b = self.port(boundaries.len() - 1, last.output);
@@ -920,7 +954,7 @@ impl Train {
             .skip(1)
             .filter(|c| **c != Condition::Free)
             .count()
-            + usize::from(self.ends(&boundaries).is_some());
+            + usize::from(self.headline_load().is_some());
         let free: Vec<usize> = m.solution.residual.iter().map(|r| r.at).collect();
         let ports = self.bodies(&boundaries);
         let ends = |body: usize| -> Vec<BodyEnd> {
@@ -1120,16 +1154,17 @@ impl Train {
         out
     }
 
-    /// **A fresh case of this kind between the train's two ends**: a
-    /// torque at the first, driven at a speed, reacted at the second, the
-    /// duty's sweep measured at the second — the case a panel's button adds,
-    /// **switched off**, so a case added at its default figures moves no
-    /// rating until the designer has written it and switched it on. A train
-    /// with no two ends gets it at two bodies of its own, parked for the
-    /// first stage to take up or the designer to move.
+    /// **A fresh case of this kind along the headline case's path** — or,
+    /// on a train with no case, between the chain's two ends: a torque at
+    /// the first, driven at a speed, reacted at the second, the duty's sweep
+    /// measured at the second — the case a panel's button adds, **switched
+    /// off**, so a case added at its default figures moves no rating until
+    /// the designer has written it and switched it on. A train with neither
+    /// gets it at two bodies of its own, parked for the first stage to take
+    /// up or the designer to move.
     #[must_use]
     pub fn fresh_case(&self, kind: super::CaseKind, torque: f64, speed: f64) -> super::LoadCase {
-        let ends = self.boundaries().ok().and_then(|b| self.ends(&b));
+        let ends = self.headline().or_else(|| self.chain_ends());
         let (input, output) = ends.unwrap_or_else(|| {
             let parked = self.parked();
             match parked.as_slice() {

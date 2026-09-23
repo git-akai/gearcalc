@@ -136,11 +136,7 @@ fn fixtures() -> Vec<(String, Train)> {
     // A chain of these stages, loaded between its two ends.
     let train = |stages: Vec<Shape>| {
         let mut t = Train::chained(stages, |_| Vec::new());
-        let (input, output) = t
-            .boundaries()
-            .ok()
-            .and_then(|b| t.ends(&b))
-            .expect("a chain fixture has two ends");
+        let (input, output) = t.chain_ends().expect("a chain fixture has two ends");
         t.load_cases = loads(input, output);
         t
     };

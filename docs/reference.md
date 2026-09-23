@@ -2472,9 +2472,9 @@ later stage is its output, failing that the next open port. They decide
 nothing about a load case.
 
 **The train's own figures are per path.** Where its holds leave it one
-motion, a row for each path that is asked about — the two conventional ends,
-and then, in case order, every path an enabled case uses, from each of its
-loads to each of its reactions, once each — between two open bodies: the
+motion, a row for each path that is asked about — in case order, every path
+an enabled case uses, from each of its loads to each of its reactions, once
+each, so the first is the **headline case's** — between two open bodies: the
 **ratio** off that motion, driven at the one with the other free; the **efficiency** off the
 train's flow at unit load — the first driving, the second holding the load,
 every other body free — and the reverse, so a path that crosses one stage of
@@ -2496,13 +2496,16 @@ tooth tells and where it does not: a planet's moves a set's ratio by
 nothing, and a gear off the path moves it only by locking it. **Whether a
 path breaks away** is its own flow against every mesh's static friction
 ([the friction balance](#the-friction-balance)), since a train can hold at
-rest where none of its meshes does. The two conventional ends — the first stage's input and the
-last stage's output, where each is open — are the first row whether or not
-a case loads them, and are what a chain's total was; every other pair of
-open bodies is a path the graph could answer and nobody asked about, and
-the way to ask is a case. A train whose holds leave its motion a family has
-no row: a ratio between two ports of a mechanism with two freedoms needs a
-third held, which is the designer's to say.
+rest where none of its meshes does. Every other pair of open bodies is a
+path the graph could answer and nobody asked about, and the way to ask is a
+case: a fresh train starts with a case between its first preset's ends, so
+it opens on that path, and says under what load. (The chain's two
+conventional ends were a row of their own, present whether or not a case
+loaded them — a reading nobody had stated.) The train's motion is read
+along the headline case, at one turn of its first load. A train whose holds
+leave its motion a family has no row: a ratio between two ports of a
+mechanism with two freedoms needs a third held, which is the designer's to
+say.
 
 **Motion needs none of the geometry.** With every constraint in force the train
 is one system — one node per body, ground shared, one row per mesh in the

@@ -9,10 +9,9 @@ import type { TrainCase } from "./TrainCase";
 export type TrainResult = { 
 /**
  * **The train's own figures, one row per path**, where its holds leave
- * it one motion: the two conventional ends first, where it has them —
- * what a chain's total was, present whether or not a case loads it —
- * then every path an enabled case uses, from each of its loads to each
- * of its reactions, once each, in case order. Empty where the motion is
+ * it one motion: every path an enabled case uses, from each of its
+ * loads to each of its reactions, once each, in case order — the
+ * headline case's first. Empty where the motion is
  * a family (a differential, an isolated stage), which is still rated:
  * each case's loads decide its motion, and every stage rates under
  * that; what a family has none of is a figure read under one motion.

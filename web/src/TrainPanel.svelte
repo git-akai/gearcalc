@@ -1761,8 +1761,8 @@
 
 <section class="train">
   <div class="paths">
-    <!-- **The train's figures, one row per path** — between every two of
-         its open bodies, the two ends first: the ratio off the one motion,
+    <!-- **The train's figures, one row per path** — every path a case
+         asks about, the headline case's first: the ratio off the one motion,
          the efficiency both ways off the train's flow, the play at each end
          driven from the other. The table stands whether or not there is an
          answer in it, so the page holds still while a designer edits; a

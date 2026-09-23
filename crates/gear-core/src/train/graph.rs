@@ -430,7 +430,7 @@ mod tests {
         for (name, train) in fixtures() {
             let system = train.system().unwrap();
             let base = train.conditions(system.bodies()).unwrap();
-            let (from, _) = train.ends(&train.boundaries().unwrap()).unwrap();
+            let (from, _) = train.chain_ends().unwrap();
             let mut c = base.clone();
             c[from] = Condition::Drive(crate::ratio::Ratio::ONE);
             let want = system.motion(&c).unwrap();
