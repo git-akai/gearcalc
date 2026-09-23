@@ -594,6 +594,11 @@ graph as one card (`wholePart`), so every field and relief hook it shares
 with the cards takes the graph's pieces by the graph's numbers; it lays
 itself out by its own width, three columns where there is room.
 
+**Phase 7, step 3 — a case in the workspace.** Done: a case chip selects the
+case, and the workspace edits it — its duty, each body's role and its
+figures, what it comes to body by body, its switch — by the one editor the
+accordion used (`caseEditor`); a case is added from the strip and shown.
+
 **Phase 6 — results and the boundary.** `TrainResult` per member, mesh,
 distance, axis and path, with `topology` carrying the groupings;
 `relieve_stage` → `relieve`; `adopt_member` by member; bindings; the probe.

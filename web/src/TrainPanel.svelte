@@ -741,6 +741,24 @@
     {@render bodyWorkspace(sel.body)}
   {:else if sel !== null && "axis" in sel && tab.train.shape.axes[sel.axis] !== undefined}
     {@render axisWorkspace(sel.axis)}
+  {:else if sel !== null && "case" in sel && tab.train.load_cases[sel.case] !== undefined}
+    {@const c = tab.train.load_cases[sel.case]}
+    {@const complete = forCase(solved?.cases, sel.case)?.solved ?? false}
+    <div class="ws-head">
+      <h4 class="section-heading">{caseName(sel.case)} · {kindLabel(c.kind)}</h4>
+      <small>{caseSummary(c)}</small>
+      <span class="control" class:locked={solved !== undefined && !complete}>
+        <Switch
+          label={t("ui.train_case_enabled")}
+          on={c.enabled}
+          set={(v) => {
+            if (v && solved !== undefined && !complete) return;
+            c.enabled = v;
+          }}
+        />
+      </span>
+    </div>
+    <div class="casebody">{@render caseEditor(c, sel.case)}</div>
   {:else if sel !== null && "junction" in sel && result.topology[sel.junction] !== undefined}
     {@const part = result.topology[sel.junction].part}
     {#each part.meshes as k (k)}
@@ -910,6 +928,173 @@
       <span class="gearrow">{gearName(i)}</span>
     {/each}
   {/each}
+{/snippet}
+
+{#snippet caseEditor(c: LoadCase, i: number)}
+  {@const cres = forCase(solved?.cases, i)}
+    <div class="grid shared">
+      {#if c.kind === "fatigue"}
+        <!-- **What is the case's, before what is each load's.** A
+             fatigue case alone has a duty: an ultimate load is survived
+             once and counts nothing. The sweep is measured at a named
+             shaft, since it is a fact about the mechanism's motion and
+             not about where its load enters. -->
+        <div class="mode">
+          <span>{t("ui.train_actuation")}</span>
+          <div class="segmented">
+            <button class:on={dutyMode(c) === "intermittent"} onclick={() => setDuty(i, c, "intermittent")}>
+              {t("ui.train_intermittent")}
+            </button>
+            <button class:on={dutyMode(c) === "continuous"} onclick={() => setDuty(i, c, "continuous")}>
+              {t("ui.train_continuous")}
+            </button>
+          </div>
+        </div>
+        {#if "intermittent" in c.duty}
+          {@const act = c.duty.intermittent}
+          <label>
+            <span>{t("ui.train_actuation_range")}</span>
+            <input type="number" step="1" bind:value={() => act.range_degrees, finite((v) => (act.range_degrees = v))} />
+            <em>°</em>
+          </label>
+          <label>
+            <span>{t("ui.train_actuation_range_at")}</span>
+            <select value={String(act.at)} onchange={(e) => (act.at = Number(e.currentTarget.value))}>
+              {#each portOptionsNow as p (p.body)}
+                <option value={String(p.body)}>{refLabel(p.body)}</option>
+              {/each}
+            </select>
+            <em></em>
+          </label>
+          {@render numberField("ui.train_actuation_count", () => act.actuations, (v) => (act.actuations = v), 100, "")}
+          <!-- It changes nothing but the cycle count and which roots are
+               loaded both ways, and the note says how — whether or not
+               it is on. -->
+          {@render switchField(
+            "ui.train_reversing",
+            act.reversing,
+            (v) => (act.reversing = v),
+            t("ui.train_note_reversing"),
+          )}
+        {:else if "continuous" in c.duty}
+          {@const cont = c.duty.continuous}
+          {@render numberField("ui.train_runtime", () => cont.runtime_hours, (v) => (cont.runtime_hours = v), 100, "ui.train_hours")}
+        {/if}
+      {/if}
+
+      <!-- **One row per body of the train**, in the rows every other
+           input sits in. A body the train holds is fixed, and no case
+           can say otherwise. Every other body is what the case
+           declares it: a load carries a torque and a speed, each
+           given or derived — of the speeds exactly the train's
+           mobility given, of the torques one statics equation fewer
+           than the bodies that carry one, which the core keeps so
+           through relief after every toggle; a reacted body turns as
+           the motion says and carries whatever the flow puts on it;
+           a free one turns and carries nothing. The chain's ends are
+           reacted and everything else free until the case says so. A
+           body two stages share has an end on each, and cannot be a
+           reaction — a second reaction on one chain is a division by
+           stiffness the core refuses — so it is a load, an inline
+           take-off, or free. A derived box shows what the case comes
+           to and stands blank until it can. -->
+      {#each bodies as b (b.body)}
+        {@const role = roleOf(c, b)}
+        {@const load = role === "load" ? entryOf(c, b) : undefined}
+        {@const at = bodyOf(cres, b.body)}
+        {@const shared = b.ends.length > 1}
+        <div class="mode" class:later={c.kind === "fatigue" || b !== bodies[0]}>
+          <span>{refLabel(b.body)}</span>
+          {#if role === "fixed"}
+            <div class="segmented locked">
+              <button class="on" disabled>{t("ui.train_case_fixed")}</button>
+            </div>
+          {:else}
+            <div class="segmented">
+              <button class:on={role === "load"} onclick={() => setRole(i, b, "load")}>
+                {t("ui.train_case_load")}
+              </button>
+              <button
+                class:on={role === "reacted"}
+                disabled={shared}
+                title={shared ? t("ui.train_note_shared_not_reacted") : undefined}
+                onclick={() => setRole(i, b, "reacted")}
+              >
+                {t("ui.train_case_reacted")}
+              </button>
+              <button class:on={role === "free"} onclick={() => setRole(i, b, "free")}>
+                {t("ui.train_case_free")}
+              </button>
+            </div>
+          {/if}
+        </div>
+        {#if load}
+          {@render autoNumber(
+            "ui.train_torque",
+            load.torque,
+            load.torque.auto ? (at?.torque ?? null) : undefined,
+            0.01,
+            touched(i, load, "torque"),
+            undefined,
+            "ui.train_nm",
+            undefined,
+            undefined,
+            true,
+          )}
+          {@render autoNumber(
+            "ui.train_speed",
+            load.speed,
+            load.speed.auto ? (at?.speed ?? null) : undefined,
+            100,
+            touched(i, load, "speed"),
+            undefined,
+            "ui.train_rpm",
+            undefined,
+            undefined,
+            true,
+          )}
+        {/if}
+      {/each}
+    </div>
+
+    <!-- **What this case comes to, body by body**, in the table a
+         gear's ratings use: every body of the train and the frame,
+         what it is in this case — a load, a reaction, fixed, or free —
+         and what it turns at and carries. A fixed body has no speed to
+         report and shows none. The table stands while the train has no
+         answer, as every readout does; the notes under it say why a
+         case did not solve. -->
+    <div class="delivered">
+      <h4 class="section-heading">{t("ui.train_case_delivered")}</h4>
+      <div class="caselist">
+        <table class="cases">
+          <thead>
+            <tr>
+              <th></th>
+              <th></th>
+              <th>{t("ui.train_speed")}<small>{t("ui.train_rpm")}</small></th>
+              <th>{t("ui.train_torque")}<small>{t("ui.train_nm")}</small></th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each delivered(cres) as row (row.key)}
+              <tr class:muted={row.role === "free"}>
+                <th>{row.name}</th>
+                <td class="role">{roleWord(row.role)}</td>
+                <td>{row.speed === null ? "—" : num(row.speed, 1)}</td>
+                <td>{num(row.torque, 4)}</td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
+      {#if (cres?.notes.length ?? 0) > 0}
+        <ul class="notes">
+          {#each cres?.notes ?? [] as n, j (j)}<li class="warn">{note(n)}</li>{/each}
+        </ul>
+      {/if}
+    </div>
+    <button class="action danger" onclick={() => removeCase(i)}>{t("ui.train_remove_case")}</button>
 {/snippet}
 
 {#snippet property(
@@ -2131,6 +2316,17 @@
       {caseName(i)} · {kindLabel(c.kind)}{caseSummary(c) ? ` · ${caseSummary(c)}` : ""}
     </button>
   {/each}
+  <span class="grow"></span>
+  {#each CASE_KINDS as k (k.key)}
+    <button
+      class="action add"
+      onclick={() => {
+        addCaseOfKind(k);
+        tab.view.case = tab.train.load_cases.length - 1;
+        select({ case: tab.view.case });
+      }}>{t(k.add)}</button
+    >
+  {/each}
 </div>
 {#if casePath}
   <dl class="out pathbox">
@@ -2338,169 +2534,7 @@
       </div>
       {#if tab.openCases[i]}
         <div class="body casebody">
-          <div class="grid shared">
-            {#if c.kind === "fatigue"}
-              <!-- **What is the case's, before what is each load's.** A
-                   fatigue case alone has a duty: an ultimate load is survived
-                   once and counts nothing. The sweep is measured at a named
-                   shaft, since it is a fact about the mechanism's motion and
-                   not about where its load enters. -->
-              <div class="mode">
-                <span>{t("ui.train_actuation")}</span>
-                <div class="segmented">
-                  <button class:on={dutyMode(c) === "intermittent"} onclick={() => setDuty(i, c, "intermittent")}>
-                    {t("ui.train_intermittent")}
-                  </button>
-                  <button class:on={dutyMode(c) === "continuous"} onclick={() => setDuty(i, c, "continuous")}>
-                    {t("ui.train_continuous")}
-                  </button>
-                </div>
-              </div>
-              {#if "intermittent" in c.duty}
-                {@const act = c.duty.intermittent}
-                <label>
-                  <span>{t("ui.train_actuation_range")}</span>
-                  <input type="number" step="1" bind:value={() => act.range_degrees, finite((v) => (act.range_degrees = v))} />
-                  <em>°</em>
-                </label>
-                <label>
-                  <span>{t("ui.train_actuation_range_at")}</span>
-                  <select value={String(act.at)} onchange={(e) => (act.at = Number(e.currentTarget.value))}>
-                    {#each portOptionsNow as p (p.body)}
-                      <option value={String(p.body)}>{refLabel(p.body)}</option>
-                    {/each}
-                  </select>
-                  <em></em>
-                </label>
-                {@render numberField("ui.train_actuation_count", () => act.actuations, (v) => (act.actuations = v), 100, "")}
-                <!-- It changes nothing but the cycle count and which roots are
-                     loaded both ways, and the note says how — whether or not
-                     it is on. -->
-                {@render switchField(
-                  "ui.train_reversing",
-                  act.reversing,
-                  (v) => (act.reversing = v),
-                  t("ui.train_note_reversing"),
-                )}
-              {:else if "continuous" in c.duty}
-                {@const cont = c.duty.continuous}
-                {@render numberField("ui.train_runtime", () => cont.runtime_hours, (v) => (cont.runtime_hours = v), 100, "ui.train_hours")}
-              {/if}
-            {/if}
-
-            <!-- **One row per body of the train**, in the rows every other
-                 input sits in. A body the train holds is fixed, and no case
-                 can say otherwise. Every other body is what the case
-                 declares it: a load carries a torque and a speed, each
-                 given or derived — of the speeds exactly the train's
-                 mobility given, of the torques one statics equation fewer
-                 than the bodies that carry one, which the core keeps so
-                 through relief after every toggle; a reacted body turns as
-                 the motion says and carries whatever the flow puts on it;
-                 a free one turns and carries nothing. The chain's ends are
-                 reacted and everything else free until the case says so. A
-                 body two stages share has an end on each, and cannot be a
-                 reaction — a second reaction on one chain is a division by
-                 stiffness the core refuses — so it is a load, an inline
-                 take-off, or free. A derived box shows what the case comes
-                 to and stands blank until it can. -->
-            {#each bodies as b (b.body)}
-              {@const role = roleOf(c, b)}
-              {@const load = role === "load" ? entryOf(c, b) : undefined}
-              {@const at = bodyOf(cres, b.body)}
-              {@const shared = b.ends.length > 1}
-              <div class="mode" class:later={c.kind === "fatigue" || b !== bodies[0]}>
-                <span>{refLabel(b.body)}</span>
-                {#if role === "fixed"}
-                  <div class="segmented locked">
-                    <button class="on" disabled>{t("ui.train_case_fixed")}</button>
-                  </div>
-                {:else}
-                  <div class="segmented">
-                    <button class:on={role === "load"} onclick={() => setRole(i, b, "load")}>
-                      {t("ui.train_case_load")}
-                    </button>
-                    <button
-                      class:on={role === "reacted"}
-                      disabled={shared}
-                      title={shared ? t("ui.train_note_shared_not_reacted") : undefined}
-                      onclick={() => setRole(i, b, "reacted")}
-                    >
-                      {t("ui.train_case_reacted")}
-                    </button>
-                    <button class:on={role === "free"} onclick={() => setRole(i, b, "free")}>
-                      {t("ui.train_case_free")}
-                    </button>
-                  </div>
-                {/if}
-              </div>
-              {#if load}
-                {@render autoNumber(
-                  "ui.train_torque",
-                  load.torque,
-                  load.torque.auto ? (at?.torque ?? null) : undefined,
-                  0.01,
-                  touched(i, load, "torque"),
-                  undefined,
-                  "ui.train_nm",
-                  undefined,
-                  undefined,
-                  true,
-                )}
-                {@render autoNumber(
-                  "ui.train_speed",
-                  load.speed,
-                  load.speed.auto ? (at?.speed ?? null) : undefined,
-                  100,
-                  touched(i, load, "speed"),
-                  undefined,
-                  "ui.train_rpm",
-                  undefined,
-                  undefined,
-                  true,
-                )}
-              {/if}
-            {/each}
-          </div>
-
-          <!-- **What this case comes to, body by body**, in the table a
-               gear's ratings use: every body of the train and the frame,
-               what it is in this case — a load, a reaction, fixed, or free —
-               and what it turns at and carries. A fixed body has no speed to
-               report and shows none. The table stands while the train has no
-               answer, as every readout does; the notes under it say why a
-               case did not solve. -->
-          <div class="delivered">
-            <h4 class="section-heading">{t("ui.train_case_delivered")}</h4>
-            <div class="caselist">
-              <table class="cases">
-                <thead>
-                  <tr>
-                    <th></th>
-                    <th></th>
-                    <th>{t("ui.train_speed")}<small>{t("ui.train_rpm")}</small></th>
-                    <th>{t("ui.train_torque")}<small>{t("ui.train_nm")}</small></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {#each delivered(cres) as row (row.key)}
-                    <tr class:muted={row.role === "free"}>
-                      <th>{row.name}</th>
-                      <td class="role">{roleWord(row.role)}</td>
-                      <td>{row.speed === null ? "—" : num(row.speed, 1)}</td>
-                      <td>{num(row.torque, 4)}</td>
-                    </tr>
-                  {/each}
-                </tbody>
-              </table>
-            </div>
-            {#if (cres?.notes.length ?? 0) > 0}
-              <ul class="notes">
-                {#each cres?.notes ?? [] as n, j (j)}<li class="warn">{note(n)}</li>{/each}
-              </ul>
-            {/if}
-          </div>
-          <button class="action danger" onclick={() => removeCase(i)}>{t("ui.train_remove_case")}</button>
+          {@render caseEditor(c, i)}
         </div>
       {/if}
     </section>
@@ -3702,6 +3736,9 @@
   }
   .strip .lab {
     margin: 0 0.5rem 0 0;
+  }
+  .strip .grow {
+    flex: 1 1 auto;
   }
   .case {
     font: inherit;
