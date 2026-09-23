@@ -97,9 +97,18 @@ impl Builder {
         self
     }
 
+    /// The shape, each mesh group's module and pressure angle **stated on
+    /// its first member** and followed by the rest — the one box a
+    /// designer reads them from, which is what relief would pin.
     #[must_use]
     pub fn build(self) -> Shape {
-        self.shape
+        let mut shape = self.shape;
+        for group in shape.mesh_groups() {
+            let first = &mut shape.members[group[0]];
+            first.module.auto = false;
+            first.pressure_angle.auto = false;
+        }
+        shape
     }
 }
 
@@ -380,7 +389,7 @@ impl Shape {
     ) -> usize {
         let pressure_angle = self.members.first().map_or_else(
             || crate::params::GearParams::default().pressure_angle,
-            |m| m.pressure_angle,
+            Member::normal_pressure_angle,
         );
         self.members.push(Member {
             body,
@@ -388,8 +397,8 @@ impl Shape {
                 teeth,
                 ..StageGear::default()
             },
-            module,
-            pressure_angle,
+            module: Auto::automatic(module),
+            pressure_angle: Auto::automatic(pressure_angle),
             thickness_mod: Auto::automatic(1.0),
             ring,
             pitch_diameter: Auto::automatic(0.0),
@@ -487,7 +496,7 @@ pub fn hula(teeth: [u32; 4], module: [f64; 2]) -> Shape {
     shape.distances[0].tip_clearance = 0.3;
     for (i, m) in shape.members.iter_mut().enumerate() {
         let mesh = i % 2;
-        m.module = module[mesh];
+        m.module.manual = module[mesh];
         m.gear.addendum = 0.7;
         m.gear.dedendum = 1.0;
         m.thickness_mod = if m.ring.is_some() {

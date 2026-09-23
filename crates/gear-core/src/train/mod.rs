@@ -1984,6 +1984,11 @@ pub enum MemberFreedom {
     /// external mesh, a ring takes its pinion's), so at most one of a
     /// mesh's two is given and the other follows.
     ThicknessMod,
+    /// The normal module — one per mesh group, stated on one member and
+    /// followed by the rest ([`shape::Member::module`]).
+    Module,
+    /// The normal pressure angle, by the module's rule.
+    PressureAngle,
 }
 
 /// **What one input came to**, by the name relief knows it by — the number a
@@ -2286,7 +2291,7 @@ impl shape::Shape {
     /// fail there, rather than depend on the order the groups were written in.
     #[must_use]
     pub fn relieved(&self, just: Option<Freedom>) -> Self {
-        let mut out = self.clone();
+        let mut out = self.shared();
         let bound = out.toggles().len() + 1;
         for _ in 0..bound {
             let mut moved = false;
@@ -2297,6 +2302,9 @@ impl shape::Shape {
                 break;
             }
         }
+        // What moved may be which member of a group states its module:
+        // the rest follow the one that stands now.
+        out.share();
         out
     }
 
@@ -2486,6 +2494,8 @@ impl shape::ShapeResult {
                 MemberFreedom::PitchDiameter => g.pitch_diameter,
                 MemberFreedom::FaceWidth => g.face_width,
                 MemberFreedom::ThicknessMod => g.params.thickness_mod,
+                MemberFreedom::Module => g.params.module,
+                MemberFreedom::PressureAngle => g.params.pressure_angle,
             }),
         }
     }
@@ -5120,7 +5130,7 @@ mod tests {
             for k in 1..=steps {
                 let a = free.distances[0].running
                     - (free.distances[0].running
-                        - stage.members[0].module * 0.5 * f64::from(teeth[0] + teeth[1]))
+                        - stage.members[0].normal_module() * 0.5 * f64::from(teeth[0] + teeth[1]))
                         * f64::from(steps - k)
                         / f64::from(steps);
                 let here = at(a).meshes[0].efficiency.forward;
@@ -7579,6 +7589,10 @@ mod tests {
             Freedom::Member(_, MemberFreedom::Helix) => a.manual += 2.0,
             Freedom::Member(_, MemberFreedom::FaceWidth) => a.manual += 1.0,
             Freedom::Member(_, MemberFreedom::ThicknessMod) => a.manual += 0.1,
+            // Small: a layshaft's pairs share one distance, and a module
+            // moved a tenth is further than the others' shifts can follow.
+            Freedom::Member(_, MemberFreedom::Module) => a.manual *= 1.002,
+            Freedom::Member(_, MemberFreedom::PressureAngle) => a.manual += 0.2,
         };
         let mut checked = 0u32;
         for stage in every_preset() {

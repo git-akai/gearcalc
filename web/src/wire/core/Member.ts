@@ -12,16 +12,22 @@ export type Member = {
  */
 body: number, gear: StageGear, 
 /**
- * Normal module, mm. Every mesh a member is in shares it.
+ * **Normal module, mm — given on one member of a mesh group, and
+ * followed by the rest.** Every mesh a member is in shares it, so the
+ * members a run of meshes joins ([`Shape::mesh_groups`]) are cut at one
+ * module and two groups may differ. It is the helix's rule: at most one
+ * member of the group states it, relief keeps it so, and where none
+ * does the group's first member's box stands ([`Shape::share`]). Read
+ * through [`Member::normal_module`].
  */
-module: number, 
+module: Auto<number>, 
 /**
- * Normal pressure angle, degrees. Every mesh a member is in shares
- * it, as the module — a tooth is cut at one angle — so the members a
- * run of meshes joins ([`Shape::mesh_groups`]) have one, and two
- * groups of one stage may differ. Absent in a file, 20°.
+ * **Normal pressure angle, degrees**, by the module's rule — a tooth is
+ * cut at one angle, so a mesh group has one. Absent in a file,
+ * following its group at 20°. Read through
+ * [`Member::normal_pressure_angle`].
  */
-pressure_angle: number, 
+pressure_angle: Auto<number>, 
 /**
  * Tooth-thickness coefficient, `k`: above 1 this gear's teeth thicken.
  * **Given on one member of a mesh and automatic on the other**, which

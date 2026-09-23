@@ -31,7 +31,11 @@ import re
 import sys
 from pathlib import Path
 
-FIELD = re.compile(r"^\s*pub ([a-z_0-9]+): (\[?f64[^,]*),")
+# An angle held as an `Auto` or an `Option` is an angle all the same: the
+# pattern matched a bare `f64` alone, so every automatic angle — the helix
+# first among them — went unchecked, and a pressure angle that became one
+# dropped out of the count without anything saying so.
+FIELD = re.compile(r"^\s*pub ([a-z_0-9]+): (\[?f64[^,]*|(?:Auto|Option)<f64>),")
 RADIANS = re.compile(r"\bradians\b")
 DEGREES = re.compile(r"degrees|°")
 

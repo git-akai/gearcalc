@@ -221,7 +221,7 @@ impl Shape {
                 f64::from(self.members[p].gear.teeth),
                 f64::from(self.members[c].gear.teeth),
             );
-            let module = self.members[c].module;
+            let module = self.members[c].normal_module();
             Some(if self.members[c].ring.is_some() {
                 (zc - zp) * module / 2.0
             } else {
@@ -300,7 +300,10 @@ impl Shape {
         let central_axis = self
             .central_axis_of(planet_axis)
             .ok_or(EditRefused::NoSuchIndex)?;
-        let (zp, module) = (self.members[gear].gear.teeth, self.members[gear].module);
+        let (zp, module) = (
+            self.members[gear].gear.teeth,
+            self.members[gear].normal_module(),
+        );
         // Sized to the radius the axis runs at; a few teeth of difference
         // where nothing sets it yet.
         let radius = self.carrier_radius(planet_axis);
@@ -351,10 +354,10 @@ impl Shape {
                 profile_shift: Auto::automatic(0.0),
                 ..self.members[gear].gear.clone()
             },
-            module,
-            // The gear it meets sets its module and pressure angle: they
-            // mesh.
-            pressure_angle: self.members[gear].pressure_angle,
+            // The gear it meets sets its module and pressure angle — they
+            // mesh — so it follows them rather than stating its own.
+            module: Auto::automatic(module),
+            pressure_angle: Auto::automatic(self.members[gear].normal_pressure_angle()),
             thickness_mod: Auto::automatic(1.0),
             ring: cutter,
             pitch_diameter: Auto::automatic(0.0),

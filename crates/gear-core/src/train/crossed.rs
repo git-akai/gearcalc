@@ -254,7 +254,7 @@ mod tests {
         )
         .expect("a right-angle pair has one");
         let d_turning =
-            f64::from(free.members[0].gear.teeth) * free.members[0].module / turning.sin();
+            f64::from(free.members[0].gear.teeth) * free.members[0].normal_module() / turning.sin();
         assert!(
             free.first_pitch_diameter() > d_turning,
             "the shipped worm should sit on the fat branch: {} against {d_turning}",
@@ -270,7 +270,7 @@ mod tests {
                 Auto::fixed(a0 + 0.5 + stage.distances[0].clearance.manual);
             let x = stage.shifts();
             assert!(
-                (x[1] - 0.5 / stage.members[0].module).abs() < 1e-9 && x[0] == 0.0,
+                (x[1] - 0.5 / stage.members[0].normal_module()).abs() < 1e-9 && x[0] == 0.0,
                 "the wheel should take the half module: {x:?}"
             );
             assert!(

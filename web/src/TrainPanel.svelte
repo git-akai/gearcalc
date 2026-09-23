@@ -934,6 +934,30 @@
   </label>
   {#if opts.member}
     {@const m = opts.member}
+    <!-- **The module and the pressure angle, stated on one gear of a mesh
+         group and followed by the rest** — the helix's rule with the
+         relation made equality: a tooth is cut at one of each, so the gears
+         a run of meshes joins share them. Touching one here makes it the
+         group's, and relief hands the rest to it; automatic shows what the
+         group is cut at. -->
+    {@render autoNumber(
+      "ui.train_normal_module",
+      m.module,
+      g?.params.module,
+      0.1,
+      () => opts.relief && relieveStage(opts.relief.stage, { member: [opts.relief.member, "module"] }, opts.relief.figures),
+      undefined,
+      "ui.train_mm",
+    )}
+    {@render autoNumber(
+      "ui.train_pressure_angle",
+      m.pressure_angle,
+      g?.params.pressure_angle,
+      0.5,
+      () => opts.relief && relieveStage(opts.relief.stage, { member: [opts.relief.member, "pressure_angle"] }, opts.relief.figures),
+      undefined,
+      "°",
+    )}
     <!-- One coefficient per member, given on one member of each mesh and
          automatic on the other, which follows the mesh's rule — the two sum
          to 2 across an external mesh, a ring takes its pinion's. Relief keeps
@@ -2127,11 +2151,10 @@
                angle — two gears in mesh do, so everything the run joins
                does — and the core reports the groups (`mesh_groups`, a
                layer read off the graph): one on a pair or a set, two on a
-               stepped planet, three on a layshaft. One box each per group,
-               written to every member of it; nothing is computed here, the
-               value is copied to the members the core says must agree.
-               Then each of the group's meshes' own inputs: what its flanks
-               rub with, which a set's two meshes may differ in. -->
+               stepped planet, three on a layshaft. The module and the angle
+               are each stated on one gear of the group and followed by the
+               rest, so they sit on the gear cards with the helix, not here;
+               what is here is the group's own, then each of its meshes'. -->
           {#each meshGroups as group, gi (gi)}
             {@const inGroup = (m: { a: number; b: number }) => group.includes(m.a) && group.includes(m.b)}
             {@const groupMeshes = stage.meshes.map((m, k) => (inGroup(m) ? k : -1)).filter((k) => k >= 0)}
@@ -2143,34 +2166,6 @@
                 : t("ui.train_mesh_group", { members: group.map(name).join(" / ") })}
             </h4>
             <div class="grid shared">
-              <label>
-                <span>{t("ui.train_normal_module")}</span>
-                <input
-                  type="number"
-                  step="0.1"
-                  bind:value={
-                    () => stage.members[group[0]]?.module ?? 0,
-                    finite((v) => {
-                      for (const j of group) stage.members[j].module = v;
-                    })
-                  }
-                />
-                <em>{t("ui.train_mm")}</em>
-              </label>
-              <label>
-                <span>{t("ui.train_pressure_angle")}</span>
-                <input
-                  type="number"
-                  step="0.5"
-                  bind:value={
-                    () => stage.members[group[0]]?.pressure_angle ?? 0,
-                    finite((v) => {
-                      for (const j of group) stage.members[j].pressure_angle = v;
-                    })
-                  }
-                />
-                <em>°</em>
-              </label>
               <!-- The group's axial contact ratio: one size per group, so
                    one ratio — on parallel shafts, where a line contact has
                    an overlap at all. -->

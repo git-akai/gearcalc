@@ -215,6 +215,14 @@
 //!   stage's clearance is each replicated axis's. A mesh that omits them is
 //!   not searched and shares nothing, and an axis that omits its gap is at
 //!   0.3 mm — which is what every older file meant where it wrote none.
+//! - **A module and a pressure angle are stated once per mesh group.**
+//!   `module` and `pressure_angle` are `{ auto, manual }` on every member:
+//!   the members a run of meshes joins are cut at one of each, stated on
+//!   one member and followed by the rest, which is the helix's rule. A file
+//!   that writes a plain number is refused by name. What a pre-existing
+//!   file meant is `{ auto = false, manual = m }` on each group's first
+//!   member and `{ auto = true, manual = m }` on the rest; a member that
+//!   omits `pressure_angle` follows its group at 20°.
 //!
 //! No compatibility shim, deliberately. Accepting both shapes means carrying two
 //! readers for one format and testing both forever, and the thing that would go
@@ -556,6 +564,14 @@ mod tests {
                 Err(TrainError::Parse(e)) => assert!(e.to_string().contains(field), "{e}"),
                 other => panic!("a stage's old {field} must be a parse error, not {other:?}"),
             }
+        }
+        // ...a module written as the plain number it used to be, where it
+        // is stated on one member of a group and followed by the rest now.
+        let mut value: toml::Value = toml::from_str(&text).unwrap();
+        value["train"]["stages"][0]["members"][0]["module"] = toml::Value::Float(1.0);
+        match from_toml(&toml::to_string(&value).unwrap()) {
+            Err(TrainError::Parse(e)) => assert!(e.to_string().contains("module"), "{e}"),
+            other => panic!("a plain module must be a parse error, not {other:?}"),
         }
         // ...and on the train itself.
         let stale = text.replacen(

@@ -720,7 +720,11 @@ fn hula_report(n: u32, clearance: f64, m_outer: f64, m_inner: f64, cutter_teeth:
 
     println!(
         "hula  z {}/{}/{}/{}  module {m_outer}/{m_inner}  alpha {} deg  clearance {clearance} mm",
-        teeth[0], teeth[1], teeth[2], teeth[3], stage.members[0].pressure_angle
+        teeth[0],
+        teeth[1],
+        teeth[2],
+        teeth[3],
+        stage.members[0].normal_pressure_angle()
     );
     println!(
         "  ratio {} / {} = {:+.4}   crank offset {:.6} mm (running {:.6}){}",
@@ -1250,7 +1254,7 @@ fn hula_sweep(n: u32, clearance: f64, mesh_index: usize) {
     let (ring_i, pinion_i) = if result.gears[a].1 { (a, b) } else { (b, a) };
     let member = |i: usize| &stage.members[HULA_ORDER[i]];
     let params = |i: usize| GearParams {
-        module: member(i).module,
+        module: member(i).normal_module(),
         teeth: result.gears[i].0.params.teeth,
         profile_shift: result.gears[i].0.profile_shift,
         addendum: member(i).gear.addendum,
@@ -3084,7 +3088,9 @@ fn worm_stage_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, torque: 
 
     println!(
         "worm stage  z {starts}/{wheel_teeth}  module {}  ratio {:.4}:1  a {:.4} mm",
-        stage.members[0].module, r.ratio, r.centre_distance
+        stage.members[0].normal_module(),
+        r.ratio,
+        r.centre_distance
     );
     let m = point(&r);
     println!(
@@ -3155,7 +3161,7 @@ fn planetary_report(sun: u32, planet: u32, planets: u32, sun_shift: f64, ring_sh
     let at = |ring: u32| -> Result<gear_core::train::ShapeResult, TrainError> {
         let mut set = arr::planetary(sun, planet, ring, planets);
         for m in &mut set.members {
-            m.module = module;
+            m.module.manual = module;
         }
         set.distances[0].clearance = Auto::fixed(0.0);
         set.members[0].gear.profile_shift = Auto::fixed(sun_shift);
@@ -3241,7 +3247,8 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
     println!(
         "planetary stage  z {sun}/{planet}/{ring}  N={planets}  helix {helix} deg  \
          module {}  alpha {} deg",
-        base.members[0].module, base.members[0].pressure_angle
+        base.members[0].normal_module(),
+        base.members[0].normal_pressure_angle()
     );
     let all = [
         PlanetaryShaft::Sun,

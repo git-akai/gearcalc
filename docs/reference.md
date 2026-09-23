@@ -2209,7 +2209,13 @@ tooth is cut at one of each — so the members a run of meshes joins share
 them, and those runs are the **mesh groups** (`Shape::mesh_groups`), a
 layer read off the graph and never stored: one on a pair or a set, two on a
 stepped planet, three on a layshaft, each with a module and a pressure angle
-of its own, which the panel offers one box for and writes to every member. A mesh's **frame** is the carrier common to its two axes.
+of its own. **Each is stated on one member of the group and followed by the
+rest** — the helix's rule with the relation made equality: `Member::module`
+and `::pressure_angle` are `Auto`, relief keeps exactly one of a group's
+given, and `Shape::share` writes the stated value into the members that
+follow before anything reads one, so a follower is cut at what it follows.
+Two members that both state one and disagree are left for the mesh to
+refuse by name. A mesh's **frame** is the carrier common to its two axes.
 The **wiring** is the members' slots and the meshes' frames, and it feeds
 `kinematics.rs` as any other. The **ports** are the slots not replicated;
 the slot held by convention is the first ring's, the input the first port

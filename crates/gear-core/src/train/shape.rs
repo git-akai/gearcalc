@@ -91,9 +91,27 @@ pub(crate) fn default_planet_clearance() -> f64 {
 }
 
 /// The crate's pressure angle, for a member a file does not give one:
-/// [`GearParams`]'s, said once.
-fn default_pressure_angle() -> f64 {
-    GearParams::default().pressure_angle
+/// [`GearParams`]'s, said once — and followed from its group rather than
+/// stated, since a file that says nothing states nothing.
+fn default_pressure_angle() -> Auto<f64> {
+    Auto::automatic(GearParams::default().pressure_angle)
+}
+
+impl Member {
+    /// **The normal module this member is cut at** — its mesh group's,
+    /// once the shape has shared it ([`Shape::share`]); the solve shares
+    /// before it reads.
+    #[must_use]
+    pub fn normal_module(&self) -> f64 {
+        self.module.manual
+    }
+
+    /// The normal pressure angle this member is cut at, degrees, as
+    /// [`Self::normal_module`].
+    #[must_use]
+    pub fn normal_pressure_angle(&self) -> f64 {
+        self.pressure_angle.manual
+    }
 }
 
 /// `carried_by` as a stored train wrote it while it was an `Option`: `null`
@@ -136,14 +154,20 @@ pub struct Member {
     /// The train's body it spins with, one of this stage's [`BodyOn`]s.
     pub body: usize,
     pub gear: StageGear,
-    /// Normal module, mm. Every mesh a member is in shares it.
-    pub module: f64,
-    /// Normal pressure angle, degrees. Every mesh a member is in shares
-    /// it, as the module — a tooth is cut at one angle — so the members a
-    /// run of meshes joins ([`Shape::mesh_groups`]) have one, and two
-    /// groups of one stage may differ. Absent in a file, 20°.
+    /// **Normal module, mm — given on one member of a mesh group, and
+    /// followed by the rest.** Every mesh a member is in shares it, so the
+    /// members a run of meshes joins ([`Shape::mesh_groups`]) are cut at one
+    /// module and two groups may differ. It is the helix's rule: at most one
+    /// member of the group states it, relief keeps it so, and where none
+    /// does the group's first member's box stands ([`Shape::share`]). Read
+    /// through [`Member::normal_module`].
+    pub module: Auto<f64>,
+    /// **Normal pressure angle, degrees**, by the module's rule — a tooth is
+    /// cut at one angle, so a mesh group has one. Absent in a file,
+    /// following its group at 20°. Read through
+    /// [`Member::normal_pressure_angle`].
     #[cfg_attr(feature = "serde", serde(default = "default_pressure_angle"))]
-    pub pressure_angle: f64,
+    pub pressure_angle: Auto<f64>,
     /// Tooth-thickness coefficient, `k`: above 1 this gear's teeth thicken.
     /// **Given on one member of a mesh and automatic on the other**, which
     /// follows the mesh's rule — the two sum to 2 across an external mesh, a
@@ -450,14 +474,14 @@ impl Shape {
                 crate::screw::ScrewError::FirstMemberIsADisc,
             ));
         }
-        let module = self.members[m.a].module;
+        let module = self.members[m.a].normal_module();
         // Two gears in mesh share a normal module, on crossed shafts as on
         // parallel ones — where `Mesh::new` asks it of the racks.
         // ...and a pressure angle, which `Mesh::new` asks of a line contact's
         // racks and this asks here.
-        let pressure_angle = self.members[m.a].pressure_angle;
-        if (self.members[m.b].module - module).abs() > crate::params::compat::SAME_RACK
-            || (self.members[m.b].pressure_angle - pressure_angle).abs()
+        let pressure_angle = self.members[m.a].normal_pressure_angle();
+        if (self.members[m.b].normal_module() - module).abs() > crate::params::compat::SAME_RACK
+            || (self.members[m.b].normal_pressure_angle() - pressure_angle).abs()
                 > crate::params::compat::SAME_RACK
         {
             return Err(TrainError::Mesh(crate::mesh::MeshError::Incompatible));
@@ -485,7 +509,7 @@ impl Shape {
             let zero = vec![0.0; self.members.len()];
             let s = self.screw_of(mesh, &zero, helix).ok()?;
             let m = self.meshes[mesh];
-            let sum = (nominal - s.reference_distance) / self.members[m.a].module;
+            let sum = (nominal - s.reference_distance) / self.members[m.a].normal_module();
             return sum.is_finite().then_some(sum);
         }
         let rack = self.rack_of(mesh, helix);
@@ -861,7 +885,7 @@ impl Shape {
         let m = self.meshes[mesh];
         let a = &self.members[m.a];
         let z1 = f64::from(a.gear.teeth.max(1));
-        let floor = z1 * a.module;
+        let floor = z1 * a.normal_module();
         // The designer's own number, held to the tooth's own diameter below
         // which no pair exists.
         let from = a.pitch_diameter.manual.max(floor * 1.000_001);
@@ -963,8 +987,8 @@ impl Shape {
         GearParams {
             angular_shift: 0.0,
             index_offset: 0.0,
-            module: m.module,
-            pressure_angle: m.pressure_angle,
+            module: m.normal_module(),
+            pressure_angle: m.normal_pressure_angle(),
             teeth: m.gear.teeth,
             helix_angle: helix[i],
             profile_shift: m.gear.profile_shift.manual,
@@ -1090,8 +1114,8 @@ impl Shape {
     fn rack_of(&self, mesh: usize, helix: &[f64]) -> BasicRack {
         let m = self.meshes[mesh];
         BasicRack::new(
-            self.members[m.a].module,
-            self.members[m.a].pressure_angle,
+            self.members[m.a].normal_module(),
+            self.members[m.a].normal_pressure_angle(),
             helix[m.a].abs(),
         )
     }
@@ -1365,7 +1389,7 @@ impl Shape {
         let slope = |mesh: usize, v: f64| -> Option<f64> {
             if self.is_crossed(mesh) {
                 // The rack law: a module of distance per module of shift.
-                return Some(coefficient(mesh) * self.members[self.meshes[mesh].a].module);
+                return Some(coefficient(mesh) * self.members[self.meshes[mesh].a].normal_module());
             }
             let rack = self.rack_of(mesh, helix);
             let sum_z = self.tooth_sum(mesh);
@@ -1870,6 +1894,43 @@ impl Shape {
         }
     }
 
+    /// **Every member cut at its mesh group's module and pressure angle** —
+    /// the one member that states each, or the group's first where none
+    /// does — written into the members that follow. Two members that both
+    /// state one and disagree are left as they are: the mesh they share
+    /// refuses them by name, which is what a designer needs to see.
+    pub fn share(&mut self) {
+        for group in self.mesh_groups() {
+            let pick = |get: &dyn Fn(&Member) -> Auto<f64>| -> f64 {
+                group
+                    .iter()
+                    .map(|&i| get(&self.members[i]))
+                    .find(|a| !a.auto)
+                    .unwrap_or_else(|| get(&self.members[group[0]]))
+                    .manual
+            };
+            let module = pick(&|m| m.module);
+            let pressure_angle = pick(&|m| m.pressure_angle);
+            for &i in &group {
+                let m = &mut self.members[i];
+                if m.module.auto {
+                    m.module.manual = module;
+                }
+                if m.pressure_angle.auto {
+                    m.pressure_angle.manual = pressure_angle;
+                }
+            }
+        }
+    }
+
+    /// This shape, shared ([`Self::share`]).
+    #[must_use]
+    pub fn shared(&self) -> Self {
+        let mut s = self.clone();
+        s.share();
+        s
+    }
+
     /// **Every mesh searched, or none** — what one switch on a stage used to
     /// say, for a fixture that means the whole shape. The panel sets each
     /// mesh's own.
@@ -2106,7 +2167,8 @@ impl Shape {
     #[cfg(test)]
     pub(crate) fn first_pitch_diameter(&self) -> f64 {
         let m = &self.members[0];
-        f64::from(m.gear.teeth.max(1)) * m.module / self.helix_angles()[0].to_radians().cos()
+        f64::from(m.gear.teeth.max(1)) * m.normal_module()
+            / self.helix_angles()[0].to_radians().cos()
     }
 
     /// The shifts the shape settles on under a search — what the tests
@@ -3026,6 +3088,10 @@ pub fn solve_shape_after(
     reversal: super::Reversal,
     prior: Option<Chosen>,
 ) -> Result<(ShapeResult, Chosen), TrainError> {
+    // **Every member at its group's module and pressure angle** before
+    // anything reads one — a member that follows reads what it follows.
+    let shared = shape.shared();
+    let shape = &shared;
     let n = shape.members.len();
     let helix = shape.helix_angles();
 
@@ -3410,7 +3476,7 @@ pub fn solve_shape_after(
             if built.meshes[k].line().is_none() {
                 return 0.0;
             }
-            super::width_for_overlap(&m.overlap, helix[m.a], shape.members[m.a].module)
+            super::width_for_overlap(&m.overlap, helix[m.a], shape.members[m.a].normal_module())
                 .unwrap_or(0.0)
         })
         .collect();
@@ -3487,7 +3553,7 @@ pub fn solve_shape_after(
         match &bm.contact {
             BuiltContact::Line(l) => {
                 let rack = shape.rack_of(k, &helix);
-                let alpha_n = shape.members[m.a].pressure_angle.to_radians();
+                let alpha_n = shape.members[m.a].normal_pressure_angle().to_radians();
                 let bb = crate::plane::base_helix_angle(helix[m.a].to_radians(), alpha_n);
                 let slide = axial * bb.sin().abs();
                 let p_bn = std::f64::consts::PI * rack.mn * alpha_n.cos();
@@ -3606,7 +3672,7 @@ pub fn solve_shape_after(
             notes.extend(super::overlap_notes(
                 n == 0 && reads_size && !m.overlap.auto,
                 &m.overlap,
-                shape.members[m.a].module,
+                shape.members[m.a].normal_module(),
                 shape.given_width(group),
                 helix[m.a],
             ));
@@ -3800,7 +3866,7 @@ pub fn solve_shape_after(
                             l.path.contact_ratio,
                             mesh_widths[k],
                             helix[m.a],
-                            shape.members[m.a].module,
+                            shape.members[m.a].normal_module(),
                         ),
                         operating_pressure_angle: l.operating.alpha_w.to_degrees(),
                         efficiency,
@@ -3851,7 +3917,7 @@ pub fn solve_shape_after(
                             path.flank_interference(&p.screw, [a.flank_ends(), b.flank_ends()])
                         }),
                         first_reference_radius: f64::from(shape.members[m.a].gear.teeth)
-                            * shape.members[m.a].module
+                            * shape.members[m.a].normal_module()
                             / helix[m.a].to_radians().cos()
                             / 2.0,
                         // The first member's speed against the frame the
@@ -3962,6 +4028,11 @@ impl Shape {
                 Freedom::Member(i, MemberFreedom::ThicknessMod),
                 &mut m.thickness_mod,
             ));
+            out.push((Freedom::Member(i, MemberFreedom::Module), &mut m.module));
+            out.push((
+                Freedom::Member(i, MemberFreedom::PressureAngle),
+                &mut m.pressure_angle,
+            ));
         }
         out
     }
@@ -3980,7 +4051,7 @@ impl Shape {
             for &i in group {
                 let m = &self.members[i];
                 out.push(Reading::helix(i, &m.gear, |b| b));
-                let z1 = f64::from(m.gear.teeth.max(1)) * m.module;
+                let z1 = f64::from(m.gear.teeth.max(1)) * m.normal_module();
                 out.push(Reading {
                     freedom: Freedom::Member(i, MemberFreedom::PitchDiameter),
                     helix: (!m.pitch_diameter.auto).then(|| {
@@ -3997,7 +4068,7 @@ impl Shape {
                     out.push(Reading::overlap(
                         k,
                         &m.overlap,
-                        self.members[m.a].module,
+                        self.members[m.a].normal_module(),
                         self.given_width(group),
                     ));
                 }
@@ -4090,6 +4161,24 @@ impl Shape {
                     vec![Freedom::Member(m.b, MemberFreedom::ThicknessMod)],
                 ],
             });
+        }
+        // **A mesh group's module and pressure angle are one number each,
+        // said once.** Exactly one member of the group states it — the one
+        // just touched stays, and the rest follow — which is the helix's
+        // rule with the relation made equality. Given nowhere, the first
+        // member is pinned: a module is a designer's number, and a box that
+        // says *given* is the one they read it from.
+        for group in self.mesh_groups() {
+            for freedom in [MemberFreedom::Module, MemberFreedom::PressureAngle] {
+                groups.push(FreedomGroup {
+                    given_at_most: 1,
+                    automatic_at_most: group.len() - 1,
+                    order: group
+                        .iter()
+                        .map(|&i| vec![Freedom::Member(i, freedom)])
+                        .collect(),
+                });
+            }
         }
         // On crossed shafts an axial contact ratio is nothing at all, and is
         // turned back automatic.
@@ -5465,7 +5554,7 @@ mod pressure_angle {
     fn two_mesh_groups_of_one_stage_run_at_two_pressure_angles() {
         let mut shape = layshaft((17, 43), &[(41, 19)], 0);
         for j in [2, 3] {
-            shape.members[j].pressure_angle = 25.0;
+            shape.members[j].pressure_angle = Auto::fixed(25.0);
         }
         let r = solve(&shape).unwrap();
         let alpha = |k: usize| r.meshes[k].line.unwrap().operating_pressure_angle;
@@ -5482,7 +5571,7 @@ mod pressure_angle {
     fn two_members_in_mesh_at_two_pressure_angles_are_refused() {
         for preset in [StagePreset::Spur, StagePreset::Worm] {
             let mut shape = preset.build();
-            shape.members[1].pressure_angle = 25.0;
+            shape.members[1].pressure_angle = Auto::fixed(25.0);
             assert!(
                 matches!(
                     solve(&shape),
@@ -6094,5 +6183,107 @@ mod the_pieces_own {
         for l in &after.layouts {
             assert_eq!(l.clearance_ok, l.axis != first, "{:?}", after.layouts);
         }
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod one_module_per_group {
+    //! **A mesh group's module and pressure angle are stated once**: on one
+    //! member, followed by the rest, and relief keeps exactly one standing —
+    //! the helix's rule with the relation made equality.
+
+    use super::super::arrangements::{self as arr, layshaft};
+    use super::super::{test_library, Freedom, MemberFreedom, Reversal, StageBoundary, StageLoads};
+    use super::*;
+
+    fn solve(shape: &Shape) -> ShapeResult {
+        solve_loads(
+            shape,
+            &StageLoads::at(2.0, 3000.0)
+                .under(StageBoundary::conventional(&shape.wiring(), &shape.ports())),
+            &test_library(),
+            Reversal::default(),
+        )
+        .unwrap()
+    }
+
+    fn given(shape: &Shape, group: &[usize], f: MemberFreedom) -> usize {
+        let mut s = shape.clone();
+        group
+            .iter()
+            .filter(|&&i| s.input_mut(Freedom::Member(i, f)).is_some_and(|a| !a.auto))
+            .count()
+    }
+
+    /// Every preset states each group's module and pressure angle on one
+    /// member, and relief leaves exactly one — whatever it is handed.
+    #[test]
+    fn relief_keeps_one_statement_per_group() {
+        for preset in arr::StagePreset::ALL {
+            let shape = preset.build();
+            for group in shape.mesh_groups() {
+                for f in [MemberFreedom::Module, MemberFreedom::PressureAngle] {
+                    assert_eq!(given(&shape, &group, f), 1, "{preset:?} as built");
+                    // Everything stated at once: relief turns all but one back.
+                    let mut all = shape.clone();
+                    for &i in &group {
+                        all.input_mut(Freedom::Member(i, f)).unwrap().auto = false;
+                    }
+                    assert_eq!(
+                        given(&all.relieved(None), &group, f),
+                        1,
+                        "{preset:?} all given"
+                    );
+                    // Nothing stated: relief pins one.
+                    let mut none = shape.clone();
+                    for &i in &group {
+                        none.input_mut(Freedom::Member(i, f)).unwrap().auto = true;
+                    }
+                    assert_eq!(
+                        given(&none.relieved(None), &group, f),
+                        1,
+                        "{preset:?} none given"
+                    );
+                }
+            }
+        }
+    }
+
+    /// **The one touched stands, and the rest follow it.** A pair's second
+    /// gear stated at module 2: relief turns the first's back, and both are
+    /// cut at 2 — the solve reads what the follower follows.
+    #[test]
+    fn the_rest_of_a_group_follow_the_member_that_states_it() {
+        let mut shape = arr::pair([17, 43]);
+        let touched = Freedom::Member(1, MemberFreedom::Module);
+        *shape.input_mut(touched).unwrap() = Auto::fixed(2.0);
+        let settled = shape.relieved(Some(touched));
+        assert!(settled.members[0].module.auto && !settled.members[1].module.auto);
+        assert_eq!(
+            settled.members[0].normal_module(),
+            2.0,
+            "the follower shows it"
+        );
+        let r = solve(&settled);
+        assert!(r.members.iter().all(|g| g.params.module == 2.0));
+        // ...and unrelieved, the solve shares before it reads.
+        let mut raw = arr::pair([17, 43]);
+        raw.members[0].module = Auto::automatic(1.0);
+        raw.members[1].module = Auto::fixed(2.0);
+        assert!(solve(&raw).members.iter().all(|g| g.params.module == 2.0));
+    }
+
+    /// **A group is the mesh graph's, not the stage's.** A layshaft's
+    /// second pair stated at 1.5 follows no other pair: the constant mesh
+    /// stays at 1.
+    #[test]
+    fn a_group_follows_its_own_statement_and_no_other() {
+        let mut shape = layshaft((17, 43), &[(41, 19)], 0);
+        shape.members[2].module = Auto::fixed(1.0 / 0.998);
+        let shared = shape.shared();
+        assert_eq!(shared.members[3].normal_module(), 1.0 / 0.998);
+        assert_eq!(shared.members[0].normal_module(), 1.0);
+        assert_eq!(shared.members[1].normal_module(), 1.0);
     }
 }
