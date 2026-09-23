@@ -27,7 +27,6 @@
     type Shape,
     type Member,
     type StageEdit,
-    type Optimisation,
     type Value,
     type GearResult,
     type Note,
@@ -608,9 +607,16 @@
      written as a label had a hit area running the width of the row, well
      outside the button a reader can see. There is nothing else in this row to
      focus, so there is nothing for a label to be for. -->
-{#snippet switchField(key: string, on: boolean, set: (v: boolean) => void, note?: string | null)}
+{#snippet switchField(
+  key: string,
+  on: boolean,
+  set: (v: boolean) => void,
+  note?: string | null,
+  /** What the label's key names, where it names something. */
+  args?: Record<string, string>,
+)}
   <div class="switchrow">
-    <span class="control"><Switch label={t(key)} {on} {set} /></span>
+    <span class="control"><Switch label={t(key, args)} {on} {set} /></span>
     {#if note !== undefined}
       <FieldNote notes={notes(note, null)} />
     {/if}
@@ -1571,22 +1577,25 @@
      The contact ratio comes with it because it is the constraint the answer sits
      against: sliding loss falls with the length of the path, so without a floor
      the least-loss pair is always the one whose teeth barely reach. -->
-<!-- **How the load is divided while two tooth pairs are engaged**, offered by
-     every stage that reports a bending stress.
+<!-- **How the load is divided while two tooth pairs are engaged**, a mesh's
+     own: the ramp is a model of one contact, so two meshes on one gear can be
+     rated under different ones.
 
      Off by default and deliberately so: the ramp behind it is an uncalibrated
      placeholder rather than a stiffness model. Offered rather than hidden,
      because an estimate a designer chooses is a feature and one applied on
-     their behalf is not — and one field rather than one per preset, because it
-     selects a *model* and a stage running two meshes under two readings of the
-     same thing would be reporting a comparison rather than a design.
+     their behalf is not. It was one field on the stage, on the argument that a
+     stage running two meshes under two readings would be reporting a
+     comparison; the default answers that instead — every mesh starts at none,
+     and a mesh an edit adds takes the first mesh's — and a designer who sets
+     two differently has said so, mesh by mesh, where they can see it.
 
      Withheld only where there is no bending stress to reach: a crossed pair
      contacts at a point, and this touches bending alone. -->
-{#snippet loadSharing(stage: { load_sharing: LoadSharing })}
+{#snippet loadSharing(m: { load_sharing: LoadSharing }, pair?: { a: string; b: string })}
   <label>
-    <span>{t("ui.train_load_sharing")}</span>
-    <select bind:value={stage.load_sharing}>
+    <span>{pair ? t("ui.train_load_sharing_of", pair) : t("ui.train_load_sharing")}</span>
+    <select bind:value={m.load_sharing}>
       <option value="none">{t("ui.train_load_sharing_none")}</option>
       <option value="linear_ramp">
         {t("ui.train_load_sharing_linear_ramp")}
@@ -1642,15 +1651,13 @@
   )}
 {/snippet}
 
-{#snippet efficiencyToggle(o: Optimisation, after?: () => void)}
+{#snippet searchToggle(m: { search: boolean }, pair?: { a: string; b: string })}
   {@render switchField(
-    "ui.train_optimise_efficiency",
-    o.enabled,
-    (v) => {
-      o.enabled = v;
-      after?.();
-    },
+    pair ? "ui.train_optimise_efficiency_of" : "ui.train_optimise_efficiency",
+    m.search,
+    (v) => (m.search = v),
     t("ui.train_note_optimise_efficiency"),
+    pair,
   )}
 {/snippet}
 
@@ -2065,25 +2072,28 @@
       {#if tab.open[i]}
         <div class="body">
           <div class="grid shared">
-            {#if !crossed}
-              {@render loadSharing(stage)}
-            {/if}
-            <!-- One search for either contact: the loss integral along a
-                 line, the friction balance along a point's. -->
-            {@render efficiencyToggle(stage.optimisation)}
             <!-- A replicated axis is a set of planets: how many, and how
-                 close their tips may come. Asked only where there is one,
-                 and once per such axis where there are more. -->
+                 close their tips may come — each axis's own, since two
+                 planet axes on one carrier run at their own radii. Asked
+                 only where there is one, and named where there are more. -->
             {#each carriedAxes as k (k)}
               <label>
                 <span>{carriedAxes.length > 1 ? t("ui.train_planets_on", { axis: axisName(stage, i, k) }) : t("ui.train_planets")}</span>
                 <input type="number" step="1" min="1" bind:value={() => stage.axes[k].count, finite((v) => (stage.axes[k].count = v))} />
                 <em></em>
               </label>
+              {#if stage.axes[k].count > 1}
+                {@render numberField(
+                  carriedAxes.length > 1 ? "ui.train_minimum_planet_clearance_on" : "ui.train_minimum_planet_clearance",
+                  () => stage.axes[k].min_planet_clearance,
+                  (v) => (stage.axes[k].min_planet_clearance = v),
+                  0.05,
+                  "ui.train_mm",
+                  t("ui.train_note_planet_clearance"),
+                  carriedAxes.length > 1 ? { axis: axisName(stage, i, k) } : undefined,
+                )}
+              {/if}
             {/each}
-            {#if replicated.length > 0}
-              {@render numberField("ui.train_minimum_planet_clearance", () => stage.min_planet_clearance, (v) => (stage.min_planet_clearance = v), 0.05, "ui.train_mm", t("ui.train_note_planet_clearance"))}
-            {/if}
             <!-- **The structural edits**: a step on each carried axis of an
                  epicyclic stage; an axis at the end of a parallel chain, and
                  the last one off again while more than a pair's two are
@@ -2170,7 +2180,7 @@
               <!-- The floor the efficiency search holds the group's meshes
                    to, offered while the search is on; each mesh's own in
                    the core, the group's written together here. -->
-              {#if stage.optimisation.enabled && groupMeshes.length > 0}
+              {#if groupMeshes.some((k) => stage.meshes[k].search)}
                 <label>
                   <span>{t("ui.train_min_contact_ratio")}</span>
                   <input
@@ -2195,6 +2205,13 @@
                 {@const pair = { a: name(m.a), b: name(m.b) }}
                 {@render numberField(groupMeshes.length > 1 ? "ui.train_sliding_friction_of" : "ui.train_sliding_friction", () => m.sliding_friction, (v) => (m.sliding_friction = v), 0.01, "", undefined, pair)}
                 {@render numberField(groupMeshes.length > 1 ? "ui.train_static_friction_of" : "ui.train_static_friction", () => m.static_friction, (v) => (m.static_friction = v), 0.01, "", t("ui.train_note_static_friction"), pair)}
+                <!-- A mesh's sharing and its search, beside its friction:
+                     the three things that are the mesh's own. The search
+                     runs over its component, which the note says. -->
+                {#if !crossed}
+                  {@render loadSharing(m, groupMeshes.length > 1 ? pair : undefined)}
+                {/if}
+                {@render searchToggle(m, groupMeshes.length > 1 ? pair : undefined)}
                 <!-- **Add and remove, where the meshes are.** One more
                      mesh across these same centres is a layshaft's next
                      ratio, and it belongs beside the mesh it doubles

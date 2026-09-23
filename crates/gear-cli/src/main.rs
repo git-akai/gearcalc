@@ -1443,7 +1443,7 @@ fn train_file_report(path: Option<&str>) {
 /// that cost.
 fn shifts_report(z1: u32, z2: u32) {
     use gear_core::params::Auto;
-    use gear_core::train::{Optimisation, StageGear, StageLoads};
+    use gear_core::train::{StageGear, StageLoads};
 
     let lib = gear_io::default_library();
     let stage = |on: bool, at: Option<f64>| {
@@ -1455,7 +1455,7 @@ fn shifts_report(z1: u32, z2: u32) {
             m.gear = g;
         }
         s.distances[0].distance = at.map_or(Auto::automatic(0.0), Auto::fixed);
-        s.optimisation = Optimisation { enabled: on };
+        s.set_search(on);
         s
     };
     let solved =
@@ -1566,10 +1566,9 @@ fn shifts_report(z1: u32, z2: u32) {
 /// for — 26 of 30 sets swept came back with a ring the cutter had to alter.
 fn epicyclic_shifts_report() {
     use gear_core::params::Auto;
-    use gear_core::train::{solve_any, Optimisation, StageLoads};
+    use gear_core::train::{solve_any, StageLoads};
 
     let lib = gear_io::default_library();
-    let on = Optimisation { enabled: true };
 
     // **The hula stage belongs here too.** It is the third kind that chooses
     // shifts, and the one whose optimiser can find *nothing* to choose — at a
@@ -1590,7 +1589,7 @@ fn epicyclic_shifts_report() {
             [1.0 / f64::from(d); 2],
             0.30 / f64::from(d),
         );
-        hula.optimisation = on;
+        hula.set_search(true);
         match solve_hula(&hula, &StageLoads::at(2.0, 1000.0), &lib) {
             Err(e) => println!("{d:<12} {e}"),
             Ok((as_stage, r)) => {
@@ -1616,7 +1615,7 @@ fn epicyclic_shifts_report() {
     );
     for (sun, planet) in [(11u32, 18u32), (13, 25), (17, 17), (24, 18), (31, 21)] {
         let mut set = arr::planetary(sun, planet, sun + 2 * planet, 3);
-        set.optimisation = on;
+        set.set_search(true);
         set.members[0].gear.profile_shift = Auto::automatic(0.0);
         set.members[2].gear.profile_shift = Auto::automatic(0.0);
         match solve_any(&set, &StageLoads::just(2.0), &lib) {
@@ -1648,7 +1647,7 @@ fn epicyclic_shifts_report() {
     );
     for n in [12u32, 18, 30] {
         let mut stage = hula_stage([n + 1, n, n - 1, n], [1.0, 1.0], 0.3);
-        stage.optimisation = on;
+        stage.set_search(true);
         match solve_hula(&stage, &StageLoads::at(2.0, 1000.0), &lib) {
             Ok((_, r)) => {
                 // The two wobble gears' shifts: the list's members 0 and 1.
@@ -1694,7 +1693,7 @@ fn train_report(mode: Option<&str>) {
             vec![
                 ({
                     let mut s = arr::pair([17, 43]);
-                    s.load_sharing = gear_core::contact::LoadSharing::LinearRamp;
+                    s.set_load_sharing(gear_core::contact::LoadSharing::LinearRamp);
                     s.members[0].gear = toggled(17, false, true);
                     s.members[1].gear = toggled(43, true, false);
                     s
@@ -1702,7 +1701,7 @@ fn train_report(mode: Option<&str>) {
                 .with_additional_helix(30.0),
                 {
                     let mut s = arr::pair([17, 43]);
-                    s.load_sharing = gear_core::contact::LoadSharing::LinearRamp;
+                    s.set_load_sharing(gear_core::contact::LoadSharing::LinearRamp);
                     s.members[0].gear = toggled(13, true, false);
                     s.members[1].gear = toggled(31, false, true);
                     s
@@ -3520,7 +3519,7 @@ fn crossed_report(z1: u32, z2: u32, shaft_angle: f64) {
     // crossed answer is in the change detector, which is the ninth time this
     // audit has had to put an opt-in the harness never switched on into it.
     let mut s = base.clone();
-    s.optimisation = gear_core::train::Optimisation { enabled: true };
+    s.set_search(true);
     let even = s.with_first_helix(shaft_angle / 2.0);
     let mut free = even.clone();
     for m in &mut free.members {

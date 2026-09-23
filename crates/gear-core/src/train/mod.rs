@@ -1808,37 +1808,6 @@ pub(super) fn test_library() -> MaterialLibrary {
     }
 }
 
-/// **What a stage is asked to optimise, and what it may not do to get there.**
-///
-/// Every stage with shifts to choose carries the same two decisions, and they
-/// were the same two fields written out three times — which is three places to
-/// edit, three serde defaults to keep in step, and a fourth stage away from
-/// being four. The searches differ in what is free and what it is worth; this
-/// does not differ at all.
-#[derive(Clone, Copy, Debug, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
-#[cfg_attr(feature = "serde", serde(default))]
-#[cfg_attr(
-    feature = "typescript",
-    derive(ts_rs::TS),
-    ts(export, export_to = "core/")
-)]
-pub struct Optimisation {
-    /// **Choose the automatic shifts for efficiency rather than for undercut.**
-    ///
-    /// Off, so a stage answers as it always has. On, the shifts a designer has
-    /// left automatic are chosen to make the stage lose least, with the undercut
-    /// shift as a *floor* rather than as the answer
-    /// (docs/reference.md#efficiency-parallel-axes).
-    ///
-    /// What is already given constrains it rather than being overruled by it: a
-    /// manual shift is that gear's, and a manual centre distance or crank offset
-    /// fixes a shift sum. Enough of them leave nothing to choose, which is a
-    /// design fully specified rather than an error.
-    pub enabled: bool,
-}
-
 /// **The transverse contact ratio the optimiser may not take a mesh
 /// below**, where the mesh's own field (`MeshInput::min_contact_ratio`) is
 /// not given: 1.2, the usual design minimum.
@@ -4834,7 +4803,7 @@ mod tests {
         for teeth in [[9_u32, 37], [12, 29]] {
             let stage = {
                 let mut s = arr::pair(teeth);
-                s.optimisation = Optimisation { enabled: true };
+                s.set_search(true);
                 s
             };
             let asked = [0, 1].map(|i| stage.members[i].gear.shift_asked(&stage.base_params_of(i)));
@@ -4865,7 +4834,7 @@ mod tests {
                     for (i, m) in s.members.iter_mut().enumerate() {
                         m.gear.profile_shift = Auto::fixed(x[i]);
                     }
-                    s.optimisation = Optimisation::default();
+                    s.set_search(false);
                     s
                 };
                 solve_pair_stage(&fixed, &StageLoads::just(2.0), &lib)
@@ -4939,7 +4908,7 @@ mod tests {
         for teeth in [[9_u32, 37], [17, 43], [12, 29]] {
             let stage = {
                 let mut s = arr::pair(teeth);
-                s.optimisation = Optimisation { enabled: true };
+                s.set_search(true);
                 s
             };
             let x = stage.shifts_at(&Search::SHIPPED);
@@ -4967,7 +4936,7 @@ mod tests {
         // --- an epicyclic set, both of its meshes.
         for (sun, planet) in [(17_u32, 17_u32), (24, 18), (13, 25)] {
             let mut set = arr::planetary(sun, planet, sun + 2 * planet, 3);
-            set.optimisation = Optimisation { enabled: true };
+            set.set_search(true);
             set.members[0].gear.profile_shift = Auto::automatic(0.0);
             set.members[2].gear.profile_shift = Auto::automatic(0.0);
             let shape = set.clone();
@@ -5000,7 +4969,7 @@ mod tests {
         // --- a hula stage, both of its meshes, at the crank the shape sizes.
         for n in [12_u32, 18, 30] {
             let mut shape = hula_shape([n + 1, n, n - 1, n]);
-            shape.optimisation = Optimisation { enabled: true };
+            shape.set_search(true);
             let Ok(b) = shape.build_at(&shape.shifts_at(&Search::SHIPPED)) else {
                 continue;
             };
@@ -5049,7 +5018,7 @@ mod tests {
         for sun in [11_u32, 13, 17, 19, 24, 31] {
             for planet in [14_u32, 17, 18, 21, 25] {
                 let mut set = arr::planetary(sun, planet, sun + 2 * planet, 3);
-                set.optimisation = Optimisation { enabled: true };
+                set.set_search(true);
                 set.members[0].gear.profile_shift = Auto::automatic(0.0);
                 set.members[2].gear.profile_shift = Auto::automatic(0.0);
                 let Ok(r) = solve_planetary_stage(&set, &StageLoads::just(2.0), &lib) else {
@@ -5100,7 +5069,7 @@ mod tests {
         for teeth in [[9_u32, 37], [17, 43], [12, 29], [23, 61]] {
             let stage = {
                 let mut s = arr::pair(teeth);
-                s.optimisation = Optimisation { enabled: true };
+                s.set_search(true);
                 s
             };
             let free = solve_pair_stage(&stage, &StageLoads::just(2.0), &lib)
@@ -5248,7 +5217,7 @@ mod tests {
         ] {
             let stage = {
                 let mut s = arr::pair(teeth);
-                s.optimisation = Optimisation { enabled: true };
+                s.set_search(true);
                 s
             };
             // Scored by solving the stage at the shifts each search chose, so
@@ -5260,7 +5229,7 @@ mod tests {
                     for (i, m) in s.members.iter_mut().enumerate() {
                         m.gear.profile_shift = Auto::fixed(x[i]);
                     }
-                    s.optimisation = Optimisation::default();
+                    s.set_search(false);
                     s
                 };
                 solve_pair_stage(&fixed, &StageLoads::just(2.0), &lib)
@@ -5321,7 +5290,7 @@ mod tests {
         for sun in [11_u32, 13, 17, 19, 24, 31] {
             for planet in [14_u32, 17, 18, 21, 25] {
                 let mut set = arr::planetary(sun, planet, sun + 2 * planet, 3);
-                set.optimisation = Optimisation { enabled: true };
+                set.set_search(true);
                 set.members[0].gear.profile_shift = Auto::automatic(0.0);
                 set.members[2].gear.profile_shift = Auto::automatic(0.0);
                 let shape = set.clone();
@@ -7943,7 +7912,7 @@ mod tests {
             [16, 33],
         ] {
             let mut stage = arr::pair([17, 43]);
-            stage.optimisation.enabled = true;
+            stage.set_search(true);
             for (m, z) in stage.members.iter_mut().zip(teeth) {
                 m.gear.teeth = z;
             }
@@ -8275,7 +8244,7 @@ mod tests {
                         sp.distances[0].distance = Auto::fixed(a + clearance);
                         sp.members[0].gear.teeth = z1;
                         sp.members[1].gear.teeth = z2;
-                        sp.optimisation.enabled = optimiser;
+                        sp.set_search(optimiser);
                         let t = train_of(vec![sp.clone()]);
                         let Ok(r) = solve_train(&t, &lib) else {
                             continue;
@@ -8328,7 +8297,7 @@ mod tests {
                 for optimiser in [false, true] {
                     let mut sp = arr::pair([17, 43]);
                     sp.distances[0].clearance = Auto::fixed(clearance);
-                    sp.optimisation.enabled = optimiser;
+                    sp.set_search(optimiser);
                     if let Some(a) = distance {
                         sp.distances[0].distance = Auto::fixed(a);
                     }
@@ -9497,12 +9466,12 @@ mod tests {
         };
         let bending_of = |sharing: LoadSharing| {
             let mut spur = arr::pair([17, 43]);
-            spur.load_sharing = sharing;
+            spur.set_load_sharing(sharing);
             for m in &mut spur.members {
                 m.gear = tall(&m.gear);
             }
             let mut set = arr::planetary(12, 30, 72, 3);
-            set.load_sharing = sharing;
+            set.set_load_sharing(sharing);
             // Named rather than the shipped counts: a set with a small sun
             // cannot reach the band on its sun mesh at any addendum a tooth
             // can carry, and what this test asks is of a set that does.
@@ -9518,7 +9487,7 @@ mod tests {
             // teeth foul, which the stage reports. The rating path is the one a
             // buildable stage uses, so this is what says the input reaches it.
             let mut hula = hula_shape([65, 61, 57, 61]);
-            hula.load_sharing = sharing;
+            hula.set_load_sharing(sharing);
             for m in &mut hula.members {
                 m.gear.addendum = 1.1;
             }
@@ -9594,7 +9563,7 @@ mod tests {
         let lib = library();
         let solve = |sharing| {
             let mut stage = hula_shape([65, 61, 57, 61]);
-            stage.load_sharing = sharing;
+            stage.set_load_sharing(sharing);
             solve_hula_stage(&stage, &StageLoads::just(2.0), &lib).unwrap()
         };
         let off = solve(LoadSharing::None);
@@ -9656,7 +9625,6 @@ mod tests {
     #[test]
     fn every_search_is_quick_enough_to_type_over() {
         let lib = library();
-        let tuned = Optimisation { enabled: true };
         let each = |name: &str, ceiling: u64, f: &dyn Fn()| {
             let start = std::time::Instant::now();
             for _ in 0..5 {
@@ -9671,7 +9639,7 @@ mod tests {
 
         let pair = {
             let mut s = arr::pair([17, 43]);
-            s.optimisation = tuned;
+            s.set_search(true);
             s
         };
         each("pair's", 40, &|| {
@@ -9679,7 +9647,7 @@ mod tests {
         });
 
         let mut set = arr::planetary(12, 30, 72, 3);
-        set.optimisation = tuned;
+        set.set_search(true);
         set.members[0].gear.profile_shift = Auto::automatic(0.0);
         set.members[2].gear.profile_shift = Auto::automatic(0.0);
         each("epicyclic set's", 200, &|| {
@@ -9696,7 +9664,7 @@ mod tests {
         // multiplier is for a loaded machine, and twice is what this stage
         // has needed on one.
         let mut drive = hula_shape([65, 61, 57, 61]);
-        drive.optimisation = tuned;
+        drive.set_search(true);
         each("hula stage's", 60, &|| {
             solve_hula_stage(&drive, &StageLoads::just(2.0), &lib).unwrap();
         });
@@ -9722,7 +9690,7 @@ mod tests {
             for m in &mut s.members {
                 m.gear.root_radius = rho;
             }
-            s.optimisation = Optimisation { enabled: true };
+            s.set_search(true);
             s
         };
         let mut last = f64::INFINITY;
@@ -9741,7 +9709,7 @@ mod tests {
                 // The round is unreachable at every shift; nothing was chosen.
                 assert_eq!(x, {
                     let mut plain = s.clone();
-                    plain.optimisation = Optimisation::default();
+                    plain.set_search(false);
                     plain.shifts()
                 });
                 continue;
@@ -9769,7 +9737,7 @@ mod tests {
     fn a_stage_that_did_not_ask_keeps_the_shifts_it_had() {
         let stage = |on: bool| {
             let mut s = arr::pair([17, 43]);
-            s.optimisation = Optimisation { enabled: on };
+            s.set_search(on);
             s
         };
         let plain = stage(false).shifts();
@@ -9825,7 +9793,7 @@ mod tests {
 
         let spur = {
             let mut s = arr::pair([17, 43]);
-            s.optimisation = Optimisation { enabled: true };
+            s.set_search(true);
             s
         };
         for (i, x) in spur.shifts().iter().enumerate() {
@@ -9833,7 +9801,7 @@ mod tests {
         }
 
         let mut set = arr::planetary(12, 30, 72, 3);
-        set.optimisation = Optimisation { enabled: true };
+        set.set_search(true);
         set.members[0].gear.profile_shift = Auto::automatic(0.0);
         set.members[2].gear.profile_shift = Auto::automatic(0.0);
         let shape = set;
@@ -9846,7 +9814,7 @@ mod tests {
         // The hula stage's rack-generated members are its pinions; its
         // rings are the shaper's and are not asked.
         let mut shape = hula_shape([65, 61, 57, 61]);
-        shape.optimisation = Optimisation { enabled: true };
+        shape.set_search(true);
         let built = shape
             .build_at(&shape.shifts_at(&crate::auto::Search::SHIPPED))
             .expect("the stage solves");
@@ -9877,7 +9845,7 @@ mod tests {
         let asked = free.distances[0].nominal[0] + 0.05;
         let at = |on: bool| {
             let mut s = arr::pair([17, 43]);
-            s.optimisation = Optimisation { enabled: on };
+            s.set_search(on);
             s.distances[0].distance = Auto::fixed(asked);
             s.distances[0].clearance = Auto::fixed(0.05);
             s
@@ -9928,7 +9896,7 @@ mod tests {
             let r = solve_pair_stage(
                 &{
                     let mut s = arr::pair([17, 43]);
-                    s.optimisation = Optimisation { enabled: on };
+                    s.set_search(on);
                     s.distances[0].clearance = Auto::fixed(0.05);
                     s
                 },
@@ -9950,7 +9918,7 @@ mod tests {
         let asked = free.distances[0].nominal[0] + 0.4;
         let stage = {
             let mut s = arr::pair([17, 43]);
-            s.optimisation = Optimisation { enabled: true };
+            s.set_search(true);
             s.distances[0].distance = Auto::fixed(asked);
             s
         };
@@ -10021,7 +9989,7 @@ mod tests {
             for (m, g) in s.members.iter_mut().zip(gears) {
                 m.gear = g;
             }
-            s.optimisation = Optimisation { enabled: true };
+            s.set_search(true);
             s
         };
         assert_eq!(

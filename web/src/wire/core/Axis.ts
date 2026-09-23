@@ -19,4 +19,13 @@ carried_by: number,
  * How many times this axis, its bodies and their gears are replicated
  * about the axis it is carried round — `N` planets. One elsewhere.
  */
-count: number, };
+count: number, 
+/**
+ * **The least tip-to-tip gap between neighbouring instances**, mm —
+ * read only where the axis is replicated, and reported against the
+ * closest pair of this axis's planets (`LayoutReport`). An axis's own
+ * since two planet axes on one carrier can run at different radii and
+ * be allowed different gaps; it was the stage's until the stage went.
+ * Absent in a file, three tenths of a millimetre.
+ */
+min_planet_clearance: number, };

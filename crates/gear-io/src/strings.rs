@@ -751,7 +751,7 @@ mod tests {
             };
             let stage = {
                 let mut s = arr::pair([gear.teeth, gear.teeth]);
-                s.load_sharing = gear_core::contact::LoadSharing::LinearRamp;
+                s.set_load_sharing(gear_core::contact::LoadSharing::LinearRamp);
                 s.members[0].gear = gear.clone();
                 s.members[1].gear = gear;
                 s
@@ -871,7 +871,9 @@ mod tests {
         for (planets, clearance) in [(3_u32, 0.5_f64), (4, 9.0), (5, 0.5), (6, 40.0), (7, 0.5)] {
             let stage = {
                 let mut s = arr::planetary(12, 30, 72, planets);
-                s.min_planet_clearance = clearance;
+                for a in s.axes.iter_mut().filter(|a| a.count > 1) {
+                    a.min_planet_clearance = clearance;
+                }
                 s
             };
             if let Ok(r) =
@@ -966,7 +968,7 @@ mod tests {
             if let Ok(r) = solve_crossed(
                 &({
                     let mut s = stage.clone();
-                    s.optimisation = gear_core::train::Optimisation { enabled: true };
+                    s.set_search(true);
                     s
                 }),
                 &gear_core::train::StageLoads::just(2.0),
@@ -997,7 +999,7 @@ mod tests {
         // (`docs/corrections.md`; the audit's record F58, F82).
         {
             let mut hula = gear_core::train::arrangements::hula([18, 19, 19, 20], [1.0, 1.0]);
-            hula.optimisation.enabled = true;
+            hula.set_search(true);
             if let Ok(r) =
                 gear_core::train::solve_any(&hula, &gear_core::train::StageLoads::just(2.0), &lib)
             {

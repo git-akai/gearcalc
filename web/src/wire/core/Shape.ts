@@ -2,22 +2,13 @@
 import type { Axis } from "./Axis";
 import type { BodyOn } from "./BodyOn";
 import type { Distance } from "./Distance";
-import type { LoadSharing } from "./LoadSharing";
 import type { Member } from "./Member";
 import type { MeshInput } from "./MeshInput";
-import type { Optimisation } from "./Optimisation";
 
 /**
  * The stage.
  */
-export type Shape = { optimisation: Optimisation, load_sharing: LoadSharing, 
-/**
- * Tip-to-tip clearance between neighbouring planets, mm — one
- * allowance for every replicated axis, asked only where there is
- * one; what is reported against it is the closest pair of planets
- * anywhere in the stage.
- */
-min_planet_clearance: number, axes: Array<Axis>, 
+export type Shape = { axes: Array<Axis>, 
 /**
  * **The bodies on this stage's axes**, in the stage's order — what a
  * stage has of the train's bodies: a body that runs on into another

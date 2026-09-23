@@ -712,10 +712,17 @@ Wolfrom.
 
 ---
 
-**What a stage asks for, and what it may not do.** Every stage that has shifts to
-choose carries one toggle. Off, the automatic shifts are the undercut minimum and
-every answer is what it always was. On, they are chosen to lose least, and the
-undercut shift becomes the floor.
+**What a mesh asks for, and what it may not do.** Every mesh carries one
+switch, `search`. Off, the automatic shifts are the undercut minimum and every
+answer is what it always was. On, they are chosen to lose least, and the
+undercut shift becomes the floor. **The switch is a mesh's but the search's
+unit is its component** — the meshes a free gear is shared between, and every
+mesh on one automatic distance an absorber ties together — because a planet's
+shift moves both its meshes and an absorber carries any move across its
+distance: a component is searched where any of its meshes asks, and one none
+of whose meshes asks keeps its undercut shifts. It was one switch on the stage
+until the stage stopped being a container; all on, or all off, is still
+exactly what that switch meant.
 
 What is already given constrains the search rather than being overruled by it:
 
@@ -1772,7 +1779,9 @@ own gear, and the two must agree at every station; on a simple planet this
 is the textbook `(z_s + z_r) mod N = 0`, on a stepped one `N · gcd(z_p1,
 z_p2) | z_s z_p2 + z_r z_p1`, and `Shape::assembly` is held to a search over
 the phases. Simultaneous meshing needs `N | z_c` for every central member
-the axis meets; planet clearance is `2 a_w sin(π/N) − d_a,planet`.
+the axis meets; planet clearance is `2 a_w sin(π/N) − d_a,planet`, held to
+the axis's own `min_planet_clearance` — two planet axes on one carrier run at
+their own radii and may be allowed their own gaps.
 
 **Efficiency** — Pennestrì–Freudenstein, all six arrangements from one piece of
 algebra:
@@ -2692,8 +2701,9 @@ a held ring's is not zero while its speed is), its cycles on a fatigue case,
 both stresses and the widths each would need. A mesh reports its contact per
 case, and a stage every body's speed and torque per case.
 
-**Load sharing.** A stage input, `LoadSharing`, **off by default**, on every
-stage that reports a bending stress. It reaches bending alone — a contact rating
+**Load sharing.** A mesh input, `LoadSharing`, **off by default**, on every
+mesh that reports a bending stress — a model of one contact, so two meshes on
+one gear may be rated under different ones. It reaches bending alone — a contact rating
 is already taken where one tooth carries everything, so sharing cannot move it —
 and where it is off the rating is `bending_section`'s own answer rather than one
 that agrees with it. Switched on, the mesh cycle is swept for the largest

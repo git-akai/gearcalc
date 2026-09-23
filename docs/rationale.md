@@ -618,8 +618,12 @@ precedent does not settle.
 
 `ContactPath::load_fraction` takes a `LoadSharing` model, and
 `LoadSharing::LinearRamp` is an explicitly uncalibrated 1/3→2/3 ramp. It is a
-**stage input, off by default**, on every stage that reports a bending stress,
-and it reaches bending alone.
+**mesh input, off by default**, on every mesh that reports a bending stress,
+and it reaches bending alone. It was the stage's, on the argument that a stage
+running two meshes under two models would report a comparison rather than a
+design; the default answers that better — every mesh starts at none, and a
+mesh an edit adds takes the first mesh's — and a designer who sets two
+differently has said so where they can see it.
 
 **Off by default, because it is an estimate.** A calibrated mesh-stiffness model
 would drag in tooth and rim stiffness, deflection under load and manufacturing

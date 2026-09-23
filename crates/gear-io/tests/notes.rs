@@ -31,7 +31,7 @@ fn the_sharing_note_quotes_a_number_the_sweep_still_produces() {
         };
         let stage = {
             let mut s = arrangements::pair([g.teeth, g.teeth]);
-            s.load_sharing = model;
+            s.set_load_sharing(model);
             s.members[0].gear = g.clone();
             s.members[1].gear = g;
             s

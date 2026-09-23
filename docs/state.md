@@ -480,8 +480,8 @@ backlash and cycle accumulation; efficiency and backlash in **both** drive
 directions. Contact is `max(elliptical, line)` on **both** mesh kinds now — a
 crossed pair's ellipse lengthens as its shafts come parallel, so the line its
 teeth actually provide is what carries the load there, and rating on the ellipse
-alone under-stated a near-parallel pair eightfold. Load sharing is a stage input
-on **every stage that reports a bending stress**, off by default, reaching
+alone under-stated a near-parallel pair eightfold. Load sharing is a mesh input
+on **every mesh that reports a bending stress**, off by default, reaching
 bending alone — a ring included, which had no shared section of its own. Below a
 virtual contact ratio of 2 the model finds the point the unshared rating already
 took and reports the same tooth, which is the model rather than a fault; a hula

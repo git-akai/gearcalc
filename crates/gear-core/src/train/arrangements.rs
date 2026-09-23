@@ -17,9 +17,11 @@
 //! builder hands back are the ones a train's constraints address.
 
 use super::shape::{
-    default_min_contact_ratio, default_overlap, Axis, BodyOn, Distance, Member, MeshInput, Shape,
+    default_min_contact_ratio, default_overlap, default_planet_clearance, Axis, BodyOn, Distance,
+    Member, MeshInput, Shape,
 };
 use super::StageGear;
+use crate::contact::LoadSharing;
 use crate::kinematics::{Body, GROUND};
 use crate::params::Auto;
 use crate::ring::Cutter;
@@ -340,8 +342,19 @@ impl Shape {
 /// the two add a body, a member, a mesh or a distance by one rule. Every
 /// push appends and hands back the index the wiring gives the piece.
 impl Shape {
+    /// An axis, at the planet gap the shape's replicated axes already keep
+    /// — the first's, or the crate's where there is none.
     pub(crate) fn push_axis(&mut self, carried_by: Body, count: u32) -> usize {
-        self.axes.push(Axis { carried_by, count });
+        let min_planet_clearance = self
+            .axes
+            .iter()
+            .find(|a| a.count > 1)
+            .map_or_else(default_planet_clearance, |a| a.min_planet_clearance);
+        self.axes.push(Axis {
+            carried_by,
+            count,
+            min_planet_clearance,
+        });
         self.axes.len() - 1
     }
 
@@ -385,18 +398,18 @@ impl Shape {
     }
 
     /// Two members in mesh, the ring second as the mesh's kind is read,
-    /// at the friction the shape's meshes already run with — the first
-    /// mesh's, or the set's where there is none.
+    /// running as the shape's meshes already run — the first mesh's
+    /// friction, sharing and search, or the crate's where there is none — so
+    /// a mesh an edit adds to a searched stage is searched with it.
     pub(crate) fn push_mesh(&mut self, a: usize, b: usize) {
         let (a, b) = if self.members[a].ring.is_some() {
             (b, a)
         } else {
             (a, b)
         };
-        let (sliding_friction, static_friction) = self
-            .meshes
-            .first()
-            .map_or(FRICTION, |m| (m.sliding_friction, m.static_friction));
+        let like = self.meshes.first().copied();
+        let (sliding_friction, static_friction) =
+            like.map_or(FRICTION, |m| (m.sliding_friction, m.static_friction));
         self.meshes.push(MeshInput {
             a,
             b,
@@ -404,6 +417,8 @@ impl Shape {
             static_friction,
             overlap: default_overlap(),
             min_contact_ratio: default_min_contact_ratio(),
+            load_sharing: like.map_or(LoadSharing::None, |m| m.load_sharing),
+            search: like.is_some_and(|m| m.search),
         });
     }
 
@@ -1314,7 +1329,7 @@ mod hula {
 
         fn shape(&self) -> Shape {
             let mut shape = hula(self.teeth, self.module);
-            shape.optimisation.enabled = self.optimise;
+            shape.set_search(self.optimise);
             shape.distances[0].tip_clearance = self.gap;
             for m in &mut shape.meshes {
                 m.sliding_friction = self.friction.0;

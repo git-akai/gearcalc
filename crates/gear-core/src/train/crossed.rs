@@ -217,7 +217,7 @@ mod tests {
         let flat = {
             let mut s = stage.clone();
             s.distances[0].angle = 0.0;
-            s.optimisation = super::super::Optimisation::default();
+            s.set_search(false);
             s.with_additional_helix(stage.helix_angles()[0])
         };
         solve_pair_stage(&flat, &StageLoads::just(2.0), &library())
@@ -1501,11 +1501,11 @@ mod tests {
     ///   shorten the path further before the same floor stops it.
     #[test]
     fn the_optimiser_reaches_a_crossed_pair_by_its_own_mesh() {
-        use super::super::{Optimisation, Searched};
+        use super::super::Searched;
         use crate::auto::Search;
         let lib = library();
         let optimised = |mut st: Shape| {
-            st.optimisation = Optimisation { enabled: true };
+            st.set_search(true);
             st
         };
         let shifts = |r: &ShapeResult| [r.members[0].profile_shift, r.members[1].profile_shift];

@@ -204,6 +204,17 @@
 //!   `deny_unknown_fields`, and without that a file's stale field is
 //!   accepted in silence — which is the one thing this format refuses to
 //!   do.)
+//! - **What was a stage's is the piece's.** A stage's `optimisation`,
+//!   `load_sharing` and `min_planet_clearance` are gone, and a file that
+//!   still writes any is refused by name. Every mesh carries `search` and
+//!   `load_sharing` of its own, and every axis `min_planet_clearance` —
+//!   read where it is replicated. `optimisation = { enabled = true }` is
+//!   `search = true` on each of the stage's meshes (a component is searched
+//!   where any of its meshes asks, so one is enough where they share a
+//!   gear); `load_sharing = "linear_ramp"` is the same on each mesh; and a
+//!   stage's clearance is each replicated axis's. A mesh that omits them is
+//!   not searched and shares nothing, and an axis that omits its gap is at
+//!   0.3 mm — which is what every older file meant where it wrote none.
 //!
 //! No compatibility shim, deliberately. Accepting both shapes means carrying two
 //! readers for one format and testing both forever, and the thing that would go
@@ -532,11 +543,19 @@ mod tests {
             }
             other => panic!("a stale field must be a parse error, not {other:?}"),
         }
-        // ...the tag a stage used to carry included.
-        let stale = text.replacen("[[train.stages]]", "[[train.stages]]\nkind = \"shape\"", 1);
-        match from_toml(&stale) {
-            Err(TrainError::Parse(e)) => assert!(e.to_string().contains("kind"), "{e}"),
-            other => panic!("a stage's old tag must be a parse error, not {other:?}"),
+        // ...the tag a stage used to carry included, and the three inputs
+        // that were the stage's until they became its meshes' and axes'.
+        for (field, line) in [
+            ("kind", "kind = \"shape\""),
+            ("load_sharing", "load_sharing = \"linear_ramp\""),
+            ("min_planet_clearance", "min_planet_clearance = 0.3"),
+            ("optimisation", "optimisation = { enabled = true }"),
+        ] {
+            let stale = text.replacen("[[train.stages]]", &format!("[[train.stages]]\n{line}"), 1);
+            match from_toml(&stale) {
+                Err(TrainError::Parse(e)) => assert!(e.to_string().contains(field), "{e}"),
+                other => panic!("a stage's old {field} must be a parse error, not {other:?}"),
+            }
         }
         // ...and on the train itself.
         let stale = text.replacen(

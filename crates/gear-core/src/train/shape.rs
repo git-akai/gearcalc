@@ -38,7 +38,7 @@
 use super::wiring::{BodyLabel, MeshSpec, Mount, Wiring};
 use super::{
     ContactRatios, Freedom, FreedomGroup, GearResult, Loading, MemberFacts, MemberFreedom,
-    MemberRating, MeshReport, Optimisation, Ports, Reading, StageGear, TrainError, PROBE,
+    MemberRating, MeshReport, Ports, Reading, StageGear, TrainError, PROBE,
 };
 use crate::contact::{efficiency, ContactPath, Directional, Drive, LoadSharing};
 use crate::kinematics::{Body, GROUND};
@@ -75,6 +75,19 @@ pub struct Axis {
     /// How many times this axis, its bodies and their gears are replicated
     /// about the axis it is carried round — `N` planets. One elsewhere.
     pub count: u32,
+    /// **The least tip-to-tip gap between neighbouring instances**, mm —
+    /// read only where the axis is replicated, and reported against the
+    /// closest pair of this axis's planets (`LayoutReport`). An axis's own
+    /// since two planet axes on one carrier can run at different radii and
+    /// be allowed different gaps; it was the stage's until the stage went.
+    /// Absent in a file, three tenths of a millimetre.
+    #[cfg_attr(feature = "serde", serde(default = "default_planet_clearance"))]
+    pub min_planet_clearance: f64,
+}
+
+/// The gap a replicated axis a file does not give one is held to.
+pub(crate) fn default_planet_clearance() -> f64 {
+    0.3
 }
 
 /// The crate's pressure angle, for a member a file does not give one:
@@ -174,6 +187,26 @@ pub struct MeshInput {
     /// held to the same. Bounds the optimiser only.
     #[cfg_attr(feature = "serde", serde(default = "default_min_contact_ratio"))]
     pub min_contact_ratio: f64,
+    /// **How the load is shared between tooth pairs in contact** on this
+    /// mesh — a model of one contact, so a mesh's own: two meshes on one
+    /// member can be rated under different ones. Absent in a file, none,
+    /// which is what every file written before it meant.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub load_sharing: LoadSharing,
+    /// **Choose this mesh's automatic shifts for efficiency** rather than
+    /// for undercut, the undercut shift then a floor rather than the answer
+    /// (docs/reference.md#efficiency-parallel-axes).
+    ///
+    /// **The search's unit is not the mesh but its component** — the meshes
+    /// a free member is shared between, and every mesh on an automatic
+    /// distance an absorber ties together ([`Shape::search_components`]):
+    /// a planet's shift moves both its meshes. So a component is searched
+    /// where *any* of its meshes asks, and a component none of whose
+    /// meshes asks keeps its undercut shifts. What is given constrains the
+    /// search rather than being overruled by it. Absent in a file, not
+    /// asked.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub search: bool,
 }
 
 /// The floor a mesh a file does not give one is held to by the search.
@@ -240,13 +273,6 @@ pub struct Distance {
     ts(export, export_to = "core/")
 )]
 pub struct Shape {
-    pub optimisation: Optimisation,
-    pub load_sharing: LoadSharing,
-    /// Tip-to-tip clearance between neighbouring planets, mm — one
-    /// allowance for every replicated axis, asked only where there is
-    /// one; what is reported against it is the closest pair of planets
-    /// anywhere in the stage.
-    pub min_planet_clearance: f64,
     pub axes: Vec<Axis>,
     /// **The bodies on this stage's axes**, in the stage's order — what a
     /// stage has of the train's bodies: a body that runs on into another
@@ -259,17 +285,12 @@ pub struct Shape {
     pub distances: Vec<Distance>,
 }
 
-/// **The empty shape, at the crate's defaults** — 20° pressure angle, an
-/// axial contact ratio asked for automatically at one, no search, no load
-/// sharing, three tenths of a millimetre between neighbouring planets'
-/// tips — which is what the builder starts from and what the pair's and
-/// the set's vocabularies default those same words to, once.
+/// **The empty shape** — what the builder starts from. Every default a
+/// piece takes is the piece's own now: a mesh's sharing and search, an
+/// axis's planet gap.
 impl Default for Shape {
     fn default() -> Self {
         Self {
-            optimisation: Optimisation::default(),
-            load_sharing: LoadSharing::None,
-            min_planet_clearance: 0.3,
             axes: Vec::new(),
             bodies: Vec::new(),
             members: Vec::new(),
@@ -1663,11 +1684,16 @@ impl Shape {
                     }),
                 }
             };
-        if !self.optimisation.enabled {
+        if !self.meshes.iter().any(|m| m.search) {
             return fallback(&plan, &bound_by, super::Searched::NotAsked);
         }
+        // **Only the components that ask.** A free member in a component
+        // none of whose meshes asks keeps its undercut shift; the rest are
+        // searched as ever. Every mesh asking, or none, is what one switch on
+        // the stage used to mean, and both come out as they did.
+        let asking = self.asking_members(&plan);
         let free: Vec<usize> = (0..self.members.len())
-            .filter(|&i| plan.role[i] == Role::Free)
+            .filter(|&i| plan.role[i] == Role::Free && asking[i])
             .collect();
         if free.is_empty() {
             return fallback(&plan, &bound_by, super::Searched::NotAsked);
@@ -1842,6 +1868,80 @@ impl Shape {
                 bound_by,
             }),
         }
+    }
+
+    /// **Every mesh searched, or none** — what one switch on a stage used to
+    /// say, for a fixture that means the whole shape. The panel sets each
+    /// mesh's own.
+    pub fn set_search(&mut self, on: bool) {
+        for m in &mut self.meshes {
+            m.search = on;
+        }
+    }
+
+    /// **Every mesh under one sharing model** — as [`Self::set_search`].
+    pub fn set_load_sharing(&mut self, sharing: LoadSharing) {
+        for m in &mut self.meshes {
+            m.load_sharing = sharing;
+        }
+    }
+
+    /// **Which members a search may move**: those in a component — meshes
+    /// sharing a free member, or on one automatic distance an absorber ties
+    /// together, as [`Self::search_components`] reads them — where at least
+    /// one mesh asks to be searched.
+    fn asking_members(&self, plan: &Plan) -> Vec<bool> {
+        let n = self.meshes.len();
+        let mut parent: Vec<usize> = (0..n).collect();
+        fn find(parent: &mut [usize], i: usize) -> usize {
+            let mut r = i;
+            while parent[r] != r {
+                r = parent[r];
+            }
+            r
+        }
+        let mut union = |a: usize, b: usize| {
+            let (ra, rb) = (find(&mut parent, a), find(&mut parent, b));
+            if ra != rb {
+                parent[ra] = rb;
+            }
+        };
+        for d in 0..self.distances.len() {
+            if plan.held[d].is_none() {
+                let on = self.meshes_on(d);
+                for w in on.windows(2) {
+                    union(w[0], w[1]);
+                }
+            }
+        }
+        for i in 0..self.members.len() {
+            if plan.role[i] != Role::Free {
+                continue;
+            }
+            let mine: Vec<usize> = (0..n)
+                .filter(|&k| self.meshes[k].a == i || self.meshes[k].b == i)
+                .collect();
+            for w in mine.windows(2) {
+                union(w[0], w[1]);
+            }
+        }
+        let asks: Vec<bool> = {
+            let mut asks = vec![false; n];
+            for k in 0..n {
+                if self.meshes[k].search {
+                    let r = find(&mut parent, k);
+                    asks[r] = true;
+                }
+            }
+            asks
+        };
+        (0..self.members.len())
+            .map(|i| {
+                (0..n).any(|k| {
+                    (self.meshes[k].a == i || self.meshes[k].b == i) && asks[find(&mut parent, k)]
+                })
+            })
+            .collect()
     }
 
     /// **The search's axes grouped by the meshes they can move**: two axes
@@ -3133,7 +3233,6 @@ pub fn solve_shape_after(
     // loads — its contact is a point tracking diagonally across the flank,
     // and a cantilever loaded across its whole face has no honest reading
     // of it (docs/rationale.md#a-worm-stage-reports-no-bending-stress).
-    let sharing = shape.load_sharing;
     let mut bendings: Vec<Vec<(usize, Option<super::Bending>)>> =
         (0..n).map(|_| Vec::new()).collect();
     for (k, m) in shape.meshes.iter().enumerate() {
@@ -3144,7 +3243,7 @@ pub fn solve_shape_after(
         for i in [m.a, m.b] {
             bendings[i].push((
                 k,
-                built.members[i].bending(cr, sharing, shape.members[i].gear.rim_thickness),
+                built.members[i].bending(cr, m.load_sharing, shape.members[i].gear.rim_thickness),
             ));
         }
     }
@@ -3547,7 +3646,7 @@ pub fn solve_shape_after(
                 equal_spacing,
                 simultaneous_meshing,
                 clearance,
-                clearance_ok: clearance >= shape.min_planet_clearance,
+                clearance_ok: clearance >= a.min_planet_clearance,
             })
         })
         .collect();
@@ -3560,7 +3659,7 @@ pub fn solve_shape_after(
             notes.push(
                 Note::new(key::STAGE_PLANET_CLEARANCE_BELOW_MINIMUM)
                     .number("gap", l.clearance, 3)
-                    .number("minimum", shape.min_planet_clearance, 3),
+                    .number("minimum", shape.axes[l.axis].min_planet_clearance, 3),
             );
         }
     }
@@ -5285,7 +5384,7 @@ mod tests {
             solve_set(
                 &{
                     let mut s = free();
-                    s.optimisation = Optimisation { enabled: on };
+                    s.set_search(on);
                     s
                 },
                 &StageLoads::just(2.0),
@@ -5331,7 +5430,7 @@ mod tests {
     #[test]
     fn a_given_shift_survives_the_search() {
         let mut stage = stage_of(24, 18, 60, 0.0);
-        stage.optimisation = Optimisation { enabled: true };
+        stage.set_search(true);
         stage.members[0].gear.profile_shift = Auto::automatic(0.0);
         stage.members[2].gear.profile_shift = Auto::fixed(0.25);
         let r = solve_set(&stage, &StageLoads::just(2.0), &test_library()).expect("solves");
@@ -5830,5 +5929,170 @@ mod assembly {
         let shape = arr::ravigneaux([18, 30], [22, 18], 62, 3);
         assert_eq!(shape.assembly(1), None);
         assert_eq!(shape.assembly(2), None);
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod the_pieces_own {
+    //! **What was the stage's is the piece's**: a mesh's search and its
+    //! sharing, a replicated axis's planet gap. Each law turns one piece and
+    //! holds every other to what it was — the claim a switch on the stage
+    //! could not make.
+
+    use super::super::arrangements::{self as arr, Builder};
+    use super::super::{test_library, Reversal, StageBoundary, StageLoads};
+    use super::*;
+
+    fn under(shape: &Shape, boundary: StageBoundary) -> ShapeResult {
+        solve_loads(
+            shape,
+            &StageLoads::at(2.0, 3000.0).under(boundary),
+            &test_library(),
+            Reversal::default(),
+        )
+        .unwrap()
+    }
+
+    fn conventionally(shape: &Shape) -> ShapeResult {
+        under(
+            shape,
+            StageBoundary::conventional(&shape.wiring(), &shape.ports()),
+        )
+    }
+
+    fn shifts(r: &ShapeResult) -> Vec<f64> {
+        r.members.iter().map(|g| g.profile_shift).collect()
+    }
+
+    /// Two pairs in series through a compound shaft — which is what two
+    /// stages in a row are once the train is one graph: their meshes share
+    /// no member and no automatic distance, so they are two components.
+    fn compound() -> Shape {
+        let mut b = Builder::new(1.0);
+        let (x0, x1, x2) = (b.axis(), b.axis(), b.axis());
+        let (s0, s1, s2) = (b.body(x0), b.body(x1), b.body(x2));
+        let g1 = b.gear(s0, 17);
+        let g2 = b.gear(s1, 43);
+        let g3 = b.gear(s1, 13);
+        let g4 = b.gear(s2, 31);
+        b.mesh(g1, g2).distance([x0, x1]);
+        b.mesh(g3, g4).distance([x1, x2]);
+        b.build()
+    }
+
+    /// **A component is searched where one of its meshes asks, and only
+    /// then.** The first pair asking and the second not: the first's shifts
+    /// are the ones both asking give, and the second's the ones neither
+    /// asking gives — and the search moves something, or the law is empty.
+    #[test]
+    fn a_component_that_does_not_ask_keeps_its_undercut_shifts() {
+        let solve = |ask: [bool; 2]| {
+            let mut s = compound();
+            s.meshes[0].search = ask[0];
+            s.meshes[1].search = ask[1];
+            shifts(&under(&s, StageBoundary::holding(4, &[], 1, 3)))
+        };
+        let (none, both, first) = (solve([false; 2]), solve([true; 2]), solve([true, false]));
+        assert!(
+            (0..2).any(|i| (both[i] - none[i]).abs() > 1e-6),
+            "the search should move the first pair: {both:?} vs {none:?}"
+        );
+        for i in 0..2 {
+            assert!((first[i] - both[i]).abs() < 1e-12, "{first:?} vs {both:?}");
+        }
+        for i in 2..4 {
+            assert!((first[i] - none[i]).abs() < 1e-12, "{first:?} vs {none:?}");
+        }
+    }
+
+    /// **...and searched whole, where a member is shared.** A set's planet
+    /// is in both its meshes, so the sun mesh alone asking searches the
+    /// ring mesh too: every shift is the one both asking give.
+    #[test]
+    fn one_mesh_asking_searches_its_whole_component() {
+        let solve = |ask: [bool; 2]| {
+            let mut s = arr::planetary(12, 30, 72, 3);
+            s.members[0].gear.profile_shift = Auto::automatic(0.0);
+            s.members[2].gear.profile_shift = Auto::automatic(0.0);
+            s.meshes[0].search = ask[0];
+            s.meshes[1].search = ask[1];
+            shifts(&conventionally(&s))
+        };
+        let (none, both, one) = (solve([false; 2]), solve([true; 2]), solve([true, false]));
+        assert!(
+            (0..3).any(|i| (both[i] - none[i]).abs() > 1e-6),
+            "the search should move the set: {both:?} vs {none:?}"
+        );
+        for i in 0..3 {
+            assert!((one[i] - both[i]).abs() < 1e-12, "{one:?} vs {both:?}");
+        }
+    }
+
+    /// **Sharing is each mesh's own.** The ramp on one of a set's meshes:
+    /// the member only in that mesh bends as with the ramp on both, the
+    /// member only in the other as with it on neither — each way round,
+    /// since at these counts the ramp moves the ring and leaves the sun,
+    /// and the check that matters is that it does not leak.
+    #[test]
+    fn sharing_is_each_meshes_own() {
+        let solve = |ramp: [bool; 2]| {
+            let mut s = arr::planetary(12, 30, 72, 3);
+            for m in &mut s.members {
+                m.gear.addendum = 1.35;
+            }
+            for (k, on) in ramp.into_iter().enumerate() {
+                s.meshes[k].load_sharing = if on {
+                    LoadSharing::LinearRamp
+                } else {
+                    LoadSharing::None
+                };
+            }
+            conventionally(&s)
+                .members
+                .iter()
+                .map(|g| g.cases[0].bending_stress.unwrap())
+                .collect::<Vec<f64>>()
+        };
+        let (none, both) = (solve([false; 2]), solve([true; 2]));
+        let (sun, ring) = (0, 2);
+        assert!(
+            (both[ring] - none[ring]).abs() > 1e-6,
+            "the ramp should move the ring: {both:?} vs {none:?}"
+        );
+        let on_sun = solve([true, false]);
+        assert!(
+            (on_sun[sun] - both[sun]).abs() < 1e-9,
+            "{on_sun:?} vs {both:?}"
+        );
+        assert!(
+            (on_sun[ring] - none[ring]).abs() < 1e-9,
+            "{on_sun:?} vs {none:?}"
+        );
+        let on_ring = solve([false, true]);
+        assert!(
+            (on_ring[ring] - both[ring]).abs() < 1e-9,
+            "{on_ring:?} vs {both:?}"
+        );
+        assert!(
+            (on_ring[sun] - none[sun]).abs() < 1e-9,
+            "{on_ring:?} vs {none:?}"
+        );
+    }
+
+    /// **A planet axis keeps its own gap.** Meshed planets run two carried
+    /// axes; a minimum no gap meets on one is reported against that axis
+    /// alone.
+    #[test]
+    fn a_planet_axis_keeps_its_own_gap() {
+        let mut s = arr::meshed_planets(18, [13, 13], 72, 3);
+        let before = conventionally(&s);
+        assert!(before.layouts.len() == 2 && before.layouts.iter().all(|l| l.clearance_ok));
+        let first = before.layouts[0].axis;
+        s.axes[first].min_planet_clearance = 1e3;
+        let after = conventionally(&s);
+        for l in &after.layouts {
+            assert_eq!(l.clearance_ok, l.axis != first, "{:?}", after.layouts);
+        }
     }
 }
