@@ -1066,9 +1066,9 @@ mod tests {
             t.stages[1].bodies
         );
         assert!(
-            t.constraints.is_empty(),
+            t.held.is_empty(),
             "the hold on the removed body is gone: {:?}",
-            t.constraints
+            t.held
         );
         assert_eq!(t.load_cases[0].loads[0].at, 1, "the crank stayed");
         assert_eq!(
@@ -1087,7 +1087,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(t.load_cases[0].loads, before.load_cases[0].loads);
-        assert_eq!(t.constraints, before.constraints);
+        assert_eq!(t.held, before.held);
         for b in 1..=before.max_body() {
             assert_eq!(t.ends_of(b), before.ends_of(b), "body {b} moved");
         }

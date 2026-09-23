@@ -8,7 +8,7 @@
     CASE_KINDS,
     type CaseKindSpec,
     portOptions,
-    constraintOn,
+    isHeld,
     type CaseKind,
     type PortSpec,
     type LoadCase,
@@ -131,9 +131,8 @@
    *  which — the ground, a numbered body the port shares with another
    *  stage's, or a body of its own — so a body two stages share is read as
    *  two ends on one number rather than as a pair of names. */
-  /** Whether a body is held, as the constraints in force have it: the
-   *  train's own word on it, or the convention the port reports. */
-  const heldNow = (p: PortSpec): boolean => (constraintOn(tab.train, p.body) ?? p.by_convention) === "held";
+  /** Whether a body is held: the train's own list says, every hold stated. */
+  const heldNow = (p: PortSpec): boolean => isHeld(tab.train, p.body);
   /** Every body some stage has as a port, once, in number order. */
   const portBodies = $derived<PortSpec[]>(
     result.topology

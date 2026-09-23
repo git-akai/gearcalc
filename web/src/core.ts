@@ -77,8 +77,6 @@ import type {
   Adopted,
   TrainFailure,
   Variation,
-  Constraint,
-  BodyConstraint,
   PortSpec,
   StagePorts,
   MemberName,
@@ -159,8 +157,6 @@ export type {
   Adopted,
   TrainFailure,
   Variation,
-  Constraint,
-  BodyConstraint,
   PortSpec,
   StagePorts,
   MemberName,
@@ -808,12 +804,10 @@ export function solveTrain(train: Train, materials?: MaterialLibrary): TrainOutc
   }
 }
 
-/** **What a train asks of a body**, as it stands: the constraint the train
- *  states, or `null` where it states none and the stage's convention holds.
- *  Read here, never decided here — what that convention comes to is the
- *  core's, and arrives as each port's `by_convention` in `topology`. */
-export function constraintOn(train: Train, body: number): Constraint | null {
-  return train.constraints.find((c) => c.body === body)?.constraint ?? null;
+/** **Whether a train holds a body** — which is exactly what its list of
+ *  holds says: every hold is stated, a preset's conventional one included. */
+export function isHeld(train: Train, body: number): boolean {
+  return train.held.includes(body);
 }
 
 /** **One edit to a train's graph, by the core's rules** — what a port's
@@ -850,7 +844,7 @@ export function editTrain(train: Train, edit: TrainEdit): string | null {
     return message.startsWith("ui.") ? message : null;
   }
   train.stages = edited.stages;
-  train.constraints = edited.constraints;
+  train.held = edited.held;
   train.load_cases = edited.load_cases;
   return null;
 }

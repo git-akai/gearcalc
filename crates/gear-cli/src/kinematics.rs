@@ -39,7 +39,7 @@
 
 use gear_core::train::arrangements as arr;
 use gear_core::train::{
-    solve_train, BodyConstraint, Duty, LoadCase, Shape, ShapeResult, StageGear, Train, TrainResult,
+    solve_train, Duty, LoadCase, Shape, ShapeResult, StageGear, Train, TrainResult,
 };
 
 /// The loads every fixture is rated for, between two bodies: one from each,
@@ -107,7 +107,7 @@ fn arranged(input: &str, fixed: &str) -> Train {
     let mut t = Train::chained(vec![set()], |t| {
         loads(t.port(0, member(input)), t.port(0, member(output)))
     });
-    t.constraints = vec![BodyConstraint::held(t.port(0, member(fixed)))];
+    t.held = vec![t.port(0, member(fixed))];
     t
 }
 
@@ -260,7 +260,7 @@ fn fixtures() -> Vec<(String, Train)> {
             let mut t = Train::chained(vec![shape(ravigneaux())], |t| {
                 loads(t.port(0, 1), t.port(0, 2))
             });
-            t.constraints = vec![BodyConstraint::held(t.port(0, 3))];
+            t.held = vec![t.port(0, 3)];
             t
         }));
     }
@@ -281,13 +281,15 @@ fn fixtures() -> Vec<(String, Train)> {
     // into a size were both outside the change detector. A set that could not
     // be followed by anything at all, and a backlash 23.5 % light, are what
     // that cost; these two rows are what keeps them caught.
-    // A set with its carrier held reverses. Ahead of a pair it runs on by
-    // its ring — the chain shares the carrier with the pair, which the hold
-    // would hold too, so the pair's end is split off and joined to the
-    // ring — and is loaded at its sun; behind one it is entered by its sun
-    // through the shared body and leaves by the ring.
+    // A set with its carrier held reverses: its ring released and its
+    // carrier held, both said. Ahead of a pair it runs on by its ring — the
+    // chain shares the carrier with the pair, which the hold would hold
+    // too, so the pair's end is split off and joined to the ring — and is
+    // loaded at its sun; behind one it is entered by its sun through the
+    // shared body and leaves by the ring.
     out.push(("set-then-pair".to_string(), {
         let mut t = Train::chained(vec![set(), pair(17, 43, 0.0)], |_| Vec::new());
+        t.release(t.port(0, 3));
         t.hold(t.port(0, 2));
         t.split(1, t.port(0, 2));
         t.join(t.port(0, 3), t.port(1, 1));
@@ -296,6 +298,7 @@ fn fixtures() -> Vec<(String, Train)> {
     }));
     out.push(("pair-then-set".to_string(), {
         let mut t = Train::chained(vec![pair(17, 43, 0.0), set()], |_| Vec::new());
+        t.release(t.port(1, 3));
         t.hold(t.port(1, 2));
         t.load_cases = loads(t.port(0, 1), t.port(1, 3));
         t

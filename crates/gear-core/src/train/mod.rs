@@ -54,8 +54,8 @@ pub mod shape;
 mod wiring;
 
 pub use conditions::{
-    BodyConstraint, BodyEnd, BodyReport, Constraint, Exact, MotionError, MotionReport, PortBody,
-    PortSpec, Ports, StageBoundary, StagePorts, Term, TrainMotion,
+    BodyEnd, BodyReport, Exact, MotionError, MotionReport, PortBody, PortSpec, Ports,
+    StageBoundary, StagePorts, Term, TrainMotion,
 };
 
 use crate::kinematics::{Body, Condition, GROUND};
@@ -3151,11 +3151,7 @@ impl Train {
                 LoadCase::fatigue(input, output, torque, speed),
             ],
             reversed_bending: false,
-            constraints: boundary
-                .held()
-                .into_iter()
-                .map(BodyConstraint::held)
-                .collect(),
+            held: boundary.held(),
             stages: vec![stage],
         }
     }
@@ -3167,7 +3163,7 @@ impl Train {
     /// numbers them.
     #[must_use]
     pub fn arranged(mut self, held: &[Body], input: Body, output: Body) -> Self {
-        self.constraints = held.iter().map(|&b| BodyConstraint::held(b)).collect();
+        self.held = held.to_vec();
         for case in &mut self.load_cases {
             for load in &mut case.loads {
                 if load.is_load() {
@@ -3597,12 +3593,14 @@ pub struct Train {
     /// stages name is what a coupling used to say, and the bodies are the
     /// numbers in use — nothing lists them.
     pub stages: Vec<Shape>,
-    /// **What is asked of a body** — held or free. Empty is each stage's
-    /// convention. Written out, this is where a planetary set's arrangement
-    /// lives, and where a released ring is one more line. See
-    /// [`BodyConstraint`].
+    /// **The bodies held to ground**, every one stated. A preset's
+    /// conventional hold — a set's ring — is written here when it is
+    /// inserted ([`Train::push_stage`]), so a body is held exactly where
+    /// this says, and released by taking it out. It was a list of
+    /// constraints laid over each stage's conventions, which held what
+    /// nobody had written and needed a *free* to say otherwise.
     #[cfg_attr(feature = "serde", serde(default))]
-    pub constraints: Vec<BodyConstraint>,
+    pub held: Vec<usize>,
 }
 
 impl Train {
@@ -6367,21 +6365,16 @@ mod tests {
         // train's to say now, so it is a constraint on the train and the set
         // itself is the default one. Slot 2 is the carrier in the set's wiring.
         let reversing = || arr::planetary(12, 30, 72, 3);
-        // The set's three central bodies, stated in full: the train's
-        // constraints lay over the stage's conventions body by body, so
-        // holding the carrier *instead of* the ring says so about the ring.
-        let carrier_held = |t: &Train, stage: usize| {
-            vec![
-                BodyConstraint::held(t.port(stage, 2)),
-                BodyConstraint::free(t.port(stage, 3)),
-            ]
-        };
+        // The carrier held and nothing else: every hold is stated, so the
+        // ring the set was inserted holding is released by not being
+        // listed.
+        let carrier_held = |t: &Train, stage: usize| vec![t.port(stage, 2)];
 
         // --- the set ahead of a pair, chained by its ring once its carrier
         // is held: the pair's end of the carrier split off, and the ring
         // joined to it. It used to refuse outright.
         let mut t = train_of(vec![reversing(), arr::pair([17, 43])]);
-        t.constraints = carrier_held(&t, 0);
+        t.held = carrier_held(&t, 0);
         t.split(1, t.port(0, 2));
         t.join(t.port(0, 3), t.port(1, 1));
         let r = solve_train(&t, &lib).expect("a reversing stage can be followed");
@@ -6399,7 +6392,7 @@ mod tests {
         // --- and behind one, where the play is referred through it: the
         // pair's output coupled to the sun still, and the ring the end.
         let mut t = train_of(vec![arr::pair([17, 43]), reversing()]);
-        t.constraints = carrier_held(&t, 1);
+        t.held = carrier_held(&t, 1);
         let (was, end) = (t.port(1, 2), t.port(1, 3));
         for c in &mut t.load_cases {
             for l in &mut c.loads {
@@ -6582,13 +6575,10 @@ mod tests {
         );
         // The carrier moved to ground: held.
         t.move_end(0, t.port(0, carrier), Some(GROUND));
-        assert!(t
-            .constraints_in_force()
-            .iter()
-            .any(|c| c.body == t.port(0, carrier) && c.constraint == Constraint::Held));
+        assert!(t.held.contains(&t.port(0, carrier)));
         // ...and to nothing: its own, and free.
         t.move_end(0, t.port(0, carrier), None);
-        assert!(!t.constraints.iter().any(|c| c.body == t.port(0, carrier)));
+        assert!(!t.held.contains(&t.port(0, carrier)));
         // An end moved to the body it is on changes nothing.
         let same = t.clone();
         t.move_end(0, t.port(0, ring), Some(t.port(0, ring)));
@@ -6601,10 +6591,10 @@ mod tests {
         assert_ne!(t.port(1, 1), t.port(0, ring));
     }
 
-    /// **A hold on a stage replaces the convention's hold, and a coupling
-    /// says where a stage is entered.** Holding a set's carrier is *instead
-    /// of* the ring — one line, and the ring is released without being
-    /// written. A set behind a pair, coupled to it by its carrier, is
+    /// **Holds are stated, and a shared body says where a stage is
+    /// entered.** A set is inserted holding its ring; holding its carrier
+    /// instead is two statements — the ring released, the carrier held —
+    /// each on the page. A set behind a pair, coupled to it by its carrier, is
     /// entered at the carrier and leaves by the sun; coupled by its ring
     /// with its sun held, it is entered at the ring and leaves by the
     /// carrier at the ring-in ratio, not by the ring at a ratio of one.
@@ -6612,23 +6602,19 @@ mod tests {
     /// about that body: holding one that runs on to a second stage holds
     /// that stage's end of it too, and it is a split that says otherwise.
     #[test]
-    fn a_hold_replaces_the_conventions_hold_and_a_shared_body_says_where_a_stage_is_entered() {
+    fn holds_are_stated_and_a_shared_body_says_where_a_stage_is_entered() {
         let lib = library();
         let set = || arr::planetary(12, 30, 72, 3);
         let (sun, carrier, ring) = (1, 2, 3);
 
-        // --- one line: the carrier held, the ring released — and the set,
+        // --- two lines: the ring released, the carrier held — and the set,
         // chained onward by its carrier, holds the pair's gear with it, so
         // the pair's end is split off and the ring is what it runs on by.
         let mut t = train_of(vec![set(), arr::pair([17, 43])]);
+        assert_eq!(t.held, vec![t.port(0, ring)], "inserted holding its ring");
+        t.release(t.port(0, ring));
         t.hold(t.port(0, carrier));
-        let held: Vec<usize> = t
-            .constraints_in_force()
-            .iter()
-            .filter(|c| c.constraint == Constraint::Held)
-            .map(|c| c.body)
-            .collect();
-        assert_eq!(held, vec![t.port(0, carrier)]);
+        assert_eq!(t.held, vec![t.port(0, carrier)]);
         assert_eq!(
             t.ends_of(t.port(0, carrier)).len(),
             2,
@@ -6666,7 +6652,7 @@ mod tests {
         // leaving by the carrier at the ring-in ratio.
         t.split(1, t.port(1, carrier));
         t.join(t.port(0, 2), t.port(1, ring));
-        t.constraints = vec![BodyConstraint::held(t.port(1, sun))];
+        t.held = vec![t.port(1, sun)];
         let b = t.boundaries().unwrap();
         assert_eq!((b[1].input, b[1].output), (ring, carrier));
         let (start, end) = ends_of(&t);
@@ -6740,7 +6726,7 @@ mod tests {
             .any(|n| n.is(key::TRAIN_CASE_UNDERDETERMINED)));
         // A differential: a lone set with its ring released has two.
         let mut diff = train_of(vec![arr::planetary(12, 30, 72, 3)]);
-        diff.constraints = vec![BodyConstraint::free(diff.port(0, 3))];
+        diff.release(diff.port(0, 3));
         assert_eq!(diff.case_mobility().unwrap(), 2);
         // The released ring is `End` by convention; the carrier by reference.
         diff.load_cases = vec![LoadCase {
@@ -6840,7 +6826,7 @@ mod tests {
     fn a_train_no_case_of_which_solves_keeps_its_automatic_widths_at_their_boxes() {
         let lib = library();
         let mut t = train_of(vec![arr::pair([17, 43]), arr::planetary(12, 30, 72, 3)]);
-        t.constraints = vec![BodyConstraint::free(t.port(1, 3))];
+        t.release(t.port(1, 3));
         let (start, end) = ends_of(&t);
         t.load_cases = vec![LoadCase::ultimate(start, end, 0.1, 30000.0)];
         for sh in &mut t.stages {
@@ -6910,7 +6896,7 @@ mod tests {
         let at = |slot| diff.port(0, slot);
         let (b1, b2, b3) = (at(1), at(2), at(3));
         let at = |slot: usize| [b1, b2, b3][slot - 1];
-        diff.constraints = vec![BodyConstraint::free(at(3))];
+        diff.release(at(3));
         diff.load_cases = vec![LoadCase {
             loads: vec![
                 Load::given(at(1), 2.0, 3000.0),
@@ -7222,7 +7208,7 @@ mod tests {
         );
         let mut t = train_of(vec![arr::planetary(12, 30, 72, 3)]);
         assert_eq!(ends_of(&t), (1, 2));
-        t.constraints = vec![BodyConstraint::free(3)];
+        t.release(3);
         let b = t.boundaries().unwrap();
         let ports = t.open_ports(&b);
         assert_eq!(
@@ -7254,7 +7240,7 @@ mod tests {
     fn a_train_one_condition_short_reports_the_family_and_rates_its_cases() {
         let lib = library();
         let mut t = train_of(vec![arr::planetary(12, 30, 72, 3)]);
-        t.constraints = vec![BodyConstraint::free(t.port(0, 3))];
+        t.release(t.port(0, 3));
         let (sun, carrier, ring) = (1, 2, 3);
         // A lone stage's bodies are numbered as its slots are.
         let at = |slot| slot;
@@ -7357,24 +7343,20 @@ mod tests {
     #[test]
     fn a_conflict_a_missing_shaft_and_an_overflow_are_each_named() {
         let lib = library();
-        let set = |constraints| {
+        let set = |held: Vec<usize>| {
             let mut t = train_of(vec![arr::planetary(12, 30, 72, 3)]);
-            t.constraints = constraints;
+            t.held = held;
             t
         };
-        // Holding the carrier alone releases the ring by rule; holding both
-        // is a locked set, and the sun driven against it is the conflict —
-        // named at the last statement the designer made, the ring.
+        // Holding the carrier and the ring is a locked set, and the sun
+        // driven against it is the conflict — named at the last statement
+        // the designer made, the ring.
         assert_eq!(
-            solve_train(
-                &set(vec![BodyConstraint::held(2), BodyConstraint::held(3)]),
-                &lib
-            )
-            .err(),
+            solve_train(&set(vec![2, 3]), &lib).err(),
             Some(TrainError::Overdetermined { at: 3 })
         );
         assert_eq!(
-            solve_train(&set(vec![BodyConstraint::held(7)]), &lib).err(),
+            solve_train(&set(vec![7]), &lib).err(),
             Some(TrainError::NoSuchBody { at: 7 })
         );
         let huge = |teeth| StageGear {
@@ -8609,7 +8591,7 @@ mod tests {
         let (old_start, old_end) = ends_of(t);
         let fresh = Train::chained(stages, |_| Vec::new());
         t.stages = fresh.stages;
-        t.constraints = fresh.constraints;
+        t.held = fresh.held;
         let (start, end) = ends_of(t);
         let carry = |at: &mut usize| {
             if *at == old_start {
@@ -10193,7 +10175,7 @@ mod tests {
             load_cases: vec![LoadCase::ultimate(1, 2, 1.0, 1.0)],
             reversed_bending: false,
             stages: vec![],
-            constraints: Vec::new(),
+            held: Vec::new(),
         };
         let r = solve_train(&t, &library()).expect("a train with no stages is a train");
         assert!(r.stages.is_empty() && r.paths.is_empty());

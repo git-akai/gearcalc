@@ -2225,8 +2225,9 @@ refuse by name. A mesh's **frame** is the carrier common to its two axes.
 The **wiring** is the members' slots and the meshes' frames, and it feeds
 `kinematics.rs` as any other. The **ports** are the slots not replicated;
 the slot held by convention is the first ring's, the input the first port
-not held and the output the next — a chain's conventions, which a train's
-own constraints and the bodies it shares between stages replace. **What each member is** — sun,
+not held and the output the next — a chain's conventions: the hold is
+written as the train's when the stage is added, and the ends are where a
+chain joins and a fresh case starts. **What each member is** — sun,
 planet, ring, worm, wheel, or a gear by its number — is read off the shape
 by one rule (`Shape::member_names`) and travels with the topology, so the
 harness and the panel name a member the same way. A spur pair is two ground
@@ -2415,24 +2416,27 @@ what the rest decides, and ground is one more body that happens to be held
 — the same row in the same matrix as any other. A set, which used to carry
 "sun in, ring fixed" as a field, carries none; the stage answers instead
 which of its slots are **ports** — the ones a train may address — and which
-of those it holds *by convention*.
+of those a preset holds *by convention*.
 
 ```text
-constraint   body → held | free       a body, by its number across the train
+held         [body, …]                every body the train holds, by its number
 ```
 
-**A hold replaces the convention's hold, and only that.** With no
-constraints, every stage's convention stands — a set's ring is held. A
-constraint on a body replaces the convention *on that body* — `free` on a
-set's ring releases it and nothing else moves — and a `held` anywhere on a
-stage replaces that stage's conventional holds: "hold the carrier" means
-instead of the ring, not as well. What a designer writes twice stands twice
-— two holds on a set lock it, and the train says so at the hold that closed
-it. A hold is on the body, every end of it: a carrier a pair runs on from
-is held with the pair's gear, and it is a split that says otherwise. (There
-was a third word, *driven*, from when the train was a chain with a head. It
-named where the chain entered and drove nothing behind a coupling; what
-drives is a load on an open port now, and the word is gone.)
+**Every hold is stated.** A body is held exactly where the train's list says
+so, and free everywhere else. A preset's conventional hold — a set's ring —
+is written into the list when the preset is inserted, so it is on the page
+from the moment it exists; holding a set's carrier *instead* is two
+statements, the ring released and the carrier held. What a designer writes
+twice stands twice — two holds on a set lock it, and the train says so at
+the hold that closed it. A hold is on the body, every end of it: a carrier a
+pair runs on from is held with the pair's gear, and it is a split that says
+otherwise. (Holds were once laid over each stage's conventions: with none
+written a set's ring was held, a hold anywhere on a stage replaced its
+conventional ones, and releasing a conventional hold took a `free` written
+against it — a hold nobody had stated, and a word that existed only to
+cancel it. There was a third word too, *driven*, from when the train was a
+chain with a head; what drives is a load on an open port, and both words
+are gone.)
 
 **A body two stages share is written, never assumed.** A file lists each
 stage's bodies by number, and a train the panel builds writes each one:
@@ -2444,8 +2448,8 @@ stage's end of the body is split off where the body ran on to another
 stage, and then joined to the body chosen (the lower number kept, `join`)
 or left a body of its own (`split`). Held is not among its entries: a hold
 is a statement about the *body*, which every end of it shares, so it is a
-button beside the menu (`hold`, `release`, the latter writing off a stage
-convention's hold in so many words).
+button beside the menu (`hold`, `release`). Adding a stage writes what the
+preset holds by convention as holds of the train's.
 Joining a body to one a case had declared *reacted* turns that entry into a
 load with its torque derived — an inline take-off, the same physics — since
 a body two stages share cannot be a reaction; a hold drops every case entry

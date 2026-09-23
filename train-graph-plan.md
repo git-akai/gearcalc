@@ -460,6 +460,11 @@ after it is close to concatenation.
   three-stage train, each law run first against the code it guards and
   seen to fail.
 
+**Phase 4, step 1 — holds are stated.** Done: `held` is every hold, a
+preset's conventional one written at insertion; `release` takes a hold out;
+`Constraint`, `BodyConstraint` and `by_convention` are gone, and the file's
+`constraints` is refused by name. No figure moved.
+
 **Phase 4 — storage flips.** `Train` holds the graph. Conventions are written
 as holds at insertion, and a fresh train's default cases at its first
 preset's ends; `Train::ends` and its row go. **The reader does not convert**:

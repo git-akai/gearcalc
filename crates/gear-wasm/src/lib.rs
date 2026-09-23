@@ -2366,7 +2366,7 @@ mod tests {
         // 3), written in so many words, and the loads between its sun and
         // its carrier. The set carries none of its own.
         let mut train = train_json(&[set], (2.0, 3000.0), 0.0, (1.6, 2400.0), 1000.0);
-        train["constraints"] = serde_json::json!([{ "body": 3, "constraint": "held" }]);
+        train["held"] = serde_json::json!([3]);
         let req = serde_json::json!({ "train": train });
 
         let v = solved(&req.to_string());

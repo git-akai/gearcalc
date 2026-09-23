@@ -223,6 +223,14 @@
 //!   file meant is `{ auto = false, manual = m }` on each group's first
 //!   member and `{ auto = true, manual = m }` on the rest; a member that
 //!   omits `pressure_angle` follows its group at 20°.
+//! - **Every hold is stated.** `[[train.constraints]]` is gone, and a file
+//!   that still writes it is refused by name. `held = [..]` lists the bodies
+//!   the train holds, and nothing else is held: a stage no longer holds its
+//!   first ring by convention, so there is no `"free"` to write against
+//!   one. What an older file meant is the body of every `"held"` entry, and
+//!   — for each stage none of whose bodies it held — the body its
+//!   convention held (a set's or a Wolfrom's first ring, a hula's grounded
+//!   gear, a planocentric's ring) unless an entry wrote that body `"free"`.
 //! - **A stage may couple two bodies.** `couplings` lists pairs of bodies
 //!   that turn as one through an offset coupling — a cycloidal disc's
 //!   output pins, an Oldham coupling — `[[3, 4]]` on a planocentric,
@@ -375,7 +383,7 @@ mod tests {
     use super::*;
     use gear_core::params::Auto;
     use gear_core::train::arrangements as arr;
-    use gear_core::train::{BodyConstraint, Duty, Load, LoadCase, LoadRole};
+    use gear_core::train::{Duty, Load, LoadCase, LoadRole};
 
     /// One of every preset, so the `kind` tag and every preset's layout are
     /// exercised in both directions and none can quietly stop round-tripping.
@@ -428,10 +436,7 @@ mod tests {
                 ]
             },
         );
-        train.constraints = vec![
-            BodyConstraint::held(train.port(3, 2)),
-            BodyConstraint::free(train.port(3, 3)),
-        ];
+        train.held = vec![train.port(3, 2)];
         TrainDocument {
             name: "Test train".into(),
             train,
@@ -523,7 +528,7 @@ mod tests {
     fn a_train_without_stages_reads_as_written() {
         let mut doc = document();
         doc.train.stages.clear();
-        doc.train.constraints.clear();
+        doc.train.held.clear();
         let text = to_toml(&doc).unwrap();
         let back = from_toml(&text).unwrap().document;
         assert!(back.train.stages.is_empty());
@@ -656,7 +661,7 @@ mod tests {
         // its number kept.
         let mut doc = document();
         doc.train.stages.truncate(1);
-        doc.train.constraints.clear();
+        doc.train.held.clear();
         doc.train.load_cases.truncate(1);
         // The reaction at the pair's second gear made a load with both
         // figures given.

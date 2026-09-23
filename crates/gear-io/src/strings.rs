@@ -1447,12 +1447,12 @@ mod tests {
             // (the sun cannot turn); a constraint on a body no stage has;
             // and a chain whose tooth counts multiply past `i128`.
             {
-                use gear_core::train::{BodyConstraint, LoadCase, StageGear, Train};
-                let set = |constraints| {
+                use gear_core::train::{LoadCase, StageGear, Train};
+                let set = |held: Vec<usize>| {
                     let mut t = Train::chained(vec![arr::planetary(12, 30, 72, 3)], |t| {
                         vec![LoadCase::ultimate(t.port(0, 1), t.port(0, 2), 2.0, 3000.0)]
                     });
-                    t.constraints = constraints;
+                    t.held = held;
                     t
                 };
                 let huge = |teeth| StageGear {
@@ -1471,11 +1471,8 @@ mod tests {
                     |t| vec![LoadCase::ultimate(t.port(0, 1), t.port(5, 2), 2.0, 3000.0)],
                 );
                 let trains = [
-                    (
-                        set(vec![BodyConstraint::held(2), BodyConstraint::held(3)]),
-                        "overdetermined",
-                    ),
-                    (set(vec![BodyConstraint::held(7)]), "no such body"),
+                    (set(vec![2, 3]), "overdetermined"),
+                    (set(vec![7]), "no such body"),
                     (wide, "overflow"),
                 ];
                 for (train, what) in trains {

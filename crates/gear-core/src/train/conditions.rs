@@ -21,7 +21,7 @@
 //! own kinematics (a *slot*, ground 0); a body two stages list is what a
 //! coupling used to say, and there is no coupling now — the body is the
 //! statement. "Input" and "output" are not names here: they are *readings* of
-//! a [`Constraint`] — a loaded body is where power comes in, and which body
+//! a load case — a loaded body is where power comes in, and which body
 //! power leaves by is a result. That is the handoff's point about mobility
 //! above one taken seriously: two drives and one load, and one drive with two
 //! loads, are the same kinematic object, and asking the designer to declare
@@ -32,83 +32,13 @@
 //!
 //! [`Train::chained`] gives each stage's bodies train numbers and joins each
 //! stage's conventional output body with the next stage's conventional
-//! input; a train with no constraints of its own holds what each stage holds
-//! by convention. A train says everything it has: what a file lists is the
-//! graph.
+//! input, and writes what each stage holds by convention as the train's
+//! holds. A train says everything it has: what a file lists is the graph,
+//! and what it holds is what it says it holds.
 
 use super::wiring::Wiring;
 use crate::kinematics::{Body, Condition, GROUND};
 use crate::ratio::Ratio;
-
-/// What is asked of one body. Two things, and no third.
-///
-/// The train-level reading of [`crate::kinematics::Condition`], without the
-/// drive's speed: a train's motion is solved at one turn of whatever is driven,
-/// and a load case's speed scales it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(
-    feature = "typescript",
-    derive(ts_rs::TS),
-    ts(export, export_to = "core/")
-)]
-#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
-pub enum Constraint {
-    /// Fixed to ground.
-    Held,
-    /// Not held — it does what the rest decides. Whether it carries a
-    /// torque, or drives, is a load case's question ([`super::LoadRole`]):
-    /// the output of a set is free in exactly this sense and carries the
-    /// whole load. (There was a third word, *driven*, from when the train
-    /// was a chain with a head; what drives is a load on an open body now,
-    /// and nothing more.)
-    Free,
-}
-
-impl Constraint {
-    /// The condition the solver takes.
-    #[must_use]
-    pub const fn condition(self) -> Condition {
-        match self {
-            Self::Held => Condition::Ground,
-            Self::Free => Condition::Free,
-        }
-    }
-}
-
-/// One body, and what is asked of it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(
-    feature = "typescript",
-    derive(ts_rs::TS),
-    ts(export, export_to = "core/")
-)]
-#[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
-pub struct BodyConstraint {
-    pub body: usize,
-    pub constraint: Constraint,
-}
-
-impl BodyConstraint {
-    /// A body held to ground.
-    #[must_use]
-    pub const fn held(body: usize) -> Self {
-        Self {
-            body,
-            constraint: Constraint::Held,
-        }
-    }
-
-    /// A body released from a hold a stage's convention put on it.
-    #[must_use]
-    pub const fn free(body: usize) -> Self {
-        Self {
-            body,
-            constraint: Constraint::Free,
-        }
-    }
-}
 
 /// **A stage's conventional ports and what it holds by default** — what a chain
 /// is built from when a train says nothing of its own, and what a stage asked
@@ -117,8 +47,9 @@ impl BodyConstraint {
 /// Conventions, and named as such: a pair's first member is its input because
 /// that is the way round it is written; a set holds its ring and drives its
 /// sun because that is the arrangement most sets are built for. Nothing in the
-/// solve depends on these being the *only* way to ask — a train's own
-/// constraints override every one of them.
+/// solve reads them: a stage's conventional holds are written as the train's
+/// when it is inserted, and its conventional ends are where a chain joins
+/// and a fresh case starts.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Ports {
     /// **Every body a train may couple to, in the order a chain prefers
@@ -312,7 +243,7 @@ impl Train {
             load_cases: Vec::new(),
             reversed_bending: false,
             stages: Vec::new(),
-            constraints: Vec::new(),
+            held: Vec::new(),
         };
         for stage in stages {
             train.push_stage(stage);
@@ -347,7 +278,7 @@ impl Train {
                 super::Duty::Continuous { .. } => None,
             })
         });
-        let holds = self.constraints.iter().map(|c| c.body);
+        let holds = self.held.iter().copied();
         stages.chain(cases).chain(holds).max().unwrap_or(GROUND)
     }
 
@@ -383,9 +314,9 @@ impl Train {
             s.couplings.retain(|c| c.iter().all(|&b| keep(b)));
             s.renumber_bodies(to);
         }
-        self.constraints.retain(|c| keep(c.body));
-        for c in &mut self.constraints {
-            c.body = to(c.body);
+        self.held.retain(|&b| keep(b));
+        for b in &mut self.held {
+            *b = to(*b);
         }
         for case in &mut self.load_cases {
             case.loads.retain(|l| keep(l.at));
@@ -410,7 +341,7 @@ impl Train {
                         .stages
                         .iter()
                         .any(|s| s.bodies.iter().any(|x| x.body == b))
-                    || self.constraints.iter().any(|c| c.body == b)
+                    || self.held.contains(&b)
                     || self.load_cases.iter().any(|c| {
                         c.loads.iter().any(|l| l.at == b)
                             || matches!(c.duty, super::Duty::Intermittent { at, .. } if at == b)
@@ -445,7 +376,7 @@ impl Train {
             return;
         }
         let on_a_stage = |b: usize| b == GROUND || self.stages.iter().any(|s| s.slot(b) != GROUND);
-        self.constraints.retain(|c| on_a_stage(c.body));
+        self.held.retain(|&b| on_a_stage(b));
         for case in &mut self.load_cases {
             case.loads.retain(|l| on_a_stage(l.at));
             if let super::Duty::Intermittent { at, .. } = &mut case.duty {
@@ -454,44 +385,6 @@ impl Train {
                 }
             }
         }
-    }
-
-    /// **The constraints in force**: each stage's conventions — its own holds
-    /// — with the train's own laid over them.
-    ///
-    /// Laid over rather than replacing, so that a train stating one thing
-    /// keeps the rest. Two things follow and each is what a designer means:
-    ///
-    /// - a constraint on a body **replaces** the convention on that body, so
-    ///   `Free` on a conventionally held ring releases it;
-    /// - a hold on any body of a stage **replaces the conventional holds on
-    ///   that stage** — "hold the carrier" means instead of the ring, not as
-    ///   well, and a set locked by holding two of its bodies is what a
-    ///   designer asks for by writing both.
-    ///
-    /// A convention is the weakest statement there is, and gives way to any
-    /// statement of the same kind about the same stage.
-    #[must_use]
-    pub fn constraints_in_force(&self) -> Vec<BodyConstraint> {
-        let mut out: Vec<(usize, BodyConstraint)> = Vec::new();
-        for (k, stage) in self.stages.iter().enumerate() {
-            for &slot in &stage.ports().held {
-                out.push((k, BodyConstraint::held(self.port(k, slot))));
-            }
-        }
-        for own in &self.constraints {
-            if own.constraint == Constraint::Held {
-                for (k, _) in self.ends_of(own.body) {
-                    out.retain(|(s, c)| !(*s == k && c.constraint == Constraint::Held));
-                }
-            }
-        }
-        let mut out: Vec<BodyConstraint> = out.into_iter().map(|(_, c)| c).collect();
-        for own in &self.constraints {
-            out.retain(|c| c.body != own.body);
-            out.push(*own);
-        }
-        out
     }
 
     /// How many bodies the stages have between them, ground counted — the
@@ -553,22 +446,22 @@ impl Train {
     }
 
     /// **What the train asks of every body**, one condition per body: ground
-    /// held, and each constraint in force at the body it names.
+    /// held, and each body the train holds.
     ///
     /// # Errors
     ///
-    /// A constraint naming a body the train does not have.
+    /// A hold at a body the train does not have.
     pub fn conditions(&self, bodies: usize) -> Result<Vec<Condition>, MotionError> {
         let mut out = vec![Condition::Free; bodies];
         out[GROUND] = Condition::Ground;
-        for c in self.constraints_in_force() {
-            if c.body == GROUND {
+        for &body in &self.held {
+            if body == GROUND {
                 continue;
             }
-            if c.body >= bodies {
-                return Err(MotionError::NoSuchBody(c.body));
+            if body >= bodies {
+                return Err(MotionError::NoSuchBody(body));
             }
-            out[c.body] = c.constraint.condition();
+            out[body] = Condition::Ground;
         }
         Ok(out)
     }
@@ -665,11 +558,7 @@ impl Train {
             // at its sun at all, and the designer's own holds go in last so
             // the one that closed the set is the one named — the ring, not
             // the sun the convention drives.
-            let holds: Vec<Body> = self
-                .constraints
-                .iter()
-                .filter_map(|c| self.slot(k, c.body))
-                .collect();
+            let holds: Vec<Body> = self.held.iter().filter_map(|&b| self.slot(k, b)).collect();
             let first: Vec<Body> = (0..local.len()).filter(|s| !holds.contains(s)).collect();
             if let Err(Refusal::Conflicts(i)) = w
                 .alone(&super::teeth_of(stage.gears()))
@@ -711,7 +600,7 @@ impl Train {
         // convention it contradicts: holding a set's carrier beside its
         // held ring is reported at the carrier.
         let order: Vec<Body> = std::iter::once(GROUND)
-            .chain(self.constraints_in_force().iter().map(|c| c.body))
+            .chain(self.held.iter().copied())
             .collect();
         let solution = system.motion_in(&conditions, &order).map_err(|e| match e {
             Refusal::Conflicts(i) => MotionError::Conflicts(i),
@@ -838,13 +727,6 @@ pub struct PortSpec {
     pub slot: Body,
     /// The train's body it is.
     pub body: usize,
-    /// **What this port is asked if the train says nothing about it** — the
-    /// stage's convention *as the overlay leaves it*, with everything else
-    /// the train states in force: a set's ring reads `free` here once its
-    /// carrier is held, because holding the carrier releases it. What a
-    /// panel's "convention" choice would come to, computed by the rule
-    /// rather than guessed from the preset.
-    pub by_convention: Constraint,
 }
 
 /// **A stage's ports and its conventional holds**, so a panel can offer
@@ -996,33 +878,19 @@ impl Train {
         self.stages
             .iter()
             .enumerate()
-            .map(|(k, stage)| {
-                StagePorts {
-                    members: stage.member_names(),
-                    mesh_groups: stage.mesh_groups(),
-                    family: stage.family(),
-                    ports: stage
-                        .ports()
-                        .ports
-                        .iter()
-                        .map(|&slot| {
-                            let body = self.port(k, slot);
-                            // The train without its own word on this body,
-                            // and what the overlay then asks of it.
-                            let mut without = self.clone();
-                            without.constraints.retain(|c| c.body != body);
-                            PortSpec {
-                                slot,
-                                body,
-                                by_convention: without
-                                    .constraints_in_force()
-                                    .iter()
-                                    .find(|c| c.body == body)
-                                    .map_or(Constraint::Free, |c| c.constraint),
-                            }
-                        })
-                        .collect(),
-                }
+            .map(|(k, stage)| StagePorts {
+                members: stage.member_names(),
+                mesh_groups: stage.mesh_groups(),
+                family: stage.family(),
+                ports: stage
+                    .ports()
+                    .ports
+                    .iter()
+                    .map(|&slot| PortSpec {
+                        slot,
+                        body: self.port(k, slot),
+                    })
+                    .collect(),
             })
             .collect()
     }
@@ -1180,7 +1048,8 @@ impl Train {
                 keep
             });
         }
-        self.constraints.dedup_by_key(|c| c.body);
+        self.held.sort_unstable();
+        self.held.dedup();
         self.prune();
     }
 
@@ -1215,33 +1084,25 @@ impl Train {
         }
     }
 
-    /// **A body held to ground**, in so many words: held by the train, which
-    /// replaces its stages' conventional holds ([`Self::constraints_in_force`]).
-    /// Every case entry at it goes with it: a held body is fixed, and no
-    /// case can say anything of it.
+    /// **A body held to ground**, in so many words. Every case entry at it
+    /// goes with it: a held body is fixed, and no case can say anything of
+    /// it.
     pub fn hold(&mut self, body: usize) {
         if body == GROUND {
             return;
         }
-        self.constraints.retain(|c| c.body != body);
-        self.constraints.push(BodyConstraint::held(body));
+        if !self.held.contains(&body) {
+            self.held.push(body);
+        }
         for case in &mut self.load_cases {
             case.loads.retain(|l| l.at != body);
         }
     }
 
-    /// **A body released**: every statement the train made about it
-    /// withdrawn, and a hold a stage's convention puts on it written off in
-    /// so many words.
+    /// **A body released**: the hold on it taken out, and nothing written
+    /// in its place — a body the train does not hold is free.
     pub fn release(&mut self, body: usize) {
-        self.constraints.retain(|c| c.body != body);
-        let by_convention = self
-            .ends_of(body)
-            .iter()
-            .any(|&(k, slot)| self.stages[k].ports().held.contains(&slot));
-        if by_convention {
-            self.constraints.push(BodyConstraint::free(body));
-        }
+        self.held.retain(|&b| b != body);
     }
 
     /// **The bodies a case names that no stage has** — where the cases
@@ -1348,7 +1209,7 @@ impl Train {
                 .iter()
                 .enumerate()
                 .any(|(k, s)| k != except && s.slot(body) != GROUND)
-                || train.constraints.iter().any(|c| c.body == body)
+                || train.held.contains(&body)
                 || train.load_cases.iter().any(|c| {
                     c.loads.iter().any(|l| l.at == body)
                         || matches!(c.duty, super::Duty::Intermittent { at, .. } if at == body)
@@ -1412,6 +1273,14 @@ impl Train {
         stage.renumber_bodies(|b| slots.iter().position(|&x| x == b).map_or(b, |i| next + i));
         let input = stage.ports().input();
         let output = stage.ports().output();
+        // **What the stage holds by convention is written**, in train
+        // numbers: from here on the train holds it because it says so.
+        let held: Vec<usize> = stage
+            .ports()
+            .held
+            .iter()
+            .map(|&slot| stage.body_at(slot))
+            .collect();
         let onward = self.boundaries().ok().and_then(|b| {
             let open = self.open_ports(&b);
             let last = k.checked_sub(1)?;
@@ -1430,6 +1299,11 @@ impl Train {
             }
         });
         self.stages.push(stage);
+        for body in held {
+            if !self.held.contains(&body) {
+                self.held.push(body);
+            }
+        }
         if k == 0 {
             // Taken up as they were: a reaction parked at the output is a
             // reaction at the stage's, not a body two stages share. Each
