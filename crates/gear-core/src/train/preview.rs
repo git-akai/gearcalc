@@ -62,6 +62,12 @@ fn counts(t: &Train) -> [usize; 9] {
     ]
 }
 
+/// **Whether an edit changed nothing** — the train it left is the train it
+/// was given, every input and every number in it.
+pub(super) fn unchanged(before: &Train, after: &Train) -> bool {
+    format!("{before:?}") == format!("{after:?}")
+}
+
 fn whole(n: usize) -> u32 {
     u32::try_from(n).unwrap_or(u32::MAX)
 }
@@ -100,7 +106,7 @@ pub fn preview(
                 .count("after", whole(now))
         })
         .collect();
-    if changes.is_empty() && format!("{before:?}") == format!("{after:?}") {
+    if changes.is_empty() && unchanged(before, after) {
         changes.push(Note::new(key::PREVIEW_NOTHING));
     }
 

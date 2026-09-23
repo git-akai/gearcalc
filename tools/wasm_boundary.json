@@ -12,6 +12,7 @@
   "import_materials",
   "import_train",
   "languages",
+  "offers",
   "preview_edit",
   "relieve",
   "relieve_case",
@@ -3444,23 +3445,23 @@
    "ok": [
     [
      "en",
-     536
+     560
     ],
     [
      "de",
-     536
+     560
     ],
     [
      "pt",
-     536
+     560
     ],
     [
      "zh-Hans",
-     536
+     560
     ],
     [
      "zh-Hant",
-     536
+     560
     ]
    ]
   },
@@ -27306,6 +27307,429 @@
      "paths": [],
      "unsolved": null
     }
+   ]
+  },
+  "offers": {
+   "ok": [
+    [
+     "train",
+     [
+      {
+       "edit": {
+        "insert": {
+         "preset": "spur",
+         "at": null
+        }
+       },
+       "refused": null
+      },
+      {
+       "edit": {
+        "insert": {
+         "preset": "idler",
+         "at": null
+        }
+       },
+       "refused": null
+      },
+      {
+       "edit": {
+        "insert": {
+         "preset": "layshaft",
+         "at": null
+        }
+       },
+       "refused": null
+      },
+      {
+       "edit": {
+        "insert": {
+         "preset": "worm",
+         "at": null
+        }
+       },
+       "refused": null
+      },
+      {
+       "edit": {
+        "insert": {
+         "preset": "crossed",
+         "at": null
+        }
+       },
+       "refused": null
+      },
+      {
+       "edit": {
+        "insert": {
+         "preset": "planetary",
+         "at": null
+        }
+       },
+       "refused": null
+      },
+      {
+       "edit": {
+        "insert": {
+         "preset": "wolfrom",
+         "at": null
+        }
+       },
+       "refused": null
+      },
+      {
+       "edit": {
+        "insert": {
+         "preset": "compound",
+         "at": null
+        }
+       },
+       "refused": null
+      },
+      {
+       "edit": {
+        "insert": {
+         "preset": "planocentric",
+         "at": null
+        }
+       },
+       "refused": null
+      },
+      {
+       "edit": {
+        "insert": {
+         "preset": "meshed_planets",
+         "at": null
+        }
+       },
+       "refused": null
+      }
+     ]
+    ],
+    [
+     {
+      "member": 0
+     },
+     [
+      {
+       "edit": {
+        "add_gear": {
+         "mate": 0,
+         "on": "new_axis",
+         "ring": false
+        }
+       },
+       "refused": null
+      },
+      {
+       "edit": {
+        "add_gear": {
+         "mate": 0,
+         "on": "new_axis",
+         "ring": true
+        }
+       },
+       "refused": null
+      },
+      {
+       "edit": {
+        "add_gear": {
+         "mate": 0,
+         "on": {
+          "new_body": 1
+         },
+         "ring": false
+        }
+       },
+       "refused": null
+      },
+      {
+       "edit": {
+        "add_gear": {
+         "mate": 0,
+         "on": {
+          "new_body": 1
+         },
+         "ring": true
+        }
+       },
+       "refused": null
+      },
+      {
+       "edit": {
+        "add_gear": {
+         "mate": 0,
+         "on": {
+          "body": 2
+         },
+         "ring": false
+        }
+       },
+       "refused": null
+      },
+      {
+       "edit": {
+        "add_gear": {
+         "mate": 0,
+         "on": {
+          "body": 2
+         },
+         "ring": true
+        }
+       },
+       "refused": null
+      },
+      {
+       "edit": {
+        "remove": {
+         "member": 0
+        }
+       },
+       "refused": null
+      }
+     ]
+    ],
+    [
+     {
+      "mesh": 0
+     },
+     [
+      {
+       "edit": {
+        "add_ratio": {
+         "distance": 0,
+         "shared": 1
+        }
+       },
+       "refused": null
+      },
+      {
+       "edit": {
+        "add_ratio": {
+         "distance": 0,
+         "shared": 2
+        }
+       },
+       "refused": null
+      },
+      {
+       "edit": {
+        "remove": {
+         "mesh": 0
+        }
+       },
+       "refused": null
+      }
+     ]
+    ],
+    [
+     {
+      "body": 1
+     },
+     [
+      {
+       "edit": {
+        "add_gear": {
+         "mate": 1,
+         "on": {
+          "body": 1
+         },
+         "ring": false
+        }
+       },
+       "refused": null
+      },
+      {
+       "edit": {
+        "add_gear": {
+         "mate": 1,
+         "on": {
+          "body": 1
+         },
+         "ring": true
+        }
+       },
+       "refused": null
+      },
+      {
+       "edit": {
+        "insert": {
+         "preset": "spur",
+         "at": 1
+        }
+       },
+       "refused": null
+      },
+      {
+       "edit": {
+        "insert": {
+         "preset": "idler",
+         "at": 1
+        }
+       },
+       "refused": null
+      },
+      {
+       "edit": {
+        "insert": {
+         "preset": "layshaft",
+         "at": 1
+        }
+       },
+       "refused": null
+      },
+      {
+       "edit": {
+        "insert": {
+         "preset": "worm",
+         "at": 1
+        }
+       },
+       "refused": null
+      },
+      {
+       "edit": {
+        "insert": {
+         "preset": "crossed",
+         "at": 1
+        }
+       },
+       "refused": null
+      },
+      {
+       "edit": {
+        "insert": {
+         "preset": "planetary",
+         "at": 1
+        }
+       },
+       "refused": null
+      },
+      {
+       "edit": {
+        "insert": {
+         "preset": "wolfrom",
+         "at": 1
+        }
+       },
+       "refused": null
+      },
+      {
+       "edit": {
+        "insert": {
+         "preset": "compound",
+         "at": 1
+        }
+       },
+       "refused": null
+      },
+      {
+       "edit": {
+        "insert": {
+         "preset": "planocentric",
+         "at": 1
+        }
+       },
+       "refused": null
+      },
+      {
+       "edit": {
+        "insert": {
+         "preset": "meshed_planets",
+         "at": 1
+        }
+       },
+       "refused": null
+      },
+      {
+       "edit": {
+        "join": {
+         "a": 1,
+         "b": 2
+        }
+       },
+       "refused": "ui.train_edit_refused_one_card"
+      },
+      {
+       "edit": {
+        "hold": 1
+       },
+       "refused": null
+      },
+      {
+       "edit": {
+        "remove": {
+         "body": 1
+        }
+       },
+       "refused": null
+      }
+     ]
+    ],
+    [
+     {
+      "axis": 0
+     },
+     [
+      {
+       "edit": {
+        "add_gear": {
+         "mate": 1,
+         "on": {
+          "new_body": 0
+         },
+         "ring": false
+        }
+       },
+       "refused": null
+      },
+      {
+       "edit": {
+        "add_gear": {
+         "mate": 1,
+         "on": {
+          "new_body": 0
+         },
+         "ring": true
+        }
+       },
+       "refused": null
+      },
+      {
+       "edit": {
+        "remove": {
+         "axis": 0
+        }
+       },
+       "refused": null
+      }
+     ]
+    ],
+    [
+     {
+      "distance": 0
+     },
+     [
+      {
+       "edit": {
+        "add_ratio": {
+         "distance": 0,
+         "shared": 1
+        }
+       },
+       "refused": null
+      },
+      {
+       "edit": {
+        "add_ratio": {
+         "distance": 0,
+         "shared": 2
+        }
+       },
+       "refused": null
+      }
+     ]
+    ]
    ]
   },
   "solve_train": {

@@ -234,6 +234,29 @@ const out = {
       preview({ graph: { join: { a: 1, b: 2 } } }),
     ];
   }),
+  // **What can be done to each piece** of the default train — the train, its
+  // first gear, its mesh, its first body, its first axis and its distance:
+  // each offer's edit and its refusal's key. A stage an insert lays in is
+  // named by its preset rather than printed whole, the presets being
+  // `defaults`' to record.
+  offers: call("offers", () => {
+    const train = structuredClone(defaults.train);
+    const at = [
+      "train",
+      { member: 0 },
+      { mesh: 0 },
+      { body: 1 },
+      { axis: 0 },
+      { distance: 0 },
+    ];
+    return at.map((target) => [
+      target,
+      JSON.parse(w.offers(JSON.stringify({ train, at: target }))).map((o) => ({
+        edit: o.preset === null ? o.edit : { insert: { preset: o.preset, at: o.edit.insert.at } },
+        refused: o.refused?.key ?? null,
+      })),
+    ]);
+  }),
   // The default train, and the same train with a set pushed behind its pair
   // by the core — a chain of two, its cases at the set's carrier.
   solve_train: call("solve_train", () => {

@@ -2327,6 +2327,30 @@ the body as it names a lock by holds; the edit's to say is only whether the
 graph it leaves hangs together. A refusal crosses the boundary as its
 catalogue key, which is what the panel says under the card.
 
+**What a piece offers** (`Train::offers`) is every one of those edits that
+applies there, read off the graph by the rule each states and tried on a
+copy. At a **gear**: a gear or a ring meshing it on a new axis, on a new
+body of every axis a distance joins to its own and on every body there;
+the gear moved onto a body of its own or another body on its axis; and its
+removal. At a **mesh**: another ratio across its distance sharing either
+gear's body, and its removal. At a **body**: a gear or a ring on it meshing
+any gear across a distance from its axis; a coupling, where its axis is
+carried; every preset inserted with its input there; every gear on its
+axis moved onto it; a join to every other body; a hold or a release; the
+removal of any coupling it is in; and its own. At an **axis**: a gear or a
+ring meshing any gear across a distance, on a new body of it; a step,
+where it is carried; and its removal. At an **axis distance**: another
+ratio sharing each body on either axis. At a **coupling**, its removal; and
+at the **train**, every preset at its output. **An offer is its edit** —
+refused exactly where the edit is, carrying the refusal's key, and never
+one that would change nothing — and two laws hold the reading to the edits
+without sharing it: every offer made leaves a graph that hangs together,
+and every edit a brute-force sweep over every index finds the train makes
+is offered at every piece it names. The panel lists the adds in its one
+menu and the rest as a strip of verbs over the selection, a refused entry
+in its place and not pressable, and each entry's dry run is
+`preview_edit`'s.
+
 **Closing the distances.** Each member's shift has one role: given (the
 designer typed it), free (a search chooses it, or it stands at the undercut
 floor), *reaches* a given distance, or *absorbs* an automatic one. A given
@@ -3077,6 +3101,11 @@ couplings, the cards, the holds, the case entries), what the headline path
 would come to, ratio and efficiency before and after — or that it would go,
 or appear — and why the train would not solve after it where it would not.
 The comparison is the core's and the words the catalogue's; nothing is kept.
+`offers` is what can be done to a piece: the train and a piece — a member, a
+mesh, a body, an axis, an axis distance or a coupling by the graph's index,
+or the train itself — in, and every edit the core offers there out, in the
+order a menu lists them, each with its refusal's key where it would be
+refused ([the stage](#the-stage), *what a piece offers*).
 
 **A `null` that crosses is not always a `None`.** `serde_json` writes an
 infinity and a NaN as `null`, which is indistinguishable from a field that

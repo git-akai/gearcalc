@@ -33,6 +33,8 @@
     type Cutter,
     type MeshReport,
     type LoadSharing,
+    type Edit,
+    type Target,
     note,
     t,
   } from "./core";
@@ -58,6 +60,8 @@
     roleLabel,
   } from "./members";
   import { cardsOf, cardView, relieveStage, wholePart } from "./cards";
+  import Offers from "./Offers.svelte";
+  import { adds, type Names } from "./offers";
 
   /** **Resolving an over-determined stage is the core's rule, not this file's.**
    *
@@ -159,6 +163,18 @@
   /** The gears fixed to a body, by the graph's index. */
   const gearsOn = (body: number): number[] =>
     tab.train.shape.members.flatMap((m, i) => (m.body === body ? [i] : []));
+  /** **The offset couplings a body is in**, each with the body it turns
+   *  with — what a shaft with no gear on it is there for. */
+  const couplingsOf = (body: number): { coupling: number; other: number }[] =>
+    tab.train.shape.couplings.flatMap(([a, b], coupling) =>
+      a === body ? [{ coupling, other: b }] : b === body ? [{ coupling, other: a }] : [],
+    );
+  /** What is on a body, as a row says it: its gears, or what it turns with. */
+  const onBody = (body: number): string =>
+    [
+      ...gearsOn(body).map(gearName),
+      ...couplingsOf(body).map((c) => t("ui.train_turns_with", { on: bodyName(c.other) })),
+    ].join(" · ");
   const axisLabel = (a: number) => t("ui.train_axis_name", { number: String(a + 1) });
   /** **What a body does in the case shown**: its speed, and the torque a load
    *  or a reaction puts on it — the core's figures, said. */
@@ -189,6 +205,55 @@
     const reaction = c?.loads.find((l) => l.role === "reacted")?.at;
     return solved?.paths.find((p) => p.from === load && p.to === reaction);
   });
+  /** An axis distance by its two axes — "Axis 1 ↔ Axis 2". */
+  const distanceName = (d: number): string => {
+    const x = tab.train.shape.distances[d];
+    return x === undefined ? "" : `${axisLabel(x.axes[0])} ↔ ${axisLabel(x.axes[1])}`;
+  };
+  /** **The names an offer is said in** — the ones the list says them in. */
+  const names: Names = {
+    gear: gearName,
+    body: bodyName,
+    axis: axisLabel,
+    mesh: meshName,
+    distance: distanceName,
+    preset: (p) => t(defaults().stages.find((e) => e.preset === p)?.label ?? ""),
+  };
+  /** **The pieces a selection offers edits at**, each under the heading its
+   *  entries go under: a mesh and its two gears; a body; an axis; a centre's
+   *  distance; a coupling; a junction's planet axes. */
+  const selected = $derived.by((): { target: Target; heading: string }[] => {
+    const sel = tab.view.selection;
+    const s = tab.train.shape;
+    const at = (target: Target, piece: string) => ({ target, heading: t("ui.train_offers_at", { piece }) });
+    if (sel === null) return [];
+    if ("mesh" in sel) {
+      const m = s.meshes[sel.mesh];
+      if (m === undefined) return [];
+      return [at({ mesh: sel.mesh }, meshName(sel.mesh)), at({ member: m.a }, gearName(m.a)), at({ member: m.b }, gearName(m.b))];
+    }
+    if ("body" in sel) return s.bodies.some((b) => b.body === sel.body) ? [at({ body: sel.body }, bodyName(sel.body))] : [];
+    if ("axis" in sel) return s.axes[sel.axis] === undefined ? [] : [at({ axis: sel.axis }, axisLabel(sel.axis))];
+    if ("centre" in sel) return s.distances[sel.centre] === undefined ? [] : [at({ distance: sel.centre }, distanceName(sel.centre))];
+    if ("coupling" in sel) {
+      return s.couplings[sel.coupling] === undefined ? [] : [at({ coupling: sel.coupling }, t("ui.train_coupling_heading"))];
+    }
+    if ("junction" in sel) {
+      const axes = result.topology[sel.junction]?.part.axes ?? [];
+      return axes.filter((a) => (s.axes[a]?.carried_by ?? 0) !== 0).map((a) => at({ axis: a }, axisLabel(a)));
+    }
+    return [];
+  });
+  /** What the add menu offers with nothing selected, and under what is. */
+  const atOutput = $derived({ target: "train" as Target, heading: t("ui.train_offers_at_output") });
+  /** **Where the reader looks after an edit**: what an add made — its first
+   *  new mesh — or the body a join kept; nothing, after a removal, since
+   *  what was selected has gone and the numbers after it have moved. */
+  function made(edit: Edit, meshes: number) {
+    if ("remove" in edit) tab.view.selection = null;
+    else if ("join" in edit) tab.view.selection = { body: Math.min(edit.join.a, edit.join.b) };
+    else if (adds(edit) && tab.train.shape.meshes.length > meshes) tab.view.selection = { mesh: meshes };
+  }
   /** The mesh after this one along the shown case's flow, where there is one. */
   const nextAlong = (k: number): number | undefined => {
     const at = flow.findIndex((row) => "mesh" in row && row.mesh.mesh === k);
@@ -641,7 +706,7 @@
       {@const b = row.body.body}
       <button class="fb" class:sel={isSelected({ body: b })} onclick={() => select({ body: b })}>
         <span class="name">{bodyName(b)}</span>
-        <span class="on">{gearsOn(b).map(gearName).join(" · ")}</span>
+        <span class="on">{onBody(b)}</span>
         <span class="fig">{bodyInCase(b)}</span>
       </button>
     {:else if "mesh" in row}
@@ -668,7 +733,7 @@
           {/each}
         {/each}
         {#each j.terminals.filter((tb) => !flow.some((x) => "body" in x && x.body.body === tb)) as tb (tb)}
-          {@const on = gearsOn(tb).map(gearName).join(" · ")}
+          {@const on = onBody(tb)}
           <small class="line">
             {#if axes.some((a) => a.carried_by === tb)}
               {t("ui.train_junction_carrier", { body: bodyName(tb) })} · {bodyInCase(tb)}
@@ -681,7 +746,10 @@
         {/each}
       </div>
     {:else if "coupling" in row}
-      <div class="fm"><span class="arrow">↔</span> {t("ui.train_turns_with", { on: bodyName(row.coupling.to) })}</div>
+      {@const c = row.coupling.coupling}
+      <button class="fm" class:sel={isSelected({ coupling: c })} onclick={() => select({ coupling: c })}>
+        <span class="arrow">↔</span> {t("ui.train_turns_with", { on: bodyName(row.coupling.to) })}
+      </button>
     {/if}
   {/each}
 {/snippet}
@@ -723,6 +791,11 @@
       {#if b.members.length === 0 && b.carries.length > 0}
         <small class="gearrow dim">{t("ui.train_the_carrier")}</small>
       {/if}
+      {#each couplingsOf(b.body) as c (c.coupling)}
+        <button class="gearrow" class:sel={isSelected({ coupling: c.coupling })} onclick={() => select({ coupling: c.coupling })}>
+          ↔ {t("ui.train_turns_with", { on: bodyName(c.other) })}
+        </button>
+      {/each}
     {/each}
   {/each}
 {/snippet}
@@ -759,6 +832,10 @@
       </span>
     </div>
     <div class="casebody">{@render caseEditor(c, sel.case)}</div>
+  {:else if sel !== null && "coupling" in sel && tab.train.shape.couplings[sel.coupling] !== undefined}
+    {@const [from, to] = tab.train.shape.couplings[sel.coupling]}
+    <h4 class="section-heading">{t("ui.train_coupling_heading")}</h4>
+    <p class="hint">{t("ui.train_coupling_between", { a: bodyName(from), b: bodyName(to) })}</p>
   {:else if sel !== null && "junction" in sel && result.topology[sel.junction] !== undefined}
     {@const part = result.topology[sel.junction].part}
     {#each part.meshes as k (k)}
@@ -883,17 +960,16 @@
 {/snippet}
 
 {#snippet bodyWorkspace(b: number)}
-  <h4 class="section-heading">{bodyName(b)}</h4>
-  <div class="edits">
-    {#if isHeld(tab.train, b)}
-      <button class="action" onclick={() => editTrain(tab.train, { release: b })}>{t("ui.train_release")}</button>
-    {:else}
-      <button class="action" onclick={() => editTrain(tab.train, { hold: b })}>{t("ui.train_hold")}</button>
-    {/if}
-  </div>
+  <h4 class="section-heading">
+    {bodyName(b)}
+    {#if isHeld(tab.train, b)}<span class="chip held">{t("ui.train_case_fixed")}</span>{/if}
+  </h4>
   {#each gearsOn(b) as i (i)}
     {@const first = tab.train.shape.meshes.findIndex((m) => m.a === i || m.b === i)}
     <button class="gearrow" onclick={() => first >= 0 && select({ mesh: first })}>{gearName(i)}</button>
+  {/each}
+  {#each couplingsOf(b) as c (c.coupling)}
+    <button class="gearrow" onclick={() => select({ coupling: c.coupling })}>↔ {t("ui.train_turns_with", { on: bodyName(c.other) })}</button>
   {/each}
   <dl class="out">
     {#each solved?.cases ?? [] as c (c.case)}
@@ -2373,8 +2449,10 @@
     {:else}
       {@render axesList()}
     {/if}
+    <Offers train={tab.train} at={[...selected, atOutput]} kind="adds" {names} materials={ratedUnder()} {made} />
   </section>
   <section class="pane workspace">
+    <Offers train={tab.train} at={selected} kind="verbs" {names} materials={ratedUnder()} {made} />
     {@render workspaceOf(tab.view.selection)}
   </section>
 </div>

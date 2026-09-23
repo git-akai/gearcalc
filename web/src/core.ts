@@ -92,6 +92,8 @@ import type {
   Place,
   Piece,
   Preview,
+  Offer,
+  Target,
 } from "./wire";
 export type { CaseKind, LoadCase };
 export type {
@@ -177,6 +179,8 @@ export type {
   Place,
   Piece,
   Preview,
+  Offer,
+  Target,
 } from "./wire";
 
 import init, {
@@ -200,6 +204,7 @@ import init, {
   relieve,
   relieve_case,
   preview_edit,
+  offers as wasm_offers,
   edit_train,
   adopt_member,
 } from "./wasm/gear_wasm.js";
@@ -879,6 +884,19 @@ export function previewEdit(train: Train, edit: TrainEdit, materials?: MaterialL
     ) as Preview;
   } catch {
     return null;
+  }
+}
+
+/** **What can be done to a piece of the train** — every edit the core
+ *  offers there, in the order a menu lists them, each with its refusal's key
+ *  where it would be refused and none that would change nothing. The graph
+ *  is read and every edit tried by the core; this side lists them. An empty
+ *  list where the boundary failed, which is a defect on this side of it. */
+export function offersAt(train: Train, at: Target): Offer[] {
+  try {
+    return JSON.parse(wasm_offers(JSON.stringify({ train, at }))) as Offer[];
+  } catch {
+    return [];
   }
 }
 

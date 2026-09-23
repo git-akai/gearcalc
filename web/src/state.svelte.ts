@@ -100,13 +100,15 @@ export interface TrainTab {
 }
 
 /** **A piece of the train a reader can select**, by the graph's index — a
- *  body by its number, a junction by its part, a case by its index. */
+ *  body by its number, a junction by its part, a coupling and a case by
+ *  their indices. */
 export type Selection =
   | { mesh: number }
   | { body: number }
   | { axis: number }
   | { centre: number }
   | { junction: number }
+  | { coupling: number }
   | { case: number };
 
 /** The three groupings the list is drawn in. */

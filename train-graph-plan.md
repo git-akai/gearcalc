@@ -599,6 +599,30 @@ case, and the workspace edits it — its duty, each body's role and its
 figures, what it comes to body by body, its switch — by the one editor the
 accordion used (`caseEditor`); a case is added from the strip and shown.
 
+**Phase 7, step 4 — select, act, and see before you click.** Done:
+`Train::offers` reads what can be done at a piece off the graph by the rule
+each edit states — a gear meshes across a distance, so it is offered on the
+axes a distance joins to its mate's; a gear moves among its axis's bodies; a
+step goes on a carried axis — and tries each on a copy, so an offer carries
+its refusal's key and none is offered that would change nothing (a gear
+alone on its body moved to one of its own). It crosses as `offers`. The
+panel lists the adds as **one** menu under the list — at each piece
+selected, then at the train's output — and the rest as a strip of verbs
+over the workspace, a join's and a move's destinations listed under the
+verb; a refused entry stays in its place, `aria-disabled` rather than
+disabled so hovering and focus still reach it, and every entry's dry run is
+`preview_edit` drawn beside it. After an add the workspace shows the first
+mesh it made; after a join, the body kept; after a removal, nothing. Laws:
+an offer is its edit, over every piece of every preset alone and after a
+pair; and every edit a brute-force sweep over every index finds the train
+makes is offered at **every** piece it names — which, run against broken
+code, first let through the body's and the axis's view of an edit its gear
+offered, and now does not. **Found on the way**: a coupling within one part
+has no row in the flow (a flow's coupling row joins two parts), so nothing
+could select it — a coupled shaft now says what it turns with, its
+workspace links to the coupling, and the body offers the coupling's
+removal.
+
 **Phase 6 — results and the boundary.** `TrainResult` per member, mesh,
 distance, axis and path, with `topology` carrying the groupings;
 `relieve_stage` → `relieve`; `adopt_member` by member; bindings; the probe.
@@ -613,7 +637,8 @@ carrier, tune one mesh, read a case.
 **Phase 8 — the documents.** `reference.md`'s *The stage* becomes *The graph*;
 `rationale.md` gains why a stage is a preset's footprint and not a container;
 a `corrections.md` row per model change (the doubled axis first); `state.md`;
-the map in `CLAUDE.md`, whose `train/` table is rewritten; this plan deleted.
+the map in `CLAUDE.md`, whose `train/` table is rewritten and whose census
+is taken again at the branch's head; this plan deleted.
 
 ---
 

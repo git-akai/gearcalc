@@ -1693,6 +1693,38 @@ fn preview_edit_impl(input: &str) -> Result<String, String> {
     serde_json::to_string(&preview).map_err(|e| e.to_string())
 }
 
+/// **What can be done to a piece of a train.**
+///
+/// `{ train, at }` JSON in — the train as it stands and a
+/// [`gear_core::train::Target`]: a member, a mesh, a body, an axis, an axis
+/// distance or a coupling by the graph's index, or the train where nothing
+/// is selected — and every [`gear_core::train::Offer`] there out, in the
+/// order a menu lists them: each an edit [`edit_train`] takes as
+/// `{ "graph": edit }`, with its refusal's catalogue key where the edit
+/// would be refused, and none that would change nothing
+/// ([`gear_core::train::Train::offers`]). What each would come to is
+/// [`preview_edit`]'s.
+///
+/// # Errors
+///
+/// A malformed request, which would be a defect on this side of the
+/// boundary.
+#[wasm_bindgen]
+pub fn offers(input: &str) -> Result<String, JsError> {
+    offers_impl(input).map_err(|e| JsError::new(&e))
+}
+
+#[derive(Deserialize)]
+struct OffersRequest {
+    train: gear_core::train::Train,
+    at: gear_core::train::Target,
+}
+
+fn offers_impl(input: &str) -> Result<String, String> {
+    let OffersRequest { train, at } = serde_json::from_str(input).map_err(|e| e.to_string())?;
+    serde_json::to_string(&train.offers(at)).map_err(|e| e.to_string())
+}
+
 /// Version of the core, so the UI can show what it is actually running.
 #[wasm_bindgen]
 #[must_use]
@@ -3120,6 +3152,34 @@ mod tests {
             gear_core::train::EditRefused::OneCard.key()
         );
         assert!(refused["changes"].as_array().unwrap().is_empty());
+    }
+
+    /// **An offer crosses as an edit the train takes**: every offer at the
+    /// shipped train's first gear, sent back as `{ "graph": edit }`, is
+    /// refused by the key it carried, or made.
+    #[test]
+    fn an_offer_crosses_as_an_edit_the_train_takes() {
+        let d: serde_json::Value = serde_json::from_str(&defaults_impl().unwrap()).unwrap();
+        let offers: serde_json::Value = serde_json::from_str(
+            &offers_impl(
+                &serde_json::json!({ "train": d["train"], "at": { "member": 0 } }).to_string(),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        let offers = offers.as_array().unwrap();
+        assert!(offers.iter().any(|o| o["refused"].is_null()), "{offers:?}");
+        for o in offers {
+            let made = edit_train_impl(
+                &serde_json::json!({ "train": d["train"], "edit": { "graph": o["edit"] } })
+                    .to_string(),
+            );
+            match (made, o["refused"]["key"].as_str()) {
+                (Ok(_), None) => {}
+                (Err(key), Some(offered)) => assert_eq!(key, offered, "{o}"),
+                (made, _) => panic!("{o}: {made:?}"),
+            }
+        }
     }
 
     /// **A refused edit crosses as its catalogue key**, which is what the

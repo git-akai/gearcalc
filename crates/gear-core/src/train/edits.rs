@@ -1136,6 +1136,66 @@ impl Shape {
     }
 }
 
+/// **What every edit leaves**: nothing hanging — every gear on a body
+/// on an axis and in a mesh, every mesh across a distance between two
+/// axes, one distance per pair of axes and each carrying a mesh, no
+/// axis with nothing on it, every carried axis carried by a body on
+/// another, and every hold at a body the graph has.
+#[cfg(test)]
+pub(super) fn well_formed(t: &super::Train) -> Result<(), String> {
+    let s = &t.shape;
+    let axis_of = |body: usize| s.bodies.iter().find(|b| b.body == body).map(|b| b.axis);
+    for b in &s.bodies {
+        if b.axis >= s.axes.len() {
+            return Err(format!("body {} on no axis", b.body));
+        }
+    }
+    for (i, m) in s.members.iter().enumerate() {
+        if axis_of(m.body).is_none() {
+            return Err(format!("member {i} on no body"));
+        }
+        if !s.meshes.iter().any(|x| x.a == i || x.b == i) {
+            return Err(format!("member {i} in no mesh"));
+        }
+    }
+    for (k, m) in s.meshes.iter().enumerate() {
+        if axis_of(s.members[m.a].body) == axis_of(s.members[m.b].body) {
+            return Err(format!("mesh {k} on one axis"));
+        }
+        if s.distance_of(k).is_none() {
+            return Err(format!("mesh {k} across no distance"));
+        }
+    }
+    for (d, x) in s.distances.iter().enumerate() {
+        if s.meshes_on(d).is_empty() {
+            return Err(format!("distance {d} with no mesh"));
+        }
+        let same =
+            |y: &super::shape::Distance| y.axes == x.axes || y.axes == [x.axes[1], x.axes[0]];
+        if s.distances.iter().filter(|y| same(y)).count() > 1 {
+            return Err(format!("distance {d} stated twice"));
+        }
+    }
+    for (a, x) in s.axes.iter().enumerate() {
+        if !s.bodies.iter().any(|b| b.axis == a) && !s.distances.iter().any(|d| d.axes.contains(&a))
+        {
+            return Err(format!("axis {a} with nothing on it"));
+        }
+        if x.carried_by != GROUND && axis_of(x.carried_by).is_none_or(|c| c == a) {
+            return Err(format!("axis {a} carried by no body on another axis"));
+        }
+    }
+    for &h in &t.held {
+        if axis_of(h).is_none() {
+            return Err(format!("a hold at {h}, which the graph has not"));
+        }
+    }
+    if !s.planets_at_a_radius() {
+        return Err("a planet meeting nothing on its carrier's axis".into());
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
@@ -1909,67 +1969,6 @@ mod tests {
 
     fn debug(t: &Train) -> String {
         format!("{t:?}")
-    }
-
-    /// **What every edit leaves**: nothing hanging — every gear on a body
-    /// on an axis and in a mesh, every mesh across a distance between two
-    /// axes, one distance per pair of axes and each carrying a mesh, no
-    /// axis with nothing on it, every carried axis carried by a body on
-    /// another, and every hold at a body the graph has.
-    fn well_formed(t: &Train) -> Result<(), String> {
-        let s = &t.shape;
-        let axis_of = |body: usize| s.bodies.iter().find(|b| b.body == body).map(|b| b.axis);
-        for b in &s.bodies {
-            if b.axis >= s.axes.len() {
-                return Err(format!("body {} on no axis", b.body));
-            }
-        }
-        for (i, m) in s.members.iter().enumerate() {
-            if axis_of(m.body).is_none() {
-                return Err(format!("member {i} on no body"));
-            }
-            if !s.meshes.iter().any(|x| x.a == i || x.b == i) {
-                return Err(format!("member {i} in no mesh"));
-            }
-        }
-        for (k, m) in s.meshes.iter().enumerate() {
-            if axis_of(s.members[m.a].body) == axis_of(s.members[m.b].body) {
-                return Err(format!("mesh {k} on one axis"));
-            }
-            if s.distance_of(k).is_none() {
-                return Err(format!("mesh {k} across no distance"));
-            }
-        }
-        for (d, x) in s.distances.iter().enumerate() {
-            if s.meshes_on(d).is_empty() {
-                return Err(format!("distance {d} with no mesh"));
-            }
-            let same = |y: &super::super::shape::Distance| {
-                y.axes == x.axes || y.axes == [x.axes[1], x.axes[0]]
-            };
-            if s.distances.iter().filter(|y| same(y)).count() > 1 {
-                return Err(format!("distance {d} stated twice"));
-            }
-        }
-        for (a, x) in s.axes.iter().enumerate() {
-            if !s.bodies.iter().any(|b| b.axis == a)
-                && !s.distances.iter().any(|d| d.axes.contains(&a))
-            {
-                return Err(format!("axis {a} with nothing on it"));
-            }
-            if x.carried_by != GROUND && axis_of(x.carried_by).is_none_or(|c| c == a) {
-                return Err(format!("axis {a} carried by no body on another axis"));
-            }
-        }
-        for &h in &t.held {
-            if axis_of(h).is_none() {
-                return Err(format!("a hold at {h}, which the graph has not"));
-            }
-        }
-        if !s.planets_at_a_radius() {
-            return Err("a planet meeting nothing on its carrier's axis".into());
-        }
-        Ok(())
     }
 
     /// **Every gear the graph admits is refused whole, or undoes.** On

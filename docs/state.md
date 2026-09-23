@@ -321,6 +321,10 @@ builds now, turns as the stages did body for body, and falls apart into
 the stages, each solving as it did — and by the probe, after whose every
 edit the cards are the old stages field for field
 ([rationale](rationale.md#a-train-is-one-graph-and-a-card-is-a-part-of-it)).
+The panel edits the graph through what the core offers at the piece
+selected — each offer an edit tried on a copy, a refused one said with its
+reason, and every one's dry run shown before it is pressed (`Train::offers`,
+`preview_edit`; [reference](reference.md#the-stage)).
 
 **One stage shape.** Every stage is one `Shape` — axes, the train's
 bodies on them, members, meshes, distances — and every menu entry (`StagePreset`:
