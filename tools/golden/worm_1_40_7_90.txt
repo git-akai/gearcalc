@@ -1,5 +1,5 @@
 worm   z 1/40  module 1  alpha_n 20.0 deg  shaft angle 90.0 deg
-       ratio 40.0000:1   centre distance 23.7073 mm
+       ratio 40.0000:1   axis distance 23.7073 mm
 
 geometry
   lead angle          worm   8.2132 deg    wheel  81.7868 deg
@@ -17,7 +17,7 @@ efficiency          worm driving   wheel driving
   locks driving forward at mu >= 6.5104
   locks back-driving at    mu >= 0.1356   (cos alpha_n tan gamma)
 
-  centre distance is least at lead angle 16.2990 deg  (d1 3.5632 mm) — above it two worms reach the same distance
+  axis distance is least at lead angle 16.2990 deg  (d1 3.5632 mm) — above it two worms reach the same distance
   a mm given, the wheel's shift absorbs it
     23.7073  x2  +0.0000   d1   7.0000 mm   ran at   23.7073
     24.2073  x2  +0.5000   d1   7.0000 mm   ran at   24.2073

@@ -763,7 +763,7 @@ mod tests {
         // which is the point. The face is centred on its own gear and the
         // contact is not quite centred on the face, because the pair runs at its
         // nominal centre distance *plus the clearance* and that slides the
-        // contact along the bodies (docs/reference.md#centre-distance-and-backlash). Trimming a face symmetrically about
+        // contact along the bodies (docs/reference.md#axis-distance-and-backlash). Trimming a face symmetrically about
         // an asymmetric contact loses a little more than half.
         let narrow = solve_crossed(&stage(Auto::fixed(sized[0] / 2.0)), 2.0, 0.0, &lib).unwrap();
         let n = point(&narrow);
@@ -1823,7 +1823,7 @@ mod tests {
     ///
     /// The effect the model could not see while every path was built at the
     /// zero-backlash centre distance. A crossed pair's line of action cannot
-    /// turn when the centres move (docs/reference.md#centre-distance-and-backlash), so it *translates* instead — and the
+    /// turn when the centres move (docs/reference.md#axis-distance-and-backlash), so it *translates* instead — and the
     /// translation grows roughly as `1/sin Σ`, without bound. A 20 µm clearance
     /// is nothing at 90° and several millimetres at half a degree.
     ///

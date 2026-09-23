@@ -224,13 +224,13 @@ worth keeping because each was a model change rather than a fix:
 1. *Efficiency*, when the friction balance replaced the pitch-point formula:
    68.691 → 68.430 % forward. The old figures were the same balance sampled at
    the one point on the path where the added term is zero.
-2. *Backlash*, when the centre-distance term stopped counting one flank of two.
+2. *Backlash*, when the axis-distance term stopped counting one flank of two.
    The **minimum is unchanged at 0.11342°**, which is the arithmetic confirming
-   itself: at `clearance − tol₋ = 0` the centre-distance term vanishes and only
+   itself: at `clearance − tol₋ = 0` the axis-distance term vanishes and only
    the axial float is left.
-3. *Efficiency again*, when the rating moved to the centre distance the pair runs
+3. *Efficiency again*, when the rating moved to the axis distance the pair runs
    at: 68.430 → 68.369 %. **Backlash did not move**, which is the check that the
-   two centre distances stayed in their own lanes.
+   two axis distances stayed in their own lanes.
 4. *Backward efficiency to zero*, when static friction arrived. **Forward is
    unchanged**, which is the check that the two coefficients stayed in theirs.
 5. *Efficiency again*, when the default sliding coefficient moved from 0.06 to
@@ -284,7 +284,7 @@ location: where a boundary is drawn, and what a directory is not for.
 
 **Parallel-axis gearing.** Involute + trochoid profile, undercut, severed teeth,
 validated against a rack simulation from both sides over 1080 cases · primitives
-(safeguarded `inv⁻¹`, Brent, bracketed Newton) · mesh, centre distance, exact
+(safeguarded `inv⁻¹`, Brent, bracketed Newton) · mesh, axis distance, exact
 backlash, contact path · metrology (span, over-pins, JGMA 116-02 tables) ·
 strength (critical section, form factor, bending stress, Hertz, face width,
 helical throughout) · efficiency · automatic profile shift and altered addendum.
@@ -370,7 +370,7 @@ in one `MeshReport`, and where the two contacts' figures meet is measured and
 recorded with its seams ([reference](reference.md#contact-stress)).
 
 **Internal gears.** The ring's flank, its profile shift, a shaper-cut fillet at
-the centre distance the shift puts the tool at, the flank/fillet tangency, the
+the axis distance the shift puts the tool at, the flank/fillet tangency, the
 generation limit, **three** mesh interference conditions — two about a tip
 reaching past a flank where the teeth mesh, and one about the tips fouling where
 their circles cross, which is what decides a small tooth difference — and a
@@ -455,7 +455,7 @@ that chooses the automatic shifts to lose least instead of taking the least that
 clears undercut — which becomes a floor rather than the answer, and is worth up
 to 1.6 points of mesh efficiency on an ordinary pair. Whatever is given
 constrains the search instead of being overruled by it: a shift is that gear's, a
-centre distance fixes the two shifts' sum, and pinning all three is relieved
+axis distance fixes the two shifts' sum, and pinning all three is relieved
 visibly rather than silently ignored. The spur pair, the planetary set and the
 hula stage each have their own free variables and their own objective over
 one shared search; a crossed pair's shifts are placed by the constraints alone,
@@ -478,8 +478,8 @@ there, so it cannot be read without the word
 ([rationale](rationale.md#unfinished-work-is-knocked-for-not-switched-on)).
 
 One hob, one setting; the root belongs
-to the gear; the commanded centre distance and what a simple crank leaves —
-either the shift amplitude or the centre-distance offset is the input and the
+to the gear; the commanded axis distance and what a simple crank leaves —
+either the shift amplitude or the axis-distance offset is the input and the
 other is solved, an inversion that reads the shift law directly rather than
 building a gear per trial; and
 inspection data — span and over-pins — as the range it takes around the
@@ -672,7 +672,7 @@ whose size is unmeasured is a debt still owed, and is marked as one.
   transverse one. Each is the standard convention of its own model; the
   parallel figure is the higher on both. At `μ = 0` the pitch point meets to a
   part in 10⁵.
-- **A crossed pair's centre-distance error slides its contact along the shafts
+- **A crossed pair's axis-distance error slides its contact along the shafts
   by `Δa / sin Σ`**, which is the model's own degeneracy toward parallel: at a
   hundredth of a degree the default 0.02 mm of clearance moves the contact
   95 mm, off any face. The reported zone then says *face* and a contact ratio

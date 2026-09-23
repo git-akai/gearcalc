@@ -19027,7 +19027,7 @@
        [
         {
          "freedom": {
-          "centre_distance": 0
+          "distance": 0
          },
          "value": "30.025652520608507"
         },
@@ -20701,7 +20701,7 @@
        [
         {
          "freedom": {
-          "centre_distance": 0
+          "distance": 0
          },
          "value": "30.025652520608507"
         },
@@ -20847,7 +20847,7 @@
        [
         {
          "freedom": {
-          "centre_distance": 0
+          "distance": 0
          },
          "value": "21.145278775291828"
         },

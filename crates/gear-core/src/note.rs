@@ -134,8 +134,8 @@ pub mod key {
     //
     // What only the arrangement can say: its distance, its search, its
     // planets.
-    /// `stage.centre_distance_not_reached`
-    pub const STAGE_CENTRE_DISTANCE_NOT_REACHED: &str = "stage.centre_distance_not_reached";
+    /// `stage.distance_not_reached`
+    pub const STAGE_DISTANCE_NOT_REACHED: &str = "stage.distance_not_reached";
     /// `stage.clearance_negative`
     pub const STAGE_CLEARANCE_NEGATIVE: &str = "stage.clearance_negative";
     /// `stage.optimiser_found_nothing`
@@ -179,8 +179,8 @@ pub mod key {
     pub const ERROR_MESH_RING_TOO_SMALL: &str = "error.mesh_ring_too_small";
     /// `error.mesh_outside_involute_domain`
     pub const ERROR_MESH_OUTSIDE_INVOLUTE_DOMAIN: &str = "error.mesh_outside_involute_domain";
-    /// `error.mesh_centre_distance_too_small`
-    pub const ERROR_MESH_CENTRE_DISTANCE_TOO_SMALL: &str = "error.mesh_centre_distance_too_small";
+    /// `error.mesh_axis_distance_too_small`
+    pub const ERROR_MESH_AXIS_DISTANCE_TOO_SMALL: &str = "error.mesh_axis_distance_too_small";
     /// `error.measure_no_valid_span`
     pub const ERROR_MEASURE_NO_VALID_SPAN: &str = "error.measure_no_valid_span";
     /// `error.measure_pin_too_small`
@@ -256,7 +256,7 @@ pub mod key {
         MESH_OVERLAP_BELOW_ONE,
         MESH_SELF_LOCKING,
         MESH_LOAD_SHARING_OUT_OF_BAND,
-        STAGE_CENTRE_DISTANCE_NOT_REACHED,
+        STAGE_DISTANCE_NOT_REACHED,
         STAGE_CLEARANCE_NEGATIVE,
         STAGE_OPTIMISER_FOUND_NOTHING,
         STAGE_OVERLAP_UNREACHABLE,
@@ -272,7 +272,7 @@ pub mod key {
         ERROR_MESH_INCOMPATIBLE,
         ERROR_MESH_RING_TOO_SMALL,
         ERROR_MESH_OUTSIDE_INVOLUTE_DOMAIN,
-        ERROR_MESH_CENTRE_DISTANCE_TOO_SMALL,
+        ERROR_MESH_AXIS_DISTANCE_TOO_SMALL,
         ERROR_MEASURE_NO_VALID_SPAN,
         ERROR_MEASURE_PIN_TOO_SMALL,
         ERROR_MEASURE_PIN_TOO_LARGE,

@@ -1731,7 +1731,7 @@ impl std::fmt::Display for TrainError {
             Self::NoContact => write!(f, "the teeth never come into contact"),
             Self::NoCommonDistance => write!(
                 f,
-                "no profile shift brings the two centre distances together; \
+                "no profile shift brings the meshes to one axis distance; \
                  these tooth counts cannot be assembled"
             ),
             Self::Wiring(e) => match e {
@@ -1908,7 +1908,7 @@ pub(crate) fn distance_notes(target: Option<f64>, nominal: f64, clearance: f64) 
     if let Some(target) = target {
         if (nominal - target).abs() > REACHED {
             out.push(
-                Note::new(key::STAGE_CENTRE_DISTANCE_NOT_REACHED)
+                Note::new(key::STAGE_DISTANCE_NOT_REACHED)
                     .number("asked", target, 4)
                     .number("reached", nominal, 4),
             );
@@ -1941,9 +1941,10 @@ pub(crate) fn distance_notes(target: Option<f64>, nominal: f64, clearance: f64) 
 )]
 #[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 pub enum Freedom {
-    /// The distance a pair of the stage's axes run at, by the distance's
-    /// index in the shape — a pair has one, a Ravigneaux three.
-    CentreDistance(usize),
+    /// The distance a pair of the stage's axes run at — its axis distance —
+    /// by the distance's index in the shape: a pair has one, a Ravigneaux
+    /// three.
+    Distance(usize),
     /// What portion of that distance is running play.
     Clearance(usize),
     /// **A mesh's axial contact ratio**, by the mesh's index in the shape,
@@ -2178,10 +2179,7 @@ pub(crate) fn distance_and_clearance(d: usize) -> FreedomGroup {
     FreedomGroup {
         given_at_most: 2,
         automatic_at_most: 1,
-        order: vec![
-            vec![Freedom::Clearance(d)],
-            vec![Freedom::CentreDistance(d)],
-        ],
+        order: vec![vec![Freedom::Clearance(d)], vec![Freedom::Distance(d)]],
     }
 }
 
@@ -2456,7 +2454,7 @@ impl shape::ShapeResult {
     #[must_use]
     pub fn figure(&self, f: Freedom) -> Option<f64> {
         match f {
-            Freedom::CentreDistance(d) => self.distances.get(d).map(|d| d.running),
+            Freedom::Distance(d) => self.distances.get(d).map(|d| d.running),
             Freedom::Clearance(d) => self.distances.get(d).map(|d| d.clearance),
             Freedom::Overlap(k) => self
                 .meshes
@@ -7559,7 +7557,7 @@ mod tests {
                 .collect()
         };
         let nudge = |f: Freedom, a: &mut Auto<f64>| match f {
-            Freedom::CentreDistance(_) => a.manual += 0.2,
+            Freedom::Distance(_) => a.manual += 0.2,
             Freedom::Clearance(_) => a.manual += 0.01,
             Freedom::Overlap(_) => a.manual += 0.1,
             Freedom::Member(_, MemberFreedom::PitchDiameter) => a.manual *= 1.05,
@@ -7671,11 +7669,7 @@ mod tests {
     fn a_crossed_pairs_ratio_cannot_stand_given() {
         let mut crossed = arr::worm(1, 40);
         crossed.meshes[0].overlap = Auto::fixed(1.5);
-        for just in [
-            None,
-            Some(Freedom::Overlap(0)),
-            Some(Freedom::CentreDistance(0)),
-        ] {
+        for just in [None, Some(Freedom::Overlap(0)), Some(Freedom::Distance(0))] {
             let relieved = crossed.clone().relieved(just);
             let p = relieved;
             assert!(
@@ -7753,7 +7747,7 @@ mod tests {
                 value: Some(0.123_456_789),
             },
             Figure {
-                freedom: Freedom::CentreDistance(0),
+                freedom: Freedom::Distance(0),
                 value: Some(99.0),
             },
         ];
@@ -7790,7 +7784,7 @@ mod tests {
         hula.distances[0].clearance = Auto::automatic(0.02);
         for just in [
             Some(Freedom::Clearance(0)),
-            Some(Freedom::CentreDistance(0)),
+            Some(Freedom::Distance(0)),
             Some(Freedom::Member(1, MemberFreedom::Shift)),
             None,
         ] {
@@ -7967,8 +7961,7 @@ mod tests {
         let (clearance, keys) = at(23.0);
         assert!(clearance < 0.0, "this one should not be assemblable");
         assert!(
-            keys.iter()
-                .any(|k| k == key::STAGE_CENTRE_DISTANCE_NOT_REACHED),
+            keys.iter().any(|k| k == key::STAGE_DISTANCE_NOT_REACHED),
             "a distance no shifts reach should say so: {keys:?}"
         );
         assert!(
@@ -7980,8 +7973,7 @@ mod tests {
         let (clearance, keys) = at(25.0);
         assert!(clearance > 0.0);
         assert!(
-            keys.iter()
-                .any(|k| k == key::STAGE_CENTRE_DISTANCE_NOT_REACHED)
+            keys.iter().any(|k| k == key::STAGE_DISTANCE_NOT_REACHED)
                 && !keys.iter().any(|k| k == key::STAGE_CLEARANCE_NEGATIVE),
             "the distance is unreachable but the pair goes together: {keys:?}"
         );
@@ -7995,7 +7987,7 @@ mod tests {
         );
         assert!(
             !keys.iter().any(|k| {
-                k == key::STAGE_CENTRE_DISTANCE_NOT_REACHED || k == key::STAGE_CLEARANCE_NEGATIVE
+                k == key::STAGE_DISTANCE_NOT_REACHED || k == key::STAGE_CLEARANCE_NEGATIVE
             }),
             "a distance that is reached should say neither: {keys:?}"
         );
@@ -8167,7 +8159,7 @@ mod tests {
             .find(|g| g.order.len() == 5)
             .expect("the pair's relation");
         assert_eq!(relation.given_at_most, 4);
-        assert_eq!(relation.order[0], vec![Freedom::CentreDistance(0)]);
+        assert_eq!(relation.order[0], vec![Freedom::Distance(0)]);
         assert_eq!(
             relation.order[1],
             vec![Freedom::Member(0, MemberFreedom::Shift)]
@@ -8823,7 +8815,7 @@ mod tests {
     /// The direction is the law and is asserted as one: separating the centres
     /// can only shorten the path of contact. Everything downstream follows —
     /// less load sharing, so more bending stress — which is why the numbers
-    /// moved when this landed (docs/reference.md#centre-distance-and-backlash).
+    /// moved when this landed (docs/reference.md#axis-distance-and-backlash).
     ///
     /// Backlash is deliberately *not* in this test's scope: it measures play
     /// against the zero-backlash reference and keeps the design mesh. That

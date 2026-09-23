@@ -432,7 +432,7 @@
             <FieldNote notes={amplitudeNotes} />
           </label>
           <label class="auto" class:invalid={byThrow && "error" in result}>
-            <span>{t("ui.gear_centre_distance_throw")}</span>
+            <span>{t("ui.gear_axis_distance_throw")}</span>
             <Switch
               small
               label={t("ui.gear_auto")}
@@ -755,13 +755,13 @@
           </dd>
         </dl>
 
-        <h2 class="section-heading">{t("ui.gear_commanded_centre_distance")}</h2>
+        <h2 class="section-heading">{t("ui.gear_commanded_axis_distance")}</h2>
         {#if isUnavailable(s.centre_profile)}
           <p class="aside">{note(s.centre_profile.unavailable)}</p>
         {:else}
           {@const p = s.centre_profile}
           <dl>
-            <dt>{t("ui.gear_centre_distance")}</dt>
+            <dt>{t("ui.gear_axis_distance")}</dt>
             <dd>
               {range(n(p.range[0]), n(p.range[1]))} mm
               <small>{t("ui.gear_zero_backlash_at_each_tooth")}</small>

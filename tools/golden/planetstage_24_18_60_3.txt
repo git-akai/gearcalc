@@ -1,6 +1,6 @@
 planetary stage  z 24/18/60  N=3  helix 0 deg  module 1  alpha 20 deg
 
-running centre distance 20.999928 mm (zero-backlash 20.979928 sun-planet, 21.019928 planet-ring; residual 0.0e0)  shifts +0.0000 / -0.0200 / +0.0000
+running axis distance 20.999928 mm (zero-backlash 20.979928 sun-planet, 21.019928 planet-ring; residual 0.0e0)  shifts +0.0000 / -0.0200 / +0.0000
 eps_a  sun-planet 1.553   planet-ring 1.923   eta_0 0.9713   even spacing true   planet gap 16.413 mm
 sun-planet flank interference  member 1 false  member 2 false
 planet-ring flank interference  member 1 true  member 2 false   tips false (+2.9333 deg of pinion)
@@ -17,7 +17,7 @@ sigma_F  sun 14.9 MPa   planet 16.3 MPa   ring 10.3 MPa
 
 note: 3 planets assumed to share load equally; real sets do not without a floating member, and the remedy is a mesh-load factor this tool declines to apply
 
-centre distance given, shifts chosen to reach it
+axis distance given, shifts chosen to reach it
 a mm             x_sun  x_planet    x_ring    residual     eta_0
 20.7999        -0.3851    0.1741    0.0000       0.0e0    0.9708
 20.8999        -0.1963    0.0789    0.0000     3.6e-15    0.9715

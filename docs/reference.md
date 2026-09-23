@@ -31,7 +31,7 @@ The refinement is **bracketed**: the bare scheme diverges above roughly 60°, wh
 is inside the pressure-angle range this tool allows.
 
 Domain: `inv α ≥ 0` for `α ≥ 0`, so `inv⁻¹(v)` for `v < 0` returns `None`. That is
-not a numerical failure — it means the requested centre distance is below what
+not a numerical failure — it means the requested axis distance is below what
 the base circles permit, and a sweep over ring counts requests it constantly.
 
 ### Root finding
@@ -90,7 +90,7 @@ identically, to 4e-16 over `α_n ∈ {14.5, 20, 25, 30}°`, `x ∈ {−0.5, 0, 0
 > tip radius, cutter depth — take `x`. *Thickness* quantities take `x + x_s`.
 
 Because a meshing pair requires `k₁ + k₂ = 2`, the `x_s` terms cancel and
-thickness modification provably cannot move the centre distance.
+thickness modification provably cannot move the axis distance.
 
 **Cutter tip width**, in the normal plane so it is helix-independent:
 
@@ -254,7 +254,11 @@ a bracketed Newton between `r_b` and the pointed-tooth radius.
 
 ## Meshing
 
-### Centre distance and backlash
+### Axis distance and backlash
+
+The distance between two axes that mesh is their **axis distance** — the
+standards' *centre distance*, `a`, named here for the axes it is between,
+which are what a train is drawn and asked in.
 
 ```text
 inv α_w = inv α_t + 2 Σx tan α_n / Σz          Σx = x₁ + σ x₂,  Σz = z₁ + σ z₂
@@ -304,7 +308,7 @@ parallel:  j_n = 2 a′ ( inv α′ − inv α_w ) cos α′ cos β_b
 crossed:   j_n = j_axial sin β_b1 + 2 Δa sin α_n
 ```
 
-A centre-distance error is a *separation* and opens both flanks, so it counts
+A axis-distance error is a *separation* and opens both flanks, so it counts
 twice; a worm's axial float is a rigid-body slide and counts once. `sin α_n` is
 the contact normal's component along the line of centres at **every** shaft
 angle — an identity, not a small-angle reading.
@@ -314,7 +318,7 @@ flank kept in contact: exactly half the backlash, because a change in centre
 distance is a displacement along the mirror axis of the two lines of action, so
 it opens both flanks equally.
 
-### The centre distance a pair runs at
+### The axis distance a pair runs at
 
 `Mesh::a_w` is the **zero-backlash** distance. A real pair runs at that opened
 by its assembly clearance — `MeshKind::run_at`, outward on an external pair
@@ -333,11 +337,11 @@ rated at zero backlash for as long as a pair had not.
 
 ### Which of the three numbers is given, and which follows
 
-A centre distance is the **true** distance and a clearance says what portion of
+A axis distance is the **true** distance and a clearance says what portion of
 it is clearance, so
 
 ```text
-centre distance = zero-backlash distance + clearance
+axis distance = zero-backlash distance + clearance
 zero-backlash distance = f(the shifts)
 ```
 
@@ -490,7 +494,7 @@ a fast lead and a fat one with a slow one — and the tool takes the branch the
 designer's own number is on, which is the only choice under which nudging the
 target moves the answer smoothly. Below it there is no worm at all, and the
 stage says so. On parallel shafts there is no turning point: the distance only
-grows with the helix, and a helical pair cut to fit a standard centre distance
+grows with the helix, and a helical pair cut to fit a standard axis distance
 is the same request with one branch.
 
 That is one of the two bounds `train::FreedomGroup` carries. The other counts how
@@ -661,7 +665,7 @@ What it buys the efficiency with is contact ratio, and that is a trade a designe
 may not want: fewer teeth sharing the load, and a noisier pair. The tool reports
 both and decides neither.
 
-**The same question, asked with the centre distance given**, must give the same
+**The same question, asked with the axis distance given**, must give the same
 answer at the distance the free search chose — it fixes the shift *sum* and
 leaves only the division, which is the search's own second coordinate.
 `gear-cli shifts` prints that sweep beside the table, and
@@ -729,7 +733,7 @@ What is already given constrains the search rather than being overruled by it:
 | given | what it fixes |
 |---|---|
 | a profile shift | that gear's, exactly |
-| a centre distance | the two shifts' signed *sum*, through `mesh::shift_sum_for` |
+| a axis distance | the two shifts' signed *sum*, through `mesh::shift_sum_for` |
 | a crank offset | the same, on each of the hula stage's two meshes |
 
 A pair has two shifts to choose, so any two of `{a, x₁, x₂}` fix the third and
@@ -823,7 +827,7 @@ undercut. They combine rather than compete:
 | on | on | free and floored: the least that clears undercut where nothing else decides, which is what an automatic shift has always been |
 
 Only shifts left automatic are the optimiser's to move; a given one constrains
-it, as a given centre distance does.
+it, as a given axis distance does.
 
 **The bound is not one number, and that is not an inconsistency.** There are
 three ways a shift arrives and each earns a different answer to the same
@@ -842,7 +846,7 @@ so applying it to a *chooser* would thin a tooth that needed no help, for
 nothing; a search is therefore floored at `max(x_min, 0)`, which is the
 automatic value this crate has always used. A number a designer typed is held
 to `x_min` itself, because a deliberate −0.3 on a 43-tooth wheel is a decision
-about centre distance or balance and not a mistake about undercut. A shift that
+about axis distance or balance and not a mistake about undercut. A shift that
 *was* raised says so in a note, so the field and the gear never disagree in
 silence.
 
@@ -888,7 +892,7 @@ the other side of it and *is* a clamp, since it truncates the profile.
 
 **Where a clearance is read.** A clearance is taken by whatever is free to
 absorb it, and each stage reports what it took rather than leaving a reader to
-work it out. The centre distance absorbs it when the distance is automatic; the
+work it out. The axis distance absorbs it when the distance is automatic; the
 shifts absorb it when they are being chosen, closing the pair to zero backlash a
 clearance *inside* a given housing; and with neither free the input goes unread
 and the answer says zero. The hula stage's minimum clearance is the same
@@ -989,7 +993,7 @@ point to a line. `path_of_contact` returns `None` there.
 Which of the eight lines is the mesh is settled once at the **reference**
 distance — where the reference cylinders touch and the pitch point lies on the
 line — and carried, since which flanks face each other is not a function of
-centre distance.
+axis distance.
 
 ### The friction balance
 
@@ -1465,7 +1469,7 @@ space     h_k = [ 2π/z + λ(ψ_k − ψ_{k+1}) − ψ_k − ψ_{k+1} ] / 2
 ```
 
 **λ reaches a span**, where it reaches neither the flanks nor the commanded
-centre distance: a span is measured between flanks of *different* teeth, and the
+axis distance: a span is measured between flanks of *different* teeth, and the
 indexing offset is exactly what moves one relative to another.
 
 Each is written from the **pitch and the ψ**, not as a difference of two
@@ -1537,7 +1541,7 @@ a_cut = operating_geometry(…, −x)              so no k reaches a radius
 ```
 
 A shaper cannot be displaced the way a rack can — two pinions have their ratio
-fixed by their tooth counts, so the pitch point moves with the centre distance
+fixed by their tooth counts, so the pitch point moves with the axis distance
 and the rolling circles with it. Everything follows from one factor:
 
 ```text
@@ -1555,7 +1559,7 @@ fillet is the envelope of the cutter's corner circle, so the fillet point lies o
 the common normal — and a rolling pair's common normal passes through the pitch
 point.
 
-`σ = ±1` appears in exactly **two** places: the centre distance `a = r + σ r_c`,
+`σ = ±1` appears in exactly **two** places: the axis distance `a = r + σ r_c`,
 and which side of the cutter's axis its tip points from. Deliberately not in the
 rolling, where two reversals cancel.
 
@@ -1697,7 +1701,7 @@ one shift.
 A tooth reaches to the **midpoint between the two seats**, not half a pitch:
 λ seats the teeth unevenly by construction.
 
-### The commanded centre distance
+### The commanded axis distance
 
 ```text
 inv α_w(θ) = inv α_t + 2 ( x(θ) + x_mate ) tan α_n / Σz
@@ -1711,7 +1715,7 @@ reported too. The fit is exact rather than optimised: equally spaced samples mak
 the first Fourier coefficient *be* the least-squares sinusoid.
 
 The eccentricity has two faces and only one is stored: `Δx`, or the
-**centre-distance throw**, the second solved from the first by a bracketed
+**axis-distance throw**, the second solved from the first by a bracketed
 inversion since the throw rises monotonically in `Δx` from zero.
 
 ---
@@ -1719,12 +1723,12 @@ inversion since the throw rises monotonically in `Δx` from zero.
 ## Planetary sets
 
 ```text
-common centre distance   g(x_p) = [a_w,ext(x_s + x_p) + c] − [a_w,int(x_r − x_p) − c] = 0
+common axis distance   g(x_p) = [a_w,ext(x_s + x_p) + c] − [a_w,int(x_r − x_p) − c] = 0
 da_w/dΣx = [ a cos α_t sin α_w / cos²α_w ] · [ 2 tan α_n / (Σz tan²α_w) ]
 ```
 
 with `c` the running clearance, which each mesh takes in its own direction
-([centre distance](#centre-distance-and-backlash)). `g` is strictly
+([axis distance](#axis-distance-and-backlash)). `g` is strictly
 increasing, so the root is unique and Newton is safe from `x_p = 0`. The
 bracket is closed form, from `inv α_w ≥ 0` on both meshes:
 
@@ -1755,7 +1759,7 @@ be driven to zero numerically — the Newton solve above. The sun is in one mesh
 only, and so is the ring: fix the other two and the mesh the absorber is **not**
 in gives the distance outright, leaving its own mesh a shift sum to reach at a
 known distance. That is `mesh::shift_sum_for`, the same relation a spur pair
-reads a given centre distance through, and a closed form rather than an
+reads a given axis distance through, and a closed form rather than an
 iteration.
 
 Which member absorbs is read off the shift toggles rather than named by a
@@ -2500,7 +2504,7 @@ is one system — one node per body, ground shared, one row per mesh in the
 frame of its axes — and its solution at one turn of its first end is
 reported as every body's exact speed, each stage's ratio,
 the total, and the **mobility**: how many conditions the mechanism needs beyond
-its frame, and how many it has. That is why a train whose centre distances
+its frame, and how many it has. That is why a train whose axis distances
 cannot be made to agree still reports its ratios: Willis needs tooth counts and
 a topology, and the refusal is the geometry's.
 

@@ -1512,7 +1512,7 @@ pub fn shifts_for_efficiency(
         let (a, b) = (Tooth::new(pa), Tooth::new(pb));
         // **The pair as it runs, not as its shifts leave it.** The stage opens
         // the zero-backlash distance by its assembly clearance and rates
-        // contact there (docs/reference.md#centre-distance-and-backlash); so
+        // contact there (docs/reference.md#axis-distance-and-backlash); so
         // does this, or the search would optimise a contact ratio nobody
         // measures and settle just under the floor it was given.
         //

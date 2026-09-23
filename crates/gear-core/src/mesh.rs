@@ -756,7 +756,7 @@ impl crate::note::Explain for MeshError {
             Self::Incompatible => key::ERROR_MESH_INCOMPATIBLE,
             Self::RingTooSmall => key::ERROR_MESH_RING_TOO_SMALL,
             Self::OutsideInvoluteDomain => key::ERROR_MESH_OUTSIDE_INVOLUTE_DOMAIN,
-            Self::CentreDistanceTooSmall => key::ERROR_MESH_CENTRE_DISTANCE_TOO_SMALL,
+            Self::CentreDistanceTooSmall => key::ERROR_MESH_AXIS_DISTANCE_TOO_SMALL,
         })
     }
 }
@@ -771,7 +771,7 @@ impl std::fmt::Display for MeshError {
             Self::OutsideInvoluteDomain => {
                 "no such gear pair: the profile shifts require the base circles to overlap"
             }
-            Self::CentreDistanceTooSmall => "centre distance is below the base-circle limit",
+            Self::CentreDistanceTooSmall => "the axis distance is below the base-circle limit",
         };
         f.write_str(s)
     }

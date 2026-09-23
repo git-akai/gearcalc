@@ -455,7 +455,7 @@ const COMMANDS: &[Command] = &[
     Command {
         name: "shifts",
         args: "[z1] [z2] | epicyclic",
-        summary: "the shifts a pair loses least at, free and against a given centre distance (9, 37); `epicyclic` asks the two presets that choose more than two",
+        summary: "the shifts a pair loses least at, free and against a given axis distance (9, 37); `epicyclic` asks the two presets that choose more than two",
         run: |a| {
             if a.get(1).map(String::as_str) == Some("epicyclic") {
                 epicyclic_shifts_report();
@@ -1044,7 +1044,7 @@ fn roll_pair(ring: &gear_core::ring::Ring, pinion: &gear_core::Gear, a: f64, tit
     }
     let psi = best.1;
 
-    println!("{title}   centre distance {a:.4} mm");
+    println!("{title}   axis distance {a:.4} mm");
     println!(
         "  best assembly phase {:.4} deg of a {:.3} deg ring pitch, clear by {:+.5} mm there",
         psi.to_degrees(),
@@ -1497,7 +1497,7 @@ fn shifts_report(z1: u32, z2: u32) {
     // **The same question asked the other way.** A given centre distance fixes
     // the shift sum and leaves the division; at the distance the free search
     // itself chose, the two must agree.
-    println!("\ncentre distance given, shifts chosen to reach it");
+    println!("\naxis distance given, shifts chosen to reach it");
     println!(
         "{:<34} {:>9} {:>9} {:>9} {:>9} {:>10}",
         "a mm", "x1", "x2", "sum", "eps", "eta fwd"
@@ -1509,7 +1509,7 @@ fn shifts_report(z1: u32, z2: u32) {
     // nothing, which is the point.
     let said = |r: &Pair| {
         for n in r.notes {
-            if n.is(gear_core::note::key::STAGE_CENTRE_DISTANCE_NOT_REACHED)
+            if n.is(gear_core::note::key::STAGE_DISTANCE_NOT_REACHED)
                 || n.is(gear_core::note::key::STAGE_CLEARANCE_NEGATIVE)
             {
                 println!("{:>36}{}", "", words().render(n));
@@ -2895,7 +2895,7 @@ fn worm_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, shaft_angle_de
         shaft_angle_deg
     );
     println!(
-        "       ratio {:.4}:1   centre distance {:.4} mm",
+        "       ratio {:.4}:1   axis distance {:.4} mm",
         s.ratio, s.centre_distance
     );
     println!();
@@ -2975,7 +2975,7 @@ fn worm_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, shaft_angle_de
         println!();
         if let Some(least) = least {
             println!(
-                "  centre distance is least at lead angle {:.4} deg  (d1 {:.4} mm) \
+                "  axis distance is least at lead angle {:.4} deg  (d1 {:.4} mm) \
                  — above it two worms reach the same distance",
                 least.to_degrees(),
                 f64::from(starts.max(1)) / least.sin()
@@ -3201,7 +3201,7 @@ fn planetary_report(sun: u32, planet: u32, planets: u32, sun_shift: f64, ring_sh
 
     println!(
         "\n{:>6} {:>10} {:>12} {:>10} {:>9} {:>7} {:>7} {:>11}",
-        "z_ring", "x_planet", "c2c mm", "residual", "a_w sun", "even", "simult", "clearance"
+        "z_ring", "x_planet", "a mm", "residual", "a_w sun", "even", "simult", "clearance"
     );
     for (ring, r) in &rows {
         let s = r;
@@ -3285,7 +3285,7 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
                     let r = set_view(&solved).expect("a set");
                     if !shown {
                         println!(
-                            "\nrunning centre distance {:.6} mm (zero-backlash {:.6} sun-planet, \
+                            "\nrunning axis distance {:.6} mm (zero-backlash {:.6} sun-planet, \
                              {:.6} planet-ring; residual {:.1e})  shifts {:+.4} / {:+.4} / {:+.4}",
                             r.centre_distance,
                             r.centre_distance_nominal[0],
@@ -3393,7 +3393,7 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
     let free = solve_set(&base, 2.0, 3000.0, &lib);
     if let Ok(free) = free {
         let free = set_view(&free).expect("a set");
-        println!("\ncentre distance given, shifts chosen to reach it");
+        println!("\naxis distance given, shifts chosen to reach it");
         println!(
             "{:<12} {:>9} {:>9} {:>9} {:>11} {:>9}",
             "a mm", "x_sun", "x_planet", "x_ring", "residual", "eta_0"

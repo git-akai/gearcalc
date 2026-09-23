@@ -300,7 +300,7 @@ search**, which is named below rather than left out of the count.
 | 1 | `inv⁻¹` | series seed + safeguarded Newton, with a domain guard |
 | 2 | Tip radius for a given tip width | Newton, analytic `ds/dr` |
 | 3 | Flank/fillet junction when undercut | Brent, bracketed by construction |
-| 4 | Planet shift for a common centre distance | Newton, closed-form bracket |
+| 4 | Planet shift for a common axis distance | Newton, closed-form bracket |
 | 5 | 30° tangent critical section | Brent on the trochoid parameter |
 | 5b | Inscribed-parabola critical section | Brent on the fillet, then on the flank's roll |
 | 6 | Contact ellipse aspect ratio `κ` | Brent in `ln κ` |
@@ -348,7 +348,7 @@ exponent underneath every crossed-axis contact stress the tool reports. The solv
 costs about fifty function evaluations and is exact.
 
 **Guards matter as much as solvers.** Ordinary planetary inputs routinely request
-a centre distance outside the involute domain, and the difference between a
+a axis distance outside the involute domain, and the difference between a
 guarded and unguarded `inv⁻¹` there is the difference between "this ring tooth
 count is impossible" and a NaN silently reaching a stress figure.
 
@@ -832,7 +832,7 @@ a carrier is turning about it or not. So **what is asked of a mesh is asked
 once**, in one place, and every arrangement that builds one gets it —
 `auto::MeshTrial`. What the shape owns is what it genuinely does own: which
 meshes a candidate has, and how each is *assembled* — at a clearance-opened
-centre distance, from a shaper cut, around a crank. Those are its mechanics.
+axis distance, from a shaper cut, around a crank. Those are its mechanics.
 What is asked of the result is not.
 
 **Written per stage type, they disagreed.** Three types each spelled the
@@ -1003,18 +1003,18 @@ with the same tool.
 
 **The mesh-phase coefficient is exactly half the backlash**, and being half of an
 exact law it is exact. The drive and coast lines of action are mirror images
-about the line of centres, and a change in centre distance is a displacement
+about the line of centres, and a change in axis distance is a displacement
 along that mirror axis — so whatever gap it opens on one flank it opens equally
 on the other.
 
 **Gated twice, because half of an arithmetic identity is not evidence.** The
 obvious acceptance test is met by construction, so it proves nothing. The real
-one places the two **drawn outlines** at a centre distance and closes them until
+one places the two **drawn outlines** at a axis distance and closes them until
 they touch, once on each flank: the seated placement holds to 3.4e-16 rad across
 `Δa` = 0.1, 0.3, 0.6 mm, and the play the drawn teeth leave converges on the law
 from below.
 
-**λ reaches none of the commanded centre distance.** The indexing offset moves a
+**λ reaches none of the commanded axis distance.** The indexing offset moves a
 tooth *rigidly*, so it decides when a tooth arrives and not how thick it is; zero
 backlash is set by the thickness, which is the shift the tooth was cut at.
 Asserted **exactly** — the profile is bit-identical at every λ — because "λ does
@@ -1023,7 +1023,7 @@ not reach this" is an invariant rather than a trend.
 **A close tooth-count internal mate genuinely limits the eccentricity**, and the
 model is right to refuse it: the shift term carries `1/Σz`, and for an internal
 pair `Σz` is the tooth-count *difference*, so a 24-in-26 pair runs at a 1 mm
-centre distance and even `Δx = 0.05` is 5 % of it.
+axis distance and even `Δx = 0.05` is 5 % of it.
 
 **What would change this:** knowing what the mechanism can physically follow. If
 it is a simple eccentric, `x(θ)` should be optimised against *that* constraint
@@ -1032,7 +1032,7 @@ reported because the mechanism is not yet chosen.
 
 ### A stage is rated where it runs
 
-The zero-backlash centre distance is where the profile shifts put the pair; a
+The zero-backlash axis distance is where the profile shifts put the pair; a
 real one runs at that opened by its assembly clearance. Every contact quantity
 belongs to the second, and only **backlash** keeps the design mesh, because it
 measures play *against* the zero-backlash reference.
@@ -1613,7 +1613,7 @@ of a set through it beside the types' own solves. Every figure but four
 agreed, and each of the four was a fault in a type
 ([corrections](corrections.md#the-log)) rather than a difference of model — so
 the types went. An epicyclic set is more reference frames than a pair, not a
-different thing; a centre distance shared by several meshes is a layshaft's
+different thing; a axis distance shared by several meshes is a layshaft's
 question as much as a set's; what a type kept apart — three bodies here, two
 there, a planet's own row — the shape reads off its graph, and a layshaft, a
 Wolfrom, a stepped planet, a planocentric, a Ravigneaux and a hula stage are
@@ -1784,7 +1784,7 @@ would be a fourth section rather than a note on the nearest of these three.
 
 An automatic input shows the value it resolved to, so a readout printing the
 same number is the same figure twice on one page — and it was three times on
-a pair, whose centre-distance row carried the running distance with the
+a pair, whose axis-distance row carried the running distance with the
 nominal folded into an annotation, both of which the two inputs above it
 already said between them. A set's row hung a "residual" off it that a solve
 that closes always reports as nought and a solve that does not reports as a
@@ -1800,7 +1800,7 @@ which read as a different kind of number from the box beside it.
 **And turning automatic off keeps the number the box was showing.** `Auto`
 holds its `manual` while `auto` is on so the field has something to fall back
 to, and seeding it from the solved value is the front end's job — which the
-geartrain panel was not doing, so a centre distance turned manual dropped to
+geartrain panel was not doing, so a axis distance turned manual dropped to
 the zero it was created with and the stage fell over. It is seeded to the
 digits shown, so what the reader saw is what they now hold, the way the gear
 tab's throw and amplitude already were.
@@ -2070,7 +2070,7 @@ determine an answer.
 | Planetary stage | **Held** — which body is grounded | the spec names only the driven one, which picks one of three and leaves the arrangement undetermined |
 
 **One more input has two faces:** an eccentric gear's eccentricity can be entered
-as the angular-shift amplitude or as the centre-distance offset. The second is the
+as the angular-shift amplitude or as the axis-distance offset. The second is the
 first read backwards, and `Δx` stays the single field everything is built from —
 the boundary resolves it once, so nothing downstream knows which face was shown.
 
@@ -2113,7 +2113,7 @@ On top of that, in rough order of what has actually caught things:
    pays", "efficiency never exceeds one", "every length scales with the module".
    Each is checkable without knowing the answer, and each has caught something.
 4. **Analytic cross-checks** against textbook special cases.
-5. **Invariants**: thickness modification does not move the centre distance;
+5. **Invariants**: thickness modification does not move the axis distance;
    `b_min` is independent of the `b` used; backlash is zero at nominal centres;
    `z_r = z_s + 2z_p` ⟹ `x_p = 0`.
 6. **Regression fixtures**, pinned so refactors fail loudly — with the old bug

@@ -6,7 +6,7 @@ least loss                            0.4946    0.7620    1.2566    1.4626    98
 
   the trade: 0.14 points of efficiency for 0.14 of contact ratio
 
-centre distance given, shifts chosen to reach it
+axis distance given, shifts chosen to reach it
 a mm                                      x1        x2       sum       eps    eta fwd
 30.0200                               0.1453   -0.1453    0.0000    1.5773    98.366 %
 30.2061                               0.1904    0.0000    0.1904    1.5384    98.407 %

@@ -97,7 +97,7 @@ const out = {
       // `members[].gear`.
       for (const d of stage.distances) d.distance = pin(d.distance);
       for (const m of stage.members) m.gear.profile_shift = pin(m.gear.profile_shift);
-      const just = { centre_distance: 0 };
+      const just = { distance: 0 };
       // ...and a figure for the shift relief turns back given, so the
       // seeding is exercised too.
       const figures = [{ freedom: { member: [1, "shift"] }, value: 0.25 }];

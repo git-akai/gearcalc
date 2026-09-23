@@ -736,7 +736,7 @@ impl Screw {
     /// the zone and with it the contact ratio, and the whole contact slides
     /// **along the axes**. A parallel pair has no equivalent of that last one —
     /// there the line of action turns instead, which is the same degeneracy seen
-    /// from the other side (docs/reference.md#centre-distance-and-backlash).
+    /// from the other side (docs/reference.md#axis-distance-and-backlash).
     #[must_use]
     pub fn path_of_contact_at(
         &self,
@@ -1049,7 +1049,7 @@ impl CrossedPath {
     /// bodily along both shafts. It is not a small effect near the parallel
     /// limit — roughly `Δa / sin Σ` in shape — so a pair that is fine at 90° can
     /// have its contact pushed clean off the face at 1°. A parallel pair has no
-    /// counterpart: there the line of action turns instead (docs/reference.md#centre-distance-and-backlash).
+    /// counterpart: there the line of action turns instead (docs/reference.md#axis-distance-and-backlash).
     #[must_use]
     pub fn axial_centre(&self, screw: &Screw, i: usize) -> Option<f64> {
         let axis = if i == 0 {

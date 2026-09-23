@@ -2302,11 +2302,11 @@
                 )}
               {/if}
               {@render autoNumber(
-                "ui.train_c2c_distance",
+                "ui.train_distance",
                 d.distance,
                 dres?.running,
                 0.1,
-                () => relieveStage(stage, { centre_distance: k }, figures),
+                () => relieveStage(stage, { distance: k }, figures),
                 // An automatic distance the tips sized says which mesh
                 // held it open, under the number it opened to.
                 dres?.sized_by == null
@@ -2322,7 +2322,7 @@
                 {@render numberField("ui.train_tip_gap", () => d.tip_clearance, (v) => (d.tip_clearance = v), 0.05, "ui.train_mm", t("ui.train_note_tip_gap"))}
               {/if}
               {@render autoNumber(
-                "ui.train_c2c_clearance",
+                "ui.train_distance_clearance",
                 d.clearance,
                 dres?.clearance,
                 0.01,
@@ -2331,12 +2331,12 @@
                 "ui.train_mm",
               )}
               <label>
-                <span>{t("ui.train_c2c_tolerance_plus")}</span>
+                <span>{t("ui.train_distance_tolerance_plus")}</span>
                 <input type="number" step="0.01" bind:value={() => d.tolerance_plus, finite((v) => (d.tolerance_plus = v))} />
                 <em>{t("ui.train_mm")}</em>
               </label>
               <label>
-                <span>{t("ui.train_c2c_tolerance_minus")}</span>
+                <span>{t("ui.train_distance_tolerance_minus")}</span>
                 <input type="number" step="0.01" bind:value={() => d.tolerance_minus, finite((v) => (d.tolerance_minus = v))} />
                 <em>{t("ui.train_mm")}</em>
               </label>

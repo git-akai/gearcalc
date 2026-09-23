@@ -82,7 +82,7 @@ of a gear is worth more than knowing what it does.
 | `shaper.rs` | Generation by a pinion cutter, of which the rack is the `z → ∞` limit | which of the two it is being used for |
 | `ring.rs` | Internal gear geometry: the flank, where the tool sits, the limits | external gears |
 | `outline.rs` | The gear outline as a CAD-ready closed path, to a chord tolerance | file formats |
-| `mesh.rs` | Two gears in mesh: centre distance, operating angle, backlash | load, material, or strength |
+| `mesh.rs` | Two gears in mesh: axis distance, operating angle, backlash | load, material, or strength |
 | `contact.rs` | The path of contact and how load is shared along it | stress |
 | `screw.rs` | Crossed-axis screw gearing — one model for a worm and a crossed pair | that a worm is special |
 | `planetary.rs` | The set's **vocabulary** — sun, carrier, ring; an arrangement — and Pennestrì's closed form, the independent check the shape's flow is held to on every arrangement, and `carrier_driven_efficiency`, the 3K family's closed form the hula laws hold the flow to. No solve: the set's closure is the shape's | tooth form, geometry |

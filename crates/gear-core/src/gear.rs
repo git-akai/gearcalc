@@ -980,7 +980,7 @@ fn centre_profile_of(
         for (k, &ideal) in commanded.iter().enumerate() {
             let fit = mean + amplitude * (angle(k) - phase).cos();
             error = error.max((ideal - fit).abs());
-            // What the mechanism's departure costs, by the docs/reference.md#centre-distance-and-backlash law: the ideal
+            // What the mechanism's departure costs, by the docs/reference.md#axis-distance-and-backlash law: the ideal
             // is the zero-backlash distance at this position, the fit is where
             // the machine actually puts the axes.
             let a_ref = g.mt * z_sum.abs() / 2.0;

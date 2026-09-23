@@ -1,3 +1,3 @@
-control  ring z60  pinion z20   contact ratio 1.6761   alpha_w 20.00 deg   troch false inv false tip false (+2.2560 deg)   centre distance 20.0000 mm
+control  ring z60  pinion z20   contact ratio 1.6761   alpha_w 20.00 deg   troch false inv false tip false (+2.2560 deg)   axis distance 20.0000 mm
   best assembly phase 3.0000 deg of a 6.000 deg ring pitch, clear by -0.00000 mm there
   rolled through one tooth: least clearance -0.00001 mm at -3.5 deg from the line of centres   (touching, as a mesh does)

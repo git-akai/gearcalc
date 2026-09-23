@@ -3850,7 +3850,7 @@ impl Shape {
     pub(crate) fn inputs(&mut self) -> Vec<(Freedom, &mut Auto<f64>)> {
         let mut out = Vec::new();
         for (k, d) in self.distances.iter_mut().enumerate() {
-            out.push((Freedom::CentreDistance(k), &mut d.distance));
+            out.push((Freedom::Distance(k), &mut d.distance));
             out.push((Freedom::Clearance(k), &mut d.clearance));
         }
         for (k, m) in self.meshes.iter_mut().enumerate() {
@@ -3965,7 +3965,7 @@ impl Shape {
                 let m = self.meshes[k];
                 let mut order = Vec::new();
                 if n == 0 {
-                    order.push(vec![Freedom::CentreDistance(d)]);
+                    order.push(vec![Freedom::Distance(d)]);
                     order.push(vec![Freedom::Member(m.a, MemberFreedom::Shift)]);
                     order.push(vec![Freedom::Member(m.b, MemberFreedom::Shift)]);
                     order.push(vec![Freedom::Clearance(d)]);
@@ -4648,7 +4648,7 @@ mod tests {
         assert!(
             over.notes
                 .iter()
-                .any(|n| n.is(key::STAGE_CENTRE_DISTANCE_NOT_REACHED)),
+                .any(|n| n.is(key::STAGE_DISTANCE_NOT_REACHED)),
             "the mesh whose sum nothing reached says so: {:?}",
             over.notes
         );
@@ -4673,7 +4673,7 @@ mod tests {
         let shift = |i: usize| vec![Freedom::Member(i, MemberFreedom::Shift)];
         let first = groups
             .iter()
-            .find(|g| g.order[0] == vec![Freedom::CentreDistance(0)])
+            .find(|g| g.order[0] == vec![Freedom::Distance(0)])
             .expect("the sun's mesh declares its relation");
         assert_eq!(first.given_at_most, 4);
         assert_eq!(first.order.len(), 5);
