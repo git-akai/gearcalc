@@ -397,8 +397,15 @@ impl Shape {
     }
 
     /// **The frame a member's axis stands still in for meshing purposes**:
-    /// its carrier where it rides one, and the carrier on its own axis where
-    /// it is central to one, and ground otherwise ([`super::wiring`]).
+    /// its carrier where it rides one; where it is central, the carrier of
+    /// the planets it meshes — a sun's or a ring's, whose axis that carrier
+    /// turns about — and ground otherwise ([`super::wiring`]).
+    ///
+    /// **Asked of the member's meshes, not of its axis.** It was the first
+    /// carrier on the member's axis, which inside one stage is the same
+    /// answer — every central member of a set meshes its planets — and on
+    /// a graph is not: a gear on a sun's shaft meshing a pinion on a fixed
+    /// axis turns about the same line as the carrier and meshes in ground.
     fn frame_of_member(&self, member: usize) -> Body {
         let shaft = self.slot_of_member(member);
         let Some(axis) = self.axis_of_slot(shaft) else {
@@ -408,13 +415,17 @@ impl Shape {
         if c != GROUND {
             return c;
         }
-        // A carrier on this axis: the first slot here that carries an axis.
-        self.bodies
+        self.meshes
             .iter()
-            .enumerate()
-            .filter(|(_, s)| s.axis == axis)
-            .map(|(i, _)| i + 1)
-            .find(|&s| self.axes.iter().any(|a| self.slot(a.carried_by) == s))
+            .filter_map(|m| {
+                (m.a == member)
+                    .then_some(m.b)
+                    .or((m.b == member).then_some(m.a))
+            })
+            .find_map(|mate| {
+                let carrier = self.carrier_slot(self.axis_of_slot(self.slot_of_member(mate))?);
+                (carrier != GROUND && self.axis_of_slot(carrier) == Some(axis)).then_some(carrier)
+            })
             .unwrap_or(GROUND)
     }
 
@@ -5837,6 +5848,59 @@ mod assembly {
         let shape = arr::ravigneaux([18, 30], [22, 18], 62, 3);
         assert_eq!(shape.assembly(1), None);
         assert_eq!(shape.assembly(2), None);
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod a_mesh_stands_where_its_axes_do {
+    //! **A mesh's frame is the body both its axes stand still in**, asked of
+    //! the mesh rather than of the axis a member turns about — which is what
+    //! lets a set and the pair that drives it be one shape, the shaft they
+    //! share one line.
+
+    use super::super::arrangements::Builder;
+    use super::super::{solve_alone, test_library, Train};
+    use super::*;
+
+    #[test]
+    fn a_gear_on_a_suns_shaft_meshes_in_ground() {
+        let mut b = Builder::new(1.0);
+        let (fixed, central) = (b.axis(), b.axis());
+        let pinion_body = b.body(fixed);
+        let sun_body = b.body(central);
+        let carrier = b.body(central);
+        let ring_body = b.body(central);
+        let planets = b.carried_axis(carrier, 3);
+        let planet_body = b.body(planets);
+        let pinion = b.gear(pinion_body, 17);
+        let drive = b.gear(sun_body, 43);
+        let sun = b.gear(sun_body, 12);
+        let planet = b.gear(planet_body, 30);
+        let ring = b.ring(ring_body, 72);
+        b.mesh(pinion, drive).distance([fixed, central]);
+        b.mesh(sun, planet)
+            .mesh(planet, ring)
+            .distance([central, planets]);
+        let shape = b.build();
+        let w = shape.wiring();
+        assert_eq!(w.frame(0).unwrap(), GROUND, "the pair meshes in ground");
+        let c = shape.slot(carrier);
+        assert_eq!(w.frame(1).unwrap(), c, "the sun meshes in its carrier");
+        assert_eq!(w.frame(2).unwrap(), c, "...and so does the ring");
+        // One shape is the pair and the set in a row: the ratio a chain of
+        // the two reports, the pair's reversal times the set's `1 + z_r/z_s`.
+        let r = solve_alone(
+            &Train::alone(&shape, 2.0, 3000.0).arranged(&[ring_body], pinion_body, carrier),
+            &test_library(),
+        )
+        .unwrap();
+        let want = -(43.0 / 17.0) * (1.0 + 72.0 / 12.0);
+        assert!(
+            (r.ratio.unwrap() - want).abs() < 1e-9 * want.abs(),
+            "{:?} against {want}",
+            r.ratio
+        );
     }
 }
 

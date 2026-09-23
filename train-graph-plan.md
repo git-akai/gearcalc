@@ -423,7 +423,21 @@ after it is close to concatenation.
 - **3d — one solve over the graph.** `Train::graph()` flattens the stages,
   axes merged wherever a body is shared, and `solve_train` solves it once;
   per-stage results are sliced back out for the result still shaped by
-  stage. *Diff: none* — the null diff that proves the solve.
+  stage. *Diff: none* — the null diff that proves the solve. Two
+  stage-local assumptions found by reading for it, each its own step:
+  1. **The frame a member meshes in** was the first carrier on its axis;
+     on a graph a gear on a sun's shaft meshes a fixed-axis pinion in
+     ground. Asked of the member's meshes now. **Done.**
+  2. **The search's unit is the component, and it was the shape**: one
+     closure over every distance, one set of sizing rounds and one outcome
+     for the whole shape, so on a graph one stage's closure failing, its
+     tips resizing or its interval missing would reach every other's.
+     Each component is searched on its own constraints.
+  3. `Train::graph()`, its motion law, and a law that one solve of the
+     graph is every stage's solve, element by element, on every fixture.
+  4. The production switch and the slicing — notes and indices back to
+     their stages — weighed once 1–3 are in: it is an adapter Phase 6
+     deletes.
 
 **Phase 4 — storage flips.** `Train` holds the graph. Conventions are written
 as holds at insertion, and a fresh train's default cases at its first
