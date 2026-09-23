@@ -13,6 +13,7 @@
 //! Proximity is not a mechanism; a table that *is* the dispatch is.
 
 mod diagram;
+mod graph;
 mod kinematics;
 mod matrix;
 
@@ -481,6 +482,14 @@ const COMMANDS: &[Command] = &[
         summary: "motion, torque, loss and play alone, for every preset and every epicyclic arrangement — what a graph over shafts and meshes has to reproduce",
         run: |a| kinematics::run(a.get(1).map(String::as_str)),
         record: Record::Cases(&["kinematics"]),
+        slow: false
+    },
+    Command {
+        name: "graph",
+        args: "",
+        summary: "every preset alone and after every other, by member, mesh, distance and body and never by stage — what the train-as-graph refactor is held to",
+        run: |_| graph::run(),
+        record: Record::Cases(&["graph"]),
         slow: false
     },
     Command {
