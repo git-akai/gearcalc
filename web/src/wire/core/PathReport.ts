@@ -35,7 +35,8 @@ backlash: Directional<Backlash>,
  * sum over the meshes the path loads of what each passes: one across a
  * pair, under one where a carrier takes part of it bodily, many times
  * one where power circulates, which is where such a path's efficiency
- * goes ([`flow::Flow::circulation`]).
+ * goes ([`flow::Flow::mesh_powers`]). An offset coupling passes power
+ * and has no teeth, so it counts for nothing here.
  */
 circulation: Directional<number>, 
 /**

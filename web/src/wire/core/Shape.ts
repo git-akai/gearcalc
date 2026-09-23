@@ -16,4 +16,14 @@ export type Shape = { axes: Array<Axis>,
  * stage's own; the train numbers bodies once, and a stage's members
  * and carriers name them.
  */
-bodies: Array<BodyOn>, members: Array<Member>, meshes: Array<MeshInput>, distances: Array<Distance>, };
+bodies: Array<BodyOn>, members: Array<Member>, meshes: Array<MeshInput>, distances: Array<Distance>, 
+/**
+ * **Offset couplings**: two bodies on parallel axes that turn as one —
+ * the pins that take a cycloidal disc's rotation off to a shaft on the
+ * centre line, an Oldham coupling, a Schmidt coupling. No geometry and
+ * no play: a row in the motion, `ω_a = ω_b`, and a lossless way through
+ * the flow. What lets an orbiting body drive a shaft that does not
+ * orbit, and never what a stage has to have: a stage adds one and takes
+ * it away like a step ([`super::StageEdit::Couple`]).
+ */
+couplings: Array<[number, number]>, };

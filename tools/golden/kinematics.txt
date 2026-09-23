@@ -778,17 +778,20 @@
     fixed    ground ground                          -  torque     0.000000
     load     b1  carrier                3000.0000 rpm  torque     2.000000
     fixed    b2  ring                            -  torque   -21.431187
-    reacted  b3  planet                 -300.0000 rpm  torque    19.431187
+    reacted  b3  coupled                -300.0000 rpm  torque    19.431187
+    free     b4  planet                 -300.0000 rpm  torque     0.000000
   case 2       0.6000 Nm /      0.00 rpm at b3     +reacted at b1   
     fixed    ground ground                          -  torque     0.000000
     reacted  b1  carrier                0.0000 rpm  torque     0.058248
     fixed    b2  ring                            -  torque    -0.658248
-    load     b3  planet                 0.0000 rpm  torque     0.600000
+    load     b3  coupled                0.0000 rpm  torque     0.600000
+    free     b4  planet                 0.0000 rpm  torque     0.000000
   case 3       2.0000 Nm /   2400.00 rpm at b1     +reacted at b3   
     fixed    ground ground                          -  torque     0.000000
     load     b1  carrier                2400.0000 rpm  torque     2.000000
     fixed    b2  ring                            -  torque   -21.431187
-    reacted  b3  planet                 -240.0000 rpm  torque    19.431187
+    reacted  b3  coupled                -240.0000 rpm  torque    19.431187
+    free     b4  planet                 -240.0000 rpm  torque     0.000000
   stage 1
     slot carrier   case 1  speed    3000.000000  torque       2.000000
     slot carrier   case 2  speed       0.000000  torque       0.058248
@@ -796,9 +799,12 @@
     slot ring      case 1  speed       0.000000  torque     -21.431187
     slot ring      case 2  speed       0.000000  torque      -0.658248
     slot ring      case 3  speed       0.000000  torque     -21.431187
-    slot planet    case 1  speed    -300.000000  torque      19.431187
-    slot planet    case 2  speed       0.000000  torque       0.600000
-    slot planet    case 3  speed    -240.000000  torque      19.431187
+    slot coupled   case 1  speed    -300.000000  torque      19.431187
+    slot coupled   case 2  speed       0.000000  torque       0.600000
+    slot coupled   case 3  speed    -240.000000  torque      19.431187
+    slot planet    case 1  speed    -300.000000  torque       0.000000
+    slot planet    case 2  speed       0.000000  torque       0.000000
+    slot planet    case 3  speed    -240.000000  torque       0.000000
     member 1  z 30  
       case 1  speed    -300.000000  vs frame   -3300.000000  torque      19.482897  cycles -
       case 2  speed       0.000000  vs frame       0.000000  torque       0.600000  cycles -
@@ -813,7 +819,8 @@
     ground ground    of the train speed 0
     b1     carrier   of stage 1 speed 1
     b2     ring      of stage 1 speed 0
-    b3     planet    of stage 1 speed -1/10
+    b3     coupled   of stage 1 speed -1/10
+    b4     planet    of stage 1 speed -1/10
 
 == meshed-planets ==
   path b1    -> b2    ratio      -3.000000   efficiency  93.358179 / 93.466662  %   backlash   0.069648 / 0.208944   deg

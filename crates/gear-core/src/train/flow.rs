@@ -148,12 +148,6 @@ pub struct Flow {
 }
 
 impl Flow {
-    /// The power crossing every mesh, over the power in.
-    #[must_use]
-    pub fn circulation(&self) -> f64 {
-        self.mesh_powers.iter().sum()
-    }
-
     /// **What mesh `k` puts on its three bodies** — `a`'s, `b`'s and the
     /// frame's — the driver's whole, the driven member's under `η`, and the
     /// frame's the negative sum: the moment balance of the three bodies. Summed

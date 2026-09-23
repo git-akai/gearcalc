@@ -317,16 +317,19 @@
     b1   load     speed      3000.0000  torque 2.000000
     b2   fixed    speed              -  torque -21.431187
     b3   reacted  speed      -300.0000  torque 19.431187
+    b4   free     speed      -300.0000  torque 0.000000
   case 2
     b0   fixed    speed              -  torque 0.000000
     b1   reacted  speed         0.0000  torque 0.058248
     b2   fixed    speed              -  torque -0.658248
     b3   load     speed         0.0000  torque 0.600000
+    b4   free     speed         0.0000  torque 0.000000
   case 3
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      2400.0000  torque 2.000000
     b2   fixed    speed              -  torque -21.431187
     b3   reacted  speed      -240.0000  torque 19.431187
+    b4   free     speed      -240.0000  torque 0.000000
   member 1  z 30  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 30.000000
     case 1  T 19.482897  n -300.0000  vs frame -3300.0000  sF 292.162  sH 421.090  cycles -  widths 2.140384 / 0.951667
     case 2  T 0.600000  n 0.0000  vs frame 0.0000  sF 8.998  sH 73.897  cycles -  widths 0.065916 / 0.029308
@@ -823,18 +826,21 @@
     b2   free     speed     -1186.0465  torque 0.000000
     b3   fixed    speed              -  torque 53.311136
     b4   reacted  speed       118.6047  torque -48.336037
+    b5   free     speed       118.6047  torque 0.000000
   case 2
     b0   fixed    speed              -  torque 0.080896
     b1   reacted  speed         0.0000  torque -0.022647
     b2   free     speed         0.0000  torque 0.000000
     b3   fixed    speed              -  torque -0.658248
     b4   load     speed         0.0000  torque 0.600000
+    b5   free     speed         0.0000  torque 0.000000
   case 3
     b0   fixed    speed              -  torque -6.975099
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed      -948.8372  torque 0.000000
     b3   fixed    speed              -  torque 53.311136
     b4   reacted  speed        94.8837  torque -48.336037
+    b5   free     speed        94.8837  torque 0.000000
   member 1  z 17  m 1  alpha 20  x 0.005657  b 10.000000  beta 0.000000  d 17.000000
     case 1  T 2.000000  n 3000.0000  vs frame 3000.0000  sF 67.148  sH 690.774  cycles -  widths 0.491925 / 2.560982
     case 2  T 0.023028  n 0.0000  vs frame 0.0000  sF 0.773  sH 74.123  cycles -  widths 0.005664 / 0.029488
@@ -1445,6 +1451,7 @@
     b3   free     speed     -2040.0000  torque 0.000000
     b4   fixed    speed              -  torque -52.471922
     b5   reacted  speed      -118.6047  torque 47.575140
+    b6   free     speed      -118.6047  torque 0.000000
   case 2
     b0   fixed    speed              -  torque 0.035958
     b1   reacted  speed         0.0000  torque 0.022291
@@ -1452,6 +1459,7 @@
     b3   free     speed         0.0000  torque 0.000000
     b4   fixed    speed              -  torque -0.658248
     b5   load     speed         0.0000  torque 0.600000
+    b6   free     speed         0.0000  torque 0.000000
   case 3
     b0   fixed    speed              -  torque 2.896782
     b1   load     speed      2400.0000  torque 2.000000
@@ -1459,6 +1467,7 @@
     b3   free     speed     -1632.0000  torque 0.000000
     b4   fixed    speed              -  torque -52.471922
     b5   reacted  speed       -94.8837  torque 47.575140
+    b6   free     speed       -94.8837  torque 0.000000
   member 1  z 17  m 1  alpha 20  x 0.005657  b 10.000000  beta 0.000000  d 17.000000
     case 1  T 2.000000  n 3000.0000  vs frame 3000.0000  sF 69.118  sH 734.202  cycles -  widths 0.506357 / 2.893118
     case 2  T 0.022726  n 0.0000  vs frame 0.0000  sF 0.785  sH 78.264  cycles -  widths 0.005754 / 0.032875
@@ -2209,6 +2218,7 @@
     b4   free     speed       549.6313  torque 0.000000
     b5   fixed    speed              -  torque -49.189077
     b6   reacted  speed      -126.7843  torque 44.598657
+    b7   free     speed      -126.7843  torque 0.000000
   case 2
     b0   fixed    speed              -  torque 0.034370
     b1   reacted  speed         0.0000  torque 0.023878
@@ -2217,6 +2227,7 @@
     b4   free     speed         0.0000  torque 0.000000
     b5   fixed    speed              -  torque -0.658248
     b6   load     speed         0.0000  torque 0.600000
+    b7   free     speed         0.0000  torque 0.000000
   case 3
     b0   fixed    speed              -  torque 2.590420
     b1   load     speed      2400.0000  torque 2.000000
@@ -2225,6 +2236,7 @@
     b4   free     speed       439.7050  torque 0.000000
     b5   fixed    speed              -  torque -49.189077
     b6   reacted  speed      -101.4274  torque 44.598657
+    b7   free     speed      -101.4274  torque 0.000000
   member 1  z 17  m 1  alpha 20  x 0.005657  b 10.000000  beta 0.000000  d 17.000000
     case 1  T 2.000000  n 3000.0000  vs frame 3000.0000  sF 67.148  sH 690.774  cycles -  widths 0.491925 / 2.560982
     case 2  T 0.024280  n 0.0000  vs frame 0.0000  sF 0.815  sH 76.110  cycles -  widths 0.005972 / 0.031090
@@ -2800,18 +2812,21 @@
     b2   free     speed       -75.0000  torque 0.000000
     b3   fixed    speed              -  torque 529.818446
     b4   reacted  speed         7.5000  torque -480.374759
+    b5   free     speed         7.5000  torque 0.000000
   case 2
     b0   fixed    speed              -  torque 0.058248
     b1   reacted  speed         0.0000  torque 0.000000
     b2   free     speed         0.0000  torque 0.000000
     b3   fixed    speed              -  torque -0.658248
     b4   load     speed         0.0000  torque 0.600000
+    b5   free     speed         0.0000  torque 0.000000
   case 3
     b0   fixed    speed              -  torque -51.443687
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed       -60.0000  torque 0.000000
     b3   fixed    speed              -  torque 529.818446
     b4   reacted  speed         6.0000  torque -480.374759
+    b5   free     speed         6.0000  torque 0.000000
   member 1  z 1  m 1  alpha 20  x 0.000000  b 13.538864  beta 81.786789  d 7.000000
     case 1  T 2.000000  n 3000.0000  vs frame 3000.0000  sF -  sH 3376.091  cycles -  widths - / -
     case 2  T 0.001456  n 0.0000  vs frame 0.0000  sF -  sH 354.787  cycles -  widths - / -
@@ -3335,18 +3350,21 @@
     b2   free     speed     -1186.0465  torque 0.000000
     b3   fixed    speed              -  torque 45.673362
     b4   reacted  speed       118.6047  torque -41.411035
+    b5   free     speed       118.6047  torque 0.000000
   case 2
     b0   fixed    speed              -  torque 0.077651
     b1   reacted  speed         0.0000  torque -0.019402
     b2   free     speed         0.0000  torque 0.000000
     b3   fixed    speed              -  torque -0.658248
     b4   load     speed         0.0000  torque 0.600000
+    b5   free     speed         0.0000  torque 0.000000
   case 3
     b0   fixed    speed              -  torque -6.262327
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed      -948.8372  torque 0.000000
     b3   fixed    speed              -  torque 45.673362
     b4   reacted  speed        94.8837  torque -41.411035
+    b5   free     speed        94.8837  torque 0.000000
   member 1  z 17  m 1  alpha 20  x 0.000000  b 10.000000  beta 45.000000  d 24.041631
     case 1  T 2.000000  n 3000.0000  vs frame 3000.0000  sF -  sH 1277.647  cycles -  widths - / -
     case 2  T 0.023028  n 0.0000  vs frame 0.0000  sF -  sH 288.282  cycles -  widths - / -
@@ -3974,6 +3992,7 @@
     b4   free     speed      -600.0000  torque 0.000000
     b5   fixed    speed              -  torque -146.540599
     b6   reacted  speed       -42.8571  torque 132.865146
+    b7   free     speed       -42.8571  torque 0.000000
   case 2
     b0   fixed    speed              -  torque 0.000000
     b1   reacted  speed         0.0000  torque 0.008128
@@ -3982,6 +4001,7 @@
     b4   free     speed         0.0000  torque 0.000000
     b5   fixed    speed              -  torque -0.658248
     b6   load     speed         0.0000  torque 0.600000
+    b7   free     speed         0.0000  torque 0.000000
   case 3
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      2400.0000  torque 2.000000
@@ -3990,6 +4010,7 @@
     b4   free     speed      -480.0000  torque 0.000000
     b5   fixed    speed              -  torque -146.540599
     b6   reacted  speed       -34.2857  torque 132.865146
+    b7   free     speed       -34.2857  torque 0.000000
   member 1  z 12  m 1  alpha 20  x 0.298101  b 10.000000  beta 0.000000  d 12.000000
     case 1  T 0.666667  n 3000.0000  vs frame 2571.4286  sF 29.122  sH 546.008  cycles -  widths 0.213347 / 1.600044
     case 2  T 0.002769  n 0.0000  vs frame 0.0000  sF 0.121  sH 35.189  cycles -  widths 0.000886 / 0.006646
@@ -4653,6 +4674,7 @@
     b4   free     speed     -7000.0000  torque 0.000000
     b5   fixed    speed              -  torque -592.942487
     b6   reacted  speed        -4.9180  torque 537.607942
+    b7   free     speed        -4.9180  torque 0.000000
   case 2
     b0   fixed    speed              -  torque 0.000000
     b1   reacted  speed         0.0000  torque -0.000219
@@ -4661,6 +4683,7 @@
     b4   free     speed         0.0000  torque 0.000000
     b5   fixed    speed              -  torque -0.658248
     b6   load     speed         0.0000  torque 0.600000
+    b7   free     speed         0.0000  torque 0.000000
   case 3
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      2400.0000  torque 2.000000
@@ -4669,6 +4692,7 @@
     b4   free     speed     -5600.0000  torque 0.000000
     b5   fixed    speed              -  torque -592.942487
     b6   reacted  speed        -3.9344  torque 537.607942
+    b7   free     speed        -3.9344  torque 0.000000
   member 1  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
     ! gear.reversed_bending_uncorrected
     case 1  T 5.442742  n -7000.0000  vs frame -10000.0000  sF 146.726  sH 812.877  cycles -  widths 1.074919 / 3.546374
@@ -5449,6 +5473,7 @@
     b5   free     speed     -2000.0000  torque 0.000000
     b6   fixed    speed              -  torque -1243.231560
     b7   reacted  speed        -3.3898  torque 1127.210775
+    b8   free     speed        -3.3898  torque 0.000000
   case 2
     b0   fixed    speed              -  torque 0.000000
     b1   reacted  speed         0.0000  torque 0.000319
@@ -5458,6 +5483,7 @@
     b5   free     speed         0.0000  torque 0.000000
     b6   fixed    speed              -  torque -0.658248
     b7   load     speed         0.0000  torque 0.600000
+    b8   free     speed         0.0000  torque 0.000000
   case 3
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      2400.0000  torque 2.000000
@@ -5467,6 +5493,7 @@
     b5   free     speed     -1600.0000  torque 0.000000
     b6   fixed    speed              -  torque -1243.231560
     b7   reacted  speed        -2.7119  torque 1127.210775
+    b8   free     speed        -2.7119  torque 0.000000
   member 1  z 24  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 24.000000
     case 1  T 0.666667  n 3000.0000  vs frame 2142.8571  sF 14.930  sH 333.129  cycles -  widths 0.109374 / 0.595605
     case 2  T 0.000108  n 0.0000  vs frame 0.0000  sF 0.002  sH 4.250  cycles -  widths 0.000018 / 0.000097
@@ -5606,26 +5633,29 @@
   distance 4  running 18.020000  clearance 0.020000
 
 == planocentric then spur ==
-  path b1 -> b4  ratio 25.294118  efficiency 95.547980 / 95.473744 %  backlash 0.076810 / 1.942835 deg
+  path b1 -> b5  ratio 25.294118  efficiency 95.547980 / 95.473744 %  backlash 0.076810 / 1.942835 deg
     power through the teeth 11.687153 / 11.817947   one more tooth: 39.205882 18.970588 23.888889 25.882353
   case 1
     b0   fixed    speed              -  torque 67.767224
     b1   load     speed      3000.0000  torque 2.000000
     b2   fixed    speed              -  torque -21.431187
     b3   free     speed      -300.0000  torque 0.000000
-    b4   reacted  speed       118.6047  torque -48.336037
+    b4   free     speed      -300.0000  torque 0.000000
+    b5   reacted  speed       118.6047  torque -48.336037
   case 2
     b0   fixed    speed              -  torque -0.833283
     b1   reacted  speed         0.0000  torque -0.022647
     b2   fixed    speed              -  torque 0.255931
     b3   free     speed         0.0000  torque 0.000000
-    b4   load     speed         0.0000  torque 0.600000
+    b4   free     speed         0.0000  torque 0.000000
+    b5   load     speed         0.0000  torque 0.600000
   case 3
     b0   fixed    speed              -  torque 67.767224
     b1   load     speed      2400.0000  torque 2.000000
     b2   fixed    speed              -  torque -21.431187
     b3   free     speed      -240.0000  torque 0.000000
-    b4   reacted  speed        94.8837  torque -48.336037
+    b4   free     speed      -240.0000  torque 0.000000
+    b5   reacted  speed        94.8837  torque -48.336037
   member 1  z 30  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 30.000000
     case 1  T 19.482897  n -300.0000  vs frame -3300.0000  sF 292.162  sH 421.090  cycles -  widths 2.140384 / 0.951667
     case 2  T 0.233283  n 0.0000  vs frame 0.0000  sF 3.498  sH 46.078  cycles -  widths 0.025628 / 0.011395
@@ -5650,29 +5680,32 @@
   distance 2  running 30.025653  clearance 0.020000
 
 == planocentric then idler ==
-  path b1 -> b4  ratio -25.294118  efficiency 94.043881 / 93.970814 %  backlash 0.115759 / 2.928016 deg
+  path b1 -> b5  ratio -25.294118  efficiency 94.043881 / 93.970814 %  backlash 0.115759 / 2.928016 deg
     power through the teeth 12.640101 / 12.634526   one more tooth: -39.205882 -18.970588 -23.888889 -25.294118 -25.882353
   case 1
     b0   fixed    speed              -  torque -28.143953
     b1   load     speed      3000.0000  torque 2.000000
     b2   fixed    speed              -  torque -21.431187
     b3   free     speed      -300.0000  torque 0.000000
-    b4   reacted  speed      -118.6047  torque 47.575140
-    b5   free     speed       204.0000  torque 0.000000
+    b4   free     speed      -300.0000  torque 0.000000
+    b5   reacted  speed      -118.6047  torque 47.575140
+    b6   free     speed       204.0000  torque 0.000000
   case 2
     b0   fixed    speed              -  torque -0.370389
     b1   reacted  speed         0.0000  torque 0.022291
     b2   fixed    speed              -  torque -0.251902
     b3   free     speed         0.0000  torque 0.000000
-    b4   load     speed         0.0000  torque 0.600000
-    b5   free     speed         0.0000  torque 0.000000
+    b4   free     speed         0.0000  torque 0.000000
+    b5   load     speed         0.0000  torque 0.600000
+    b6   free     speed         0.0000  torque 0.000000
   case 3
     b0   fixed    speed              -  torque -28.143953
     b1   load     speed      2400.0000  torque 2.000000
     b2   fixed    speed              -  torque -21.431187
     b3   free     speed      -240.0000  torque 0.000000
-    b4   reacted  speed       -94.8837  torque 47.575140
-    b5   free     speed       163.2000  torque 0.000000
+    b4   free     speed      -240.0000  torque 0.000000
+    b5   reacted  speed       -94.8837  torque 47.575140
+    b6   free     speed       163.2000  torque 0.000000
   member 1  z 30  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 30.000000
     case 1  T 19.482897  n -300.0000  vs frame -3300.0000  sF 292.162  sH 421.090  cycles -  widths 2.140384 / 0.951667
     case 2  T 0.229611  n 0.0000  vs frame 0.0000  sF 3.443  sH 45.714  cycles -  widths 0.025225 / 0.011216
@@ -5705,32 +5738,35 @@
   distance 3  running 34.020000  clearance 0.020000
 
 == planocentric then layshaft ==
-  path b1 -> b4  ratio -23.662239  efficiency 94.240145 / 94.166925 %  backlash 0.139861 / 3.309425 deg
+  path b1 -> b5  ratio -23.662239  efficiency 94.240145 / 94.166925 %  backlash 0.139861 / 3.309425 deg
     power through the teeth 12.642633 / 12.656186   one more tooth: -36.676471 -17.746679 -22.347670 -24.212524 -23.662239 -23.662239 -24.478178 -22.922794
   case 1
     b0   fixed    speed              -  torque -25.167470
     b1   load     speed      3000.0000  torque 2.000000
     b2   fixed    speed              -  torque -21.431187
     b3   free     speed      -300.0000  torque 0.000000
-    b4   reacted  speed      -126.7843  torque 44.598657
-    b5   free     speed       118.6047  torque 0.000000
-    b6   free     speed       -54.9631  torque 0.000000
+    b4   free     speed      -300.0000  torque 0.000000
+    b5   reacted  speed      -126.7843  torque 44.598657
+    b6   free     speed       118.6047  torque 0.000000
+    b7   free     speed       -54.9631  torque 0.000000
   case 2
     b0   fixed    speed              -  torque -0.354041
     b1   reacted  speed         0.0000  torque 0.023878
     b2   fixed    speed              -  torque -0.269836
     b3   free     speed         0.0000  torque 0.000000
-    b4   load     speed         0.0000  torque 0.600000
-    b5   free     speed         0.0000  torque 0.000000
+    b4   free     speed         0.0000  torque 0.000000
+    b5   load     speed         0.0000  torque 0.600000
     b6   free     speed         0.0000  torque 0.000000
+    b7   free     speed         0.0000  torque 0.000000
   case 3
     b0   fixed    speed              -  torque -25.167470
     b1   load     speed      2400.0000  torque 2.000000
     b2   fixed    speed              -  torque -21.431187
     b3   free     speed      -240.0000  torque 0.000000
-    b4   reacted  speed      -101.4274  torque 44.598657
-    b5   free     speed        94.8837  torque 0.000000
-    b6   free     speed       -43.9705  torque 0.000000
+    b4   free     speed      -240.0000  torque 0.000000
+    b5   reacted  speed      -101.4274  torque 44.598657
+    b6   free     speed        94.8837  torque 0.000000
+    b7   free     speed       -43.9705  torque 0.000000
   member 1  z 30  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 30.000000
     case 1  T 19.482897  n -300.0000  vs frame -3300.0000  sF 292.162  sH 421.090  cycles -  widths 2.140384 / 0.951667
     case 2  T 0.245959  n 0.0000  vs frame 0.0000  sF 3.688  sH 47.313  cycles -  widths 0.027021 / 0.012014
@@ -5775,26 +5811,29 @@
   distance 2  running 30.025653  clearance 0.020000
 
 == planocentric then worm ==
-  path b1 -> b4  ratio 400.000000  efficiency 60.046845 / 0.000000 %  backlash 0.157518 / 63.007278 deg
+  path b1 -> b5  ratio 400.000000  efficiency 60.046845 / 0.000000 %  backlash 0.157518 / 63.007278 deg
     power through the teeth 11.687153 / 1.000000   one more tooth: 620.000000 300.000000 200.000000 410.000000
   case 1
     b0   fixed    speed              -  torque 499.805946
     b1   load     speed      3000.0000  torque 2.000000
     b2   fixed    speed              -  torque -21.431187
     b3   free     speed      -300.0000  torque 0.000000
-    b4   reacted  speed         7.5000  torque -480.374759
+    b4   free     speed      -300.0000  torque 0.000000
+    b5   reacted  speed         7.5000  torque -480.374759
   case 2
     b0   fixed    speed              -  torque -0.600000
     b1   reacted  speed         0.0000  torque 0.000000
     b2   fixed    speed              -  torque 0.000000
     b3   free     speed         0.0000  torque 0.000000
-    b4   load     speed         0.0000  torque 0.600000
+    b4   free     speed         0.0000  torque 0.000000
+    b5   load     speed         0.0000  torque 0.600000
   case 3
     b0   fixed    speed              -  torque 499.805946
     b1   load     speed      2400.0000  torque 2.000000
     b2   fixed    speed              -  torque -21.431187
     b3   free     speed      -240.0000  torque 0.000000
-    b4   reacted  speed         6.0000  torque -480.374759
+    b4   free     speed      -240.0000  torque 0.000000
+    b5   reacted  speed         6.0000  torque -480.374759
   member 1  z 30  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 30.000000
     case 1  T 19.482897  n -300.0000  vs frame -3300.0000  sF 292.162  sH 421.090  cycles -  widths 2.140384 / 0.951667
     case 2  T 0.000000  n 0.0000  vs frame 0.0000  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
@@ -5820,26 +5859,29 @@
   distance 2  running 23.727259  clearance 0.020000
 
 == planocentric then crossed ==
-  path b1 -> b4  ratio 25.294118  efficiency 81.859022 / 81.793767 %  backlash 0.076657 / 1.938982 deg
+  path b1 -> b5  ratio 25.294118  efficiency 81.859022 / 81.793767 %  backlash 0.076657 / 1.938982 deg
     power through the teeth 11.687153 / 10.267895   one more tooth: 39.205882 18.970588 23.888889 25.882353
   case 1
     b0   fixed    speed              -  torque 60.842222
     b1   load     speed      3000.0000  torque 2.000000
     b2   fixed    speed              -  torque -21.431187
     b3   free     speed      -300.0000  torque 0.000000
-    b4   reacted  speed       118.6047  torque -41.411035
+    b4   free     speed      -300.0000  torque 0.000000
+    b5   reacted  speed       118.6047  torque -41.411035
   case 2
     b0   fixed    speed              -  torque -0.799857
     b1   reacted  speed         0.0000  torque -0.019402
     b2   fixed    speed              -  torque 0.219260
     b3   free     speed         0.0000  torque 0.000000
-    b4   load     speed         0.0000  torque 0.600000
+    b4   free     speed         0.0000  torque 0.000000
+    b5   load     speed         0.0000  torque 0.600000
   case 3
     b0   fixed    speed              -  torque 60.842222
     b1   load     speed      2400.0000  torque 2.000000
     b2   fixed    speed              -  torque -21.431187
     b3   free     speed      -240.0000  torque 0.000000
-    b4   reacted  speed        94.8837  torque -41.411035
+    b4   free     speed      -240.0000  torque 0.000000
+    b5   reacted  speed        94.8837  torque -41.411035
   member 1  z 30  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 30.000000
     case 1  T 19.482897  n -300.0000  vs frame -3300.0000  sF 292.162  sH 421.090  cycles -  widths 2.140384 / 0.951667
     case 2  T 0.199857  n 0.0000  vs frame 0.0000  sF 2.997  sH 42.649  cycles -  widths 0.021956 / 0.009762
@@ -5864,32 +5906,35 @@
   distance 2  running 42.446407  clearance 0.020000
 
 == planocentric then planetary ==
-  path b1 -> b4  ratio -70.000000  efficiency 94.903675 / 94.821211 %  backlash 0.055404 / 3.878296 deg
+  path b1 -> b5  ratio -70.000000  efficiency 94.903675 / 94.821211 %  backlash 0.055404 / 3.878296 deg
     power through the teeth 12.363123 / 12.460169   one more tooth: -108.500000 -52.500000 -65.384615 -70.000000 -70.833333
   case 1
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      3000.0000  torque 2.000000
     b2   fixed    speed              -  torque -21.431187
     b3   free     speed      -300.0000  torque 0.000000
-    b4   reacted  speed       -42.8571  torque 132.865146
-    b5   fixed    speed              -  torque -113.433959
-    b6   free     speed        60.0000  torque 0.000000
+    b4   free     speed      -300.0000  torque 0.000000
+    b5   reacted  speed       -42.8571  torque 132.865146
+    b6   fixed    speed              -  torque -113.433959
+    b7   free     speed        60.0000  torque 0.000000
   case 2
     b0   fixed    speed              -  torque 0.000000
     b1   reacted  speed         0.0000  torque 0.008128
     b2   fixed    speed              -  torque -0.091847
     b3   free     speed         0.0000  torque 0.000000
-    b4   load     speed         0.0000  torque 0.600000
-    b5   fixed    speed              -  torque -0.516280
-    b6   free     speed         0.0000  torque 0.000000
+    b4   free     speed         0.0000  torque 0.000000
+    b5   load     speed         0.0000  torque 0.600000
+    b6   fixed    speed              -  torque -0.516280
+    b7   free     speed         0.0000  torque 0.000000
   case 3
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      2400.0000  torque 2.000000
     b2   fixed    speed              -  torque -21.431187
     b3   free     speed      -240.0000  torque 0.000000
-    b4   reacted  speed       -34.2857  torque 132.865146
-    b5   fixed    speed              -  torque -113.433959
-    b6   free     speed        48.0000  torque 0.000000
+    b4   free     speed      -240.0000  torque 0.000000
+    b5   reacted  speed       -34.2857  torque 132.865146
+    b6   fixed    speed              -  torque -113.433959
+    b7   free     speed        48.0000  torque 0.000000
   member 1  z 30  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 30.000000
     case 1  T 19.482897  n -300.0000  vs frame -3300.0000  sF 292.162  sH 421.090  cycles -  widths 2.140384 / 0.951667
     case 2  T 0.083720  n 0.0000  vs frame 0.0000  sF 1.255  sH 27.603  cycles -  widths 0.009197 / 0.004089
@@ -5921,32 +5966,35 @@
   distance 2  running 21.145279  clearance 0.020000
 
 == planocentric then wolfrom ==
-  path b1 -> b5  ratio -610.000000  efficiency 44.066225 / 0.000000 %  backlash 0.050506 / 30.808922 deg
+  path b1 -> b6  ratio -610.000000  efficiency 44.066225 / 0.000000 %  backlash 0.050506 / 30.808922 deg
     power through the teeth 63.318277 / 100.628943   one more tooth: -945.500000 -457.500000 -610.000000 - -310.000000
   case 1
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      3000.0000  torque 2.000000
     b2   fixed    speed              -  torque -21.431187
     b3   free     speed      -300.0000  torque 0.000000
-    b4   fixed    speed              -  torque -518.176755
-    b5   reacted  speed        -4.9180  torque 537.607942
-    b6   free     speed       700.0000  torque 0.000000
+    b4   free     speed      -300.0000  torque 0.000000
+    b5   fixed    speed              -  torque -518.176755
+    b6   reacted  speed        -4.9180  torque 537.607942
+    b7   free     speed       700.0000  torque 0.000000
   case 2
     b0   fixed    speed              -  torque 0.000000
     b1   reacted  speed         0.0000  torque -0.000232
     b2   fixed    speed              -  torque 0.002489
     b3   free     speed         0.0000  torque 0.000000
-    b4   fixed    speed              -  torque -0.602257
-    b5   load     speed         0.0000  torque 0.600000
-    b6   free     speed         0.0000  torque 0.000000
+    b4   free     speed         0.0000  torque 0.000000
+    b5   fixed    speed              -  torque -0.602257
+    b6   load     speed         0.0000  torque 0.600000
+    b7   free     speed         0.0000  torque 0.000000
   case 3
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      2400.0000  torque 2.000000
     b2   fixed    speed              -  torque -21.431187
     b3   free     speed      -240.0000  torque 0.000000
-    b4   fixed    speed              -  torque -518.176755
-    b5   reacted  speed        -3.9344  torque 537.607942
-    b6   free     speed       560.0000  torque 0.000000
+    b4   free     speed      -240.0000  torque 0.000000
+    b5   fixed    speed              -  torque -518.176755
+    b6   reacted  speed        -3.9344  torque 537.607942
+    b7   free     speed       560.0000  torque 0.000000
   member 1  z 30  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 30.000000
     case 1  T 19.482897  n -300.0000  vs frame -3300.0000  sF 292.162  sH 421.090  cycles -  widths 2.140384 / 0.951667
     case 2  T 0.002263  n 0.0000  vs frame 0.0000  sF 0.034  sH 4.538  cycles -  widths 0.000249 / 0.000111
@@ -5980,35 +6028,38 @@
   distance 2  running 20.980000  clearance 0.020000
 
 == planocentric then compound ==
-  path b1 -> b5  ratio -885.000000  efficiency 63.684225 / 0.000000 %  backlash 0.057831 / 51.180143 deg
+  path b1 -> b6  ratio -885.000000  efficiency 63.684225 / 0.000000 %  backlash 0.057831 / 51.180143 deg
     power through the teeth 42.858508 / 55.383167   one more tooth: -1371.750000 -663.750000 -859.714286 -1504.500000 -630.000000 -388.465347 2065.000000
   case 1
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      3000.0000  torque 2.000000
     b2   fixed    speed              -  torque -21.431187
     b3   free     speed      -300.0000  torque 0.000000
-    b4   fixed    speed              -  torque -1107.779588
-    b5   reacted  speed        -3.3898  torque 1127.210775
-    b6   free     speed       -85.7143  torque 0.000000
-    b7   free     speed       200.0000  torque 0.000000
+    b4   free     speed      -300.0000  torque 0.000000
+    b5   fixed    speed              -  torque -1107.779588
+    b6   reacted  speed        -3.3898  torque 1127.210775
+    b7   free     speed       -85.7143  torque 0.000000
+    b8   free     speed       200.0000  torque 0.000000
   case 2
     b0   fixed    speed              -  torque 0.000000
     b1   reacted  speed         0.0000  torque 0.000319
     b2   fixed    speed              -  torque -0.003608
     b3   free     speed         0.0000  torque 0.000000
-    b4   fixed    speed              -  torque -0.596711
-    b5   load     speed         0.0000  torque 0.600000
-    b6   free     speed         0.0000  torque 0.000000
+    b4   free     speed         0.0000  torque 0.000000
+    b5   fixed    speed              -  torque -0.596711
+    b6   load     speed         0.0000  torque 0.600000
     b7   free     speed         0.0000  torque 0.000000
+    b8   free     speed         0.0000  torque 0.000000
   case 3
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      2400.0000  torque 2.000000
     b2   fixed    speed              -  torque -21.431187
     b3   free     speed      -240.0000  torque 0.000000
-    b4   fixed    speed              -  torque -1107.779588
-    b5   reacted  speed        -2.7119  torque 1127.210775
-    b6   free     speed       -68.5714  torque 0.000000
-    b7   free     speed       160.0000  torque 0.000000
+    b4   free     speed      -240.0000  torque 0.000000
+    b5   fixed    speed              -  torque -1107.779588
+    b6   reacted  speed        -2.7119  torque 1127.210775
+    b7   free     speed       -68.5714  torque 0.000000
+    b8   free     speed       160.0000  torque 0.000000
   member 1  z 30  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 30.000000
     case 1  T 19.482897  n -300.0000  vs frame -3300.0000  sF 292.162  sH 421.090  cycles -  widths 2.140384 / 0.951667
     case 2  T 0.003289  n 0.0000  vs frame 0.0000  sF 0.049  sH 5.471  cycles -  widths 0.000361 / 0.000161
@@ -6053,29 +6104,35 @@
   distance 2  running 20.999928  clearance 0.020000
 
 == planocentric then planocentric ==
-  path b1 -> b5  ratio 100.000000  efficiency 94.392755 / 94.246135 %  backlash 0.105338 / 10.533811 deg
+  path b1 -> b6  ratio 100.000000  efficiency 94.392755 / 94.246135 %  backlash 0.105338 / 10.533811 deg
     power through the teeth 21.126428 / 21.678849   one more tooth: 155.000000 75.000000 155.000000 75.000000
   case 1
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      3000.0000  torque 2.000000
     b2   fixed    speed              -  torque -21.431187
     b3   free     speed      -300.0000  torque 0.000000
-    b4   fixed    speed              -  torque 208.216698
-    b5   reacted  speed        30.0000  torque -188.785511
+    b4   free     speed      -300.0000  torque 0.000000
+    b5   fixed    speed              -  torque 208.216698
+    b6   reacted  speed        30.0000  torque -188.785511
+    b7   free     speed        30.0000  torque 0.000000
   case 2
     b0   fixed    speed              -  torque 0.000000
     b1   reacted  speed         0.0000  torque -0.005655
     b2   fixed    speed              -  torque 0.063903
     b3   free     speed         0.0000  torque 0.000000
-    b4   fixed    speed              -  torque -0.658248
-    b5   load     speed         0.0000  torque 0.600000
+    b4   free     speed         0.0000  torque 0.000000
+    b5   fixed    speed              -  torque -0.658248
+    b6   load     speed         0.0000  torque 0.600000
+    b7   free     speed         0.0000  torque 0.000000
   case 3
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      2400.0000  torque 2.000000
     b2   fixed    speed              -  torque -21.431187
     b3   free     speed      -240.0000  torque 0.000000
-    b4   fixed    speed              -  torque 208.216698
-    b5   reacted  speed        24.0000  torque -188.785511
+    b4   free     speed      -240.0000  torque 0.000000
+    b5   fixed    speed              -  torque 208.216698
+    b6   reacted  speed        24.0000  torque -188.785511
+    b7   free     speed        24.0000  torque 0.000000
   member 1  z 30  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 30.000000
     case 1  T 19.482897  n -300.0000  vs frame -3300.0000  sF 292.162  sH 421.090  cycles -  widths 2.140384 / 0.951667
     case 2  T 0.058248  n 0.0000  vs frame 0.0000  sF 0.873  sH 23.024  cycles -  widths 0.006399 / 0.002845
@@ -6100,35 +6157,38 @@
   distance 2  running 1.734179  clearance 0.020000
 
 == planocentric then meshedplanets ==
-  path b1 -> b4  ratio 30.000000  efficiency 90.703011 / 90.737855 %  backlash 0.101569 / 3.047061 deg
+  path b1 -> b5  ratio 30.000000  efficiency 90.703011 / 90.737855 %  backlash 0.101569 / 3.047061 deg
     power through the teeth 14.526073 / 14.160700   one more tooth: 46.500000 22.500000 28.400000 30.000000 30.000000 30.416667
   case 1
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      3000.0000  torque 2.000000
     b2   fixed    speed              -  torque -21.431187
     b3   free     speed      -300.0000  torque 0.000000
-    b4   reacted  speed       100.0000  torque -54.421806
-    b5   fixed    speed              -  torque 73.852993
-    b6   free     speed       633.3333  torque 0.000000
-    b7   free     speed      -433.3333  torque 0.000000
+    b4   free     speed      -300.0000  torque 0.000000
+    b5   reacted  speed       100.0000  torque -54.421806
+    b6   fixed    speed              -  torque 73.852993
+    b7   free     speed       633.3333  torque 0.000000
+    b8   free     speed      -433.3333  torque 0.000000
   case 2
     b0   fixed    speed              -  torque 0.000000
     b1   reacted  speed         0.0000  torque -0.018148
     b2   fixed    speed              -  torque 0.205081
     b3   free     speed         0.0000  torque 0.000000
-    b4   load     speed         0.0000  torque 0.600000
-    b5   fixed    speed              -  torque -0.786933
-    b6   free     speed         0.0000  torque 0.000000
+    b4   free     speed         0.0000  torque 0.000000
+    b5   load     speed         0.0000  torque 0.600000
+    b6   fixed    speed              -  torque -0.786933
     b7   free     speed         0.0000  torque 0.000000
+    b8   free     speed         0.0000  torque 0.000000
   case 3
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      2400.0000  torque 2.000000
     b2   fixed    speed              -  torque -21.431187
     b3   free     speed      -240.0000  torque 0.000000
-    b4   reacted  speed        80.0000  torque -54.421806
-    b5   fixed    speed              -  torque 73.852993
-    b6   free     speed       506.6667  torque 0.000000
-    b7   free     speed      -346.6667  torque 0.000000
+    b4   free     speed      -240.0000  torque 0.000000
+    b5   reacted  speed        80.0000  torque -54.421806
+    b6   fixed    speed              -  torque 73.852993
+    b7   free     speed       506.6667  torque 0.000000
+    b8   free     speed      -346.6667  torque 0.000000
   member 1  z 30  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 30.000000
     case 1  T 19.482897  n -300.0000  vs frame -3300.0000  sF 292.162  sH 421.090  cycles -  widths 2.140384 / 0.951667
     case 2  T 0.186933  n 0.0000  vs frame 0.0000  sF 2.803  sH 41.247  cycles -  widths 0.020536 / 0.009131
@@ -6803,6 +6863,7 @@
     b5   free     speed      4333.3333  torque 0.000000
     b6   fixed    speed              -  torque 60.023297
     b7   reacted  speed       100.0000  torque -54.421806
+    b8   free     speed       100.0000  torque 0.000000
   case 2
     b0   fixed    speed              -  torque 0.000000
     b1   reacted  speed         0.0000  torque -0.018148
@@ -6812,6 +6873,7 @@
     b5   free     speed         0.0000  torque 0.000000
     b6   fixed    speed              -  torque -0.658248
     b7   load     speed         0.0000  torque 0.600000
+    b8   free     speed         0.0000  torque 0.000000
   case 3
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      2400.0000  torque 2.000000
@@ -6821,6 +6883,7 @@
     b5   free     speed      3466.6667  torque 0.000000
     b6   fixed    speed              -  torque 60.023297
     b7   reacted  speed        80.0000  torque -54.421806
+    b8   free     speed        80.0000  torque 0.000000
   member 1  z 24  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 24.000000
     case 1  T 0.666667  n 3000.0000  vs frame 4000.0000  sF 14.993  sH 331.781  cycles -  widths 0.109839 / 0.590795
     case 2  T 0.006166  n 0.0000  vs frame 0.0000  sF 0.139  sH 31.907  cycles -  widths 0.001016 / 0.005464

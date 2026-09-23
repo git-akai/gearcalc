@@ -435,6 +435,14 @@ after it is close to concatenation.
      Each component is searched on its own constraints.
   3. `Train::graph()`, its motion law, and a law that one solve of the
      graph is every stage's solve, element by element, on every fixture.
+     **Found on the way, and decided**: a planocentric's output was its
+     orbiting planet, and a chain after it would put the next gear on the
+     eccentric. Its output is now a shaft on the centre line turned by an
+     **offset coupling** (pins, an Oldham coupling) — an element a stage may
+     have and lose, so a planocentric and a hula are one step and a
+     coupling apart (decision 8). **Done.** A file written before it, whose
+     chain joins a planocentric's planet, is the converter's to rewrite in
+     Phase 4: the join becomes the coupled shaft's.
   4. The production switch and the slicing — notes and indices back to
      their stages — weighed once 1–3 are in: it is an adapter Phase 6
      deletes.
@@ -576,3 +584,7 @@ were, and each board on the canvas is a flow the script walks.
 6. **`StageLoads` and `solve_any` retire.**
 7. **Outputs run down, never across** (§3.2): labels and figures mixed at
    uneven widths do not read in a line.
+8. **An orbiting output is an offset coupling**, a general element rather
+   than an Oldham coupling by name — most cycloidal drives use pins — and
+   never mandatory: presets transition into one another by edits, and a
+   preset the edits cannot reach or leave marks a hole in the method.

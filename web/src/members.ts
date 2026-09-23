@@ -239,7 +239,14 @@ export function onSlot(
     )
     .filter((x) => x !== null);
   if (gears.length > 0) return gears.join(" · ");
-  return shape.axes.some((a) => a.carried_by === body) ? t("ui.train_carrier") : "";
+  if (shape.axes.some((a) => a.carried_by === body)) return t("ui.train_carrier");
+  // A shaft with no gear that an offset coupling turns: what it turns with.
+  const coupled = shape.couplings.find((c) => c.includes(body));
+  if (coupled !== undefined) {
+    const other = coupled[0] === body ? coupled[1] : coupled[0];
+    return t("ui.train_turns_with", { on: onSlot(train, topology, stage, slotOf(shape, other), numbered) });
+  }
+  return "";
 }
 
 /** **Everything on a body, across the train**: each end's stage and what

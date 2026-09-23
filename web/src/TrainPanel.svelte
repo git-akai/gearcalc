@@ -1404,10 +1404,31 @@
               onclick={() => editTrain(tab.train, held ? { release: b.body } : { hold: b.body })}
             >{held ? t("ui.train_release") : t("ui.train_hold")}</button>
           {/if}
+          <!-- **An orbiting body may drive a shaft that does not orbit**,
+               through an offset coupling — the pins a cycloidal disc
+               drives — on a new body of the axis its carrier turns about.
+               Offered wherever it is not coupled already; a planet too,
+               since a drive of two discs couples both. -->
+          {#if g.carriedBy !== null && !shape.couplings.some((c) => c.includes(b.body))}
+            {#if port === undefined}<span class="filler"></span>{/if}
+            <button
+              class="action add"
+              aria-label={t("ui.train_couple_of", { body: bodyName(b.body) })}
+              onclick={() => editStage(i, { couple: { body: b.body } })}
+            >{t("ui.train_couple")}</button>
+          {/if}
         </div>
         {#if b.members.length === 0 && b.carries}
           <div class="onbody"><span class="dim">{t("ui.train_carrier")}</span></div>
         {/if}
+        {#each shape.couplings as c, k (k)}
+          {#if c.includes(b.body)}
+            <div class="onbody">
+              <span class="dim">{t("ui.train_turns_with", { on: bodyName(c[0] === b.body ? c[1] : c[0]) })}</span>
+              <button class="action danger" onclick={() => editStage(i, { uncouple: { coupling: k } })}>{t("ui.train_uncouple")}</button>
+            </div>
+          {/if}
+        {/each}
         {#each b.members as j (j)}
           {@const where = movable.find((x) => x.member === j)}
           <div class="onbody">

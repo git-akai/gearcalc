@@ -2378,7 +2378,8 @@ and the idlers and the even ones the layshaft's — the disengaged pairs'
 gears idling on bodies of their own), a Wolfrom (one
 planet, two rings, no sun), a stepped planet (two gears on the planet's body,
 two rings), a planocentric reducer (one planet on an eccentric carrier, its
-own turn the output), meshed planets (sun, planet, planet, ring — the
+own turn the output, taken off to a shaft on the centre line by an offset
+coupling), meshed planets (sun, planet, planet, ring — the
 carrier turning against the sun) and a Ravigneaux (two suns, long and short
 planets, one ring, the planet–planet mesh a distance between two carried
 axes), and a worm feeding a spur pair (a point contact and a line contact
@@ -2583,8 +2584,21 @@ train with no two ends is parked the same way, at two bodies of its own.
 
 **Ports and bodies.** A **port** is every slot of a stage that is not
 replicated — a set's sun, carrier and ring, a layshaft, and a single
-orbiting member, since a planocentric reducer's output *is* its planet —
-and the train's *open ports* are the port bodies it does not fix. Both are
+orbiting member, a hula's wobble body — and the train's *open ports* are
+the port bodies it does not fix.
+
+**An offset coupling** turns two bodies on parallel axes as one: the pins
+that take a cycloidal disc's turn off to the centre line, an Oldham
+coupling, a Schmidt coupling. It is a row in the motion, `ω_a = ω_b`, and a
+way through the flow that loses nothing either way, with no geometry and no
+play — and it has no teeth, so a path's power through the teeth does not
+count it. A planocentric reducer's output is the shaft its planet is
+coupled to, on the centre line, so what follows it turns about the input's
+axis. The coupling is the stage's to lose: a stage couples an orbiting body
+to a new shaft on its carrier's axis and uncouples it again, and a
+planocentric with a step on its planet, a ring on the step and its
+coupling taken away is a hula stage — each reached from the other by the
+card's edits. Both are
 readings of **one list**: the motion report's `bodies` is every body of the
 train, ground first, each with its ends (the stages it is listed on and
 what it is there), whether a case may address it (`port`), whether the

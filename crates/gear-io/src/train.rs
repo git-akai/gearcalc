@@ -223,6 +223,13 @@
 //!   file meant is `{ auto = false, manual = m }` on each group's first
 //!   member and `{ auto = true, manual = m }` on the rest; a member that
 //!   omits `pressure_angle` follows its group at 20°.
+//! - **A stage may couple two bodies.** `couplings` lists pairs of bodies
+//!   that turn as one through an offset coupling — a cycloidal disc's
+//!   output pins, an Oldham coupling — `[[3, 4]]` on a planocentric,
+//!   whose output is now a shaft on the centre line coupled to its planet
+//!   rather than the planet itself. A stage that omits it couples nothing,
+//!   which is what every older file meant: an older planocentric still
+//!   reads, its output the planet's own body as it was.
 //!
 //! No compatibility shim, deliberately. Accepting both shapes means carrying two
 //! readers for one format and testing both forever, and the thing that would go

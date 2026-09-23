@@ -85,6 +85,12 @@ impl Builder {
         self
     }
 
+    /// Two bodies turning as one through an offset coupling.
+    pub fn couple(&mut self, a: usize, b: usize) -> &mut Self {
+        self.shape.couplings.push([a, b]);
+        self
+    }
+
     /// An automatic distance between two axes, at the shipped clearance.
     pub fn distance(&mut self, axes: [usize; 2]) -> &mut Self {
         self.crossed(axes, 0.0)
@@ -170,6 +176,10 @@ pub enum Central {
     Sun { on: usize, teeth: u32 },
     /// A ring meshing the planet gear `on`.
     Ring { on: usize, teeth: u32 },
+    /// **A shaft with no gear, turned by the planet body of axis `to`**
+    /// through an offset coupling — the pins that take a cycloidal disc's
+    /// turn off to the centre line.
+    Coupled { to: usize },
 }
 
 /// **The one epicyclic stage**: a carrier, `planets` carried axes each
@@ -237,7 +247,13 @@ pub fn epicyclic(
             }
             Central::Sun { teeth, .. } => Some(b.gear(shaft, teeth)),
             Central::Ring { teeth, .. } => Some(b.ring(shaft, teeth)),
+            Central::Coupled { .. } => None,
         });
+    }
+    for (c, &shaft) in centrals.iter().zip(&shafts) {
+        if let Central::Coupled { to } = *c {
+            b.couple(shaft, planet_shafts[to]);
+        }
     }
     for (c, m) in centrals.iter().zip(&central_members) {
         if let (Central::Sun { on, .. } | Central::Ring { on, .. }, Some(m)) = (*c, *m) {
@@ -573,17 +589,24 @@ pub fn stepped(sun: u32, planets: [u32; 2], rings: [u32; 2], count: u32) -> Shap
 
 /// **A planocentric (cycloid-style involute) reducer**: one planet on an
 /// eccentric carrier meshing one ring a tooth or two larger; the ring held,
-/// the carrier the input, the planet's own rotation the output. The ratio
-/// is `−z_p / (z_r − z_p)`.
+/// the carrier the input, the planet's own rotation the output, taken off
+/// to a shaft on the centre line by an offset coupling — the pins a
+/// cycloidal disc drives. The ratio is `−z_p / (z_r − z_p)`.
 ///
-/// Carrier, ring, then the planet's own body — the output, an orbiting
-/// port.
+/// Carrier, ring, the coupled shaft — the output — then the planet's own
+/// body. The coupling is the stage's to lose: a step on the planet and a
+/// ring on it, the coupling taken away, and the second ring is the output
+/// of a hula stage.
 #[must_use]
 pub fn planocentric(planet: u32, ring: u32) -> Shape {
     epicyclic(
         1,
         &[&[external(planet)]],
-        &[Central::Carrier, Central::Ring { on: 0, teeth: ring }],
+        &[
+            Central::Carrier,
+            Central::Ring { on: 0, teeth: ring },
+            Central::Coupled { to: 0 },
+        ],
         &[],
     )
 }

@@ -165,7 +165,16 @@ const out = {
     out.push(["stage_parallel_added", structuredClone(t)]);
     t = stage(2, "remove_axis");
     t = stage(2, { remove_mesh: { mesh: t.stages[2].meshes.length - 1 } });
-    out.push(["stage_parallel_removed", t]);
+    out.push(["stage_parallel_removed", structuredClone(t)]);
+    // **A coupling taken off a planocentric and put back**: its shaft goes
+    // with the coupling where nothing else names it, and the planet coupled
+    // again drives a new one.
+    t = edit(t, { push_stage: preset("planocentric") });
+    const plano = t.stages.length - 1;
+    t = stage(plano, { uncouple: { coupling: 0 } });
+    out.push(["stage_uncoupled", structuredClone(t)]);
+    t = stage(plano, { couple: { body: t.stages[plano].members[0].body } });
+    out.push(["stage_coupled", t]);
     return out;
   }),
   // The default train, and the same train with a set pushed behind its pair

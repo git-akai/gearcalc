@@ -574,6 +574,8 @@ fn labelled(stage: &Shape, label: gear_core::train::BodyLabel) -> String {
         // A shaft with nothing on it: a gearbox in neutral.
         (BodyLabel::Bare, _) => "bare".into(),
         (BodyLabel::Carrier { .. }, _) => "carrier".into(),
+        // A shaft an offset coupling turns: a cycloidal drive's output.
+        (BodyLabel::Coupled { .. }, _) => "coupled".into(),
         (BodyLabel::Member { member }, shape) => member_role(shape, member),
     }
 }

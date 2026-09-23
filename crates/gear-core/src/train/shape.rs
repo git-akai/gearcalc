@@ -307,6 +307,15 @@ pub struct Shape {
     pub members: Vec<Member>,
     pub meshes: Vec<MeshInput>,
     pub distances: Vec<Distance>,
+    /// **Offset couplings**: two bodies on parallel axes that turn as one —
+    /// the pins that take a cycloidal disc's rotation off to a shaft on the
+    /// centre line, an Oldham coupling, a Schmidt coupling. No geometry and
+    /// no play: a row in the motion, `ω_a = ω_b`, and a lossless way through
+    /// the flow. What lets an orbiting body drive a shaft that does not
+    /// orbit, and never what a stage has to have: a stage adds one and takes
+    /// it away like a step ([`super::StageEdit::Couple`]).
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub couplings: Vec<[usize; 2]>,
 }
 
 /// **The empty shape** — what the builder starts from. Every default a
@@ -320,6 +329,7 @@ impl Default for Shape {
             members: Vec::new(),
             meshes: Vec::new(),
             distances: Vec::new(),
+            couplings: Vec::new(),
         }
     }
 }
@@ -393,6 +403,9 @@ impl Shape {
             if a.carried_by != GROUND {
                 a.carried_by = map(a.carried_by);
             }
+        }
+        for c in &mut self.couplings {
+            *c = c.map(&map);
         }
     }
 
@@ -759,10 +772,16 @@ impl Shape {
         if let Some(index) = carriers.iter().position(|&c| c == shaft) {
             return BodyLabel::Carrier { index };
         }
-        self.members
+        if let Some(member) = self.members.iter().position(|m| self.slot(m.body) == shaft) {
+            return BodyLabel::Member { member };
+        }
+        self.couplings
             .iter()
-            .position(|m| self.slot(m.body) == shaft)
-            .map_or(BodyLabel::Bare, |member| BodyLabel::Member { member })
+            .find_map(|c| {
+                let [a, b] = c.map(|x| self.slot(x));
+                (a == shaft).then_some(b).or((b == shaft).then_some(a))
+            })
+            .map_or(BodyLabel::Bare, |to| BodyLabel::Coupled { to })
     }
 
     // ---------------------------------------------------------- helices ---
@@ -4063,14 +4082,19 @@ impl Shape {
                     }
                 })
                 .collect(),
+            couplings: self
+                .couplings
+                .iter()
+                .map(|c| c.map(|b| self.slot(b)))
+                .collect(),
         }
     }
 
     /// **Every body that is not replicated is a port**, in body order — a
-    /// pair's two members, a set's sun, carrier and ring, a layshaft, and a
-    /// single orbiting member: a planocentric reducer's output *is* its
-    /// planet, taken off through an Oldham coupling, and a hula's wobble
-    /// body is the same body with four gears on it. (For a while a body
+    /// pair's two members, a set's sun, carrier and ring, a layshaft, a
+    /// shaft an offset coupling turns, and a single orbiting member: a
+    /// hula's wobble body is the same body with four gears on it. (For a
+    /// while a body
     /// on a carried axis was no port, because a case reacted every open
     /// port it did not load and so held the wobble body; a case declares
     /// what it reacts now, and an orbiting port is a port.) What is held by

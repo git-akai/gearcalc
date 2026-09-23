@@ -550,8 +550,10 @@ axes (spur/helical, idler, layshaft), skew shafts (worm, crossed), epicyclic
 (planetary, Wolfrom, compound, planocentric, meshed planets), all one shape
 and all one list of what sits where (`arrangements`), the hula an
 arrangement of the epicyclic family the harness names · a stage
-edited on its card — a step, a sun or a ring, an axis, a mesh — by the
-core's rules, the cases following, the cards dealt by step and by mesh
+edited on its card — a step, a sun or a ring, an axis, a mesh, an offset
+coupling from an orbiting body to a shaft on the centre line — by the
+core's rules, the cases following, a planocentric and a hula one step and
+a coupling apart, the cards dealt by step and by mesh
 group, each mesh above the distance it runs at · **a train's bodies are its one vocabulary for what
 turns**: numbered across the train as the gears are, a stage listing the
 bodies on its axes and a body on two stages being what a coupling used to

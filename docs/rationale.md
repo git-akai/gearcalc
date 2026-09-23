@@ -183,6 +183,36 @@ nothing about loads — and `screw.rs` a **pair**.
 genuinely not a stage of a geartrain, it needs its own noun rather than this
 one stretched.
 
+### An orbiting output is a coupling, and a coupling is the stage's to lose
+
+A planocentric reducer's output was its planet's own body — an orbiting
+port — and whatever followed it in a train was joined to that body. A stage
+kept its axes to itself, so the next stage's gear sat on a fixed axis of
+its own while being the same body as a planet going round the eccentric,
+and the model said nothing about how. **A shaft is straight**: the train is
+becoming one graph in which a body turns about one axis, and on it that
+join puts the next gear on the eccentric.
+
+The machine answers it. A cycloidal disc's turn is taken off by pins in
+holes, or an Oldham coupling, or a Schmidt coupling, to a shaft on the
+centre line — so the output is **a second body, coaxial with the input,
+turning with the disc**. That is an offset coupling: `ω_a = ω_b` between
+bodies on parallel axes, lossless, with no geometry and no play. The
+kinematics had the row already (`System::couple`, a coaxial coupling's),
+and the flow passes it as a mesh of one tooth and minus one, whose frame
+carries nothing.
+
+**It is not what a planocentric is.** A preset is a starting point: a
+planocentric with a step on its planet, a ring on the step and the coupling
+taken away is a hula stage, and a hula with its wobble body coupled and its
+second step taken away is a planocentric. So the coupling is an element a
+stage has, added and removed like a step, and a law walks both ways ratio
+for ratio. A preset the edits could not reach, or leave, would be a hole in
+the edits rather than a property of the preset.
+
+**What would change it:** an output mechanism with a ratio of its own — a
+pin-and-roller output that is not 1:1 — would be a mesh, not a coupling.
+
 ### Degrees where a designer states a number, radians in the mathematics
 
 Both units are right and the tool needs both: a drawing says 20°, and every

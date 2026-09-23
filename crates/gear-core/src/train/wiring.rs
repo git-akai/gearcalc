@@ -98,6 +98,9 @@ pub enum BodyLabel {
     /// what neutral is. It turns as nothing decides, and the motion says
     /// so by being a family one condition short.
     Bare,
+    /// **No gear, and turned by an offset coupling** — the shaft a
+    /// cycloidal disc's pins drive — with the slot it turns with.
+    Coupled { to: Body },
 }
 
 /// Where one member sits: what it turns with, and what its axis stands still
@@ -163,6 +166,10 @@ pub struct Wiring {
     pub mounts: Vec<Mount>,
     /// One per mesh, in [`super::ShapeResult::meshes`] order.
     pub meshes: Vec<MeshSpec>,
+    /// **Two slots that turn as one** through an offset coupling, one per
+    /// coupling in the shape's order. A row in the motion and nothing in
+    /// the geometry.
+    pub couplings: Vec<[Body; 2]>,
 }
 
 /// Why a wiring could not be turned into a system.
@@ -181,6 +188,8 @@ pub enum WiringError {
     /// A member or body index a wiring names and does not have, or a gear
     /// meshing itself. A preset's defect rather than a design's.
     NotAMesh(usize),
+    /// A coupling naming a body the stage does not have, or one body twice.
+    NotACoupling(usize),
 }
 
 impl Wiring {
@@ -272,6 +281,13 @@ impl Wiring {
                     frame: at(frame),
                 })
                 .ok_or(WiringError::NotAMesh(k))?;
+        }
+        // A coupling is no mesh row, so the play a mesh is asked about by
+        // its index stays that mesh's ([`System::play`]).
+        for (k, &[a, b]) in self.couplings.iter().enumerate() {
+            system
+                .couple(at(a), at(b))
+                .ok_or(WiringError::NotACoupling(k))?;
         }
         Ok(())
     }

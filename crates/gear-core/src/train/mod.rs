@@ -1747,6 +1747,9 @@ impl std::fmt::Display for TrainError {
                 WiringError::NotAMesh(k) => {
                     write!(f, "mesh {} is not a mesh this stage has", k + 1)
                 }
+                WiringError::NotACoupling(k) => {
+                    write!(f, "coupling {} joins no two bodies this stage has", k + 1)
+                }
             },
             Self::UnknownMaterial(n) => write!(f, "no material named {n:?} in the library"),
             Self::NoRootSection => write!(f, "the tooth is too undercut to have a root section"),
@@ -3393,6 +3396,7 @@ fn paths_of(
     boundaries: &[StageBoundary],
     system: &crate::kinematics::System,
     [moving, resting]: [&[flow::MeshFlow]; 2],
+    with_teeth: usize,
     rep: &[Body],
     base: &[Condition],
     stages: &[ShapeResult],
@@ -3461,7 +3465,14 @@ fn paths_of(
             speed,
             &flow::Asked::through(shafts, rep[from], speed[from].signum(), rep[to], &held),
         )
-        .map_or((0.0, 0.0), |f| (f.efficiency, f.circulation()))
+        .map_or((0.0, 0.0), |f| {
+            (
+                f.efficiency,
+                f.mesh_powers[..with_teeth.min(f.mesh_powers.len())]
+                    .iter()
+                    .sum(),
+            )
+        })
     };
     // **One more tooth on each gear**, gears numbered across the train:
     // the same motion asked of the system with that one count raised.
@@ -3902,7 +3913,8 @@ pub struct PathReport {
     /// sum over the meshes the path loads of what each passes: one across a
     /// pair, under one where a carrier takes part of it bodily, many times
     /// one where power circulates, which is where such a path's efficiency
-    /// goes ([`flow::Flow::circulation`]).
+    /// goes ([`flow::Flow::mesh_powers`]). An offset coupling passes power
+    /// and has no teeth, so it counts for nothing here.
     pub circulation: Directional<f64>,
     /// **The ratio one more tooth on each gear would give**, gears numbered
     /// across the train — the graph's exact answer at `z_i + 1`, which is
@@ -4080,6 +4092,30 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
             meshes.push(mesh);
         }
         mesh_of_stage.push(mine);
+    }
+    // **Every offset coupling after every mesh**: a way through the flow
+    // that loses nothing either way — a mesh of one tooth and minus one,
+    // so the frame it would stand in carries nothing — and no teeth, so
+    // what a path says passes its teeth does not count it.
+    let with_teeth = meshes.len();
+    let mut coupling_of_stage: Vec<Vec<usize>> = Vec::new();
+    for (k, w) in wirings.iter().enumerate() {
+        let mut mine = Vec::new();
+        for &[a, b] in &w.couplings {
+            mine.push(meshes.len());
+            let coupling = flow::MeshFlow {
+                a: train.port(k, a),
+                b: train.port(k, b),
+                frame: GROUND,
+                za: 1.0,
+                zb: -1.0,
+                efficiency: Directional::of(|_| 1.0),
+                paths: 1.0,
+            };
+            meshes.push(coupling);
+            resting.push(coupling);
+        }
+        coupling_of_stage.push(mine);
     }
     // Every body's label, ground first, as the report lists them and as the
     // case's conditions index them: what the body is on the first stage
@@ -4381,6 +4417,11 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
                 torques[w.mounts[m.b].spins_with] += on_b;
                 torques[w.frame(j).unwrap_or(GROUND)] += on_frame;
             }
+            for (&[a, b], &g) in w.couplings.iter().zip(&coupling_of_stage[k]) {
+                let [on_a, on_b, _] = flow.on_shafts(g, &meshes[g]);
+                torques[a] += on_a;
+                torques[b] += on_b;
+            }
             per_stage[k].push(CaseLoad {
                 case: index,
                 kind: case.kind,
@@ -4437,6 +4478,7 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
         &boundaries,
         &system,
         [&body_meshes, &resting],
+        with_teeth,
         &rep,
         &base,
         &stages,
@@ -10908,6 +10950,43 @@ mod a_path_is_what_it_crosses {
                 check(&name, vec![a.build(), b.build()], 0, &lib);
                 check(&name, vec![a.build(), b.build()], 1, &lib);
             }
+        }
+    }
+
+    /// **An offset coupling passes what reaches it and adds nothing**: a
+    /// planocentric's path to the shaft its planet is coupled to is the
+    /// path to the planet — the ratio, the efficiency both ways, the play at
+    /// each end and the power through the teeth, which a coupling has none
+    /// of — and the shaft turns with the planet in every case.
+    #[test]
+    fn a_coupled_shaft_is_the_body_it_turns_with() {
+        let lib = test_library();
+        let stage = StagePreset::Planocentric.build();
+        assert_eq!(
+            stage.couplings,
+            vec![[3, 4]],
+            "carrier, ring, shaft, planet"
+        );
+        let to = |output: Body| {
+            solve_alone(
+                &Train::alone(&stage, 2.0, 3000.0).arranged(&[2], 1, output),
+                &lib,
+            )
+            .unwrap()
+        };
+        let (shaft, planet) = (to(3), to(4));
+        assert!(close(shaft.ratio.unwrap(), planet.ratio.unwrap()));
+        let (e, pe) = (shaft.efficiency.unwrap(), planet.efficiency.unwrap());
+        assert!(close(e.forward, pe.forward) && close(e.backward, pe.backward));
+        let (b, pb) = (shaft.backlash.unwrap(), planet.backlash.unwrap());
+        assert!(
+            close(b.forward.nominal, pb.forward.nominal)
+                && close(b.backward.nominal, pb.backward.nominal)
+        );
+        let (c, pc) = (shaft.circulation.unwrap(), planet.circulation.unwrap());
+        assert!(close(c.forward, pc.forward) && close(c.backward, pc.backward));
+        for case in &shaft.cases {
+            assert!(close(case.speeds[3], case.speeds[4]), "{case:?}");
         }
     }
 

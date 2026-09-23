@@ -380,6 +380,7 @@ impl Train {
         for s in &mut self.stages {
             s.bodies.retain(|b| keep(b.body));
             s.members.retain(|m| keep(m.body));
+            s.couplings.retain(|c| c.iter().all(|&b| keep(b)));
             s.renumber_bodies(to);
         }
         self.constraints.retain(|c| keep(c.body));
@@ -1361,6 +1362,7 @@ impl Train {
                 .filter(|&b| {
                     self.stages[k].members_on_body(b).is_empty()
                         && !self.stages[k].carries_an_axis(b)
+                        && !self.stages[k].couplings.iter().any(|c| c.contains(&b))
                         && !named(self, b, k)
                 })
                 .collect();

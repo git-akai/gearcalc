@@ -82,6 +82,15 @@ pub enum StageEdit {
     /// a gear fixed to the carrier of the planets it meshes locks the
     /// stage.
     MoveBody { member: usize, body: Option<usize> },
+    /// **An offset coupling** from `body`, on a carried axis, to a new body
+    /// on its carrier's axis: the pins that take a cycloidal disc's turn off
+    /// to the centre line, or an Oldham coupling. Refused for a body on an
+    /// axis nothing carries, and for one coupled already.
+    Couple { body: usize },
+    /// **An offset coupling removed**, with each body it joined that is
+    /// left with nothing on it — the shaft it turned, as a mesh removed
+    /// takes its gears' emptied bodies.
+    Uncouple { coupling: usize },
 }
 
 /// Why an edit is refused: the invariant it would break.
@@ -105,6 +114,8 @@ pub enum EditRefused {
     /// The body carries an axis: a gear on the carrier of the planets it
     /// meshes locks the stage.
     CarriesAnAxis,
+    /// The body is coupled already.
+    Coupled,
 }
 
 impl EditRefused {
@@ -121,6 +132,7 @@ impl EditRefused {
             Self::NotOnTheAxis => "ui.train_edit_refused_axis",
             Self::NoRoom => "ui.train_edit_refused_no_room",
             Self::CarriesAnAxis => "ui.train_edit_refused_carrier",
+            Self::Coupled => "ui.train_edit_refused_coupled",
         }
     }
 }
@@ -135,6 +147,7 @@ impl std::fmt::Display for EditRefused {
             Self::NotOnTheAxis => "not a body on the member's axis",
             Self::NoRoom => "nothing of that kind fits at this radius",
             Self::CarriesAnAxis => "that body carries an axis",
+            Self::Coupled => "that body is coupled already",
         })
     }
 }
@@ -158,6 +171,8 @@ impl Shape {
             StageEdit::AddMesh { distance } => self.add_mesh_on(distance, next),
             StageEdit::RemoveMesh { mesh } => self.remove_mesh(mesh),
             StageEdit::MoveBody { member, body } => self.move_body(member, body, next),
+            StageEdit::Couple { body } => self.couple(body, next),
+            StageEdit::Uncouple { coupling } => self.uncouple(coupling),
         }
     }
 
@@ -439,6 +454,14 @@ impl Shape {
             self.drop_member(i);
         }
         // Any body left on it, and its distances, and the axis.
+        let gone: Vec<usize> = self
+            .bodies
+            .iter()
+            .filter(|b| b.axis == axis)
+            .map(|b| b.body)
+            .collect();
+        self.couplings
+            .retain(|c| !c.iter().any(|b| gone.contains(b)));
         self.bodies.retain(|b| b.axis != axis);
         self.distances.retain(|d| !d.axes.contains(&axis));
         self.axes.pop();
@@ -564,7 +587,48 @@ impl Shape {
         Ok(())
     }
 
+    // --------------------------------------------------------- couplings ---
+
+    fn couple(&mut self, body: usize, next: usize) -> Result<(), EditRefused> {
+        let axis = self.axis_of_body(body).ok_or(EditRefused::NoSuchIndex)?;
+        if !self.carried(axis) {
+            return Err(EditRefused::WrongFamily);
+        }
+        if self.couplings.iter().any(|c| c.contains(&body)) {
+            return Err(EditRefused::Coupled);
+        }
+        let central = self.central_axis_of(axis).ok_or(EditRefused::NoSuchIndex)?;
+        self.bodies.push(super::shape::BodyOn {
+            body: next,
+            axis: central,
+        });
+        self.couplings.push([next, body]);
+        Ok(())
+    }
+
+    fn uncouple(&mut self, coupling: usize) -> Result<(), EditRefused> {
+        if coupling >= self.couplings.len() {
+            return Err(EditRefused::NoSuchIndex);
+        }
+        let joined = self.couplings.remove(coupling);
+        for body in joined {
+            self.drop_if_bare(body);
+        }
+        Ok(())
+    }
+
     // ---------------------------------------------------------- the drops ---
+
+    /// A body off the stage where nothing is on it, it carries no axis and
+    /// no coupling turns it — with nothing left to say what it is.
+    fn drop_if_bare(&mut self, body: usize) {
+        if self.members_on_body(body).is_empty()
+            && !self.carries_an_axis(body)
+            && !self.couplings.iter().any(|c| c.contains(&body))
+        {
+            self.bodies.retain(|b| b.body != body);
+        }
+    }
 
     /// A member gone, with its meshes, and its body off the stage where it
     /// was alone on it and the body carries no axis.
@@ -582,6 +646,7 @@ impl Shape {
         self.members.remove(member);
         if self.members_on_body(body).is_empty() && !self.carries_an_axis(body) {
             self.bodies.retain(|b| b.body != body);
+            self.couplings.retain(|c| !c.contains(&body));
         }
     }
 }
@@ -639,6 +704,10 @@ mod tests {
                     .unwrap();
                 out.push(StageEdit::AddStep { axis });
                 out.push(StageEdit::AddCentral { gear, ring: true });
+                let body = shape.members[gear].body;
+                if !shape.couplings.iter().any(|c| c.contains(&body)) {
+                    out.push(StageEdit::Couple { body });
+                }
                 // No sun fits inside a planocentric, and it says so.
                 if shape.members.len() > 2 {
                     out.push(StageEdit::AddCentral { gear, ring: false });
@@ -740,6 +809,14 @@ mod tests {
         let last = shape.meshes.len() - 1;
         edit(&mut shape, StageEdit::RemoveMesh { mesh: last }).unwrap();
         assert!(same(&shape, &layshaft), "a mesh added and removed");
+        // A coupling added to a hula's wobble body and taken away, the
+        // shaft it turned with it.
+        let hula = arr::hula([19, 18, 17, 18], [1.0, 1.0]);
+        let mut shape = hula.clone();
+        edit(&mut shape, StageEdit::Couple { body: 4 }).unwrap();
+        assert!(!same(&shape, &hula), "a coupling changed nothing");
+        edit(&mut shape, StageEdit::Uncouple { coupling: 0 }).unwrap();
+        assert!(same(&shape, &hula), "a coupling added and removed");
     }
 
     /// **A refused edit changes nothing**, and refuses for the reason named:
@@ -748,6 +825,21 @@ mod tests {
     #[test]
     fn a_refused_edit_changes_nothing() {
         let cases: Vec<(Shape, StageEdit, EditRefused)> = vec![
+            (
+                StagePreset::Planocentric.build(),
+                StageEdit::Couple { body: 4 },
+                EditRefused::Coupled,
+            ),
+            (
+                StagePreset::Spur.build(),
+                StageEdit::Couple { body: 1 },
+                EditRefused::WrongFamily,
+            ),
+            (
+                StagePreset::Planocentric.build(),
+                StageEdit::Uncouple { coupling: 1 },
+                EditRefused::NoSuchIndex,
+            ),
             (
                 StagePreset::Planocentric.build(),
                 StageEdit::RemoveMember { member: 1 },
@@ -1032,6 +1124,65 @@ mod tests {
             "{:?} against the list's {:?}",
             edited.ratio,
             listed.ratio
+        );
+    }
+
+    /// **The hula is reached from the planocentric by the card's edits**,
+    /// and the planocentric from the hula: the coupling is the stage's to
+    /// lose. A step on the planet — a gear and a ring on it — and the
+    /// coupling taken away is a hula whose second ring is the output; a
+    /// coupling on a hula's wobble body and its second step taken away is
+    /// a planocentric whose coupled shaft is. Each is the list it reaches,
+    /// ratio for ratio, on the counts the tables print.
+    #[test]
+    fn the_planocentric_and_the_hula_are_one_edit_apart() {
+        let mut shape = StagePreset::Planocentric.build();
+        // Bodies: carrier, ring, the coupled shaft, the planet's body.
+        edit(&mut shape, StageEdit::AddStep { axis: 1 }).unwrap();
+        edit(&mut shape, StageEdit::Uncouple { coupling: 0 }).unwrap();
+        assert!(shape.couplings.is_empty());
+        assert_eq!(
+            shape.bodies.iter().map(|b| b.body).collect::<Vec<_>>(),
+            [1, 2, 4, 5],
+            "the coupled shaft goes with its coupling"
+        );
+        // Members: planet 1, ring 1 (grounded), planet 2, the ring on it.
+        for (m, z) in shape.members.iter_mut().zip([18, 19, 17, 18]) {
+            m.gear.teeth = z;
+        }
+        let edited = under(&shape, StageBoundary::holding(5, &[2], 1, 4));
+        let listed = under(
+            &arr::hula([19, 18, 17, 18], [1.0, 1.0]),
+            StageBoundary::holding(5, &[2], 1, 3),
+        );
+        assert!(
+            (edited.ratio.unwrap() - listed.ratio.unwrap()).abs() < 1e-9,
+            "{:?} against the list's {:?}",
+            edited.ratio,
+            listed.ratio
+        );
+
+        // ...and back: the hula's wobble body coupled to a shaft on the
+        // centre line, its second step and the output ring on it taken away.
+        let mut shape = arr::hula([19, 18, 17, 18], [1.0, 1.0]);
+        edit(&mut shape, StageEdit::Couple { body: 4 }).unwrap();
+        edit(&mut shape, StageEdit::RemoveStep { gear: 1 }).unwrap();
+        assert_eq!(shape.couplings, vec![[5, 4]]);
+        // Bodies: carrier, the grounded ring, the wobble body, the shaft.
+        let edited = under(&shape, StageBoundary::holding(5, &[2], 1, 4));
+        let listed = under(
+            &arr::planocentric(18, 19),
+            StageBoundary::holding(5, &[2], 1, 3),
+        );
+        assert!(
+            (edited.ratio.unwrap() - listed.ratio.unwrap()).abs() < 1e-9,
+            "{:?} against the list's {:?}",
+            edited.ratio,
+            listed.ratio
+        );
+        assert!(
+            (listed.ratio.unwrap() + 18.0).abs() < 1e-9,
+            "−z_p / (z_r − z_p)"
         );
     }
 
