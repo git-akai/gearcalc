@@ -121,14 +121,13 @@ pub struct Train {
     pub meshes: Vec<MeshInput>,
     pub distances: Vec<Distance>,    // one per pair of axes that mesh
     pub constraints: Vec<BodyConstraint>,
-    pub readings: Vec<Reading>,      // the paths a designer keeps (§2.4)
-    pub load_cases: Vec<LoadCase>,
+    pub load_cases: Vec<LoadCase>,   // and the paths the train reports (§2.4)
     pub reversed_bending: bool,
 }
 ```
 
-Structurally this is today's `Shape` with the train's constraints, cases and
-readings beside it, and `Shape` can stay the name of the graph part so that
+Structurally this is today's `Shape` with the train's constraints and cases
+beside it, and `Shape` can stay the name of the graph part so that
 most of `shape.rs` moves by deletion rather than by rewrite.
 
 **The invariants**, each a refusal that names itself as `EditRefused` does
@@ -139,7 +138,7 @@ today, and each checked on load:
 3. one distance per pair of axes that mesh, and none between axes that do not;
 4. every member is in a mesh, and a mesh's two members are on two axes with a
    distance between them;
-5. every body a member, an axis, a hold, a case or a reading names exists.
+5. every body a member, an axis, a hold or a case names exists.
 
 ### 2.2 Where every stage input goes
 
@@ -180,25 +179,29 @@ graph. (Decision 1.)
 
 | Today, on `ShapeResult` | Moves to |
 |---|---|
-| `ratio`, `efficiency`, `circulation`, `backlash` — under the stage's own convention | the **readings** (§2.4): a `PathReport` per kept path and per case's load→reaction |
-| `ratio_per_tooth` — one more tooth, against the stage ratio | per member, **per reading**: what one more tooth here does to each kept path |
+| `ratio`, `efficiency`, `circulation`, `backlash` — under the stage's own convention | the **paths** (§2.4): a `PathReport` per case's load→reaction |
+| `ratio_per_tooth` — one more tooth, against the stage ratio | per member, **per path**: what one more tooth here does to each |
 | `members: Vec<GearResult>` | train-wide, per member |
 | `meshes: Vec<MeshReport>` | train-wide, per mesh |
 | `distances: Vec<DistanceReport>` | train-wide, per distance |
 | `layouts: Vec<LayoutReport>` | per replicated axis (`AxisReport`) |
 | `cases: Vec<SlotCase>` | gone: `TrainCase` already says every body's speed and torque |
-| `notes` | on the thing they concern — a member, a mesh, a distance, an axis, a reading, a case |
+| `notes` | on the thing they concern — a member, a mesh, a distance, an axis, a case |
 
-### 2.4 Readings replace the stage figures and the ends
+### 2.4 A case is the reading
 
-`Reading { from: Body, to: Body }` is an input: a path the designer keeps.
-The rows are the readings, then — as `paths_of` does now, minus the
-conventional ends — every enabled case's load-to-reaction path once. A stage's
-ratio was always a proxy for one of these ("Body 2 to Body 3"); a reading says
-which, and can cross what used to be a stage boundary.
+The train reports a path for every case — from each of its loads to each of
+its reactions, once — as `paths_of` does now, **minus the conventional
+ends**, which go with `Train::ends`. A stage's ratio was always a proxy for
+one of these ("Body 2 to Body 3"); a case says which, and can cross what used
+to be a stage boundary.
 
-A fresh train keeps the reading its first preset suggests (§2.5), so a new
-spur pair still opens on its ratio.
+There is no second input for it. A path worth watching is a case worth
+running, and a fresh train starts with a default case — its first preset's
+conventional input loaded, its output reacted — so a new spur pair still opens
+on its ratio, and says under what load. (Considered and dropped: a
+`readings` list beside the cases. It would have been two ways of naming the
+same path, one of them unloaded.)
 
 ### 2.5 Presets insert, and write what their conventions meant
 
@@ -211,9 +214,9 @@ with its conventional input, output and holds named in it. Inserting one:
    without stating;
 3. writes its conventional holds as `BodyConstraint`s, so "Fixed" is a stated
    hold from the moment it appears;
-4. carries the readings, case entries and holds at the old output on to the
-   new one, as `push_stage` carries case entries now; on an empty train, adds
-   the reading input→output.
+4. carries the case entries and holds at the old output on to the new one,
+   as `push_stage` carries case entries now; on an empty train, writes the
+   default cases at the preset's conventional input and output.
 
 `StagePreset::ALL`, `defaults()` and the menu stay as they are. What goes is
 the preset's *afterlife*: once inserted, a planetary set is gears on axes like
@@ -221,8 +224,8 @@ everything else, and can be edited into anything the graph admits.
 
 **Old files convert, and keep their answers.** The reader concatenates a
 stage-shaped file into one graph — axes merged where a body is shared — and
-writes each stage's convention as explicit holds and the chain's ends as one
-reading. A law holds every converted fixture's figures to the stage-shaped
+writes each stage's convention as explicit holds; its cases already name the
+paths it reports. A law holds every converted fixture's figures to the stage-shaped
 solve it came from (§6).
 
 ### 2.6 One edit set
@@ -240,7 +243,6 @@ solve it came from (§6).
 | `split(stage, body)`, `move_end` | `Move` of the members that leave | a split was always "these gears onto a body of their own" |
 | `join(a, b)` | `Join { a, b }` | **merges the axes** where the two turn about different ones — refused where one is carried and the other is not, or where two distances would join one pair of axes and disagree beyond relief |
 | `hold`, `release` | `Hold(b)`, `Release(b)` | unchanged |
-| — | `Read { from, to }`, `Unread(i)` | §2.4 |
 | `relieve_stage` | `relieve(freedom)` | freedoms indexed train-wide |
 | cases, duty | unchanged | |
 
@@ -260,7 +262,7 @@ gears; everything else a card did is `AddGear`, `Remove`, `Move` or `Join`.
    exists because a stage was solved before the train knew its loads. With
    one graph it is one pass: geometry, then flow, then each mesh pressed with
    its own driver's force. `Chosen` survives only where relief needs a prior.
-5. **Results**: `TrainResult { readings, cases, members, meshes, distances,
+5. **Results**: `TrainResult { paths, cases, members, meshes, distances,
    axes, notes, topology }`, where `topology` carries every grouping the panel
    draws (§3) — computed in Rust, because the *order* of the flow grouping
    reads power direction, which is a result, and one rule should serve the
@@ -318,16 +320,18 @@ named at the edge ("Body 2 also carries Gear 3 → Gear 3 ⇄ Gear 4").
   distance, clearance, tolerances, tip gap — named with what else they set
   ("also sets Gear 3 ⇄ Gear 4 and Gear 5 ⇄ Gear 6"), since editing them here
   moves meshes that are not on screen.
-- **Outputs** sit below: first what the mesh comes to whatever the load —
-  efficiency, contact ratios, operating angle, backlash, interference, and
-  the reading across the mesh with one more tooth on each gear — then one
+- **Outputs** sit below, and **run down, never across**: a label and a
+  value per row, so every figure starts at the same edge and no descriptor is
+  read as a number. First what the mesh comes to whatever the load —
+  efficiency, contact ratios, operating angle, backlash, interference, the
+  ratio across it and what one more tooth on each gear does to it — then one
   column per case, with a band of rows per gear in the order the columns run
   (Gear 1, the mesh, Gear 2), so the weaker gear of the pair is read across a
   row and each case's governing figure is marked.
 
 For a body the pane is the body — hold, join, what is on it, its speed and
 torque per case. For an axis, the axis — its bodies, its distances, its
-planets and their gap. For a reading, the path; for a case, the case.
+planets and their gap. For a case, the case and the path it reports.
 
 ### 3.3 Select, act, and see before you click
 
@@ -338,16 +342,16 @@ whose entries are complete outcomes generated from the graph.
 
 Every entry and every verb gets a **dry run on hover**: the core applies the
 edit to a copy, solves it and reports what it would make, what else it would
-change and what the readings would come to — or why it would be refused. An
+change and what the paths would come to — or why it would be refused. An
 edit is a pure function and a solve is microseconds, so this is cheap; it is
 one entry point, `preview_edit(train, edit)`, returning the refusal or the
 diff as keys and values, so the words stay in the catalogue and the
 comparison stays in Rust.
 
-### 3.4 Readings and cases
+### 3.4 Cases, and the paths they report
 
-Across the top: the kept readings (the train's headline figures), then the
-cases as a row of chips with one selected. The selected case is what the flow
+Across the top: the cases as a row of chips with one selected, and under
+them the path each reports — the train's headline figures. The selected case is what the flow
 list annotates each body with — its speed and torque — so evaluating a case
 is reading down the list.
 
@@ -386,10 +390,11 @@ none* — this is the null diff that proves the solve, and the phase most
 likely to find a stage-local assumption the geometry was leaning on.
 
 **Phase 4 — storage flips.** `Train` holds the graph. Conventions are written
-as holds at insertion; readings are an input; the reader converts
+as holds at insertion, and a fresh train's default cases at its first
+preset's ends; `Train::ends` and its row go; the reader converts
 stage-shaped files, and a law holds every converted fixture's figures to its
 Phase-3 answer. *Diff: the corpus's train fixtures change form — stage
-figures become reading rows — and no number moves.*
+figures become path rows — and no number moves.*
 
 **Phase 5 — one edit set.** §2.6. `every_add_on_every_preset_solves`,
 `every_add_undoes` and `a_refused_edit_changes_nothing` sweep every preset
@@ -398,13 +403,13 @@ refusals, and for `AddGear` over every mate and target the graph admits.
 `preview_edit` lands here, since it is `edit` plus `solve` and nothing else.
 
 **Phase 6 — results and the boundary.** `TrainResult` per member, mesh,
-distance, axis and reading, with `topology` carrying the groupings;
+distance, axis and path, with `topology` carrying the groupings;
 `relieve_stage` → `relieve`; `adopt_member` by member; bindings; the probe.
 *Diff: the wasm record, whole.*
 
 **Phase 7 — the interface.** The two panes, the three list groupings, the
-workspace, select-and-act, the add menu with the dry run, the readings and
-case strips. Driven in the browser against the canvas, flow by flow: build a
+workspace, select-and-act, the add menu with the dry run, the case strip
+and its paths. Driven in the browser against the canvas, flow by flow: build a
 spur-to-layshaft-to-set train from nothing, engage the other ratio, hold the
 carrier, tune one mesh, read a case.
 
@@ -424,9 +429,9 @@ the map in `CLAUDE.md`, whose `train/` table is rewritten; this plan deleted.
   the stage figures, `SlotCase`.
 - **The two-pass solve**: `CaseLoad`, the per-stage second pass, most of
   `Chosen`'s plumbing.
-- **`StageLoads` and `solve_any`** — the lone-stage asked form — become "a
-  train with one preset inserted", which is what every caller meant; the 212
-  references are mostly tests, and they shrink to a helper.
+- **`StageLoads` and `solve_any`** — the lone-stage asked form — retire:
+  every caller becomes "a train with one preset inserted and a case on it",
+  which is what each meant. The 212 references are mostly tests.
 - **`StageEdit` and `edit_stage`**, into one `Edit`; `split` and `move_end`
   into `Move`.
 - **The panel's stage cards**, `bodies_of`, `cardOrder`, the per-stage
@@ -466,13 +471,13 @@ were, and each board on the canvas is a flow the script walks.
 ## 7. Documentation, strings and checks
 
 - Five catalogues: the stage headings, the per-stage notes and the edits'
-  names go; the workspace, the groupings, the readings and the dry run's
+  names go; the workspace, the groupings, the paths and the dry run's
   sentences arrive. `tools/check_strings.py` holds both directions.
 - `tools/check_bindings.sh --write` at Phases 2, 4 and 6.
 - `tools/check_wasm.sh --write` at every phase that moves the boundary, and
   its record read, not just written.
 - `tools/check_figures.py`: the documents' figures that are stage figures
-  become reading figures and are re-tagged.
+  become path figures and are re-tagged.
 - The corpus at every phase, with the diff each phase names.
 
 ---
@@ -504,19 +509,17 @@ were, and each board on the canvas is a flow the script walks.
 
 ---
 
-## 9. Decisions to take
+## 9. Decisions taken
 
-1. **The search switch**: per mesh with "any mesh asks" (proposed), or per
-   component.
-2. **Stage labels**: keep a name on a region, for reading only, or none at
-   all — the groupings are derived and may be enough.
-3. **The fresh train's reading**: the first preset's input to output
-   (proposed), or none until a case exists.
-4. **Selection**: kept on the tab like `open`, or transient.
-5. **Flow drawn down, as a list beside the workspace** (proposed), **or
-   across, as a strip above a full-width one** — the canvas draws both. Down
-   scales to any train and leaves the workspace narrower; across reads as a
-   power path at a glance and gives the workspace the width a run of three
-   wants, but runs out of room at five or six steps.
-6. **The lone-stage harness form**: keep `StageLoads` as a thin helper over a
-   one-preset train for the CLI and the tests, or retire it.
+1. **The search switch is per mesh**, a component searched where any of its
+   meshes asks, and the panel naming the others it covers.
+2. **No stage labels.** A stage's name lives in the preset menu and nowhere
+   after insertion.
+3. **A fresh train starts with a default case** at its first preset's
+   conventional ends, and that case is its headline path. No `readings`.
+4. **The selection is view state kept on the tab**, like `open`: leaving a
+   tab and coming back finds the same thing selected.
+5. **The flow is drawn down**, as a list beside the workspace.
+6. **`StageLoads` and `solve_any` retire.**
+7. **Outputs run down, never across** (§3.2): labels and figures mixed at
+   uneven widths do not read in a line.
