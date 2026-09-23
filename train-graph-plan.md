@@ -518,6 +518,28 @@ inserted alone and after another; new laws for `Join`'s axis merge and its
 refusals, and for `AddGear` over every mate and target the graph admits.
 `preview_edit` lands here, since it is `edit` plus `solve` and nothing else.
 
+**Phase 5, step 1 — the graph's edits.** Done: `Edit` — `AddGear` at a
+body, a new body or a new axis (`Place`), `AddRatio` on the body asked,
+`AddStep`, `Couple`, `Remove` of a member, mesh, axis, body or coupling
+(`Piece`) with what goes with it, `Move`, `Join`, `Hold`, `Release` and
+`Insert` at a body — made by `Train::edit`, each on a copy and kept whole
+or refused whole. The card's `StageEdit` is read into these with its own
+refusals, so the panel's behaviour held: the probe's every card step
+answers byte for byte. Decided on the way: **a lock by construction is
+made and named by the solve**, as a lock by holds is — the edit's to say is
+whether the graph hangs together — save the one the card's move already
+refused, a gear on its own planet's carrier; **a gear's body goes with it
+where nothing else is on it**, as it did, but a shaft an offset coupling
+turns stays; `Join` makes an orbiting end's join a coupling rather than
+refusing it (decision 8). Laws: every gear the graph admits over every mate
+and place, on every preset alone and as a second card, is refused whole or
+leaves nothing hanging, sized to the distance it crosses, and undoes;
+every removal leaves nothing hanging; a join is one body on one axis or
+says why; an insert runs on its shaft; a ratio goes on the body asked —
+each rule run against broken code first. Found by them: a gear taken off a
+coupled shaft took the shaft, a hold outlived an emptied train, and an
+edit's refusal had never crossed the boundary as its key (`corrections.md`).
+
 **Phase 6 — results and the boundary.** `TrainResult` per member, mesh,
 distance, axis and path, with `topology` carrying the groupings;
 `relieve_stage` → `relieve`; `adopt_member` by member; bindings; the probe.

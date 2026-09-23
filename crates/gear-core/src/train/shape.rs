@@ -479,7 +479,7 @@ impl Shape {
     }
 
     /// Whether a mesh is the point contact of crossed shafts.
-    fn is_crossed(&self, mesh: usize) -> bool {
+    pub(crate) fn is_crossed(&self, mesh: usize) -> bool {
         self.shaft_angle_of(mesh) != 0.0
     }
 

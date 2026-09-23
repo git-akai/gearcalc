@@ -1,6 +1,8 @@
-//! **The edits a stage takes on the card**, each a rule about what else has
-//! to change — the mirror, one level down, of what `conditions.rs` does
-//! for a train.
+//! **The edits a train's graph takes**, each a rule about what else has to
+//! change, made whole or refused whole ([`Edit`], made by
+//! [`super::Train::edit`]) — and the card's vocabulary for the same
+//! ([`StageEdit`]), read through its part into the graph's until the
+//! interface asks the graph's edits by name.
 //!
 //! A designer permutes an arrangement by adding and removing: a step on the
 //! planet body, a sun or a ring on a planet gear, an axis at the end of a
@@ -18,13 +20,107 @@
 //! every member is in a mesh, every planet gear meets a central member,
 //! every distance carries a mesh, and a carrier's body is never removed.
 
+use super::graph::Part;
 use super::shape::{Member, Shape};
 use super::StageGear;
 use crate::kinematics::GROUND;
 use crate::params::Auto;
 
-/// What a card asks of a stage. Indices are the card's own — a member, a
-/// mesh, a distance, an axis or a coupling by its position in the part
+/// **What a designer does to a train's graph** — the one set of edits,
+/// every index the graph's own: a member, a mesh, a distance, an axis or a
+/// coupling by its place in the [`Shape`]'s lists, a body by the train's
+/// number for it. Each is a rule about what else changes, made whole or
+/// refused whole ([`EditRefused`]) by [`super::Train::edit`].
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+pub enum Edit {
+    /// **A gear meshing `mate`**, on `on` — a ring where `ring` — sized to
+    /// what it meets: to the distance between the two axes where they have
+    /// one (a sun or a ring on a planet gear to the radius its axis runs
+    /// at), and on a new axis the mate's count, a ring twice it. It follows
+    /// the mate's module and pressure angle, its shift and thickness
+    /// automatic. Everything a card's *add* guessed at is one of these.
+    AddGear { mate: usize, on: Place, ring: bool },
+    /// **Another ratio across a distance**: a gear on `shared` — a body on
+    /// one of the distance's two axes — meshing a gear on a new body of the
+    /// other, the two copying the distance's first mesh. Which body the
+    /// ratios share is asked: it is what makes the stage a layshaft.
+    AddRatio { distance: usize, shared: usize },
+    /// **A step**: one more gear on the planet body of carried `axis`, with
+    /// a ring meshing it at the radius the axis runs at.
+    AddStep { axis: usize },
+    /// **An offset coupling** from `body`, on a carried axis, to a new body
+    /// on its carrier's axis: the pins that take a cycloidal disc's turn
+    /// off to the centre line.
+    Couple { body: usize },
+    /// **A piece taken out, with what goes with it** — a gear left meshing
+    /// nothing, a body left with nothing on it, a distance left with no
+    /// mesh, an axis left with nothing on it — and refused where a planet
+    /// gear would be left meeting nothing on its carrier's axis, whose
+    /// radius it runs at.
+    Remove(Piece),
+    /// **A gear moved** to another body on its axis — `None` a new one —
+    /// the body it leaves staying while anything names it.
+    Move { member: usize, to: Option<usize> },
+    /// **Two bodies made one** ([`super::Train::join`]).
+    Join { a: usize, b: usize },
+    /// A body held to ground.
+    Hold(usize),
+    /// A body's hold taken out.
+    Release(usize),
+    /// **A stage laid into the train**, its bodies numbered after the
+    /// train's: its conventional input made one with `at` where given, and
+    /// otherwise with the last part's remaining open output, the case
+    /// entries there carried to its own ([`super::Train::push_stage`]).
+    Insert { stage: Shape, at: Option<usize> },
+}
+
+/// **Where a gear an edit adds goes.**
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+pub enum Place {
+    /// On a body the train has.
+    Body(usize),
+    /// On a new body of an axis the graph has.
+    NewBody(usize),
+    /// On a new axis fixed in ground, at an automatic distance from the
+    /// mate's.
+    NewAxis,
+}
+
+/// **A piece of the graph**, by the graph's index — a body by its number.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+pub enum Piece {
+    Member(usize),
+    Mesh(usize),
+    Axis(usize),
+    Body(usize),
+    Coupling(usize),
+}
+
+/// **What a card asks of its stage** — the card's vocabulary for the graph's
+/// edits ([`Edit`]), each read through its part into one of them with the
+/// card's own refusals. Indices are the card's own — a member, a mesh, a
+/// distance, an axis or a coupling by its position in the part
 /// ([`super::graph::Part`]), which on a shape asked alone is the shape's —
 /// and a body is the train's number for it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -121,6 +217,13 @@ pub enum EditRefused {
     CarriesAnAxis,
     /// The body is coupled already.
     Coupled,
+    /// No axis distance joins the two axes a mesh would cross.
+    NoDistance,
+    /// Two bodies of one part made one: a mesh or a carrier would turn
+    /// against itself.
+    OneCard,
+    /// Two bodies an axis distance apart made one: a shaft is straight.
+    Apart,
 }
 
 impl EditRefused {
@@ -138,6 +241,9 @@ impl EditRefused {
             Self::NoRoom => "ui.train_edit_refused_no_room",
             Self::CarriesAnAxis => "ui.train_edit_refused_carrier",
             Self::Coupled => "ui.train_edit_refused_coupled",
+            Self::NoDistance => "ui.train_edit_refused_no_distance",
+            Self::OneCard => "ui.train_edit_refused_one_card",
+            Self::Apart => "ui.train_edit_refused_apart",
         }
     }
 }
@@ -153,27 +259,34 @@ impl std::fmt::Display for EditRefused {
             Self::NoRoom => "nothing of that kind fits at this radius",
             Self::CarriesAnAxis => "that body carries an axis",
             Self::Coupled => "that body is coupled already",
+            Self::NoDistance => "no axis distance joins those axes",
+            Self::OneCard => "those bodies are on one card",
+            Self::Apart => "those bodies are an axis distance apart",
         })
     }
 }
 
 impl Shape {
-    /// Apply one edit, numbering any body it adds from `next` — the first
-    /// number the train has free — upward.
+    /// **A card's edit on a shape asked alone** — the whole shape one card
+    /// ([`Part::whole`]) — numbering any body it adds from `next`, the first
+    /// number the train has free, upward.
     ///
     /// # Errors
     ///
     /// [`EditRefused`] where the edit would break an invariant, with the
     /// shape untouched.
     pub fn edit(&mut self, edit: StageEdit, next: usize) -> Result<(), EditRefused> {
-        let all: Vec<usize> = (0..self.members.len()).collect();
-        self.edit_among(&all, edit, next)
+        let whole = Part::whole(self);
+        self.edit_part(&whole, edit, next)
     }
 
     /// **An edit a card asks of its part**, on the graph the part is of:
-    /// the card's indices read through the part's maps into the graph's
-    /// ([`super::graph::Part`]), and an axis removed from the card's gears
-    /// alone — a shaft another part's gears are on stays, with them.
+    /// the card's indices read through the part's maps into the graph's,
+    /// the card's own refusals asked, and the graph's edit made
+    /// ([`Self::apply`]). What it reads of its stage it reads among the
+    /// card's gears — an axis removed from them alone, a shaft another
+    /// part's gears are on staying with them; a gear alone among them
+    /// already on a body of its own.
     ///
     /// # Errors
     ///
@@ -181,68 +294,156 @@ impl Shape {
     /// the part does not have.
     pub fn edit_part(
         &mut self,
-        part: &super::graph::Part,
+        part: &Part,
         edit: StageEdit,
         next: usize,
     ) -> Result<(), EditRefused> {
         let at = |v: &[usize], i: usize| v.get(i).copied().ok_or(EditRefused::NoSuchIndex);
         let member = |i: usize| at(&part.members, i);
-        let edit = match edit {
-            StageEdit::AddStep { axis } => StageEdit::AddStep {
+        let graph = match edit {
+            StageEdit::AddStep { axis } => Edit::AddStep {
                 axis: at(&part.axes, axis)?,
             },
-            StageEdit::RemoveStep { gear } => StageEdit::RemoveStep {
-                gear: member(gear)?,
-            },
-            StageEdit::AddCentral { gear, ring } => StageEdit::AddCentral {
-                gear: member(gear)?,
-                ring,
-            },
-            StageEdit::RemoveMember { member: i } => StageEdit::RemoveMember { member: member(i)? },
-            StageEdit::AddAxis { mate } => StageEdit::AddAxis {
+            StageEdit::RemoveStep { gear } => {
+                let gear = member(gear)?;
+                if !self.is_planet_gear(gear) {
+                    return Err(EditRefused::WrongFamily);
+                }
+                if self.members_on_body(self.members[gear].body).len() < 2 {
+                    return Err(EditRefused::LastOnItsStep);
+                }
+                Edit::Remove(Piece::Member(gear))
+            }
+            StageEdit::AddCentral { gear, ring } => {
+                let gear = member(gear)?;
+                let axis = self
+                    .axis_of_slot(self.slot_of_member(gear))
+                    .ok_or(EditRefused::NoSuchIndex)?;
+                if !self.carried(axis) {
+                    return Err(EditRefused::WrongFamily);
+                }
+                let central = self.central_axis_of(axis).ok_or(EditRefused::NoSuchIndex)?;
+                Edit::AddGear {
+                    mate: gear,
+                    on: Place::NewBody(central),
+                    ring,
+                }
+            }
+            StageEdit::RemoveMember { member: i } => {
+                let i = member(i)?;
+                self.may_remove_member(i)?;
+                Edit::Remove(Piece::Member(i))
+            }
+            StageEdit::AddAxis { mate } => Edit::AddGear {
                 mate: member(mate)?,
+                on: Place::NewAxis,
+                ring: false,
             },
-            StageEdit::RemoveAxis { axis } => StageEdit::RemoveAxis {
-                axis: at(&part.axes, axis)?,
-            },
-            StageEdit::AddMesh { distance } => StageEdit::AddMesh {
-                distance: at(&part.distances, distance)?,
-            },
-            StageEdit::RemoveMesh { mesh } => StageEdit::RemoveMesh {
-                mesh: at(&part.meshes, mesh)?,
-            },
-            StageEdit::MoveBody { member: i, body } => StageEdit::MoveBody {
-                member: member(i)?,
-                body,
-            },
-            StageEdit::Couple { body } => StageEdit::Couple { body },
-            StageEdit::Uncouple { coupling } => StageEdit::Uncouple {
-                coupling: at(&part.couplings, coupling)?,
-            },
+            StageEdit::RemoveAxis { axis } => {
+                let axis = at(&part.axes, axis)?;
+                let gears = self.may_clear_axis(axis, &part.members)?;
+                return self.transact(|s| {
+                    s.clear_axis(axis, gears);
+                    Ok(())
+                });
+            }
+            StageEdit::AddMesh { distance } => {
+                let distance = at(&part.distances, distance)?;
+                Edit::AddRatio {
+                    distance,
+                    shared: self.shared_body(distance)?,
+                }
+            }
+            StageEdit::RemoveMesh { mesh } => {
+                let mesh = at(&part.meshes, mesh)?;
+                let d = self.distance_of(mesh).ok_or(EditRefused::NoSuchIndex)?;
+                if self.meshes_on(d).len() < 2 {
+                    return Err(EditRefused::LastOfItsKind);
+                }
+                let m = self.meshes[mesh];
+                if self.is_planet_gear(m.a) || self.is_planet_gear(m.b) {
+                    return Err(EditRefused::WrongFamily);
+                }
+                Edit::Remove(Piece::Mesh(mesh))
+            }
+            StageEdit::MoveBody { member: i, body } => {
+                let i = member(i)?;
+                // Alone among the card's gears on its body, it is on one of
+                // its own already, whatever another part has there.
+                let alone = self
+                    .members_on_body(self.members[i].body)
+                    .iter()
+                    .filter(|j| part.members.contains(j))
+                    .count()
+                    == 1;
+                if body.is_none() && alone {
+                    return Ok(());
+                }
+                Edit::Move {
+                    member: i,
+                    to: body,
+                }
+            }
+            StageEdit::Couple { body } => Edit::Couple { body },
+            StageEdit::Uncouple { coupling } => {
+                Edit::Remove(Piece::Coupling(at(&part.couplings, coupling)?))
+            }
         };
-        self.edit_among(&part.members, edit, next)
+        self.apply(&graph, next)
     }
 
-    /// An edit, with `among` the gears the asking card has.
-    fn edit_among(
+    /// **One of the graph's edits on the shape** — every one but a join, a
+    /// hold and an insert, which are the train's ([`super::Train::edit`]) —
+    /// numbering any body it adds from `next`.
+    ///
+    /// # Errors
+    ///
+    /// [`EditRefused`], the shape untouched.
+    pub(crate) fn apply(&mut self, edit: &Edit, next: usize) -> Result<(), EditRefused> {
+        let all: Vec<usize> = (0..self.members.len()).collect();
+        self.transact(|s| match *edit {
+            Edit::AddGear { mate, on, ring } => s.add_gear(mate, on, ring, next),
+            Edit::AddRatio { distance, shared } => s.add_ratio(distance, shared, next),
+            Edit::AddStep { axis } => s.add_step(axis, next),
+            Edit::Couple { body } => s.couple(body, next),
+            Edit::Remove(piece) => s.remove(piece),
+            Edit::Move { member, to } => s.move_body(member, to, &all, next),
+            Edit::Join { .. } | Edit::Hold(_) | Edit::Release(_) | Edit::Insert { .. } => {
+                Err(EditRefused::WrongFamily)
+            }
+        })
+    }
+
+    /// **An edit made whole or not at all**: on a copy, kept where it
+    /// refuses nothing and leaves every planet that ran at a radius still
+    /// running at one — a carried axis a gear is on meeting a gear on its
+    /// carrier's axis, the mesh its radius is read from.
+    fn transact(
         &mut self,
-        among: &[usize],
-        edit: StageEdit,
-        next: usize,
+        edit: impl FnOnce(&mut Self) -> Result<(), EditRefused>,
     ) -> Result<(), EditRefused> {
-        match edit {
-            StageEdit::AddStep { axis } => self.add_step(axis, next),
-            StageEdit::RemoveStep { gear } => self.remove_step(gear),
-            StageEdit::AddCentral { gear, ring } => self.add_central(gear, ring, next),
-            StageEdit::RemoveMember { member } => self.remove_member(member),
-            StageEdit::AddAxis { mate } => self.add_axis(mate, next),
-            StageEdit::RemoveAxis { axis } => self.remove_axis(axis, among),
-            StageEdit::AddMesh { distance } => self.add_mesh_on(distance, next),
-            StageEdit::RemoveMesh { mesh } => self.remove_mesh(mesh),
-            StageEdit::MoveBody { member, body } => self.move_body(member, body, among, next),
-            StageEdit::Couple { body } => self.couple(body, next),
-            StageEdit::Uncouple { coupling } => self.uncouple(coupling),
+        let mut s = self.clone();
+        edit(&mut s)?;
+        if self.planets_at_a_radius() && !s.planets_at_a_radius() {
+            return Err(EditRefused::LastOnItsStep);
         }
+        *self = s;
+        Ok(())
+    }
+
+    /// Whether every carried axis with a gear on it meets a gear on its
+    /// carrier's axis.
+    fn planets_at_a_radius(&self) -> bool {
+        let axis_of = |i: usize| self.axis_of_slot(self.slot_of_member(i));
+        (0..self.axes.len()).filter(|&a| self.carried(a)).all(|a| {
+            let central = self.central_axis_of(a);
+            let meets = |x: usize, y: usize| axis_of(x) == Some(a) && axis_of(y) == central;
+            !(0..self.members.len()).any(|i| axis_of(i) == Some(a))
+                || self
+                    .meshes
+                    .iter()
+                    .any(|m| meets(m.a, m.b) || meets(m.b, m.a))
+        })
     }
 
     // ----------------------------------------------------------- reading ---
@@ -314,82 +515,107 @@ impl Shape {
         })
     }
 
-    // ---------------------------------------------------------- epicyclic ---
+    // ------------------------------------------------------------ adding ---
 
-    fn add_step(&mut self, axis: usize, next: usize) -> Result<(), EditRefused> {
+    /// **A gear meshing `mate`, on `on`** ([`Edit::AddGear`]).
+    fn add_gear(
+        &mut self,
+        mate: usize,
+        on: Place,
+        ring: bool,
+        next: usize,
+    ) -> Result<(), EditRefused> {
+        if mate >= self.members.len() {
+            return Err(EditRefused::NoSuchIndex);
+        }
+        let from = self
+            .axis_of_slot(self.slot_of_member(mate))
+            .ok_or(EditRefused::NoSuchIndex)?;
+        // Two rings in mesh are no mesh.
+        if ring && self.members[mate].ring.is_some() {
+            return Err(EditRefused::WrongFamily);
+        }
+        let (axis, body) = match on {
+            Place::NewAxis => return self.add_on_new_axis(mate, from, ring, next),
+            Place::NewBody(axis) => (axis, None),
+            Place::Body(b) => (
+                self.axis_of_body(b).ok_or(EditRefused::NoSuchIndex)?,
+                Some(b),
+            ),
+        };
+        // A gear fixed to the carrier of the planet it meshes locks it.
+        if body.is_some_and(|b| self.axes[from].carried_by == b) {
+            return Err(EditRefused::CarriesAnAxis);
+        }
         if axis >= self.axes.len() {
             return Err(EditRefused::NoSuchIndex);
         }
-        if !self.carried(axis) {
-            return Err(EditRefused::WrongFamily);
-        }
-        let body = self
-            .bodies
+        let across = |d: &super::shape::Distance| d.axes == [axis, from] || d.axes == [from, axis];
+        let Some(distance) = self
+            .distances
             .iter()
-            .find(|b| b.axis == axis)
-            .map(|b| b.body)
-            .ok_or(EditRefused::NoSuchIndex)?;
-        let last = self
-            .members_on_body(body)
-            .last()
-            .copied()
-            .ok_or(EditRefused::NoSuchIndex)?;
-        let gear = Member {
-            ring: None,
-            ..self.members[last].clone()
+            .position(across)
+            .filter(|_| axis != from)
+        else {
+            return Err(EditRefused::NoDistance);
         };
-        self.members.push(gear);
-        let new = self.members.len() - 1;
-        self.add_central(new, true, next)
-    }
-
-    fn remove_step(&mut self, gear: usize) -> Result<(), EditRefused> {
-        if gear >= self.members.len() {
-            return Err(EditRefused::NoSuchIndex);
-        }
-        if !self.is_planet_gear(gear) {
-            return Err(EditRefused::WrongFamily);
-        }
-        if self.members_on_body(self.members[gear].body).len() < 2 {
-            return Err(EditRefused::LastOnItsStep);
-        }
-        // Its central members go with it — a central that also meets
-        // another gear only loses this mesh — then the gear. Dropped from
-        // the highest index down, so each index is still the one read.
-        let mut going: Vec<usize> = self
-            .meshes_of_member(gear)
-            .into_iter()
-            .map(|k| self.mate(k, gear))
-            .filter(|&c| !self.is_planet_gear(c) && self.meshes_of_member(c).len() == 1)
-            .collect();
-        going.push(gear);
-        going.sort_unstable();
-        going.dedup();
-        for i in going.into_iter().rev() {
-            self.drop_member(i);
-        }
+        // A sun or a ring on a planet gear, at the radius the planet runs
+        // at; anything else, at the distance between the two axes.
+        let teeth = if self.carried(from) && self.central_axis_of(from) == Some(axis) {
+            self.central_teeth(mate, ring, body.is_none())?
+        } else {
+            self.fitted_teeth(mate, axis, distance, ring)?
+        };
+        let body = body.unwrap_or_else(|| self.push_body(axis, next));
+        self.push_follower(mate, body, teeth, ring);
         Ok(())
     }
 
-    fn add_central(&mut self, gear: usize, ring: bool, next: usize) -> Result<(), EditRefused> {
-        if gear >= self.members.len() {
-            return Err(EditRefused::NoSuchIndex);
-        }
-        let planet_axis = self
-            .axis_of_slot(self.slot_of_member(gear))
-            .ok_or(EditRefused::NoSuchIndex)?;
-        if !self.carried(planet_axis) {
+    /// **A gear on a new axis fixed in ground**, at an automatic distance
+    /// from its mate's: a copy of the mate — which at a chain's end is an
+    /// idler behind the last — or a ring twice its count round it. Refused
+    /// for a mate that does not mesh in ground — a planet, or a sun or a
+    /// ring meshing planets — whose frame the new axis cannot share.
+    fn add_on_new_axis(
+        &mut self,
+        mate: usize,
+        from: usize,
+        ring: bool,
+        next: usize,
+    ) -> Result<(), EditRefused> {
+        if self.frame_of_member(mate) != GROUND {
             return Err(EditRefused::WrongFamily);
         }
-        let central_axis = self
-            .central_axis_of(planet_axis)
+        let axis = self.push_axis(GROUND, 1);
+        let body = self.push_body(axis, next);
+        if ring {
+            let teeth = 2 * self.members[mate].gear.teeth;
+            self.push_follower(mate, body, teeth, true);
+        } else {
+            self.members.push(Member {
+                body,
+                ring: None,
+                ..self.members[mate].clone()
+            });
+            let new = self.members.len() - 1;
+            self.push_mesh(mate, new);
+        }
+        self.push_distance([from, axis], 0.0);
+        Ok(())
+    }
+
+    /// **The count a sun or a ring on planet gear `mate` takes**: sized to
+    /// the radius its axis runs at, a few teeth of difference where nothing
+    /// sets it yet — and on a body of its own (`fresh`), moved off a count
+    /// that would turn as one with another.
+    fn central_teeth(&self, mate: usize, ring: bool, fresh: bool) -> Result<u32, EditRefused> {
+        let planet_axis = self
+            .axis_of_slot(self.slot_of_member(mate))
             .ok_or(EditRefused::NoSuchIndex)?;
         let (zp, module) = (
-            self.members[gear].gear.teeth,
-            self.members[gear].normal_module(),
+            self.members[mate].gear.teeth,
+            self.members[mate].normal_module(),
         );
-        // Sized to the radius the axis runs at; a few teeth of difference
-        // where nothing sets it yet.
         let radius = self.carrier_radius(planet_axis);
         let fit = radius.map(|r| (2.0 * r / module).round());
         let mut teeth = match (ring, fit) {
@@ -419,175 +645,98 @@ impl Shape {
                         && f64::from(self.members[c].gear.teeth) == z
                 })
         };
-        while taken(teeth) && teeth > floor {
+        while fresh && taken(teeth) && teeth > floor {
             teeth -= 1.0;
         }
-        while taken(teeth) {
+        while fresh && taken(teeth) {
             teeth += 1.0;
         }
         #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-        let teeth = teeth as u32;
-        let body = self.push_body(central_axis, next);
+        Ok(teeth as u32)
+    }
+
+    /// **The count a gear on `axis` meshing `mate` takes to close
+    /// `distance`**, read off the distance's first mesh: on parallel axes
+    /// the reference span it runs at, `|z_a ± z_b| m_t / 2` — a ring's
+    /// count negative, at that mesh's transverse module — in the mate's
+    /// transverse module, less the mate's count; at an angle the count
+    /// across from the mate's side, since there a helix sets the size.
+    fn fitted_teeth(
+        &self,
+        mate: usize,
+        axis: usize,
+        distance: usize,
+        ring: bool,
+    ) -> Result<u32, EditRefused> {
+        let first = *self
+            .meshes_on(distance)
+            .first()
+            .ok_or(EditRefused::NoDistance)?;
+        let m = self.meshes[first];
+        let on_axis = |i: usize| self.axis_of_slot(self.slot_of_member(i)) == Some(axis);
+        let across = if on_axis(m.a) { m.a } else { m.b };
+        if self.is_crossed(first) {
+            return Ok(self.members[across].gear.teeth);
+        }
+        let signed = |i: usize| {
+            let z = f64::from(self.members[i].gear.teeth);
+            if self.members[i].ring.is_some() {
+                -z
+            } else {
+                z
+            }
+        };
+        let (shared, helix) = (self.shared(), self.helix_angles());
+        let transverse = |i: usize| shared.members[i].normal_module() / helix[i].to_radians().cos();
+        let span = ((signed(m.a) + signed(m.b)).abs() * transverse(m.a) / transverse(mate)).round();
+        let zm = f64::from(self.members[mate].gear.teeth);
+        let z = match (ring, self.members[mate].ring.is_some()) {
+            (true, _) => zm + span,
+            (false, true) => zm - span,
+            (false, false) => span - zm,
+        };
+        if z < 4.0 || (ring && z < zm + 2.0) {
+            return Err(EditRefused::NoRoom);
+        }
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        Ok(z as u32)
+    }
+
+    /// A gear of `teeth` on `body` meshing `mate` and following it: its
+    /// module, pressure angle and form the mate's, its shift and thickness
+    /// automatic — a second central at one carrier radius is closed by its
+    /// shift, which one given at zero could not do — a ring cut by the
+    /// shape's first cutter.
+    fn push_follower(&mut self, mate: usize, body: usize, teeth: u32, ring: bool) {
         let cutter = ring.then(|| self.members.iter().find_map(|m| m.ring).unwrap_or_default());
+        let module = self.members[mate].normal_module();
         self.members.push(Member {
             body,
-            // Its shift automatic: a second central at one carrier radius
-            // is closed by its shift, which one given at zero could not do.
             gear: StageGear {
                 teeth,
                 profile_shift: Auto::automatic(0.0),
-                ..self.members[gear].gear.clone()
+                ..self.members[mate].gear.clone()
             },
-            // The gear it meets sets its module and pressure angle — they
-            // mesh — so it follows them rather than stating its own.
             module: Auto::automatic(module),
-            pressure_angle: Auto::automatic(self.members[gear].normal_pressure_angle()),
+            pressure_angle: Auto::automatic(self.members[mate].normal_pressure_angle()),
             thickness_mod: Auto::automatic(1.0),
             ring: cutter,
             pitch_diameter: Auto::automatic(0.0),
         });
         let new = self.members.len() - 1;
-        self.push_mesh(new, gear);
-        Ok(())
+        self.push_mesh(new, mate);
     }
 
-    fn remove_member(&mut self, member: usize) -> Result<(), EditRefused> {
-        if member >= self.members.len() {
-            return Err(EditRefused::NoSuchIndex);
-        }
-        if self.is_planet_gear(member) {
-            return Err(EditRefused::WrongFamily);
-        }
-        // The planet gear it meets keeps at least one central member.
-        for k in self.meshes_of_member(member) {
-            let mate = self.mate(k, member);
-            if self.is_planet_gear(mate)
-                && self.meshes_of_member(mate).into_iter().all(|j| {
-                    self.mate(j, mate) == member || self.is_planet_gear(self.mate(j, mate))
-                })
-            {
-                return Err(EditRefused::LastOnItsStep);
-            }
-        }
-        // On a parallel chain the same rule holds for a distance's last mesh.
-        if !self.axes.iter().any(|a| a.carried_by != GROUND) {
-            for k in self.meshes_of_member(member) {
-                if let Some(d) = self.distance_of(k) {
-                    if self.meshes_on(d).len() < 2 {
-                        return Err(EditRefused::LastOfItsKind);
-                    }
-                }
-            }
-        }
-        self.drop_member(member);
-        Ok(())
-    }
-
-    // ----------------------------------------------------------- parallel ---
-
-    fn add_axis(&mut self, mate: usize, next: usize) -> Result<(), EditRefused> {
-        if mate >= self.members.len() {
-            return Err(EditRefused::NoSuchIndex);
-        }
-        let from = self
-            .axis_of_slot(self.slot_of_member(mate))
-            .ok_or(EditRefused::NoSuchIndex)?;
-        if self.frame_of_member(mate) != GROUND {
-            return Err(EditRefused::WrongFamily);
-        }
-        let axis = self.push_axis(GROUND, 1);
-        let body = self.push_body(axis, next);
-        self.members.push(Member {
-            body,
-            ring: None,
-            ..self.members[mate].clone()
-        });
-        let new = self.members.len() - 1;
-        self.push_mesh(mate, new);
-        self.push_distance([from, axis], 0.0);
-        Ok(())
-    }
-
-    /// The axis removed from the gears `among` — every gear a shape has,
-    /// asked alone; a card's, asked of a graph, where a shaft another
-    /// part's gears are on stays with them.
-    fn remove_axis(&mut self, axis: usize, among: &[usize]) -> Result<(), EditRefused> {
-        if axis >= self.axes.len() {
-            return Err(EditRefused::NoSuchIndex);
-        }
-        let axis_of = |i: usize| self.axis_of_slot(self.slot_of_member(i));
-        let turns_a_carrier = self.axes.iter().enumerate().any(|(c, a)| {
-            a.carried_by != GROUND
-                && self.axis_of_body(a.carried_by) == Some(axis)
-                && among.iter().any(|&i| axis_of(i) == Some(c))
-        });
-        if self.carried(axis) || turns_a_carrier {
-            return Err(EditRefused::WrongFamily);
-        }
-        let on_axis: Vec<usize> = among
-            .iter()
-            .copied()
-            .filter(|&i| axis_of(i) == Some(axis))
-            .collect();
-        // **A gear left behind meshing nothing** is no mechanism: the
-        // idler of a chain goes with the chain's end, not before it.
-        let stranded = (0..self.members.len())
-            .filter(|i| !on_axis.contains(i))
-            .any(|i| {
-                let meshes = self.meshes_of_member(i);
-                !meshes.is_empty() && meshes.iter().all(|&k| on_axis.contains(&self.mate(k, i)))
-            });
-        if stranded {
-            return Err(EditRefused::LastOfItsKind);
-        }
-        let mut on_axis = on_axis;
-        on_axis.sort_unstable();
-        for &i in on_axis.iter().rev() {
-            self.drop_member(i);
-        }
-        // Every body left on it with nothing on it, every distance on it
-        // with no mesh left, and the axis where nothing is left on it —
-        // the axes after it renumbered down.
-        let gone: Vec<usize> = self
-            .bodies
-            .iter()
-            .filter(|b| {
-                b.axis == axis
-                    && self.members_on_body(b.body).is_empty()
-                    && !self.carries_an_axis(b.body)
-            })
-            .map(|b| b.body)
-            .collect();
-        self.couplings
-            .retain(|c| !c.iter().any(|b| gone.contains(b)));
-        self.bodies.retain(|b| !gone.contains(&b.body));
-        let empty: Vec<usize> = (0..self.distances.len())
-            .filter(|&d| self.distances[d].axes.contains(&axis) && self.meshes_on(d).is_empty())
-            .collect();
-        for &d in empty.iter().rev() {
-            self.distances.remove(d);
-        }
-        let left = self.bodies.iter().any(|b| b.axis == axis)
-            || self.distances.iter().any(|d| d.axes.contains(&axis));
-        if !left {
-            self.axes.remove(axis);
-            for b in &mut self.bodies {
-                if b.axis > axis {
-                    b.axis -= 1;
-                }
-            }
-            for d in &mut self.distances {
-                for a in &mut d.axes {
-                    if *a > axis {
-                        *a -= 1;
-                    }
-                }
-            }
-        }
-        Ok(())
-    }
-
-    fn add_mesh_on(&mut self, distance: usize, next: usize) -> Result<(), EditRefused> {
+    /// **Another ratio across `distance`**, sharing `shared`
+    /// ([`Edit::AddRatio`]): the first mesh there copied, its gear on the
+    /// shared body's axis onto the shared body and the other onto a new
+    /// body of its own axis.
+    fn add_ratio(
+        &mut self,
+        distance: usize,
+        shared: usize,
+        next: usize,
+    ) -> Result<(), EditRefused> {
         if distance >= self.distances.len() {
             return Err(EditRefused::NoSuchIndex);
         }
@@ -597,34 +746,16 @@ impl Shape {
             .copied()
             .ok_or(EditRefused::NoSuchIndex)?;
         let m = self.meshes[first];
-        // The body the distance's pairs share: the one with the most
-        // members among them, where that is more than one; else the first
-        // pair's second gear's.
-        let on_distance: Vec<usize> = self
-            .meshes_on(distance)
-            .into_iter()
-            .flat_map(|k| [self.meshes[k].a, self.meshes[k].b])
-            .collect();
-        let count = |body: usize| {
-            on_distance
-                .iter()
-                .filter(|&&i| self.members[i].body == body)
-                .count()
-        };
-        let shared = on_distance
-            .iter()
-            .map(|&i| self.members[i].body)
-            .max_by_key(|&b| count(b))
-            .filter(|&b| count(b) > 1)
-            .unwrap_or(self.members[m.b].body);
-        let (on_shared, alone) = if self.members[m.a].body == shared {
+        let shared_axis = self.axis_of_body(shared).ok_or(EditRefused::NoSuchIndex)?;
+        let axis_of = |i: usize| self.axis_of_slot(self.slot_of_member(i));
+        let (on_shared, alone) = if axis_of(m.a) == Some(shared_axis) {
             (m.a, m.b)
-        } else {
+        } else if axis_of(m.b) == Some(shared_axis) {
             (m.b, m.a)
+        } else {
+            return Err(EditRefused::NotOnTheAxis);
         };
-        let axis = self
-            .axis_of_body(self.members[alone].body)
-            .ok_or(EditRefused::NoSuchIndex)?;
+        let axis = axis_of(alone).ok_or(EditRefused::NoSuchIndex)?;
         self.members.push(Member {
             body: shared,
             ..self.members[on_shared].clone()
@@ -639,28 +770,243 @@ impl Shape {
         Ok(())
     }
 
-    fn remove_mesh(&mut self, mesh: usize) -> Result<(), EditRefused> {
-        if mesh >= self.meshes.len() {
+    /// **The body a card's *add mesh* shares** — its guess, where the
+    /// graph's edit asks: the one with the most members among the
+    /// distance's meshes, where that is more than one — a layshaft — and
+    /// else the first mesh's second gear's.
+    fn shared_body(&self, distance: usize) -> Result<usize, EditRefused> {
+        if distance >= self.distances.len() {
             return Err(EditRefused::NoSuchIndex);
         }
-        let d = self.distance_of(mesh).ok_or(EditRefused::NoSuchIndex)?;
-        if self.meshes_on(d).len() < 2 {
-            return Err(EditRefused::LastOfItsKind);
+        let first = *self
+            .meshes_on(distance)
+            .first()
+            .ok_or(EditRefused::NoSuchIndex)?;
+        let on_distance: Vec<usize> = self
+            .meshes_on(distance)
+            .into_iter()
+            .flat_map(|k| [self.meshes[k].a, self.meshes[k].b])
+            .collect();
+        let count = |body: usize| {
+            on_distance
+                .iter()
+                .filter(|&&i| self.members[i].body == body)
+                .count()
+        };
+        Ok(on_distance
+            .iter()
+            .map(|&i| self.members[i].body)
+            .max_by_key(|&b| count(b))
+            .filter(|&b| count(b) > 1)
+            .unwrap_or(self.members[self.meshes[first].b].body))
+    }
+
+    /// **A step on carried `axis`** ([`Edit::AddStep`]): the last gear on
+    /// its planet body copied beside it, and a ring meshing the copy.
+    fn add_step(&mut self, axis: usize, next: usize) -> Result<(), EditRefused> {
+        if axis >= self.axes.len() {
+            return Err(EditRefused::NoSuchIndex);
         }
-        let m = self.meshes[mesh];
-        if self.is_planet_gear(m.a) || self.is_planet_gear(m.b) {
+        if !self.carried(axis) {
             return Err(EditRefused::WrongFamily);
         }
-        let (hi, lo) = (m.a.max(m.b), m.a.min(m.b));
-        // A member in another mesh too stays: only the mesh goes from it.
-        for i in [hi, lo] {
-            if self.meshes_of_member(i).len() < 2 {
+        let body = self
+            .bodies
+            .iter()
+            .find(|b| b.axis == axis)
+            .map(|b| b.body)
+            .ok_or(EditRefused::NoSuchIndex)?;
+        let last = self
+            .members_on_body(body)
+            .last()
+            .copied()
+            .ok_or(EditRefused::NoSuchIndex)?;
+        let gear = Member {
+            ring: None,
+            ..self.members[last].clone()
+        };
+        self.members.push(gear);
+        let new = self.members.len() - 1;
+        let central = self.central_axis_of(axis).ok_or(EditRefused::NoSuchIndex)?;
+        self.add_gear(new, Place::NewBody(central), true, next)
+    }
+
+    // ---------------------------------------------------------- removing ---
+
+    /// **A piece taken out, with what goes with it** ([`Edit::Remove`]).
+    fn remove(&mut self, piece: Piece) -> Result<(), EditRefused> {
+        match piece {
+            Piece::Member(i) => {
+                if i >= self.members.len() {
+                    return Err(EditRefused::NoSuchIndex);
+                }
+                self.cascade(vec![i]);
+            }
+            Piece::Mesh(k) => {
+                if k >= self.meshes.len() {
+                    return Err(EditRefused::NoSuchIndex);
+                }
+                let m = self.meshes.remove(k);
+                let loose = [m.a, m.b]
+                    .into_iter()
+                    .filter(|&i| self.meshes_of_member(i).is_empty())
+                    .collect();
+                self.cascade(loose);
+            }
+            Piece::Axis(axis) => {
+                if axis >= self.axes.len() {
+                    return Err(EditRefused::NoSuchIndex);
+                }
+                if self.turns_a_carrier(axis, None) {
+                    return Err(EditRefused::WrongFamily);
+                }
+                let gears = (0..self.members.len())
+                    .filter(|&i| self.axis_of_slot(self.slot_of_member(i)) == Some(axis))
+                    .collect();
+                self.clear_axis(axis, gears);
+                return Ok(());
+            }
+            Piece::Body(body) => {
+                if !self.bodies.iter().any(|b| b.body == body) {
+                    return Err(EditRefused::NoSuchIndex);
+                }
+                if self.carries_an_axis(body) {
+                    return Err(EditRefused::CarriesAnAxis);
+                }
+                self.cascade(self.members_on_body(body));
+                self.drop_bodies(&[body]);
+            }
+            Piece::Coupling(c) => return self.uncouple(c),
+        }
+        self.tidy();
+        Ok(())
+    }
+
+    /// **Members taken out with their meshes, and every gear that leaves
+    /// meshing nothing after them**, until none does: a gear in no mesh is
+    /// no mechanism, and the idler of a chain goes with the chain's end.
+    fn cascade(&mut self, mut going: Vec<usize>) {
+        while !going.is_empty() {
+            going.sort_unstable();
+            going.dedup();
+            for &i in going.iter().rev() {
                 self.drop_member(i);
-            } else {
-                self.meshes.retain(|x| !(x.a == m.a && x.b == m.b));
+            }
+            going = (0..self.members.len())
+                .filter(|&i| self.meshes_of_member(i).is_empty())
+                .collect();
+        }
+    }
+
+    /// **`gears` taken off `axis`**, with what goes with them: every body
+    /// left on it with nothing on it, every distance left with no mesh, and
+    /// the axis where nothing is left on it — the axes after it numbered
+    /// down.
+    fn clear_axis(&mut self, axis: usize, gears: Vec<usize>) {
+        let before: Vec<usize> = self
+            .bodies
+            .iter()
+            .filter(|b| b.axis == axis)
+            .map(|b| b.body)
+            .collect();
+        self.cascade(gears);
+        let bare: Vec<usize> = before
+            .into_iter()
+            .filter(|&b| self.members_on_body(b).is_empty() && !self.carries_an_axis(b))
+            .collect();
+        self.drop_bodies(&bare);
+        self.tidy();
+    }
+
+    /// Bodies taken out by number, with every coupling they are in.
+    fn drop_bodies(&mut self, bodies: &[usize]) {
+        self.bodies.retain(|b| !bodies.contains(&b.body));
+        self.couplings
+            .retain(|c| !c.iter().any(|b| bodies.contains(b)));
+    }
+
+    /// Every distance left with no mesh on it, and every axis left with
+    /// nothing on it, taken out.
+    fn tidy(&mut self) {
+        let meshless: Vec<usize> = (0..self.distances.len())
+            .filter(|&d| self.meshes_on(d).is_empty())
+            .collect();
+        for &d in meshless.iter().rev() {
+            self.distances.remove(d);
+        }
+        self.drop_empty_axes();
+    }
+
+    /// Whether a body on `axis` carries an axis — one of `among`'s gears
+    /// is on, where given.
+    fn turns_a_carrier(&self, axis: usize, among: Option<&[usize]>) -> bool {
+        let axis_of = |i: usize| self.axis_of_slot(self.slot_of_member(i));
+        self.axes.iter().enumerate().any(|(c, a)| {
+            a.carried_by != GROUND
+                && self.axis_of_body(a.carried_by) == Some(axis)
+                && among.is_none_or(|g| g.iter().any(|&i| axis_of(i) == Some(c)))
+        })
+    }
+
+    /// **What a card's *remove* asks of a central member**: not a planet
+    /// gear, which is a step; not the last member meeting its planet gear —
+    /// remove the step instead; and on a parallel chain not a distance's
+    /// last mesh.
+    fn may_remove_member(&self, member: usize) -> Result<(), EditRefused> {
+        if member >= self.members.len() {
+            return Err(EditRefused::NoSuchIndex);
+        }
+        if self.is_planet_gear(member) {
+            return Err(EditRefused::WrongFamily);
+        }
+        for k in self.meshes_of_member(member) {
+            let mate = self.mate(k, member);
+            if self.is_planet_gear(mate)
+                && self.meshes_of_member(mate).into_iter().all(|j| {
+                    self.mate(j, mate) == member || self.is_planet_gear(self.mate(j, mate))
+                })
+            {
+                return Err(EditRefused::LastOnItsStep);
+            }
+        }
+        if !self.axes.iter().any(|a| a.carried_by != GROUND) {
+            for k in self.meshes_of_member(member) {
+                if let Some(d) = self.distance_of(k) {
+                    if self.meshes_on(d).len() < 2 {
+                        return Err(EditRefused::LastOfItsKind);
+                    }
+                }
             }
         }
         Ok(())
+    }
+
+    /// **What a card's *remove axis* asks**, and the card's gears on it:
+    /// not a carried axis, nor one turning a carrier of the card's, and
+    /// no gear left behind meshing nothing — the idler of a chain goes with
+    /// the chain's end, not before it.
+    fn may_clear_axis(&self, axis: usize, among: &[usize]) -> Result<Vec<usize>, EditRefused> {
+        if axis >= self.axes.len() {
+            return Err(EditRefused::NoSuchIndex);
+        }
+        if self.carried(axis) || self.turns_a_carrier(axis, Some(among)) {
+            return Err(EditRefused::WrongFamily);
+        }
+        let on_axis: Vec<usize> = among
+            .iter()
+            .copied()
+            .filter(|&i| self.axis_of_slot(self.slot_of_member(i)) == Some(axis))
+            .collect();
+        let stranded = (0..self.members.len())
+            .filter(|i| !on_axis.contains(i))
+            .any(|i| {
+                let meshes = self.meshes_of_member(i);
+                !meshes.is_empty() && meshes.iter().all(|&k| on_axis.contains(&self.mate(k, i)))
+            });
+        if stranded {
+            return Err(EditRefused::LastOfItsKind);
+        }
+        Ok(on_axis)
     }
 
     // --------------------------------------------------------------- both ---
@@ -762,7 +1108,10 @@ impl Shape {
     }
 
     /// A member gone, with its meshes, and its body off the stage where it
-    /// was alone on it and the body carries no axis.
+    /// was alone on it, the body carries no axis and no coupling turns it
+    /// from a fixed axis — a shaft a planet's turn is taken off to stays
+    /// with its coupling, while a planet body left with nothing on it goes
+    /// with the coupling it turned.
     fn drop_member(&mut self, member: usize) {
         let body = self.members[member].body;
         self.meshes.retain(|m| m.a != member && m.b != member);
@@ -775,7 +1124,12 @@ impl Shape {
             }
         }
         self.members.remove(member);
-        if self.members_on_body(body).is_empty() && !self.carries_an_axis(body) {
+        let coupled = self.couplings.iter().any(|c| c.contains(&body));
+        let orbiting = self.axis_of_body(body).is_some_and(|a| self.carried(a));
+        if self.members_on_body(body).is_empty()
+            && !self.carries_an_axis(body)
+            && (!coupled || orbiting)
+        {
             self.bodies.retain(|b| b.body != body);
             self.couplings.retain(|c| !c.contains(&body));
         }
@@ -1532,5 +1886,341 @@ mod tests {
         let before = t.clone();
         t.join(a, b);
         assert_eq!(format!("{t:?}"), format!("{before:?}"), "refused");
+    }
+
+    // ------------------------------------------------ the graph's edits ---
+
+    /// Every preset alone, and as a train's second card — whose members,
+    /// meshes, distances and axes are not the graph's by the same index.
+    fn trains() -> Vec<(String, Train)> {
+        let mut out = Vec::new();
+        for p in StagePreset::ALL {
+            out.push((
+                format!("{p:?}"),
+                Train::chained(vec![p.build()], |_| Vec::new()),
+            ));
+            out.push((
+                format!("spur then {p:?}"),
+                Train::chained(vec![StagePreset::Spur.build(), p.build()], |_| Vec::new()),
+            ));
+        }
+        out
+    }
+
+    fn debug(t: &Train) -> String {
+        format!("{t:?}")
+    }
+
+    /// **What every edit leaves**: nothing hanging — every gear on a body
+    /// on an axis and in a mesh, every mesh across a distance between two
+    /// axes, one distance per pair of axes and each carrying a mesh, no
+    /// axis with nothing on it, every carried axis carried by a body on
+    /// another, and every hold at a body the graph has.
+    fn well_formed(t: &Train) -> Result<(), String> {
+        let s = &t.shape;
+        let axis_of = |body: usize| s.bodies.iter().find(|b| b.body == body).map(|b| b.axis);
+        for b in &s.bodies {
+            if b.axis >= s.axes.len() {
+                return Err(format!("body {} on no axis", b.body));
+            }
+        }
+        for (i, m) in s.members.iter().enumerate() {
+            if axis_of(m.body).is_none() {
+                return Err(format!("member {i} on no body"));
+            }
+            if !s.meshes.iter().any(|x| x.a == i || x.b == i) {
+                return Err(format!("member {i} in no mesh"));
+            }
+        }
+        for (k, m) in s.meshes.iter().enumerate() {
+            if axis_of(s.members[m.a].body) == axis_of(s.members[m.b].body) {
+                return Err(format!("mesh {k} on one axis"));
+            }
+            if s.distance_of(k).is_none() {
+                return Err(format!("mesh {k} across no distance"));
+            }
+        }
+        for (d, x) in s.distances.iter().enumerate() {
+            if s.meshes_on(d).is_empty() {
+                return Err(format!("distance {d} with no mesh"));
+            }
+            let same = |y: &super::super::shape::Distance| {
+                y.axes == x.axes || y.axes == [x.axes[1], x.axes[0]]
+            };
+            if s.distances.iter().filter(|y| same(y)).count() > 1 {
+                return Err(format!("distance {d} stated twice"));
+            }
+        }
+        for (a, x) in s.axes.iter().enumerate() {
+            if !s.bodies.iter().any(|b| b.axis == a)
+                && !s.distances.iter().any(|d| d.axes.contains(&a))
+            {
+                return Err(format!("axis {a} with nothing on it"));
+            }
+            if x.carried_by != GROUND && axis_of(x.carried_by).is_none_or(|c| c == a) {
+                return Err(format!("axis {a} carried by no body on another axis"));
+            }
+        }
+        for &h in &t.held {
+            if axis_of(h).is_none() {
+                return Err(format!("a hold at {h}, which the graph has not"));
+            }
+        }
+        if !s.planets_at_a_radius() {
+            return Err("a planet meeting nothing on its carrier's axis".into());
+        }
+        Ok(())
+    }
+
+    /// **Every gear the graph admits is refused whole, or undoes.** On
+    /// every preset alone and as a second card, a gear meshing every
+    /// member, on a new axis, a new body of every axis and every body, as
+    /// a ring and not: refused, the train is as it was; made, the graph
+    /// has nothing hanging, the train solves or says why, and the gear
+    /// taken off again leaves the train it was — where the body it went on
+    /// keeps something without it, since a gear's body goes with it
+    /// where nothing else is on it.
+    #[test]
+    fn every_gear_the_graph_admits_is_refused_whole_or_undoes() {
+        let lib = library();
+        let mut made = 0;
+        let mut misfits: Vec<String> = Vec::new();
+        for (name, t) in trains() {
+            let s = &t.shape;
+            let places: Vec<Place> = std::iter::once(Place::NewAxis)
+                .chain((0..s.axes.len()).map(Place::NewBody))
+                .chain(s.bodies.iter().map(|b| Place::Body(b.body)))
+                .collect();
+            for mate in 0..s.members.len() {
+                for &on in &places {
+                    for ring in [false, true] {
+                        let edit = Edit::AddGear { mate, on, ring };
+                        let mut u = t.clone();
+                        let axis = s.axis_of_slot(s.slot_of_member(mate)).unwrap();
+                        if on == Place::Body(s.axes[axis].carried_by) {
+                            assert_eq!(
+                                u.edit(edit.clone()),
+                                Err(EditRefused::CarriesAnAxis),
+                                "{name}: a gear on the carrier of the planet it meshes"
+                            );
+                        }
+                        if u.edit(edit.clone()).is_err() {
+                            assert_eq!(debug(&u), debug(&t), "{name}: {edit:?} refused");
+                            continue;
+                        }
+                        made += 1;
+                        well_formed(&u).unwrap_or_else(|e| panic!("{name}: {edit:?}: {e}"));
+                        // It solves, or says why — a lock by construction, a
+                        // distance two groups cannot share — as a train does.
+                        let _ = solve_train(&u, &lib);
+                        if let Some(error) = misfit(&u, mate) {
+                            misfits.push(format!("{name}: {edit:?}: {error}"));
+                        }
+                        let keeps = match on {
+                            Place::Body(b) => {
+                                !s.members_on_body(b).is_empty()
+                                    || s.carries_an_axis(b)
+                                    || s.couplings.iter().any(|c| c.contains(&b))
+                            }
+                            Place::NewAxis | Place::NewBody(_) => true,
+                        };
+                        let new = u.shape.members.len() - 1;
+                        u.edit(Edit::Remove(Piece::Member(new)))
+                            .unwrap_or_else(|e| panic!("{name}: {edit:?} then its removal: {e}"));
+                        if keeps {
+                            assert_eq!(debug(&u), debug(&t), "{name}: {edit:?} then its removal");
+                        }
+                    }
+                }
+            }
+        }
+        assert!(made > 200, "only {made} gears made");
+        assert!(
+            misfits.is_empty(),
+            "{} of {made}:\n{}",
+            misfits.len(),
+            misfits.join("\n")
+        );
+    }
+
+    /// **Whether the last gear added is sized to the distance it meshes
+    /// across** — on parallel axes, its mesh's reference span within half
+    /// a transverse module of the distance's first mesh's, which is the
+    /// rounding a count takes; `None` where it is, where it went on a new
+    /// axis, crossed, or round a planet (sized to the carrier radius, and
+    /// moved a tooth off a count that would turn as one).
+    fn misfit(u: &Train, mate: usize) -> Option<String> {
+        let s = &u.shape;
+        let k = s.meshes.len() - 1;
+        let d = s.distance_of(k)?;
+        let first = s.meshes_on(d)[0];
+        let axis = |i: usize| s.axis_of_slot(s.slot_of_member(i));
+        let planet = axis(mate).is_some_and(|a| s.axes[a].carried_by != GROUND);
+        if first == k || s.is_crossed(k) || planet {
+            return None;
+        }
+        let (shared, helix) = (s.shared(), s.helix_angles());
+        let transverse = |i: usize| shared.members[i].normal_module() / helix[i].to_radians().cos();
+        let span = |k: usize| {
+            let m = s.meshes[k];
+            let z = |i: usize| {
+                let z = f64::from(s.members[i].gear.teeth);
+                if s.members[i].ring.is_some() {
+                    -z
+                } else {
+                    z
+                }
+            };
+            (z(m.a) + z(m.b)).abs() * transverse(m.a) / 2.0
+        };
+        let (want, got) = (span(first), span(k));
+        ((got - want).abs() > transverse(mate) / 2.0 + 1e-9)
+            .then(|| format!("spans {got} where the distance's first mesh spans {want}"))
+    }
+
+    /// **A removal takes what goes with it and leaves nothing hanging**:
+    /// every member, mesh, axis, body and coupling of every preset alone
+    /// and as a second card, taken out — refused, the train as it was;
+    /// made, something gone and nothing left hanging, the train solving
+    /// or saying why.
+    #[test]
+    fn a_removal_takes_what_goes_with_it_and_leaves_nothing_hanging() {
+        let lib = library();
+        let mut made = 0;
+        for (name, t) in trains() {
+            let s = &t.shape;
+            let pieces: Vec<Piece> = (0..s.members.len())
+                .map(Piece::Member)
+                .chain((0..s.meshes.len()).map(Piece::Mesh))
+                .chain((0..s.axes.len()).map(Piece::Axis))
+                .chain(s.bodies.iter().map(|b| Piece::Body(b.body)))
+                .chain((0..s.couplings.len()).map(Piece::Coupling))
+                .collect();
+            for piece in pieces {
+                let mut u = t.clone();
+                if u.edit(Edit::Remove(piece)).is_err() {
+                    assert_eq!(debug(&u), debug(&t), "{name}: {piece:?} refused");
+                    continue;
+                }
+                made += 1;
+                assert_ne!(debug(&u), debug(&t), "{name}: {piece:?} took nothing");
+                well_formed(&u).unwrap_or_else(|e| panic!("{name}: {piece:?}: {e}"));
+                let _ = solve_train(&u, &lib);
+            }
+        }
+        assert!(made > 100, "only {made} removals made");
+    }
+
+    /// **A join is one body on one axis, or says why.** Two pairs apart —
+    /// four axes, two parts — the first's output joined to the second's
+    /// input: one body, three axes, a chain of two at the product of their
+    /// ratios. A card's two bodies are refused (`OneCard`), as are ground
+    /// and a body the train has not; each refusal changes nothing.
+    #[test]
+    fn a_join_is_one_body_on_one_axis_or_says_why() {
+        let pair = StagePreset::Spur.build();
+        let mut second = pair.clone();
+        second.renumber_bodies(|b| b + 2);
+        let t = Train {
+            load_cases: Vec::new(),
+            reversed_bending: false,
+            shape: super::super::graph::graph_of(&[pair, second], 1).shape,
+            held: Vec::new(),
+        };
+        assert_eq!((t.parts().len(), t.shape.axes.len()), (2, 4));
+        let mut u = t.clone();
+        u.edit(Edit::Join { a: 2, b: 3 }).unwrap();
+        well_formed(&u).unwrap();
+        assert_eq!(
+            (u.parts().len(), u.shape.axes.len(), u.shape.bodies.len()),
+            (2, 3, 3)
+        );
+        assert_eq!(u.ends_of(2).len(), 2, "the shaft is both pairs'");
+        let mut c = vec![crate::kinematics::Condition::Free; 4];
+        c[0] = crate::kinematics::Condition::Ground;
+        c[1] = crate::kinematics::Condition::Drive(crate::ratio::Ratio::ONE);
+        let motion = u.system().unwrap().motion(&c).unwrap();
+        assert_eq!(
+            motion.values[1].checked_div(motion.values[3]),
+            Some(crate::ratio::Ratio::new(43 * 43, 17 * 17).unwrap()),
+            "a chain of two at the product"
+        );
+        for (a, b, why) in [
+            (1, 2, EditRefused::OneCard),
+            (0, 1, EditRefused::NoSuchIndex),
+            (1, 99, EditRefused::NoSuchIndex),
+        ] {
+            let mut v = t.clone();
+            assert_eq!(v.edit(Edit::Join { a, b }), Err(why), "join {a} {b}");
+            assert_eq!(debug(&v), debug(&t));
+        }
+    }
+
+    /// **An insert at a body runs on its shaft**: a set laid in at a
+    /// pair's input shares that shaft — its sun on the pair's first body
+    /// — and at a body the train has not is refused whole.
+    #[test]
+    fn an_insert_at_a_body_runs_on_its_shaft() {
+        let mut t = Train::chained(vec![StagePreset::Spur.build()], |_| Vec::new());
+        t.edit(Edit::Insert {
+            stage: StagePreset::Planetary.build(),
+            at: Some(1),
+        })
+        .unwrap();
+        well_formed(&t).unwrap();
+        assert_eq!(t.parts().len(), 2);
+        assert_eq!(t.ends_of(1).len(), 2, "the input shaft carries both");
+        solve_train(&t, &library()).unwrap();
+        let before = t.clone();
+        assert_eq!(
+            t.edit(Edit::Insert {
+                stage: StagePreset::Spur.build(),
+                at: Some(99),
+            }),
+            Err(EditRefused::NoSuchIndex)
+        );
+        assert_eq!(debug(&t), debug(&before));
+    }
+
+    /// **A ratio goes on the body asked.** A layshaft's next ratio shares
+    /// the body the edit names — the layshaft, or the input shaft — which
+    /// a card's *add mesh* could only guess; a body on neither of the
+    /// distance's axes is refused.
+    #[test]
+    fn a_ratio_goes_on_the_body_asked() {
+        let t = Train::chained(vec![StagePreset::Layshaft.build()], |_| Vec::new());
+        let s = &t.shape;
+        let across: Vec<usize> = s
+            .bodies
+            .iter()
+            .filter(|b| s.distances[0].axes.contains(&b.axis))
+            .map(|b| b.body)
+            .collect();
+        assert!(across.len() > 2, "a layshaft's shafts: {across:?}");
+        for shared in across {
+            let mut u = t.clone();
+            u.edit(Edit::AddRatio {
+                distance: 0,
+                shared,
+            })
+            .unwrap();
+            well_formed(&u).unwrap_or_else(|e| panic!("sharing {shared}: {e}"));
+            let n = u.shape.members.len();
+            assert_eq!(u.shape.members[n - 2].body, shared, "on the body asked");
+        }
+        let elsewhere = s.bodies.iter().map(|b| b.body).find(|&b| {
+            let axis = s.bodies.iter().find(|x| x.body == b).unwrap().axis;
+            !s.distances[0].axes.contains(&axis)
+        });
+        if let Some(b) = elsewhere {
+            let mut u = t.clone();
+            assert_eq!(
+                u.edit(Edit::AddRatio {
+                    distance: 0,
+                    shared: b
+                }),
+                Err(EditRefused::NotOnTheAxis)
+            );
+        }
     }
 }

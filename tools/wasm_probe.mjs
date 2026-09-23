@@ -185,7 +185,38 @@ const out = {
     t = stage(plano, { uncouple: { coupling: 0 } });
     out.push(["stage_uncoupled", structuredClone(t)]);
     t = stage(plano, { couple: { body: cards(t)[plano].members[0].body } });
-    out.push(["stage_coupled", t]);
+    out.push(["stage_coupled", structuredClone(t)]);
+    // **The graph's own edits**, every index the graph's: a gear on a new
+    // axis at the train's first gear and taken off again; another ratio on
+    // the layshaft sharing its input shaft; a gear moved to a body of its
+    // own and joined back; the planocentric's coupling removed and its
+    // planet coupled again; a set inserted at the train's first body; and
+    // a refusal, which crosses as its catalogue key.
+    const graph = (e) => edit(t, { graph: e });
+    t = graph({ add_gear: { mate: 0, on: "new_axis", ring: false } });
+    out.push(["graph_add_gear", structuredClone(t)]);
+    t = graph({ remove: { member: t.shape.members.length - 1 } });
+    out.push(["graph_removed", structuredClone(t)]);
+    const layParts = cards(t)[2];
+    const layInput = layParts.bodies[0].body;
+    const layDistance = JSON.parse(w.solve_train(JSON.stringify({ train: t, library }))).topology[2].part.distances[0];
+    t = graph({ add_ratio: { distance: layDistance, shared: layInput } });
+    out.push(["graph_add_ratio", structuredClone(t)]);
+    t = graph({ insert: { stage: preset("planetary"), at: 1 } });
+    out.push(["graph_insert_at", structuredClone(t)]);
+    const refusal = (e) => {
+      try {
+        graph(e);
+        return null;
+      } catch (x) {
+        return String(x.message ?? x);
+      }
+    };
+    out.push(["graph_refused", [
+      refusal({ join: { a: 1, b: 2 } }),
+      refusal({ add_gear: { mate: 0, on: { new_body: 0 }, ring: false } }),
+      refusal({ remove: { axis: 9999 } }),
+    ]]);
     return out;
   }),
   // The default train, and the same train with a set pushed behind its pair

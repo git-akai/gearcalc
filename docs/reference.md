@@ -2304,6 +2304,29 @@ keeps — every member in a mesh, every planet gear meeting a central member,
 every distance carrying a mesh, a chain keeping two axes — are refusals
 the panel shows by name, and a refused edit changes nothing.
 
+**The graph's own edits** (`Edit`, `Train::edit`) are what a card's are read
+into, every index the graph's: a **gear** meshing any gear, on a body the
+train has, a new body of an axis it has or a new axis fixed in ground
+(`AddGear`) — sized to the distance between the two axes where they have
+one, a sun or a ring on a planet gear to the radius the planet runs at, and
+on a new axis a copy of its mate or a ring twice its count — and refused
+where no distance joins the two axes, or where the body is the carrier of
+the planet it would mesh; **another ratio** across a distance on the body
+asked (`AddRatio`); a **step**; a **coupling**; a gear **moved**; a **join**,
+a **hold**, a **release**; a stage **inserted** at a body, its input on that
+shaft (`Insert`); and a member, a mesh, an axis, a body or a coupling
+**removed with what goes with it** (`Remove`) — a gear left meshing nothing,
+then any it leaves the same, until none does; a gear's body where nothing
+else is on it, though a shaft an offset coupling turns stays with its
+coupling; a distance left with no mesh; an axis left with nothing on it —
+refused where a planet would be left meeting nothing on its carrier's axis,
+whose radius it runs at. Each is made on a copy and kept whole or refused
+whole. A lock by construction — a ring on the second gear's body of a pair,
+two ratios across one pair of shafts — is made, and the train names it at
+the body as it names a lock by holds; the edit's to say is only whether the
+graph it leaves hangs together. A refusal crosses the boundary as its
+catalogue key, which is what the panel says under the card.
+
 **Closing the distances.** Each member's shift has one role: given (the
 designer typed it), free (a search chooses it, or it stands at the undercut
 floor), *reaches* a given distance, or *absorbs* an automatic one. A given

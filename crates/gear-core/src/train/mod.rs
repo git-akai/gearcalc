@@ -60,7 +60,7 @@ pub use conditions::{
 
 use crate::kinematics::{Body, Condition, GROUND};
 pub use arrangements::{StageFamily, StagePreset};
-pub use edits::{EditRefused, StageEdit};
+pub use edits::{Edit, EditRefused, Piece, Place, StageEdit};
 pub(crate) use pair::ShiftAsked;
 pub use planetary::boundary_for as planetary_boundary;
 pub use shape::{Shape, ShapeResult};

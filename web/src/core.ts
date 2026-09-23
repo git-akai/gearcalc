@@ -88,6 +88,9 @@ import type {
   StagePreset,
   StagePresetEntry,
   StageEdit,
+  Edit,
+  Place,
+  Piece,
 } from "./wire";
 export type { CaseKind, LoadCase };
 export type {
@@ -169,6 +172,9 @@ export type {
   StagePreset,
   StagePresetEntry,
   StageEdit,
+  Edit,
+  Place,
+  Piece,
 } from "./wire";
 
 import init, {
@@ -832,7 +838,8 @@ export type TrainEdit =
   | { remove_stage: number }
   | { add_case: CaseKind }
   | { duty: { case: number; intermittent: boolean } }
-  | { stage: { stage: number; edit: StageEdit } };
+  | { stage: { stage: number; edit: StageEdit } }
+  | { graph: Edit };
 /** The train edited by the core's rules, in place. A stage edit the core
  *  refuses leaves the train as it was and comes back as the catalogue key of
  *  the reason, for the panel to say; any other failure is a defect on this

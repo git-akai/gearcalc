@@ -393,14 +393,15 @@ impl Train {
 
     /// **What a case or a hold names that no stage has**, dropped: a body
     /// that left the train with its stage, or with the member that was
-    /// alone on it. Not on a train with no stages, where the cases wait
-    /// ([`Self::push_stage`]).
+    /// alone on it. A hold goes whatever is left, since it holds nothing;
+    /// a case's entries wait on a train with no stages for the first to
+    /// take them up ([`Self::push_stage`]).
     fn drop_orphans(&mut self) {
+        let on_a_stage = |b: usize| b == GROUND || self.shape.bodies.iter().any(|x| x.body == b);
+        self.held.retain(|&b| on_a_stage(b));
         if self.shape.members.is_empty() {
             return;
         }
-        let on_a_stage = |b: usize| b == GROUND || self.shape.bodies.iter().any(|x| x.body == b);
-        self.held.retain(|&b| on_a_stage(b));
         for case in &mut self.load_cases {
             case.loads.retain(|l| on_a_stage(l.at));
             if let super::Duty::Intermittent { at, .. } = &mut case.duty {
@@ -1117,14 +1118,23 @@ impl Train {
     /// through a coupling, which is what the join meant. Two ends at an
     /// axis distance from each other are refused, as is a part with both.
     pub fn join(&mut self, a: usize, b: usize) {
-        if a == b || a == GROUND || b == GROUND {
-            return;
+        let _ = self.try_join(a, b);
+    }
+
+    /// As [`Self::join`], saying why a join is refused.
+    fn try_join(&mut self, a: usize, b: usize) -> Result<(), super::EditRefused> {
+        if a == b {
+            return Ok(());
+        }
+        let named = |x: usize| x != GROUND && x <= self.max_body();
+        if !named(a) || !named(b) {
+            return Err(super::EditRefused::NoSuchIndex);
         }
         // A part with both would have one body at two of its slots, which
         // is a mesh or a carrier turning against itself: not a body.
         let both = |p: &Part| p.shape.slot_if_any(a).is_some() && p.shape.slot_if_any(b).is_some();
         if self.parts().iter().any(both) {
-            return;
+            return Err(super::EditRefused::OneCard);
         }
         let axis = |body: usize| {
             self.shape
@@ -1144,11 +1154,11 @@ impl Train {
                 {
                     self.shape.couplings.push([a, b]);
                 }
-                return;
+                return Ok(());
             }
             let apart = |d: &super::shape::Distance| d.axes == [x, y] || d.axes == [y, x];
             if x != y && self.shape.distances.iter().any(apart) {
-                return;
+                return Err(super::EditRefused::Apart);
             }
         }
         // The lower number survives, which is the order a chain names in.
@@ -1164,6 +1174,7 @@ impl Train {
             }
         }
         self.merge(a, b);
+        Ok(())
     }
 
     /// Everything that named `b` names `a`, once, and `b`'s number is given
@@ -1425,7 +1436,9 @@ impl Train {
         Ok(())
     }
 
-    /// **Every body with nothing on it that nothing else names, given up.**
+    /// **Every body with nothing on it that nothing else names, given up**,
+    /// and every axis that leaves with nothing on it — a set's carrier
+    /// that carried the planets a removal took.
     ///
     /// A body with no member, no axis to carry and no coupling is a shaft
     /// in neutral, which is a state worth being able to reach — but only
@@ -1452,6 +1465,7 @@ impl Train {
             })
             .collect();
         self.shape.bodies.retain(|b| !bare.contains(&b.body));
+        self.shape.drop_empty_axes();
     }
 
     /// **A case's duty switched**, to intermittent or continuous, seeded from
@@ -1487,19 +1501,9 @@ impl Train {
     /// chain's end is at its new end, which is what the chain did without
     /// saying so. **The first stage takes up the parked cases** at its
     /// conventional input and output.
-    pub fn push_stage(&mut self, mut stage: Shape) {
+    pub fn push_stage(&mut self, stage: Shape) {
         let parts = self.parts();
         let k = parts.len();
-        let next = self.max_body() + 1;
-        // The stage's own numbering, moved above everything the train has:
-        // its slot `i` becomes body `next + i - 1`.
-        let slots: Vec<usize> = stage.bodies.iter().map(|b| b.body).collect();
-        stage.renumber_bodies(|b| slots.iter().position(|&x| x == b).map_or(b, |i| next + i));
-        let ports = stage.ports();
-        let (input, output) = (ports.input(), ports.output());
-        // **What the stage holds by convention is written**, in train
-        // numbers: from here on the train holds it because it says so.
-        let held: Vec<usize> = ports.held.iter().map(|&slot| stage.body_at(slot)).collect();
         let onward = self.boundaries_of(&parts).ok().and_then(|b| {
             let open = self.open_ports(&b);
             let last = k.checked_sub(1)?;
@@ -1518,16 +1522,8 @@ impl Train {
                 None
             }
         });
-        // Where the stage's slots land in the graph's list of bodies, which
-        // no merge below reorders.
-        let at = self.shape.bodies.len();
-        self.shape.append(stage);
-        let body = |train: &Self, slot: Body| train.shape.bodies[at + slot - 1].body;
-        for body in held {
-            if !self.held.contains(&body) {
-                self.held.push(body);
-            }
-        }
+        let (input, output) = self.lay(stage);
+        let body = |train: &Self, entry: usize| train.shape.bodies[entry].body;
         if k == 0 {
             // Taken up as they were: a reaction parked at the output is a
             // reaction at the stage's, not a body two stages share. Each
@@ -1555,6 +1551,87 @@ impl Train {
                 }
             }
             self.join(from, input);
+        }
+    }
+
+    /// **A stage laid into the graph beside what is there**: its bodies
+    /// numbered after every body the train has, in its own slot order —
+    /// slot `i` body `next + i - 1` — and what it holds by convention
+    /// written as the train's holds, so from here on the train holds it
+    /// because it says so. Where its conventional input and output landed
+    /// in the graph's list of bodies, which no merge with a body nothing
+    /// lists reorders.
+    fn lay(&mut self, mut stage: Shape) -> (usize, usize) {
+        let next = self.max_body() + 1;
+        let slots: Vec<usize> = stage.bodies.iter().map(|b| b.body).collect();
+        stage.renumber_bodies(|b| slots.iter().position(|&x| x == b).map_or(b, |i| next + i));
+        let ports = stage.ports();
+        let (input, output) = (ports.input(), ports.output());
+        let held: Vec<usize> = ports.held.iter().map(|&slot| stage.body_at(slot)).collect();
+        let at = self.shape.bodies.len();
+        self.shape.append(stage);
+        for body in held {
+            if !self.held.contains(&body) {
+                self.held.push(body);
+            }
+        }
+        (at + input - 1, at + output - 1)
+    }
+
+    /// **A stage laid in at a body** ([`super::Edit::Insert`]): its
+    /// conventional input made one with `at` — the shaft it runs on —
+    /// where given, and chained on from the last part's open output
+    /// otherwise ([`Self::push_stage`]).
+    fn insert(&mut self, stage: Shape, at: Option<usize>) -> Result<(), super::EditRefused> {
+        let Some(at) = at else {
+            self.push_stage(stage);
+            return Ok(());
+        };
+        if !self.shape.bodies.iter().any(|b| b.body == at) {
+            return Err(super::EditRefused::NoSuchIndex);
+        }
+        let mut t = self.clone();
+        let (input, _) = t.lay(stage);
+        let input = t.shape.bodies[input].body;
+        t.try_join(at, input)?;
+        *self = t;
+        Ok(())
+    }
+
+    /// **One edit to the train's graph** ([`super::Edit`]), made whole or
+    /// refused whole. A shape's edit numbers any body it adds after every
+    /// body the train has; a body it takes off the train leaves with every
+    /// case entry and hold at it, a body left with nothing on it that
+    /// nothing names is given up, and the rest are numbered densely again —
+    /// as a card's edit does ([`Self::edit_stage`]).
+    ///
+    /// # Errors
+    ///
+    /// [`super::EditRefused`], the train unchanged.
+    pub fn edit(&mut self, edit: super::Edit) -> Result<(), super::EditRefused> {
+        use super::Edit;
+        match edit {
+            Edit::Join { a, b } => self.try_join(a, b),
+            Edit::Hold(body) => {
+                if body == GROUND || !self.shape.bodies.iter().any(|b| b.body == body) {
+                    return Err(super::EditRefused::NoSuchIndex);
+                }
+                self.hold(body);
+                Ok(())
+            }
+            Edit::Release(body) => {
+                self.release(body);
+                Ok(())
+            }
+            Edit::Insert { stage, at } => self.insert(stage, at),
+            edit => {
+                let next = self.max_body() + 1;
+                self.shape.apply(&edit, next)?;
+                self.drop_bare();
+                self.drop_orphans();
+                self.prune();
+                Ok(())
+            }
         }
     }
 }

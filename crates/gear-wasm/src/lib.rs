@@ -1534,8 +1534,17 @@ fn relieve_case_impl(input: &str) -> Result<String, String> {
 ///   ([`gear_core::train::StageEdit`]: a step, a sun or a ring, an axis, a
 ///   mesh added or removed, a member moved to another body), a body it
 ///   adds numbered after the train's and one it takes off the stage leaving
-///   the train where no other stage has it ([`Train::edit_stage`]). A
-///   refused edit is an error and the train is returned unchanged.
+///   the train where no other stage has it ([`Train::edit_stage`]);
+/// - `{ "graph": edit }` — one of the graph's own edits
+///   ([`gear_core::train::Edit`]: a gear at a body, a new body or a new
+///   axis; a ratio on the body asked; a step; a coupling; a member, mesh,
+///   axis, body or coupling removed with what goes with it; a gear moved;
+///   a join, a hold, a release; a stage inserted at a body), every index
+///   the graph's ([`Train::edit`]).
+///
+/// A refused edit is an error carrying the refusal's catalogue key
+/// ([`gear_core::train::EditRefused::key`]), the words being the panel's to
+/// say, and the train is returned unchanged.
 ///
 /// # Errors
 ///
@@ -1575,6 +1584,7 @@ enum TrainEdit {
         stage: usize,
         edit: gear_core::train::StageEdit,
     },
+    Graph(gear_core::train::Edit),
 }
 
 #[derive(Deserialize)]
@@ -1605,9 +1615,12 @@ fn edit_train_impl(input: &str) -> Result<String, String> {
             train.load_cases.push(case);
         }
         TrainEdit::Duty { case, intermittent } => train.set_duty(case, intermittent),
-        TrainEdit::Stage { stage, edit } => {
-            train.edit_stage(stage, edit).map_err(|e| e.to_string())?
-        }
+        // **A refusal crosses as its catalogue key**, which is what the
+        // panel says under the card; its `Display` is English for a log.
+        TrainEdit::Stage { stage, edit } => train
+            .edit_stage(stage, edit)
+            .map_err(|e| e.key().to_string())?,
+        TrainEdit::Graph(edit) => train.edit(edit).map_err(|e| e.key().to_string())?,
     }
     serde_json::to_string(&train).map_err(|e| e.to_string())
 }
@@ -2999,6 +3012,36 @@ mod tests {
             v["failure"]
         );
         v["result"].clone()
+    }
+
+    /// **A refused edit crosses as its catalogue key**, which is what the
+    /// panel says under the card — for a card's edit and the graph's. It
+    /// crossed as English for as long as there were edits, and the panel,
+    /// looking for a key, said nothing.
+    #[test]
+    fn a_refused_edit_crosses_as_its_key() {
+        let d: serde_json::Value = serde_json::from_str(&defaults_impl().unwrap()).unwrap();
+        for edit in [
+            serde_json::json!({ "stage": { "stage": 0, "edit": { "remove_axis": { "axis": 0 } } } }),
+            serde_json::json!({ "graph": { "join": { "a": 1, "b": 2 } } }),
+        ] {
+            let e = edit_train_impl(
+                &serde_json::json!({ "train": d["train"], "edit": edit }).to_string(),
+            )
+            .unwrap_err();
+            let keys = [
+                gear_core::train::EditRefused::LastOfItsKind,
+                gear_core::train::EditRefused::OneCard,
+            ]
+            .map(gear_core::train::EditRefused::key);
+            assert!(keys.contains(&e.as_str()), "{edit}: {e}");
+            assert!(
+                gear_io::strings::Catalogue::for_language("en")
+                    .messages()
+                    .contains_key(e.as_str()),
+                "{e} has words"
+            );
+        }
     }
 
     #[test]
