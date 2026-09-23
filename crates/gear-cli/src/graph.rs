@@ -140,7 +140,7 @@ fn report(name: &str, train: &Train, r: &TrainResult) {
     let mut member = 0;
     let mut mesh = 0;
     let mut distance = 0;
-    for (k, s) in r.stages.iter().enumerate() {
+    for (k, s) in r.cards(train).iter().enumerate() {
         let stages = train.stages();
         let shape = &stages[k];
         for g in &s.members {

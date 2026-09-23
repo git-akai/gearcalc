@@ -2001,6 +2001,22 @@ pub enum MemberFreedom {
     PressureAngle,
 }
 
+impl MemberFreedom {
+    /// What this input of a gear came to, off its result.
+    #[must_use]
+    pub fn of(self, g: &GearResult) -> f64 {
+        match self {
+            Self::Shift => g.profile_shift,
+            Self::Helix => g.helix_angle,
+            Self::PitchDiameter => g.pitch_diameter,
+            Self::FaceWidth => g.face_width,
+            Self::ThicknessMod => g.params.thickness_mod,
+            Self::Module => g.params.module,
+            Self::PressureAngle => g.params.pressure_angle,
+        }
+    }
+}
+
 /// **What one input came to**, by the name relief knows it by — the number a
 /// box turned given by relief is seeded with, so a designer holds what they
 /// were shown rather than a stale zero.
@@ -2466,15 +2482,7 @@ impl shape::ShapeResult {
                 .meshes
                 .get(k)
                 .and_then(|m| m.line.as_ref().map(|l| l.contact_ratios.overlap)),
-            Freedom::Member(i, m) => self.members.get(i).map(|g| match m {
-                MemberFreedom::Shift => g.profile_shift,
-                MemberFreedom::Helix => g.helix_angle,
-                MemberFreedom::PitchDiameter => g.pitch_diameter,
-                MemberFreedom::FaceWidth => g.face_width,
-                MemberFreedom::ThicknessMod => g.params.thickness_mod,
-                MemberFreedom::Module => g.params.module,
-                MemberFreedom::PressureAngle => g.params.pressure_angle,
-            }),
+            Freedom::Member(i, m) => self.members.get(i).map(|g| m.of(g)),
         }
     }
 
@@ -3252,7 +3260,7 @@ pub fn solve_alone(train: &Train, lib: &MaterialLibrary) -> Result<Alone, TrainE
         return Err(MotionError::Empty.into());
     }
     let whole = [graph::Part::whole(&train.shape)];
-    let mut r = solve_parts(train, &whole, lib).map_err(|e| match e {
+    let (r, mut stages) = solve_parts(train, &whole, lib).map_err(|e| match e {
         TrainError::InStage { cause, .. } => *cause,
         other => other,
     })?;
@@ -3270,7 +3278,7 @@ pub fn solve_alone(train: &Train, lib: &MaterialLibrary) -> Result<Alone, TrainE
     }
     .cloned();
     Ok(Alone {
-        stage: r.stages.remove(0),
+        stage: stages.remove(0),
         ratio: path.as_ref().map(|p| p.ratio),
         efficiency: path.as_ref().map(|p| p.efficiency),
         backlash: path.as_ref().map(|p| p.backlash),
@@ -3951,7 +3959,49 @@ pub struct TrainResult {
     /// solved at the train level alone so a panel can say whether one
     /// could be switched on; no stage rates a case that is off.
     pub cases: Vec<TrainCase>,
-    pub stages: Vec<ShapeResult>,
+    /// **Every gear's result**, in the graph's order ([`Shape::members`]).
+    pub members: Vec<GearResult>,
+    /// Every mesh's report, in the graph's order.
+    pub meshes: Vec<MeshReport>,
+    /// **Every axis distance's report**, in the graph's order, the mesh
+    /// that held one open named by the graph's number for it — `None` for a
+    /// distance nothing meshes across, which has nothing to report.
+    pub distances: Vec<Option<shape::DistanceReport>>,
+    /// Every axis's report, in the graph's order.
+    pub axes: Vec<AxisReport>,
+    /// **What is a part's own**, one per part in the order the cards are
+    /// dealt ([`Train::parts`]).
+    pub parts: Vec<PartReport>,
+}
+
+/// **One axis's report**: how its planets lay out, where it is replicated.
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+pub struct AxisReport {
+    /// The layout, its `axis` the graph's number for it.
+    pub layout: Option<shape::LayoutReport>,
+}
+
+/// **What is a part's own** — its junction's, where it is one: the speed and
+/// the torque its meshes put on each of its bodies in each case, which on a
+/// shaft two parts share is what the one hands the other, and what its
+/// search and its closures came to.
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+pub struct PartReport {
+    /// Per case, per body of the part, ground first.
+    pub cases: Vec<shape::SlotCase>,
+    pub notes: Vec<Note>,
 }
 
 impl TrainResult {
@@ -3960,6 +4010,140 @@ impl TrainResult {
     #[must_use]
     pub fn total(&self) -> Option<&PathReport> {
         self.paths.first()
+    }
+
+    /// **The train's result, laid from its parts'**: each part's members,
+    /// meshes, distances and replicated axes at their places in the graph,
+    /// the indices they carry — the mesh that held a distance open, a
+    /// layout's axis — renumbered to the graph's, beside its paths and cases.
+    fn laid(
+        shape: &Shape,
+        parts: &[graph::Part],
+        results: &[ShapeResult],
+        paths: Vec<PathReport>,
+        cases: Vec<TrainCase>,
+    ) -> Self {
+        let mut members: Vec<Option<GearResult>> = vec![None; shape.members.len()];
+        let mut meshes: Vec<Option<MeshReport>> = vec![None; shape.meshes.len()];
+        let mut distances: Vec<Option<shape::DistanceReport>> = vec![None; shape.distances.len()];
+        let mut axes: Vec<AxisReport> = (0..shape.axes.len())
+            .map(|_| AxisReport { layout: None })
+            .collect();
+        let mut own = Vec::with_capacity(parts.len());
+        for (part, r) in parts.iter().zip(results) {
+            for (&i, g) in part.members.iter().zip(&r.members) {
+                members[i] = Some(g.clone());
+            }
+            for (&k, m) in part.meshes.iter().zip(&r.meshes) {
+                meshes[k] = Some(m.clone());
+            }
+            for (&d, report) in part.distances.iter().zip(&r.distances) {
+                distances[d] = Some(shape::DistanceReport {
+                    sized_by: report.sized_by.and_then(|k| part.meshes.get(k).copied()),
+                    ..report.clone()
+                });
+            }
+            for l in &r.layouts {
+                if let Some(&a) = part.axes.get(l.axis) {
+                    axes[a].layout = Some(shape::LayoutReport {
+                        axis: a,
+                        ..l.clone()
+                    });
+                }
+            }
+            own.push(PartReport {
+                cases: r.cases.clone(),
+                notes: r.notes.clone(),
+            });
+        }
+        Self {
+            paths,
+            cases,
+            members: members.into_iter().flatten().collect(),
+            meshes: meshes.into_iter().flatten().collect(),
+            distances,
+            axes,
+            parts: own,
+        }
+    }
+
+    /// **A part's view of the train's result** — the `k`th part's members,
+    /// meshes, distances and layouts in its own numbering, and what is its
+    /// own: the result it solved to, which is what a card shows and the
+    /// harness prints stage by stage. A law holds it to the part's own
+    /// solve, field for field.
+    #[must_use]
+    pub fn part(&self, part: &graph::Part, k: usize) -> ShapeResult {
+        let own = self.parts.get(k);
+        ShapeResult {
+            members: part
+                .members
+                .iter()
+                .filter_map(|&i| self.members.get(i).cloned())
+                .collect(),
+            meshes: part
+                .meshes
+                .iter()
+                .filter_map(|&m| self.meshes.get(m).cloned())
+                .collect(),
+            distances: part
+                .distances
+                .iter()
+                .filter_map(|&d| self.distances.get(d).cloned().flatten())
+                .map(|d| shape::DistanceReport {
+                    sized_by: d
+                        .sized_by
+                        .and_then(|k| part.meshes.iter().position(|&m| m == k)),
+                    ..d
+                })
+                .collect(),
+            layouts: part
+                .axes
+                .iter()
+                .enumerate()
+                .filter_map(|(j, &a)| {
+                    self.axes
+                        .get(a)
+                        .and_then(|x| x.layout.clone())
+                        .map(|l| shape::LayoutReport { axis: j, ..l })
+                })
+                .collect(),
+            cases: own.map(|o| o.cases.clone()).unwrap_or_default(),
+            notes: own.map(|o| o.notes.clone()).unwrap_or_default(),
+        }
+    }
+
+    /// **What an input of the train's came to** — the figure a box relief
+    /// turns given is seeded from, a freedom named by the graph's indices
+    /// ([`Shape::toggles`] on the train's shape).
+    #[must_use]
+    pub fn figure(&self, f: Freedom) -> Option<f64> {
+        match f {
+            Freedom::Distance(d) => self.distances.get(d).cloned().flatten().map(|d| d.running),
+            Freedom::Clearance(d) => self
+                .distances
+                .get(d)
+                .cloned()
+                .flatten()
+                .map(|d| d.clearance),
+            Freedom::Overlap(k) => self
+                .meshes
+                .get(k)
+                .and_then(|m| m.line.as_ref().map(|l| l.contact_ratios.overlap)),
+            Freedom::Member(i, m) => self.members.get(i).map(|g| m.of(g)),
+        }
+    }
+
+    /// **Every card's view of the result** ([`Self::part`]), in the order
+    /// the cards are dealt — what the harness prints stage by stage.
+    #[must_use]
+    pub fn cards(&self, train: &Train) -> Vec<ShapeResult> {
+        train
+            .parts()
+            .iter()
+            .enumerate()
+            .map(|(k, p)| self.part(p, k))
+            .collect()
     }
 }
 
@@ -3999,18 +4183,19 @@ impl TrainResult {
 /// A train with no stages, a train whose motion is a family under its own
 /// constraints, and whatever a stage refuses.
 pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, TrainError> {
-    solve_parts(train, &train.parts(), lib)
+    solve_parts(train, &train.parts(), lib).map(|(r, _)| r)
 }
 
 /// **The train solved card by card** — each of `parts` closed, sized,
 /// searched and rated on its own, one flow and one motion across them all.
 /// The train's own parts ([`Train::parts`]), or a lone stage's whole shape
-/// ([`solve_alone`]).
+/// ([`solve_alone`]). The train's result, and each part's own that it was
+/// laid from.
 fn solve_parts(
     train: &Train,
     parts: &[graph::Part],
     lib: &MaterialLibrary,
-) -> Result<TrainResult, TrainError> {
+) -> Result<(TrainResult, Vec<ShapeResult>), TrainError> {
     // **A train with no stages is a train**: nothing to rate, no figure of
     // its own, and every case reported unsolved with nothing to say of it —
     // the train's own state says why — so a designer who removes the last
@@ -4029,8 +4214,13 @@ fn solve_parts(
                     notes: Vec::new(),
                 })
                 .collect(),
-            stages: Vec::new(),
-        });
+            members: Vec::new(),
+            meshes: Vec::new(),
+            distances: Vec::new(),
+            axes: Vec::new(),
+            parts: Vec::new(),
+        })
+        .map(|r| (r, Vec::new()));
     }
 
     // Whether to correct for a root loaded on both flanks is one switch for the
@@ -4508,11 +4698,10 @@ fn solve_parts(
         &stages,
     );
 
-    Ok(TrainResult {
-        paths,
-        cases,
+    Ok((
+        TrainResult::laid(&train.shape, parts, &stages, paths, cases),
         stages,
-    })
+    ))
 }
 
 #[cfg(test)]
@@ -4523,6 +4712,72 @@ mod tests {
 
     fn library() -> MaterialLibrary {
         super::test_library()
+    }
+
+    /// **A train's result, and each card's view of it** — what these tests
+    /// read stage by stage, read through [`TrainResult::part`] so every one
+    /// of them reads the view the panel and the harness do; the law
+    /// `a_card_is_its_part_solved` holds the view to the part's own solve.
+    #[derive(Debug)]
+    pub(super) struct Solved {
+        pub result: TrainResult,
+        pub stages: Vec<ShapeResult>,
+    }
+
+    impl std::ops::Deref for Solved {
+        type Target = TrainResult;
+        fn deref(&self) -> &TrainResult {
+            &self.result
+        }
+    }
+
+    pub(super) fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<Solved, TrainError> {
+        let result = super::solve_train(train, lib)?;
+        let stages = result.cards(train);
+        Ok(Solved { result, stages })
+    }
+
+    /// **A card is its part, solved**: the view the train's result gives
+    /// of each part is the result the part solved to, field for field — on
+    /// every preset alone and after every other, where a part's pieces are
+    /// not the graph's by the same index.
+    #[test]
+    fn a_card_is_its_part_solved() {
+        let lib = library();
+        for a in arr::StagePreset::ALL {
+            for b in [
+                None,
+                Some(arr::StagePreset::Spur),
+                Some(arr::StagePreset::Planetary),
+            ] {
+                let presets: Vec<Shape> = b
+                    .into_iter()
+                    .map(arr::StagePreset::build)
+                    .chain(std::iter::once(a.build()))
+                    .collect();
+                let t = Train::chained(presets, |t| {
+                    t.chain_ends()
+                        .map(|(x, y)| vec![LoadCase::ultimate(x, y, 1.0, 1000.0)])
+                        .unwrap_or_default()
+                });
+                let parts = t.parts();
+                let Ok((r, own)) = solve_parts(&t, &parts, &lib) else {
+                    continue;
+                };
+                assert_eq!(own.len(), parts.len());
+                for (k, p) in parts.iter().enumerate() {
+                    assert_eq!(
+                        format!("{:?}", r.part(p, k)),
+                        format!("{:?}", own[k]),
+                        "{a:?} after {b:?}: card {k}"
+                    );
+                }
+                assert_eq!(r.members.len(), t.shape.members.len());
+                assert_eq!(r.meshes.len(), t.shape.meshes.len());
+                assert_eq!(r.distances.len(), t.shape.distances.len());
+                assert!(r.distances.iter().all(Option::is_some));
+            }
+        }
     }
 
     /// These tests build pairs, and read a pair's result as the shape's:
@@ -4555,7 +4810,7 @@ mod tests {
         let (from, to) = (train.port(k, b[k].input), train.port(k, b[k].output));
         let mut t = train.clone();
         t.load_cases = vec![LoadCase::ultimate(from, to, 2.0, 3000.0)];
-        solve_train(&t, lib)
+        super::solve_train(&t, lib)
             .unwrap()
             .paths
             .into_iter()
@@ -6782,7 +7037,7 @@ mod tests {
         let one = t.stages()[..1].to_vec();
         restage(&mut t, one);
         let ratio = 43.0 / 17.0;
-        let case = |torque: f64, speed: f64| -> (Train, TrainResult) {
+        let case = |torque: f64, speed: f64| -> (Train, Solved) {
             let mut t = t.clone();
             t.load_cases = vec![LoadCase {
                 loads: vec![

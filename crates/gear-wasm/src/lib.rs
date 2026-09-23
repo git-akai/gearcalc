@@ -774,14 +774,14 @@ pub struct TrainRequest {
 pub struct TrainOutcome {
     pub result: Option<gear_core::train::TrainResult>,
     pub failure: Option<TrainFailure>,
-    /// **What each stage's constrainable inputs came to**, one list per
-    /// stage, by the name relief knows them by — what a box relief turns
-    /// given is seeded from ([`relieve_stage`]). Beside the result rather
-    /// than inside it because it is the *inputs'* names lined up against the
+    /// **What every constrainable input of the train came to**, by the name
+    /// relief knows it by, indexed as the graph is — what a box relief turns
+    /// given is seeded from ([`relieve`]). Beside the result rather than
+    /// inside it because it is the *inputs'* names lined up against the
     /// result's figures, which the core does in one place
-    /// (`ShapeResult::figure`) and the panel need not know at all: it hands
-    /// this list back with the stage, and never learns which field is which.
-    pub figures: Vec<Vec<gear_core::train::Figure>>,
+    /// (`TrainResult::figure`) and the panel need not know at all: it hands
+    /// this list back with the graph, and never learns which field is which.
+    pub figures: Vec<gear_core::train::Figure>,
     /// **Every card**: the part of the train's graph it is, in its own
     /// numbering with where each of its pieces is in the graph — what the
     /// panel stands a card on — and its ports, with the label the panel names
@@ -795,6 +795,12 @@ pub struct TrainOutcome {
     /// whether or not the geometry solved. A train mid-edit whose stage will
     /// not close still turns, and this is what says at what.
     pub motion: Option<gear_core::train::MotionReport>,
+    /// **Each card's view of the result**, in the order the topology deals
+    /// them ([`gear_core::train::TrainResult::cards`]) — the result laid
+    /// back out in each part's own numbering by the core's one rule, so the
+    /// cards do not slice it a second time. Empty where the train did not
+    /// solve.
+    pub cards: Vec<gear_core::train::ShapeResult>,
 }
 
 /// Why a train has no answer, and where.
@@ -824,20 +830,15 @@ fn solve_train_impl(input: &str) -> Result<String, String> {
         Ok(result) => TrainOutcome {
             figures: req
                 .train
-                .stages()
-                .iter()
-                .zip(&result.stages)
-                .map(|(stage, solved)| {
-                    stage
-                        .toggles()
-                        .into_iter()
-                        .map(|(freedom, _)| gear_core::train::Figure {
-                            freedom,
-                            value: solved.figure(freedom),
-                        })
-                        .collect()
+                .shape
+                .toggles()
+                .into_iter()
+                .map(|(freedom, _)| gear_core::train::Figure {
+                    freedom,
+                    value: result.figure(freedom),
                 })
                 .collect(),
+            cards: result.cards(&req.train),
             result: Some(result),
             failure: None,
             topology,
@@ -859,6 +860,7 @@ fn solve_train_impl(input: &str) -> Result<String, String> {
                 figures: Vec::new(),
                 topology,
                 motion,
+                cards: Vec::new(),
             }
         }
     };
@@ -1290,9 +1292,9 @@ pub fn export_train(document_json: &str) -> Result<String, JsError> {
 
 /// **One member of a geartrain, as a gear tab would hold it.**
 ///
-/// `{ train, materials, stage, member }` JSON in — a train request with the
-/// stage's index and the member's, in the order the stage's cards show them
-/// — and `{ params, internal, cutter }` out: the tooth the stage cut that
+/// `{ train, materials, member }` JSON in — a train request with the
+/// member's index in the train's graph — and `{ params, internal, cutter }`
+/// out: the tooth the stage cut that
 /// member with, every automatic value resolved and every convention applied
 /// (`GearResult::params`), whether it is a ring, and the pinion cutter that
 /// cut it where it is. The gear tab **adopts** the member — a word chosen so
@@ -1307,7 +1309,7 @@ pub fn export_train(document_json: &str) -> Result<String, JsError> {
 ///
 /// # Errors
 ///
-/// A malformed request; a stage or member index the train does not have; a
+/// A malformed request; a member index the train does not have; a
 /// train that has no answer, with its reason; and a **worm**, which is not a
 /// gear the tab can hold — a thread's proportions are its own — and which the
 /// panel lists greyed rather than omitted so a reader can see why it is not
@@ -1322,7 +1324,7 @@ struct AdoptRequest {
     train: gear_core::train::Train,
     #[serde(default)]
     materials: Option<gear_core::MaterialLibrary>,
-    stage: usize,
+    /// The member, by the graph's index.
     member: usize,
 }
 
@@ -1360,40 +1362,28 @@ pub struct AdoptOutcome {
 
 fn adopt_member_impl(input: &str) -> Result<String, String> {
     let req: AdoptRequest = serde_json::from_str(input).map_err(|e| e.to_string())?;
-    // A stage or member the train does not have, or a worm, is a defect on
-    // the other side of the boundary — the panel lists what can be adopted —
-    // so each is a refusal rather than an outcome.
-    let stages = req.train.stages();
-    let stage = stages
-        .get(req.stage)
-        .ok_or_else(|| format!("the train has no stage {}", req.stage + 1))?;
-    if req.member >= stage.gears().len() {
-        return Err(format!(
-            "stage {} has no member {}",
-            req.stage + 1,
-            req.member + 1
-        ));
+    // A member the train does not have, or a worm, is a defect on the other
+    // side of the boundary — the panel lists what can be adopted — so each
+    // is a refusal rather than an outcome.
+    let shape = &req.train.shape;
+    if req.member >= shape.members.len() {
+        return Err(format!("the train has no member {}", req.member + 1));
     }
-    // A worm is the first member of a distance sized as a worm — the thread
-    // the tab cannot hold; its wheel it can.
-    let is_worm = stage
-        .distances
-        .first()
-        .is_some_and(|d| d.worm && stage.meshes.first().is_some_and(|m| m.a == req.member));
-    if is_worm {
+    // A worm's thread is a thread the tab cannot hold; its wheel it can.
+    if shape.is_worm_thread(req.member) {
         return Err("a worm is not a gear the tab can hold".to_string());
     }
     let lib = req.materials.unwrap_or_else(gear_io::default_library);
     let outcome = match gear_core::train::solve_train(&req.train, &lib) {
         Ok(result) => {
-            let cutter = stage.member_cutter(req.member).map(|c| CutterRef {
+            let cutter = shape.member_cutter(req.member).map(|c| CutterRef {
                 teeth: c.teeth,
                 addendum: c.addendum,
                 tip_round: c.tip_round,
             });
             AdoptOutcome {
                 adopted: Some(Adopted {
-                    params: result.stages[req.stage].members[req.member].params,
+                    params: result.members[req.member].params,
                     internal: cutter.is_some(),
                     cutter,
                 }),
@@ -1408,19 +1398,20 @@ fn adopt_member_impl(input: &str) -> Result<String, String> {
     serde_json::to_string(&outcome).map_err(|e| e.to_string())
 }
 
-/// **A stage with its over-determined inputs relieved.**
+/// **The train's graph with its over-determined inputs relieved.**
 ///
-/// `{ stage, just, figures }` JSON in — the stage as it now stands, the
-/// [`Freedom`] the designer has this moment pinned (`null` where what changed
-/// was not a toggle), and what the stage's inputs last came to
-/// ([`TrainOutcome::figures`] for it) — and the corrected stage out, with
-/// every box relief turned given seeded from its figure.
+/// `{ shape, just, figures }` JSON in — the train's graph as it now stands,
+/// the [`Freedom`] the designer has this moment pinned (`null` where what
+/// changed was not a toggle), and what the graph's inputs last came to
+/// ([`TrainOutcome::figures`]), every index the graph's — and the corrected
+/// graph out, with every box relief turned given seeded from its figure.
 ///
 /// A designer who pins a pair's distance *and* both its shifts has asked for a
 /// contradiction: the three are bound by one relation, so one would have to be
 /// ignored. Rather than accept an input and quietly disregard it, the first one
 /// in relief order that they are not this moment pinning goes back to
-/// automatic.
+/// automatic. **Every group of inputs that argue is a part's**, so relieving
+/// the graph is relieving each card, whichever the designer touched.
 ///
 /// Which inputs argue, how many may stand and which gives way first are facts
 /// about the geometry, and they used to live in the panel as three functions,
@@ -1434,25 +1425,25 @@ fn adopt_member_impl(input: &str) -> Result<String, String> {
 ///
 /// # Errors
 ///
-/// A malformed stage or freedom, which would be a defect on this side of the
+/// A malformed graph or freedom, which would be a defect on this side of the
 /// boundary.
 #[wasm_bindgen]
-pub fn relieve_stage(input: &str) -> Result<String, JsError> {
-    relieve_stage_impl(input).map_err(|e| JsError::new(&e))
+pub fn relieve(input: &str) -> Result<String, JsError> {
+    relieve_impl(input).map_err(|e| JsError::new(&e))
 }
 
 #[derive(Deserialize)]
 struct RelieveRequest {
-    stage: gear_core::train::Shape,
+    shape: gear_core::train::Shape,
     #[serde(default)]
     just: Option<gear_core::train::Freedom>,
     #[serde(default)]
     figures: Vec<gear_core::train::Figure>,
 }
 
-fn relieve_stage_impl(input: &str) -> Result<String, String> {
+fn relieve_impl(input: &str) -> Result<String, String> {
     let req: RelieveRequest = serde_json::from_str(input).map_err(|e| e.to_string())?;
-    serde_json::to_string(&req.stage.relieved_from(req.just, &req.figures))
+    serde_json::to_string(&req.shape.relieved_from(req.just, &req.figures))
         .map_err(|e| e.to_string())
 }
 
@@ -1464,7 +1455,7 @@ fn relieve_stage_impl(input: &str) -> Result<String, String> {
 /// with exactly the train's mobility of its speeds given and the torques one
 /// statics equation short of the bodies that carry one, every figure relief
 /// turned derived seeded from what the case comes to
-/// ([`Train::relieve_case`]). The same relation [`relieve_stage`] keeps on a
+/// ([`Train::relieve_case`]). The same relation [`relieve`] keeps on a
 /// stage's geometry, kept on a case's loads: a pair with a speed at each end
 /// has asked for a contradiction, and the one not this moment pinned gives
 /// way. A case with fewer given than that is left short — relief never
@@ -1788,7 +1779,7 @@ mod tests {
         });
         let solved: serde_json::Value =
             serde_json::from_str(&solve_train_impl(&train.to_string()).unwrap()).unwrap();
-        let member = &solved["result"]["stages"][0]["members"][0]["ranges"]["profile_shift"];
+        let member = &solved["result"]["members"][0]["ranges"]["profile_shift"];
         assert!(
             member.is_object(),
             "the stage's gear has no ranges: {member}"
@@ -1969,7 +1960,7 @@ mod tests {
         let request = |kind: &str, member: usize| {
             let mut train = d["train"].clone();
             train["shape"] = preset(&d, kind);
-            serde_json::json!({ "train": train, "stage": 0, "member": member }).to_string()
+            serde_json::json!({ "train": train, "member": member }).to_string()
         };
         let adopt = |kind: &str, member: usize| -> serde_json::Value {
             serde_json::from_str(&adopt_member_impl(&request(kind, member)).unwrap()).unwrap()
@@ -2430,7 +2421,9 @@ mod tests {
         let req = serde_json::json!({ "train": train });
 
         let v = solved(&req.to_string());
-        let stage = &v["stages"][0];
+        // One part: the graph's order is the card's, and what the part's
+        // meshes put on its bodies is the part's own.
+        let stage = &v["parts"][0];
 
         // Ring held, sun driving: the classical 1 + z_r/z_s.
         assert!((v["paths"][0]["ratio"].as_f64().unwrap() - 3.5).abs() < 1e-12);
@@ -2455,8 +2448,8 @@ mod tests {
         // ring, so what moves it is the running clearance alone — the planet
         // thinned by that much opens both meshes — and it comes back negative,
         // small, closing the distance.
-        let x_p = stage["members"][1]["profile_shift"].as_f64().unwrap();
-        let c = stage["distances"][0]["clearance"].as_f64().unwrap();
+        let x_p = v["members"][1]["profile_shift"].as_f64().unwrap();
+        let c = v["distances"][0]["clearance"].as_f64().unwrap();
         assert!(
             c > 0.0 && x_p < 0.0 && x_p.abs() < 2.0 * c,
             "x_p {x_p} at clearance {c}"
@@ -2464,8 +2457,8 @@ mod tests {
         // The one distance closes on both meshes: each runs at it, and each
         // is opened by the same clearance — outward for the sun's mesh, inward
         // for the ring's, which is what a signed clearance reads as.
-        let running = stage["distances"][0]["running"].as_f64().unwrap();
-        for nominal in stage["distances"][0]["nominal"].as_array().unwrap() {
+        let running = v["distances"][0]["running"].as_f64().unwrap();
+        for nominal in v["distances"][0]["nominal"].as_array().unwrap() {
             assert!(
                 ((running - nominal.as_f64().unwrap()).abs() - c).abs() < 1e-9,
                 "nominal {nominal}, running {running}, clearance {c}"
@@ -2473,7 +2466,7 @@ mod tests {
         }
         // A planet's root is loaded on both flanks, and with no correction asked
         // for the stage says so rather than derating it out of sight.
-        let notes = stage["members"][1]["notes"]
+        let notes = v["members"][1]["notes"]
             .as_array()
             .expect("a gear carries its own notes");
         assert!(
@@ -2484,7 +2477,7 @@ mod tests {
         );
 
         // Two meshes with their own answers, and every member rated.
-        let meshes = stage["meshes"].as_array().unwrap();
+        let meshes = v["meshes"].as_array().unwrap();
         assert_eq!(meshes.len(), 2);
         for (k, mesh) in meshes.iter().enumerate() {
             assert!(mesh["contact_ratio"].as_f64().unwrap() > 1.0);
@@ -2499,14 +2492,14 @@ mod tests {
         }
         for who in 0..3 {
             assert!(
-                stage["members"][who]["cases"][0]["bending_stress"]
+                v["members"][who]["cases"][0]["bending_stress"]
                     .as_f64()
                     .unwrap()
                     > 0.0,
                 "member {who} must be rated"
             );
         }
-        assert_eq!(stage["layouts"][0]["equal_spacing"], true);
+        assert_eq!(v["axes"][1]["layout"]["equal_spacing"], true);
         // What the stage *assumes* has to come across too — here, equal load
         // sharing between planets, which no calculation can establish. Crossing
         // as a key and its values, not as a sentence: the words are the string
@@ -2543,7 +2536,8 @@ mod tests {
             "train": train_json(&[hula_stage()], (2.0, 3000.0), 0.0, (1.0, 3000.0), 1.0)
         });
         let v = solved(&train.to_string());
-        let stage = &v["stages"][0];
+        // One part: the graph's gears are the card's.
+        let stage = &v;
 
         // Four gears, each with the rating every stage member carries.
         let gears = stage["members"].as_array().expect("four gears");
@@ -2594,14 +2588,17 @@ mod tests {
         assert!(stage["distances"][0]["sized_by"].is_number());
         // The bodies are in equilibrium, and the drive says so in the
         // vocabulary a stage says anything in.
-        let sum: f64 = stage["cases"][0]["torques"]
+        let sum: f64 = v["parts"][0]["cases"][0]["torques"]
             .as_array()
             .unwrap()
             .iter()
             .map(|t| t.as_f64().unwrap())
             .sum();
         assert!(sum.abs() < 1e-9, "torques must balance, got {sum}");
-        assert!(stage["notes"].is_array(), "a stage carries its own notes");
+        assert!(
+            v["parts"][0]["notes"].is_array(),
+            "a part carries its own notes"
+        );
     }
 
     #[test]
@@ -2626,27 +2623,29 @@ mod tests {
 
         // Both stages are the one shape, and each says which contact it has
         // by what its mesh carries: the transverse figures on parallel shafts,
-        // the zone on crossed ones. Neither carries a kind: there is one.
-        assert!(v["stages"][0]["kind"].is_null());
-        assert!(v["stages"][1]["kind"].is_null());
-        let (spur, worm) = (&v["stages"][0], &v["stages"][1]);
-        assert!(spur["meshes"][0]["line"].is_object() && spur["meshes"][0]["point"].is_null());
-        assert!(worm["meshes"][0]["point"].is_object() && worm["meshes"][0]["line"].is_null());
+        // the zone on crossed ones. Neither carries a kind: there is one. The
+        // pair's mesh is the graph's first and the worm's its second; the
+        // worm's thread is the graph's third gear.
+        assert!(v["parts"][0]["kind"].is_null());
+        assert!(v["parts"][1]["kind"].is_null());
+        let (spur, worm) = (&v["meshes"][0], &v["meshes"][1]);
+        assert!(spur["line"].is_object() && spur["point"].is_null());
+        assert!(worm["point"].is_object() && worm["line"].is_null());
         // The sliding a line contact has at its pitch point is exactly none.
-        assert_eq!(spur["meshes"][0]["sliding_ratio"], 0.0);
-        assert!(worm["meshes"][0]["sliding_ratio"].as_f64().unwrap() > 1.0);
+        assert_eq!(spur["sliding_ratio"], 0.0);
+        assert!(worm["sliding_ratio"].as_f64().unwrap() > 1.0);
         assert!(
-            spur["members"][0]["cases"][0]["bending_stress"]
+            v["members"][0]["cases"][0]["bending_stress"]
                 .as_f64()
                 .unwrap()
                 > 0.0
         );
 
         assert!(
-            worm["members"][0]["pitch_diameter"].as_f64().unwrap() > 0.0,
+            v["members"][2]["pitch_diameter"].as_f64().unwrap() > 0.0,
             "a worm stage's members are gears like any other"
         );
-        let mesh = &worm["meshes"][0];
+        let mesh = worm;
         assert!(
             mesh["cases"][0]["contact"]["max_pressure"]
                 .as_f64()
@@ -2658,7 +2657,7 @@ mod tests {
         // ...while the spur stage puts the same number in both, which is the
         // point of reporting it directionally everywhere rather than only where
         // it differs.
-        let spur_eff = &spur["meshes"][0]["efficiency"];
+        let spur_eff = &spur["efficiency"];
         assert_eq!(spur_eff["forward"], spur_eff["backward"]);
         // And the train reports both totals, plus backlash at each end.
         //
@@ -2687,7 +2686,7 @@ mod tests {
         );
         // The sliding speed is each case's own, at that case's speed.
         assert!(mesh["cases"][0]["sliding_velocity"].as_f64().unwrap() > 0.0);
-        assert!(worm["members"][1]["cases"][0]["speed"].as_f64().unwrap() > 0.0);
+        assert!(v["members"][3]["cases"][0]["speed"].as_f64().unwrap() > 0.0);
     }
 
     /// **Every number that crosses is a number**, or a `null` at a field that is
@@ -2728,6 +2727,8 @@ mod tests {
         "binding_mesh",
         // A single planet has no neighbour to clear.
         "planet_clearance",
+        // An axis nothing is replicated round has no layout.
+        "layout",
         // A layout's assembly rule is known for one gear on the axis meshing
         // two central members, and is a question with no answer elsewhere.
         "equal_spacing",
@@ -3025,7 +3026,7 @@ mod tests {
         assert!(bodies[0]["speed"].is_null(), "ground reports no speed");
         assert_eq!(v["cases"][0]["solved"], true);
 
-        let g0 = &v["stages"][0]["members"][0];
+        let g0 = &v["members"][0];
         // The automatic face width came back, and so did the cycle count.
         assert!(g0["face_width"].as_f64().unwrap() > 0.0);
         assert!(g0["cases"][2]["cycles"]["bending"].as_f64().unwrap() > 0.0);
@@ -3033,7 +3034,7 @@ mod tests {
         assert!((g0["cases"][0]["speed"].as_f64().unwrap() - 3000.0).abs() < 1e-9);
         // Spur stage: the overlap ratio is exactly zero, not merely small.
         assert_eq!(
-            v["stages"][0]["meshes"][0]["line"]["contact_ratios"]["overlap"]
+            v["meshes"][0]["line"]["contact_ratios"]["overlap"]
                 .as_f64()
                 .unwrap(),
             0.0
@@ -3134,7 +3135,7 @@ mod tests {
             "shape": { "axes": [], "bodies": [], "members": [], "meshes": [], "distances": [] }}}"#;
         let v: serde_json::Value = serde_json::from_str(&solve_train_impl(bad).unwrap()).unwrap();
         assert!(
-            v["failure"].is_null() && v["result"]["stages"].as_array().unwrap().is_empty(),
+            v["failure"].is_null() && v["result"]["members"].as_array().unwrap().is_empty(),
             "an empty train is a train with nothing rated: {v}"
         );
         assert_eq!(v["result"]["cases"].as_array().unwrap().len(), 3);

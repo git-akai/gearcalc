@@ -93,7 +93,7 @@ const out = {
   // rather than a stage that needed none. Every input the kind has is pinned
   // and the first one is declared as the freedom just touched, which is the one
   // that must survive.
-  relieve_stage: call("relieve_stage", () =>
+  relieve: call("relieve", () =>
     defaults.stages.map((e) => {
       const stage = structuredClone(e.stage);
       const pin = (a) => (a ? { auto: false, manual: 0.1 } : a);
@@ -105,7 +105,7 @@ const out = {
       // ...and a figure for the shift relief turns back given, so the
       // seeding is exercised too.
       const figures = [{ freedom: { member: [1, "shift"] }, value: 0.25 }];
-      return [e.preset, JSON.parse(w.relieve_stage(JSON.stringify({ stage, just, figures })))];
+      return [e.preset, JSON.parse(w.relieve(JSON.stringify({ shape: stage, just, figures })))];
     }),
   ),
   // **One member of each preset adopted**, including a planetary ring so
@@ -119,7 +119,7 @@ const out = {
       ["wolfrom", 0],
     ].map(([k, member]) => {
       const train = { ...structuredClone(defaults.train), shape: preset(k) };
-      return [k, JSON.parse(w.adopt_member(JSON.stringify({ train, materials: library, stage: 0, member })))];
+      return [k, JSON.parse(w.adopt_member(JSON.stringify({ train, materials: library, member })))];
     }),
   ),
   // **The train's graph edited by the core's rules**, each edit recorded:

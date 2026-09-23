@@ -37,7 +37,7 @@
     t,
   } from "./core";
   import { trains, library, type TrainTab } from "./state.svelte";
-  import { exportTrain, relieveStage, relieveCase, editTrain } from "./core";
+  import { exportTrain, relieveCase, editTrain } from "./core";
   import FieldNote from "./FieldNote.svelte";
   import Switch from "./Switch.svelte";
   import { notes, type Notes } from "./notes";
@@ -56,7 +56,7 @@
     isWorm,
     carried,
   } from "./members";
-  import { cardsOf } from "./cards";
+  import { cardsOf, relieveStage } from "./cards";
 
   /** **Resolving an over-determined stage is the core's rule, not this file's.**
    *
@@ -125,10 +125,11 @@
    *  them, each standing on the graph's own pieces (`cards.ts`) — so a box
    *  bound to a card's member writes the train. */
   const cards = $derived(cardsOf(tab.train, result.topology));
-  /** What a card's inputs last came to, by name — handed back to relief so
-   *  a box it turns given holds the number it showed. An empty list where
-   *  the train has not solved, and the box keeps what it had. */
-  const figuresOf = (stage: Shape): Figure[] => result.figures[cards.indexOf(stage)] ?? [];
+  /** What the train's inputs last came to, by name — handed back to relief
+   *  so a box it turns given holds the number it showed. An empty list where
+   *  the train has not solved, and the box keeps what it had. The train's,
+   *  whichever card asks: relief is asked of the whole graph. */
+  const figuresOf = (_stage: Shape): Figure[] => result.figures;
 
   /** **A stage's port is on a body of the train**, numbered across the
    *  train as gears are, ground being 0. The select beside a port says
@@ -2102,7 +2103,7 @@
     <p class="notice">{t("ui.train_no_stages")}</p>
   {/if}
   {#each cards as stage, i (i)}
-    {@const res = solved?.stages[i] ?? null}
+    {@const res = result.cards[i] ?? null}
     {@const figures = figuresOf(stage)}
     {@const worm = isWorm(stage)}
     {@const crossed = stage.distances.some((d) => d.angle !== 0)}

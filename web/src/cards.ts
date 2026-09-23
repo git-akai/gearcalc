@@ -5,17 +5,22 @@
 // with every solve (`StagePorts.part`). A card is drawn from its part's
 // shape, in the part's own numbering, and its inputs are bound to the
 // graph's own objects: a member, an axis, a mesh and a distance of the view
-// *are* the graph's, so a box typed into writes the train, and relief copied
-// back leaf by leaf (`relieveStage`) writes it too. Only the indices a mesh
-// and a distance carry — which members it joins, which axes — are read in
-// the part's numbering, and they are the part's to read and nobody's to
-// write: a card changes them through an edit the core makes (`editTrain`).
+// *are* the graph's, so a box typed into writes the train, and relief —
+// asked of the whole graph with the card's freedom read into the graph's
+// (`relieveStage`) — writes it too. Only the indices a mesh and a distance
+// carry — which members it joins, which axes — are read in the part's
+// numbering, and they are the part's to read and nobody's to write: a card
+// changes them through an edit the core makes (`editTrain`). What a card
+// shows of the result is the core's view of it (`TrainOutcome.cards`).
 //
 // Nothing here decides what a part is. Which pieces close apart is the
 // core's rule (`Shape::parts`); this is the bookkeeping that lets a card
 // numbered its own way stand on the graph.
 
-import type { Part, Shape, StagePorts, Train } from "./core";
+import { relieveTrain, type Figure, type Freedom, type Part, type Shape, type StagePorts, type Train } from "./core";
+
+/** Which train and part a card's view stands on, for relief to find. */
+const owners = new WeakMap<Shape, { train: Train; part: Part }>();
 
 /** A graph piece seen through a part's numbering: `local` answers the keys
  *  it has, and every other key reads and writes the piece itself. */
@@ -31,7 +36,7 @@ function reindexed<T extends object>(piece: T, local: Partial<T>): T {
  *  graph's own pieces. */
 export function cardView(train: Train, part: Part): Shape {
   const graph = train.shape;
-  return {
+  const view: Shape = {
     axes: part.axes.map((a) => graph.axes[a]),
     bodies: part.shape.bodies,
     members: part.members.map((i) => graph.members[i]),
@@ -41,6 +46,27 @@ export function cardView(train: Train, part: Part): Shape {
     distances: part.distances.map((d, j) => reindexed(graph.distances[d], { axes: part.shape.distances[j].axes })),
     couplings: part.couplings.map((c) => graph.couplings[c]),
   };
+  owners.set(view, { train, part });
+  return view;
+}
+
+/** A card's freedom — its member, mesh or distance by the card's own
+ *  number — named by the graph's. */
+function toGraph(part: Part, f: Freedom): Freedom {
+  if ("distance" in f) return { distance: part.distances[f.distance] };
+  if ("clearance" in f) return { clearance: part.distances[f.clearance] };
+  if ("overlap" in f) return { overlap: part.meshes[f.overlap] };
+  return { member: [part.members[f.member[0]], f.member[1]] };
+}
+
+/** **A card's inputs relieved**: the train's graph relieved by the core —
+ *  every group of inputs that argue is a part's, so relieving the graph is
+ *  relieving the card — with the input just touched named by the graph's
+ *  index, and `figures` the train's own (`TrainOutcome.figures`). */
+export function relieveStage(view: Shape, just: Freedom | null, figures: Figure[]): void {
+  const owner = owners.get(view);
+  if (owner === undefined) return;
+  relieveTrain(owner.train, just === null ? null : toGraph(owner.part, just), figures);
 }
 
 /** Every card of a train, in the order the core deals its parts. */

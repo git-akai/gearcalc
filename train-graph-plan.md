@@ -551,6 +551,25 @@ path is compared where the headline case keeps its entries, which is when
 it is the same path whatever the edit numbered again. The interface's
 hover is Phase 7's; the wrapper waits in `core.ts` (`previewEdit`).
 
+**Phase 6 — results and the boundary.** Done: `TrainResult` answers per
+piece — `members`, `meshes`, `distances` and `axes` by the graph's index,
+`parts` for what is a part's own — laid from the parts' own solves, the
+indices a result carries renumbered to the graph's; `TrainResult::part` lays
+a card's view back out, and a law holds it to the part's own solve on every
+preset alone and after a pair and a set. The figures are the train's, by the
+graph's freedoms; `relieve_stage` is `relieve`, over the graph; `adopt_member`
+takes the graph's member. **Decided on the way**: a shaft two parts share
+carries a torque that is neither part's external load — what the one hands
+the other — which `TrainCase` does not say and the cards need, so the
+torque a part's meshes put on each of its bodies stays the part's own
+(`PartReport::cases`), the junction's terminals in the flow grouping to come;
+and the notes stay the part's until the workspace shows pieces. The cards
+read their view from the core (`TrainOutcome::cards`) rather than slicing
+the result a second time in TypeScript, until Phase 7 retires them. *Diff:*
+the corpus and every path, case, topology and motion byte for byte; each
+card's view equal to the stage result it replaced, and the figures the same
+values.
+
 **Phase 6 — results and the boundary.** `TrainResult` per member, mesh,
 distance, axis and path, with `topology` carrying the groupings;
 `relieve_stage` → `relieve`; `adopt_member` by member; bindings; the probe.

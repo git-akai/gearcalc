@@ -22,9 +22,11 @@ import {
 
 /** One member of a train, as a list can show it. */
 export interface MemberRef {
-  /** The stage's index in the train, and the member's in the core's order. */
+  /** The card's index in the train, and the member's in the core's order. */
   stage: number;
   member: number;
+  /** The member's index in the train's graph — what the core names it by. */
+  index: number;
   /** The gear number across the train, from 1. */
   number: number;
   /** "gear 3", "Sun (4)", "Wormwheel (6)" — the card's name, numbered. */
@@ -287,6 +289,7 @@ export function memberRefs(train: Train, topology: StagePorts[] = memberNames(tr
       out.push({
         stage: i,
         member: j,
+        index: s.part.members[j],
         number,
         label: memberListName(topology, i, j),
         // A worm is a thread with proportions of its own: the first member

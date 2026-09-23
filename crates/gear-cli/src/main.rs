@@ -1968,7 +1968,7 @@ fn train_report(mode: Option<&str>) {
     }
     print_train_cases(&train, &r);
 
-    for (k, s) in r.stages.iter().enumerate() {
+    for (k, s) in r.cards(&train).iter().enumerate() {
         // One report, and which contact it is decides the rows — the same
         // rows for every line contact and for every point.
         match pair(s, None) {

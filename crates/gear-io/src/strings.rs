@@ -584,7 +584,9 @@ mod tests {
         impl EveryNote for gear_core::train::TrainResult {
             fn every_note(&self) -> Vec<Note> {
                 let mut out: Vec<Note> = self.cases.iter().flat_map(|c| c.notes.clone()).collect();
-                out.extend(self.stages.iter().flat_map(every_note_of));
+                out.extend(self.parts.iter().flat_map(|p| p.notes.iter().cloned()));
+                out.extend(self.members.iter().flat_map(|g| g.notes.iter().cloned()));
+                out.extend(self.meshes.iter().flat_map(|m| m.notes.iter().cloned()));
                 out
             }
         }

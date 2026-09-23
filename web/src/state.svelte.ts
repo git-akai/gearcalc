@@ -181,10 +181,9 @@ class Workspace {
    *
    *  A train that will not build has no tooth to adopt, and says why in the
    *  catalogue's words rather than leaving a tab half-filled. */
-  adopt(train: TrainTab, stage: number, member: number, label: string) {
+  adopt(train: TrainTab, member: number, label: string) {
     const r = adoptMember(
       train.train,
-      stage,
       member,
       library.origin === null ? undefined : library.materials,
     );

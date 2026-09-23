@@ -366,6 +366,17 @@ impl Shape {
         }
     }
 
+    /// **Whether a member is a worm's thread**: the first member of a mesh
+    /// across a distance sized as a worm drive — which is a thread with
+    /// proportions of its own, and no gear a gear tab can hold; its wheel
+    /// is one.
+    #[must_use]
+    pub fn is_worm_thread(&self, member: usize) -> bool {
+        self.meshes.iter().enumerate().any(|(k, m)| {
+            m.a == member && self.distance_of(k).is_some_and(|d| self.distances[d].worm)
+        })
+    }
+
     /// The slot a member spins with.
     pub(crate) fn slot_of_member(&self, member: usize) -> Body {
         self.slot(self.members[member].body)

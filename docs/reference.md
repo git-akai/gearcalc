@@ -3048,14 +3048,24 @@ entry point missing from it — so no count is quoted here, a number that dates
 belonging in `state.md` if anywhere. Seven of them compute nothing: `defaults`,
 `strings`, `languages`, `resolve_language`, `version`, and the two documents'
 round trips (`import_train`/`export_train`, `import_materials`/
-`export_materials`, with `default_materials` beside them). `relieve_stage` is
-the one rule that is neither — which input gives way when a stage is
-over-specified, asked of the core so the front end does not hold a copy — and
-`import_train` applies the same rule to every stage it reads, reporting
-`adjusted` where a file asked for what no stage can honour
+`export_materials`, with `default_materials` beside them). `relieve` is
+the one rule that is neither — which input gives way when the train's graph
+is over-specified, asked of the core so the front end does not hold a copy,
+every freedom by the graph's index and every group of inputs that argue a
+part's — and `import_train` applies the same rule to the graph it reads,
+reporting `adjusted` where a file asked for what nothing can honour
 ([rationale](rationale.md#a-file-is-adjusted-to-what-the-tool-can-honour)).
-`adopt_member` is the one that hands a train's member to the gear tab: it
-solves the train and returns `GearResult::params`, **the tooth as built** —
+**`solve_train` answers per piece**: every gear, mesh, axis distance and axis
+by the graph's index (`TrainResult::members`, `meshes`, `distances`,
+`axes`), what is a part's own — the torque its meshes put on each of its
+bodies per case, which on a shaft two parts share is what the one hands the
+other, and its notes — the paths and the cases, the figures relief seeds from
+by the graph's freedoms, and each card's view of the result laid back out in
+its part's numbering by the core (`TrainResult::part`, which a law holds to
+the part's own solve), so a card does not slice it a second time.
+`adopt_member` is the one that hands a train's member — named by the graph's
+index — to the gear tab: it solves the train and returns
+`GearResult::params`, **the tooth as built** —
 every automatic value resolved, every guard applied — with whether the member
 is a ring and the cutter that cut it
 ([rationale](rationale.md#a-member-is-adopted-not-imported)).

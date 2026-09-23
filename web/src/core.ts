@@ -197,7 +197,7 @@ import init, {
   export_materials,
   import_train,
   export_train,
-  relieve_stage,
+  relieve,
   relieve_case,
   preview_edit,
   edit_train,
@@ -672,45 +672,47 @@ export function exportLibrary(
 //  Geartrains
 // --------------------------------------------------------------------- //
 
-/** **Resolve an over-determined stage**, whatever preset it came from.
+/** **Resolve an over-determined train**, whatever presets it came from.
  *
  *  `just` is the input the designer has this moment pinned, and is never the one
  *  relieved; `null` where what changed was not a toggle — a shaft angle — and
- *  nothing is spared. Which inputs argue with each other, how many may stand
- *  and which gives way first are facts about the geometry, so Rust decides all
+ *  nothing is spared. Which inputs argue with each other, how many may stand and
+ *  which gives way first are facts about the geometry, so Rust decides all
  *  of it — this used to be three functions here, one per stage type, each
  *  restating a relation the core already enforces, and none of them tested.
+ *  Every index is the train's graph's; a card names its inputs in its own and
+ *  reads them through its part first (`cards.ts`).
  *
- *  Written **in place**, leaf by leaf, rather than by replacing the stage: the
+ *  Written **in place**, leaf by leaf, rather than by replacing the graph: the
  *  caller holds a reactive proxy and a wholesale swap would detach every input
  *  bound to it. Only leaves that differ are written, and this side does not
  *  know which they are — it used to list every field relief could touch by
  *  name, per type, so a type with a field named otherwise got no relief and
- *  nothing said so. Now the core hands back the stage as it should stand and
+ *  nothing said so. Now the core hands back the graph as it should stand and
  *  the copy is shape-blind.
  *
  *  **A box relief turns given keeps the number it was showing.** The core seeds
- *  it from `figures` — what the stage's inputs last came to, by name, which
+ *  it from `figures` — what the graph's inputs last came to, by name, which
  *  `solveTrain` returns beside the result — so a helix pinned when its
  *  neighbour was freed holds the angle it had rather than a stale zero, exactly
  *  as the designer's own toggle does. This side forwards the list and never
  *  learns which figure is which.
  *
- *  A stage that will not cross the boundary is left alone. Relief runs on a
+ *  A train that will not cross the boundary is left alone. Relief runs on a
  *  click, and a click is not the place to discover a broken boundary.
  */
-export function relieveStage(stage: Shape, just: Freedom | null, figures: Figure[] = []): void {
+export function relieveTrain(train: Train, just: Freedom | null, figures: Figure[] = []): void {
   let corrected: Shape;
   try {
-    corrected = JSON.parse(relieve_stage(JSON.stringify({ stage, just, figures }))) as Shape;
+    corrected = JSON.parse(relieve(JSON.stringify({ shape: train.shape, just, figures }))) as Shape;
   } catch {
     return;
   }
-  assignLeaves(stage, corrected);
+  assignLeaves(train.shape, corrected);
 }
 
 /** **A load case with its over-determined figures relieved**, the same
- *  relation `relieveStage` keeps on a stage's geometry kept on a case's
+ *  relation `relieveTrain` keeps on the train's geometry kept on a case's
  *  loads: the train has some mobility, exactly that many of the case's
  *  speeds stand given and the torques one statics equation short of the
  *  bodies that carry one, and the figure just touched is the one that
@@ -765,12 +767,11 @@ function assignLeaves(into: Record<string, unknown>, from: Record<string, unknow
  *  this tool wrote, and this reads a member of a train that is open. */
 export function adoptMember(
   train: Train,
-  stage: number,
   member: number,
   materials?: MaterialLibrary,
 ): AdoptOutcome | { error: string } {
   try {
-    const body = JSON.stringify({ train, materials: materials ?? null, stage, member });
+    const body = JSON.stringify({ train, materials: materials ?? null, member });
     return JSON.parse(adopt_member(body)) as AdoptOutcome;
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) };
@@ -811,6 +812,7 @@ export function solveTrain(train: Train, materials?: MaterialLibrary): TrainOutc
       figures: [],
       topology: [],
       motion: null,
+      cards: [],
     };
   }
 }

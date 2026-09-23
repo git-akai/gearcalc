@@ -295,18 +295,18 @@
       value=""
       aria-label={t("ui.gear_from_train")}
       onchange={(e) => {
-        const [train, stage, member] = e.currentTarget.value.split(":").map(Number);
+        const [train, index] = e.currentTarget.value.split(":").map(Number);
         e.currentTarget.value = "";
         const source = trains.tabs[train];
-        const ref = memberRefs(source.train).find((r) => r.stage === stage && r.member === member);
-        if (ref) workspace.adopt(source, stage, member, ref.label);
+        const ref = memberRefs(source.train).find((r) => r.index === index);
+        if (ref) workspace.adopt(source, index, ref.label);
       }}
     >
       <option value="" disabled>{t("ui.gear_from_train")}</option>
       {#each trains.tabs as source, i (source.id)}
         <optgroup label={source.name || t("ui.train_unnamed")}>
           {#each memberRefs(source.train) as ref (ref.number)}
-            <option value={`${i}:${ref.stage}:${ref.member}`} disabled={!ref.adoptable}>
+            <option value={`${i}:${ref.index}`} disabled={!ref.adoptable}>
               {t("ui.gear_from_train_member", { stage: String(ref.stage + 1), member: ref.label })}
             </option>
           {/each}

@@ -10,6 +10,7 @@
 
 export type { Auto } from "./core/Auto";
 export type { Axis } from "./core/Axis";
+export type { AxisReport } from "./core/AxisReport";
 export type { Backlash } from "./core/Backlash";
 export type { Basis } from "./core/Basis";
 export type { BetweenPins } from "./core/BetweenPins";
@@ -64,6 +65,7 @@ export type { MotionReport } from "./core/MotionReport";
 export type { Note } from "./core/Note";
 export type { Overrides } from "./core/Overrides";
 export type { Part } from "./core/Part";
+export type { PartReport } from "./core/PartReport";
 export type { PathReport } from "./core/PathReport";
 export type { PerToothClamps } from "./core/PerToothClamps";
 export type { Piece } from "./core/Piece";
