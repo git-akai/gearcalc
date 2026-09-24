@@ -2444,58 +2444,6 @@ impl shape::Shape {
     }
 }
 
-impl shape::ShapeResult {
-    /// **Every member of this stage that is a gear**, whatever its role.
-    ///
-    /// This says what every *member* has, and it is the one that was missing: a sweep
-    /// over "every number every member reports" had to know five stage types and
-    /// name their fields, which is how a formula comes to be written five times
-    /// and one of them to be wrong (`docs/corrections.md`, and F30 of the audit
-    /// that added this).
-    ///
-    /// A worm and its wheel are here too: in this model both are involute
-    /// helicoids on cylinders — a worm is a helical gear with a few starts at a
-    /// steep helix — so both carry a tooth form, a shift, and every question a
-    /// gear can be asked. A worm stage used to contribute nothing, on the
-    /// reading that a thread is not a gear; that was a separate stage type
-    /// speaking, not the model.
-    #[must_use]
-    pub fn members(&self) -> Vec<&GearResult> {
-        self.members.iter().collect()
-    }
-
-    /// **What one of the stage's inputs came to**, by the name relief knows
-    /// it by — the one place a [`Freedom`] meets the figure a result carries
-    /// for it, so a box relief turns given can be seeded from what it showed
-    /// without the panel knowing which field that is. `None` where the result
-    /// has no such figure: a crossed pair has no overlap.
-    #[must_use]
-    pub fn figure(&self, f: Freedom) -> Option<f64> {
-        match f {
-            Freedom::Distance(d) => self.distances.get(d).map(|d| d.running),
-            Freedom::Clearance(d) => self.distances.get(d).map(|d| d.clearance),
-            Freedom::Overlap(k) => self
-                .meshes
-                .get(k)
-                .and_then(|m| m.line.as_ref().map(|l| l.contact_ratios.overlap)),
-            Freedom::Member(i, m) => self.members.get(i).map(|g| m.of(g)),
-        }
-    }
-
-    /// **Every mesh this stage has**, in the order it built them.
-    ///
-    /// The companion of [`Self::members`], and for the same reason: a question
-    /// about *a mesh* — is contact continuous, do the tips foul, how much play
-    /// is there — is asked of a stage by asking each of its meshes, and a walk
-    /// that names the arrangements is a walk that forgets one. A pair has one, a
-    /// set has two — and a crossed pair has one like any other,
-    /// which reports a point contact in the same type.
-    #[must_use]
-    pub fn meshes(&self) -> Vec<&MeshReport> {
-        self.meshes.iter().collect()
-    }
-}
-
 /// Which ratings an automatic face width is sized from.
 ///
 /// Four toggles, and shaped like the answer they select from so the UI can walk
@@ -3391,15 +3339,14 @@ fn paths_of(
     system: &crate::kinematics::System,
     [moving, resting]: [&[flow::MeshFlow]; 2],
     with_teeth: usize,
-    rep: &[Body],
     base: &[Condition],
-    stages: &[ShapeResult],
+    rated: &[ShapeResult],
 ) -> Vec<PathReport> {
     let shafts = system.bodies();
     // **Which paths are worth a row**: in case order, every path an
     // enabled case actually uses, from each of its loads to each of its
     // reactions. Every pair of open bodies is a path the graph could
-    // answer, and on a train of many stages nearly all of them are ones
+    // answer, and on a train of many parts nearly all of them are ones
     // nobody asked about; the way to ask is a case. (The chain's two
     // conventional ends used to be a row of their own, present whether or
     // not any case loaded them — a reading nobody had stated.)
@@ -3413,7 +3360,7 @@ fn paths_of(
             wanted.push((a, b));
         }
     };
-    // An entry at a held body, or at one no stage has, is no path's end.
+    // An entry at a held body, or at one no part has, is no path's end.
     let bodies = train.bodies_of(parts);
     let open = |b: usize| -> Option<usize> {
         bodies
@@ -3443,10 +3390,10 @@ fn paths_of(
         .filter(|&s| base[s] == Condition::Ground)
         .collect();
     // Every mesh's play in the row's own units at the three band points,
-    // in the train's mesh order.
-    let row_play: Vec<[f64; 3]> = stages
+    // in the flow's mesh order, which is each part's in turn.
+    let row_play: Vec<[f64; 3]> = rated
         .iter()
-        .flat_map(|s| s.meshes().iter().map(|m| m.row_play).collect::<Vec<_>>())
+        .flat_map(|r| r.meshes.iter().map(|m| m.row_play))
         .collect();
     // The flow driving `from` against `to` through `meshes`: its
     // efficiency, and the power its meshes pass over the power in.
@@ -3455,7 +3402,7 @@ fn paths_of(
             shafts,
             meshes,
             speed,
-            &flow::Asked::through(shafts, rep[from], speed[from].signum(), rep[to], &held),
+            &flow::Asked::through(shafts, from, speed[from].signum(), to, &held),
         )
         .map_or((0.0, 0.0), |f| {
             (
@@ -4221,61 +4168,48 @@ fn solve_parts(
     train.motion_of(parts)?;
     let port = |k: usize, slot: Body| parts[k].shape.body_at(slot);
 
-    // Two passes: the first learns the geometry — each stage's meshes and
-    // their efficiencies, which no load can move — and the second rates it.
-    // The shifts a stage chooses read nothing a load case changes, so the
-    // second pass takes the first's rather than searching again.
-    let solve = |loads: &dyn Fn(usize) -> Vec<CaseLoad>,
-                 priors: Option<&[shape::Chosen]>|
-     -> Result<(Vec<ShapeResult>, Vec<shape::Chosen>), TrainError> {
-        let mut results = Vec::new();
-        let mut chosen = Vec::new();
-        for (k, part) in parts.iter().enumerate() {
-            let (r, c) = shape::solve_shape_after(
-                &part.shape,
-                &loads(k),
-                lib,
-                reversal,
-                priors.map(|p| p[k].clone()),
-            )
-            .map_err(|e| TrainError::InPart {
-                part: k,
-                cause: Box::new(e),
-            })?;
-            results.push(r);
-            chosen.push(c);
+    // **Each part cut once**: its shifts searched, its members cut and its
+    // meshes at their running distances — the geometry, which no load case
+    // moves, and each mesh's efficiency with it, which the flow is written
+    // from. What the flow hands each part is rated below.
+    let in_part = |k: usize| {
+        move |e: TrainError| TrainError::InPart {
+            part: k,
+            cause: Box::new(e),
         }
-        Ok((results, chosen))
     };
-    let (first, chosen) = solve(&|_| Vec::new(), None)?;
+    let cuts: Vec<shape::Cut> = parts
+        .iter()
+        .enumerate()
+        .map(|(k, part)| shape::cut(&part.shape, lib).map_err(in_part(k)))
+        .collect::<Result<_, _>>()?;
 
-    // ---- the train's graph, with every stage's meshes on it.
+    // ---- the train's graph, with every part's meshes on it.
     let system = train.system_counting(parts, |_, _, z| z)?;
     let shafts = system.bodies();
     let wirings: Vec<Wiring> = parts.iter().map(|p| p.shape.wiring()).collect();
-    // Each stage's meshes as the flow sees them, in one list, with the first
-    // pass's efficiencies — sliding, and locked where it locks at rest —
-    // and the same list against static friction, which is what a path's
-    // breaking away is asked of.
+    // Each part's meshes as the flow sees them, in one list — sliding, and
+    // locked where it locks at rest — and the same list against static
+    // friction, which is what a path's breaking away is asked of.
     let mut meshes: Vec<flow::MeshFlow> = Vec::new();
     let mut resting: Vec<flow::MeshFlow> = Vec::new();
     let mut mesh_of_part: Vec<Vec<usize>> = Vec::new();
     for (k, w) in wirings.iter().enumerate() {
-        let reports = first[k].meshes();
         let mut mine = Vec::new();
         for (j, m) in w.meshes.iter().enumerate() {
             mine.push(meshes.len());
+            let [efficiency, at_rest] = cuts[k].efficiency(j);
             let mesh = flow::MeshFlow {
                 a: port(k, w.mounts[m.a].spins_with),
                 b: port(k, w.mounts[m.b].spins_with),
                 frame: w.frame(j).map_or(GROUND, |f| port(k, f)),
-                za: f64::from(first[k].members[m.a].params.teeth),
-                zb: m.kind.sign() * f64::from(first[k].members[m.b].params.teeth),
-                efficiency: reports[j].efficiency,
+                za: f64::from(cuts[k].teeth(m.a)),
+                zb: m.kind.sign() * f64::from(cuts[k].teeth(m.b)),
+                efficiency,
                 paths: f64::from(m.paths),
             };
             resting.push(flow::MeshFlow {
-                efficiency: reports[j].efficiency_at_rest,
+                efficiency: at_rest,
                 ..mesh
             });
             meshes.push(mesh);
@@ -4314,27 +4248,11 @@ fn solve_parts(
             resting.push(coupling(a, b));
         }
     }
-    // Every body's label, ground first, as the report lists them and as the
-    // case's conditions index them: what the body is on the first stage
-    // that has it.
-    let refs: Vec<(usize, BodyLabel)> = (0..shafts)
-        .map(|b| {
-            let label = conditions::ends_in(parts, b)
-                .first()
-                .map_or(BodyLabel::Ground, |&(k, slot)| wirings[k].slots[slot]);
-            (b, label)
-        })
-        .collect();
-    let global = |b: usize| -> Body { b };
-    // What the train itself holds, before any case.
-    let base = train.conditions(shafts)?;
-    // **A body is one thing to the flow** as to the kinematics: the torque
-    // balance is on it, and what a mesh puts on either of a body's ends is
-    // put on the body. (Two coupled bodies were once two nodes and a row,
-    // and the flow solved over a representative per coupled set; a body
-    // needs no representative but itself.)
-    let rep: Vec<Body> = (0..shafts).collect();
-    let body_meshes: Vec<flow::MeshFlow> = meshes.clone();
+    // What the train itself holds, before any case: ground, and every body
+    // it holds. **A body is one thing to the flow** as to the kinematics:
+    // the torque balance is on it, and what a mesh puts on either of a
+    // body's ends is put on the body.
+    let conditions = train.conditions(shafts)?;
 
     // --- what each stage is loaded by, case by case. **Every case is
     // solved at the train level**, switched off or not, so a panel can say
@@ -4346,7 +4264,7 @@ fn solve_parts(
         let mut notes = Vec::new();
         // Every entry by the body it names, whatever it declares; the
         // loads among them are what carry figures.
-        let entries: Vec<(Body, &Load)> = case.loads.iter().map(|l| (global(l.at), l)).collect();
+        let entries: Vec<(Body, &Load)> = case.loads.iter().map(|l| (l.at, l)).collect();
         let loads: Vec<(Body, &Load)> = entries
             .iter()
             .filter(|(_, l)| l.is_load())
@@ -4382,13 +4300,6 @@ fn solve_parts(
             .copied()
             .filter(|&s| declared(s, LoadRole::Reacted))
             .collect();
-        let conditions: Vec<Condition> = base
-            .iter()
-            .map(|c| match c {
-                Condition::Drive(_) => Condition::Free,
-                other => *other,
-            })
-            .collect();
         // Roles, before anything is solved: what each body is in this case.
         let role = |s: Body| -> BodyRole {
             if loaded(s) {
@@ -4405,11 +4316,9 @@ fn solve_parts(
             |notes: Vec<Note>, cases: &mut Vec<TrainCase>, per_part: &mut [Vec<CaseLoad>]| {
                 cases.push(TrainCase {
                     case: index,
-                    bodies: refs
-                        .iter()
-                        .enumerate()
-                        .map(|(s, &(at, _))| CaseBody {
-                            at,
+                    bodies: (0..shafts)
+                        .map(|s| CaseBody {
+                            at: s,
                             role: role(s),
                             speed: (conditions[s] != Condition::Ground).then_some(0.0),
                             torque: 0.0,
@@ -4509,36 +4418,15 @@ fn solve_parts(
         for (g, l) in &loads {
             if l.torque.auto {
                 known[*g] = None;
-                unknown.push(*g);
+                if !unknown.contains(g) {
+                    unknown.push(*g);
+                }
             } else {
                 known[*g] = Some(l.torque.manual);
             }
         }
-        // ...on the bodies: a coupled set's known torques summed on its
-        // representative, unknown where any of its bodies is.
-        let on_bodies = |known: &[Option<f64>], unknown: &[Body]| -> flow::Asked {
-            let mut k: Vec<Option<f64>> = vec![Some(0.0); shafts];
-            let mut u: Vec<Body> = Vec::new();
-            for s in 0..shafts {
-                let r = rep[s];
-                match (known[s], k[r]) {
-                    (None, _) => k[r] = None,
-                    (Some(t), Some(had)) => k[r] = Some(had + t),
-                    (Some(_), None) => {}
-                }
-            }
-            for &s in unknown {
-                if !u.contains(&rep[s]) {
-                    u.push(rep[s]);
-                }
-            }
-            flow::Asked {
-                known: k,
-                unknown: u,
-            }
-        };
-        let asked = on_bodies(&known, &unknown);
-        let flow = match flow::solve(shafts, &body_meshes, &unit, &asked) {
+        let asked = flow::Asked { known, unknown };
+        let flow = match flow::solve(shafts, &meshes, &unit, &asked) {
             Ok(flow) => flow,
             Err(flow::Refused::NothingDrives) => {
                 notes.push(Note::new(key::TRAIN_CASE_NOTHING_DRIVES));
@@ -4572,7 +4460,7 @@ fn solve_parts(
                 actuations,
                 ..
             } => {
-                let port = global(sweep_at);
+                let port = sweep_at;
                 // **A sweep is a magnitude**, stated at a port; every body's
                 // share of it is the ratio of the two speeds, which the
                 // unit motion has where a held load's speed does not. The
@@ -4634,11 +4522,9 @@ fn solve_parts(
         }
         cases.push(TrainCase {
             case: index,
-            bodies: refs
-                .iter()
-                .enumerate()
-                .map(|(s, &(at, _))| CaseBody {
-                    at,
+            bodies: (0..shafts)
+                .map(|s| CaseBody {
+                    at: s,
                     role: role(s),
                     speed: (conditions[s] != Condition::Ground).then_some(speeds[s]),
                     // A body's external torque is reported on the body it
@@ -4650,7 +4536,7 @@ fn solve_parts(
                     torque: if role(s) == BodyRole::Free {
                         0.0
                     } else {
-                        flow.shaft_torques[rep[s]]
+                        flow.shaft_torques[s]
                     },
                 })
                 .collect(),
@@ -4658,7 +4544,13 @@ fn solve_parts(
             notes,
         });
     }
-    let (stages, _) = solve(&|k| per_part[k].clone(), Some(&chosen))?;
+    // ---- each part rated under what the flow handed it.
+    let stages: Vec<ShapeResult> = cuts
+        .iter()
+        .zip(&per_part)
+        .enumerate()
+        .map(|(k, (cut, loads))| shape::rate(cut, loads, reversal).map_err(in_part(k)))
+        .collect::<Result<_, _>>()?;
 
     // **The train's own figures are per path**: between every two open
     // bodies, where the train's holds leave it one motion. Each is the same
@@ -4671,10 +4563,9 @@ fn solve_parts(
         train,
         parts,
         &system,
-        [&body_meshes, &resting],
+        [&meshes, &resting],
         with_teeth,
-        &rep,
-        &base,
+        &conditions,
         &stages,
     );
 
@@ -5990,7 +5881,7 @@ mod tests {
                 .unwrap_or_else(|e| panic!("a stage at no operating load: {e:?}"));
             // A worm's members are not gears, so the walk below is empty there
             // and the claim is the stage's own — which is the one that failed.
-            if let Some(m) = r.stages[0].meshes().first().filter(|m| m.point.is_some()) {
+            if let Some(m) = r.stages[0].meshes.first().filter(|m| m.point.is_some()) {
                 assert_eq!(m.cases[1].contact.max_pressure, 0.0);
                 assert!(m.cases[0].contact.max_pressure > 0.0);
             }
@@ -6158,7 +6049,7 @@ mod tests {
         ] {
             let train = train_of(vec![stage]);
             let r = solve_train(&train, &lib).expect("every shipped kind solves");
-            let meshes = r.stages[0].meshes();
+            let meshes = &r.stages[0].meshes;
             assert_eq!(
                 meshes.len(),
                 internal.len(),
@@ -7098,7 +6989,7 @@ mod tests {
             let r = solve_train(&t, &lib).unwrap();
             (t, r)
         };
-        let eta = case(0.1, 100.0).1.stages[0].meshes()[0].efficiency.forward;
+        let eta = case(0.1, 100.0).1.stages[0].meshes[0].efficiency.forward;
         assert!(eta > 0.9 && eta < 1.0);
         // The pair's ratio is negative: at +100 rpm at the end, the start
         // turns backward, and a positive torque there works against it.
@@ -7889,12 +7780,11 @@ mod tests {
             let t = train_of(vec![stage.clone()]);
             let r = solve_train(&t, &lib)
                 .unwrap_or_else(|e| panic!("a pinned preset solves: {e:?}\n{stage:?}"));
-            let solved = &r.stages[0];
             stage
                 .toggles()
                 .into_iter()
-                .filter_map(|(f, _)| solved.figure(f))
-                .chain(solved.members.iter().map(|g| g.pitch_diameter))
+                .filter_map(|(f, _)| r.figure(f))
+                .chain(r.members.iter().map(|g| g.pitch_diameter))
                 .collect()
         };
         let nudge = |f: Freedom, a: &mut Auto<f64>| match f {
@@ -7920,7 +7810,7 @@ mod tests {
             let solved = solve_train(&t, &lib).expect("every preset solves");
             let mut pinned = stage.clone();
             for (f, _) in stage.toggles() {
-                if let Some(v) = solved.stages[0].figure(f) {
+                if let Some(v) = solved.figure(f) {
                     pinned.input_mut(f).expect("its own input").manual = v;
                 }
             }
@@ -11146,7 +11036,7 @@ mod tests {
                 for g in &s.members {
                     assert!(g.cases.is_empty());
                 }
-                for m in s.meshes() {
+                for m in &s.meshes {
                     assert!(m.cases.is_empty());
                 }
             }

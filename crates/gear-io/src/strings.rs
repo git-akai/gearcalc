@@ -573,7 +573,7 @@ mod tests {
         fn every_note_of(r: &gear_core::train::ShapeResult) -> Vec<Note> {
             let mut out: Vec<Note> = r.notes.clone();
             out.extend(r.members.iter().flat_map(|g| g.notes.iter().cloned()));
-            out.extend(r.meshes().iter().flat_map(|m| m.notes.iter().cloned()));
+            out.extend(r.meshes.iter().flat_map(|m| m.notes.iter().cloned()));
             out
         }
         impl EveryNote for gear_core::train::ShapeResult {

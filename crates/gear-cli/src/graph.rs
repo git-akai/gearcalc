@@ -177,7 +177,7 @@ fn report(name: &str, train: &Train, r: &TrainResult) {
                 );
             }
         }
-        for (j, m) in s.meshes().iter().enumerate() {
+        for (j, m) in s.meshes.iter().enumerate() {
             mesh += 1;
             let first = member - s.members.len();
             let pair = shape.meshes[j];

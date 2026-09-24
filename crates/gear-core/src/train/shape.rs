@@ -93,6 +93,7 @@ pub(crate) fn default_planet_clearance() -> f64 {
 /// The crate's pressure angle, for a member a file does not give one:
 /// [`GearParams`]'s, said once — and followed from its group rather than
 /// stated, since a file that says nothing states nothing.
+#[cfg(feature = "serde")]
 fn default_pressure_angle() -> Auto<f64> {
     Auto::automatic(GearParams::default().pressure_angle)
 }
@@ -3050,36 +3051,93 @@ pub struct ShapeResult {
     pub notes: Vec<Note>,
 }
 
+/// **A shape solved alone**, under the loads its bodies are handed: cut
+/// ([`cut`]) and rated ([`rate`]).
+///
 /// # Errors
 ///
-/// A wiring that describes no mechanism, a mesh that cannot mesh, no
-/// contact, a distance no shift reaches, a material not in the library, or a
-/// member whose root cannot be rated.
+/// As [`cut`] and [`rate`].
 pub fn solve_shape(
     shape: &Shape,
     cases: &[super::CaseLoad],
     lib: &MaterialLibrary,
     reversal: super::Reversal,
 ) -> Result<ShapeResult, TrainError> {
-    solve_shape_after(shape, cases, lib, reversal, None).map(|(r, _)| r)
+    rate(&cut(shape, lib)?, cases, reversal)
 }
 
-/// [`solve_shape`], **with the shifts a prior solve of the same shape
-/// chose** handed back in — what lets a train's two passes over a stage
-/// search once. The search reads nothing a load case changes, so the
-/// second pass's answer is the first's; what it returns beside the result
-/// is what the third would take.
-pub fn solve_shape_after(
-    shape: &Shape,
-    cases: &[super::CaseLoad],
-    lib: &MaterialLibrary,
-    reversal: super::Reversal,
-    prior: Option<Chosen>,
-) -> Result<(ShapeResult, Chosen), TrainError> {
+/// **A shape cut**: everything about it no load case moves — the shifts its
+/// search settled on, every member cut and every mesh at its running
+/// distance, the materials, the bending sections, and each mesh's
+/// efficiency, which is what the train's flow is written from. A train cuts
+/// each of its parts once, solves one flow across them all, and rates each
+/// under what the flow hands it ([`rate`]).
+pub struct Cut {
+    /// Every member at its group's module and pressure angle.
+    shape: Shape,
+    helix: Vec<f64>,
+    wiring: Wiring,
+    chosen: Chosen,
+    built: Built,
+    materials: Vec<Material>,
+    /// The meshes each member is in.
+    meshes_of: Vec<Vec<usize>>,
+    /// The width a worm distance's proportions give a member, where one does.
+    recommended: Vec<Option<f64>>,
+    /// Each mesh's efficiency sliding, and at rest.
+    sliding: Vec<Directional<f64>>,
+    at_rest: Vec<Directional<f64>>,
+    /// Per member, a bending section in each line mesh it is in.
+    bendings: Vec<Vec<(usize, Option<super::Bending>)>>,
+}
+
+impl Cut {
+    /// **Mesh `k`'s efficiency**, once moving and at rest — what the train's
+    /// flow is written from.
+    pub(crate) fn efficiency(&self, k: usize) -> [Directional<f64>; 2] {
+        [
+            self.sliding[k].once_moving(&self.at_rest[k]),
+            self.at_rest[k],
+        ]
+    }
+
+    /// Member `i`'s tooth count as cut.
+    pub(crate) fn teeth(&self, i: usize) -> u32 {
+        self.built.members[i].params().teeth
+    }
+
+    /// Whether member `i` is in a line mesh.
+    fn on_a_line(&self, i: usize) -> bool {
+        self.meshes_of[i]
+            .iter()
+            .any(|&k| self.built.meshes[k].line().is_some())
+    }
+
+    /// **Member `i`'s width before any rating sizes one**: a worm distance's
+    /// conventional proportions, or the width in the box.
+    fn early_width(&self, i: usize) -> f64 {
+        let w = &self.shape.members[i].gear.face_width;
+        self.recommended[i].map_or(w.manual, |r| w.resolve(r))
+    }
+
+    /// Mesh `k`'s two members' widths, as `width` gives a member's.
+    fn face_of(&self, k: usize, width: &dyn Fn(usize) -> f64) -> [f64; 2] {
+        let m = self.shape.meshes[k];
+        [width(m.a), width(m.b)]
+    }
+}
+
+/// **A shape cut** ([`Cut`]).
+///
+/// # Errors
+///
+/// A wiring that describes no mechanism, a mesh that cannot mesh, a distance
+/// no shift reaches, a material not in the library, or a member with no root
+/// section in any of its line meshes.
+pub fn cut(shape: &Shape, lib: &MaterialLibrary) -> Result<Cut, TrainError> {
     // **Every member at its group's module and pressure angle** before
     // anything reads one — a member that follows reads what it follows.
-    let shared = shape.shared();
-    let shape = &shared;
+    let shape = shape.shared();
     let n = shape.members.len();
     let helix = shape.helix_angles();
 
@@ -3090,12 +3148,8 @@ pub fn solve_shape_after(
     wiring.alone(&super::teeth_of(shape.gears()))?;
 
     // ---- the shifts, and every member and mesh built at them.
-    let chosen = match prior {
-        Some(c) => c,
-        None => shape.chosen_at(&crate::auto::Search::SHIPPED, &helix)?,
-    };
-    let x = chosen.shifts.clone();
-    let built = shape.build(&x, &helix, &chosen.held)?;
+    let chosen = shape.chosen_at(&crate::auto::Search::SHIPPED, &helix)?;
+    let built = shape.build(&chosen.shifts, &helix, &chosen.held)?;
 
     // ---- materials.
     let materials: Vec<Material> = shape
@@ -3108,7 +3162,7 @@ pub fn solve_shape_after(
         })
         .collect::<Result<_, _>>()?;
 
-    // ---- the meshes each member is in, and which of them are lines.
+    // ---- the meshes each member is in.
     let meshes_of: Vec<Vec<usize>> = (0..n)
         .map(|i| {
             (0..shape.meshes.len())
@@ -3116,12 +3170,6 @@ pub fn solve_shape_after(
                 .collect()
         })
         .collect();
-    let on_a_line = |i: usize| {
-        meshes_of[i]
-            .iter()
-            .any(|&k| built.meshes[k].line().is_some())
-    };
-
     // ---- the widths a point contact runs at, decided before anything that
     // reads them: a worm distance's conventional proportions, or the width
     // in the box. Nothing rates a crossed pair's face — its pressure does
@@ -3156,32 +3204,109 @@ pub fn solve_shape_after(
             })
         })
         .collect();
-    let early_width = |i: usize| -> f64 {
-        let w = &shape.members[i].gear.face_width;
-        recommended[i].map_or(w.manual, |r| w.resolve(r))
-    };
-    let face_of = |k: usize, width: &dyn Fn(usize) -> f64| -> [f64; 2] {
-        let m = shape.meshes[k];
-        [width(m.a), width(m.b)]
+    let mut cut = Cut {
+        shape,
+        helix,
+        wiring,
+        chosen,
+        built,
+        materials,
+        meshes_of,
+        recommended,
+        sliding: Vec::new(),
+        at_rest: Vec::new(),
+        bendings: Vec::new(),
     };
 
     // ---- each mesh's own efficiency, sliding and at rest.
     let mesh_efficiency = |k: usize, mu: f64| -> Directional<f64> {
-        let bm = &built.meshes[k];
-        let a = built.members[shape.meshes[k].a].as_gear();
-        bm.efficiency(a, mu, face_of(k, &early_width))
+        let bm = &cut.built.meshes[k];
+        let a = cut.built.members[cut.shape.meshes[k].a].as_gear();
+        bm.efficiency(a, mu, cut.face_of(k, &|i| cut.early_width(i)))
     };
-    let sliding: Vec<Directional<f64>> = (0..shape.meshes.len())
-        .map(|k| mesh_efficiency(k, shape.meshes[k].sliding_friction))
+    let meshes = &cut.shape.meshes;
+    let sliding: Vec<Directional<f64>> = (0..meshes.len())
+        .map(|k| mesh_efficiency(k, meshes[k].sliding_friction))
         .collect();
-    let at_rest: Vec<Directional<f64>> = (0..shape.meshes.len())
-        .map(|k| mesh_efficiency(k, shape.meshes[k].static_friction))
+    let at_rest: Vec<Directional<f64>> = (0..meshes.len())
+        .map(|k| mesh_efficiency(k, meshes[k].static_friction))
         .collect();
+    cut.sliding = sliding;
+    cut.at_rest = at_rest;
+
+    // ---- bending sections: one per (member, line mesh) pair. **No bending
+    // on a point contact, and that is a decision rather than a gap**: the
+    // tooth a beam formula would measure is not the tooth a crossed mesh
+    // loads — its contact is a point tracking diagonally across the flank,
+    // and a cantilever loaded across its whole face has no honest reading
+    // of it (docs/rationale.md#a-worm-stage-reports-no-bending-stress).
+    let mut bendings: Vec<Vec<(usize, Option<super::Bending>)>> =
+        (0..n).map(|_| Vec::new()).collect();
+    for (k, m) in cut.shape.meshes.iter().enumerate() {
+        let Some(line) = cut.built.meshes[k].line() else {
+            continue;
+        };
+        let cr = line.path.contact_ratio;
+        for i in [m.a, m.b] {
+            bendings[i].push((
+                k,
+                cut.built.members[i].bending(
+                    cr,
+                    m.load_sharing,
+                    cut.shape.members[i].gear.rim_thickness,
+                ),
+            ));
+        }
+    }
+    // **A member with no root section in any of its line meshes refuses the
+    // shape**; one rated in some mesh keeps that rating and says which flank
+    // went unrated — a planet whose ring-side load point falls off its flank
+    // is still rated on its sun side, which is what the set's own kind did
+    // without saying so. A ring refuses only its own rating.
+    for (i, (m, b)) in cut.shape.members.iter().zip(&bendings).enumerate() {
+        if m.ring.is_none() && cut.on_a_line(i) && b.iter().all(|(_, b)| b.is_none()) {
+            return Err(TrainError::NoRootSection);
+        }
+    }
+
+    cut.bendings = bendings;
+    Ok(cut)
+}
+
+/// **A cut shape rated for the train's cases** — each member and mesh under
+/// what the train's flow puts on its bodies in each case ([`super::CaseLoad`]).
+///
+/// # Errors
+///
+/// No contact, or a point contact that cannot be rated.
+pub fn rate(
+    cut: &Cut,
+    cases: &[super::CaseLoad],
+    reversal: super::Reversal,
+) -> Result<ShapeResult, TrainError> {
+    let Cut {
+        shape,
+        helix,
+        wiring,
+        chosen,
+        built,
+        materials,
+        meshes_of,
+        recommended,
+        sliding,
+        at_rest,
+        bendings,
+    } = cut;
+    let n = shape.members.len();
+    let x = &chosen.shifts;
+    let on_a_line = |i: usize| cut.on_a_line(i);
+    let early_width = |i: usize| cut.early_width(i);
+    let face_of = |k: usize, width: &dyn Fn(usize) -> f64| cut.face_of(k, width);
 
     // **A case's torques are the train's** ([`super::solve_train`]): one
-    // flow across every stage's meshes, read off for this stage's — which
-    // member drives each mesh and the torque pressing it. The stage solves
-    // no flow of its own for a case.
+    // flow across every part's meshes, read off for this shape's — which
+    // member drives each mesh and the torque pressing it. A shape solves no
+    // flow of its own for a case.
     //
     // **How many instances of a mesh act in parallel** — one per planet —
     // which is the mesh's own count, not what either member sees: a
@@ -3200,37 +3325,6 @@ pub fn solve_shape_after(
         .map(|k| super::scaled(cases, |c| pressing_torque_at_a(k, c)))
         .collect();
 
-    // ---- bending sections: one per (member, line mesh) pair. **No bending
-    // on a point contact, and that is a decision rather than a gap**: the
-    // tooth a beam formula would measure is not the tooth a crossed mesh
-    // loads — its contact is a point tracking diagonally across the flank,
-    // and a cantilever loaded across its whole face has no honest reading
-    // of it (docs/rationale.md#a-worm-stage-reports-no-bending-stress).
-    let mut bendings: Vec<Vec<(usize, Option<super::Bending>)>> =
-        (0..n).map(|_| Vec::new()).collect();
-    for (k, m) in shape.meshes.iter().enumerate() {
-        let Some(line) = built.meshes[k].line() else {
-            continue;
-        };
-        let cr = line.path.contact_ratio;
-        for i in [m.a, m.b] {
-            bendings[i].push((
-                k,
-                built.members[i].bending(cr, m.load_sharing, shape.members[i].gear.rim_thickness),
-            ));
-        }
-    }
-    // **A member with no root section in any of its line meshes refuses the
-    // stage**; one rated in some mesh keeps that rating and says which flank
-    // went unrated — a planet whose ring-side load point falls off its flank
-    // is still rated on its sun side, which is what the set's own kind did
-    // without saying so. A ring refuses only its own rating.
-    for (i, (m, b)) in shape.members.iter().zip(&bendings).enumerate() {
-        if m.ring.is_none() && on_a_line(i) && b.iter().all(|(_, b)| b.is_none()) {
-            return Err(TrainError::NoRootSection);
-        }
-    }
-
     // ---- contact stress per mesh at the probe width.
     let e_star: Vec<f64> = (0..shape.meshes.len())
         .map(|k| contact_modulus(&materials[shape.meshes[k].a], &materials[shape.meshes[k].b]))
@@ -3243,9 +3337,9 @@ pub fn solve_shape_after(
             let Some(line) = built.meshes[k].line() else {
                 return Ok(None);
             };
-            // Nothing to rate: a stage with no case — the train's first
-            // pass, learning the geometry — takes no contact at all, rather
-            // than one at a face of no width to refuse.
+            // Nothing to rate: a shape rated under no case — every case
+            // switched off — takes no contact at all, rather than one at a
+            // face of no width to refuse.
             if cases.is_empty() {
                 return Ok(None);
             }
@@ -3460,7 +3554,7 @@ pub fn solve_shape_after(
         let axial = shape.distances[d].axial_clearance;
         match &bm.contact {
             BuiltContact::Line(l) => {
-                let rack = shape.rack_of(k, &helix);
+                let rack = shape.rack_of(k, helix);
                 let alpha_n = shape.members[m.a].normal_pressure_angle().to_radians();
                 let bb = crate::plane::base_helix_angle(helix[m.a].to_radians(), alpha_n);
                 let slide = axial * bb.sin().abs();
@@ -3627,11 +3721,11 @@ pub fn solve_shape_after(
         )));
         let g = &shape.members[i].gear;
         if shape.members[i].ring.is_none() {
-            out.extend(g.shift_asked(&shape.base_params(i, &helix)).note());
+            out.extend(g.shift_asked(&shape.base_params(i, helix)).note());
             out.extend(
                 g.addendum_asked(&GearParams {
                     profile_shift: x[i],
-                    ..shape.base_params(i, &helix)
+                    ..shape.base_params(i, helix)
                 })
                 .note(),
             );
@@ -3842,7 +3936,7 @@ pub fn solve_shape_after(
         meshes,
         notes,
     };
-    Ok((result, chosen))
+    Ok(result)
 }
 
 // -------------------------------------------------- what a stage owes ---

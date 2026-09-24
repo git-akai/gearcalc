@@ -38,7 +38,7 @@ fn the_sharing_note_quotes_a_number_the_sweep_still_produces() {
         };
         solve_alone(&Train::alone(&stage, 2.0, 0.0), &lib)
             .ok()
-            .and_then(|r| r.members()[0].cases[0].bending_stress)
+            .and_then(|r| r.members[0].cases[0].bending_stress)
     };
 
     let mut seen: Vec<f64> = Vec::new();

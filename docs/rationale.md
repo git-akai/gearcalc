@@ -1453,14 +1453,18 @@ What *is* derivable is where the reaction lands once the ports are declared
 — a self-locking stage holding it first, the reacted ends otherwise — and
 every body's torque is reported per case so it can be read off.
 
-**Why a two-pass solve.** A stage's torque depends on the ratio and efficiency
-of every stage between it and the port, which are not known until those stages
-are solved. Ratio and efficiency do not depend on torque, so the train is solved
-once for the shaft line and again for the ratings. The second pass is not a
-refinement of the first — it is the same arithmetic with the loads it was
-missing. The first runs at a unit load rather than at none: an automatic face
-width is sized from a rating, and a stage asked to rate nothing on a face of no
-width has a `0/0` to refuse where the shaft line was all that was wanted.
+**Why the solve cuts before it rates.** A part's torques depend on the ratio
+and efficiency of every mesh between it and the ports, and neither depends on
+torque: a mesh's efficiency is its friction over its path of contact, which is
+geometry. So the train cuts every part first — its shifts searched, its members
+cut, each mesh at its running distance with its efficiency (`shape::cut`) —
+solves one motion and one flow across them all, and then rates each part under
+what that flow hands it (`shape::rate`). This was once two passes of one solve,
+the first rating nothing to learn the geometry and the second doing it all
+again with the loads it had been missing and the first's shifts handed back; a
+cut kept between the two is the same arithmetic done once. A part rated under
+no case — every case switched off — takes no contact at all, rather than one
+on a face of no width with a `0/0` to refuse.
 
 ### A reversed root is disclosed, and corrected only on request
 

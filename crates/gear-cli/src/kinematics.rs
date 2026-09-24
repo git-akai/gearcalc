@@ -522,7 +522,7 @@ fn report(name: &str, train: &Train, r: &TrainResult) {
                 );
             }
         }
-        for (j, m) in s.meshes().iter().enumerate() {
+        for (j, m) in s.meshes.iter().enumerate() {
             println!(
                 "    mesh {}  efficiency {:>10.6} / {:<10.6} %  contact ratio {:>8.4}  {}",
                 j + 1,

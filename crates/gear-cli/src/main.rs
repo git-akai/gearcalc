@@ -1166,7 +1166,7 @@ fn hula_band(z0: u32, clearance_in_modules: f64) {
                     // conditions moved onto the mesh report — which let fouling
                     // candidates win four of these rows.
                     let admissible =
-                        r.meshes().iter().all(|m| {
+                        r.meshes.iter().all(|m| {
                             transverse(m).contact_ratios.transverse >= 1.0 && m.teeth_clear()
                         }) && r.members.iter().all(gear_core::train::GearResult::as_asked);
                     if !admissible {
@@ -1738,7 +1738,7 @@ fn epicyclic_shifts_report() {
         match gear_core::train::solve_alone(&gear_core::train::Train::alone(&set, 2.0, 0.0), &lib) {
             Ok(r) => {
                 let members = &r.members;
-                let meshes = r.meshes();
+                let meshes = &r.meshes;
                 println!(
                     "{:<12} {:>9.4} {:>9.4} {:>9.4} {:>10.4} % {:>16}",
                     format!("{sun}/{planet}"),
