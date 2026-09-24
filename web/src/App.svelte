@@ -8,6 +8,10 @@
 
   let loaded = $state(false);
   let failed = $state<string | null>(null);
+  /** **Whether the tab lists are open** — a reader working in one tab folds
+   *  them away for the width. A view preference, held here and not stored:
+   *  it changes no number and does not outlive the page. */
+  let sidebarOpen = $state(true);
 
   // The tab's title is the application's **name**, read from the same catalogue
   // entry the sidebar heading uses — so the name is written down once.
@@ -61,8 +65,8 @@
   });
 </script>
 
-<div class="shell">
-  <Sidebar version={loaded ? coreVersion() : null} />
+<div class="shell" class:folded={!sidebarOpen}>
+  <Sidebar version={loaded ? coreVersion() : null} open={sidebarOpen} toggle={() => (sidebarOpen = !sidebarOpen)} />
   <main>
     {#if failed}
       <p class="error">{t("ui.app_core_failed", { reason: failed })}</p>
@@ -117,6 +121,9 @@
     height: 100vh;
     height: 100dvh;
     overflow: hidden;
+  }
+  .shell.folded {
+    grid-template-columns: 2.4rem 1fr;
   }
   main {
     padding: 1rem 1.25rem 2rem;

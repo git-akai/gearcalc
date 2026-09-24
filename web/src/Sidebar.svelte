@@ -2,9 +2,20 @@
   import { workspace, trains, library, applyLanguage, developer } from "./state.svelte";
   import { exportLibrary, t, languages, language } from "./core";
 
-  let { version }: { version: string | null } = $props();
+  let {
+    version,
+    open,
+    toggle,
+  }: {
+    version: string | null;
+    /** Whether the lists are shown, or the pane folded to its button. */
+    open: boolean;
+    toggle: () => void;
+  } = $props();
 
-  let picker: HTMLInputElement;
+  /** The library's file input — inside the unfolded pane, so bound as
+   *  state: it comes and goes with the fold. */
+  let picker = $state<HTMLInputElement>();
 
   async function onPicked(e: Event) {
     const input = e.currentTarget as HTMLInputElement;
@@ -30,7 +41,12 @@
   }
 </script>
 
-<aside>
+<aside class:folded={!open}>
+  <!-- **Folded, the pane is its button**: the tab lists, the language and the
+       library are one press away, and the width is the panel's. -->
+  {#if !open}
+    <button class="fold" aria-expanded="false" aria-label={t("ui.sidebar_expand")} title={t("ui.sidebar_expand")} onclick={toggle}>»</button>
+  {:else}
   <!-- The application's name, which is not the same string as the heading over
        the gear tabs below even though both once read "Gears". One key for two
        jobs meant renaming either renamed both.
@@ -47,7 +63,10 @@
        the rest, so two on one line silently waives one and warns on the other. -->
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-  <h1 onclick={() => developer.knock()}>{t("ui.app_name")}</h1>
+  <div class="head">
+    <h1 onclick={() => developer.knock()}>{t("ui.app_name")}</h1>
+    <button class="fold" aria-expanded="true" aria-label={t("ui.sidebar_collapse")} title={t("ui.sidebar_collapse")} onclick={toggle}>«</button>
+  </div>
 
   <!-- Under the title rather than at the foot of the pane. It sat below the tab
        lists, which grow: past a dozen tabs it was pushed off the bottom and the
@@ -82,7 +101,7 @@
   <section class="library">
     <h2 class="section-heading">{t("ui.sidebar_materials")}</h2>
     <div class="row">
-      <button class="action" onclick={() => picker.click()}>{t("ui.sidebar_import_library")}</button>
+      <button class="action" onclick={() => picker?.click()}>{t("ui.sidebar_import_library")}</button>
       <button class="action" onclick={saveLibrary} disabled={library.materials.material.length === 0}>{t("ui.sidebar_export")}</button>
     </div>
     <input
@@ -146,6 +165,7 @@
   {#if version}
     <p class="version">{t("ui.sidebar_core_version", { version })}</p>
   {/if}
+  {/if}
 </aside>
 
 <style>
@@ -157,6 +177,31 @@
     border-right: 1px solid var(--rule);
     background: var(--panel);
     overflow-y: auto;
+  }
+  aside.folded {
+    padding: 0.8rem 0.3rem;
+    align-items: center;
+  }
+  .head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+  .fold {
+    font: inherit;
+    font-size: 0.9rem;
+    line-height: 1;
+    padding: 0.15rem 0.35rem;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .fold:hover {
+    border-color: var(--rule);
+    color: var(--fg);
   }
   h1 {
     font-size: 1rem;

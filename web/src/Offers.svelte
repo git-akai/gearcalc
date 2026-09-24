@@ -21,7 +21,7 @@
     type Target,
     type Train,
   } from "./core";
-  import { adds, destination, offerLabel, type Names } from "./offers";
+  import { adds, destination, offerLabel, sections, type Names } from "./offers";
 
   interface Props {
     train: Train;
@@ -106,15 +106,19 @@
   }}
 />
 
+<!-- An entry, named as its place in the menu leaves it to be — `label` —
+     and said whole over its dry run, where nothing around it says the rest. -->
 {#snippet entry(o: Offer, label: string, danger: boolean)}
+  {@const whole = offerLabel(o, names)}
   <button
     type="button"
     class="action entry"
     class:danger
     class:refused={o.refused !== null}
     aria-disabled={o.refused !== null}
-    onmouseenter={(e) => show(e, o, label)}
-    onfocus={(e) => show(e, o, label)}
+    aria-label={whole}
+    onmouseenter={(e) => show(e, o, whole)}
+    onfocus={(e) => show(e, o, whole)}
     onmouseleave={() => (over = null)}
     onblur={() => (over = null)}
     onclick={() => make(o)}>{label}</button
@@ -128,10 +132,21 @@
     >
     {#if open === "menu"}
       <div class="menu">
+        <!-- **Headings group, entries tell apart**: the piece an add is
+             offered at heads its group, what it adds heads a run within it,
+             and an entry is named by what is left — a preset by its name
+             under its family, a gear by where it goes or what it meshes. -->
         {#each groups as g, gi (gi)}
           <h5>{g.heading}</h5>
-          {#each g.offers as o, oi (oi)}
-            {@render entry(o, offerLabel(o, names), false)}
+          {#each sections(g.offers, g.target, names) as sec, si (si)}
+            <div class="run" class:headed={sec.heading !== null}>
+              {#if sec.heading !== null}
+                <h6>{sec.heading}</h6>
+              {/if}
+              {#each sec.entries as x, xi (xi)}
+                {@render entry(x.offer, x.label, false)}
+              {/each}
+            </div>
           {/each}
         {:else}
           <p class="hint">{t("ui.train_offer_nothing")}</p>
@@ -217,6 +232,21 @@
   }
   .menu h5:first-child {
     margin-top: 0;
+  }
+  .run {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.15rem;
+  }
+  .run h6 {
+    margin: 0.3rem 0 0 0.4rem;
+    font-size: 0.74rem;
+    font-weight: 600;
+    color: var(--muted);
+  }
+  .run.headed .entry {
+    padding-left: 1.2rem;
   }
   .menu .entry {
     text-align: left;

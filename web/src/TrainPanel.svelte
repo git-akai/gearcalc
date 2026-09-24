@@ -223,6 +223,10 @@
     mesh: meshName,
     distance: distanceName,
     preset: (p) => t(defaults().stages.find((e) => e.preset === p)?.label ?? ""),
+    family: (p) => {
+      const family = defaults().stages.find((e) => e.preset === p)?.family;
+      return t(defaults().families.find((f) => f.family === family)?.label ?? "");
+    },
   };
   /** **The pieces a selection offers edits at**, each under the heading its
    *  entries go under: a mesh and its two gears; a body; an axis; a centre's
@@ -2091,153 +2095,155 @@
   </div>
 {/if}
 
-<!-- **The cases, one chip each, and the path the shown one walks.** The
-     chip chosen is the case the list's flow and the workspace are shown for,
-     and the path under the strip is the one that case reports: its load to
-     its reaction, with what the train comes to along it. -->
-<div class="strip">
-  <span class="lab section-heading">{t("ui.train_cases")}</span>
-  {#each tab.train.load_cases as c, i (i)}
-    <button
-      class="case"
-      class:on={i === shownCase}
-      class:off={!c.enabled}
-      onclick={() => {
-        tab.view.case = i;
-        select({ case: i });
-      }}
-    >
-      {caseName(i)} · {kindLabel(c.kind)}{caseSummary(c) ? ` · ${caseSummary(c)}` : ""}
-      {#if c.enabled && solved !== undefined && !(forCase(solved.cases, i)?.solved ?? false)}
-        <span class="warn"> · {t("ui.train_case_incomplete")}</span>
-      {/if}
-    </button>
-  {/each}
-  <span class="grow"></span>
-  {#each CASE_KINDS as k (k.key)}
-    <button
-      class="action add"
-      onclick={() => {
-        addCaseOfKind(k);
-        tab.view.case = tab.train.load_cases.length - 1;
-        select({ case: tab.view.case });
-      }}>{t(k.add)}</button
-    >
-  {/each}
-</div>
-{#if casePath}
-  <dl class="out pathbox">
-    <dt>{t("ui.train_path_of", { case: caseName(shownCase) })}</dt>
-    <dd>{t("ui.train_path_between", { from: bodyName(casePath.from), to: bodyName(casePath.to) })}</dd>
-    <dt>{t("ui.train_ratio")}</dt>
-    <dd>{Math.abs(casePath.ratio) >= 1 ? `${num(casePath.ratio, 4)} : 1` : `1 : ${num(1 / casePath.ratio, 4)}`}</dd>
-    <dt>{t("ui.train_efficiency")}</dt>
-    <dd>
-      {bothWays(casePath.efficiency)}
-      {#if lockedWays(casePath.efficiency)}<small class="warn">{lockedWays(casePath.efficiency)}</small>{/if}
-    </dd>
-    <!-- The play at each end, driven from the other: at the far end
-         driving forward, and at the near end driving back. -->
-    <dt>{t("ui.train_backlash")}</dt>
-    <dd>
-      <span class="line">
-        {t("ui.train_backlash_at", { angle: num(casePath.backlash.forward.nominal, 5), member: bodyName(casePath.to) })}
-        <small>{range(num(casePath.backlash.forward.minimum, 5), num(casePath.backlash.forward.maximum, 5))}</small>
-      </span>
-      <span class="line">
-        {t("ui.train_backlash_at", { angle: num(casePath.backlash.backward.nominal, 5), member: bodyName(casePath.from) })}
-        <small>{range(num(casePath.backlash.backward.minimum, 5), num(casePath.backlash.backward.maximum, 5))}</small>
-      </span>
-    </dd>
-    <!-- The power the teeth pass, as a multiple of the power in: one
-         across a pair, and where it is many the path's loss is the
-         meshes' loss that many times over. -->
-    <dt>{t("ui.train_circulation")}</dt>
-    <dd>
-      {t("ui.train_circulation_both", { forward: num(casePath.circulation.forward, 2), backward: num(casePath.circulation.backward, 2) })}
-      <small>{t("ui.train_note_circulation")}</small>
-    </dd>
-  </dl>
-{:else if solved && tab.train.load_cases.length > 0}
-  <p class="notice">{t("ui.train_no_path_for_case")}</p>
-{/if}
-
-<!-- **What the train says of itself**: why there is no answer at all, and
-     what each part's own solve raised — its search, its closures, its
-     planets — each naming the part by its meshes and showing it on a
-     click; and the one train-wide decision about how a gear is judged. -->
-<div class="said">
-  {#if failure || partNotes.length > 0}
-    <ul class="notes">
-      {#if failure}
-        <li class="warn">
-          {#if failure.stage !== null}
-            <button class="link" onclick={() => showPart(failure.stage! - 1)}>{partName(failure.stage - 1)}</button>:
-          {/if}
-          {note(failure.note)}
-        </li>
-      {/if}
-      {#each partNotes as x, i (i)}
-        <li><button class="link" onclick={() => showPart(x.part)}>{partName(x.part)}</button>: {note(x.note)}</li>
-      {/each}
-    </ul>
-  {/if}
-  <!-- Train-wide, because it is one decision about how every gear is
-       judged rather than a property of any part or any load: a planet's
-       root is loaded on both flanks whatever the load does, and a
-       reversing duty loads every root both ways — but the allowance for it
-       is a fraction on an allowable a part is sized against, which this
-       tool asks for rather than applies. Its note says what it does
-       whether or not it is on. -->
-  <div class="grid shared">
-    {@render switchField(
-      "ui.train_reversed_bending",
-      tab.train.reversed_bending,
-      (v) => (tab.train.reversed_bending = v),
-      t("ui.train_note_reversed_bending", {
-        coefficient: defaults().reverse_loading_coefficient.toFixed(2),
-      }),
-    )}
-  </div>
-</div>
-
 <!-- **The list and the workspace.** The list is the train grouped one of
      three ways, each the core's (`groupings`, `flows`): the flow, drawn
      down; the centres; the axes. Selecting a row shows that piece in the
      workspace beside it, and the selection is the tab's, so looking away
      and back finds it where it was. -->
 <div class="panes">
-  <section class="pane">
-    <div class="pane-head">
-      <div class="seg">
-        {#each groupings as g (g.key)}
-          <button class:on={tab.view.grouping === g.key} onclick={() => (tab.view.grouping = g.key)}>{t(g.label)}</button>
+  <div class="side">
+    <!-- **The cases, one to a row, and the path the shown one walks** — in the
+         list's column, so the workspace beside it starts at the top. The case
+         chosen is the one the list's flow and the workspace are shown for, and
+         the path under the cases is the one it reports: its load to its
+         reaction, with what the train comes to along it. -->
+    <section class="pane cases">
+      <h4 class="section-heading">{t("ui.train_cases")}</h4>
+      <div class="case-list">
+        {#each tab.train.load_cases as c, i (i)}
+          <button
+            class="case"
+            class:on={i === shownCase}
+            class:off={!c.enabled}
+            onclick={() => {
+              tab.view.case = i;
+              select({ case: i });
+            }}
+          >
+            <span class="case-name">{caseName(i)} · {kindLabel(c.kind)}</span>
+            {#if caseSummary(c)}
+              <span class="case-sum">{caseSummary(c)}</span>
+            {/if}
+            {#if c.enabled && solved !== undefined && !(forCase(solved.cases, i)?.solved ?? false)}
+              <span class="case-sum warn">{t("ui.train_case_incomplete")}</span>
+            {/if}
+          </button>
         {/each}
       </div>
-      {#if tab.view.grouping === "flow" && tab.train.load_cases.length > 0}
-        <small>{t("ui.train_showing_case", { case: caseName(shownCase) })}</small>
+      <div class="case-adds">
+        {#each CASE_KINDS as k (k.key)}
+          <button class="action add" onclick={() => addCaseOfKind(k)}>{t(k.add)}</button>
+        {/each}
+      </div>
+    {#if casePath}
+      <dl class="out pathbox">
+        <dt>{t("ui.train_path_of", { case: caseName(shownCase) })}</dt>
+        <dd>{t("ui.train_path_between", { from: bodyName(casePath.from), to: bodyName(casePath.to) })}</dd>
+        <dt>{t("ui.train_ratio")}</dt>
+        <dd>{Math.abs(casePath.ratio) >= 1 ? `${num(casePath.ratio, 4)} : 1` : `1 : ${num(1 / casePath.ratio, 4)}`}</dd>
+        <dt>{t("ui.train_efficiency")}</dt>
+        <dd>
+          <span class="line">{t("ui.train_driven_forward", { percent: pct(casePath.efficiency.forward) })}</span>
+          <span class="line">{t("ui.train_driven_backward", { percent: pct(casePath.efficiency.backward) })}</span>
+          {#if lockedWays(casePath.efficiency)}<small class="warn">{lockedWays(casePath.efficiency)}</small>{/if}
+        </dd>
+        <!-- The play at each end, driven from the other: at the far end
+             driving forward, and at the near end driving back. -->
+        <dt>{t("ui.train_backlash")}</dt>
+        <dd>
+          <span class="line">
+            {t("ui.train_backlash_at", { angle: num(casePath.backlash.forward.nominal, 5), member: bodyName(casePath.to) })}
+            <small>{range(num(casePath.backlash.forward.minimum, 5), num(casePath.backlash.forward.maximum, 5))}</small>
+          </span>
+          <span class="line">
+            {t("ui.train_backlash_at", { angle: num(casePath.backlash.backward.nominal, 5), member: bodyName(casePath.from) })}
+            <small>{range(num(casePath.backlash.backward.minimum, 5), num(casePath.backlash.backward.maximum, 5))}</small>
+          </span>
+        </dd>
+        <!-- The power the teeth pass, as a multiple of the power in: one
+             across a pair, and where it is many the path's loss is the
+             meshes' loss that many times over. -->
+        <dt>{t("ui.train_circulation")}</dt>
+        <dd>
+          {t("ui.train_circulation_both", { forward: num(casePath.circulation.forward, 2), backward: num(casePath.circulation.backward, 2) })}
+          <small>{t("ui.train_note_circulation")}</small>
+        </dd>
+      </dl>
+    {:else if solved && tab.train.load_cases.length > 0}
+      <p class="notice">{t("ui.train_no_path_for_case")}</p>
+    {/if}
+    </section>
+
+    <!-- **What the train says of itself**: why there is no answer at all, and
+         what each part's own solve raised — its search, its closures, its
+         planets — each naming the part by its meshes and showing it on a
+         click; and the one train-wide decision about how a gear is judged. -->
+    <div class="said">
+      {#if failure || partNotes.length > 0}
+        <ul class="notes">
+          {#if failure}
+            <li class="warn">
+              {#if failure.stage !== null}
+                <button class="link" onclick={() => showPart(failure.stage! - 1)}>{partName(failure.stage - 1)}</button>:
+              {/if}
+              {note(failure.note)}
+            </li>
+          {/if}
+          {#each partNotes as x, i (i)}
+            <li><button class="link" onclick={() => showPart(x.part)}>{partName(x.part)}</button>: {note(x.note)}</li>
+          {/each}
+        </ul>
       {/if}
+      <!-- Train-wide, because it is one decision about how every gear is
+           judged rather than a property of any part or any load: a planet's
+           root is loaded on both flanks whatever the load does, and a
+           reversing duty loads every root both ways — but the allowance for it
+           is a fraction on an allowable a part is sized against, which this
+           tool asks for rather than applies. Its note says what it does
+           whether or not it is on. -->
+      <div class="grid shared">
+        {@render switchField(
+          "ui.train_reversed_bending",
+          tab.train.reversed_bending,
+          (v) => (tab.train.reversed_bending = v),
+          t("ui.train_note_reversed_bending", {
+            coefficient: defaults().reverse_loading_coefficient.toFixed(2),
+          }),
+        )}
+      </div>
     </div>
-    <p class="hint">
-      {t({ flow: "ui.train_note_flow", centres: "ui.train_note_centres", axes: "ui.train_note_axes" }[tab.view.grouping])}
-    </p>
-    {#if shownUnsolved !== null && tab.view.grouping === "flow"}
-      <p class="notice warn">
-        {t("ui.train_case_incomplete")}{shownUnsolved.length > 0 ? `: ${shownUnsolved.map(note).join(" · ")}` : ""}
+    <section class="pane">
+      <div class="pane-head">
+        <div class="seg">
+          {#each groupings as g (g.key)}
+            <button class:on={tab.view.grouping === g.key} onclick={() => (tab.view.grouping = g.key)}>{t(g.label)}</button>
+          {/each}
+        </div>
+        {#if tab.view.grouping === "flow" && tab.train.load_cases.length > 0}
+          <small>{t("ui.train_showing_case", { case: caseName(shownCase) })}</small>
+        {/if}
+      </div>
+      <p class="hint">
+        {t({ flow: "ui.train_note_flow", centres: "ui.train_note_centres", axes: "ui.train_note_axes" }[tab.view.grouping])}
       </p>
-    {/if}
-    {#if tab.view.grouping === "flow"}
-      {@render flowList()}
-    {:else if tab.view.grouping === "centres"}
-      {@render centresList()}
-    {:else}
-      {@render axesList()}
-    {/if}
-    {#if tab.train.shape.members.length === 0}
-      <p class="hint">{t("ui.train_no_stages")}</p>
-    {/if}
-    <Offers train={tab.train} at={[...selected, atOutput]} kind="adds" {names} materials={ratedUnder()} {made} />
-  </section>
+      {#if shownUnsolved !== null && tab.view.grouping === "flow"}
+        <p class="notice warn">
+          {t("ui.train_case_incomplete")}{shownUnsolved.length > 0 ? `: ${shownUnsolved.map(note).join(" · ")}` : ""}
+        </p>
+      {/if}
+      {#if tab.view.grouping === "flow"}
+        {@render flowList()}
+      {:else if tab.view.grouping === "centres"}
+        {@render centresList()}
+      {:else}
+        {@render axesList()}
+      {/if}
+      {#if tab.train.shape.members.length === 0}
+        <p class="hint">{t("ui.train_no_stages")}</p>
+      {/if}
+      <Offers train={tab.train} at={[...selected, atOutput]} kind="adds" {names} materials={ratedUnder()} {made} />
+    </section>
+  </div>
   <section class="pane workspace">
     <Offers train={tab.train} at={selected} kind="verbs" {names} materials={ratedUnder()} {made} />
     {@render workspaceOf(tab.view.selection)}
@@ -2748,42 +2754,61 @@
   /* What the train says of itself, under its path: why it has no answer,
      each part's notes, and the switch every gear is judged by. */
   .said {
-    margin: 0.5rem 0 0.75rem;
+    margin: 0;
   }
   .said .notes {
     margin: 0 0 0.5rem;
     padding-left: 1.1rem;
     font-size: 0.82rem;
   }
-  /* **The case strip, the path box, the list and the workspace** — the
-     canvas's page: cases as chips across the top, the shown case's path
-     under them, the list on the left and the selected piece on the right. */
-  .strip {
+  /* **The list's column and the workspace** — the canvas's page: the
+     cases, what the train says of itself and the list one above the other,
+     and the selected piece beside them from the top. */
+  .side {
     display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-    padding: 0.45rem 0.6rem;
-    margin: 0.5rem 0;
-    border: 1px solid var(--rule);
-    border-radius: 4px;
-    background: var(--panel);
+    flex-direction: column;
+    gap: 0.8rem;
+    min-width: 0;
   }
-  .strip .lab {
-    margin: 0 0.5rem 0 0;
+  .case-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    margin-top: 0.4rem;
   }
-  .strip .grow {
-    flex: 1 1 auto;
-  }
+  /* A case to a row: its name and kind, what it loads, and whether it
+     solves, one under the other. */
   .case {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.05rem;
+    width: 100%;
+    text-align: left;
     font: inherit;
     font-size: 0.8rem;
-    padding: 0.2rem 0.6rem;
+    padding: 0.3rem 0.55rem;
     border: 1px solid var(--rule);
-    border-radius: 999px;
+    border-radius: 4px;
     background: var(--bg);
     color: var(--fg);
     cursor: pointer;
+  }
+  .case .case-name {
+    font-weight: 600;
+  }
+  .case .case-sum {
+    font-size: 0.74rem;
+    color: var(--muted);
+  }
+  .case .case-sum.warn {
+    color: var(--warn);
+  }
+  .case-adds {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-top: 0.5rem;
   }
   .case.on {
     background: var(--selected);
@@ -2792,18 +2817,15 @@
   .case.off {
     color: var(--muted);
   }
+  /* The path the shown case walks, under the cases: a rule above it, and
+     its figures right-aligned against their labels. */
   .pathbox {
-    display: inline-grid;
-    grid-template-columns: auto auto;
-    column-gap: 2rem;
-    padding: 0.45rem 0.6rem;
-    margin: 0 0 0.6rem;
-    border: 1px solid var(--rule);
-    border-radius: 4px;
-    background: var(--panel);
-  }
-  .pathbox {
-    max-width: 40rem;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: 1rem;
+    margin: 0.7rem 0 0;
+    padding: 0.5rem 0 0;
+    border-top: 1px solid var(--rule);
   }
   .pathbox dd {
     text-align: right;
