@@ -441,16 +441,6 @@
   } as const;
   const UNDER_A_FIELD: readonly string[] = Object.values(FIELD_NOTES).flat();
 
-  /** A mesh efficiency, both ways round. Two keys rather than one sentence: the
-   *  two halves are separated by a bullet the grammar of no language owns. */
-  const bothWays = (e: { forward: number; backward: number } | undefined) =>
-    e === undefined
-      ? BLANK
-      : `${t("ui.train_driven_forward", { percent: pct(e.forward) })} · ${t(
-          "ui.train_driven_backward",
-          { percent: pct(e.backward) },
-        )}`;
-
   /** **A mesh's notes are drawn beside the figure each is about.** Those
    *  about its contact — a ratio below one, a helical pair short of full
    *  overlap, a sharing model extrapolating past the single-pair zone — go
@@ -666,10 +656,13 @@
     {/if}
   </div>
   <div class="ws">
-    <!-- **The mesh's own inputs, above the gears it joins** — under the
-         workspace's head, which already names the mesh, so the card needs
-         no heading of its own. -->
+    <!-- **The mesh's own card, above the gears it joins** — under the
+         workspace's head, which already names the mesh, so the card needs no
+         heading of its own: its inputs, and what it comes to beside them,
+         the two wrapping one above the other as one where the card is too
+         narrow for both. -->
     <div class="col meshcol">
+      <div class="mesh-in">
       <div class="grid shared">
         {@render numberField("ui.train_sliding_friction", () => m.sliding_friction, (v) => (m.sliding_friction = v), 0.01, "")}
         {@render numberField("ui.train_static_friction", () => m.static_friction, (v) => (m.static_friction = v), 0.01, "", t("ui.train_note_static_friction"))}
@@ -690,22 +683,32 @@
         <h4 class="section-heading later">{t("ui.train_distance_between", { a: axisLabel(dist.axes[0]), b: axisLabel(dist.axes[1]) })}</h4>
         {@render distanceFields(d)}
       {/if}
+      </div>
+      <!-- **What the mesh comes to, running down**: a label and a figure
+           per row, the power it carries last. -->
+      <dl class="out comes">
+        {@render meshRows(solved?.meshes[k], [gearName(m.a), gearName(m.b)])}
+        {#if worm && solved}
+          <dt>{t("ui.train_lead_angle")}</dt>
+          <dd>
+            {num(solved.members[m.a]?.lead_angle, 4)}° · {num(solved.members[m.b]?.lead_angle, 4)}°
+            <small>{t("ui.train_lead")} {num(solved.members[m.a]?.lead, 4)} {t("ui.train_mm")}</small>
+          </dd>
+        {/if}
+        <!-- The power crossing the mesh over the power into the train, in
+             each case, from the train's own flow: a mesh a case leaves
+             unloaded passes nothing. -->
+        <dt>{t("ui.train_mesh_power_through")}</dt>
+        <dd>
+          {#each solved?.meshes[k]?.cases ?? [] as c (c.case)}
+            <span class="line">{caseName(c.case)}: {num(c.power_through, 2)}×</span>
+          {/each}
+        </dd>
+      </dl>
     </div>
     <div class="col first">{@render gearColumn(m.a, k, crossed, worm)}</div>
     <div class="col second">{@render gearColumn(m.b, k, crossed, worm)}</div>
   </div>
-  <!-- **What the mesh comes to, running down** under the cards, at the
-       workspace's width: a label and a figure per row. -->
-  <dl class="out comes">
-    {@render meshRows(solved?.meshes[k], [gearName(m.a), gearName(m.b)])}
-    {#if worm && solved}
-      <dt>{t("ui.train_lead_angle")}</dt>
-      <dd>
-        {num(solved.members[m.a]?.lead_angle, 4)}° · {num(solved.members[m.b]?.lead_angle, 4)}°
-        <small>{t("ui.train_lead")} {num(solved.members[m.a]?.lead, 4)} {t("ui.train_mm")}</small>
-      </dd>
-    {/if}
-  </dl>
 {/snippet}
 
 {#snippet gearColumn(i: number, k: number, crossed: boolean, worm: boolean)}
@@ -1132,35 +1135,25 @@
       <small class="warn">{note(n)}</small>
     {/each}
   </dd>
-  <!-- The power crossing the mesh over the power into the train, in each
-       case, from the train's own flow: a mesh a case leaves unloaded
-       passes nothing. -->
-  <dt>{t("ui.train_mesh_power_through")}</dt>
-  <dd>
-    {#each m?.cases ?? [] as c (c.case)}
-      <span class="line">{caseName(c.case)}: {num(c.power_through, 2)}×</span>
-    {/each}
-  </dd>
+  <!-- Both ways, one to a line, as a path's efficiency is. -->
   <dt>{t("ui.train_mesh_efficiency")}</dt>
   <dd>
-    {bothWays(m?.efficiency)}
+    <span class="line">{t("ui.train_driven_forward", { percent: pct(m?.efficiency.forward) })}</span>
+    <span class="line">{t("ui.train_driven_backward", { percent: pct(m?.efficiency.backward) })}</span>
     {#each efficiencyNotes(m) as n, i (i)}
       <small class="warn">{note(n)}</small>
     {/each}
   </dd>
-  <!-- One gap, seen from each of its two ends, with the tolerance band on the
-       first — the way every other mesh here writes its play. -->
+  <!-- One gap, seen from each of its two ends, each with its tolerance band
+       and on a line of its own — the way a path writes its play. -->
   <dt>{t("ui.train_mesh_backlash")}</dt>
   <dd>
-    {t("ui.train_backlash_at", {
-      angle: num(m?.backlash[0].nominal, 5),
-      member: members[0],
-    })}
-    <small>{range(num(m?.backlash[0].minimum, 5), num(m?.backlash[0].maximum, 5))}</small>
-    · {t("ui.train_backlash_at", {
-      angle: num(m?.backlash[1].nominal, 5),
-      member: members[1],
-    })}
+    {#each [0, 1] as e (e)}
+      <span class="line">
+        {t("ui.train_backlash_at", { angle: num(m?.backlash[e].nominal, 5), member: members[e] })}
+        <small>{range(num(m?.backlash[e].minimum, 5), num(m?.backlash[e].maximum, 5))}</small>
+      </span>
+    {/each}
   </dd>
   <!-- Every mesh has a locking threshold and a sliding at the pitch point;
        a line contact's are *never* and *zero*, and are shown where the
@@ -2027,7 +2020,7 @@
       <div class="case-list">
         {#each tab.train.load_cases as c, i (i)}
           {@const complete = forCase(solved?.cases, i)?.solved ?? false}
-          <div class="case" class:on={i === shownCase} class:off={!c.enabled}>
+          <div class="case" class:sel={isSelected({ case: i })} class:off={!c.enabled}>
             <button
               class="case-pick"
               onclick={() => {
@@ -2086,12 +2079,14 @@
             <small>{range(num(casePath.backlash.backward.minimum, 5), num(casePath.backlash.backward.maximum, 5))}</small>
           </span>
         </dd>
-        <!-- The power the teeth pass, as a multiple of the power in: one
-             across a pair, and where it is many the path's loss is the
-             meshes' loss that many times over. -->
+        <!-- The power the path's meshes carry, as a multiple of the power
+             in, both ways, one to a line as the efficiency is: one across a
+             pair, and where it is many, power circulates and the meshes'
+             loss is taken that many times over. -->
         <dt>{t("ui.train_circulation")}</dt>
         <dd>
-          {t("ui.train_circulation_both", { forward: num(casePath.circulation.forward, 2), backward: num(casePath.circulation.backward, 2) })}
+          <span class="line">{t("ui.train_circulation_forward", { times: num(casePath.circulation.forward, 2) })}</span>
+          <span class="line">{t("ui.train_circulation_backward", { times: num(casePath.circulation.backward, 2) })}</span>
           <small>{t("ui.train_note_circulation")}</small>
         </dd>
       </dl>
@@ -2752,7 +2747,7 @@
     gap: 0.35rem;
     margin-top: 0.5rem;
   }
-  .case.on {
+  .case.sel {
     background: var(--selected);
     border-color: var(--accent);
   }
@@ -2960,7 +2955,12 @@
     flex-wrap: wrap;
     margin-bottom: 0.5rem;
   }
+  /* **A workspace's head on two rows**: its name, with where to go next
+     beside it, and under them what it is made of — which gears sit on which
+     bodies, what a case loads. */
   .ws-head small {
+    flex-basis: 100%;
+    order: 1;
     color: var(--muted);
   }
   .ws-head .link {
@@ -3004,14 +3004,26 @@
   .ws .meshcol {
     grid-area: mesh;
   }
-  .out.comes {
-    max-width: 48rem;
-    margin-top: 0.7rem;
-  }
-  /* A card as a gear's is: its border tells it apart, and nothing else. */
+  /* A card as a gear's is: its border tells it apart, and nothing else.
+     Its inputs on the left and what it comes to on the right, and the
+     outputs wrapping under the inputs, whole, where the card cannot hold
+     both at the widths they read at. */
   .ws .meshcol {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 0.8rem 1.5rem;
     border: 1px solid var(--rule);
     border-radius: 3px;
     padding: 0.5rem 0.7rem;
+  }
+  .mesh-in {
+    flex: 1 1 21rem;
+    min-width: 0;
+  }
+  .out.comes {
+    flex: 1 1 21rem;
+    min-width: 0;
+    margin: 0;
   }
 </style>

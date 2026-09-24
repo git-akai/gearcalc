@@ -870,9 +870,11 @@
   }
 
   /* Size, weight and colour are `app.css`'s `.section-heading`, shared with
-     the geartrain's headings. */
+     the geartrain's headings, and so are its gaps: against its column's top
+     where it opens one, a section's gap under what went before where it
+     opens a later one. */
   h2 {
-    margin: 1.25rem 0 0.5rem;
+    margin: 0.8rem 0 0.4rem;
   }
   h2:first-child {
     margin-top: 0;
@@ -909,9 +911,6 @@
   label:has(> select) {
     grid-template-columns: 1fr var(--field-box-wide) var(--unit-cell);
   }
-  /* A switch that carries its own name has nothing to put in a label column,
-     so the row is the button alone at the right edge — the same edge every
-     input in this column ends on. */
   /* A switch that carries its own name has nothing to put in a label column,
      so the row is the button alone at the right — but *which* right matters.
      Every row here keeps a trailing cell for its unit, and every note ends
