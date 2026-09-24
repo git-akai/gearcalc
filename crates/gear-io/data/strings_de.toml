@@ -90,9 +90,9 @@ distances = "Achsabstände: {before} → {after}"
 couplings = "Versatzkupplungen: {before} → {after}"
 holds = "Festhaltungen: {before} → {after}"
 case_entries = "Lastfalleinträge: {before} → {after}"
-path = "Körper {from} zu Körper {to}: Übersetzung {ratio_before} → {ratio_after}, Wirkungsgrad {efficiency_before} → {efficiency_after} %"
+path = "Körper {from} zu Körper {to}: Übersetzung {ratio_before_from} : {ratio_before_to} → {ratio_after_from} : {ratio_after_to}, Wirkungsgrad {efficiency_before} → {efficiency_after} %"
 path_gone = "Körper {from} zu Körper {to}: kein Pfad mehr"
-path_new = "Körper {from} zu Körper {to}: ein Pfad, Übersetzung {ratio}, Wirkungsgrad {efficiency} %"
+path_new = "Körper {from} zu Körper {to}: ein Pfad, Übersetzung {ratio_from} : {ratio_to}, Wirkungsgrad {efficiency} %"
 
 [error]
 mesh_incompatible = "die Räder können nicht kämmen: Modul, Eingriffswinkel oder Schrägungswinkel unterscheiden sich"

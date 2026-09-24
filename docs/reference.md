@@ -2553,7 +2553,10 @@ each and **a direction each** — a case that loads the far end and reacts the
 near one asks for the path the other way round, whose ratio, efficiencies
 and play are read from the other end — so the first is the **headline
 case's** — between two open bodies: the
-**ratio** off that motion, driven at the one with the other free; the **efficiency** off the
+**ratio** off that motion, driven at the one with the other free — read as
+so many turns to one, whichever way round keeps the figure at one or more,
+`2.5294 : 1` or `1 : 2.5294`, and decided in the core once for the path's row
+and an edit's dry run alike (`RatioReading`); the **efficiency** off the
 train's flow at unit load — the first driving, the second holding the load,
 every other body free — and the reverse, so a path that crosses one preset of
 three is that preset's alone, where a product over the presets could not say

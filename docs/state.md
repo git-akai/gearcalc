@@ -1110,14 +1110,6 @@ future reader knows it was read and set aside rather than missed.
 Not a queue with a head; this is what a next session would pick from.
 
 - **Further UI work**, as it is asked for.
-- **A path's ratio under one is inverted in TypeScript**, against the first
-  standing rule: the path row prints `r : 1` where `|r| ≥ 1` and otherwise
-  `1 : ` the panel's own `1 / r`. It came from the chain's total-ratio row
-  and was carried to the path's; a path having a direction makes it common,
-  since every back-driving case's row is a forward row's reciprocal. Either
-  the row prints `r : 1` always — the figure the harness prints, and what a
-  speed-up's ratio is — or the core states the form it is read in; the
-  first moves no number and needs no field.
 - **The two panels' remaining differences of style**, catalogued when their
   top bars were made one (`app.css`, *the bar at the top of a tab*) and
   trimmed when the section headings, the names' contrast, the field-box
@@ -1125,11 +1117,10 @@ Not a queue with a head; this is what a next session would pick from.
   is left, with the two values so the next alignment is a decision rather
   than a diff; the gear tab's treatment is the one to keep unless the
   geartrain's has a reason:
-  - **number boxes** — the gear tab's are right-aligned (`text-align: right`,
-    padding `0.2rem 0.4rem`, background `--bg`); the geartrain's are left-aligned
-    at `0.15rem 0.3rem` on no background, so a column of figures lines up on
-    its decimal point on one tab and on its first digit on the other. The
-    gear tab's is the one to keep;
+  - **number boxes** — right-aligned on both, the stepper on the left
+    (`app.css`, one rule for both tabs); what is left is the box itself,
+    padding `0.2rem 0.4rem` on `--bg` on the gear tab and `0.15rem 0.3rem`
+    on no background on the geartrain;
   - **the field grid** — a single column on the gear tab (`.grid`: flex
     column, `--field-gap` between rows, and `--field-gap` again between
     groups); the geartrain's inputs flow in `repeat(auto-fill, minmax(15rem, 1fr))`
@@ -1140,17 +1131,24 @@ Not a queue with a head; this is what a next session would pick from.
     label to sit in pulls itself up by `calc(--note-gap − --field-gap)` and
     right-aligns; the gear tab has no such note;
   - **readouts** — both right-align their figures now, tabular at normal
-    weight; what is left is the grid, `max-content 1fr` at `0.15rem 1rem` on
-    the gear tab and `auto 1fr` at `0.15rem 0.75rem` on the geartrain, whose
-    readouts also carry an annotation in a muted `small` and a note under a
-    row that takes the readout's whole width (`dd.note`);
+    weight; what is left is the grid's column gap, the least room between a
+    name and its figure and so seen only where a row is full: `1rem` on the
+    gear tab's and on the geartrain's path box, `0.75rem` on the geartrain's
+    other readouts (the mesh card's, a body's, a replicated axis's). The
+    geartrain's also carry an annotation in a muted `small` and a note under
+    a row that takes the readout's whole width (`dd.note`);
   - **the list of notes** at the foot of a section — `0.75rem 0 0` margin,
     1.1 rem indent, 0.8 rem on the gear tab; `0.5rem 0 0`, 1 rem, 0.78 rem on
     the geartrain;
-  - **buttons that show a state** — the gear tab's `button:disabled` is
-    `opacity: 0.5`, the geartrain's is `color: --muted`; the `Switch` is one
-    component on both, and the `auto` and `no undercut` toggles keep their
-    small size by design;
+  - **a control that cannot be pressed** — dimmed to half on both where it
+    is a button: the gear tab's *Export DXF*, the sidebar's and the bar's
+    `.action`s, and an offer the core refuses. The geartrain's own two
+    differ: a case's switch while the case cannot solve dims to `0.45`, and
+    a held body's *Fixed* keeps its full contrast on the selected background,
+    since it states a choice rather than refusing one. The geartrain's
+    `button:disabled` rule, `color: --muted`, reaches no button; the `Switch`
+    is one component on both, and the `auto` and `no undercut` toggles keep
+    their small size by design;
   - **error and notice paragraphs** — the same tokens, but only the geartrain
     has a `.notice` (an import adjusted); the gear tab's adopt failure uses
     `.error` and has no quieter slot;
@@ -1187,7 +1185,12 @@ Not a queue with a head; this is what a next session would pick from.
   crosses as a wire type, and `gear-cli strength … <rim>` exercises it. What is
   left is a form field on the gear card, a serde-defaulted `null` in the tab
   state, and one label plus one unit in five string catalogues. Nothing about
-  it needs the standard in hand.
+  it needs the standard in hand. **Until then it is kept though the panel
+  never reads it**, and so is `Material::ultimate_measure`, which says what a
+  material's ultimate allowable measures and which nothing yet shows: both
+  are inputs that cross and come back unread, so a train or a library taken
+  through the panel keeps them — an exception, on purpose, to taking out
+  what nothing reads.
 - **A calibrated mesh-stiffness model**, which would replace the load-sharing
   ramp rather than the control exposing it.
 - **A planet's root under the ring mesh is rated; its flank's sliding is not**

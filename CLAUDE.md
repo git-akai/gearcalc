@@ -237,6 +237,12 @@ And elsewhere:
   against a published standard. They go when that command does.
 - **`verify.rs` is in the library rather than in `tests/`** so the CLI can sweep
   it over thousands of cases.
+- **Two inputs the panel never reads** — `MemberGear::rim_thickness`, a
+  complete and gated model waiting for its form field, and
+  `Material::ultimate_measure`, what a material's ultimate allowable
+  measures. Both cross and come back unread, so a train or a library taken
+  through the panel keeps them. Kept on purpose, against the rule that what
+  nothing reads goes (`docs/state.md#worth-doing-next`).
 - **Eight modules carry no `#[cfg(test)]` module** — `metrology.rs`,
   `params.rs`, `tooth.rs`, `verify.rs`, `train/pair.rs`, `train/conditions.rs`,
   `train/wiring.rs`, `train/planetary.rs` — and seven of them are covered from

@@ -1813,18 +1813,19 @@ mod tests {
     fn a_stored_train_with_a_null_carrier_still_loads() {
         let d: serde_json::Value = serde_json::from_str(&defaults_impl().unwrap()).unwrap();
         let mut stored = d["train"].clone();
-        let want = solved(&serde_json::json!({ "train": stored }).to_string())["paths"][0]["ratio"]
+        let want = solved(&serde_json::json!({ "train": stored }).to_string())["paths"][0]["reads"]
             .clone();
+        assert!(want["turns"].is_number(), "{want}");
         for axis in stored["shape"]["axes"].as_array_mut().unwrap() {
             axis["carried_by"] = serde_json::Value::Null;
         }
         let v = solved(&serde_json::json!({ "train": stored }).to_string());
-        assert_eq!(v["paths"][0]["ratio"], want, "null is ground");
+        assert_eq!(v["paths"][0]["reads"], want, "null is ground");
         for axis in stored["shape"]["axes"].as_array_mut().unwrap() {
             axis.as_object_mut().unwrap().remove("carried_by");
         }
         let v = solved(&serde_json::json!({ "train": stored }).to_string());
-        assert_eq!(v["paths"][0]["ratio"], want, "absent is ground");
+        assert_eq!(v["paths"][0]["reads"], want, "absent is ground");
     }
 
     #[test]
@@ -2416,7 +2417,9 @@ mod tests {
         let stage = &v["parts"][0];
 
         // Ring held, sun driving: the classical 1 + z_r/z_s.
-        assert!((v["paths"][0]["ratio"].as_f64().unwrap() - 3.5).abs() < 1e-12);
+        let reads = &v["paths"][0]["reads"];
+        assert!((reads["turns"].as_f64().unwrap() - 3.5).abs() < 1e-12);
+        assert_eq!(reads["step_up"], false);
 
         // Five bodies, ground and the held ring still, the sun at the case's
         // own speed, and every external torque — ground's reaction among
@@ -2611,7 +2614,9 @@ mod tests {
 
         let v = solved(&req.to_string());
         let want = (43.0 / 17.0) * 40.0;
-        assert!((v["paths"][0]["ratio"].as_f64().unwrap() - want).abs() < 1e-9);
+        let reads = &v["paths"][0]["reads"];
+        assert!((reads["turns"].as_f64().unwrap() - want).abs() < 1e-9);
+        assert_eq!(reads["step_up"], false);
 
         // Both stages are the one shape, and each says which contact it has
         // by what its mesh carries: the transverse figures on parallel shafts,
@@ -3003,7 +3008,9 @@ mod tests {
         // **Negative**, because an external pair reverses and a train's ratio
         // says so now: it is read off the graph rather than multiplied out of
         // the stage ratios, and a pair reports its own as a magnitude.
-        assert!((v["paths"][0]["ratio"].as_f64().unwrap() + 43.0 / 17.0).abs() < 1e-12);
+        let reads = &v["paths"][0]["reads"];
+        assert!((reads["turns"].as_f64().unwrap() + 43.0 / 17.0).abs() < 1e-12);
+        assert_eq!(reads["step_up"], false);
         // Every body of the case, with what it is: the pair's second member
         // is the reacted end and carries the load stepped up.
         let bodies = v["cases"][0]["bodies"].as_array().unwrap();

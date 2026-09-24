@@ -176,10 +176,7 @@ header.tab-bar .actions button:disabled,
    is not one of these and keeps its own size and highlight. */
 
 /* **A section heading**, on either tab: small capitals, bold, muted — the
-   geartrain's card titles, which the gear tab's sections and the geartrain's
-   stage and case headings now share. What sits beside a heading's name — a
-   stage's tooth counts, a case's load — is a figure, and keeps its own case
-   and weight (`.section-heading .aside`). */
+   gear tab's sections and the geartrain's lists and workspaces alike. */
 .section-heading {
   font-size: 0.8rem;
   font-weight: 700;
@@ -187,10 +184,17 @@ header.tab-bar .actions button:disabled,
   letter-spacing: 0.06em;
   color: var(--muted);
 }
-.section-heading .aside {
-  font-weight: 400;
-  text-transform: none;
-  letter-spacing: normal;
+
+/* **A number box reads down its last digit, its stepper on the left**, on
+   either tab: a column of boxes lines up as a column of figures does, and
+   the stepper stands clear of the digits rather than against the last of
+   them. The stepper sits on the side `direction` says; `plaintext` then
+   lays the figure out by its own characters, which keeps a minus sign in
+   front of the digits rather than after them, where `rtl` alone put it. */
+input[type="number"] {
+  direction: rtl;
+  unicode-bidi: plaintext;
+  text-align: right;
 }
 /* A select drawn as a button: no value shows, only its label, since choosing
    an entry acts at once and the control returns to the label. */

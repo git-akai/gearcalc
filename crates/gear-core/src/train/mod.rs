@@ -1197,7 +1197,9 @@ pub struct MemberGear {
     /// the only one: see [`RimSupport`](crate::strength::RimSupport).
     ///
     /// It reaches bending alone. A rim under the teeth has nothing to do with
-    /// the pressure between two flanks, so no contact rating reads it.
+    /// the pressure between two flanks, so no contact rating reads it. The
+    /// panel has no field for it yet and carries it back unread, on purpose
+    /// (docs/state.md#worth-doing-next).
     #[cfg_attr(feature = "serde", serde(default))]
     pub rim_thickness: Option<f64>,
     /// Name of a material in the library.
@@ -3506,6 +3508,7 @@ fn paths_of(
             from,
             to,
             ratio: forward[a] / forward[b],
+            reads: RatioReading::of(forward[a] / forward[b]),
             efficiency: Directional {
                 forward: ahead.0,
                 backward: astern.0,
@@ -3830,6 +3833,43 @@ impl TrainCase {
     }
 }
 
+/// **A ratio as it is read**: so many turns to one, whichever way round
+/// keeps the figure at one or more — `2.5294 : 1` for a reduction, and
+/// `1 : 2.5294` for a step-up rather than `0.3953 : 1`. The sign, where the
+/// two ends turn opposite ways, is the figure's. Decided here once, so the
+/// path's row and an edit's dry run read a path the same way.
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+pub struct RatioReading {
+    /// The side that is not one: `|turns| ≥ 1`.
+    pub turns: f64,
+    /// Whether the one is the first side's — a step-up, read `1 : turns`.
+    pub step_up: bool,
+}
+
+impl RatioReading {
+    /// A signed ratio, first per second, read. Never zero on a path: one
+    /// whose either end stands still is no path (`paths_of`).
+    pub fn of(ratio: f64) -> Self {
+        if ratio.abs() >= 1.0 {
+            Self {
+                turns: ratio,
+                step_up: false,
+            }
+        } else {
+            Self {
+                turns: 1.0 / ratio,
+                step_up: true,
+            }
+        }
+    }
+}
+
 /// **One path of the train**: what it comes to between two of its open
 /// bodies, with nothing loaded anywhere else — the three questions a stage
 /// once answered of itself, asked of the whole graph.
@@ -3843,8 +3883,13 @@ impl TrainCase {
 pub struct PathReport {
     pub from: usize,
     pub to: usize,
-    /// Turns of `from` per turn of `to`, signed, off the one motion.
+    /// Turns of `from` per turn of `to`, signed, off the one motion. **Not
+    /// sent**: the harness's and the preview's; the panel shows [`Self::reads`].
+    #[cfg_attr(feature = "serde", serde(skip))]
+    #[cfg_attr(feature = "typescript", ts(skip))]
     pub ratio: f64,
+    /// The same ratio as it is read, never under one on either side.
+    pub reads: RatioReading,
     /// Driving `from` with `to` holding the load and every other open body
     /// free, and the reverse — the train's flow at unit load, so a path
     /// that crosses one preset of three is rated on that preset alone. A path
@@ -4694,6 +4739,55 @@ mod tests {
             }
         }
         assert!(bodies > 200, "only {bodies} bodies balanced");
+    }
+
+    /// **A path read either way is one figure, the one on the other side.**
+    /// Every path's reading is its ratio, or the ratio's reciprocal with the
+    /// one first, and never a figure under one; and a case loaded at the
+    /// output walks the forward path the other way round, so its row reads
+    /// the forward row's figure as a step-up where the forward row reads a
+    /// reduction. On every preset alone.
+    #[test]
+    fn a_path_backwards_reads_its_figure_the_other_way_round() {
+        let lib = library();
+        for p in arr::Preset::ALL {
+            let t = Train::chained(vec![p.build()], |t| {
+                t.chain_ends()
+                    .map(|(x, y)| {
+                        vec![
+                            LoadCase::ultimate(x, y, 1.0, 1000.0),
+                            LoadCase::back_driving(x, y, 0.6),
+                        ]
+                    })
+                    .unwrap_or_default()
+            });
+            let r = solve_train(&t, &lib).unwrap();
+            for path in &r.paths {
+                let read = path.reads;
+                assert!(read.turns.abs() >= 1.0, "{p:?}: {read:?}");
+                let back = if read.step_up {
+                    1.0 / read.turns
+                } else {
+                    read.turns
+                };
+                assert!(
+                    (back - path.ratio).abs() <= 1e-12 * path.ratio.abs(),
+                    "{p:?}"
+                );
+            }
+            let (x, y) = t.chain_ends().unwrap();
+            let row = |a, b| r.paths.iter().find(|q| (q.from, q.to) == (a, b));
+            let (there, back) = (row(x, y).unwrap(), row(y, x).unwrap());
+            let (there, back) = (there.reads, back.reads);
+            assert!(
+                (there.turns - back.turns).abs() <= 1e-12 * there.turns.abs(),
+                "{p:?}: {there:?} and {back:?}"
+            );
+            assert!(
+                there.turns.abs() == 1.0 || there.step_up != back.step_up,
+                "{p:?}: {there:?} and {back:?}"
+            );
+        }
     }
 
     /// **A part's view is its own solve**: the view the train's result gives

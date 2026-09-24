@@ -120,9 +120,20 @@ pub fn preview(
     };
     let ends =
         |note: Note, p: &PathReport| note.count("from", whole(p.from)).count("to", whole(p.to));
+    // A ratio is two sides, read as the path's row reads it (`reads`): the
+    // one a count, so it prints as one, and the other its figure.
     let figures = |note: Note, p: &PathReport, ratio: &str, efficiency: &str| {
-        note.number(ratio, p.ratio, 4)
-            .number(efficiency, 100.0 * p.efficiency.forward, 2)
+        let (from, to) = (format!("{ratio}_from"), format!("{ratio}_to"));
+        let (one, turns) = if p.reads.step_up {
+            (from, to)
+        } else {
+            (to, from)
+        };
+        note.count(&one, 1).number(&turns, p.reads.turns, 4).number(
+            efficiency,
+            100.0 * p.efficiency.forward,
+            2,
+        )
     };
     let gone = |p: &PathReport| ends(Note::new(key::PREVIEW_PATH_GONE), p);
     let appears = |p: &PathReport| {
@@ -213,7 +224,13 @@ mod tests {
         );
         assert_eq!(keys(&p.paths), [key::PREVIEW_PATH]);
         let path = &p.paths[0].values;
-        assert_eq!(path["ratio_before"], path["ratio_after"], "{path:?}");
+        for side in ["from", "to"] {
+            assert_eq!(
+                path[&format!("ratio_before_{side}")],
+                path[&format!("ratio_after_{side}")],
+                "{path:?}"
+            );
+        }
         assert_eq!(
             path["efficiency_before"], path["efficiency_after"],
             "{path:?}"

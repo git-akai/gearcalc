@@ -86,9 +86,9 @@ distances = "轴间距：{before} → {after}"
 couplings = "偏置联轴器：{before} → {after}"
 holds = "固定：{before} → {after}"
 case_entries = "工况条目：{before} → {after}"
-path = "体 {from} 至体 {to}：传动比 {ratio_before} → {ratio_after}，效率 {efficiency_before} → {efficiency_after} %"
+path = "体 {from} 至体 {to}：传动比 {ratio_before_from} : {ratio_before_to} → {ratio_after_from} : {ratio_after_to}，效率 {efficiency_before} → {efficiency_after} %"
 path_gone = "体 {from} 至体 {to}：不再是一条路径"
-path_new = "体 {from} 至体 {to}：一条路径，传动比 {ratio}，效率 {efficiency} %"
+path_new = "体 {from} 至体 {to}：一条路径，传动比 {ratio_from} : {ratio_to}，效率 {efficiency} %"
 
 [error]
 mesh_incompatible = "这两个齿轮无法啮合：模数、压力角或螺旋角不一致"

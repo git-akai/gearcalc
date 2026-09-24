@@ -91,9 +91,9 @@ distances = "distâncias entre eixos: {before} → {after}"
 couplings = "acoplamentos desalinhados: {before} → {after}"
 holds = "fixações: {before} → {after}"
 case_entries = "entradas de casos: {before} → {after}"
-path = "Corpo {from} a Corpo {to}: relação {ratio_before} → {ratio_after}, rendimento {efficiency_before} → {efficiency_after} %"
+path = "Corpo {from} a Corpo {to}: relação {ratio_before_from} : {ratio_before_to} → {ratio_after_from} : {ratio_after_to}, rendimento {efficiency_before} → {efficiency_after} %"
 path_gone = "Corpo {from} a Corpo {to}: deixa de ser um caminho"
-path_new = "Corpo {from} a Corpo {to}: um caminho, relação {ratio}, rendimento {efficiency} %"
+path_new = "Corpo {from} a Corpo {to}: um caminho, relação {ratio_from} : {ratio_to}, rendimento {efficiency} %"
 
 [error]
 mesh_incompatible = "as engrenagens não podem engrenar: módulo, ângulo de pressão ou hélice diferem"

@@ -956,15 +956,11 @@
     font: inherit;
     font-size: 0.85rem;
     font-variant-numeric: tabular-nums;
-    text-align: right;
     padding: 0.2rem 0.4rem;
     border: 1px solid var(--rule);
     border-radius: 3px;
     background: var(--bg);
     color: var(--fg);
-  }
-  select {
-    text-align: left;
   }
   label.invalid input {
     border-color: var(--warn);

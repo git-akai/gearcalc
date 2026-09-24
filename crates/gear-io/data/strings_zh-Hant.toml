@@ -86,9 +86,9 @@ distances = "軸間距：{before} → {after}"
 couplings = "偏置聯軸器：{before} → {after}"
 holds = "固定：{before} → {after}"
 case_entries = "工況條目：{before} → {after}"
-path = "體 {from} 至體 {to}：傳動比 {ratio_before} → {ratio_after}，效率 {efficiency_before} → {efficiency_after} %"
+path = "體 {from} 至體 {to}：傳動比 {ratio_before_from} : {ratio_before_to} → {ratio_after_from} : {ratio_after_to}，效率 {efficiency_before} → {efficiency_after} %"
 path_gone = "體 {from} 至體 {to}：不再是一條路徑"
-path_new = "體 {from} 至體 {to}：一條路徑，傳動比 {ratio}，效率 {efficiency} %"
+path_new = "體 {from} 至體 {to}：一條路徑，傳動比 {ratio_from} : {ratio_to}，效率 {efficiency} %"
 
 [error]
 mesh_incompatible = "這兩個齒輪無法嚙合：模數、壓力角或螺旋角不一致"

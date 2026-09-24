@@ -2059,7 +2059,7 @@
         <dt>{t("ui.train_path_of", { case: caseName(shownCase) })}</dt>
         <dd>{t("ui.train_path_between", { from: bodyName(casePath.from), to: bodyName(casePath.to) })}</dd>
         <dt>{t("ui.train_ratio")}</dt>
-        <dd>{Math.abs(casePath.ratio) >= 1 ? `${num(casePath.ratio, 4)} : 1` : `1 : ${num(1 / casePath.ratio, 4)}`}</dd>
+        <dd>{casePath.reads.step_up ? `1 : ${num(casePath.reads.turns, 4)}` : `${num(casePath.reads.turns, 4)} : 1`}</dd>
         <dt>{t("ui.train_efficiency")}</dt>
         <dd>
           <span class="line">{t("ui.train_driven_forward", { percent: pct(casePath.efficiency.forward) })}</span>

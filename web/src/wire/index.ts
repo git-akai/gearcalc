@@ -74,6 +74,7 @@ export type { Preset } from "./core/Preset";
 export type { PresetFamily } from "./core/PresetFamily";
 export type { Preview } from "./core/Preview";
 export type { Ranges } from "./core/Ranges";
+export type { RatioReading } from "./core/RatioReading";
 export type { Shape } from "./core/Shape";
 export type { ShiftRange } from "./core/ShiftRange";
 export type { Sinusoid } from "./core/Sinusoid";

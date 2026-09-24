@@ -253,7 +253,9 @@ pub struct Material {
     /// MPa. The limit on a **peak** load — see the module documentation.
     pub ultimate_allowable: Value,
     /// What `ultimate_allowable` measures: yield, or break for materials with
-    /// no yield point.
+    /// no yield point. Nothing reads it yet, the panel included, and it is
+    /// kept on purpose, so a library taken through the panel keeps it
+    /// (docs/state.md#worth-doing-next).
     pub ultimate_measure: Measure,
     /// MPa. The limit on a **cyclic** load.
     pub fatigue_allowable: Value,

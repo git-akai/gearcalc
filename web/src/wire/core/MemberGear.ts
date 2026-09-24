@@ -119,7 +119,9 @@ face_sources: FaceSources,
  * the only one: see [`RimSupport`](crate::strength::RimSupport).
  *
  * It reaches bending alone. A rim under the teeth has nothing to do with
- * the pressure between two flanks, so no contact rating reads it.
+ * the pressure between two flanks, so no contact rating reads it. The
+ * panel has no field for it yet and carries it back unread, on purpose
+ * (docs/state.md#worth-doing-next).
  */
 rim_thickness: number | null, 
 /**
