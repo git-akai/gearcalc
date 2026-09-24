@@ -2174,13 +2174,6 @@ pub(crate) fn helix_for_overlap(overlap: f64, module: f64, width: f64) -> Option
 /// one in `order` that the designer is not this moment touching goes back to
 /// automatic. Least precious first, and stated by the shape.
 #[derive(Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
-#[cfg_attr(
-    feature = "typescript",
-    derive(ts_rs::TS),
-    ts(export, export_to = "core/")
-)]
 pub struct FreedomGroup {
     /// How many of `order` may be **given** before the set is over-determined.
     pub given_at_most: usize,

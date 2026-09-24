@@ -3032,12 +3032,6 @@ pub struct SlotCase {
 /// convention of its own, and a law held them to the path across its ends
 /// until nothing read them but the stage.
 #[derive(Clone, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-#[cfg_attr(
-    feature = "typescript",
-    derive(ts_rs::TS),
-    ts(export, export_to = "core/")
-)]
 pub struct ShapeResult {
     pub distances: Vec<DistanceReport>,
     /// One per replicated axis, in axis order.
