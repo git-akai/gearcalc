@@ -2683,15 +2683,16 @@ axis. The coupling is the graph's to lose: an orbiting body is coupled to
 a new shaft on its carrier's axis and uncoupled again, and a planocentric
 with a step on its planet, a ring on the step and its coupling taken away
 is a hula stage — each reached from the other by the graph's edits. Both
-are readings of **one list**: the motion report's `bodies` is every body of
-the train, ground first, each with whether a case may address it (`port`),
-whether the train holds it (`held`), and what it turns at — and not which
-parts it lies between, which is the solve's to derive and nothing a
-designer reads. A picker offers the ports
-that are not held; a case has a row per port; a planet is in the list with
-`port` false, since it has a speed and nothing can be attached to it. (It
-was three lists — the speeds, the port bodies, the open ports — keyed by
-the same number, two of them prefixes of the third.) A load names a body
+are readings of **one list**: the train's ports (`Train::bodies`), every
+body a case may address in number order, each saying whether the train
+holds it (`held`) — and not which parts it lies between, which is the
+solve's to derive and nothing a designer reads. A picker offers the ports
+that are not held; a case has a row per port, whether or not the train's
+motion is determined; a planet is not in the list, since nothing can be
+attached to it. (It was three lists — the speeds, the port bodies, the open
+ports — keyed by the same number, two of them prefixes of the third; then
+the motion report's bodies, every body with its exact speed, of which the
+panel read two flags. The report is the harness's now.) A load names a body
 and nothing else — no "start", no "end".
 
 **A body, to the panel, is its number.** The panel numbers nothing of its

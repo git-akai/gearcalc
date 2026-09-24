@@ -655,12 +655,6 @@ impl Train {
 
 /// A number that is exactly a quotient of integers, and how it reads.
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-#[cfg_attr(
-    feature = "typescript",
-    derive(ts_rs::TS),
-    ts(export, export_to = "core/")
-)]
 pub struct Exact {
     /// For arithmetic and for a readout that rounds.
     pub value: f64,
@@ -678,14 +672,8 @@ impl From<Ratio> for Exact {
     }
 }
 
-/// One body of the train's motion, for the front end.
+/// One body of the train's motion.
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-#[cfg_attr(
-    feature = "typescript",
-    derive(ts_rs::TS),
-    ts(export, export_to = "core/")
-)]
 pub struct BodyReport {
     pub body: usize,
     /// **A body a train may be addressed at**: one some part has as a
@@ -708,27 +696,18 @@ pub struct BodyReport {
 /// One term of a body's speed in a family: so many turns per turn of a
 /// body the conditions left free.
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-#[cfg_attr(
-    feature = "typescript",
-    derive(ts_rs::TS),
-    ts(export, export_to = "core/")
-)]
 pub struct Term {
     pub per: usize,
     pub coefficient: Exact,
 }
 
-/// **The train's motion as the front end receives it** — present whenever the
-/// tooth counts and topology give one, which is whether or not the geometry
-/// solved.
+/// **The train's motion, read out** — present whenever the tooth counts and
+/// topology give one, which is whether or not the geometry solved: every
+/// body's exact speed and a family's terms, which the harness records. It
+/// crossed to the panel on every solve until it was asked what the panel
+/// read of it, which was two flags a body — its ports ([`PortBody`]) cross
+/// instead.
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-#[cfg_attr(
-    feature = "typescript",
-    derive(ts_rs::TS),
-    ts(export, export_to = "core/")
-)]
 pub struct MotionReport {
     /// How many independent conditions the mechanism needs beyond its frame
     /// — 1 for a chain, 2 for a set with nothing held.
@@ -762,9 +741,15 @@ pub struct MotionReport {
 /// several — a pair's output and the next set's sun are one body, and a
 /// case says one thing of it.
 ///
-/// The core's own answer, which [`BodyReport`] carries to the front end
-/// beside the body's speed rather than in a list of its own.
+/// What the front end is handed as the train's ports ([`Train::bodies`]):
+/// the picker offers the ones not held, and a case has a row per one.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 pub struct PortBody {
     pub body: usize,
     /// Held by the train — ground under another name — so no case can say
@@ -773,8 +758,7 @@ pub struct PortBody {
 }
 
 impl Train {
-    /// The train's motion in the shape the boundary sends, or `None` where
-    /// there is none to send.
+    /// The train's motion read out, or `None` where there is none.
     ///
     /// **A family is sent as a family.** Where the conditions leave `m`
     /// bodies free, every body's speed is a particular value plus one term

@@ -3,8 +3,8 @@ import type { Figure } from "../core/Figure";
 import type { FlowRow } from "../core/FlowRow";
 import type { Groupings } from "../core/Groupings";
 import type { MemberName } from "../core/MemberName";
-import type { MotionReport } from "../core/MotionReport";
 import type { Part } from "../core/Part";
+import type { PortBody } from "../core/PortBody";
 import type { TrainResult } from "../core/TrainResult";
 import type { TrainFailure } from "./TrainFailure";
 
@@ -41,12 +41,12 @@ figures: Array<Figure>,
  */
 parts: Array<Part>, 
 /**
- * **The train's motion** — exact ratios, every body's speed, mobility —
- * present whenever the tooth counts and topology give one, which is
- * whether or not the geometry solved. A train mid-edit whose gears will
- * not close still turns, and this is what says at what.
+ * **The train's ports** — every body a case may address, in number
+ * order, and whether the train holds it — present whether or not the
+ * train solved, since it needs no geometry and no motion: the picker
+ * offers the ones not held, and a case has a row per one.
  */
-motion: MotionReport | null, 
+ports: Array<PortBody>, 
 /**
  * **The train's centres and its axes** — two of the three groupings a
  * list shows the graph in, derived by the core; present whether or not

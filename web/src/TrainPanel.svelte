@@ -14,7 +14,7 @@
     type LoadFreedom,
     type CaseBody,
     type BodyRole,
-    type BodyReport,
+    type PortBody,
     type LoadRole,
     type GearCase,
     type MeshCase,
@@ -305,32 +305,29 @@
   const kindLabel = (k: CaseKind) => t(CASE_KINDS.find((x) => x.key === k)?.label ?? k);
   /** The ports a duty's select offers — bodies, by number, which is the
    *  select's key. */
-  const portOptionsNow = $derived(portOptions(result.motion));
-  /** **The train's bodies, as the core lists them** — every body of the
-   *  train, each saying whether a case may address it and whether the
-   *  train holds it. A case is a row per *port*: fixed where the train
-   *  holds it, and otherwise a load, a reaction or free. Where the train
-   *  has no motion to list them from there are no rows, and the summary
-   *  says why. */
-  const bodies = $derived<BodyReport[]>(
-    (result.motion?.bodies ?? []).filter((b) => b.port),
-  );
+  const portOptionsNow = $derived(portOptions(result.ports));
+  /** **The train's ports, as the core lists them** — every body a case
+   *  may address, each saying whether the train holds it. A case is a row
+   *  per port: fixed where the train holds it, and otherwise a load, a
+   *  reaction or free — whether or not the train's motion is determined,
+   *  so a case can be put right from its own rows. */
+  const bodies = $derived<PortBody[]>(result.ports);
   /** **What the case declares a body** — the core's own four states
    *  ({@link BodyRole}), which it reports for a case that solved and this
    *  says for one that has not: fixed where the train holds it, and free
    *  where the case says nothing. */
-  const roleOf = (c: LoadCase, b: BodyReport): BodyRole => {
+  const roleOf = (c: LoadCase, b: PortBody): BodyRole => {
     if (b.held) return "fixed";
     return entryOf(c, b)?.role ?? "free";
   };
   /** The case's entry for a body. */
-  const entryOf = (c: LoadCase, b: BodyReport): Load | undefined => c.loads.find((l) => l.at === b.body);
+  const entryOf = (c: LoadCase, b: PortBody): Load | undefined => c.loads.find((l) => l.at === b.body);
   /** **A body declared a load, reacted or free.** The entry is written with
    *  both figures derived where it is new: relief never invents a given, so
    *  a load's boxes show what the case comes to, or stand blank until the
    *  designer gives one. The figures are kept while the body is reacted or
    *  free, and the core relieves what remains. */
-  function setRole(i: number, b: BodyReport, role: LoadRole) {
+  function setRole(i: number, b: PortBody, role: LoadRole) {
     const c = tab.train.load_cases[i];
     const entry = entryOf(c, b);
     if (entry) {

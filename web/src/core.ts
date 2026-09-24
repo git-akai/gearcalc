@@ -22,7 +22,7 @@ import type {
   LoadFreedom,
   CaseBody,
   BodyRole,
-  BodyReport,
+  PortBody,
   LoadRole,
   Auto,
   Backlash,
@@ -80,8 +80,6 @@ import type {
   Part,
   MemberName,
   MemberRole,
-  MotionReport,
-  Exact,
   PresetFamily,
   Preset,
   PresetEntry,
@@ -103,7 +101,7 @@ export type {
   LoadFreedom,
   CaseBody,
   BodyRole,
-  BodyReport,
+  PortBody,
   LoadRole,
   Figure,
   Freedom,
@@ -164,8 +162,6 @@ export type {
   Part,
   MemberName,
   MemberRole,
-  MotionReport,
-  Exact,
   PresetFamily,
   Preset,
   PresetEntry,
@@ -326,12 +322,12 @@ export const CASE_KINDS: CaseKindSpec[] = [
   { key: "fatigue", label: "ui.train_case_fatigue", add: "ui.train_add_fatigue_case" },
 ];
 
-/** **Where a load can enter**, in the order the chain runs: every body the
- *  core reports that a case may address and the train does not hold — one
- *  list of bodies, read rather than a second one sent. A `<select>` binds
- *  to strings, so a body's number is its key. */
-export function portOptions(motion: MotionReport | null): BodyReport[] {
-  return (motion?.bodies ?? []).filter((b) => b.port && !b.held);
+/** **Where a load can enter**, in body order: every port the core reports
+ *  that the train does not hold — one list of bodies, read rather than a
+ *  second one sent. A `<select>` binds to strings, so a body's number is
+ *  its key. */
+export function portOptions(ports: PortBody[]): PortBody[] {
+  return ports.filter((b) => !b.held);
 }
 
 export interface FieldSpec {
@@ -794,7 +790,7 @@ export function solveTrain(train: Train, materials?: MaterialLibrary): TrainOutc
       },
       figures: [],
       parts: [],
-      motion: null,
+      ports: [],
       groupings: { centres: [], axes: [] },
       flows: [],
       names: [],

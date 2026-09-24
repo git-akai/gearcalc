@@ -789,11 +789,11 @@ pub struct TrainOutcome {
     /// (`TrainResult::parts`, by the part's own numbering). Present on
     /// success and failure alike: it needs no geometry.
     pub parts: Vec<gear_core::train::graph::Part>,
-    /// **The train's motion** — exact ratios, every body's speed, mobility —
-    /// present whenever the tooth counts and topology give one, which is
-    /// whether or not the geometry solved. A train mid-edit whose gears will
-    /// not close still turns, and this is what says at what.
-    pub motion: Option<gear_core::train::MotionReport>,
+    /// **The train's ports** — every body a case may address, in number
+    /// order, and whether the train holds it — present whether or not the
+    /// train solved, since it needs no geometry and no motion: the picker
+    /// offers the ones not held, and a case has a row per one.
+    pub ports: Vec<gear_core::train::PortBody>,
     /// **The train's centres and its axes** — two of the three groupings a
     /// list shows the graph in, derived by the core; present whether or not
     /// the train solved, since neither needs a solve.
@@ -835,7 +835,7 @@ fn solve_train_impl(input: &str) -> Result<String, String> {
         serde_json::from_str(input).map_err(|e| format!("bad train request: {e}"))?;
     let lib = req.materials.unwrap_or_else(gear_io::default_library);
     let parts = req.train.parts();
-    let motion = req.train.motion_report();
+    let ports = req.train.bodies();
     let groupings = req.train.groupings();
     let names = req.train.shape.member_names();
     let mesh_groups = req.train.shape.mesh_groups();
@@ -858,7 +858,7 @@ fn solve_train_impl(input: &str) -> Result<String, String> {
             result: Some(result),
             failure: None,
             parts,
-            motion,
+            ports,
         },
         Err(e) => {
             let part = match &e {
@@ -873,7 +873,7 @@ fn solve_train_impl(input: &str) -> Result<String, String> {
                 }),
                 figures: Vec::new(),
                 parts,
-                motion,
+                ports,
                 flows: Vec::new(),
                 groupings,
                 names,

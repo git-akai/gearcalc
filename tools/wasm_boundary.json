@@ -28544,49 +28544,16 @@
         "couplings": []
        }
       ],
-      "motion": {
-       "mobility": 1,
-       "constrained": 1,
-       "untouched": [],
-       "bodies": [
-        {
-         "body": 0,
-         "port": false,
-         "held": false,
-         "speed": {
-          "value": 0,
-          "text": "0"
-         },
-         "terms": []
-        },
-        {
-         "body": 1,
-         "port": true,
-         "held": false,
-         "speed": {
-          "value": 1,
-          "text": "1"
-         },
-         "terms": []
-        },
-        {
-         "body": 2,
-         "port": true,
-         "held": false,
-         "speed": {
-          "value": "-0.39534883720930231",
-          "text": "-17/43"
-         },
-         "terms": []
-        }
-       ],
-       "total": {
-        "value": "-2.5294117647058822",
-        "text": "-43/17"
+      "ports": [
+       {
+        "body": 1,
+        "held": false
        },
-       "free": [],
-       "redundant": []
-      },
+       {
+        "body": 2,
+        "held": false
+       }
+      ],
       "groupings": {
        "centres": [
         {
@@ -31007,79 +30974,24 @@
         "couplings": []
        }
       ],
-      "motion": {
-       "mobility": 2,
-       "constrained": 2,
-       "untouched": [],
-       "bodies": [
-        {
-         "body": 0,
-         "port": false,
-         "held": false,
-         "speed": {
-          "value": 0,
-          "text": "0"
-         },
-         "terms": []
-        },
-        {
-         "body": 1,
-         "port": true,
-         "held": false,
-         "speed": {
-          "value": 1,
-          "text": "1"
-         },
-         "terms": []
-        },
-        {
-         "body": 2,
-         "port": true,
-         "held": false,
-         "speed": {
-          "value": "-0.39534883720930231",
-          "text": "-17/43"
-         },
-         "terms": []
-        },
-        {
-         "body": 3,
-         "port": true,
-         "held": false,
-         "speed": {
-          "value": "-0.056478405315614620",
-          "text": "-17/301"
-         },
-         "terms": []
-        },
-        {
-         "body": 4,
-         "port": true,
-         "held": true,
-         "speed": {
-          "value": 0,
-          "text": "0"
-         },
-         "terms": []
-        },
-        {
-         "body": 5,
-         "port": false,
-         "held": false,
-         "speed": {
-          "value": "0.079069767441860464",
-          "text": "17/215"
-         },
-         "terms": []
-        }
-       ],
-       "total": {
-        "value": "-17.705882352941178",
-        "text": "-301/17"
+      "ports": [
+       {
+        "body": 1,
+        "held": false
        },
-       "free": [],
-       "redundant": []
-      },
+       {
+        "body": 2,
+        "held": false
+       },
+       {
+        "body": 3,
+        "held": false
+       },
+       {
+        "body": 4,
+        "held": true
+       }
+      ],
       "groupings": {
        "centres": [
         {
