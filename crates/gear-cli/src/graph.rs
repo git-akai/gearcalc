@@ -1,14 +1,15 @@
 //! **Every preset, alone and after every other, read by what the graph has
-//! and never by stage** — the record the train-as-graph refactor
-//! (`train-graph-plan.md`) is held to.
+//! and never by stage** — the record the train-as-graph refactor was held
+//! to (docs/rationale.md#a-train-is-one-graph-and-a-stage-is-a-part-of-it).
 //!
 //! # Why it prints nothing a stage owns
 //!
-//! The refactor deletes the stage: its figures (ratio, efficiency, backlash
-//! under its own convention, one more tooth) become paths a case reports,
-//! and the train's conventional-ends row goes. A record that printed them
-//! would change form at that step, and a changed record cannot say whether
-//! a number moved with it. So this prints only what exists on both sides:
+//! The refactor deleted the stage's own figures (ratio, efficiency, backlash
+//! under its own convention, one more tooth), which became paths a case
+//! reports, and the train's conventional-ends row. A record that printed
+//! them would have changed form at that step, and a changed record cannot
+//! say whether a number moved with it. So this prints only what exists on
+//! both sides:
 //!
 //! - per path — each case's, from its load to its reaction, with the power
 //!   through its teeth and what one more tooth on each gear does to it;
@@ -21,17 +22,17 @@
 //! - per distance — where it runs and with what clearance;
 //! - the notes, by key.
 //!
-//! **Every phase of the refactor that should move no number leaves this
-//! byte for byte**, including the one that changes how a train is stored.
-//! That is what makes it the arbiter; `train`, `kinematics` and the rest
-//! still record what they record.
+//! **Every phase of the refactor that should have moved no number left this
+//! byte for byte**, including the one that changed how a train is stored.
+//! That is what made it the arbiter; `train`, `kinematics` and the rest
+//! record what they record.
 //!
 //! # The fixtures
 //!
 //! Each preset alone; each ordered pair of presets, the first's output
 //! running on into the second's input as the panel's menu joins them; and a
 //! spur pair, a layshaft and a compound set in a row — the train the
-//! refactor's canvas draws. Every train carries the three cases a fresh
+//! refactor's canvas drew. Every train carries the three cases a fresh
 //! train's ends are given (`Train::fresh_case`), switched on: an ultimate
 //! load at the input reacted at the output, the same from the output, and a
 //! fatigue load at the input.

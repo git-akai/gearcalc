@@ -910,7 +910,7 @@ round of zero by preset because a worm's thread is ground to its root. The
 *wheel*, which inputs a panel shows, and the conventional proportions a
 worm's faces take. Nothing in the mathematics reads it.
 
-**And one solve.** A distance at an angle in [the stage](#the-stage) is this
+**And one solve.** A distance at an angle in [the graph](#the-graph) is this
 mesh, built as a point contact beside the shape's line contacts and asked
 the same questions: its zero-backlash distance is the rack law below rather
 than the involute relation, its shift sum reaches a given distance through
@@ -1763,7 +1763,7 @@ reads a given axis distance through, and a closed form rather than an
 iteration.
 
 Which member absorbs is read off the shift toggles rather than named by a
-control of its own, by [the stage's](#the-stage) one rule: **the member left
+control of its own, by [the stage's](#the-graph) one rule: **the member left
 automatic with the most leverage on the difference absorbs**, and on a set that
 is the planet, which moves the two distances apart at twice any other member's
 rate. Pinning the planet is therefore how a designer asks the sun to close it
@@ -1801,7 +1801,7 @@ T_ring/T_sun = −i₀ η₀^w      T_carrier = −(T_sun + T_ring)
 ```
 
 This is `planetary::power`, the closed form the stage's mesh-by-mesh flow
-([the stage](#the-stage)) is held to on every arrangement; the stage itself
+([the graph](#the-graph)) is held to on every arrangement; the stage itself
 assumes a direction per mesh and keeps the consistent assignment, which is
 the same decision made mesh by mesh. **`w` is not known in advance**, since
 it depends on a torque that is itself being solved for, so both values are
@@ -1848,7 +1848,7 @@ eccentric, so **both pairs are separated by the same distance**, the crank's
 offset, and that shared number is what makes the arrangement one mechanism
 rather than two independent meshes.
 
-**It is an arrangement of [the stage](#the-stage)**, and no preset of its
+**It is an arrangement of [the graph](#the-graph)**, and no preset of its
 own: a stepped Wolfrom at one planet — a central axis carrying the grounded
 gear, the crank and the output; a wobble axis the crank carries, with both
 wobble gears on one body; two internal meshes on the one distance between
@@ -2188,17 +2188,21 @@ that bite *inside* a mesh — a tip reaching past a flank — belong to the pair
 are asked at [`ring::mesh_with`](#limits) rather than restated here.
 
 
-## The stage
+## The graph
 
-Every stage is one **shape**: a graph the geometry is hung on, and a solve
-that reads what to do off it rather than off a type.
+A train is one **shape**: a graph the geometry is hung on, and a solve that
+reads what to do off it rather than off a type. What the solve closes,
+searches and rates apart is a **part** of it — gears joined by their meshes,
+meshes by the distances they share, read off the graph and never stored
+([trains](#trains)) — and what a designer lays in from the menu is a
+**preset**, whose footprint in the graph is what a stage was.
 
 ```text
 axis       carried_by  the body it is carried round by — ground, 0, for an axis fixed in it
            count       how many copies stand round the carrier — planets
 body       body, axis  a body of the train — one number across the train, ground 0 —
-                       and the axis it spins about here; its place in the list is
-                       the stage's own slot for it (ground 0, the first listed 1)
+                       and the axis it spins about; its place in a part's list is
+                       the part's own slot for it (ground 0, the first listed 1)
 member     body, gear, module, pressure angle, k, ring cutter (none for an
            external gear), pitch diameter (a helix reading — a worm's way of
            stating its size)
@@ -2225,9 +2229,9 @@ refuse by name. A mesh's **frame** is the carrier common to its two axes.
 The **wiring** is the members' slots and the meshes' frames, and it feeds
 `kinematics.rs` as any other. The **ports** are the slots not replicated;
 the slot held by convention is the first ring's, the input the first port
-not held and the output the next — a chain's conventions: the hold is
-written as the train's when the stage is added, and the ends are where a
-chain joins and a fresh case starts. **What each member is** — sun,
+not held and the output the next — a preset's conventions: the hold is
+written as the train's when the preset is laid in, and the ends are where a
+chain joins it and a fresh case starts. **What each member is** — sun,
 planet, ring, worm, wheel, or a gear by its number — is read off the shape
 by one rule (`Shape::member_names`) and crosses with every solve, read off
 the whole graph (`names`), so the harness and the panel name a member the
@@ -2269,7 +2273,7 @@ nothing on it is a shaft in neutral, which is a thing a train has
 (`Train::drop_bare`), where what else names a body can be seen. A gear
 alone on its body moved to a body of its own is on one already, and
 nothing changes. Two gears meshing one member moved onto one body hold
-their common mate to two ratios at once — the stage locked by construction
+their common mate to two ratios at once — the train locked by construction
 rather than by its numbers — which is made, and the train names the lock
 at the body.
 
@@ -2296,7 +2300,7 @@ on a new axis a copy of its mate or a ring twice its count — and refused
 where no distance joins the two axes, or where the body is the carrier of
 the planet it would mesh; **another ratio** across a distance on the body
 asked (`AddRatio`); a **step**; a **coupling**; a gear **moved**; a **join**,
-a **hold**, a **release**; a stage **inserted** at a body, its input on that
+a **hold**, a **release**; a preset **inserted** at a body, its input on that
 shaft (`Insert`); and a member, a mesh, an axis, a body or a coupling
 **removed with what goes with it** (`Remove`) — a gear left meshing nothing,
 then any it leaves the same, until none does; a gear's body where nothing
@@ -2334,13 +2338,27 @@ menu and the rest as a strip of verbs over the selection, a refused entry
 in its place and not pressable, and each entry's dry run is
 `preview_edit`'s.
 
+**The graph grouped three ways**, one per question a designer asks of it,
+each derived and never stored (`Train::groupings`, `Train::flows`):
+**centres** — each pair of axes that mesh and every mesh at that spacing,
+which is what is geometrically coupled and the unit the shifts close over;
+**axes** — each axis, the bodies that turn about it and the gears fixed to
+each, which is what turns with what; and each case's **flow** — the bodies
+in the order its power reaches them from its load, the meshes carrying it,
+most first, an epicyclic part as one junction joining its bodies, and a
+mesh carrying none of it an idle branch. A case that did not solve has no
+shares, so its flow is the graph walked from its load in its own order and
+calls no mesh idle. Laws: every mesh at one centre, every body on one axis,
+and every body and every mesh said once in every case's flow, entered at
+the case's load.
+
 **Closing the distances.** Each member's shift has one role: given (the
 designer typed it), free (a search chooses it, or it stands at the undercut
 floor), *reaches* a given distance, or *absorbs* an automatic one. A given
 distance fixes each mesh on it a shift sum — closed form — and the sum is
 handed to a member of the mesh that is not given, in mesh order, so a member
 reached from one mesh feeds the next; a mesh both of whose members are given
-must already reach it, or the stage refuses. An automatic distance is
+must already reach it, or the part refuses. An automatic distance is
 whatever the shifts leave on the first mesh, and every later mesh on it
 absorbs the difference on one of its members, solved by bracketed Newton
 ([planetary sets](#planetary-sets)) — or, with no member left to move, must
@@ -2380,7 +2398,7 @@ sized, its tips clearing where the shifts leave them.
 **The search**, where the optimiser is on, is over the free members — in
 sum-and-division coordinates wherever both members of one mesh are free — and
 the objective is the product of every mesh's efficiency, each trial cut and
-checked as a pair's is. The helix is read once per stage: a member's given
+checked as a pair's is. The helix is read once per part: a member's given
 angle, a given first pitch diameter, or a given overlap on the first mesh;
 propagated across each mesh as `β_b = −sign·β_a`; and sized from a given
 distance when every shift is pinned.
@@ -2388,15 +2406,15 @@ distance when every shift is pinned.
 **Loads.** The train's motion is solved first, on the tooth counts and
 topology alone, then its flow of power mesh by mesh with each mesh's loss in
 the direction it turns ([efficiency](#efficiency-parallel-axes) reproduces
-Pennestrì's `η₀^w` on every arrangement). Under a load case the stage is
+Pennestrì's `η₀^w` on every arrangement). Under a load case each part is
 handed what that one flow put on its meshes and its bodies ([load
-cases](#load-cases)); a lone stage asked with a torque at its input or its
-output is a one-stage train with that load. Every mesh is pressed with its **driver's** force: where the
+cases](#load-cases)); a preset asked alone with a torque at its input or its
+output is a train of one with that load. Every mesh is pressed with its **driver's** force: where the
 driven member's torque is the one the row states, the flank sees it over
 `η`, in bending as `1/η` and in contact as `1/√η`. A member's reported torque
 per case is the torque **its teeth carry** — its worst mesh's pressing
 torque at its own radius — and the bodies' torques, signed so that torque
-times the forward speed is positive where power enters, are the stage's
+times the forward speed is positive where power enters, are the part's
 `cases`. A backward case's signs follow that rule and not the forward case's:
 the body it enters by is the one whose product is positive.
 
@@ -2408,7 +2426,7 @@ them to the path across its ends until nothing read them but the stage. So:
 each distance's nominal per mesh, running and clearance; the layout of every
 replicated axis — count, even spacing, simultaneous meshing, tip clearance
 between neighbours at the radius the carrier holds it at; every body's speed
-and torque per case; and the members and meshes as any stage reports them,
+and torque per case; and the members and meshes as any part reports them,
 each mesh with the power through it per case, over the power into the train.
 Every mesh's operating angle is the **running** mesh's, opened by the
 clearance, not the zero-backlash one.
@@ -2429,7 +2447,7 @@ coupling), meshed planets (sun, planet, planet, ring — the
 carrier turning against the sun) and a Ravigneaux (two suns, long and short
 planets, one ring, the planet–planet mesh a distance between two carried
 axes), and a worm feeding a spur pair (a point contact and a line contact
-on two distances, the stage locking backward where the worm does). Each
+on two distances, the train locking backward where the worm does). Each
 has a `gear-cli kinematics` fixture and each but the worm pair — whose
 crossed mesh the plane script does not lay out — a row in
 `tools/train_kinematics.py`, which derives the rows from velocities along
@@ -2442,7 +2460,7 @@ textbook arrangement with nothing stated.
 
 ## Trains
 
-**A train is one graph** — one shape ([the stage](#the-stage)): its axes,
+**A train is one graph** — one shape ([the graph](#the-graph)): its axes,
 its **bodies** on them — everything that turns, numbered across the train as
 the gears are, ground being 0 — the gears fixed to those, the meshes
 between gears, the distances between axes that mesh, and the offset
@@ -2692,7 +2710,7 @@ keep it.
 **The list is the graph grouped three ways, and nothing on it is a
 control** — the flow each case walks, the centres, the axes. Selecting a
 row shows the piece in the workspace, and what can be done to it is the
-core's to offer ([the stage](#the-stage), *what a piece offers*): a strip
+core's to offer ([the graph](#the-graph), *what a piece offers*): a strip
 of verbs over the workspace — a body held or released, joined to another,
 taken off; a gear moved to another body of its axis; a piece removed with
 what goes with it — and the one add menu under the list, each entry a
@@ -2769,7 +2787,7 @@ how big it is are the same questions for either kind. Cases may overlap or
 exceed one another freely; nothing is clamped against anything.
 
 **Carrying a load.** A case is solved as **one flow across every stage's
-meshes at once** ([the stage](#the-stage) says how a flow is found): the given torques
+meshes at once** ([the graph](#the-graph) says how a flow is found): the given torques
 known, the derived loads, the reacted ends, the fixed bodies and ground
 unknown, and the direction of the flow read off the case's speeds — a load
 held still takes its direction from the sign of its torque, so a stall case
@@ -2794,7 +2812,7 @@ unit torque and scales it, a power flow being linear in the torque through
 it, and evaluates every rating once at the largest torque a mesh carries in
 any case, each case being that scaled — bending linear in torque, contact as
 its square root — so a case carrying nothing is a scale of zero rather than a
-refusal ([the stage](#the-stage)).
+refusal ([the graph](#the-graph)).
 
 A gear reports, per case, the torque its teeth carry at its own radius, its
 speed, its speed **against the carrier of its mesh** (its own speed on a pair;
@@ -3085,7 +3103,7 @@ The comparison is the core's and the words the catalogue's; nothing is kept.
 mesh, a body, an axis, an axis distance or a coupling by the graph's index,
 or the train itself — in, and every edit the core offers there out, in the
 order a menu lists them, each with its refusal's key where it would be
-refused ([the stage](#the-stage), *what a piece offers*).
+refused ([the graph](#the-graph), *what a piece offers*).
 
 **A `null` that crosses is not always a `None`.** `serde_json` writes an
 infinity and a NaN as `null`, which is indistinguishable from a field that

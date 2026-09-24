@@ -1,6 +1,6 @@
 //! **What an edit would do, before it is made** — the dry run the interface
-//! shows over an entry or a verb (`train-graph-plan.md`, *see before you
-//! click*). The edit is
+//! shows beside an entry or a verb (docs/reference.md#the-graph, *what a
+//! piece offers*). The edit is
 //! made on a copy by the rule that would make it, both trains are solved,
 //! and the difference is said as notes: the words stay in the catalogue and
 //! the comparison in the core.

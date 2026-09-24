@@ -1,5 +1,5 @@
 //! **The train's graph grouped three ways**, one per question a designer
-//! asks of it (`train-graph-plan.md`, *four groupings, four questions*),
+//! asks of it (docs/reference.md#the-graph, *the graph grouped*),
 //! each derived and never stored, so none can disagree with the gears:
 //!
 //! - **centres** — each pair of axes that mesh, and every mesh at that

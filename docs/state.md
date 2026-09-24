@@ -256,7 +256,7 @@ leaving free (below).
 
 ## Layout
 
-**The complete map is [`CLAUDE.md`](../CLAUDE.md)** — all 27 modules of
+**The complete map is [`CLAUDE.md`](../CLAUDE.md)** — every module of
 `gear-core`, each with what it owns and, more usefully, what it must *not* know.
 This table named seven of them and read as though it named all of them, which is
 the same failure the harness's command list had.
@@ -269,7 +269,7 @@ location: where a boundary is drawn, and what a directory is not for.
 | `crates/gear-core` | All mathematics. No I/O, no UI, no wasm. `serde` and `ts-rs`, both optional and both about the shape a type takes when it leaves. |
 | `gear-core/src/gear.rs` | `Gear` — the assembly, and the only place a gear is drawn. An ordinary gear is `Δx = 0`. |
 | `gear-core/src/strength.rs` | The bending model: the critical section both kinds of member share, the notch factors and which fillet radius each reads, and the Hertz contact beside it. |
-| `gear-core/src/train/mod.rs` | What every stage shares: the load cases, each solved as one flow across every stage with what it puts on each stage's bodies handed down, `MemberRating` — every mesh a member is in, in every case, and the worst mesh — `Bending`, `MeshReport`, the engagement rule, and the train that strings the stages together. |
+| `gear-core/src/train/mod.rs` | The train: one graph, its holds and its load cases, each solved as one flow across the whole graph with what it puts on each part handed down; the result per piece — `MemberRating` (every mesh a member is in, in every case, and the worst mesh), `Bending`, `MeshReport` — and the engagement rule. |
 | `crates/gear-io` | File formats: DXF export, the TOML material library and geartrain documents, and the string catalogue. |
 | `crates/gear-wasm` | The WebAssembly boundary. JSON in, JSON out. |
 | `crates/gear-cli` | Development harness — drive the mathematics without a browser. |
@@ -325,7 +325,7 @@ recorded, byte for byte
 The panel edits the graph through what the core offers at the piece
 selected — each offer an edit tried on a copy, a refused one said with its
 reason, and every one's dry run shown before it is pressed (`Train::offers`,
-`preview_edit`; [reference](reference.md#the-stage)).
+`preview_edit`; [reference](reference.md#the-graph)).
 
 **One stage shape.** Every stage is one `Shape` — axes, the train's
 bodies on them, members, meshes, distances — and every menu entry (`StagePreset`:
@@ -342,7 +342,7 @@ the panel names the members the same way (`members.ts`). Closing the
 distances is one plan over every member's role (given, free, reaches,
 absorbs), the power flow is followed mesh by mesh with each mesh's loss in
 the direction it turns, and every mesh is pressed with its driver's force
-([reference](reference.md#the-stage), [rationale](rationale.md#one-stage-one-result)).
+([reference](reference.md#the-graph), [rationale](rationale.md#one-stage-one-result)).
 The arrangements it reaches with no code of their own — a layshaft, a
 Wolfrom, a stepped planet, a planocentric, meshed planets, a Ravigneaux, a
 worm feeding a spur pair — are written as lists of what sits where in
@@ -624,7 +624,6 @@ been. They are not a backlog.
 | A ring's own bounds for a stage member | The gear card shows a rack's buildable range, which is not a ring's, so it shows nothing there and says so |
 | A coupled glass POM grade | Can be added if one is wanted; it must be *coupled*, not filled |
 | **Two carried axes placed round the carrier** | A meshed-planet or Ravigneaux set has three distances — centre to each planet axis and between them — and each closes on its own shifts; nothing checks the three form a triangle, and the planet-clearance layout places one axis's planets without the other's. A preset carries it, the figures it reports are the meshes', and a layout that does not close is a fault this tool does not yet name |
-| **A part's end of a shaft in neutral** | A part lists the bodies it has something on, so a layshaft's output with no gear engaged is not the layshaft's part's — it is the next stage's input, and its gear keeps it. A gear engaged onto it brings the end back, and the shaft keeps its number throughout; the panel offers the move on the gear and on the body alike (`Train::offers`) |
 | **A part's order when two parts share two bodies** | A join keeps every part's own order of bodies (`Train::keep_orders`); two parts that share two bodies in opposite orders cannot both keep theirs, and the earlier-listed part's stands. Nothing the panel offers builds it |
 | **A stepped planet's assembly, timed** | The assembly rule (`Shape::assembly`) takes every planet identical: two gears on one planet's body at one relative phase. Planets timed individually at manufacture assemble equally spaced at any count, which the rule then under-reports as *no*; the rule's answer is the cheaper build, not the only one |
 
@@ -1173,6 +1172,15 @@ Not a queue with a head; this is what a next session would pick from.
   left is a form field on the gear card, a serde-defaulted `null` in the tab
   state, and one label plus one unit in five string catalogues. Nothing about
   it needs the standard in hand.
+- **The stage's last readings in the core.** A stage is a preset's footprint
+  now ([rationale](rationale.md#a-stage-is-a-presets-footprint-not-a-container)),
+  and three readings of one remain, each derived and never stored:
+  `StageBoundary` (a part's conventional ends, which the lone-preset solve
+  and the chain's ends read), `CaseLoad` (a case's share handed to each
+  part, which the per-part solve is built on) and `planetary_boundary` (the
+  set's sun, carrier and ring as conditions, which the harness and the
+  shape's closed-form laws ask in). Each can go with its last reader; none
+  is a second answer to a question the graph answers, since none is stored.
 - **A calibrated mesh-stiffness model**, which would replace the load-sharing
   ramp rather than the control exposing it.
 - **A planet's root under the ring mesh is rated; its flank's sliding is not**
@@ -1182,13 +1190,14 @@ Not a queue with a head; this is what a next session would pick from.
 - **Arrangements that need more than the shape has.** `MemberRating` and
   `MeshReport` are per member and per mesh rather than per named role, and
   every stage is one shape — so an arrangement is a list of what sits where,
-  every menu preset is one, and a designer permutes one piece by piece. What
-  an arrangement can still want that the shape has not got is a crossed
-  distance sharing a member with a parallel one on the menu (the harness's
-  `worm_and_pair` builds it), a planet meshing a planet on a *given*
-  spacing, a second planet axis added by a control (the meshed-planets
-  preset supplies its two), and the two verifications in *Not built*
-  above: the triangle of two carried axes, and a stepped planet's timing.
+  every menu preset is one, and a designer permutes one piece by piece — a
+  worm's wheel meshing a spur on a parallel axis, the harness's
+  `worm_and_pair`, is one edit at the wheel now. What an arrangement can
+  still want that the shape has not got is a planet meshing a planet on a
+  *given* spacing, a second planet axis added by an edit (the
+  meshed-planets preset supplies its two), and the two verifications in
+  *Not built* above: the triangle of two carried axes, and a stepped
+  planet's timing.
 - **The transverse rack round at a steep helix**, in the ledger above. The
   honest transverse tool is a normal round's elliptical section, which neither
   circle is; until then a worm's fillet is the cap's and its interference

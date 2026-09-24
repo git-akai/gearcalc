@@ -190,8 +190,8 @@ port — and whatever followed it in a train was joined to that body. A stage
 kept its axes to itself, so the next stage's gear sat on a fixed axis of
 its own while being the same body as a planet going round the eccentric,
 and the model said nothing about how. **A shaft is straight**: the train is
-becoming one graph in which a body turns about one axis, and on it that
-join puts the next gear on the eccentric.
+one graph in which a body turns about one axis, and on it that join puts
+the next gear on the eccentric.
 
 The machine answers it. A cycloidal disc's turn is taken off by pins in
 holes, or an Oldham coupling, or a Schmidt coupling, to a shaft on the
@@ -205,8 +205,8 @@ carries nothing.
 **It is not what a planocentric is.** A preset is a starting point: a
 planocentric with a step on its planet, a ring on the step and the coupling
 taken away is a hula stage, and a hula with its wobble body coupled and its
-second step taken away is a planocentric. So the coupling is an element a
-stage has, added and removed like a step, and a law walks both ways ratio
+second step taken away is a planocentric. So the coupling is an element of
+the graph, added and removed like a step, and a law walks both ways ratio
 for ratio. A preset the edits could not reach, or leave, would be a hole in
 the edits rather than a property of the preset.
 
@@ -259,6 +259,45 @@ mesh removed that leaves two parts is two.
 been revisited once — a card a part gave way to one list of the graph's
 pieces and one workspace, since a part is the right unit for a result and
 not for a screen.
+
+### A stage is a preset's footprint, not a container
+
+A stage used to be a container. It had axes of its own, bodies numbered in
+its own list, figures of its own solved under a convention of its own, an
+edit vocabulary of its own asked in its own numbering, and a card of its
+own on screen. **Every one of those was a second answer to a question the
+train also answered**: a shaft two stages shared stood on two axes; a
+stage's ratio was a second motion beside the path's; a card's gear 2 was
+the train's gear 7; and an edit read through a card's maps could disagree
+with the same edit on the graph, which a law had to hold the two to.
+
+Now a preset is **laid into the one graph**, and what it laid in is its
+footprint — the pieces it added, numbered after everything the train had.
+Nothing keeps them together afterwards, and nothing needs to: an edit joins
+a preset's body to another's, adds a gear meshing across it, takes a piece
+of it away, and the graph is what it is. What does survive is a **part**,
+the pieces that close, search and rate apart (`Shape::parts`) — derived
+from the graph with every solve, and the solve's unit, not the designer's:
+nothing on screen is one, and an edit is offered at a piece
+([the graph](reference.md#the-graph), *what a piece offers*), never asked
+of a stage.
+
+The word stays where it names a footprint or a reading of one: the preset
+menu (`StagePreset`), an arrangement's name (a hula stage), the harness
+printing its corpus part by part (`TrainResult::by_part`), a part's
+conventional ends (`StageBoundary`, derived, never stored) and the load a
+part is handed (`CaseLoad`). None is stored, so none can disagree with the
+gears.
+
+**What it costs:** a preset cannot be removed *as a stage* — its pieces
+are removed, and a removal takes what goes with it, so a set goes with its
+planet axis and a pair with its mesh; and a preset's identity is not kept,
+so a train cannot say which preset laid a gear in.
+
+**What would change it:** a reason to keep a group of pieces together that
+the graph cannot derive — a gearbox bought as a unit and rated as one —
+would be a component with an identity of its own, stored and named, and
+still not a stage.
 
 ### Degrees where a designer states a number, radians in the mathematics
 
@@ -1403,7 +1442,7 @@ is loaded, since a reaction there is a thing a designer attaches and says so
 by loading it. A port loaded with a torque of nought is a port turning and
 carrying nothing, which is how the core is asked whether a stage locks; the
 panel does not offer it, because relief takes a torque given past the statics
-back, and the same question is on the stage card as its backward efficiency.
+back, and the same question is on the path as its backward efficiency.
 
 The graph refactor asked whether a reaction could be *derived* — "nothing
 reacts it" as "no torque in the rowspace of the shaft line puts that load on
@@ -1835,8 +1874,8 @@ both ways, a rim too thin to rate, a face nothing sizes), a **mesh** (`[mesh]`
 a sharing model extrapolating, a screw pair that locks), and the **stage**
 (`[stage]` — its distance, its search, its planets). Each is carried on the
 result of the thing it names and drawn there: a gear's under the field it is
-about or on its card, a mesh's beside the figure it is about, the stage's in
-the stage's list. Nothing names what it is about, because where it is drawn
+about or on its card, a mesh's beside the figure it is about, a part's under
+the train's path, naming the part by its meshes. Nothing names what it is about, because where it is drawn
 says so.
 
 **Why it was worth a rename.** Nine of these were filed under `[stage]` and
@@ -1987,10 +2026,11 @@ other reads a train that is open and cannot say anything of the kind.
 One native `<select>`, grouped by geartrain in the sidebar's order with a
 member per option, was chosen over a two-step menu because it holds no state
 of its own: choosing acts at once and the control returns to its label. The
-members are numbered as their cards are — and the cards' numbering used to
-be `2 × stage + member`, right only while every earlier stage was a pair;
-it counts the members the earlier stages have now, in one place both panels
-read.
+members are named as the geartrain's list names them — the graph's number
+and the role the core reads off the graph — in one place both panels read
+(`members.ts`). The numbering used to be `2 × stage + member`, right only
+while every earlier stage was a pair, and then the cards' own; the graph's
+index is the one number a gear has.
 
 ### A file is adjusted to what the tool can honour
 

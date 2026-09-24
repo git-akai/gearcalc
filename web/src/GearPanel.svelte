@@ -992,7 +992,7 @@
   dt {
     color: var(--muted);
   }
-  /* At the weight a geartrain card's readout has; these were 600. */
+  /* At the weight the geartrain's readouts have; these were 600. */
   dd {
     margin: 0;
     text-align: right;
