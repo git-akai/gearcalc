@@ -23,7 +23,7 @@ bodies: Array<BodyOn>, members: Array<Member>, meshes: Array<MeshInput>, distanc
  * centre line, an Oldham coupling, a Schmidt coupling. No geometry and
  * no play: a row in the motion, `ω_a = ω_b`, and a lossless way through
  * the flow. What lets an orbiting body drive a shaft that does not
- * orbit, and never what a stage has to have: a stage adds one and takes
- * it away like a step ([`super::StageEdit::Couple`]).
+ * orbit, and never what a stage has to have: one is added and taken
+ * away like a step ([`super::Edit::Couple`], and a removal).
  */
 couplings: Array<[number, number]>, };

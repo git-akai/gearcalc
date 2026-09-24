@@ -263,7 +263,7 @@ impl Train {
     }
 
     /// **The train's parts** ([`Shape::parts`]) — the pieces that close,
-    /// search and rate apart, which is what a card is. Derived: the train
+    /// search and rate apart, which is what a stage was. Derived: the train
     /// is one graph, and a part is how it falls apart.
     #[must_use]
     pub fn parts(&self) -> Vec<Part> {
@@ -297,7 +297,7 @@ impl Train {
     }
 
     /// **A part's member by the graph's index** — how a fixture changes a
-    /// card's gear, the train being one list of them.
+    /// part's gear, the train being one list of them.
     #[must_use]
     pub fn member(&self, part: usize, member: usize) -> usize {
         self.parts()[part].members[member]
@@ -804,54 +804,6 @@ impl From<Ratio> for Exact {
     }
 }
 
-/// One of a stage's ports, as the front end names it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-#[cfg_attr(
-    feature = "typescript",
-    derive(ts_rs::TS),
-    ts(export, export_to = "core/")
-)]
-pub struct PortSpec {
-    /// The stage's own numbering of it.
-    pub slot: Body,
-    /// The train's body it is.
-    pub body: usize,
-}
-
-/// **A stage's ports and its conventional holds**, so a panel can offer
-/// exactly the bodies a train may constrain or share — read from the
-/// stage's own wiring rather than written into the front end a second time.
-#[derive(Clone, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-#[cfg_attr(
-    feature = "typescript",
-    derive(ts_rs::TS),
-    ts(export, export_to = "core/")
-)]
-pub struct StagePorts {
-    pub ports: Vec<PortSpec>,
-    /// What each member is — sun, planet, ring, worm, wheel or a gear by
-    /// its number — read off the shape by the one rule
-    /// ([`super::shape::Shape::member_names`]), so a panel names a member
-    /// as the harness does without deriving it a second time.
-    pub members: Vec<super::shape::MemberName>,
-    /// **The mesh groups** — the mesh graph's connected components
-    /// ([`super::shape::Shape::mesh_groups`]), the members a run of meshes
-    /// joins — so a panel offers one module and one pressure angle per
-    /// group and writes them to every member in it, and deals the cards a
-    /// group to a row.
-    pub mesh_groups: Vec<Vec<usize>>,
-    /// **The family the shape reads as** ([`super::shape::Shape::family`]),
-    /// which decides the card's structural buttons and its chip — the
-    /// core's reading, so the panel does not derive it a second time.
-    pub family: super::StageFamily,
-    /// **The part the card is** — its shape, in its own numbering, and
-    /// where each of its pieces is in the train's one graph, which is what
-    /// a panel binds a card's inputs through.
-    pub part: Part,
-}
-
 /// One end of a body: the stage it is listed on, and what it is there.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -966,32 +918,6 @@ pub struct PortBody {
 }
 
 impl Train {
-    /// Every stage's ports, for a panel to offer.
-    #[must_use]
-    pub fn topology(&self) -> Vec<StagePorts> {
-        self.parts()
-            .into_iter()
-            .map(|part| {
-                let stage = &part.shape;
-                StagePorts {
-                    members: stage.member_names(),
-                    mesh_groups: stage.mesh_groups(),
-                    family: stage.family(),
-                    ports: stage
-                        .ports()
-                        .ports
-                        .iter()
-                        .map(|&slot| PortSpec {
-                            slot,
-                            body: stage.body_at(slot),
-                        })
-                        .collect(),
-                    part: part.clone(),
-                }
-            })
-            .collect()
-    }
-
     /// The train's motion in the shape the boundary sends, or `None` where
     /// there is none to send.
     ///
@@ -1134,7 +1060,7 @@ impl Train {
         // is a mesh or a carrier turning against itself: not a body.
         let both = |p: &Part| p.shape.slot_if_any(a).is_some() && p.shape.slot_if_any(b).is_some();
         if self.parts().iter().any(both) {
-            return Err(super::EditRefused::OneCard);
+            return Err(super::EditRefused::Geared);
         }
         let axis = |body: usize| {
             self.shape
@@ -1222,7 +1148,7 @@ impl Train {
     /// first, and the bodies a part at the later listing numbers before
     /// it — and no part at the earlier one has — move ahead of it with
     /// it. A part's slots are the order its conventions read (a set's sun
-    /// first), so a join does not reorder a card.
+    /// first), so a join does not reorder a part.
     fn keep_orders(&mut self, a: usize, b: usize) {
         let at = |body: usize| self.shape.bodies.iter().position(|x| x.body == body);
         let (Some(ia), Some(ib)) = (at(a), at(b)) else {
@@ -1307,21 +1233,6 @@ impl Train {
         fresh
     }
 
-    /// **A stage's end of a body moved to another** — what the select
-    /// beside a port means, one rule: the end is split off where the body
-    /// ran on to another stage ([`Self::split`]), and then is held to
-    /// ground (`to` ground), made one with the body named (`to` another,
-    /// [`Self::join`]), or left a body of its own with every hold on it
-    /// withdrawn (`to` none, or the body itself, [`Self::release`]).
-    pub fn move_end(&mut self, stage: usize, body: usize, to: Option<usize>) {
-        let mine = self.split(stage, body);
-        match to {
-            Some(GROUND) => self.hold(mine),
-            Some(other) if other != mine => self.join(mine, other),
-            _ => self.release(mine),
-        }
-    }
-
     /// **A body held to ground**, in so many words. Every case entry at it
     /// goes with it: a held body is fixed, and no case can say anything of
     /// it.
@@ -1399,41 +1310,6 @@ impl Train {
         self.shape.remove_part(&part);
         self.drop_orphans();
         self.prune();
-    }
-
-    /// **A part edited on its card** ([`super::StageEdit`]): the graph
-    /// takes the edit, read in the part's own indices
-    /// ([`Shape::edit_part`]), numbering any body it adds after every body
-    /// the train has; a body the edit took off that nothing else has
-    /// leaves the train, with every case entry and hold at it, and the rest
-    /// are numbered densely again.
-    ///
-    /// **A body an edit leaves empty stays while anything still names it**
-    /// — another stage, a hold, a case — and is given up otherwise
-    /// ([`Self::drop_bare`]). A gear moved off a shaft does not take the
-    /// shaft with it: that is how a layshaft's engaged ratio is changed,
-    /// one gear off and the other on, with the output the train couples to
-    /// standing still there between the two.
-    ///
-    /// # Errors
-    ///
-    /// [`super::EditRefused`] where the shape refuses, with nothing changed.
-    pub fn edit_stage(
-        &mut self,
-        k: usize,
-        edit: super::StageEdit,
-    ) -> Result<(), super::EditRefused> {
-        let next = self.max_body() + 1;
-        let part = self
-            .parts()
-            .into_iter()
-            .nth(k)
-            .ok_or(super::EditRefused::NoSuchIndex)?;
-        self.shape.edit_part(&part, edit, next)?;
-        self.drop_bare();
-        self.drop_orphans();
-        self.prune();
-        Ok(())
     }
 
     /// **Every body with nothing on it that nothing else names, given up**,
@@ -1601,9 +1477,14 @@ impl Train {
     /// **One edit to the train's graph** ([`super::Edit`]), made whole or
     /// refused whole. A shape's edit numbers any body it adds after every
     /// body the train has; a body it takes off the train leaves with every
-    /// case entry and hold at it, a body left with nothing on it that
-    /// nothing names is given up, and the rest are numbered densely again —
-    /// as a card's edit does ([`Self::edit_stage`]).
+    /// case entry and hold at it, and the rest are numbered densely again.
+    ///
+    /// **A body an edit leaves empty stays while anything still names it**
+    /// — another part's gear, a hold, a case — and is given up otherwise
+    /// ([`Self::drop_bare`]). A gear moved off a shaft does not take the
+    /// shaft with it: that is how a layshaft's engaged ratio is changed,
+    /// one gear off and the other on, with the output the train couples to
+    /// standing still there between the two.
     ///
     /// # Errors
     ///

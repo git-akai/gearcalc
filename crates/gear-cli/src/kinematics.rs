@@ -497,7 +497,7 @@ fn report(name: &str, train: &Train, r: &TrainResult) {
             );
         }
     }
-    for (k, s) in r.cards(train).iter().enumerate() {
+    for (k, s) in r.by_part(train).iter().enumerate() {
         println!("  stage {}", k + 1);
         for (label, cases) in slot_cases(&train.stages()[k], s) {
             for (case, speed, torque) in cases {

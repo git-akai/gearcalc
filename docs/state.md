@@ -310,17 +310,18 @@ member, mesh, distance and coupling once — beside its holds and its cases,
 and what a stage was is a **part** of it (`Shape::parts`), read off the
 graph with every solve; `solve_train` solves part by part and a stage
 asked alone is one part (`Part::whole`). A join makes one body on one axis
-and keeps every part's own order; an edit on a card is read through its
-part's maps (`Shape::edit_part`); the panel stands on the graph's own
-objects, one list and one workspace. A file written
+and keeps every part's own order; every edit is the graph's (`Edit`), by
+the graph's indices; the panel stands on the graph's own objects, one list
+and one workspace. A file written
 as stages is refused by name and converted once by `gear-cli convert`
 (`graph_of`): the elevation drive the tool wrote before converts to the file
 it writes of the drive now, every figure bit for bit. Held by laws on every
 preset alone and after every other — the converted graph is what a chain
 builds now, turns as the stages did body for body, and falls apart into
-the stages, each solving as it did — and by the probe, after whose every
-edit the cards are the old stages field for field
-([rationale](rationale.md#a-train-is-one-graph-and-a-card-is-a-part-of-it)).
+the stages, each solving as it did — and by the probe, whose every edit,
+asked as the graph's own, records the train the stage's edit it replaced
+recorded, byte for byte
+([rationale](rationale.md#a-train-is-one-graph-and-a-stage-is-a-part-of-it)).
 The panel edits the graph through what the core offers at the piece
 selected — each offer an edit tried on a copy, a refused one said with its
 reason, and every one's dry run shown before it is pressed (`Train::offers`,
@@ -623,7 +624,7 @@ been. They are not a backlog.
 | A ring's own bounds for a stage member | The gear card shows a rack's buildable range, which is not a ring's, so it shows nothing there and says so |
 | A coupled glass POM grade | Can be added if one is wanted; it must be *coupled*, not filled |
 | **Two carried axes placed round the carrier** | A meshed-planet or Ravigneaux set has three distances — centre to each planet axis and between them — and each closes on its own shifts; nothing checks the three form a triangle, and the planet-clearance layout places one axis's planets without the other's. A preset carries it, the figures it reports are the meshes', and a layout that does not close is a fault this tool does not yet name |
-| **A card's end of a shaft in neutral** | A card lists the bodies it has something on, so a layshaft's output with no gear engaged is not on its card — it is the next stage's input, and its gear keeps it. A gear engaged onto it brings the end back; the card offers the move while a gear is on the output, so engaging the other ratio *before* taking this one off never leaves it. The core moves a gear onto any body on its axis; the card offers its own |
+| **A part's end of a shaft in neutral** | A part lists the bodies it has something on, so a layshaft's output with no gear engaged is not the layshaft's part's — it is the next stage's input, and its gear keeps it. A gear engaged onto it brings the end back, and the shaft keeps its number throughout; the panel offers the move on the gear and on the body alike (`Train::offers`) |
 | **A part's order when two parts share two bodies** | A join keeps every part's own order of bodies (`Train::keep_orders`); two parts that share two bodies in opposite orders cannot both keep theirs, and the earlier-listed part's stands. Nothing the panel offers builds it |
 | **A stepped planet's assembly, timed** | The assembly rule (`Shape::assembly`) takes every planet identical: two gears on one planet's body at one relative phase. Planets timed individually at manufacture assemble equally spaced at any count, which the rule then under-reports as *no*; the rule's answer is the cheaper build, not the only one |
 
@@ -760,7 +761,7 @@ whose size is unmeasured is a debt still owed, and is marked as one.
   offered, and relief keeps the pair on the rule.
 - **A planet's net body torque is reported as zero**, which is what it is —
   a free idler's two meshes balance — and what the set's own solver never printed.
-  The torque its teeth carry is on its card, per mesh, as every member's is.
+  The torque its teeth carry is on its gear card, per mesh, as every member's is.
 
 ---
 
@@ -1138,9 +1139,9 @@ Not a queue with a head; this is what a next session would pick from.
   - **error and notice paragraphs** — the same tokens, but only the geartrain
     has a `.notice` (an import adjusted); the gear tab's adopt failure uses
     `.error` and has no quieter slot;
-  - **cards** — a stage's members sit in bordered `.gear` cards at
-    `0.5rem 0.7rem` in a `minmax(20rem, 1fr)` grid; the gear tab's sections
-    are unbordered, which is a difference of content rather than of style.
+  - **cards** — a mesh's two gears sit in bordered `.gear` columns either
+    side of it in the workspace; the gear tab's sections are unbordered,
+    which is a difference of content rather than of style.
 - **Where a gear tab and a stage member still differ in what they describe**,
   noted while the tab learned to adopt a member. Back end only — the tab
   needs none of the stage's solvers — and the same `GearParams` throughout:
@@ -1181,7 +1182,7 @@ Not a queue with a head; this is what a next session would pick from.
 - **Arrangements that need more than the shape has.** `MemberRating` and
   `MeshReport` are per member and per mesh rather than per named role, and
   every stage is one shape — so an arrangement is a list of what sits where,
-  every menu preset is one, and a designer permutes one on its card. What
+  every menu preset is one, and a designer permutes one piece by piece. What
   an arrangement can still want that the shape has not got is a crossed
   distance sharing a member with a parallel one on the menu (the harness's
   `worm_and_pair` builds it), a planet meshing a planet on a *given*

@@ -77,8 +77,6 @@ import type {
   Adopted,
   TrainFailure,
   Variation,
-  PortSpec,
-  StagePorts,
   Part,
   MemberName,
   MemberRole,
@@ -87,7 +85,6 @@ import type {
   StageFamily,
   StagePreset,
   StagePresetEntry,
-  StageEdit,
   Edit,
   Place,
   Piece,
@@ -164,8 +161,6 @@ export type {
   Adopted,
   TrainFailure,
   Variation,
-  PortSpec,
-  StagePorts,
   Part,
   MemberName,
   MemberRole,
@@ -174,7 +169,6 @@ export type {
   StageFamily,
   StagePreset,
   StagePresetEntry,
-  StageEdit,
   Edit,
   Place,
   Piece,
@@ -814,9 +808,8 @@ export function solveTrain(train: Train, materials?: MaterialLibrary): TrainOutc
         stage: null,
       },
       figures: [],
-      topology: [],
+      parts: [],
       motion: null,
-      cards: [],
       groupings: { centres: [], axes: [] },
       flows: [],
       names: [],
@@ -831,29 +824,18 @@ export function isHeld(train: Train, body: number): boolean {
   return train.held.includes(body);
 }
 
-/** **One edit to a train's graph, by the core's rules** — what a port's
- *  select and the panel's buttons mean: two bodies joined, a stage's end of
- *  a body split off, a body held or released, an end moved to another body
- *  (split, then held, joined or its own — the select's one rule), a stage
- *  pushed and joined onward with the cases carried to its far port, a fresh
- *  case added between the train's ends. Each is a rule about what else has
- *  to change — a join turns a reaction into a take-off, a body taken off
- *  its last stage leaves the train — and the rules are the core's, so this
- *  side hands the train over and copies the answer back. A train that will
- *  not cross the boundary is left as it stands. */
+/** **One edit to a train, by the core's rules** — one of the graph's own
+ *  edits (`Edit`: what the core offers at a piece, `offersAt`), or a case
+ *  added or its duty switched. Each is a rule about what else has to change
+ *  — a join turns a reaction into a take-off, a body taken off the graph
+ *  leaves the train with every case entry and hold at it — and the rules
+ *  are the core's, so this side hands the train over and copies the answer
+ *  back. A train that will not cross the boundary is left as it stands. */
 export type TrainEdit =
-  | { join: { a: number; b: number } }
-  | { split: { stage: number; body: number } }
-  | { hold: number }
-  | { release: number }
-  | { move_end: { stage: number; body: number; to: number | null } }
-  | { push_stage: Shape }
-  | { remove_stage: number }
+  | { graph: Edit }
   | { add_case: CaseKind }
-  | { duty: { case: number; intermittent: boolean } }
-  | { stage: { stage: number; edit: StageEdit } }
-  | { graph: Edit };
-/** The train edited by the core's rules, in place. A stage edit the core
+  | { duty: { case: number; intermittent: boolean } };
+/** The train edited by the core's rules, in place. An edit the core
  *  refuses leaves the train as it was and comes back as the catalogue key of
  *  the reason, for the panel to say; any other failure is a defect on this
  *  side of the boundary and is swallowed as before. */

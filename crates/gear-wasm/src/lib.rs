@@ -782,14 +782,13 @@ pub struct TrainOutcome {
     /// (`TrainResult::figure`) and the panel need not know at all: it hands
     /// this list back with the graph, and never learns which field is which.
     pub figures: Vec<gear_core::train::Figure>,
-    /// **Every card**: the part of the train's graph it is, in its own
-    /// numbering with where each of its pieces is in the graph — what the
-    /// panel stands a card on — and its ports, with the label the panel names
-    /// each by, so a designer is offered exactly the bodies a train may hold,
-    /// drive or couple, read from the part's wiring rather than written into
-    /// the front end a second time. Present on success and failure alike: it
-    /// needs no geometry.
-    pub topology: Vec<gear_core::train::StagePorts>,
+    /// **Every part** of the train's graph — the pieces that close apart —
+    /// in its own numbering with where each of its pieces is in the graph,
+    /// and its ports: what the panel names a part by (its meshes), and how
+    /// it reads what a part's meshes put on each of its bodies
+    /// (`TrainResult::parts`, by the part's own numbering). Present on
+    /// success and failure alike: it needs no geometry.
+    pub parts: Vec<gear_core::train::graph::Part>,
     /// **The train's motion** — exact ratios, every body's speed, mobility —
     /// present whenever the tooth counts and topology give one, which is
     /// whether or not the geometry solved. A train mid-edit whose stage will
@@ -811,12 +810,6 @@ pub struct TrainOutcome {
     /// share one module, one pressure angle and one axial contact ratio —
     /// by the graph's indices ([`gear_core::train::Shape::mesh_groups`]).
     pub mesh_groups: Vec<Vec<usize>>,
-    /// **Each card's view of the result**, in the order the topology deals
-    /// them ([`gear_core::train::TrainResult::cards`]) — the result laid
-    /// back out in each part's own numbering by the core's one rule, so the
-    /// cards do not slice it a second time. Empty where the train did not
-    /// solve.
-    pub cards: Vec<gear_core::train::ShapeResult>,
 }
 
 /// Why a train has no answer, and where.
@@ -829,9 +822,10 @@ pub struct TrainOutcome {
 pub struct TrainFailure {
     /// The message, as a key and its already-formatted values.
     pub note: gear_core::note::Note,
-    /// Which stage could not be built, **numbered from one** as the panel
-    /// numbers them. `None` where the fault is the train's own rather than any
-    /// one stage's — an empty train, say.
+    /// Which part could not be built, **numbered from one**, in the order
+    /// `parts` deals them — the panel names it by its meshes. `None`
+    /// where the fault is the train's own rather than any one part's — an
+    /// empty train, say.
     pub stage: Option<u32>,
 }
 
@@ -840,7 +834,7 @@ fn solve_train_impl(input: &str) -> Result<String, String> {
     let req: TrainRequest =
         serde_json::from_str(input).map_err(|e| format!("bad train request: {e}"))?;
     let lib = req.materials.unwrap_or_else(gear_io::default_library);
-    let topology = req.train.topology();
+    let parts = req.train.parts();
     let motion = req.train.motion_report();
     let groupings = req.train.groupings();
     let names = req.train.shape.member_names();
@@ -857,14 +851,13 @@ fn solve_train_impl(input: &str) -> Result<String, String> {
                     value: result.figure(freedom),
                 })
                 .collect(),
-            cards: result.cards(&req.train),
             flows: req.train.flows(&result),
             groupings,
             names,
             mesh_groups,
             result: Some(result),
             failure: None,
-            topology,
+            parts,
             motion,
         },
         Err(e) => {
@@ -881,9 +874,8 @@ fn solve_train_impl(input: &str) -> Result<String, String> {
                     stage,
                 }),
                 figures: Vec::new(),
-                topology,
+                parts,
                 motion,
-                cards: Vec::new(),
                 flows: Vec::new(),
                 groupings,
                 names,
@@ -1438,7 +1430,7 @@ fn adopt_member_impl(input: &str) -> Result<String, String> {
 /// ignored. Rather than accept an input and quietly disregard it, the first one
 /// in relief order that they are not this moment pinning goes back to
 /// automatic. **Every group of inputs that argue is a part's**, so relieving
-/// the graph is relieving each card, whichever the designer touched.
+/// the graph is relieving each part, whichever the designer touched.
 ///
 /// Which inputs argue, how many may stand and which gives way first are facts
 /// about the geometry, and they used to live in the panel as three functions,
@@ -1522,43 +1514,21 @@ fn relieve_case_impl(input: &str) -> Result<String, String> {
 /// **A train's graph edited by the core's rules.**
 ///
 /// `{ train, edit }` JSON in — the train as it stands and one edit — and the
-/// train out. The edits are what a body's select and the panel's buttons
-/// mean, each a rule the core owns rather than the panel:
+/// train out. The edits are what the panel's entries and verbs mean, each a
+/// rule the core owns rather than the panel:
 ///
-/// - `{ "join": { "a", "b" } }` — two bodies made one ([`Train::join`]),
-///   the lower number kept: a reaction a case declared at either becomes
-///   an inline take-off;
-/// - `{ "split": { "stage", "body" } }` — a stage's end of a body split
-///   off as a body of its own ([`Train::split`]);
-/// - `{ "hold": body }` — held to ground, every end of it;
-/// - `{ "release": body }` — not held, a hold its stage's convention puts
-///   on it written off;
-/// - `{ "move_end": { "stage", "body", "to" } }` — a stage's end of a body
-///   moved to another: split off where the body ran on, then held (`to`
-///   ground, 0), joined (`to` another body) or left its own (`to` null)
-///   ([`Train::move_end`]) — what the select beside a port means;
-/// - `{ "push_stage": stage }` — appended, its bodies numbered after the
-///   train's, and joined onward from the last stage's open output, every
-///   case entry there carried to the new stage's output
-///   ([`Train::push_stage`]);
-/// - `{ "remove_stage": k }` — removed, its bodies with it where no other
-///   stage has them, and the rest numbered densely again
-///   ([`Train::remove_stage`]);
-/// - `{ "add_case": kind }` — a fresh case of that kind between the train's
-///   two ends ([`Train::fresh_case`]);
-/// - `{ "duty": { "case", "intermittent" } }` — a case's duty switched,
-///   seeded as a fresh case's is ([`Train::set_duty`]);
-/// - `{ "stage": { "stage", "edit" } }` — one stage edited on its card
-///   ([`gear_core::train::StageEdit`]: a step, a sun or a ring, an axis, a
-///   mesh added or removed, a member moved to another body), a body it
-///   adds numbered after the train's and one it takes off the stage leaving
-///   the train where no other stage has it ([`Train::edit_stage`]);
 /// - `{ "graph": edit }` — one of the graph's own edits
 ///   ([`gear_core::train::Edit`]: a gear at a body, a new body or a new
 ///   axis; a ratio on the body asked; a step; a coupling; a member, mesh,
 ///   axis, body or coupling removed with what goes with it; a gear moved;
-///   a join, a hold, a release; a stage inserted at a body), every index
-///   the graph's ([`Train::edit`]).
+///   a join, a hold, a release; a stage inserted at a body or at the
+///   train's output), every index the graph's
+///   ([`gear_core::train::Train::edit`]) — what the core offers at a piece
+///   is [`offers`]'s;
+/// - `{ "add_case": kind }` — a fresh case of that kind along the headline
+///   case's path ([`gear_core::train::Train::fresh_case`]);
+/// - `{ "duty": { "case", "intermittent" } }` — a case's duty switched,
+///   seeded as a fresh case's is ([`gear_core::train::Train::set_duty`]).
 ///
 /// A refused edit is an error carrying the refusal's catalogue key
 /// ([`gear_core::train::EditRefused::key`]), the words being the panel's to
@@ -1576,33 +1546,9 @@ pub fn edit_train(input: &str) -> Result<String, JsError> {
 #[derive(Deserialize)]
 #[serde(rename_all = "snake_case")]
 enum TrainEdit {
-    Join {
-        a: usize,
-        b: usize,
-    },
-    Split {
-        stage: usize,
-        body: usize,
-    },
-    Hold(usize),
-    Release(usize),
-    MoveEnd {
-        stage: usize,
-        body: usize,
-        to: Option<usize>,
-    },
-    PushStage(gear_core::train::Shape),
-    RemoveStage(usize),
-    AddCase(gear_core::train::CaseKind),
-    Duty {
-        case: usize,
-        intermittent: bool,
-    },
-    Stage {
-        stage: usize,
-        edit: gear_core::train::StageEdit,
-    },
     Graph(gear_core::train::Edit),
+    AddCase(gear_core::train::CaseKind),
+    Duty { case: usize, intermittent: bool },
 }
 
 #[derive(Deserialize)]
@@ -1614,7 +1560,7 @@ struct EditRequest {
 fn edit_train_impl(input: &str) -> Result<String, String> {
     let EditRequest { mut train, edit } = serde_json::from_str(input).map_err(|e| e.to_string())?;
     // **A refusal crosses as its catalogue key**, which is what the panel
-    // says under the card; its `Display` is English for a log.
+    // says beside the verb; its `Display` is English for a log.
     apply_edit(&mut train, edit).map_err(|e| e.key().to_string())?;
     serde_json::to_string(&train).map_err(|e| e.to_string())
 }
@@ -1627,15 +1573,7 @@ fn apply_edit(
     edit: TrainEdit,
 ) -> Result<(), gear_core::train::EditRefused> {
     match edit {
-        TrainEdit::Join { a, b } => train.join(a, b),
-        TrainEdit::Split { stage, body } => {
-            train.split(stage, body);
-        }
-        TrainEdit::Hold(body) => train.hold(body),
-        TrainEdit::Release(body) => train.release(body),
-        TrainEdit::MoveEnd { stage, body, to } => train.move_end(stage, body, to),
-        TrainEdit::PushStage(stage) => train.push_stage(stage),
-        TrainEdit::RemoveStage(k) => train.remove_stage(k),
+        TrainEdit::Graph(edit) => train.edit(edit)?,
         // The figures a fresh case starts at are the shipped train's.
         TrainEdit::AddCase(kind) => {
             let (torque, speed) = match kind {
@@ -1646,8 +1584,6 @@ fn apply_edit(
             train.load_cases.push(case);
         }
         TrainEdit::Duty { case, intermittent } => train.set_duty(case, intermittent),
-        TrainEdit::Stage { stage, edit } => train.edit_stage(stage, edit)?,
-        TrainEdit::Graph(edit) => train.edit(edit)?,
     }
     Ok(())
 }
@@ -2480,7 +2416,7 @@ mod tests {
         let req = serde_json::json!({ "train": train });
 
         let v = solved(&req.to_string());
-        // One part: the graph's order is the card's, and what the part's
+        // One part: the graph's order is the part's, and what the part's
         // meshes put on its bodies is the part's own.
         let stage = &v["parts"][0];
 
@@ -2595,7 +2531,7 @@ mod tests {
             "train": train_json(&[hula_stage()], (2.0, 3000.0), 0.0, (1.0, 3000.0), 1.0)
         });
         let v = solved(&train.to_string());
-        // One part: the graph's gears are the card's.
+        // One part: the graph's gears are the part's.
         let stage = &v;
 
         // Four gears, each with the rating every stage member carries.
@@ -3149,7 +3085,7 @@ mod tests {
         let refused = preview(serde_json::json!({ "graph": { "join": { "a": 1, "b": 2 } } }));
         assert_eq!(
             refused["refused"]["key"],
-            gear_core::train::EditRefused::OneCard.key()
+            gear_core::train::EditRefused::Geared.key()
         );
         assert!(refused["changes"].as_array().unwrap().is_empty());
     }
@@ -3183,23 +3119,22 @@ mod tests {
     }
 
     /// **A refused edit crosses as its catalogue key**, which is what the
-    /// panel says under the card — for a card's edit and the graph's. It
-    /// crossed as English for as long as there were edits, and the panel,
-    /// looking for a key, said nothing.
+    /// panel says beside the verb. It crossed as English for as long as
+    /// there were edits, and the panel, looking for a key, said nothing.
     #[test]
     fn a_refused_edit_crosses_as_its_key() {
         let d: serde_json::Value = serde_json::from_str(&defaults_impl().unwrap()).unwrap();
         for edit in [
-            serde_json::json!({ "stage": { "stage": 0, "edit": { "remove_axis": { "axis": 0 } } } }),
             serde_json::json!({ "graph": { "join": { "a": 1, "b": 2 } } }),
+            serde_json::json!({ "graph": { "add_step": { "axis": 0 } } }),
         ] {
             let e = edit_train_impl(
                 &serde_json::json!({ "train": d["train"], "edit": edit }).to_string(),
             )
             .unwrap_err();
             let keys = [
-                gear_core::train::EditRefused::LastOfItsKind,
-                gear_core::train::EditRefused::OneCard,
+                gear_core::train::EditRefused::Geared,
+                gear_core::train::EditRefused::WrongFamily,
             ]
             .map(gear_core::train::EditRefused::key);
             assert!(keys.contains(&e.as_str()), "{edit}: {e}");
@@ -3234,7 +3169,7 @@ mod tests {
         let pushed = edit_train_impl(
             &serde_json::json!({
                 "train": sound["train"],
-                "edit": { "push_stage": preset(&sound, "spur") },
+                "edit": { "graph": { "insert": { "stage": preset(&sound, "spur"), "at": null } } },
             })
             .to_string(),
         )

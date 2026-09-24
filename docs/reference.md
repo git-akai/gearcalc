@@ -2229,8 +2229,9 @@ not held and the output the next — a chain's conventions: the hold is
 written as the train's when the stage is added, and the ends are where a
 chain joins and a fresh case starts. **What each member is** — sun,
 planet, ring, worm, wheel, or a gear by its number — is read off the shape
-by one rule (`Shape::member_names`) and travels with the topology, so the
-harness and the panel name a member the same way. A spur pair is two ground
+by one rule (`Shape::member_names`) and crosses with every solve, read off
+the whole graph (`names`), so the harness and the panel name a member the
+same way. A spur pair is two ground
 axes, one mesh, one distance; a worm is the same at 90° with `worm` set; a
 set is three axes of which the planet's is carried by the carrier body and
 replicated `N` times, two meshes and one distance. `gear-wasm`'s `defaults`
@@ -2250,45 +2251,27 @@ order, which is the order the conventions read — and none is a kind: a
 worm is on the menu because a worm is not an obvious thing to build from a
 pair, which is what a preset is for.
 
-**Editing a stage** (`StageEdit`, `Train::edit_stage`). An edit is asked of a
-card, in the card's own numbering — its members, meshes, distances, axes
-and couplings by their places in its part — and made on the graph, read
-through the part's maps (`Shape::edit_part`); a law holds every add on
-every preset, asked of it as a train's second card, to the same add on the
-preset alone. A designer permutes an arrangement by adding and removing,
-never by flipping: on an epicyclic
-stage a **step** (one more gear on the planet's body, with a ring on it), a
-**sun or a ring on a planet gear**, a step or a central member removed; on
-a parallel one an **axis** at a gear — a gear on a new axis meshing it,
-which at the chain's end is an idler behind the last, the panel's default —
-or an axis taken away with the card's gears on it, refused where a gear left
-behind would mesh nothing (a shaft another part's gears are on stays, with
-them), and a
-**mesh** on a distance (a layshaft's next ratio, one gear on the body the
-meshes share and the other on a body of its own — which ratio is engaged
-is which gear sits on the output's body). *Pair* named that edit for a
-while and said nothing: every mesh is a pair of gears, and what this adds
-is another **ratio across the same centres**.
+**Editing the graph.** A designer permutes an arrangement by adding and
+removing, never by flipping: a **step** on a set's planets (one more gear on
+the planet's body, with a ring on it), a **sun or a ring on a planet gear**,
+a gear on a **new axis** at a gear — which at a chain's end is an idler
+behind the last — and another **ratio across the same centres** (a
+layshaft's next, one gear on the body asked and the other on a body of its
+own; which ratio is engaged is which gear sits on the output's body), and
+any of them taken away again with what goes with it.
 
-And on any stage, a member **moved to another body** on its axis — the
-edit that engages that ratio. It is asked on the stage's own list, under
-the body the gear sits on ([bodies and constraints](#bodies-and-constraints)),
-and never offers a body whose gears mesh the same member as its own — two
-gears turning as one hold their common mate to two ratios at once, so the
-stage is locked by construction rather than by its numbers. That is what a
-set's sun and ring would do, which is why an epicyclic card offers the move
-on nothing but its steps. A gear alone among its card's gears on a body is
-on a body of its own already, whatever another part has on the same shaft.
-**The body a gear leaves stays** while anything still names it — another
-part's gear, a hold, a case: taking it with the gear is how engaging a
-layshaft's other ratio used to lose the output, and a body with nothing on
-it is a shaft in neutral, which is a thing a train has (`BodyLabel::Bare`).
-A card lists the bodies it has something on, so **in neutral the card has no
-end of the shaft**: a layshaft's output with no gear engaged is the next
-stage's input and nothing of the layshaft's, until a gear is moved onto it
-again — engage the other ratio before taking this one off, and the output
-never leaves the card. One that nothing names at all is given up a level up
-(`Train::drop_bare`), where what else names a body can be seen.
+And a gear **moved to another body** on its axis — the edit that engages a
+ratio. **The body a gear leaves stays** while anything still names it —
+another part's gear, a hold, a case: taking it with the gear is how
+engaging a layshaft's other ratio used to lose the output, and a body with
+nothing on it is a shaft in neutral, which is a thing a train has
+(`BodyLabel::Bare`). One that nothing names at all is given up a level up
+(`Train::drop_bare`), where what else names a body can be seen. A gear
+alone on its body moved to a body of its own is on one already, and
+nothing changes. Two gears meshing one member moved onto one body hold
+their common mate to two ratios at once — the stage locked by construction
+rather than by its numbers — which is made, and the train names the lock
+at the body.
 
 A sun and a ring differ in more than a flag — a cutter, a shift rule — so a
 swap is a remove and an add, the new member sized by the core to the
@@ -2301,11 +2284,11 @@ takes off the train leaves it, with every case entry and hold at it, and
 the rest are numbered densely again — so nothing a case names
 moves but by a body leaving. The invariants an edit
 keeps — every member in a mesh, every planet gear meeting a central member,
-every distance carrying a mesh, a chain keeping two axes — are refusals
-the panel shows by name, and a refused edit changes nothing.
+every distance carrying a mesh — are refusals the panel shows by name, and
+a refused edit changes nothing.
 
-**The graph's own edits** (`Edit`, `Train::edit`) are what a card's are read
-into, every index the graph's: a **gear** meshing any gear, on a body the
+**The graph's edits** (`Edit`, `Train::edit`), every index the graph's: a
+**gear** meshing any gear, on a body the
 train has, a new body of an axis it has or a new axis fixed in ground
 (`AddGear`) — sized to the distance between the two axes where they have
 one, a sun or a ring on a planet gear to the radius the planet runs at, and
@@ -2325,7 +2308,7 @@ whole. A lock by construction — a ring on the second gear's body of a pair,
 two ratios across one pair of shafts — is made, and the train names it at
 the body as it names a lock by holds; the edit's to say is only whether the
 graph it leaves hangs together. A refusal crosses the boundary as its
-catalogue key, which is what the panel says under the card.
+catalogue key, which is what the panel says beside the entry.
 
 **What a piece offers** (`Train::offers`) is every one of those edits that
 applies there, read off the graph by the rule each states and tried on a
@@ -2468,7 +2451,7 @@ share is listed once, on the one axis it turns about: a shaft is straight,
 so the two axes it turned about are one line. **What a stage was is a
 part**: the pieces that close, search and rate apart (`Shape::parts` —
 gears joined by their meshes, meshes by the distances they share), read off
-the graph and never stored, and a card is a part. A train built preset by
+the graph and never stored. A train built preset by
 preset falls apart into exactly its presets, each part solving as the
 preset alone does; a part that shares a body with another is joined to it
 by that body and nothing else — a pair's output and the next set's sun.
@@ -2498,8 +2481,8 @@ from the moment it exists; holding a set's carrier *instead* is two
 statements, the ring released and the carrier held. What a designer writes
 twice stands twice — two holds on a set lock it, and the train says so at
 the hold that closed it. A hold is on the body, every end of it: a carrier a
-pair runs on from is held with the pair's gear, and it is a split that says
-otherwise. (Holds were once laid over each stage's conventions: with none
+pair runs on from is held with the pair's gear, and it is a move — the
+pair's gear onto a body of its own — that says otherwise. (Holds were once laid over each stage's conventions: with none
 written a set's ring was held, a hold anywhere on a stage replaced its
 conventional ones, and releasing a conventional hold took a `free` written
 against it — a hold nobody had stated, and a word that existed only to
@@ -2511,14 +2494,14 @@ are gone.)
 body once, by number, on its axis, and a train the panel builds writes each
 one: adding a stage lays its preset into the graph, numbers its bodies after
 every body the train has, joins its conventional input to the last part's
-remaining open output and carries every case entry there to the new stage's
-output (`push_stage`); the **join to** menu on a body's row is one rule
-(`move_end`) — this card's end of the body is split off where the body ran
-on to another part, and then joined to the body chosen (the lower number
-kept, `join`) or left a body of its own (`split`). Held is not among its
-entries: a hold is a statement about the *body*, which every end of it
-shares, so it is a button beside the menu (`hold`, `release`). Adding a
-stage writes what the preset holds by convention as holds of the train's.
+remaining open output — or with the body the designer names — and carries
+every case entry there to the new stage's output (`push_stage`,
+`insert`). Two bodies are made one by the train's rule (`join`, the lower
+number kept); a gear sharing a body is moved off it onto one of its own,
+and a part's end split off where a train is built in code (`split`). A hold
+is a statement about the *body*, which every end of it shares (`hold`,
+`release`). Adding a stage writes what the preset holds by convention as
+holds of the train's.
 
 **A join makes one body on one axis.** The two axes the ends turned about
 become one line, every body and distance on the later moved to the earlier,
@@ -2526,7 +2509,7 @@ whose reading stands; two distances that now fall between one pair of axes
 are one, the first stated. The body is listed where it was listed first, and
 the bodies the joining part numbered ahead of its end move ahead with it, so
 **every part keeps the order it numbers its bodies in** — a set's sun first,
-which is the order its conventions read — and a join never reorders a card.
+which is the order its conventions read — and a join never reorders a part.
 Two ends an axis distance apart are no one body, and the join is refused. An
 end on an axis a carrier turns — an orbiting body, a planocentric's planet
 with its coupling taken away — cannot be coaxial with anything fixed, so a
@@ -2684,11 +2667,11 @@ way through the flow that loses nothing either way, with no geometry and no
 play — and it has no teeth, so a path's power through the teeth does not
 count it. A planocentric reducer's output is the shaft its planet is
 coupled to, on the centre line, so what follows it turns about the input's
-axis. The coupling is the stage's to lose: a stage couples an orbiting body
-to a new shaft on its carrier's axis and uncouples it again, and a
-planocentric with a step on its planet, a ring on the step and its
-coupling taken away is a hula stage — each reached from the other by the
-card's edits. Both are
+axis. The coupling is the graph's to lose: an orbiting body is coupled to
+a new shaft on its carrier's axis and uncoupled again, and a planocentric
+with a step on its planet, a ring on the step and its coupling taken away
+is a hula stage — each reached from the other by the graph's edits. Both
+are
 readings of **one list**: the motion report's `bodies` is every body of the
 train, ground first, each with its ends (the stages it is listed on and
 what it is there), whether a case may address it (`port`), whether the
@@ -2700,33 +2683,28 @@ the same number, two of them prefixes of the third.) A load names a body
 and nothing else — no "start", no "end".
 
 **A body, to the panel, is its number.** The panel numbers nothing of its
-own: a body is "Body 2" wherever it is named, with its ends in parentheses
-— "Body 2 (Stage 1 Gear 2 · Stage 2 Sun)". The train's own block lists
-every port body with what it carries stage by stage, and **states, never
-asks**: a summary at the head of the page.
+own: a body is "Body 2" wherever it is named — in the flow, under its axis,
+in a case — with what is on it beside it: its gears by role and number
+("Gear 2 · Sun (3)"), or what it turns with through a coupling. No stage is
+named anywhere: a stage is what a preset laid in, and the graph does not
+keep it.
 
-**One list is editable, and it is the stage's**, in the shape's own order
-— an axis, the bodies on it, the gears on each — so a gear is a row under
-the body it is fixed to and a body a row under the axis it turns about,
-each name written once in one meaning. The row a control sits on is what
-says what it acts on. On a **body's** row, the two things done to a body:
-**hold** it to the housing, and **join to** another body of the train —
-this stage's end of it ([Bodies and
-constraints](#bodies-and-constraints)) — both only where the body is a
-port, since a replicated body is a planet's and the train does not name
-it. On a **gear's** row, one level in, the one thing done to a gear: moved
-to another body of its own axis, or onto one of its own where it shares
-(`StageEdit::MoveBody`), and there only where there is somewhere to go. A
-held body keeps its number and is said to be fixed, on the card and in the
-summary alike. **Axes are numbered, not
+**The list is the graph grouped three ways, and nothing on it is a
+control** — the flow each case walks, the centres, the axes. Selecting a
+row shows the piece in the workspace, and what can be done to it is the
+core's to offer ([the stage](#the-stage), *what a piece offers*): a strip
+of verbs over the workspace — a body held or released, joined to another,
+taken off; a gear moved to another body of its axis; a piece removed with
+what goes with it — and the one add menu under the list, each entry a
+complete outcome with its dry run beside it. A held body keeps its number
+and is said to be fixed wherever it is listed. **Axes are numbered, not
 named**: a name off a preset — a layshaft, a centreline — states a
 distinction the shape does not have, and what is on the axis is the rows
 under it. What a number cannot say is written beside it: the body a
 carried axis rides, and how many times it is replicated, which is the
-planet count and is nowhere else on the card. Neither list shows a body
-back as the value of a control: **a menu says what it does, not what is
-the case**, since where a row already sits under its body a select
-repeating it puts a reading where there is only an action.
+planet count. **A verb says what it does, not what is the case**: a join
+lists the bodies it would make one, never the body a row already sits
+under.
 
 **What a case says of a port.** Each entry carries a `role`: a **load**
 carries a torque and a speed, each given or derived; a **reacted** port is
@@ -3084,9 +3062,11 @@ by the graph's index (`TrainResult::members`, `meshes`, `distances`,
 `axes`), what is a part's own — the torque its meshes put on each of its
 bodies per case, which on a shaft two parts share is what the one hands the
 other, and its notes — the paths and the cases, the figures relief seeds from
-by the graph's freedoms, and each card's view of the result laid back out in
-its part's numbering by the core (`TrainResult::part`, which a law holds to
-the part's own solve), so a card does not slice it a second time.
+by the graph's freedoms; and `parts` beside it, the train's parts in their
+own numbering, which is how the panel reads what a part's meshes put on
+each of its bodies. `TrainResult::part` lays the result back out in a
+part's own numbering for the harness, which prints the corpus part by part,
+and a law holds it to the part's own solve.
 `adopt_member` is the one that hands a train's member — named by the graph's
 index — to the gear tab: it solves the train and returns
 `GearResult::params`, **the tooth as built** —
@@ -3097,7 +3077,7 @@ is a ring and the cutter that cut it
 `edit_train` makes it by, both trains solved, and what it would do said as
 notes — the refusal where it would be refused, and otherwise each kind of
 piece whose count would move (gears, meshes, axes, bodies, axis distances,
-couplings, the cards, the holds, the case entries), what the headline path
+couplings, the holds, the case entries), what the headline path
 would come to, ratio and efficiency before and after — or that it would go,
 or appear — and why the train would not solve after it where it would not.
 The comparison is the core's and the words the catalogue's; nothing is kept.

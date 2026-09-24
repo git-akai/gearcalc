@@ -28,7 +28,7 @@ reversed_bending: boolean,
  * on those, the meshes and the distances between axes that mesh, and
  * the couplings — every preset added laid into it, a body two presets
  * share listed once on the one axis it turns about. Its parts are what
- * the cards show ([`Train::parts`]); nothing stores them.
+ * the stages were ([`Train::parts`]); nothing stores them.
  */
 shape: Shape, 
 /**

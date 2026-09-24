@@ -46,7 +46,7 @@ distances: Array<DistanceReport | null>,
  */
 axes: Array<AxisReport>, 
 /**
- * **What is a part's own**, one per part in the order the cards are
+ * **What is a part's own**, one per part in the order the parts are
  * dealt ([`Train::parts`]).
  */
 parts: Array<PartReport>, };

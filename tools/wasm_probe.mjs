@@ -44,10 +44,6 @@ const defaults = JSON.parse(w.defaults());
 // A preset's starting stage by name, off the list the menu renders from.
 const preset = (name) => structuredClone(defaults.stages.find((e) => e.preset === name).stage);
 const library = JSON.parse(w.default_materials());
-// **A train's cards**: the parts of its one graph, each in its own
-// numbering, as every solve deals them — what the panel draws a card from.
-const cards = (train) =>
-  JSON.parse(w.solve_train(JSON.stringify({ train, library }))).topology.map((s) => s.part.shape);
 
 // A plain external gear: the tab's own default, with the eccentric throw
 // dropped, since a throw is a question about a mate and this is one gear.
@@ -122,91 +118,89 @@ const out = {
       return [k, JSON.parse(w.adopt_member(JSON.stringify({ train, materials: library, member })))];
     }),
   ),
-  // **The train's graph edited by the core's rules**, each edit recorded:
-  // a set pushed behind the default pair and joined onward by its sun —
-  // one body, the pair's second gear and the sun — its cases carried to
+  // **The train's graph edited by the core's rules**, each edit recorded,
+  // every index the graph's — a part's body read off the part's own list
+  // by slot, and its member by its own index. A set inserted at the
+  // default pair's output, joined to it by its sun, its cases carried to
   // the new end, the carrier; the carrier held and released again; the
-  // pair's end of the sun's body split off and joined to the set's ring
-  // instead, then moved back onto the sun by the select's one rule; and a
-  // case of each kind added between the ends. A body is its number, read
-  // off the card's list by slot: the set's sun, carrier and ring are
-  // slots 1, 2 and 3.
+  // pair's second gear moved off the sun's shaft and its shaft joined to
+  // the set's ring instead, then back; and a case of each kind added
+  // between the ends, their duties switched.
   edit_train: call("edit_train", () => {
     const edit = (train, e) => JSON.parse(w.edit_train(JSON.stringify({ train, edit: e })));
-    const body = (train, stage, slot) => cards(train)[stage].bodies[slot - 1].body;
-    let t = edit(structuredClone(defaults.train), { push_stage: preset("planetary") });
-    const out = [["push_stage", structuredClone(t)]];
-    t = edit(t, { hold: body(t, 1, 2) });
+    const parts = () => JSON.parse(w.solve_train(JSON.stringify({ train: t, library }))).parts;
+    const body = (k, slot) => parts()[k].shape.bodies[slot - 1].body;
+    const member = (k, j) => parts()[k].members[j];
+    const axis = (k, a) => parts()[k].axes[a];
+    let t = structuredClone(defaults.train);
+    const graph = (e) => (t = edit(t, { graph: e }));
+    graph({ insert: { stage: preset("planetary"), at: null } });
+    const out = [["insert", structuredClone(t)]];
+    graph({ hold: body(1, 2) });
     out.push(["hold", structuredClone(t)]);
-    t = edit(t, { release: body(t, 1, 2) });
+    graph({ release: body(1, 2) });
     out.push(["release", structuredClone(t)]);
-    t = edit(t, { split: { stage: 0, body: body(t, 1, 1) } });
-    t = edit(t, { join: { a: body(t, 0, 2), b: body(t, 1, 3) } });
-    out.push(["split_join", structuredClone(t)]);
-    t = edit(t, { move_end: { stage: 0, body: body(t, 0, 2), to: body(t, 1, 1) } });
-    out.push(["move_end", structuredClone(t)]);
+    graph({ move: { member: member(0, 1), to: null } });
+    graph({ join: { a: body(0, 2), b: body(1, 3) } });
+    out.push(["move_join", structuredClone(t)]);
+    // ...and back onto the sun: moved off the ring's shaft, which it
+    // shares, and its own joined to the sun's.
+    graph({ move: { member: member(0, 1), to: null } });
+    graph({ join: { a: body(0, 2), b: body(1, 1) } });
+    out.push(["moved_back", structuredClone(t)]);
     t = edit(t, { add_case: "ultimate" });
     t = edit(t, { add_case: "fatigue" });
     out.push(["add_case", structuredClone(t)]);
     t = edit(t, { duty: { case: 4, intermittent: false } });
     t = edit(t, { duty: { case: 2, intermittent: true } });
     out.push(["duty", structuredClone(t)]);
-    // **A stage edited on its card**: the set at stage 1 gains a step (a
-    // second planet gear and a ring on it), loses its first ring — whose
-    // body leaves the train and the rest close up, the case entries at the
-    // set's carrier following — gains a sun on the new step, and has its
-    // sun moved to a body of its own; then a layshaft pushed behind gains
-    // a pair and an idler axis and loses them again.
-    const stage = (k, e) => edit(t, { stage: { stage: k, edit: e } });
-    t = stage(1, { add_step: { axis: 1 } });
-    t = stage(1, { remove_member: { member: 2 } });
-    t = stage(1, { add_central: { gear: 2, ring: false } });
-    t = stage(1, { move_body: { member: 0, body: null } });
-    out.push(["stage_epicyclic", structuredClone(t)]);
-    t = edit(t, { push_stage: preset("layshaft") });
-    t = stage(2, { add_mesh: { distance: 0 } });
-    // At the chain's end: the last gear on the card's last axis.
-    const lay = cards(t)[2];
-    const last = lay.axes.length - 1;
-    const onLast = lay.members
-      .map((m, j) => [lay.bodies.find((b) => b.body === m.body).axis, j])
+    // **A set edited piece by piece**: a step on its planets (a second
+    // planet gear and a ring on it), its first ring taken off — whose body
+    // leaves the train and the rest close up, the case entries at the
+    // set's carrier following — and a sun on the new step.
+    graph({ add_step: { axis: axis(1, 1) } });
+    graph({ remove: { member: member(1, 2) } });
+    graph({ add_gear: { mate: member(1, 2), on: { new_body: axis(1, 0) }, ring: false } });
+    out.push(["set_edited", structuredClone(t)]);
+    // **A chain grown and cut back**: a layshaft laid in at the output, a
+    // gear on a new axis at its last gear, and that axis taken away again.
+    graph({ insert: { stage: preset("layshaft"), at: null } });
+    const lay = parts()[2];
+    const last = lay.shape.axes.length - 1;
+    const onLast = lay.shape.members
+      .map((m, j) => [lay.shape.bodies.find((b) => b.body === m.body).axis, j])
       .filter(([a]) => a === last)
-      .map(([, j]) => j);
-    t = stage(2, { add_axis: { mate: onLast[onLast.length - 1] } });
-    out.push(["stage_parallel_added", structuredClone(t)]);
-    t = stage(2, { remove_axis: { axis: cards(t)[2].axes.length - 1 } });
-    t = stage(2, { remove_mesh: { mesh: cards(t)[2].meshes.length - 1 } });
-    out.push(["stage_parallel_removed", structuredClone(t)]);
+      .map(([, j]) => lay.members[j]);
+    graph({ add_gear: { mate: onLast[onLast.length - 1], on: "new_axis", ring: false } });
+    out.push(["chain_grown", structuredClone(t)]);
+    graph({ remove: { axis: t.shape.axes.length - 1 } });
+    out.push(["chain_cut", structuredClone(t)]);
     // **A coupling taken off a planocentric and put back**: its shaft goes
     // with the coupling where nothing else names it, and the planet coupled
     // again drives a new one.
-    t = edit(t, { push_stage: preset("planocentric") });
-    const plano = cards(t).length - 1;
-    t = stage(plano, { uncouple: { coupling: 0 } });
-    out.push(["stage_uncoupled", structuredClone(t)]);
-    t = stage(plano, { couple: { body: cards(t)[plano].members[0].body } });
-    out.push(["stage_coupled", structuredClone(t)]);
-    // **The graph's own edits**, every index the graph's: a gear on a new
-    // axis at the train's first gear and taken off again; another ratio on
-    // the layshaft sharing its input shaft; a gear moved to a body of its
-    // own and joined back; the planocentric's coupling removed and its
-    // planet coupled again; a set inserted at the train's first body; and
-    // a refusal, which crosses as its catalogue key.
-    const graph = (e) => edit(t, { graph: e });
-    t = graph({ add_gear: { mate: 0, on: "new_axis", ring: false } });
+    graph({ insert: { stage: preset("planocentric"), at: null } });
+    const plano = parts().length - 1;
+    graph({ remove: { coupling: parts()[plano].couplings[0] } });
+    out.push(["uncoupled", structuredClone(t)]);
+    graph({ couple: { body: t.shape.members[member(plano, 0)].body } });
+    out.push(["coupled", structuredClone(t)]);
+    // **The graph's other edits**: a gear on a new axis at the train's
+    // first gear and taken off again; another ratio on the layshaft
+    // sharing its input shaft; a set inserted at the train's first body;
+    // and a refusal, which crosses as its catalogue key.
+    graph({ add_gear: { mate: 0, on: "new_axis", ring: false } });
     out.push(["graph_add_gear", structuredClone(t)]);
-    t = graph({ remove: { member: t.shape.members.length - 1 } });
+    graph({ remove: { member: t.shape.members.length - 1 } });
     out.push(["graph_removed", structuredClone(t)]);
-    const layParts = cards(t)[2];
-    const layInput = layParts.bodies[0].body;
-    const layDistance = JSON.parse(w.solve_train(JSON.stringify({ train: t, library }))).topology[2].part.distances[0];
-    t = graph({ add_ratio: { distance: layDistance, shared: layInput } });
+    const layInput = parts()[2].shape.bodies[0].body;
+    const layDistance = parts()[2].distances[0];
+    graph({ add_ratio: { distance: layDistance, shared: layInput } });
     out.push(["graph_add_ratio", structuredClone(t)]);
-    t = graph({ insert: { stage: preset("planetary"), at: 1 } });
+    graph({ insert: { stage: preset("planetary"), at: 1 } });
     out.push(["graph_insert_at", structuredClone(t)]);
     const refusal = (e) => {
       try {
-        graph(e);
+        edit(t, { graph: e });
         return null;
       } catch (x) {
         return String(x.message ?? x);
@@ -257,12 +251,14 @@ const out = {
       })),
     ]);
   }),
-  // The default train, and the same train with a set pushed behind its pair
-  // by the core — a chain of two, its cases at the set's carrier.
+  // The default train, and the same train with a set laid in at its pair's
+  // output by the core — a chain of two, its cases at the set's carrier.
   solve_train: call("solve_train", () => {
     const t = structuredClone(defaults.train);
     const chained = JSON.parse(
-      w.edit_train(JSON.stringify({ train: t, edit: { push_stage: preset("planetary") } })),
+      w.edit_train(
+        JSON.stringify({ train: t, edit: { graph: { insert: { stage: preset("planetary"), at: null } } } }),
+      ),
     );
     return [
       ["default", JSON.parse(w.solve_train(JSON.stringify({ train: t, library })))],

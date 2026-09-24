@@ -57,13 +57,13 @@ pub mod shape;
 mod wiring;
 
 pub use conditions::{
-    BodyEnd, BodyReport, Exact, MotionError, MotionReport, PortBody, PortSpec, Ports,
-    StageBoundary, StagePorts, Term, TrainMotion,
+    BodyEnd, BodyReport, Exact, MotionError, MotionReport, PortBody, Ports, StageBoundary, Term,
+    TrainMotion,
 };
 
 use crate::kinematics::{Body, Condition, GROUND};
 pub use arrangements::{StageFamily, StagePreset};
-pub use edits::{Edit, EditRefused, Piece, Place, StageEdit};
+pub use edits::{Edit, EditRefused, Piece, Place};
 pub use groupings::{AxisBody, AxisGroup, Centre, FlowRow, Groupings};
 pub use offers::{Offer, Target};
 pub(crate) use pair::ShiftAsked;
@@ -3253,7 +3253,7 @@ impl std::ops::Deref for Alone {
 /// **A train of one, solved** ([`Train::alone`]) — see [`Alone`]. A lone
 /// stage's fault is its own, so it is handed back as the stage raised it
 /// rather than wrapped in which stage of one it was. **Solved as one
-/// card**, whatever parts it falls into ([`graph::Part::whole`]): a stage
+/// part**, whatever parts it falls into ([`graph::Part::whole`]): a stage
 /// of two pairs through a compound shaft is asked as the stage it is.
 ///
 /// # Errors
@@ -3610,7 +3610,7 @@ pub struct Train {
     /// on those, the meshes and the distances between axes that mesh, and
     /// the couplings — every preset added laid into it, a body two presets
     /// share listed once on the one axis it turns about. Its parts are what
-    /// the cards show ([`Train::parts`]); nothing stores them.
+    /// the stages were ([`Train::parts`]); nothing stores them.
     pub shape: Shape,
     /// **The bodies held to ground**, every one stated. A preset's
     /// conventional hold — a set's ring — is written here when it is
@@ -3973,7 +3973,7 @@ pub struct TrainResult {
     pub distances: Vec<Option<shape::DistanceReport>>,
     /// Every axis's report, in the graph's order.
     pub axes: Vec<AxisReport>,
-    /// **What is a part's own**, one per part in the order the cards are
+    /// **What is a part's own**, one per part in the order the parts are
     /// dealt ([`Train::parts`]).
     pub parts: Vec<PartReport>,
 }
@@ -4073,8 +4073,8 @@ impl TrainResult {
 
     /// **A part's view of the train's result** — the `k`th part's members,
     /// meshes, distances and layouts in its own numbering, and what is its
-    /// own: the result it solved to, which is what a card shows and the
-    /// harness prints stage by stage. A law holds it to the part's own
+    /// own: the result it solved to, which is what the harness prints
+    /// stage by stage. A law holds it to the part's own
     /// solve, field for field.
     #[must_use]
     pub fn part(&self, part: &graph::Part, k: usize) -> ShapeResult {
@@ -4138,10 +4138,11 @@ impl TrainResult {
         }
     }
 
-    /// **Every card's view of the result** ([`Self::part`]), in the order
-    /// the cards are dealt — what the harness prints stage by stage.
+    /// **The result part by part** ([`Self::part`]), each in its own
+    /// numbering, in the order the train's parts are dealt — what the
+    /// harness prints stage by stage.
     #[must_use]
-    pub fn cards(&self, train: &Train) -> Vec<ShapeResult> {
+    pub fn by_part(&self, train: &Train) -> Vec<ShapeResult> {
         train
             .parts()
             .iter()
@@ -4190,7 +4191,7 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
     solve_parts(train, &train.parts(), lib).map(|(r, _)| r)
 }
 
-/// **The train solved card by card** — each of `parts` closed, sized,
+/// **The train solved part by part** — each of `parts` closed, sized,
 /// searched and rated on its own, one flow and one motion across them all.
 /// The train's own parts ([`Train::parts`]), or a lone stage's whole shape
 /// ([`solve_alone`]). The train's result, and each part's own that it was
@@ -4718,10 +4719,11 @@ mod tests {
         super::test_library()
     }
 
-    /// **A train's result, and each card's view of it** — what these tests
+    /// **A train's result, and each part's view of it** — what these tests
     /// read stage by stage, read through [`TrainResult::part`] so every one
-    /// of them reads the view the panel and the harness do; the law
-    /// `a_card_is_its_part_solved` holds the view to the part's own solve.
+    /// of them reads the view the harness does; the law
+    /// `a_part_is_its_own_solve_laid_out` holds the view to the part's own
+    /// solve.
     #[derive(Debug)]
     pub(super) struct Solved {
         pub result: TrainResult,
@@ -4737,16 +4739,16 @@ mod tests {
 
     pub(super) fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<Solved, TrainError> {
         let result = super::solve_train(train, lib)?;
-        let stages = result.cards(train);
+        let stages = result.by_part(train);
         Ok(Solved { result, stages })
     }
 
-    /// **A card is its part, solved**: the view the train's result gives
+    /// **A part's view is its own solve**: the view the train's result gives
     /// of each part is the result the part solved to, field for field — on
     /// every preset alone and after every other, where a part's pieces are
     /// not the graph's by the same index.
     #[test]
-    fn a_card_is_its_part_solved() {
+    fn a_part_is_its_own_solve_laid_out() {
         let lib = library();
         for a in arr::StagePreset::ALL {
             for b in [
@@ -4773,7 +4775,7 @@ mod tests {
                     assert_eq!(
                         format!("{:?}", r.part(p, k)),
                         format!("{:?}", own[k]),
-                        "{a:?} after {b:?}: card {k}"
+                        "{a:?} after {b:?}: part {k}"
                     );
                 }
                 assert_eq!(r.members.len(), t.shape.members.len());
@@ -6824,52 +6826,6 @@ mod tests {
         // ...and an epicyclic set carries the sign its own kinematics gives:
         // sun in with the ring held turns the carrier the same way.
         assert!(one(arr::planetary(12, 30, 72, 3)) > 0.0);
-    }
-
-    /// **A port's select is one rule**: a stage's end of a body moved to
-    /// another is split off where the body ran on, then held, joined or
-    /// left its own — so the pair behind a set moved from the carrier to
-    /// the ring leaves the carrier the set's alone and enters the pair by
-    /// the ring; the carrier moved to ground is held; moved to nothing it
-    /// is its own and free; and an end moved to the body it is on already
-    /// changes nothing.
-    #[test]
-    fn a_ports_select_is_one_rule_split_then_held_joined_or_its_own() {
-        let set = || arr::planetary(12, 30, 72, 3);
-        let (carrier, ring) = (2, 3);
-        let mut t = train_of(vec![set(), arr::pair([17, 43])]);
-        let before = t.clone();
-        let shared = t.port(0, carrier);
-        assert_eq!(t.port(1, 1), shared);
-        // The pair's end moved to the ring.
-        t.move_end(1, shared, Some(t.port(0, ring)));
-        assert_eq!(
-            t.ends_of(t.port(0, carrier)).len(),
-            1,
-            "the carrier is the set's"
-        );
-        assert_eq!(t.port(1, 1), t.port(0, ring), "the pair enters by the ring");
-        assert_eq!(
-            t.max_body(),
-            before.max_body(),
-            "a body split and joined is no new body"
-        );
-        // The carrier moved to ground: held.
-        t.move_end(0, t.port(0, carrier), Some(GROUND));
-        assert!(t.held.contains(&t.port(0, carrier)));
-        // ...and to nothing: its own, and free.
-        t.move_end(0, t.port(0, carrier), None);
-        assert!(!t.held.contains(&t.port(0, carrier)));
-        // An end moved to the body it is on changes nothing.
-        let same = t.clone();
-        t.move_end(0, t.port(0, ring), Some(t.port(0, ring)));
-        assert_eq!(format!("{t:?}"), format!("{same:?}"));
-        // ...and the ring, shared with the pair, moved to its own body
-        // leaves the pair with a body of its own and the ring the set's.
-        t.move_end(1, t.port(0, ring), None);
-        assert_eq!(t.ends_of(t.port(0, ring)).len(), 1);
-        assert_eq!(t.ends_of(t.port(1, 1)).len(), 1);
-        assert_ne!(t.port(1, 1), t.port(0, ring));
     }
 
     /// **Holds are stated, and a shared body says where a stage is

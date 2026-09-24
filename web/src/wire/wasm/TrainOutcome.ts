@@ -4,8 +4,7 @@ import type { FlowRow } from "../core/FlowRow";
 import type { Groupings } from "../core/Groupings";
 import type { MemberName } from "../core/MemberName";
 import type { MotionReport } from "../core/MotionReport";
-import type { ShapeResult } from "../core/ShapeResult";
-import type { StagePorts } from "../core/StagePorts";
+import type { Part } from "../core/Part";
 import type { TrainResult } from "../core/TrainResult";
 import type { TrainFailure } from "./TrainFailure";
 
@@ -33,15 +32,14 @@ export type TrainOutcome = { result: TrainResult | null, failure: TrainFailure |
  */
 figures: Array<Figure>, 
 /**
- * **Every card**: the part of the train's graph it is, in its own
- * numbering with where each of its pieces is in the graph — what the
- * panel stands a card on — and its ports, with the label the panel names
- * each by, so a designer is offered exactly the bodies a train may hold,
- * drive or couple, read from the part's wiring rather than written into
- * the front end a second time. Present on success and failure alike: it
- * needs no geometry.
+ * **Every part** of the train's graph — the pieces that close apart —
+ * in its own numbering with where each of its pieces is in the graph,
+ * and its ports: what the panel names a part by (its meshes), and how
+ * it reads what a part's meshes put on each of its bodies
+ * (`TrainResult::parts`, by the part's own numbering). Present on
+ * success and failure alike: it needs no geometry.
  */
-topology: Array<StagePorts>, 
+parts: Array<Part>, 
 /**
  * **The train's motion** — exact ratios, every body's speed, mobility —
  * present whenever the tooth counts and topology give one, which is
@@ -72,12 +70,4 @@ names: Array<MemberName>,
  * share one module, one pressure angle and one axial contact ratio —
  * by the graph's indices ([`gear_core::train::Shape::mesh_groups`]).
  */
-mesh_groups: Array<Array<number>>, 
-/**
- * **Each card's view of the result**, in the order the topology deals
- * them ([`gear_core::train::TrainResult::cards`]) — the result laid
- * back out in each part's own numbering by the core's one rule, so the
- * cards do not slice it a second time. Empty where the train did not
- * solve.
- */
-cards: Array<ShapeResult>, };
+mesh_groups: Array<Array<number>>, };

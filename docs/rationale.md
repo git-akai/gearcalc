@@ -213,7 +213,7 @@ the edits rather than a property of the preset.
 **What would change it:** an output mechanism with a ratio of its own — a
 pin-and-roller output that is not 1:1 — would be a mesh, not a coupling.
 
-### A train is one graph, and a card is a part of it
+### A train is one graph, and a stage is a part of it
 
 A train was a list of stages, each with axes of its own, and a body two
 stages listed was what joined them. That let one shaft stand on two axes —
@@ -227,36 +227,38 @@ into it, and a join makes the two axes one line.
 stored: its parts, the pieces that close, search and rate apart
 (`Shape::parts`) — gears joined by meshes, meshes by the distances they
 share. Nothing a part closes, sizes, searches or rates reads another, so a
-part's result is a card's result with no slicing, and a train built stage
+part's result is its stage's result with no slicing, and a train built stage
 by stage falls apart into exactly its stages, each solving as the preset
 alone does; laws hold both, and a file written as stages is converted to
 the graph a chain of the same stages builds now (`graph_of`, `gear-cli
-convert`). Cards that are derived follow the graph without being told: a
-mesh removed that leaves two parts is two cards.
+convert`). Parts that are derived follow the graph without being told: a
+mesh removed that leaves two parts is two.
 
 **What it costs, and where it is paid:**
 
-- **A card's indices are not the graph's.** An edit is asked in the card's
-  numbering and read through its part's maps (`Shape::edit_part`); the
-  panel stands on the graph's own objects, so a box writes the train and
-  relief copies back leaf by leaf as it did. What
-  an edit reads of *its* stage — the gears on an axis it removes, whether a
-  gear is alone on its body — it reads among the card's gears, which a law
-  holds every add on every preset to.
-- **A card lists what it has something on.** A layshaft's output with no
-  gear engaged is the next stage's input and nothing of the layshaft's, so
-  in neutral its card has no end of it. The shaft stays — the next stage's
-  gear names it — and a gear engaged onto it brings the end back.
-- **A stage asked alone is one card**, whatever it falls into
+- **Nothing on screen is a part.** The panel shows the graph's pieces — a
+  mesh, a body, an axis — by the graph's own indices, and a stage is what a
+  preset laid in and nothing after it: an edit is the graph's (`Edit`),
+  offered at a piece and never asked of a stage, so there is no second
+  numbering to read an edit through, and a box bound to a piece writes the
+  train. The part stays in the core, the unit a result is closed,
+  searched and rated in, and the harness prints the corpus part by part.
+- **A part lists what it has something on.** A layshaft's output with no
+  gear engaged is the next stage's input and nothing of the layshaft's
+  part, so in neutral that part has no end of it. The shaft stays — the
+  next stage's gear names it — and a gear engaged onto it brings the end
+  back.
+- **A stage asked alone is one part**, whatever it falls into
   (`Part::whole`): two pairs through a compound shaft, asked as a stage,
   are the stage the harness and the tests mean.
 - **One file format, and a one-off converter** rather than a second reader,
   for the reason the format gives: two readers for one format is two to
   test for ever.
 
-**What would change it:** nothing about the one graph. How the cards group
-it is the interface's to revisit — a part is what closes apart, which is
-the right unit for a result and not necessarily for a screen.
+**What would change it:** nothing about the one graph. How it is shown has
+been revisited once — a card a part gave way to one list of the graph's
+pieces and one workspace, since a part is the right unit for a result and
+not for a screen.
 
 ### Degrees where a designer states a number, radians in the mathematics
 

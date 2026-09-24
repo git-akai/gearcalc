@@ -1519,8 +1519,8 @@ mod tests {
         //
         // What an edit would do, fired through the edits that say each part
         // of it: a gear on a new axis (gears, meshes, axes, bodies,
-        // distances, and the path kept), a stage laid in at a body (cards),
-        // a release of nothing held (nothing), a chain's last gear taken
+        // distances, and the path kept), a stage laid in at a body, a
+        // release of nothing held (nothing), a chain's last gear taken
         // (case entries, and the path lost), a coupling taken off
         // (couplings), and a set's ring held (holds, and a path found).
         {

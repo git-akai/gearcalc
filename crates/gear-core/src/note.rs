@@ -185,8 +185,6 @@ pub mod key {
     pub const PREVIEW_DISTANCES: &str = "preview.distances";
     /// `preview.couplings`
     pub const PREVIEW_COUPLINGS: &str = "preview.couplings";
-    /// `preview.cards`
-    pub const PREVIEW_CARDS: &str = "preview.cards";
     /// `preview.holds`
     pub const PREVIEW_HOLDS: &str = "preview.holds";
     /// `preview.case_entries`
@@ -260,7 +258,6 @@ pub mod key {
         PREVIEW_BODIES,
         PREVIEW_DISTANCES,
         PREVIEW_COUPLINGS,
-        PREVIEW_CARDS,
         PREVIEW_HOLDS,
         PREVIEW_CASE_ENTRIES,
         PREVIEW_PATH,

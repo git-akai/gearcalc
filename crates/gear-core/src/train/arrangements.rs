@@ -363,7 +363,7 @@ impl Shape {
 }
 
 /// **Growing a shape a piece at a time** — what [`Builder`] does to a new
-/// one and the card's edits (`train/edits.rs`) do to one that exists, so
+/// one and the graph's edits (`train/edits.rs`) do to one that exists, so
 /// the two add a body, a member, a mesh or a distance by one rule. Every
 /// push appends and hands back the index the wiring gives the piece.
 impl Shape {

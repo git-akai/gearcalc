@@ -21,9 +21,9 @@ pub struct Preview {
     /// Why the edit would not be made, where it would not.
     pub refused: Option<Note>,
     /// **What it would change**: each kind of piece whose count moves —
-    /// gears, meshes, axes, bodies, axis distances, couplings — the cards
-    /// the graph falls into, the holds and the case entries, before and
-    /// after; or that it changes nothing at all.
+    /// gears, meshes, axes, bodies, axis distances, couplings — the holds
+    /// and the case entries, before and after; or that it changes nothing
+    /// at all.
     pub changes: Vec<Note>,
     /// **What the headline path would come to** — the path the headline
     /// case walks first — its ratio and efficiency before and after, or
@@ -35,19 +35,18 @@ pub struct Preview {
 
 /// The kinds of piece and statement a preview counts, in the order it
 /// says them.
-const KINDS: [&str; 9] = [
+const KINDS: [&str; 8] = [
     key::PREVIEW_GEARS,
     key::PREVIEW_MESHES,
     key::PREVIEW_AXES,
     key::PREVIEW_BODIES,
     key::PREVIEW_DISTANCES,
     key::PREVIEW_COUPLINGS,
-    key::PREVIEW_CARDS,
     key::PREVIEW_HOLDS,
     key::PREVIEW_CASE_ENTRIES,
 ];
 
-fn counts(t: &Train) -> [usize; 9] {
+fn counts(t: &Train) -> [usize; 8] {
     let s = &t.shape;
     [
         s.members.len(),
@@ -56,7 +55,6 @@ fn counts(t: &Train) -> [usize; 9] {
         s.bodies.len(),
         s.distances.len(),
         s.couplings.len(),
-        t.parts().len(),
         t.held.len(),
         t.load_cases.iter().map(|c| c.loads.len()).sum(),
     ]
@@ -178,15 +176,15 @@ mod tests {
     #[test]
     fn a_refused_edit_previews_its_refusal_and_nothing_else() {
         let t = pair();
-        let p = preview(&t, Err(EditRefused::OneCard), &test_library());
-        assert_eq!(p.refused, Some(Note::new(EditRefused::OneCard.key())));
+        let p = preview(&t, Err(EditRefused::Geared), &test_library());
+        assert_eq!(p.refused, Some(Note::new(EditRefused::Geared.key())));
         assert!(p.changes.is_empty() && p.paths.is_empty() && p.unsolved.is_none());
     }
 
     /// **A preview counts what an edit makes**: a gear on a new axis at a
     /// pair's second gear — an idler off the path the case walks — is a
-    /// gear, a mesh, an axis, a body and a distance more, one card still,
-    /// and the path as it was.
+    /// gear, a mesh, an axis, a body and a distance more, and the path as
+    /// it was.
     #[test]
     fn a_preview_counts_what_an_edit_makes() {
         let t = pair();

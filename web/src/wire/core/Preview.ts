@@ -11,9 +11,9 @@ export type Preview = {
 refused: Note | null, 
 /**
  * **What it would change**: each kind of piece whose count moves —
- * gears, meshes, axes, bodies, axis distances, couplings — the cards
- * the graph falls into, the holds and the case entries, before and
- * after; or that it changes nothing at all.
+ * gears, meshes, axes, bodies, axis distances, couplings — the holds
+ * and the case entries, before and after; or that it changes nothing
+ * at all.
  */
 changes: Array<Note>, 
 /**

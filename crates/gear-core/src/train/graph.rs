@@ -1,6 +1,6 @@
 //! **The train is one graph** — every axis, body, member, mesh, distance
 //! and coupling in one shape ([`super::Train::shape`]) — and **its parts
-//! are what a card shows**: the pieces that close, search and rate apart
+//! are what a stage was**: the pieces that close, search and rate apart
 //! ([`Shape::parts`]), derived and never stored.
 //!
 //! A train was a list of stages, each with axes of its own, and a body two
@@ -749,7 +749,7 @@ mod tests {
     /// **A file of stages falls apart into its stages**: one part each,
     /// holding exactly that stage's members, meshes and distances, and each
     /// part solving to what its stage solves to — so a converted file's
-    /// cards are its stages, and each rates as it did.
+    /// parts are its stages, and each rates as it did.
     #[test]
     fn a_file_of_stages_falls_apart_into_its_stages() {
         let lib = test_library();

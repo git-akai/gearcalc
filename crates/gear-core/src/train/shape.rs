@@ -312,8 +312,8 @@ pub struct Shape {
     /// centre line, an Oldham coupling, a Schmidt coupling. No geometry and
     /// no play: a row in the motion, `ω_a = ω_b`, and a lossless way through
     /// the flow. What lets an orbiting body drive a shaft that does not
-    /// orbit, and never what a stage has to have: a stage adds one and takes
-    /// it away like a step ([`super::StageEdit::Couple`]).
+    /// orbit, and never what a stage has to have: one is added and taken
+    /// away like a step ([`super::Edit::Couple`], and a removal).
     #[cfg_attr(feature = "serde", serde(default))]
     pub couplings: Vec<[usize; 2]>,
 }
@@ -1084,7 +1084,7 @@ impl Shape {
     /// or a set; two for a hula stage or a stepped planet, whose meshes do
     /// not join; three for a layshaft's three pairs. A **layer over the
     /// graph**, read off it and never stored: what a panel offers one box
-    /// for and writes to every member of, and what it deals the cards by.
+    /// for and writes to every member of.
     #[must_use]
     pub fn mesh_groups(&self) -> Vec<Vec<usize>> {
         let n = self.members.len();

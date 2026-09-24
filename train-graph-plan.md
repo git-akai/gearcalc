@@ -642,6 +642,28 @@ still numbered part by part — the cards' order — among fields numbered by
 the graph; it is by the graph's index now, which a chain built in order
 never told apart, so the corpus held.
 
+**Phase 7, step 5b — the card vocabulary retires.** Done: `StageEdit`,
+`Shape::edit_part` and `Train::edit_stage` are gone, and with them the
+card's own refusals — `LastOfItsKind` among them, a rule about a card's
+chain that the graph's cascading removal does not need; `move_end`, the
+port select's rule, and `edit_train`'s card-era edits (join, split, hold,
+release, move end, push and remove stage, stage), the panel asking the
+graph's edits and a case's; `TrainOutcome::cards`, and `topology` for the
+parts themselves (`parts`), the panel reading no port, family or card
+mesh group any more — `StagePorts` and `PortSpec` went with it. The laws
+the card edits carried were ported, each card edit asked as the graph's
+edit it was read into: every add on every preset solves, every add
+undoes, every refusal names its reason (the at-no-radius refusal on
+meshed planets now, a planocentric's ring taking its planet with it), the
+hula and the planocentric reached by edits; the laws of the translation
+itself went with it. Five mutations against the ported laws, each caught.
+The probe's edits asked as the graph's record, step for step, the trains
+the card edits recorded, byte for byte. `split`, `push_stage` and
+`remove_stage` stay as the train's operations a law or a fixture builds
+with. The join refusal says what it is — two bodies **geared to each
+other** — and a preview no longer counts parts, which nothing on screen
+names; `TrainResult::cards` is `by_part`, the harness's.
+
 **Phase 6 — results and the boundary.** `TrainResult` per member, mesh,
 distance, axis and path, with `topology` carrying the groupings;
 `relieve_stage` → `relieve`; `adopt_member` by member; bindings; the probe.

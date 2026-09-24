@@ -10,7 +10,6 @@
     portOptions,
     isHeld,
     type CaseKind,
-    type PortSpec,
     type LoadCase,
     type Load,
     type LoadFreedom,
@@ -26,7 +25,6 @@
     type StageGear,
     type Shape,
     type Member,
-    type StageEdit,
     type Value,
     type GearResult,
     type Note,
@@ -184,9 +182,9 @@
   });
   /** **A part named by its meshes** — what a reader can find it by in the
    *  list — and shown by selecting its first. */
-  const partName = (p: number): string => (result.topology[p]?.part.meshes ?? []).map(meshName).join(" · ");
+  const partName = (p: number): string => (result.parts[p]?.meshes ?? []).map(meshName).join(" · ");
   function showPart(p: number) {
-    const k = result.topology[p]?.part.meshes[0];
+    const k = result.parts[p]?.meshes[0];
     if (k !== undefined) select({ mesh: k });
   }
   /** Every note a part's own solve raised, with the part it is about. */
@@ -197,10 +195,10 @@
    *  own list of bodies (ground 0) and a name: the part's gears on the
    *  body, or the carrier's word where it has none there. */
   const partsThrough = (body: number): { part: number; slot: number; name: string }[] =>
-    result.topology.flatMap((s, part) => {
-      const slot = s.part.shape.bodies.findIndex((x) => x.body === body) + 1;
+    result.parts.flatMap((s, part) => {
+      const slot = s.shape.bodies.findIndex((x) => x.body === body) + 1;
       if (slot === 0) return [];
-      const on = s.part.members.filter((i) => tab.train.shape.members[i]?.body === body);
+      const on = s.members.filter((i) => tab.train.shape.members[i]?.body === body);
       return [{ part, slot, name: on.length > 0 ? on.map(gearName).join(" · ") : t("ui.train_the_carrier") }];
     });
   /** An axis distance by its two axes — "Axis 1 ↔ Axis 2". */
@@ -237,7 +235,7 @@
       return s.couplings[sel.coupling] === undefined ? [] : [at({ coupling: sel.coupling }, t("ui.train_coupling_heading"))];
     }
     if ("junction" in sel) {
-      const axes = result.topology[sel.junction]?.part.axes ?? [];
+      const axes = result.parts[sel.junction]?.axes ?? [];
       return axes.filter((a) => (s.axes[a]?.carried_by ?? 0) !== 0).map((a) => at({ axis: a }, axisLabel(a)));
     }
     return [];
@@ -553,7 +551,7 @@
       </button>
     {:else if "junction" in row}
       {@const j = row.junction}
-      {@const axes = (result.topology[j.part]?.part.axes ?? []).map((a) => result.groupings.axes[a]).filter((a) => a !== undefined)}
+      {@const axes = (result.parts[j.part]?.axes ?? []).map((a) => result.groupings.axes[a]).filter((a) => a !== undefined)}
       <div class="junction" class:sel={isSelected({ junction: j.part })}>
         <button class="fm" onclick={() => select({ junction: j.part })}>
           <span class="arrow">↓</span> {j.meshes.map(meshName).join(" · ")}
@@ -667,8 +665,8 @@
     {@const [from, to] = tab.train.shape.couplings[sel.coupling]}
     <h4 class="section-heading">{t("ui.train_coupling_heading")}</h4>
     <p class="hint">{t("ui.train_coupling_between", { a: bodyName(from), b: bodyName(to) })}</p>
-  {:else if sel !== null && "junction" in sel && result.topology[sel.junction] !== undefined}
-    {@const part = result.topology[sel.junction].part}
+  {:else if sel !== null && "junction" in sel && result.parts[sel.junction] !== undefined}
+    {@const part = result.parts[sel.junction]}
     {#each part.meshes as k (k)}
       <button class="gearrow" onclick={() => select({ mesh: k })}>{meshName(k)}</button>
     {/each}
