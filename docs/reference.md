@@ -766,9 +766,9 @@ Each arrangement differs only in what is free and what it is worth:
 The searches share `auto::maximise`: what differs between arrangements is how many
 numbers are free and what they are worth, not how to look for them, and a
 crossed pair differs from a parallel one in nothing but the objective —
-`crossed_shifts_for_efficiency` is `shifts_for_efficiency` with the mesh
-swapped, the same floor, pinning, box and refusals, the interference asked
-along the line. A member whose shift the designer *gave* is a constraint on
+the shape's search asks each mesh through its trial, `MeshTrial` on a line
+contact and `CrossedTrial` on a point, with the same floor, pinning, box
+and refusals, the interference asked along the line. A member whose shift the designer *gave* is a constraint on
 either search and not a candidate of it: it is not judged, since a clamp the
 tool raised on it is a fact about the design — a worm's thread, whose round is
 capped at every shift, is the case, and a search that asked the pinned worm to

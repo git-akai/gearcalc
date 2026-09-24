@@ -3565,17 +3565,6 @@ pub struct Train {
     pub held: Vec<usize>,
 }
 
-impl Train {
-    /// The cases that take part, with their index in the list — which is how
-    /// every result names the case it belongs to.
-    pub fn enabled_cases(&self) -> impl Iterator<Item = (usize, &LoadCase)> {
-        self.load_cases
-            .iter()
-            .enumerate()
-            .filter(|(_, c)| c.enabled)
-    }
-}
-
 /// One of a load's two figures, named so a caller can say which was
 /// just touched.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

@@ -1111,30 +1111,6 @@ impl CrossedPath {
         })
     }
 
-    /// The radius each member's flank is at, at a parameter along the path.
-    ///
-    /// `r = √(r_b² + (ρ_n cos β_b)²)`, the same relation the zone is bounded by.
-    #[must_use]
-    pub fn radii_at(&self, s: f64, screw: &Screw) -> [f64; 2] {
-        let alpha_n = screw.normal_pressure_angle_rad;
-        let beta = [
-            screw.worm_helix_angle_rad,
-            screw.shaft_angle_rad - screw.worm_helix_angle_rad,
-        ];
-        let r = [
-            screw.worm_pitch_diameter / 2.0,
-            screw.wheel_pitch_diameter / 2.0,
-        ];
-        let mut out = [0.0; 2];
-        for i in 0..2 {
-            let rb = r[i] * crate::plane::transverse_pressure_angle(alpha_n, beta[i]).cos();
-            let bb = crate::plane::base_helix_angle(beta[i], alpha_n);
-            let rho_t = (s - self.tangency[i]).abs() * bb.cos();
-            out[i] = f64::hypot(rb, rho_t);
-        }
-        out
-    }
-
     /// The relative principal curvatures at a point of the path, 1/mm.
     ///
     /// The same call [`pitch_point_curvatures`] makes, with the **local** normal

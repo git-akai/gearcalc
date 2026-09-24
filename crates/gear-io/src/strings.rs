@@ -251,12 +251,6 @@ impl Catalogue {
         };
         fill(template, &note.values)
     }
-
-    /// Render every note in a list.
-    #[must_use]
-    pub fn render_all(&self, notes: &[Note]) -> Vec<String> {
-        notes.iter().map(|n| self.render(n)).collect()
-    }
 }
 
 /// Substitute `{name}` from `values`.
