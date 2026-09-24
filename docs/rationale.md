@@ -248,9 +248,9 @@ mesh removed that leaves two parts is two.
   part, so in neutral that part has no end of it. The shaft stays — the
   next stage's gear names it — and a gear engaged onto it brings the end
   back.
-- **A stage asked alone is one part**, whatever it falls into
-  (`Part::whole`): two pairs through a compound shaft, asked as a stage,
-  are the stage the harness and the tests mean.
+- **A preset asked alone is a train of one**, solved part by part as any
+  train is (`solve_alone`); a preset is one part, which a law holds every
+  preset to.
 - **One file format, and a one-off converter** rather than a second reader,
   for the reason the format gives: two readers for one format is two to
   test for ever.

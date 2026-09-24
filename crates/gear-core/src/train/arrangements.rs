@@ -958,36 +958,35 @@ mod tests {
     //! the set's kind could not name.
 
     use super::super::shape::ShapeResult;
-    use super::super::{test_library as library, StageBoundary};
+    use super::super::test_library as library;
     use super::*;
 
+    /// The arrangement asked with `held` held, loaded at `input` and
+    /// reacted at `output` — its slots, as a train of one numbers them.
     fn solve(shape: &Shape, held: &[Body], input: Body, output: Body) -> crate::train::Alone {
-        let boundary = StageBoundary::holding(shape.bodies.len() + 1, held, input, output);
-        under(shape, boundary)
-    }
-
-    /// The arrangement as its list reads: the first ring held, the first
-    /// body not held driven, the next the output — what a stage does with
-    /// nothing stated, which is the claim each list's doc makes.
-    fn conventionally(shape: &Shape) -> crate::train::Alone {
-        under(
-            shape,
-            StageBoundary::conventional(&shape.wiring(), &shape.ports()),
-        )
-    }
-
-    fn under(shape: &Shape, boundary: StageBoundary) -> crate::train::Alone {
         crate::train::solve_alone(
-            &crate::train::Train::alone(shape, 2.0, 3000.0).under(&boundary),
+            &crate::train::Train::alone(shape, 2.0, 3000.0).arranged(held, input, output),
             &library(),
         )
         .unwrap()
     }
 
+    /// The arrangement as its list reads: the first ring held, the first
+    /// body not held driven, the next the output — what a preset does with
+    /// nothing stated, which is the claim each list's doc makes.
+    fn conventionally(shape: &Shape) -> crate::train::Alone {
+        crate::train::solve_alone(&crate::train::Train::alone(shape, 2.0, 3000.0), &library())
+            .unwrap()
+    }
+
     /// Every mesh on every distance runs at that distance, opened by the
     /// clearance its own way.
     fn every_distance_closes(r: &ShapeResult) {
-        for d in &r.distances {
+        closes(&r.distances);
+    }
+
+    fn closes<'a>(distances: impl IntoIterator<Item = &'a super::super::shape::DistanceReport>) {
+        for d in distances {
             for nominal in &d.nominal {
                 assert!(
                     ((d.running - nominal).abs() - d.clearance.abs()).abs() < 1e-9,
@@ -1035,32 +1034,35 @@ mod tests {
         }
     }
 
-    /// **A point contact and a line contact in one stage** multiply as any
+    /// **A point contact and a line contact in one train** multiply as any
     /// two meshes do: the ratio is the worm's times the pair's, the
     /// efficiency the product of the two meshes' own, the wheel is rated by
     /// contact alone and the pinion on its body by bending as well, and
-    /// the stage locks backward exactly where the worm does.
+    /// the train locks backward exactly where the worm does. Two parts —
+    /// their meshes share nothing — read off the train's one result.
     #[test]
-    fn a_worm_and_a_spur_pair_share_one_stage() {
+    fn a_worm_and_a_spur_pair_in_one_train() {
         let shape = worm_and_pair((1, 40), (17, 43));
-        let r = solve(&shape, &[], 1, 2);
+        let train = crate::train::Train::alone(&shape, 2.0, 3000.0).arranged(&[], 1, 2);
+        let r = crate::train::solve_train(&train, &library()).unwrap();
+        let path = &r.paths[0];
         assert!(
-            (r.ratio.unwrap().abs() - 40.0 * 43.0 / 17.0).abs() < 1e-9,
+            (path.ratio.abs() - 40.0 * 43.0 / 17.0).abs() < 1e-9,
             "{}",
-            r.ratio.unwrap()
+            path.ratio
         );
-        every_distance_closes(&r);
+        closes(r.distances.iter().flatten());
         assert!(r.meshes[0].point.is_some() && r.meshes[1].line.is_some());
         let product = r.meshes[0].efficiency.forward * r.meshes[1].efficiency.forward;
         assert!(
-            (r.efficiency.unwrap().forward - product).abs() < 1e-9,
+            (path.efficiency.forward - product).abs() < 1e-9,
             "{} vs {product}",
-            r.efficiency.unwrap().forward
+            path.efficiency.forward
         );
         assert_eq!(
-            r.efficiency.unwrap().backward <= 0.0,
+            path.efficiency.backward <= 0.0,
             r.meshes[0].efficiency.backward <= 0.0,
-            "the stage locks where its worm does"
+            "the train locks where its worm does"
         );
         assert!(r.members[1].cases[0].bending_stress.is_none());
         assert!(r.members[2].cases[0].bending_stress.is_some());

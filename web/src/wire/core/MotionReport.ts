@@ -31,13 +31,9 @@ untouched: Array<number>,
  */
 bodies: Array<BodyReport>, 
 /**
- * One per stage, input over output. `None` where the output does not
- * turn.
- */
-ratios: Array<Exact | null>, 
-/**
- * The first stage's input to the last stage's output. `None` where the
- * answer is a family, since a quotient of two families is not a number.
+ * The headline case's path, its load over its reaction. `None` where
+ * there is no headline or the answer is a family, since a quotient of
+ * two families is not a number.
  */
 total: Exact | null, 
 /**

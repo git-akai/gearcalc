@@ -36,7 +36,6 @@
 //! holds. A train says everything it has: what a file lists is the graph,
 //! and what it holds is what it says it holds.
 
-use super::wiring::Wiring;
 use crate::kinematics::{Body, Condition, GROUND};
 use crate::ratio::Ratio;
 
@@ -102,61 +101,6 @@ impl Ports {
     }
 }
 
-/// **What one stage is asked**, as its solver needs it: a condition per local
-/// body, and which body power comes in and leaves by.
-///
-/// Assembled by the train from its holds, or from the stage's own [`Ports`]
-/// where it is asked alone.
-#[derive(Clone, Debug, PartialEq)]
-pub struct StageBoundary {
-    /// One per local body, ground first.
-    pub conditions: Vec<Condition>,
-    /// The local body a load is referred to.
-    pub input: Body,
-    /// The local body a load leaves by.
-    pub output: Body,
-}
-
-impl StageBoundary {
-    /// A stage on its own, under its own conventions: ground held, the
-    /// conventional bodies held, the conventional input driven at one turn.
-    #[must_use]
-    pub fn conventional(wiring: &Wiring, ports: &Ports) -> Self {
-        let (input, output) = ports.ends(&ports.held, None);
-        Self::holding(wiring.slots.len(), &ports.held, input, output)
-    }
-
-    /// `slots` slots with `held` fixed to ground and `input` driven
-    /// at one turn, the rest free.
-    #[must_use]
-    pub fn holding(slots: usize, held: &[Body], input: Body, output: Body) -> Self {
-        let mut conditions = vec![Condition::Free; slots];
-        conditions[GROUND] = Condition::Ground;
-        for &h in held {
-            conditions[h] = Condition::Ground;
-        }
-        conditions[input] = Condition::Drive(Ratio::ONE);
-        Self {
-            conditions,
-            input,
-            output,
-        }
-    }
-
-    /// The local bodies held to ground, ascending — what an epicyclic kind
-    /// reads its arrangement from.
-    #[must_use]
-    pub fn held(&self) -> Vec<Body> {
-        self.conditions
-            .iter()
-            .enumerate()
-            .skip(1)
-            .filter(|(_, c)| **c == Condition::Ground)
-            .map(|(i, _)| i)
-            .collect()
-    }
-}
-
 // ------------------------------------------------- the train as one system ---
 
 use super::graph::Part;
@@ -209,11 +153,10 @@ pub struct TrainMotion {
     /// Every body's turns per turn of the driven end — exactly — by body
     /// number, ground first.
     pub speeds: Vec<Ratio>,
-    /// One per stage: its input over its output, or `None` where the output
-    /// does not turn — two meshes stepping by the same amount and cancelling,
-    /// which is a refusal rather than a very large number.
-    pub ratios: Vec<Option<Ratio>>,
-    /// The first stage's input to the last stage's output.
+    /// **The headline case's path**, its load over its reaction — `None`
+    /// where the train has no headline, or the answer is a family, or the
+    /// reaction does not turn: two meshes stepping by the same amount and
+    /// cancelling, which is a refusal rather than a very large number.
     pub total: Option<Ratio>,
     /// How many conditions the train needs, and which bodies nothing touches.
     pub mobility: Mobility,
@@ -504,104 +447,33 @@ impl Train {
         Ok(out)
     }
 
-    /// Whether a body is listed on a stage before or after `k`.
-    fn shared_with(parts: &[Part], body: usize, k: usize, earlier: bool) -> bool {
-        ends_in(parts, body)
-            .iter()
-            .any(|&(s, _)| s != k && ((s < k) == earlier))
-    }
-
-    /// **What each stage is asked**, as its own solver needs it: its slots'
-    /// conditions, and the slot power comes in and leaves by.
-    ///
-    /// A stage in a train is driven by what it shares as often as by a
-    /// motor, so a body shared with an *earlier* stage is its input and is
-    /// driven at one turn for the stage's own solve; one shared with a later
-    /// stage is its output. Where neither says, the stage's conventions do.
-    /// This is the chain read off the graph rather than assumed of it, and
-    /// it is the one place "earlier" means anything — a general graph has
-    /// no order, and the train-level family ([`Train::motion`]) needs none.
+    /// **No part is held still by its holds.** A set with its carrier and
+    /// its ring both held cannot turn at all, whatever drives it — a hold
+    /// too many, which the train refuses and names: each part is driven at
+    /// a port it does not hold, with the designer's holds applied last, so
+    /// the one that closed it is the one named.
     ///
     /// # Errors
     ///
-    /// As [`Self::system`].
-    pub fn boundaries(&self) -> Result<Vec<StageBoundary>, MotionError> {
-        self.boundaries_of(&self.parts())
-    }
-
-    /// As [`Self::boundaries`], of parts already in hand.
-    pub(crate) fn boundaries_of(&self, parts: &[Part]) -> Result<Vec<StageBoundary>, MotionError> {
+    /// [`MotionError::Conflicts`] at the hold that locked a part.
+    fn check_parts(&self, parts: &[Part]) -> Result<(), MotionError> {
         let conditions = self.conditions(self.stage_bodies())?;
-        let mut out = Vec::with_capacity(parts.len());
         for (k, part) in parts.iter().enumerate() {
             let stage = &part.shape;
             let w = stage.wiring();
-            let ports = stage.ports();
             let mut local: Vec<Condition> = (0..w.slots.len())
                 .map(|s| conditions[stage.body_at(s)])
                 .collect();
             local[GROUND] = Condition::Ground;
-            let side = |earlier: bool| -> Option<Body> {
-                ports
-                    .ports
-                    .iter()
-                    .copied()
-                    .find(|&slot| Self::shared_with(parts, stage.body_at(slot), k, earlier))
+            let Some(driven) = stage
+                .ports()
+                .ports
+                .into_iter()
+                .find(|&slot| local[slot] == Condition::Free)
+            else {
+                continue;
             };
-            let held: Vec<Body> = local
-                .iter()
-                .enumerate()
-                .skip(1)
-                .filter(|(_, c)| **c == Condition::Ground)
-                .map(|(i, _)| i)
-                .collect();
-            // A body shared with an earlier stage says where power enters;
-            // failing that, the body the first case's first load is at,
-            // where that is one of this stage's — a set alone loaded at its
-            // carrier reads carrier in; failing that the stage's convention
-            // — its first port neither held nor shared onward, so a set at
-            // the head of a chain sharing its sun onward is entered at its
-            // carrier. **A stage's input and output are its own reporting
-            // convention** — which way its ratio, its efficiency both ways
-            // and its play are read — and decide nothing about a load case,
-            // whose loads say what turns; reading the first load here moves
-            // no case, since a case names bodies and not ends.
-            let onward = side(false);
-            let open = |p: &Body| !held.contains(p) && Some(*p) != onward;
-            let first_load = self
-                .load_cases
-                .iter()
-                .filter(|c| c.enabled)
-                .flat_map(|c| c.loads.iter())
-                .find(|l| l.is_load())
-                .and_then(|l| {
-                    let slot = stage.slot_if_any(l.at)?;
-                    ports.ports.contains(&slot).then_some(slot)
-                })
-                .filter(open);
-            let input = side(true).or(first_load).unwrap_or_else(|| {
-                ports
-                    .ports
-                    .iter()
-                    .copied()
-                    .find(open)
-                    .unwrap_or_else(|| ports.ends(&held, None).0)
-            });
-            // **The output is chosen knowing the input.** A set behind a pair
-            // and sharing its *ring* with it had its conventional output read
-            // with no input in hand — and the convention, with the sun held,
-            // is "carrier in, ring out", so the ring was named both ends.
-            // **A load names nothing here.** Which of two free ports is "the
-            // output" decides only the stage's own no-load figures — which a
-            // stage with two free ports has none of, its motion being a
-            // family. The convention stands.
-            let output = onward.unwrap_or_else(|| ports.ends(&held, Some(input)).1);
-            local[input] = Condition::Drive(Ratio::ONE);
-            // **A stage held still is named at the hold that locked it**: a
-            // set with its carrier and its ring both held cannot be entered
-            // at its sun at all, and the designer's own holds go in last so
-            // the one that closed the set is the one named — the ring, not
-            // the sun the convention drives.
+            local[driven] = Condition::Drive(Ratio::ONE);
             let holds: Vec<Body> = self
                 .held
                 .iter()
@@ -615,13 +487,8 @@ impl Train {
             {
                 return Err(MotionError::Conflicts(stage.body_at(i)));
             }
-            out.push(StageBoundary {
-                conditions: local,
-                input,
-                output,
-            });
         }
-        Ok(out)
+        Ok(())
     }
 
     /// **The train's motion**, at one turn of what is driven.
@@ -642,7 +509,7 @@ impl Train {
         // load: a fresh train's reading is its first case. With no case to
         // say so nothing is driven, the motion is a family, and each case
         // decides its own.
-        let boundaries = self.boundaries_of(parts)?;
+        self.check_parts(parts)?;
         let ends = self.headline();
         if let Some(a) = self.headline_load() {
             conditions[a] = Condition::Drive(Ratio::ONE);
@@ -680,27 +547,15 @@ impl Train {
         let solution = solution.rebased(&preferred).ok_or(MotionError::Overflow)?;
         let mobility = system.mobility().ok_or(MotionError::Overflow)?;
         let speeds = solution.values.clone();
-        let ratios: Vec<Option<Ratio>> = boundaries
-            .iter()
-            .enumerate()
-            .map(|(k, b)| {
-                let (i, o) = (
-                    parts[k].shape.body_at(b.input),
-                    parts[k].shape.body_at(b.output),
-                );
-                // `None` where the answer is a family: the quotient of two
-                // families is not a number, and the particular values alone
-                // would print one as if it were.
-                solution.ratio(i, o)
-            })
-            .collect();
+        // `None` where the answer is a family: the quotient of two families
+        // is not a number, and the particular values alone would print one
+        // as if it were.
         let total = match ends {
             Some((a, b)) => solution.ratio(a, b),
             None => None,
         };
         Ok(TrainMotion {
             speeds,
-            ratios,
             total,
             mobility,
             solution,
@@ -716,11 +571,8 @@ impl Train {
     /// What a picker offers, and what [`super::solve_train`] admits a load
     /// at.
     #[must_use]
-    pub fn open_ports(&self, boundaries: &[StageBoundary]) -> Vec<PortBody> {
-        self.bodies(boundaries)
-            .into_iter()
-            .filter(|b| !b.held)
-            .collect()
+    pub fn open_ports(&self) -> Vec<PortBody> {
+        self.bodies().into_iter().filter(|b| !b.held).collect()
     }
 
     /// **The headline case's path**: the first case switched on, from its
@@ -757,20 +609,60 @@ impl Train {
         body != GROUND && !self.held.contains(&body) && !self.ends_of(body).is_empty()
     }
 
-    /// **A chain's two ends by convention**: the first stage's conventional
-    /// input and the last stage's conventional output, where each is open
-    /// and no other stage's — where a case starts on a train that has none,
-    /// and where a fixture writes its cases. A seed for a case and nothing
-    /// the train reports: its figures are its cases'. `None` where either
-    /// is held or shared, or the train is one stage with one open port.
+    /// **A chain's two ends by convention**: the first part's conventional
+    /// input and the last part's conventional output, where each is open and
+    /// no other part's — where a case starts on a train that has none, and
+    /// where a fixture writes its cases. A seed for a case and nothing the
+    /// train reports: its figures are its cases'. `None` where either is
+    /// held or shared, or the train is one part with one open port.
+    ///
+    /// Each end is its preset's convention read with the train's holds: the
+    /// first part entered at its first port neither held nor run on to a
+    /// later part — a set at a chain's head sharing its sun onward is
+    /// entered at its carrier — and the last left by the port its
+    /// convention reads after the one an earlier part enters it by.
     #[must_use]
     pub fn chain_ends(&self) -> Option<(usize, usize)> {
-        let boundaries = self.boundaries().ok()?;
-        let boundaries = boundaries.as_slice();
-        let (first, last) = (boundaries.first()?, boundaries.last()?);
-        let a = self.port(0, first.input);
-        let b = self.port(boundaries.len() - 1, last.output);
-        let open = self.open_ports(boundaries);
+        let parts = self.parts();
+        let k = parts.len().checked_sub(1)?;
+        let shared = |p: &Part, slot: Body, earlier: bool| {
+            ends_in(&parts, p.shape.body_at(slot))
+                .iter()
+                .any(|&(s, _)| (s < k && earlier) || (s > 0 && !earlier))
+        };
+        let held = |p: &Part| -> Vec<Body> {
+            let ports = p.shape.ports().ports;
+            ports
+                .into_iter()
+                .filter(|&slot| self.held.contains(&p.shape.body_at(slot)))
+                .collect()
+        };
+        let (first, last) = (&parts[0], &parts[k]);
+        let mut closed = held(first);
+        closed.extend(
+            first
+                .shape
+                .ports()
+                .ports
+                .into_iter()
+                .filter(|&slot| k > 0 && shared(first, slot, false)),
+        );
+        let a = first
+            .shape
+            .body_at(first.shape.ports().ends(&closed, None).0);
+        let entered = (k > 0)
+            .then(|| {
+                last.shape
+                    .ports()
+                    .ports
+                    .into_iter()
+                    .find(|&slot| shared(last, slot, true))
+            })
+            .flatten();
+        let b = last
+            .shape
+            .body_at(last.shape.ports().ends(&held(last), entered).1);
+        let open = self.open_ports();
         let single =
             |body: usize| open.iter().any(|p| p.body == body) && self.ends_of(body).len() == 1;
         (a != b && single(a) && single(b)).then_some((a, b))
@@ -885,11 +777,9 @@ pub struct MotionReport {
     /// ports are the ones flagged, and what a load may enter by is a port
     /// the train does not hold.
     pub bodies: Vec<BodyReport>,
-    /// One per stage, input over output. `None` where the output does not
-    /// turn.
-    pub ratios: Vec<Option<Exact>>,
-    /// The first stage's input to the last stage's output. `None` where the
-    /// answer is a family, since a quotient of two families is not a number.
+    /// The headline case's path, its load over its reaction. `None` where
+    /// there is no headline or the answer is a family, since a quotient of
+    /// two families is not a number.
     pub total: Option<Exact>,
     /// **The bodies whose turn parameterises a family** — one per condition
     /// the train is short — and empty where the answer is one answer. Every
@@ -935,7 +825,6 @@ impl Train {
         // reads "mobility 2, one given" of a set with its ring released —
         // the one given being the drive at the train's end its ratio is read
         // from, which the holds do not count.
-        let boundaries = self.boundaries().ok()?;
         let constrained = self
             .conditions(m.solution.values.len())
             .ok()?
@@ -945,7 +834,7 @@ impl Train {
             .count()
             + usize::from(self.headline_load().is_some());
         let free: Vec<usize> = m.solution.residual.iter().map(|r| r.at).collect();
-        let ports = self.bodies(&boundaries);
+        let ports = self.bodies();
         let ends = |body: usize| -> Vec<BodyEnd> {
             if body == GROUND {
                 return vec![];
@@ -988,7 +877,6 @@ impl Train {
                         .collect(),
                 })
                 .collect(),
-            ratios: m.ratios.iter().map(|r| r.map(Exact::from)).collect(),
             total: m.total.map(Exact::from),
             free,
             redundant: m.solution.redundant.clone(),
@@ -998,20 +886,19 @@ impl Train {
     /// **Every body some stage has as a port** — see [`PortBody`] — in
     /// body order, each with its ends.
     #[must_use]
-    pub fn bodies(&self, boundaries: &[StageBoundary]) -> Vec<PortBody> {
-        self.bodies_of(&self.parts(), boundaries)
+    pub fn bodies(&self) -> Vec<PortBody> {
+        self.bodies_of(&self.parts())
     }
 
     /// As [`Self::bodies`], of the graph cut into `parts`.
-    pub(crate) fn bodies_of(&self, parts: &[Part], boundaries: &[StageBoundary]) -> Vec<PortBody> {
+    pub(crate) fn bodies_of(&self, parts: &[Part]) -> Vec<PortBody> {
         let mut out: Vec<PortBody> = Vec::new();
         for (k, part) in parts.iter().enumerate() {
             let stage = &part.shape;
             let w = stage.wiring();
-            let Some(b) = boundaries.get(k) else { break };
             for slot in stage.ports().ports {
                 let body = stage.body_at(slot);
-                let held = b.conditions[slot] == Condition::Ground;
+                let held = self.held.contains(&body);
                 if let Some(x) = out.iter_mut().find(|x| x.body == body) {
                     x.ends.push((k, w.slots[slot]));
                     x.held |= held;
@@ -1380,9 +1267,8 @@ impl Train {
     pub fn push_stage(&mut self, stage: Shape) {
         let parts = self.parts();
         let k = parts.len();
-        let onward = self.boundaries_of(&parts).ok().and_then(|b| {
-            let open = self.open_ports(&b);
-            let last = k.checked_sub(1)?;
+        let open = self.open_ports();
+        let onward = k.checked_sub(1).and_then(|last| {
             let shape = &parts[last].shape;
             let conventional = shape.body_at(shape.ports().output());
             let mine: Vec<usize> = open

@@ -406,9 +406,6 @@ fn graph(train: &Train) {
         },
         quotient(&m.total),
     );
-    for (k, r) in m.ratios.iter().enumerate() {
-        println!("    stage {}  ratio {}", k + 1, quotient(r));
-    }
     for s in &m.bodies {
         let terms: String = s
             .terms

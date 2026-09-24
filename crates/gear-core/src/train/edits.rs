@@ -891,21 +891,19 @@ mod tests {
     //! it refuses whole, and what it renumbers the train follows.
 
     use super::super::arrangements::{self as arr, StagePreset};
-    use super::super::{
-        solve_train, test_library as library, LoadCase, Shape, StageBoundary, Train,
-    };
+    use super::super::{solve_train, test_library as library, LoadCase, Shape, Train};
     use super::*;
 
     fn conventionally(shape: &Shape) -> crate::train::Alone {
-        under(
-            shape,
-            StageBoundary::conventional(&shape.wiring(), &shape.ports()),
-        )
+        crate::train::solve_alone(&Train::alone(shape, 2.0, 3000.0), &library())
+            .unwrap_or_else(|e| panic!("{e}: {shape:?}"))
     }
 
-    fn under(shape: &Shape, boundary: StageBoundary) -> crate::train::Alone {
+    /// The shape asked with `held` held, loaded at `input` and reacted at
+    /// `output` — its slots, as a train of one numbers them.
+    fn asked(shape: &Shape, held: &[usize], input: usize, output: usize) -> crate::train::Alone {
         crate::train::solve_alone(
-            &crate::train::Train::alone(shape, 2.0, 3000.0).under(&boundary),
+            &Train::alone(shape, 2.0, 3000.0).arranged(held, input, output),
             &library(),
         )
         .unwrap_or_else(|e| panic!("{e}: {shape:?}"))
@@ -1403,11 +1401,8 @@ mod tests {
         // Under the hula's arrangement on each: crank driven, grounded ring
         // held, the output ring out — slots 1, 2 and 4 here, where the ring
         // removed gave its place up, and 1, 2 and 3 on the list.
-        let edited = under(&shape, StageBoundary::holding(5, &[2], 1, 4));
-        let listed = under(
-            &arr::hula([19, 18, 17, 18], [1.0, 1.0]),
-            StageBoundary::holding(5, &[2], 1, 3),
-        );
+        let edited = asked(&shape, &[2], 1, 4);
+        let listed = asked(&arr::hula([19, 18, 17, 18], [1.0, 1.0]), &[2], 1, 3);
         assert!(
             (edited.ratio.unwrap() - listed.ratio.unwrap()).abs() < 1e-9,
             "{:?} against the list's {:?}",
@@ -1439,11 +1434,8 @@ mod tests {
         for (m, z) in shape.members.iter_mut().zip([18, 19, 17, 18]) {
             m.gear.teeth = z;
         }
-        let edited = under(&shape, StageBoundary::holding(5, &[2], 1, 4));
-        let listed = under(
-            &arr::hula([19, 18, 17, 18], [1.0, 1.0]),
-            StageBoundary::holding(5, &[2], 1, 3),
-        );
+        let edited = asked(&shape, &[2], 1, 4);
+        let listed = asked(&arr::hula([19, 18, 17, 18], [1.0, 1.0]), &[2], 1, 3);
         assert!(
             (edited.ratio.unwrap() - listed.ratio.unwrap()).abs() < 1e-9,
             "{:?} against the list's {:?}",
@@ -1458,11 +1450,8 @@ mod tests {
         edit(&mut shape, Edit::Remove(Piece::Member(1))).unwrap();
         assert_eq!(shape.couplings, vec![[5, 4]]);
         // Bodies: carrier, the grounded ring, the wobble body, the shaft.
-        let edited = under(&shape, StageBoundary::holding(5, &[2], 1, 4));
-        let listed = under(
-            &arr::planocentric(18, 19),
-            StageBoundary::holding(5, &[2], 1, 3),
-        );
+        let edited = asked(&shape, &[2], 1, 4);
+        let listed = asked(&arr::planocentric(18, 19), &[2], 1, 3);
         assert!(
             (edited.ratio.unwrap() - listed.ratio.unwrap()).abs() < 1e-9,
             "{:?} against the list's {:?}",
@@ -1503,7 +1492,7 @@ mod tests {
         );
         assert!(s1 != s2, "two suns of one count would turn as one");
         // Slots: carrier 1, planet 2, sun 1 at 3, sun 2 at 4.
-        let r = under(&shape, StageBoundary::holding(5, &[3], 1, 4));
+        let r = asked(&shape, &[3], 1, 4);
         let want = s2 / (s2 - s1);
         assert!(
             (r.ratio.unwrap() - want).abs() < 1e-9,

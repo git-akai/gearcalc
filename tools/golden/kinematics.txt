@@ -30,7 +30,6 @@
       case 3  speed    -948.837209  vs frame    -948.837209  torque       5.058824  cycles 5.693023e7 / 5.693023e7
     mesh 1  efficiency  98.344976 / 98.344976  %  contact ratio   1.5993  coprime
   graph    mobility 1 degree(s), 1 given   total ratio -43/17
-    stage 1  ratio -43/17
     ground ground    of the train speed 0
     b1     first     of stage 1 speed 1
     b2     second    of stage 1 speed -17/43
@@ -67,7 +66,6 @@
       case 3  speed    -948.837209  vs frame    -948.837209  torque       5.058824  cycles 5.693023e7 / 5.693023e7
     mesh 1  efficiency  98.389569 / 98.389569  %  contact ratio   1.5591  coprime
   graph    mobility 1 degree(s), 1 given   total ratio -43/17
-    stage 1  ratio -43/17
     ground ground    of the train speed 0
     b1     first     of stage 1 speed 1
     b2     second    of stage 1 speed -17/43
@@ -104,7 +102,6 @@
       case 3  speed     -60.000000  vs frame     -60.000000  torque      80.000000  cycles 3.600000e6 / 3.600000e6
     mesh 1  efficiency  61.804609 / 0.000000   %  contact ratio   1.8140  coprime
   graph    mobility 1 degree(s), 1 given   total ratio -40
-    stage 1  ratio -40
     ground ground    of the train speed 0
     b1     first     of stage 1 speed 1
     b2     second    of stage 1 speed -1/40
@@ -158,7 +155,6 @@
     mesh 1  efficiency  97.838469 / 97.838469  %  contact ratio   1.4369  shares a factor
     mesh 2  efficiency  99.444980 / 99.444980  %  contact ratio   1.9726  shares a factor
   graph    mobility 2 degree(s), 2 given   total ratio -6
-    stage 1  ratio -6
     ground ground    of the train speed 0
     b1     sun       of stage 1 speed 1
     b2     carrier   of stage 1 speed 0
@@ -214,7 +210,6 @@
     mesh 1  efficiency  97.838469 / 97.838469  %  contact ratio   1.4369  shares a factor
     mesh 2  efficiency  99.444980 / 99.444980  %  contact ratio   1.9726  shares a factor
   graph    mobility 2 degree(s), 2 given   total ratio 7
-    stage 1  ratio 7
     ground ground    of the train speed 0
     b1     sun       of stage 1 speed 1
     b2     carrier   of stage 1 speed 1/7
@@ -270,7 +265,6 @@
     mesh 1  efficiency  97.838469 / 97.838469  %  contact ratio   1.4369  shares a factor
     mesh 2  efficiency  99.444980 / 99.444980  %  contact ratio   1.9726  shares a factor
   graph    mobility 2 degree(s), 2 given   total ratio 6/7
-    stage 1  ratio 6/7
     ground ground    of the train speed 0
     b1     sun       of stage 1 speed 0
     b2     carrier   of stage 1 speed 1
@@ -326,7 +320,6 @@
     mesh 1  efficiency  97.838469 / 97.838469  %  contact ratio   1.4369  shares a factor
     mesh 2  efficiency  99.444980 / 99.444980  %  contact ratio   1.9726  shares a factor
   graph    mobility 2 degree(s), 2 given   total ratio 1/7
-    stage 1  ratio 1/7
     ground ground    of the train speed 0
     b1     sun       of stage 1 speed 7
     b2     carrier   of stage 1 speed 1
@@ -382,7 +375,6 @@
     mesh 1  efficiency  97.838469 / 97.838469  %  contact ratio   1.4369  shares a factor
     mesh 2  efficiency  99.444980 / 99.444980  %  contact ratio   1.9726  shares a factor
   graph    mobility 2 degree(s), 2 given   total ratio 7/6
-    stage 1  ratio 7/6
     ground ground    of the train speed 0
     b1     sun       of stage 1 speed 0
     b2     carrier   of stage 1 speed 6/7
@@ -438,7 +430,6 @@
     mesh 1  efficiency  97.838469 / 97.838469  %  contact ratio   1.4369  shares a factor
     mesh 2  efficiency  99.444980 / 99.444980  %  contact ratio   1.9726  shares a factor
   graph    mobility 2 degree(s), 2 given   total ratio -1/6
-    stage 1  ratio -1/6
     ground ground    of the train speed 0
     b1     sun       of stage 1 speed -6
     b2     carrier   of stage 1 speed 0
@@ -498,7 +489,6 @@
     mesh 1  efficiency  99.954002 / 99.954002  %  contact ratio   1.3488  coprime
     mesh 2  efficiency  99.950663 / 99.950663  %  contact ratio   1.3499  coprime
   graph    mobility 2 degree(s), 2 given   total ratio 3721/16
-    stage 1  ratio 3721/16
     ground ground    of the train speed 0
     b1     carrier   of stage 1 speed 1
     b2     ring 1    of stage 1 speed 0
@@ -582,7 +572,6 @@
     mesh 3  efficiency  98.631227 / 98.631227  %  contact ratio   1.6320  coprime
     mesh 4  efficiency  98.344976 / 98.344976  %  contact ratio   1.5993  coprime
   graph    mobility 1 degree(s), 1 given   total ratio 1247/527
-    stage 1  ratio 1247/527
     ground ground    of the train speed 0
     b1     member 1  of stage 1 speed 1
     b2     member 5  of stage 1 speed 527/1247
@@ -641,8 +630,6 @@
       case 3  speed      23.720930  vs frame      23.720930  torque     125.063443  cycles 1.423256e6 / 1.423256e6
     mesh 1  efficiency  98.344976 / 98.344976  %  contact ratio   1.5993  coprime
   graph    mobility 1 degree(s), 1 given   total ratio 1720/17
-    stage 1  ratio -40
-    stage 2  ratio -43/17
     ground ground    of the train speed 0
     b1     first     of stage 1 speed 1
     b2     second    of stage 2 speed 17/1720
@@ -697,7 +684,6 @@
     mesh 1  efficiency  99.028738 / 99.028738  %  contact ratio   1.9162  shares a factor
     mesh 2  efficiency  98.953143 / 98.953143  %  contact ratio   2.1215  coprime
   graph    mobility 2 degree(s), 2 given   total ratio 61
-    stage 1  ratio 61
     ground ground    of the train speed 0
     b1     carrier   of stage 1 speed 1
     b2     ring 1    of stage 1 speed 0
@@ -768,7 +754,6 @@
     mesh 2  efficiency  99.015487 / 99.015487  %  contact ratio   1.9233  shares a factor
     mesh 3  efficiency  98.938438 / 98.938438  %  contact ratio   1.9207  coprime
   graph    mobility 2 degree(s), 2 given   total ratio 177/2
-    stage 1  ratio 177/2
     ground ground    of the train speed 0
     b1     sun       of stage 1 speed 1
     b2     ring 1    of stage 1 speed 0
@@ -820,7 +805,6 @@
       case 3  speed       0.000000  vs frame   -2400.000000  torque      21.431187  cycles 1.440000e8 / 1.440000e8
     mesh 1  efficiency  99.734586 / 99.734586  %  contact ratio   1.7700  shares a factor
   graph    mobility 2 degree(s), 2 given   total ratio -10
-    stage 1  ratio -10
     ground ground    of the train speed 0
     b1     carrier   of stage 1 speed 1
     b2     ring      of stage 1 speed 0
@@ -887,7 +871,6 @@
     mesh 2  efficiency  98.934827 / 98.934827  %  contact ratio   1.8312  shares a factor
     mesh 3  efficiency  97.891587 / 97.891587  %  contact ratio   1.5100  shares a factor
   graph    mobility 2 degree(s), 2 given   total ratio -3
-    stage 1  ratio -3
     ground ground    of the train speed 0
     b1     sun       of stage 1 speed 1
     b2     carrier   of stage 1 speed -1/3
@@ -966,7 +949,6 @@
     mesh 3  efficiency  99.257031 / 99.257031  %  contact ratio   1.9395  shares a factor
     mesh 4  efficiency  98.042652 / 98.042652  %  contact ratio   1.5419  shares a factor
   graph    mobility 2 degree(s), 2 given   total ratio 40/9
-    stage 1  ratio 40/9
     ground ground    of the train speed 0
     b1     sun 1     of stage 1 speed 1
     b2     carrier   of stage 1 speed 9/40
@@ -1046,7 +1028,6 @@
     mesh 3  efficiency  99.257031 / 99.257031  %  contact ratio   1.9395  shares a factor
     mesh 4  efficiency  98.042652 / 98.042652  %  contact ratio   1.5419  shares a factor
   graph    mobility 2 degree(s), 2 given   total ratio -16/15
-    stage 1  ratio -6/25
     ground ground    of the train speed 0
     b1     sun 1     of stage 1 speed -25/6
     b2     carrier   of stage 1 speed -15/16
@@ -1126,7 +1107,6 @@
     mesh 3  efficiency  99.257031 / 99.257031  %  contact ratio   1.9395  shares a factor
     mesh 4  efficiency  98.042652 / 98.042652  %  contact ratio   1.5419  shares a factor
   graph    mobility 2 degree(s), 2 given   total ratio 8/3
-    stage 1  ratio 8/3
     ground ground    of the train speed 0
     b1     sun 1     of stage 1 speed 1
     b2     carrier   of stage 1 speed 3/8
@@ -1186,8 +1166,6 @@
       case 3  speed     397.899475  vs frame     397.899475  torque      11.863697  cycles 2.387397e7 / 2.387397e7
     mesh 1  efficiency  97.996440 / 97.996440  %  contact ratio   1.6372  coprime
   graph    mobility 1 degree(s), 1 given   total ratio 1333/221
-    stage 1  ratio -43/17
-    stage 2  ratio -31/13
     ground ground    of the train speed 0
     b1     first     of stage 1 speed 1
     b2     second    of stage 1 speed -17/43
@@ -1280,9 +1258,6 @@
       case 3  speed       3.388704  vs frame       3.388704  torque    1360.734643  cycles 2.033230e5 / 2.033230e5
     mesh 1  efficiency  61.804609 / 0.000000   %  contact ratio   1.8140  coprime
   graph    mobility 2 degree(s), 2 given   total ratio 12040/17
-    stage 1  ratio -43/17
-    stage 2  ratio 7
-    stage 3  ratio -40
     ground ground    of the train speed 0
     b1     first     of stage 1 speed 1
     b2     second    of stage 1 speed -17/43
@@ -1359,8 +1334,6 @@
       case 3  speed     158.139535  vs frame     158.139535  torque      29.532029  cycles 9.488373e6 / 9.488373e6
     mesh 1  efficiency  98.344976 / 98.344976  %  contact ratio   1.5993  coprime
   graph    mobility 2 degree(s), 2 given   total ratio 258/17
-    stage 1  ratio -6
-    stage 2  ratio -43/17
     ground ground    of the train speed 0
     b1     sun       of stage 1 speed 1
     b2     carrier   of stage 1 speed 0
@@ -1436,8 +1409,6 @@
     mesh 1  efficiency  97.838469 / 97.838469  %  contact ratio   1.4369  shares a factor
     mesh 2  efficiency  99.444980 / 99.444980  %  contact ratio   1.9726  shares a factor
   graph    mobility 2 degree(s), 2 given   total ratio 258/17
-    stage 1  ratio -43/17
-    stage 2  ratio -6
     ground ground    of the train speed 0
     b1     first     of stage 1 speed 1
     b2     second    of stage 1 speed -17/43
@@ -1448,7 +1419,6 @@
 == unclosed ==
   no answer: stage 1: no profile shift brings the meshes to one axis distance; these tooth counts cannot be assembled
   graph    mobility 2 degree(s), 2 given   total ratio 97/17
-    stage 1  ratio 97/17
     ground ground    of the train speed 0
     b1     sun       of stage 1 speed 1
     b2     carrier   of stage 1 speed 17/97
@@ -1458,8 +1428,6 @@
 == chain-unclosed ==
   no answer: stage 2: no profile shift brings the meshes to one axis distance; these tooth counts cannot be assembled
   graph    mobility 2 degree(s), 2 given   total ratio -4171/289
-    stage 1  ratio -43/17
-    stage 2  ratio 97/17
     ground ground    of the train speed 0
     b1     first     of stage 1 speed 1
     b2     second    of stage 1 speed -17/43
@@ -1518,7 +1486,6 @@
     mesh 1  efficiency  97.838469 / 97.838469  %  contact ratio   1.4369  shares a factor
     mesh 2  efficiency  99.444980 / 99.444980  %  contact ratio   1.9726  shares a factor
   graph    mobility 2 degree(s), 1 given  free: b2 carrier   total ratio a family
-    stage 1  ratio a family
     ground ground    of the train speed 0
     b1     sun       of stage 1 speed 1
     b2     carrier   of stage 1 speed 0 + 1 × ω(b2 carrier)

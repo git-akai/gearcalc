@@ -3386,14 +3386,14 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
             }
             // The arrangement is what the set is *asked*, not what it is:
             // the same stage, six boundaries.
-            let asked = gear_core::train::planetary_boundary(Arrangement { input, fixed });
             let output = all
                 .iter()
                 .copied()
                 .find(|&m| m != input && m != fixed)
                 .unwrap_or(input);
             match gear_core::train::solve_alone(
-                &gear_core::train::Train::alone(&base, 2.0, 3000.0).under(&asked),
+                &gear_core::train::Train::alone(&base, 2.0, 3000.0)
+                    .arranged_as(Arrangement { input, fixed }),
                 &lib,
             ) {
                 Err(e) => println!("  {:>7} in, {:>7} held: {e}", name(input), name(fixed)),

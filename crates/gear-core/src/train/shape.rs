@@ -4143,7 +4143,7 @@ mod tests {
     use super::*;
     use crate::planetary::{Arrangement, PlanetaryShaft};
     use crate::train::arrangements as arr;
-    use crate::train::{planetary_boundary, test_library};
+    use crate::train::test_library;
 
     /// How far a set's two meshes disagree about the one distance, from the
     /// zero-backlash distances it reports, each opened by the clearance its
@@ -4353,9 +4353,8 @@ mod tests {
                     continue;
                 }
                 let arrangement = Arrangement { input, fixed };
-                let boundary = planetary_boundary(arrangement);
                 let r = crate::train::solve_alone(
-                    &crate::train::Train::alone(&set, 2.0, 3000.0).under(&boundary),
+                    &crate::train::Train::alone(&set, 2.0, 3000.0).arranged_as(arrangement),
                     &test_library(),
                 )
                 .unwrap();
@@ -4959,9 +4958,9 @@ mod tests {
         for (input, fixed, output, ratio) in want {
             // The same stage, asked six things.
             let stage = stage_of(24, 18, 60, 0.0);
-            let asked = planetary_boundary(Arrangement { input, fixed });
             let r = crate::train::solve_alone(
-                &crate::train::Train::alone(&stage, 2.0, 0.0).under(&asked),
+                &crate::train::Train::alone(&stage, 2.0, 0.0)
+                    .arranged_as(Arrangement { input, fixed }),
                 &test_library(),
             )
             .unwrap();
@@ -4980,12 +4979,12 @@ mod tests {
     #[test]
     fn a_held_carrier_gives_exactly_the_product_of_the_mesh_efficiencies() {
         let stage = stage_of(24, 18, 60, 0.0);
-        let carrier_held = planetary_boundary(Arrangement {
+        let carrier_held = Arrangement {
             input: PlanetaryShaft::Sun,
             fixed: PlanetaryShaft::Carrier,
-        });
+        };
         let r = crate::train::solve_alone(
-            &crate::train::Train::alone(&stage, 2.0, 0.0).under(&carrier_held),
+            &crate::train::Train::alone(&stage, 2.0, 0.0).arranged_as(carrier_held),
             &test_library(),
         )
         .unwrap();
@@ -5054,12 +5053,12 @@ mod tests {
             // Ring held: the sun and the carrier are the two possible outputs.
             let stage = stage_of(s, p, r, 0.0);
             let asked = |input| {
-                let boundary = planetary_boundary(Arrangement {
+                let arrangement = Arrangement {
                     input,
                     fixed: PlanetaryShaft::Ring,
-                });
+                };
                 crate::train::solve_alone(
-                    &crate::train::Train::alone(&stage, 2.0, 0.0).under(&boundary),
+                    &crate::train::Train::alone(&stage, 2.0, 0.0).arranged_as(arrangement),
                     &lib,
                 )
                 .unwrap()
@@ -5895,7 +5894,7 @@ mod a_mesh_stands_where_its_axes_do {
     //! share one line.
 
     use super::super::arrangements::Builder;
-    use super::super::{solve_alone, test_library, Train};
+    use super::super::{solve_train, test_library, Train};
     use super::*;
 
     #[test]
@@ -5925,16 +5924,16 @@ mod a_mesh_stands_where_its_axes_do {
         assert_eq!(w.frame(2).unwrap(), c, "...and so does the ring");
         // One shape is the pair and the set in a row: the ratio a chain of
         // the two reports, the pair's reversal times the set's `1 + z_r/z_s`.
-        let r = solve_alone(
+        let r = solve_train(
             &Train::alone(&shape, 2.0, 3000.0).arranged(&[ring_body], pinion_body, carrier),
             &test_library(),
         )
         .unwrap();
         let want = -(43.0 / 17.0) * (1.0 + 72.0 / 12.0);
         assert!(
-            (r.ratio.unwrap() - want).abs() < 1e-9 * want.abs(),
+            (r.paths[0].ratio - want).abs() < 1e-9 * want.abs(),
             "{:?} against {want}",
-            r.ratio
+            r.paths[0].ratio
         );
     }
 }
@@ -5948,26 +5947,19 @@ mod the_pieces_own {
     //! could not make.
 
     use super::super::arrangements::{self as arr, Builder};
-    use super::super::{test_library, StageBoundary};
+    use super::super::test_library;
     use super::*;
 
-    fn under(shape: &Shape, boundary: StageBoundary) -> crate::train::Alone {
+    fn conventionally(shape: &Shape) -> crate::train::Alone {
         crate::train::solve_alone(
-            &crate::train::Train::alone(shape, 2.0, 3000.0).under(&boundary),
+            &crate::train::Train::alone(shape, 2.0, 3000.0),
             &test_library(),
         )
         .unwrap()
     }
 
-    fn conventionally(shape: &Shape) -> crate::train::Alone {
-        under(
-            shape,
-            StageBoundary::conventional(&shape.wiring(), &shape.ports()),
-        )
-    }
-
-    fn shifts(r: &ShapeResult) -> Vec<f64> {
-        r.members.iter().map(|g| g.profile_shift).collect()
+    fn shifts(members: &[GearResult]) -> Vec<f64> {
+        members.iter().map(|g| g.profile_shift).collect()
     }
 
     /// Two pairs in series through a compound shaft — which is what two
@@ -5996,7 +5988,14 @@ mod the_pieces_own {
             let mut s = compound();
             s.meshes[0].search = ask[0];
             s.meshes[1].search = ask[1];
-            shifts(&under(&s, StageBoundary::holding(4, &[], 1, 3)))
+            // Two parts — the pairs share a shaft and nothing else — read
+            // off the train's one result.
+            let train = crate::train::Train::alone(&s, 2.0, 3000.0).arranged(&[], 1, 3);
+            shifts(
+                &crate::train::solve_train(&train, &test_library())
+                    .unwrap()
+                    .members,
+            )
         };
         let (none, both, first) = (solve([false; 2]), solve([true; 2]), solve([true, false]));
         assert!(
@@ -6022,7 +6021,7 @@ mod the_pieces_own {
             s.members[2].gear.profile_shift = Auto::automatic(0.0);
             s.meshes[0].search = ask[0];
             s.meshes[1].search = ask[1];
-            shifts(&conventionally(&s))
+            shifts(&conventionally(&s).members)
         };
         let (none, both, one) = (solve([false; 2]), solve([true; 2]), solve([true, false]));
         assert!(

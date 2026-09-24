@@ -308,8 +308,8 @@ already flags. `tools/iso_6336_3_stack.py` multiplies the set out
 **The train is one graph.** A train stores one `Shape` — every axis, body,
 member, mesh, distance and coupling once — beside its holds and its cases,
 and what a stage was is a **part** of it (`Shape::parts`), read off the
-graph with every solve; `solve_train` solves part by part and a stage
-asked alone is one part (`Part::whole`). A join makes one body on one axis
+graph with every solve; `solve_train` solves part by part, and a preset
+asked alone is a train of one solved the same way — a preset is one part. A join makes one body on one axis
 and keeps every part's own order; every edit is the graph's (`Edit`), by
 the graph's indices; the panel stands on the graph's own objects, one list
 and one workspace. A file written
@@ -1172,15 +1172,6 @@ Not a queue with a head; this is what a next session would pick from.
   left is a form field on the gear card, a serde-defaulted `null` in the tab
   state, and one label plus one unit in five string catalogues. Nothing about
   it needs the standard in hand.
-- **The stage's last readings in the core.** A stage is a preset's footprint
-  now ([rationale](rationale.md#a-stage-is-a-presets-footprint-not-a-container)),
-  and three readings of one remain, each derived and never stored:
-  `StageBoundary` (a part's conventional ends, which the lone-preset solve
-  and the chain's ends read), `CaseLoad` (a case's share handed to each
-  part, which the per-part solve is built on) and `planetary_boundary` (the
-  set's sun, carrier and ring as conditions, which the harness and the
-  shape's closed-form laws ask in). Each can go with its last reader; none
-  is a second answer to a question the graph answers, since none is stored.
 - **A calibrated mesh-stiffness model**, which would replace the load-sharing
   ramp rather than the control exposing it.
 - **A planet's root under the ring mesh is rated; its flank's sliding is not**

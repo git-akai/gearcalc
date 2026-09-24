@@ -216,23 +216,6 @@ pub struct Part {
     pub couplings: Vec<usize>,
 }
 
-impl Part {
-    /// **A shape as one part**, every piece by its own index — what a
-    /// stage asked alone is solved as, whatever it falls into
-    /// ([`super::solve_alone`]).
-    #[must_use]
-    pub fn whole(shape: &Shape) -> Self {
-        Self {
-            shape: shape.clone(),
-            members: (0..shape.members.len()).collect(),
-            meshes: (0..shape.meshes.len()).collect(),
-            distances: (0..shape.distances.len()).collect(),
-            axes: (0..shape.axes.len()).collect(),
-            couplings: (0..shape.couplings.len()).collect(),
-        }
-    }
-}
-
 impl Shape {
     /// **The pieces that close apart** — the connected components of its
     /// members, a member joined to every member it meshes and a mesh to

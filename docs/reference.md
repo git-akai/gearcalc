@@ -2593,12 +2593,15 @@ say.
 
 **Motion needs none of the geometry.** With every constraint in force the train
 is one system — one node per body, ground shared, one row per mesh in the
-frame of its axes — and its solution at one turn of its first end is
-reported as every body's exact speed, each stage's ratio,
-the total, and the **mobility**: how many conditions the mechanism needs beyond
-its frame, and how many it has. That is why a train whose axis distances
-cannot be made to agree still reports its ratios: Willis needs tooth counts and
-a topology, and the refusal is the geometry's.
+frame of its axes — and its solution at one turn of the headline case's load
+is reported as every body's exact speed, the headline path's ratio, and the
+**mobility**: how many conditions the mechanism needs beyond its frame, and
+how many it has. No part has a ratio of its own, any more than a figure: a
+ratio is a path's, between two bodies a case names. That is why a train
+whose axis distances cannot be made to agree still reports its speeds:
+Willis needs tooth counts and a topology, and the refusal is the geometry's.
+A part its holds lock — a set with its carrier and its ring both held — is
+refused at the hold that locked it, whatever drives it.
 
 **A train short of conditions reports a family.** A set with its ring released
 has one free parameter, and every body's speed is a particular value plus a
