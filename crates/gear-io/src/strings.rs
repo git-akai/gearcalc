@@ -161,7 +161,7 @@ impl Catalogue {
     /// Parse a catalogue from TOML.
     ///
     /// The shape is one level of sections holding string values —
-    /// `[stage] self_locking = "..."` becomes `stage.self_locking`. Anything
+    /// `[mesh] self_locking = "..."` becomes `mesh.self_locking`. Anything
     /// else in the file is a mistake rather than an extension, so it is refused
     /// instead of ignored.
     ///
@@ -453,8 +453,8 @@ mod tests {
     /// A half-translated catalogue must not swallow a warning.
     #[test]
     fn a_missing_message_shows_its_key_rather_than_nothing() {
-        let c = Catalogue::parse("[stage]\nknown = \"fine\"").unwrap();
-        assert_eq!(c.render(&Note::new("stage.unknown")), "stage.unknown");
+        let c = Catalogue::parse("[part]\nknown = \"fine\"").unwrap();
+        assert_eq!(c.render(&Note::new("part.unknown")), "part.unknown");
     }
 
     /// ...and a missing *value* leaves its placeholder standing, for the same
@@ -1524,10 +1524,10 @@ mod tests {
         // (case entries, and the path lost), a coupling taken off
         // (couplings), and a set's ring held (holds, and a path found).
         {
-            use gear_core::train::arrangements::StagePreset;
+            use gear_core::train::arrangements::Preset;
             use gear_core::train::{preview, Edit, LoadCase, Piece, Place, Train};
             let chain = |n: usize| {
-                Train::chained(vec![StagePreset::Spur.build(); n], |t| {
+                Train::chained(vec![Preset::Spur.build(); n], |t| {
                     vec![LoadCase::ultimate(
                         t.port(0, 1),
                         t.port(n - 1, 2),
@@ -1552,15 +1552,15 @@ mod tests {
             fire(
                 &chain(1),
                 Edit::Insert {
-                    stage: StagePreset::Spur.build(),
+                    shape: Preset::Spur.build(),
                     at: Some(1),
                 },
             );
             fire(&chain(1), Edit::Release(1));
             fire(&chain(2), Edit::Remove(Piece::Member(3)));
-            let plano = Train::chained(vec![StagePreset::Planocentric.build()], |_| Vec::new());
+            let plano = Train::chained(vec![Preset::Planocentric.build()], |_| Vec::new());
             fire(&plano, Edit::Remove(Piece::Coupling(0)));
-            let mut set = Train::chained(vec![StagePreset::Planetary.build()], |_| Vec::new());
+            let mut set = Train::chained(vec![Preset::Planetary.build()], |_| Vec::new());
             set.release(3);
             set.load_cases = vec![LoadCase::ultimate(1, 2, 1.0, 1000.0)];
             fire(&set, Edit::Hold(3));

@@ -3692,13 +3692,13 @@ pub fn rate(
         })
         .collect();
     for l in &layouts {
-        notes.push(Note::new(key::STAGE_PLANETS_SHARE_LOAD_EQUALLY).count("planets", l.count));
+        notes.push(Note::new(key::PART_PLANETS_SHARE_LOAD_EQUALLY).count("planets", l.count));
         if l.equal_spacing == Some(false) {
-            notes.push(Note::new(key::STAGE_PLANETS_NOT_EVENLY_SPACED).count("planets", l.count));
+            notes.push(Note::new(key::PART_PLANETS_NOT_EVENLY_SPACED).count("planets", l.count));
         }
         if !l.clearance_ok {
             notes.push(
-                Note::new(key::STAGE_PLANET_CLEARANCE_BELOW_MINIMUM)
+                Note::new(key::PART_PLANET_CLEARANCE_BELOW_MINIMUM)
                     .number("gap", l.clearance, 3)
                     .number("minimum", shape.axes[l.axis].min_planet_clearance, 3),
             );
@@ -4776,7 +4776,7 @@ mod tests {
         assert!(
             over.notes
                 .iter()
-                .any(|n| n.is(key::STAGE_DISTANCE_NOT_REACHED)),
+                .any(|n| n.is(key::PART_DISTANCE_NOT_REACHED)),
             "the mesh whose sum nothing reached says so: {:?}",
             over.notes
         );
@@ -5502,7 +5502,7 @@ mod pressure_angle {
     //! module is — so two mesh groups of one stage may run at two angles,
     //! and two members in mesh at two are refused.
 
-    use super::super::arrangements::{layshaft, StagePreset};
+    use super::super::arrangements::{layshaft, Preset};
     use super::super::{test_library, TrainError};
     use super::*;
 
@@ -5534,7 +5534,7 @@ mod pressure_angle {
     /// through the screw.
     #[test]
     fn two_members_in_mesh_at_two_pressure_angles_are_refused() {
-        for preset in [StagePreset::Spur, StagePreset::Worm] {
+        for preset in [Preset::Spur, Preset::Worm] {
             let mut shape = preset.build();
             shape.members[1].pressure_angle = Auto::fixed(25.0);
             assert!(
@@ -6226,7 +6226,7 @@ mod one_module_per_group {
     /// member, and relief leaves exactly one — whatever it is handed.
     #[test]
     fn relief_keeps_one_statement_per_group() {
-        for preset in arr::StagePreset::ALL {
+        for preset in arr::Preset::ALL {
             let shape = preset.build();
             for group in shape.mesh_groups() {
                 for f in [MemberFreedom::Module, MemberFreedom::PressureAngle] {

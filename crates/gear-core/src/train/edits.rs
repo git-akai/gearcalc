@@ -72,11 +72,12 @@ pub enum Edit {
     Hold(usize),
     /// A body's hold taken out.
     Release(usize),
-    /// **A stage laid into the train**, its bodies numbered after the
-    /// train's: its conventional input made one with `at` where given, and
-    /// otherwise with the last part's remaining open output, the case
-    /// entries there carried to its own ([`super::Train::chain_on`]).
-    Insert { stage: Shape, at: Option<usize> },
+    /// **A shape laid into the train** — a preset's, from the add menu —
+    /// its bodies numbered after the train's: its conventional input made
+    /// one with `at` where given, and otherwise with the last part's
+    /// remaining open output, the case entries there carried to its own
+    /// ([`super::Train::chain_on`]).
+    Insert { shape: Shape, at: Option<usize> },
 }
 
 /// **Where a gear an edit adds goes.**
@@ -890,8 +891,8 @@ mod tests {
     //! **The laws an edit obeys**: it leaves a stage that solves, it undoes,
     //! it refuses whole, and what it renumbers the train follows.
 
-    use super::super::arrangements::{self as arr, StagePreset};
-    use super::super::{solve_train, test_library as library, LoadCase, Shape, Train};
+    use super::super::arrangements::{self as arr, Preset};
+    use super::super::{solve_train, test_library as library, LoadCase, LoadRole, Shape, Train};
     use super::*;
 
     fn conventionally(shape: &Shape) -> crate::train::Alone {
@@ -989,14 +990,14 @@ mod tests {
     /// added axis meshes.
     #[test]
     fn every_add_on_every_preset_solves() {
-        for preset in StagePreset::ALL {
+        for preset in Preset::ALL {
             let base = preset.build();
             for edit in applicable(&base) {
                 // A ratio on a crossed distance is a second point contact at
                 // the same angle, which the worm's proportions do not size;
                 // parallel shafts are what another ratio is for.
                 if matches!(edit, Edit::AddRatio { .. })
-                    && base.family() != arr::StageFamily::Parallel
+                    && base.family() != arr::PresetFamily::Parallel
                 {
                     continue;
                 }
@@ -1030,7 +1031,7 @@ mod tests {
     /// removal moving no other.
     #[test]
     fn every_add_undoes() {
-        let wolfrom = StagePreset::Wolfrom.build();
+        let wolfrom = Preset::Wolfrom.build();
         // Members: planet, ring 1, ring 2; the planet's axis is 1.
         let (planet, added) = (0, wolfrom.members.len());
         let on = central(&wolfrom, 1);
@@ -1053,7 +1054,7 @@ mod tests {
             edit(&mut shape, Edit::Remove(Piece::Member(added))).unwrap();
             assert!(same(&shape, &wolfrom), "{add:?} undone");
         }
-        let idler = StagePreset::Idler.build();
+        let idler = Preset::Idler.build();
         let mut shape = idler.clone();
         let at_end = Edit::AddGear {
             mate: 2,
@@ -1063,7 +1064,7 @@ mod tests {
         edit(&mut shape, at_end).unwrap();
         edit(&mut shape, Edit::Remove(Piece::Axis(3))).unwrap();
         assert!(same(&shape, &idler), "an axis added and removed");
-        let layshaft = StagePreset::Layshaft.build();
+        let layshaft = Preset::Layshaft.build();
         let mut shape = layshaft.clone();
         let ratio = Edit::AddRatio {
             distance: 0,
@@ -1092,7 +1093,7 @@ mod tests {
         // coupled shaft 3, the planet's 4. Planetary: sun 0, planet 1,
         // ring 2; bodies sun 1, carrier 2, ring 3, planet 4. Meshed
         // planets: sun 0, planets A 1 and B 2, ring 3.
-        let plano = StagePreset::Planocentric.build();
+        let plano = Preset::Planocentric.build();
         let on_centre = central(&plano, 1);
         let cases: Vec<(Shape, Edit, EditRefused)> = vec![
             (
@@ -1101,7 +1102,7 @@ mod tests {
                 EditRefused::Coupled,
             ),
             (
-                StagePreset::Spur.build(),
+                Preset::Spur.build(),
                 Edit::Couple { body: 1 },
                 EditRefused::WrongFamily,
             ),
@@ -1115,23 +1116,23 @@ mod tests {
             // taken takes its planet with it, meshing nothing, and leaves
             // nothing hanging.)
             (
-                StagePreset::MeshedPlanets.build(),
+                Preset::MeshedPlanets.build(),
                 Edit::Remove(Piece::Member(3)),
                 EditRefused::LastOnItsStep,
             ),
             (
-                StagePreset::Spur.build(),
+                Preset::Spur.build(),
                 Edit::AddStep { axis: 0 },
                 EditRefused::WrongFamily,
             ),
             // The axis a carrier turns about is no axis to take away.
             (
-                StagePreset::Planetary.build(),
+                Preset::Planetary.build(),
                 Edit::Remove(Piece::Axis(0)),
                 EditRefused::WrongFamily,
             ),
             (
-                StagePreset::Planetary.build(),
+                Preset::Planetary.build(),
                 Edit::Move {
                     member: 0,
                     to: Some(4),
@@ -1139,7 +1140,7 @@ mod tests {
                 EditRefused::NotOnTheAxis,
             ),
             (
-                StagePreset::Planetary.build(),
+                Preset::Planetary.build(),
                 Edit::Remove(Piece::Member(9)),
                 EditRefused::NoSuchIndex,
             ),
@@ -1154,7 +1155,7 @@ mod tests {
             ),
             // Two rings in mesh are no mesh.
             (
-                StagePreset::Planetary.build(),
+                Preset::Planetary.build(),
                 Edit::AddGear {
                     mate: 2,
                     on: Place::NewAxis,
@@ -1164,7 +1165,7 @@ mod tests {
             ),
             // A gear fixed to the carrier of the planet it meshes locks it.
             (
-                StagePreset::Planetary.build(),
+                Preset::Planetary.build(),
                 Edit::AddGear {
                     mate: 1,
                     on: Place::Body(2),
@@ -1175,7 +1176,7 @@ mod tests {
             // A gear meshes across an axis distance, and an idler's first
             // and last axes have none.
             (
-                StagePreset::Idler.build(),
+                Preset::Idler.build(),
                 Edit::AddGear {
                     mate: 0,
                     on: Place::NewBody(2),
@@ -1198,10 +1199,9 @@ mod tests {
     /// moved onto the body that carries the planets it meshes.
     #[test]
     fn a_move_to_a_body_of_its_own_is_no_move_and_the_carrier_takes_no_gear() {
-        let mut t = Train::chained(
-            vec![StagePreset::Spur.build(), StagePreset::Planetary.build()],
-            |t| vec![LoadCase::ultimate(t.port(0, 1), t.port(1, 2), 1.0, 1000.0)],
-        );
+        let mut t = Train::chained(vec![Preset::Spur.build(), Preset::Planetary.build()], |t| {
+            vec![LoadCase::ultimate(t.port(0, 1), t.port(1, 2), 1.0, 1000.0)]
+        });
         let before = t.clone();
         t.edit(Edit::Move {
             member: 0,
@@ -1244,7 +1244,7 @@ mod tests {
     #[test]
     fn a_gear_moved_off_a_shaft_does_not_take_the_shaft_with_it() {
         let lay = || arr::layshaft((17, 43), &[(41, 19), (29, 31)], 1);
-        let mut t = Train::chained(vec![lay(), StagePreset::Spur.build()], |t| {
+        let mut t = Train::chained(vec![lay(), Preset::Spur.build()], |t| {
             vec![LoadCase::ultimate(t.port(0, 1), t.port(1, 2), 1.0, 1000.0)]
         });
         // The layshaft's output (slot 2) runs on to the spur; the engaged
@@ -1336,10 +1336,9 @@ mod tests {
     /// the crank still at 1.
     #[test]
     fn a_remove_repoints_the_train_and_drops_what_named_the_body() {
-        let mut t = Train::chained(
-            vec![StagePreset::Wolfrom.build(), StagePreset::Spur.build()],
-            |t| vec![LoadCase::ultimate(t.port(0, 1), t.port(1, 2), 1.0, 1000.0)],
-        );
+        let mut t = Train::chained(vec![Preset::Wolfrom.build(), Preset::Spur.build()], |t| {
+            vec![LoadCase::ultimate(t.port(0, 1), t.port(1, 2), 1.0, 1000.0)]
+        });
         // The chain joins ring 2 (slot 3) onward; hold ring 1 (slot 2,
         // member 1 after the planet) explicitly too.
         assert_eq!(t.port(0, 3), 3);
@@ -1386,7 +1385,7 @@ mod tests {
     /// lists, ratio for ratio, on the counts the tables print.
     #[test]
     fn the_hula_is_reached_from_the_wolfrom_by_edits() {
-        let mut shape = StagePreset::Wolfrom.build();
+        let mut shape = Preset::Wolfrom.build();
         // Members: planet, ring 1, ring 2. A step: planet 2 and a ring on it.
         edit(&mut shape, Edit::AddStep { axis: 1 }).unwrap();
         assert_eq!(shape.members.len(), 5);
@@ -1420,7 +1419,7 @@ mod tests {
     /// ratio for ratio, on the counts the tables print.
     #[test]
     fn the_planocentric_and_the_hula_are_one_edit_apart() {
-        let mut shape = StagePreset::Planocentric.build();
+        let mut shape = Preset::Planocentric.build();
         // Bodies: carrier, ring, the coupled shaft, the planet's body.
         edit(&mut shape, Edit::AddStep { axis: 1 }).unwrap();
         edit(&mut shape, Edit::Remove(Piece::Coupling(0))).unwrap();
@@ -1472,7 +1471,7 @@ mod tests {
     /// closed.
     #[test]
     fn a_planet_between_two_suns_is_a_wolfrom_with_the_sign_flipped() {
-        let mut shape = StagePreset::Wolfrom.build();
+        let mut shape = Preset::Wolfrom.build();
         let (planet, on) = (0, central(&shape, 1));
         for _ in 0..2 {
             let sun = Edit::AddGear {
@@ -1526,7 +1525,7 @@ mod tests {
             ],
             &[],
         );
-        let mut t = Train::chained(vec![uncoupled, StagePreset::Spur.build()], |_| Vec::new());
+        let mut t = Train::chained(vec![uncoupled, Preset::Spur.build()], |_| Vec::new());
         let (planet, end) = (3, t.port(1, 1));
         assert_eq!(t.shape.couplings, vec![[planet, end]]);
         let end = t.split(1, end);
@@ -1544,7 +1543,7 @@ mod tests {
         // Three pairs in a chain, each shared shaft split: the first pair's
         // output and the third's input are ends on the two shafts the
         // middle pair meshes across.
-        let pair = || StagePreset::Spur.build();
+        let pair = || Preset::Spur.build();
         let mut t = Train::chained(vec![pair(), pair(), pair()], |_| Vec::new());
         let a = t.port(0, 2);
         t.split(1, a);
@@ -1561,14 +1560,14 @@ mod tests {
     /// meshes, distances and axes are not the graph's by the same index.
     fn trains() -> Vec<(String, Train)> {
         let mut out = Vec::new();
-        for p in StagePreset::ALL {
+        for p in Preset::ALL {
             out.push((
                 format!("{p:?}"),
                 Train::chained(vec![p.build()], |_| Vec::new()),
             ));
             out.push((
                 format!("spur then {p:?}"),
-                Train::chained(vec![StagePreset::Spur.build(), p.build()], |_| Vec::new()),
+                Train::chained(vec![Preset::Spur.build(), p.build()], |_| Vec::new()),
             ));
         }
         out
@@ -1724,7 +1723,7 @@ mod tests {
     /// and a body the train has not; each refusal changes nothing.
     #[test]
     fn a_join_is_one_body_on_one_axis_or_says_why() {
-        let pair = StagePreset::Spur.build();
+        let pair = Preset::Spur.build();
         let mut second = pair.clone();
         second.renumber_bodies(|b| b + 2);
         let t = Train {
@@ -1767,9 +1766,9 @@ mod tests {
     /// — and at a body the train has not is refused whole.
     #[test]
     fn an_insert_at_a_body_runs_on_its_shaft() {
-        let mut t = Train::chained(vec![StagePreset::Spur.build()], |_| Vec::new());
+        let mut t = Train::chained(vec![Preset::Spur.build()], |_| Vec::new());
         t.edit(Edit::Insert {
-            stage: StagePreset::Planetary.build(),
+            shape: Preset::Planetary.build(),
             at: Some(1),
         })
         .unwrap();
@@ -1780,7 +1779,7 @@ mod tests {
         let before = t.clone();
         assert_eq!(
             t.edit(Edit::Insert {
-                stage: StagePreset::Spur.build(),
+                shape: Preset::Spur.build(),
                 at: Some(99),
             }),
             Err(EditRefused::NoSuchIndex)
@@ -1788,12 +1787,66 @@ mod tests {
         assert_eq!(debug(&t), debug(&before));
     }
 
+    /// **A reaction stays a reaction whatever it is joined to.** A pair
+    /// loaded at its input and reacted at its output, a set laid in at that
+    /// output: the shaft is both parts' now, and the case still reacts it —
+    /// the path across the pair is still asked and still the pair's, and
+    /// the set, its output free, carries nothing. Which parts a body lies
+    /// between is the graph's to derive and never a case's to be told: a
+    /// second reaction on the same line, at the set's output, divides the
+    /// load by stiffness, and the case says so by name rather than the join
+    /// taking a role away (a join once turned the reaction into a derived
+    /// load, which dropped the pair's path).
+    #[test]
+    fn a_reaction_stays_a_reaction_whatever_it_is_joined_to() {
+        let lib = library();
+        let mut t = Train::chained(vec![Preset::Spur.build()], |t| {
+            vec![LoadCase::ultimate(t.port(0, 1), t.port(0, 2), 1.0, 1000.0)]
+        });
+        let alone = solve_train(&t, &lib).unwrap();
+        let (input, output) = (t.port(0, 1), t.port(0, 2));
+        t.edit(Edit::Insert {
+            shape: Preset::Planetary.build(),
+            at: Some(output),
+        })
+        .unwrap();
+        assert_eq!(t.ends_of(output).len(), 2, "the output is both parts'");
+        assert!(
+            t.load_cases[0]
+                .loads
+                .iter()
+                .any(|l| l.at == output && l.role == LoadRole::Reacted),
+            "the join keeps the reaction"
+        );
+        let r = solve_train(&t, &lib).unwrap();
+        assert!(r.cases[0].solved);
+        let (was, is) = (&alone.paths[0], &r.paths[0]);
+        assert_eq!((is.from, is.to), (input, output));
+        assert!((is.ratio - was.ratio).abs() < 1e-12);
+        assert!((is.efficiency.forward - was.efficiency.forward).abs() < 1e-12);
+        let far = t
+            .open_ports()
+            .iter()
+            .map(|p| p.body)
+            .find(|&b| b != input && b != output)
+            .expect("the set's output");
+        t.load_cases[0]
+            .loads
+            .push(super::super::Load::declared(far, LoadRole::Reacted));
+        let r = solve_train(&t, &lib).unwrap();
+        assert!(!r.cases[0].solved);
+        assert!(r.cases[0]
+            .notes
+            .iter()
+            .any(|n| n.is(crate::note::key::TRAIN_LOAD_SHARED)));
+    }
+
     /// **A ratio goes on the body asked.** A layshaft's next ratio shares
     /// the body the edit names — the layshaft, or the input shaft — and a
     /// body on neither of the distance's axes is refused.
     #[test]
     fn a_ratio_goes_on_the_body_asked() {
-        let t = Train::chained(vec![StagePreset::Layshaft.build()], |_| Vec::new());
+        let t = Train::chained(vec![Preset::Layshaft.build()], |_| Vec::new());
         let s = &t.shape;
         let across: Vec<usize> = s
             .bodies

@@ -352,16 +352,16 @@ mod tests {
     //! in a case's flow exactly once, entered at the case's load, each mesh
     //! of it said once — as a step, an idle branch, or inside a junction.
 
-    use super::super::arrangements::StagePreset;
+    use super::super::arrangements::Preset;
     use super::super::{solve_train, test_library, LoadCase, Shape};
     use super::*;
 
     fn trains() -> Vec<(String, Train)> {
         let mut out = Vec::new();
-        for a in StagePreset::ALL {
-            for b in [None, Some(StagePreset::Spur), Some(StagePreset::Layshaft)] {
+        for a in Preset::ALL {
+            for b in [None, Some(Preset::Spur), Some(Preset::Layshaft)] {
                 let presets: Vec<Shape> = std::iter::once(a.build())
-                    .chain(b.map(StagePreset::build))
+                    .chain(b.map(Preset::build))
                     .collect();
                 let t = Train::chained(presets, |t| {
                     t.chain_ends()
@@ -406,7 +406,7 @@ mod tests {
     fn a_case_that_does_not_solve_calls_no_mesh_idle() {
         let lib = test_library();
         let idle = |rows: &[FlowRow]| rows.iter().any(|r| matches!(r, FlowRow::Idle { .. }));
-        let mut t = Train::chained(vec![StagePreset::Layshaft.build()], |t| {
+        let mut t = Train::chained(vec![Preset::Layshaft.build()], |t| {
             vec![LoadCase::ultimate(t.port(0, 1), t.port(0, 2), 1.0, 1000.0)]
         });
         let r = solve_train(&t, &lib).unwrap();

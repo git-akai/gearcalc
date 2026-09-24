@@ -33,7 +33,7 @@
 #
 # `[clamp]`   a guard rail fired, and the geometry is not quite what was asked
 #             for. Shown against the gear or member it happened to.
-# `[stage]`   something about a solved stage its designer should read.
+# `[part]`    something about a solved part its designer should read.
 # `[ui]`      the application's own chrome: labels, headings, buttons, units,
 #             and the fixed explanatory notes beside inputs.
 #
@@ -50,7 +50,7 @@
 #    a paragraph of guidance — is a sentence: capital, full stop.
 # 4. **`value: consequence`.** Where a message reports a figure and then says
 #    what it means, the colon separates them, and the figure comes first. This
-#    is what lets clamp and stage notes be skimmed down the left.
+#    is what lets clamp and part notes be skimmed down the left.
 # 5. **Cut the leading article.** A note is read in the second it takes to glance
 #    at it, and "the cutter has no usable tip corner" says nothing that "cutter
 #    has no usable tip corner" does not. Definite articles at the start of a
@@ -93,12 +93,13 @@ ring_flank_ungenerated = "flank below {limit} mm not generated; increase cutter 
 ring_fully_filleted = "fully filleted root: corner rounds meet, leaving no root arc"
 ring_flank_fillet_gap = "flank and fillet do not meet: cutter does not reach this ring's flank; profile not generated"
 
-# ---------------------------------------------------------------- stage notes
+# ----------------------------------------------------------------- part notes
 #
-# Shown as bullets under a solved stage. Each leads with the figure it is about,
-# so a reader scanning the list sees the numbers first.
+# Shown as bullets naming the part they are about — its search, its closures,
+# its planets. Each leads with the figure it is about, so a reader scanning the
+# list sees the numbers first.
 
-[stage]
+[part]
 distance_not_reached = "no admissible shifts reach {asked} mm: the pair is built at {reached} mm instead, and the clearance reported is the gap"
 clearance_negative = "the running distance is {overlap} mm inside the zero-backlash {nominal} mm: these teeth cannot be assembled"
 optimiser_found_nothing = "no solution within the admissible range; shifts remain unaltered"
@@ -110,7 +111,7 @@ planet_clearance_below_minimum = "adjacent planets clear by {gap} mm, below the 
 
 # ---------------------------------------------------------------- gear notes
 #
-# A finding about one gear of a stage — a bound that moved its number, a root
+# A finding about one gear — a bound that moved its number, a root
 # loaded both ways, a rim too thin to rate, a face nothing sizes. Drawn on that
 # gear's own card, so none names a gear.
 
@@ -128,8 +129,7 @@ reversed_bending_applied = "root is loaded by both flanks and is rated against {
 # ---------------------------------------------------------------- mesh notes
 #
 # A finding about one mesh, drawn beside the figure it is about — the contact
-# ratio, the efficiency, the bending stress — on whichever stage the mesh
-# is in. A set has two meshes and says which.
+# ratio, the efficiency, the bending stress. A gear in two meshes says which.
 
 [mesh]
 overlap_below_one = "axial contact ratio below 1; helical in form but loaded like a spur gear"
@@ -143,16 +143,16 @@ low_efficiency = "mesh efficiency {percent} %: most of the input becomes heat, w
 
 # ------------------------------------------------------------------- the train
 #
-# Facts about the whole shaft line, which no single stage is in a position to
+# Facts about the whole shaft line, which no single part is in a position to
 # say: an input clamped against the peak it is measured from, and where a
 # back-driving load is reacted.
 
 [train]
-load_not_reacted = "nothing holds this load: the train turns under it and carries none of it — react a port, or a stage that locks holds it"
+load_not_reacted = "nothing holds this load: the train turns under it and carries none of it — react a port, or a mesh that locks holds it"
 case_no_load = "no load on any port: mark one or more ports as loads"
 case_underdetermined = "motion undecided: {short} more speed(s) to give, or one fewer port to leave free"
 case_nothing_drives = "no given torque does any work — every load is nought or on a still port: nothing drives this case"
-load_shared = "held at both ends: how the load divides is a matter of stiffness this model does not state — hold one end only, or let a self-locking stage hold it"
+load_shared = "held at both ends: how the load divides is a matter of stiffness this model does not state — hold one end only, or let a self-locking mesh hold it"
 
 [preview]
 nothing = "changes nothing"
@@ -197,7 +197,7 @@ screw_first_member_is_a_disc = "the first member's helix angle reaches ninety de
 screw_axes_are_parallel = "a worm stage needs non-parallel shafts"
 train_no_contact = "the teeth never contact"
 train_no_common_distance = "no profile shift brings the meshes to one axis distance; these tooth counts cannot be assembled"
-train_wiring = "this stage describes no mechanism: a member with no teeth, or two gears whose axes cannot stay a fixed distance apart"
+train_wiring = "these gears describe no mechanism: a member with no teeth, or two gears whose axes cannot stay a fixed distance apart"
 train_unknown_material = "no material named {name} in the library"
 train_no_root_section = "the tooth is too undercut to have a root section"
 train_load_port = "load case {case} enters by a body no load can be put on: ground, a held body, or one that is not a port"
@@ -490,7 +490,7 @@ train_mpa = "MPa"
 train_name = "Geartrain name"
 train_new = "New"
 train_nm = "Nm"
-train_no_stages = "Add a stage to begin."
+train_empty = "Add a preset to begin."
 train_no = "no"
 train_normal_module = "Normal module"
 train_not_reported_for_crossed_axes_no = "not reported for crossed axes; no accepted model exists"
@@ -524,7 +524,6 @@ train_planets = "Planets"
 train_circulation = "Power through the teeth"
 train_circulation_both = "{forward}× driven forward · {backward}× driven backward"
 train_note_circulation = "the power every mesh passes, over the power in; where it is many the loss is the meshes' that many times over"
-train_note_shared_not_reacted = "a body two stages share cannot be a reaction: a second reaction on one chain is a division by stiffness this model does not make — make it a load with its torque derived, or free"
 train_mesh_power_through = "Power through mesh"
 train_ratio_per_tooth = "Path ratio with one more tooth on"
 train_family_parallel = "Parallel axes"
@@ -546,7 +545,7 @@ train_edit_refused_last_on_step = "the last on its step: remove the step instead
 train_edit_refused_family = "not an edit of this family"
 train_edit_refused_axis = "not a body on this member's axis"
 train_edit_refused_no_room = "nothing of that kind fits at this radius"
-train_edit_refused_carrier = "that body carries an axis: a gear fixed to the carrier of the planets it meshes locks the stage"
+train_edit_refused_carrier = "that body carries an axis: a gear fixed to the carrier of the planets it meshes locks the set"
 train_edit_refused_coupled = "that body is coupled already"
 train_edit_refused_no_distance = "no axis distance joins those two axes: a gear meshes across one — put it on a new axis, or on an axis that meshes this gear's"
 train_edit_refused_geared = "those two bodies are geared to each other: made one, a mesh or a carrier would turn against itself"
@@ -572,8 +571,8 @@ train_offer_gear_on_body = "A gear meshing {mate}, on {body}"
 train_offer_ring_on_body = "A ring meshing {mate}, on {body}"
 train_offer_ratio = "Another ratio across {distance}, sharing {body}"
 train_offer_step = "A step on the planets of {axis}"
-train_offer_stage_at_body = "{stage}, its input on {body}"
-train_offer_stage_at_output = "{stage}, at the train's output"
+train_offer_preset_at_body = "{preset}, its input on {body}"
+train_offer_preset_at_output = "{preset}, at the train's output"
 train_offer_move_own = "{gear} onto a body of its own"
 train_offer_move_to = "{gear} onto {body}"
 train_offer_a_body_of_its_own = "A body of its own"

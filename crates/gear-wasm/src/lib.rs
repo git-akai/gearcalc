@@ -17,7 +17,7 @@
 use gear_core::jgma;
 use gear_core::metrology::{self, PinCount};
 use gear_core::note::{Explain, Note};
-use gear_core::train::{StageFamily, StagePreset};
+use gear_core::train::{Preset, PresetFamily};
 use gear_core::{GearParams, Tooth};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
@@ -1047,19 +1047,18 @@ pub fn export_ring_dxf(input: &str) -> Result<String, JsError> {
 )]
 pub struct Defaults {
     pub gear: GearTabDefaults,
-    /// A fresh geartrain, with one spur stage in it.
+    /// A fresh geartrain, with one spur pair in it.
     pub train: gear_core::train::Train,
-    /// **One of each preset, for the "add stage" menu**, in the menu's
-    /// order and each under its family — the core's list
-    /// ([`StagePreset::ALL`]), so a preset is a variant there and a row
-    /// here, never a field. A crossed pair is one of them for the menu's
-    /// sake: it is a spur stage with its shafts at an angle
-    /// (docs/reference.md#crossed-axes), and a worm is a distance marked as
-    /// one, and neither is obvious to build from a pair.
-    pub stages: Vec<StagePresetEntry>,
+    /// **One of each preset, for the add menu**, in the menu's order and
+    /// each under its family — the core's list ([`Preset::ALL`]), so a
+    /// preset is a variant there and a row here, never a field. A crossed
+    /// pair is one of them for the menu's sake: it is a spur pair with its
+    /// shafts at an angle (docs/reference.md#crossed-axes), and a worm is a
+    /// distance marked as one, and neither is obvious to build from a pair.
+    pub presets: Vec<PresetEntry>,
     /// The three families the menu groups them under, in order, each
-    /// with the key of its name — the core's list ([`StageFamily::ALL`]).
-    pub families: Vec<StageFamilyEntry>,
+    /// with the key of its name — the core's list ([`PresetFamily::ALL`]).
+    pub families: Vec<PresetFamilyEntry>,
     /// The fraction a reversed root's fatigue bending allowable is taken at.
     ///
     /// Crosses so the control's own note can name it. It is
@@ -1076,25 +1075,25 @@ pub struct Defaults {
     derive(ts_rs::TS),
     ts(export, export_to = "wasm/")
 )]
-pub struct StageFamilyEntry {
-    pub family: StageFamily,
+pub struct PresetFamilyEntry {
+    pub family: PresetFamily,
     pub label: String,
 }
 
 /// A preset as the menu takes it: which, under what family, called what,
-/// and the stage it starts as.
+/// and the shape it lays in.
 #[derive(Serialize)]
 #[cfg_attr(
     feature = "typescript",
     derive(ts_rs::TS),
     ts(export, export_to = "wasm/")
 )]
-pub struct StagePresetEntry {
-    pub preset: StagePreset,
-    pub family: StageFamily,
+pub struct PresetEntry {
+    pub preset: Preset,
+    pub family: PresetFamily,
     /// The catalogue key of its name.
     pub label: String,
-    pub stage: gear_core::train::Shape,
+    pub shape: gear_core::train::Shape,
 }
 
 /// What a new gear tab holds. The values are the specification's, and the
@@ -1148,7 +1147,7 @@ fn defaults_impl() -> Result<String, String> {
         }
         shape
     };
-    let spur = ui(StagePreset::Spur.build());
+    let spur = ui(Preset::Spur.build());
 
     let defaults = Defaults {
         gear: GearTabDefaults {
@@ -1180,18 +1179,18 @@ fn defaults_impl() -> Result<String, String> {
                 ]
             })
         },
-        stages: StagePreset::ALL
+        presets: Preset::ALL
             .into_iter()
-            .map(|preset| StagePresetEntry {
+            .map(|preset| PresetEntry {
                 preset,
                 family: preset.family(),
                 label: preset.label().to_string(),
-                stage: ui(preset.build()),
+                shape: ui(preset.build()),
             })
             .collect(),
-        families: StageFamily::ALL
+        families: PresetFamily::ALL
             .into_iter()
-            .map(|family| StageFamilyEntry {
+            .map(|family| PresetFamilyEntry {
                 family,
                 label: family.label().to_string(),
             })
@@ -1678,12 +1677,12 @@ mod tests {
     /// chain's bodies are numbered rather than assumed.
     /// The stage a preset starts as, by the preset's name on the wire.
     fn preset(d: &serde_json::Value, name: &str) -> serde_json::Value {
-        d["stages"]
+        d["presets"]
             .as_array()
             .unwrap()
             .iter()
             .find(|e| e["preset"] == name)
-            .unwrap_or_else(|| panic!("no preset {name}"))["stage"]
+            .unwrap_or_else(|| panic!("no preset {name}"))["shape"]
             .clone()
     }
 
@@ -2493,7 +2492,7 @@ mod tests {
             );
         }
         assert_eq!(v["axes"][1]["layout"]["equal_spacing"], true);
-        // What the stage *assumes* has to come across too — here, equal load
+        // What the part *assumes* has to come across too — here, equal load
         // sharing between planets, which no calculation can establish. Crossing
         // as a key and its values, not as a sentence: the words are the string
         // catalogue's business and the front end renders them, so what has to
@@ -2501,7 +2500,7 @@ mod tests {
         let notes = stage["notes"].as_array().unwrap();
         let sharing = notes
             .iter()
-            .find(|n| n["key"] == "stage.planets_share_load_equally")
+            .find(|n| n["key"] == "part.planets_share_load_equally")
             .unwrap_or_else(|| panic!("the load-sharing assumption must be reported: {notes:?}"));
         assert_eq!(sharing["values"]["planets"], "3");
         // ...and the play at the output is a real figure, the path's.
@@ -2882,11 +2881,11 @@ mod tests {
         // asks for, so each gear is rebuilt with an automatic 5 mm — and a walk
         // is what says all of them were.
         let mut seeded = 0;
-        let mut walk: Vec<serde_json::Value> = d["stages"]
+        let mut walk: Vec<serde_json::Value> = d["presets"]
             .as_array()
             .unwrap()
             .iter()
-            .map(|e| e["stage"].clone())
+            .map(|e| e["shape"].clone())
             .collect();
         walk.push(d["train"]["shape"].clone());
         for stage in &walk {
@@ -2905,7 +2904,7 @@ mod tests {
             .map(|s| s["members"].as_array().unwrap().len())
             .sum();
         assert_eq!(seeded, members, "a member's width went unseeded");
-        assert!(seeded >= 2 * (StagePreset::ALL.len() + 1), "{seeded}");
+        assert!(seeded >= 2 * (Preset::ALL.len() + 1), "{seeded}");
     }
 
     #[test]
@@ -2915,11 +2914,11 @@ mod tests {
         let d: serde_json::Value = serde_json::from_str(&defaults_impl().unwrap()).unwrap();
         let mut stages = vec![d["train"]["shape"].clone()];
         stages.extend(
-            d["stages"]
+            d["presets"]
                 .as_array()
                 .unwrap()
                 .iter()
-                .map(|e| e["stage"].clone()),
+                .map(|e| e["shape"].clone()),
         );
         stages.push(hula_stage());
         // ...and the case that started this: a width with nothing to size it.
@@ -3161,13 +3160,13 @@ mod tests {
         assert_eq!(v["result"]["cases"].as_array().unwrap().len(), 3);
         assert_eq!(v["result"]["cases"][0]["solved"], false);
 
-        // ...and where a stage is to blame, it is named — numbered as the panel
-        // numbers them, so the reader is not left counting from zero.
+        // ...and where a part is to blame, it is named — numbered from one,
+        // so the reader is not left counting from zero.
         let sound: serde_json::Value = serde_json::from_str(&defaults_impl().unwrap()).unwrap();
         let pushed = edit_train_impl(
             &serde_json::json!({
                 "train": sound["train"],
-                "edit": { "graph": { "insert": { "stage": preset(&sound, "spur"), "at": null } } },
+                "edit": { "graph": { "insert": { "shape": preset(&sound, "spur"), "at": null } } },
             })
             .to_string(),
         )

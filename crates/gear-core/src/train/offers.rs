@@ -14,7 +14,7 @@
 //! a carried axis and a coupling from a body on one. The laws below hold
 //! the reading to the edits themselves, swept by brute force.
 
-use super::arrangements::StagePreset;
+use super::arrangements::Preset;
 use super::preview::unchanged;
 use super::{Edit, Piece, Place, Train};
 use crate::kinematics::GROUND;
@@ -53,7 +53,7 @@ pub enum Target {
 pub struct Offer {
     pub edit: Edit,
     /// The preset an [`Edit::Insert`] lays in, for a menu to name it by.
-    pub preset: Option<StagePreset>,
+    pub preset: Option<Preset>,
     /// The refusal's catalogue key ([`super::EditRefused::key`]).
     pub refused: Option<Note>,
 }
@@ -87,7 +87,7 @@ impl Train {
     }
 
     /// The edits [`Self::offers`] tries at `at`, before trying them.
-    fn candidates(&self, at: Target) -> Vec<(Edit, Option<StagePreset>)> {
+    fn candidates(&self, at: Target) -> Vec<(Edit, Option<Preset>)> {
         let s = &self.shape;
         let axis_of = |body: usize| s.bodies.iter().find(|b| b.body == body).map(|b| b.axis);
         // The axes an axis distance joins `axis` to: where a gear on it
@@ -111,10 +111,10 @@ impl Train {
             [false, true].map(|ring| plain(Edit::AddGear { mate, on, ring }))
         };
         let presets = |at: Option<usize>| {
-            StagePreset::ALL.map(|p| {
+            Preset::ALL.map(|p| {
                 (
                     Edit::Insert {
-                        stage: p.build(),
+                        shape: p.build(),
                         at,
                     },
                     Some(p),
@@ -246,12 +246,12 @@ mod tests {
 
     fn trains() -> Vec<(String, Train)> {
         let mut out = Vec::new();
-        for p in StagePreset::ALL {
-            for before in [None, Some(StagePreset::Spur)] {
+        for p in Preset::ALL {
+            for before in [None, Some(Preset::Spur)] {
                 let stages: Vec<Shape> = before
                     .into_iter()
                     .chain(std::iter::once(p))
-                    .map(StagePreset::build)
+                    .map(Preset::build)
                     .collect();
                 out.push((
                     format!("{p:?} after {before:?}"),
@@ -385,14 +385,14 @@ mod tests {
                 for &x in &bodies {
                     sweep.push((Edit::Join { a: b, b: x }, at.clone()));
                 }
-                for p in StagePreset::ALL {
-                    let stage = p.build();
-                    sweep.push((Edit::Insert { stage, at: Some(b) }, at.clone()));
+                for p in Preset::ALL {
+                    let shape = p.build();
+                    sweep.push((Edit::Insert { shape, at: Some(b) }, at.clone()));
                 }
             }
-            for p in StagePreset::ALL {
-                let stage = p.build();
-                sweep.push((Edit::Insert { stage, at: None }, vec![Target::Train]));
+            for p in Preset::ALL {
+                let shape = p.build();
+                sweep.push((Edit::Insert { shape, at: None }, vec![Target::Train]));
             }
             let offered: Vec<(Target, Vec<String>)> = targets(&t)
                 .into_iter()

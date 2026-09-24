@@ -283,7 +283,7 @@ nothing on screen is one, and an edit is offered at a piece
 of a stage.
 
 The word stays where it names a footprint or a reading of one: the preset
-menu (`StagePreset`), an arrangement's name (a hula stage), the harness
+menu (`Preset`), an arrangement's name (a hula stage), the harness
 printing its corpus part by part (`TrainResult::by_part`), a part's
 conventional ends (`StageBoundary`, derived, never stored) and the load a
 part is handed (`CaseLoad`). None is stored, so none can disagree with the
@@ -1676,7 +1676,7 @@ one `ShapeResult`: a `GearResult` per member, a `MeshReport` per mesh, a
 `DistanceReport` per distance, `MemberRating` over the meshes each member is
 in. A spur pair, a worm and a planetary set are **lists of what sits
 where** like every other arrangement — `arrangements::pair`, `::worm`,
-`::planetary` — and every menu entry is a **preset** (`StagePreset`): one
+`::planetary` — and every menu entry is a **preset** (`Preset`): one
 of those lists at sensible teeth, under the family the shape reads as; a
 worm's conventional proportions are one thing set on a distance
 (`Distance::worm`). Each was a *vocabulary* first — a struct of the words a
@@ -2165,7 +2165,7 @@ whatever the row says.
 **The geartrain's presets are the core's list, not a table of their own.** A
 stage preset was three hand-written buttons and four hand-written accessors
 for a default, then a row each in a TypeScript table; it is now a variant of
-`StagePreset` in `gear-core`, which knows its family, the catalogue key of its
+`Preset` in `gear-core`, which knows its family, the catalogue key of its
 name and the shape it starts as, and `defaults()` crosses the whole list under
 its three families — parallel axes, skew shafts, epicyclic — so the "add
 stage" menu renders from the list and a preset added in the core is on the

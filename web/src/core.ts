@@ -82,9 +82,9 @@ import type {
   MemberRole,
   MotionReport,
   Exact,
-  StageFamily,
-  StagePreset,
-  StagePresetEntry,
+  PresetFamily,
+  Preset,
+  PresetEntry,
   Edit,
   Place,
   Piece,
@@ -166,9 +166,9 @@ export type {
   MemberRole,
   MotionReport,
   Exact,
-  StageFamily,
-  StagePreset,
-  StagePresetEntry,
+  PresetFamily,
+  Preset,
+  PresetEntry,
   Edit,
   Place,
   Piece,
@@ -306,21 +306,6 @@ export const KINDS: KindSpec[] = [
   },
 ];
 
-/** **A preset over the one stage shape.** A stage is a `Shape` — axes,
- *  bodies, members, meshes and distances — and a preset is a shape the core
- *  pre-assembled at sensible teeth, listed under its family: the core's
- *  `StagePreset::ALL`, crossing in `defaults().stages` with the family and
- *  the catalogue key of its name, so the menu renders from that list and a
- *  new preset is a variant there, never a row here. A crossed pair is one of
- *  them for the menu's sake: it is a spur stage with its shafts at an angle,
- *  and a worm a distance marked as one, and neither is obvious to build from
- *  a pair — which is the whole reason a preset exists. */
-/** The presets of one family, in the core's order; the families themselves
- *  are `defaults().families`, the core's list with the key of each name. */
-export function presetsOf(family: StageFamily): StagePresetEntry[] {
-  return defaults().stages.filter((e) => e.family === family);
-}
-
 export interface CaseKindSpec {
   key: CaseKind;
   /** Catalogue key for the kind's name — the chip on a heading, the option in
@@ -330,7 +315,7 @@ export interface CaseKindSpec {
   add: string;
 }
 
-/** The load case kinds, as data, for the reason the stage presets are: the "add
+/** The load case kinds, as data, for the reason the presets are: the "add
  *  load case" buttons and the kind select render from this, and a kind decides
  *  which allowable the core judges against and which inputs are put in front
  *  of the designer — nothing else. A fresh case of a kind is the core's

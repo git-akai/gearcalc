@@ -367,27 +367,27 @@ together (`auto::divide_shift_sum`).
 A shift a designer **gave** is never one of the numbers being chosen: it stands,
 and the other member takes the whole of the rest.
 
-**Where no admissible pair of shifts reaches the distance, the stage says so.**
+**Where no admissible pair of shifts reaches the distance, the part says so.**
 It still answers — at the shifts it would have built anyway, because the gears
 are cuttable and it is the *assembly* that is impossible, which rule 5 calls a
-clamp rather than a refusal — and `stage.centre_distance_not_reached` names both
+clamp rather than a refusal — and `part.distance_not_reached` names both
 distances so the clearance readout is not the only trace.
 
 At the tight end there is a second thing to say. A distance short enough puts the
 running centres **inside** the pair's own zero-backlash distance, which is teeth
 overlapping at rest: nothing can be assembled there and every figure taken at it
-describes nothing. `stage.clearance_negative` says that, and it is a stage's
+describes nothing. `part.clearance_negative` says that, and it is a part's
 finding rather than a mesh's because it is the *assembly* that fails.
 
-**And a third thing a stage says about its shifts: whether the optimiser found
+**And a third thing a part says about its shifts: whether the optimiser found
 anything to choose.** Turning it on and seeing no shift move means one of two
 opposite things — the search ran and *agreed*, the optimum being on the floor the
-stage already sits at, which is the ordinary answer wherever loss falls toward
+gears already sit at, which is the ordinary answer wherever loss falls toward
 the shortest admissible path; or the search ran and found **nothing admissible at
-all**, so there was no answer and the stage kept what it had. The first is the
+all**, so there was no answer and the part kept what it had. The first is the
 tool working; the second is a design with no room in it.
 
-The shifts cannot tell them apart, so `stage.optimiser_found_nothing` does. A
+The shifts cannot tell them apart, so `part.optimiser_found_nothing` does. A
 hula stage at a one-tooth difference is the case: it opens to about 45° of
 operating pressure angle to clear itself, sits just under continuous contact, and every split of
 both meshes is refused.
@@ -467,10 +467,10 @@ give them only one. Every mesh's ratio is a floor under its own automatic
 widths; the panel offers the ratio once per group and writes the group's
 meshes together. It is the reading the relief takes **last**, since the
 ratio is asked for less often than an angle, and it has no answer at all
-when `ε_β π m_n / b > 1`: the note `stage.overlap_unreachable` says so and
+when `ε_β π m_n / b > 1`: the note `part.overlap_unreachable` says so and
 the pair is built at the even split.
 Given as a floor on straight teeth it asks nothing, since no width buys
-overlap at zero helix, and `stage.overlap_needs_helix` says so. Crossed shafts
+overlap at zero helix, and `part.overlap_needs_helix` says so. Crossed shafts
 have no overlap in this sense: the input is not offered there, and one that
 was given is relieved back to automatic.
 
@@ -2247,7 +2247,7 @@ stored: **epicyclic** where an axis is carried, **skew** where a distance is
 at an angle or marked as a worm, **parallel** otherwise — a spur pair is
 the epicyclic family with its carrier held and no ring, and a crossed pair
 turned to nought is a parallel one afterwards. A **preset** is a shape
-pre-assembled at sensible teeth and listed under its family (`StagePreset`:
+pre-assembled at sensible teeth and listed under its family (`Preset`:
 spur, idler, layshaft; worm, crossed; planetary, Wolfrom, compound,
 planocentric, meshed planets). Every epicyclic one is a list over
 `arrangements::epicyclic` — the central members and the carrier in slot
@@ -2533,10 +2533,9 @@ with its coupling taken away — cannot be coaxial with anything fixed, so a
 join to it is an **offset coupling** between the two ends, each keeping its
 number ([below](#bodies-and-constraints)), and a split takes the coupling
 away again.
-Joining a body to one a case had declared *reacted* turns that entry into a
-load with its torque derived — an inline take-off, the same physics — since
-a body two stages share cannot be a reaction; a hold drops every case entry
-at the body, there being nothing a case can say of ground. A part that
+A case entry at either end of a join keeps its role — a reaction is a
+reaction at the body the join makes, as at any other; a hold drops every
+case entry at the body, there being nothing a case can say of ground. A part that
 shares no body is an isolated stage, which is legal: the graph has two
 components, each needs a given speed, and every case says so. Two slots of
 one part on one body is a mesh turning against itself, and a join that
@@ -2731,11 +2730,12 @@ carries a torque and a speed, each given or derived; a **reacted** port is
 held by whatever is attached — it turns as the motion says and carries the
 torque the flow puts on it, both found; a **free** port turns and carries
 nothing. A port the case does not mention is free. A port the train holds is
-fixed — ground under another name — and no case can say anything of it. A
-body two stages share can be a load (an inline take-off, its torque given
-or derived) or free, not a reaction: a second reaction on one chain is a
-division by stiffness this model does not make, and the case says so and
-rates nothing. A free port beside a given torque nothing else holds is the question
+fixed — ground under another name — and no case can say anything of it.
+Any open body can be any of the three, whichever parts it lies between: a
+take-off between two presets is a reaction or a load there, and a second
+reaction on one line is a division by stiffness this model does not make,
+which the case says and rates nothing. A free port beside a given torque
+nothing else holds is the question
 whether a stage locks, asked on purpose and answered by name. A fresh case
 is written between the train's two ends — a load at the first, a reaction at
 the second — and switched off, so that adding one moves no figure until the

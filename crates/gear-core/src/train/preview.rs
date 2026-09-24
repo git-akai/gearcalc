@@ -159,7 +159,7 @@ mod tests {
     //! nothing else; the pieces it makes and takes, counted; nothing, where
     //! it changes nothing; and the headline path kept, lost or found.
 
-    use super::super::arrangements::StagePreset;
+    use super::super::arrangements::Preset;
     use super::super::{test_library, Edit, LoadCase, Piece, Place};
     use super::*;
 
@@ -168,7 +168,7 @@ mod tests {
     }
 
     fn pair() -> Train {
-        Train::chained(vec![StagePreset::Spur.build()], |t| {
+        Train::chained(vec![Preset::Spur.build()], |t| {
             vec![LoadCase::ultimate(t.port(0, 1), t.port(0, 2), 1.0, 1000.0)]
         })
     }
@@ -238,17 +238,16 @@ mod tests {
     #[test]
     fn a_path_goes_and_a_path_appears() {
         let lib = test_library();
-        let t = Train::chained(
-            vec![StagePreset::Spur.build(), StagePreset::Spur.build()],
-            |t| vec![LoadCase::ultimate(t.port(0, 1), t.port(1, 2), 1.0, 1000.0)],
-        );
+        let t = Train::chained(vec![Preset::Spur.build(), Preset::Spur.build()], |t| {
+            vec![LoadCase::ultimate(t.port(0, 1), t.port(1, 2), 1.0, 1000.0)]
+        });
         let mut u = t.clone();
         u.edit(Edit::Remove(Piece::Member(3))).unwrap();
         let p = preview(&t, Ok(&u), &lib);
         assert_eq!(keys(&p.paths), [key::PREVIEW_PATH_GONE]);
         assert!(keys(&p.changes).contains(&key::PREVIEW_CASE_ENTRIES));
 
-        let set = StagePreset::Planetary.build();
+        let set = Preset::Planetary.build();
         let (sun, carrier, ring) = (1, 2, 3);
         let mut t = Train::chained(vec![set], |_| Vec::new());
         t.release(ring);

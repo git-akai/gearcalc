@@ -480,7 +480,7 @@ mod tests {
     //! ordered pair, the three-stage train the corpus prints, and a
     //! planocentric written before the offset coupling.
 
-    use super::super::arrangements::{epicyclic, external, Central, StagePreset};
+    use super::super::arrangements::{epicyclic, external, Central, Preset};
     use super::super::wiring::teeth_of;
     use super::super::{shape::solve_shape, test_library, Reversal, Train};
     use super::*;
@@ -522,29 +522,22 @@ mod tests {
     /// has it — its output the planet's own body — with a pair after it:
     /// the join the graph cannot make coaxial.
     fn fixtures() -> Vec<(String, Vec<Shape>)> {
-        let built = |presets: &[StagePreset]| presets.iter().map(|p| p.build()).collect();
+        let built = |presets: &[Preset]| presets.iter().map(|p| p.build()).collect();
         let mut out = Vec::new();
-        for a in StagePreset::ALL {
+        for a in Preset::ALL {
             out.push((format!("{a:?}"), built(&[a])));
-            for b in StagePreset::ALL {
+            for b in Preset::ALL {
                 out.push((format!("{a:?} then {b:?}"), built(&[a, b])));
             }
         }
         out.push((
             "spur then layshaft then compound".into(),
-            built(&[
-                StagePreset::Spur,
-                StagePreset::Layshaft,
-                StagePreset::Compound,
-            ]),
+            built(&[Preset::Spur, Preset::Layshaft, Preset::Compound]),
         ));
-        out.push((
-            UNCOUPLED.into(),
-            vec![uncoupled(), StagePreset::Spur.build()],
-        ));
+        out.push((UNCOUPLED.into(), vec![uncoupled(), Preset::Spur.build()]));
         // A set that lists its held ring before the sun it is entered at:
         // the ring stays ahead of the shaft the pair shares with it.
-        let mut ring_first = StagePreset::Planetary.build();
+        let mut ring_first = Preset::Planetary.build();
         let ring = ring_first
             .members
             .iter()
@@ -560,7 +553,7 @@ mod tests {
         ring_first.bodies.insert(0, entry);
         out.push((
             "spur then a set listing its ring first".into(),
-            vec![StagePreset::Spur.build(), ring_first],
+            vec![Preset::Spur.build(), ring_first],
         ));
         out
     }
@@ -620,7 +613,7 @@ mod tests {
     /// of its own, coupled to the planet it was joined to.
     #[test]
     fn a_join_off_an_orbiting_body_is_a_coupling() {
-        let presets = vec![uncoupled(), StagePreset::Spur.build()];
+        let presets = vec![uncoupled(), Preset::Spur.build()];
         let (stages, _) = stages_of(&presets);
         let graph = graph_of(&stages, 1);
         // Bodies: carrier 1, ring 2, planet 3; the pair's second gear 4.

@@ -8,4 +8,4 @@
  * from a planetary set, so each is a menu entry. The order here is the
  * menu's.
  */
-export type StagePreset = "spur" | "idler" | "layshaft" | "worm" | "crossed" | "planetary" | "wolfrom" | "compound" | "planocentric" | "meshed_planets";
+export type Preset = "spur" | "idler" | "layshaft" | "worm" | "crossed" | "planetary" | "wolfrom" | "compound" | "planocentric" | "meshed_planets";

@@ -807,13 +807,13 @@ pub fn worm_and_pair(worm: (u32, u32), pair: (u32, u32)) -> Shape {
     ts(export, export_to = "core/")
 )]
 #[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
-pub enum StageFamily {
+pub enum PresetFamily {
     Parallel,
     Skew,
     Epicyclic,
 }
 
-impl StageFamily {
+impl PresetFamily {
     /// The three, in the menu's order.
     pub const ALL: [Self; 3] = [Self::Parallel, Self::Skew, Self::Epicyclic];
 
@@ -830,15 +830,15 @@ impl StageFamily {
 }
 
 impl Shape {
-    /// Which family this shape is, read off it — see [`StageFamily`].
+    /// Which family this shape is, read off it — see [`PresetFamily`].
     #[must_use]
-    pub fn family(&self) -> StageFamily {
+    pub fn family(&self) -> PresetFamily {
         if self.axes.iter().any(|a| a.carried_by != GROUND) {
-            StageFamily::Epicyclic
+            PresetFamily::Epicyclic
         } else if self.distances.iter().any(|d| d.angle != 0.0 || d.worm) {
-            StageFamily::Skew
+            PresetFamily::Skew
         } else {
-            StageFamily::Parallel
+            PresetFamily::Parallel
         }
     }
 }
@@ -857,7 +857,7 @@ impl Shape {
     ts(export, export_to = "core/")
 )]
 #[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
-pub enum StagePreset {
+pub enum Preset {
     /// A spur or helical pair ([`pair`]).
     Spur,
     /// A pair with an idler between: the same ratio, the other sense.
@@ -882,7 +882,7 @@ pub enum StagePreset {
     MeshedPlanets,
 }
 
-impl StagePreset {
+impl Preset {
     /// Every preset, in the menu's order.
     pub const ALL: [Self; 10] = [
         Self::Spur,
@@ -900,15 +900,15 @@ impl StagePreset {
     /// The family the preset is listed under — the family its shape reads
     /// as, and the test below holds the two to each other.
     #[must_use]
-    pub fn family(self) -> StageFamily {
+    pub fn family(self) -> PresetFamily {
         match self {
-            Self::Spur | Self::Idler | Self::Layshaft => StageFamily::Parallel,
-            Self::Worm | Self::Crossed => StageFamily::Skew,
+            Self::Spur | Self::Idler | Self::Layshaft => PresetFamily::Parallel,
+            Self::Worm | Self::Crossed => PresetFamily::Skew,
             Self::Planetary
             | Self::Wolfrom
             | Self::Compound
             | Self::Planocentric
-            | Self::MeshedPlanets => StageFamily::Epicyclic,
+            | Self::MeshedPlanets => PresetFamily::Epicyclic,
         }
     }
 
@@ -1285,7 +1285,7 @@ mod tests {
     /// reading, and a preset a designer adds is a stage that answers.
     #[test]
     fn every_preset_is_in_its_own_family_and_solves_conventionally() {
-        for preset in StagePreset::ALL {
+        for preset in Preset::ALL {
             let shape = preset.build();
             assert_eq!(shape.family(), preset.family(), "{preset:?}");
             let r = conventionally(&shape);

@@ -366,12 +366,12 @@
      },
      "held": []
     },
-    "stages": [
+    "presets": [
      {
       "preset": "spur",
       "family": "parallel",
       "label": "ui.train_preset_spur",
-      "stage": {
+      "shape": {
        "axes": [
         {
          "carried_by": 0,
@@ -568,7 +568,7 @@
       "preset": "idler",
       "family": "parallel",
       "label": "ui.train_preset_idler",
-      "stage": {
+      "shape": {
        "axes": [
         {
          "carried_by": 0,
@@ -871,7 +871,7 @@
       "preset": "layshaft",
       "family": "parallel",
       "label": "ui.train_preset_layshaft",
-      "stage": {
+      "shape": {
        "axes": [
         {
          "carried_by": 0,
@@ -1358,7 +1358,7 @@
       "preset": "worm",
       "family": "skew",
       "label": "ui.train_preset_worm",
-      "stage": {
+      "shape": {
        "axes": [
         {
          "carried_by": 0,
@@ -1555,7 +1555,7 @@
       "preset": "crossed",
       "family": "skew",
       "label": "ui.train_preset_crossed",
-      "stage": {
+      "shape": {
        "axes": [
         {
          "carried_by": 0,
@@ -1752,7 +1752,7 @@
       "preset": "planetary",
       "family": "epicyclic",
       "label": "ui.train_preset_planetary",
-      "stage": {
+      "shape": {
        "axes": [
         {
          "carried_by": 0,
@@ -2038,7 +2038,7 @@
       "preset": "wolfrom",
       "family": "epicyclic",
       "label": "ui.train_preset_wolfrom",
-      "stage": {
+      "shape": {
        "axes": [
         {
          "carried_by": 0,
@@ -2328,7 +2328,7 @@
       "preset": "compound",
       "family": "epicyclic",
       "label": "ui.train_preset_compound",
-      "stage": {
+      "shape": {
        "axes": [
         {
          "carried_by": 0,
@@ -2763,7 +2763,7 @@
       "preset": "planocentric",
       "family": "epicyclic",
       "label": "ui.train_preset_planocentric",
-      "stage": {
+      "shape": {
        "axes": [
         {
          "carried_by": 0,
@@ -2977,7 +2977,7 @@
       "preset": "meshed_planets",
       "family": "epicyclic",
       "label": "ui.train_preset_meshed_planets",
-      "stage": {
+      "shape": {
        "axes": [
         {
          "carried_by": 0,
@@ -3445,23 +3445,23 @@
    "ok": [
     [
      "en",
-     532
+     531
     ],
     [
      "de",
-     532
+     531
     ],
     [
      "pt",
-     532
+     531
     ],
     [
      "zh-Hans",
-     532
+     531
     ],
     [
      "zh-Hant",
-     532
+     531
     ]
    ]
   },
@@ -25257,7 +25257,7 @@
         "loads": [
          {
           "at": 1,
-          "role": "load",
+          "role": "reacted",
           "torque": {
            "auto": true,
            "manual": 0
@@ -30138,7 +30138,7 @@
          ],
          "notes": [
           {
-           "key": "stage.planets_share_load_equally",
+           "key": "part.planets_share_load_equally",
            "values": {
             "planets": "3"
            }

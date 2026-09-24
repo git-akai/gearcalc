@@ -10,4 +10,4 @@ import type { Shape } from "./Shape";
  * number for it. Each is a rule about what else changes, made whole or
  * refused whole ([`EditRefused`]) by [`super::Train::edit`].
  */
-export type Edit = { "add_gear": { mate: number, on: Place, ring: boolean, } } | { "add_ratio": { distance: number, shared: number, } } | { "add_step": { axis: number, } } | { "couple": { body: number, } } | { "remove": Piece } | { "move": { member: number, to: number | null, } } | { "join": { a: number, b: number, } } | { "hold": number } | { "release": number } | { "insert": { stage: Shape, at: number | null, } };
+export type Edit = { "add_gear": { mate: number, on: Place, ring: boolean, } } | { "add_ratio": { distance: number, shared: number, } } | { "add_step": { axis: number, } } | { "couple": { body: number, } } | { "remove": Piece } | { "move": { member: number, to: number | null, } } | { "join": { a: number, b: number, } } | { "hold": number } | { "release": number } | { "insert": { shape: Shape, at: number | null, } };

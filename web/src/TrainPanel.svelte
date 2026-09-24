@@ -2,8 +2,7 @@
   import {
     defaults,
     solveTrain,
-    presetsOf,
-    type StagePreset,
+    type Preset,
     type Figure,
     CASE_KINDS,
     type CaseKindSpec,
@@ -222,9 +221,9 @@
     axis: axisLabel,
     mesh: meshName,
     distance: distanceName,
-    preset: (p) => t(defaults().stages.find((e) => e.preset === p)?.label ?? ""),
+    preset: (p) => t(defaults().presets.find((e) => e.preset === p)?.label ?? ""),
     family: (p) => {
-      const family = defaults().stages.find((e) => e.preset === p)?.family;
+      const family = defaults().presets.find((e) => e.preset === p)?.family;
       return t(defaults().families.find((f) => f.family === family)?.label ?? "");
     },
   };
@@ -970,17 +969,14 @@
            through relief after every toggle; a reacted body turns as
            the motion says and carries whatever the flow puts on it;
            a free one turns and carries nothing. The chain's ends are
-           reacted and everything else free until the case says so. A
-           body two stages share has an end on each, and cannot be a
-           reaction — a second reaction on one chain is a division by
-           stiffness the core refuses — so it is a load, an inline
-           take-off, or free. A derived box shows what the case comes
-           to and stands blank until it can. -->
+           reacted and everything else free until the case says so; a
+           second reaction on one line is a division by stiffness, which
+           the core refuses by name. A derived box shows what the case
+           comes to and stands blank until it can. -->
       {#each bodies as b (b.body)}
         {@const role = roleOf(c, b)}
         {@const load = role === "load" ? entryOf(c, b) : undefined}
         {@const at = bodyOf(cres, b.body)}
-        {@const shared = b.ends.length > 1}
         <div class="mode" class:later={c.kind === "fatigue" || b !== bodies[0]}>
           <span>{bodyName(b.body)}</span>
           {#if role === "fixed"}
@@ -992,12 +988,7 @@
               <button class:on={role === "load"} onclick={() => setRole(i, b, "load")}>
                 {t("ui.train_case_load")}
               </button>
-              <button
-                class:on={role === "reacted"}
-                disabled={shared}
-                title={shared ? t("ui.train_note_shared_not_reacted") : undefined}
-                onclick={() => setRole(i, b, "reacted")}
-              >
+              <button class:on={role === "reacted"} onclick={() => setRole(i, b, "reacted")}>
                 {t("ui.train_case_reacted")}
               </button>
               <button class:on={role === "free"} onclick={() => setRole(i, b, "free")}>
@@ -2239,7 +2230,7 @@
         {@render axesList()}
       {/if}
       {#if tab.train.shape.members.length === 0}
-        <p class="hint">{t("ui.train_no_stages")}</p>
+        <p class="hint">{t("ui.train_empty")}</p>
       {/if}
       <Offers train={tab.train} at={[...selected, atOutput]} kind="adds" {names} materials={ratedUnder()} {made} />
     </section>

@@ -6,7 +6,7 @@
 // here decides what can be done, or whether: an offer arrives with its edit
 // and, where it would be refused, the refusal's key.
 
-import { t, type Edit, type Offer, type StagePreset, type Target } from "./core";
+import { t, type Edit, type Offer, type Preset, type Target } from "./core";
 
 /** The panel's names for the pieces an edit points at, by the graph's
  *  index — a body by its number. */
@@ -16,9 +16,9 @@ export interface Names {
   axis: (a: number) => string;
   mesh: (k: number) => string;
   distance: (d: number) => string;
-  preset: (p: StagePreset) => string;
+  preset: (p: Preset) => string;
   /** The family a preset is listed under, by its label. */
-  family: (p: StagePreset) => string;
+  family: (p: Preset) => string;
 }
 
 /** **Whether an edit adds to the train** — what the one add menu lists —
@@ -66,10 +66,10 @@ export function offerLabel(o: Offer, n: Names): string {
   if ("add_step" in e) return t("ui.train_offer_step", { axis: n.axis(e.add_step.axis) });
   if ("couple" in e) return t("ui.train_couple_of", { body: n.body(e.couple.body) });
   if ("insert" in e) {
-    const stage = o.preset === null ? "" : n.preset(o.preset);
+    const preset = o.preset === null ? "" : n.preset(o.preset);
     return e.insert.at === null
-      ? t("ui.train_offer_stage_at_output", { stage })
-      : t("ui.train_offer_stage_at_body", { stage, body: n.body(e.insert.at) });
+      ? t("ui.train_offer_preset_at_output", { preset })
+      : t("ui.train_offer_preset_at_body", { preset, body: n.body(e.insert.at) });
   }
   if ("move" in e) {
     const gear = n.gear(e.move.member);
@@ -98,7 +98,7 @@ export interface Section {
  *  is offered at being the menu's heading over it, so no entry repeats it:
  *  at a gear, a gear or a ring meshing it by where it goes; at a body, one
  *  on it by what it meshes; at an axis, one on a new body there by what it
- *  meshes; another ratio by the body it shares; a stage by its preset,
+ *  meshes; another ratio by the body it shares; a preset by its name,
  *  under its family. A step and a coupling are one entry each, named whole. */
 function kindOf(o: Offer, at: Target, n: Names): { kind: string; heading: string | null; label: string } {
   const e = o.edit;
@@ -128,7 +128,7 @@ function kindOf(o: Offer, at: Target, n: Names): { kind: string; heading: string
   if ("couple" in e) return { kind: "couple", heading: null, label: t("ui.train_offer_couple_here") };
   if ("insert" in e && o.preset !== null) {
     const family = n.family(o.preset);
-    return { kind: `stage ${family}`, heading: family, label: n.preset(o.preset) };
+    return { kind: `preset ${family}`, heading: family, label: n.preset(o.preset) };
   }
   return { kind: "other", heading: null, label: offerLabel(o, n) };
 }

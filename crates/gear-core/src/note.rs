@@ -85,10 +85,10 @@ pub mod key {
 
     // ---- a member --------------------------------------------------- //
     //
-    // A finding about one gear of a stage — a bound that moved its number, a
-    // root loaded both ways, a rim too thin to rate, a face nothing sizes —
-    // carried on that gear's own result and drawn on its card, never in the
-    // stage's list where a reader would have to match it back up.
+    // A finding about one gear — a bound that moved its number, a root
+    // loaded both ways, a rim too thin to rate, a face nothing sizes —
+    // carried on that gear's own result and drawn beside it, never in a
+    // part's list where a reader would have to match it back up.
     /// `gear.face_width_as_entered`
     pub const GEAR_FACE_WIDTH_AS_ENTERED: &str = "gear.face_width_as_entered";
     /// `gear.addendum_held_to_tip_width`
@@ -130,30 +130,30 @@ pub mod key {
     /// `mesh.load_sharing_out_of_band`
     pub const MESH_LOAD_SHARING_OUT_OF_BAND: &str = "mesh.load_sharing_out_of_band";
 
-    // ---- the stage -------------------------------------------------- //
+    // ---- the part --------------------------------------------------- //
     //
-    // What only the arrangement can say: its distance, its search, its
+    // What only a part's own solve can say: its distances, its search, its
     // planets.
-    /// `stage.distance_not_reached`
-    pub const STAGE_DISTANCE_NOT_REACHED: &str = "stage.distance_not_reached";
-    /// `stage.clearance_negative`
-    pub const STAGE_CLEARANCE_NEGATIVE: &str = "stage.clearance_negative";
-    /// `stage.optimiser_found_nothing`
-    pub const STAGE_OPTIMISER_FOUND_NOTHING: &str = "stage.optimiser_found_nothing";
-    /// `stage.overlap_unreachable`
-    pub const STAGE_OVERLAP_UNREACHABLE: &str = "stage.overlap_unreachable";
-    /// `stage.overlap_needs_helix`
-    pub const STAGE_OVERLAP_NEEDS_HELIX: &str = "stage.overlap_needs_helix";
-    /// `stage.planet_clearance_below_minimum`
-    pub const STAGE_PLANET_CLEARANCE_BELOW_MINIMUM: &str = "stage.planet_clearance_below_minimum";
-    /// `stage.planets_not_evenly_spaced`
-    pub const STAGE_PLANETS_NOT_EVENLY_SPACED: &str = "stage.planets_not_evenly_spaced";
-    /// `stage.planets_share_load_equally`
-    pub const STAGE_PLANETS_SHARE_LOAD_EQUALLY: &str = "stage.planets_share_load_equally";
+    /// `part.distance_not_reached`
+    pub const PART_DISTANCE_NOT_REACHED: &str = "part.distance_not_reached";
+    /// `part.clearance_negative`
+    pub const PART_CLEARANCE_NEGATIVE: &str = "part.clearance_negative";
+    /// `part.optimiser_found_nothing`
+    pub const PART_OPTIMISER_FOUND_NOTHING: &str = "part.optimiser_found_nothing";
+    /// `part.overlap_unreachable`
+    pub const PART_OVERLAP_UNREACHABLE: &str = "part.overlap_unreachable";
+    /// `part.overlap_needs_helix`
+    pub const PART_OVERLAP_NEEDS_HELIX: &str = "part.overlap_needs_helix";
+    /// `part.planet_clearance_below_minimum`
+    pub const PART_PLANET_CLEARANCE_BELOW_MINIMUM: &str = "part.planet_clearance_below_minimum";
+    /// `part.planets_not_evenly_spaced`
+    pub const PART_PLANETS_NOT_EVENLY_SPACED: &str = "part.planets_not_evenly_spaced";
+    /// `part.planets_share_load_equally`
+    pub const PART_PLANETS_SHARE_LOAD_EQUALLY: &str = "part.planets_share_load_equally";
 
     // ---- the train, as a whole ------------------------------------ //
     //
-    // What a stage cannot say, because it is a fact about the shaft line:
+    // What no part can say, because it is a fact about the shaft line:
     // where — or whether — a load case is held at all.
     /// `train.load_not_reacted`
     pub const TRAIN_LOAD_NOT_REACTED: &str = "train.load_not_reacted";
@@ -298,14 +298,14 @@ pub mod key {
         MESH_OVERLAP_BELOW_ONE,
         MESH_SELF_LOCKING,
         MESH_LOAD_SHARING_OUT_OF_BAND,
-        STAGE_DISTANCE_NOT_REACHED,
-        STAGE_CLEARANCE_NEGATIVE,
-        STAGE_OPTIMISER_FOUND_NOTHING,
-        STAGE_OVERLAP_UNREACHABLE,
-        STAGE_OVERLAP_NEEDS_HELIX,
-        STAGE_PLANET_CLEARANCE_BELOW_MINIMUM,
-        STAGE_PLANETS_NOT_EVENLY_SPACED,
-        STAGE_PLANETS_SHARE_LOAD_EQUALLY,
+        PART_DISTANCE_NOT_REACHED,
+        PART_CLEARANCE_NEGATIVE,
+        PART_OPTIMISER_FOUND_NOTHING,
+        PART_OVERLAP_UNREACHABLE,
+        PART_OVERLAP_NEEDS_HELIX,
+        PART_PLANET_CLEARANCE_BELOW_MINIMUM,
+        PART_PLANETS_NOT_EVENLY_SPACED,
+        PART_PLANETS_SHARE_LOAD_EQUALLY,
         TRAIN_CASE_NO_LOAD,
         TRAIN_CASE_UNDERDETERMINED,
         TRAIN_CASE_NOTHING_DRIVES,
@@ -405,7 +405,7 @@ impl Note {
 /// Errors used to answer that question in English, through `Display`, from
 /// inside a crate whose standing rule is that it holds no words
 /// (`docs/corrections.md`). This is the same door [`Note`] already gave clamps
-/// and stage notes: one channel for every reason a person reads, so the
+/// and part notes: one channel for every reason a person reads, so the
 /// catalogue check covers all of them and a translator has one file.
 ///
 /// `Display` stays on each of these, for the CLI and for `Debug`. What changed

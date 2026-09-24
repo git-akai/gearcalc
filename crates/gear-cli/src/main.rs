@@ -1625,8 +1625,8 @@ fn shifts_report(z1: u32, z2: u32) {
     // nothing, which is the point.
     let said = |r: &Pair| {
         for n in r.notes {
-            if n.is(gear_core::note::key::STAGE_DISTANCE_NOT_REACHED)
-                || n.is(gear_core::note::key::STAGE_CLEARANCE_NEGATIVE)
+            if n.is(gear_core::note::key::PART_DISTANCE_NOT_REACHED)
+                || n.is(gear_core::note::key::PART_CLEARANCE_NEGATIVE)
             {
                 println!("{:>36}{}", "", words().render(n));
             }
@@ -1718,7 +1718,7 @@ fn epicyclic_shifts_report() {
                     v.fixed_carrier_efficiency * 100.0,
                     v.notes
                         .iter()
-                        .find(|n| n.is(gear_core::note::key::STAGE_OPTIMISER_FOUND_NOTHING))
+                        .find(|n| n.is(gear_core::note::key::PART_OPTIMISER_FOUND_NOTHING))
                         .map_or("a shift to choose", |_| "nothing admissible"),
                 );
             }

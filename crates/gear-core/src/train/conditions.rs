@@ -185,21 +185,22 @@ impl TrainMotion {
 }
 
 impl Train {
-    /// **A train of these stages joined as a chain**, each stage's
-    /// conventional output body one with the next stage's conventional
-    /// input, the cases written by `cases` once the bodies have their train
-    /// numbers — so a fixture names a body by its stage and slot
-    /// ([`Self::port`]) and the numbers are the train's.
+    /// **A train of these shapes joined as a chain** — presets, as a rule
+    /// — each one's conventional output body one with the next one's
+    /// conventional input ([`Self::chain_on`]), the cases written by `cases`
+    /// once the bodies have their train numbers — so a fixture names a body
+    /// by its part and slot ([`Self::port`]) and the numbers are the
+    /// train's.
     #[must_use]
-    pub fn chained(stages: Vec<Shape>, cases: impl FnOnce(&Self) -> Vec<super::LoadCase>) -> Self {
+    pub fn chained(shapes: Vec<Shape>, cases: impl FnOnce(&Self) -> Vec<super::LoadCase>) -> Self {
         let mut train = Self {
             load_cases: Vec::new(),
             reversed_bending: false,
             shape: Shape::default(),
             held: Vec::new(),
         };
-        for stage in stages {
-            train.chain_on(stage);
+        for shape in shapes {
+            train.chain_on(shape);
         }
         train.load_cases = cases(&train);
         train
@@ -902,12 +903,12 @@ impl Train {
     /// **Two bodies made one**: everything that named `b` names `a` now —
     /// every part's end of it, every case entry, every hold — and `b`'s
     /// number is given up; the axes the two turned about are one line,
-    /// since a shaft is straight ([`Self::merge`]). A reaction declared at
-    /// either becomes a load with its torque derived — an inline take-off,
-    /// the same physics — since a body two parts share cannot be a
-    /// reaction; a free entry at either is dropped, there being nothing
-    /// free about it now; and a case with an entry at each keeps the
-    /// first. Joining a body to itself changes nothing.
+    /// since a shaft is straight ([`Self::merge`]). A case entry keeps its
+    /// role: a reaction at either is a reaction at the body they make, as
+    /// at any other. A free entry at either is dropped, since it says what
+    /// saying nothing says and would otherwise stand in the way of the
+    /// other's; and a case with an entry at each keeps the first. Joining a
+    /// body to itself changes nothing.
     ///
     /// **A join that cannot be coaxial is an offset coupling**: an end on
     /// an axis a carrier turns orbits, and no shaft on a fixed axis can be
@@ -963,12 +964,6 @@ impl Train {
         for case in &mut self.load_cases {
             case.loads
                 .retain(|l| !((l.at == a || l.at == b) && l.role == super::LoadRole::Free));
-            for l in &mut case.loads {
-                if (l.at == a || l.at == b) && l.role == super::LoadRole::Reacted {
-                    l.role = super::LoadRole::Load;
-                    l.torque.auto = true;
-                }
-            }
         }
         self.merge(a, b);
         Ok(())
@@ -1222,23 +1217,23 @@ impl Train {
         };
     }
 
-    /// **A stage appended to the train and joined onward**: its bodies
-    /// given train numbers after every body the train has, and its
-    /// conventional input made one with the last stage's remaining open
-    /// output, where the train has exactly one to give — a chain grows by
-    /// one — and left its own otherwise, an isolated stage for the designer
-    /// to tie in. Every case entry at the body just shared moves to the new
-    /// stage's conventional output: a load or a reaction at what was the
-    /// chain's end is at its new end, which is what the chain did without
-    /// saying so. **The first stage takes up the parked cases** at its
-    /// conventional input and output.
-    pub fn chain_on(&mut self, stage: Shape) {
+    /// **A shape appended to the train and joined onward** — a preset's,
+    /// as a chain is built: its bodies given train numbers after every body
+    /// the train has, and its conventional input made one with the last
+    /// part's remaining open output, where the train has exactly one to
+    /// give — a chain grows by one — and left its own otherwise, a part
+    /// apart for the designer to tie in. Every case entry at the body just
+    /// shared moves to the new shape's conventional output: a load or a
+    /// reaction at what was the chain's end is at its new end. **The first
+    /// shape laid in takes up the parked cases** at its conventional input
+    /// and output.
+    pub fn chain_on(&mut self, shape: Shape) {
         let parts = self.parts();
         let k = parts.len();
         let open = self.open_ports();
         let onward = k.checked_sub(1).and_then(|last| {
-            let shape = &parts[last].shape;
-            let conventional = shape.body_at(shape.ports().output());
+            let before = &parts[last].shape;
+            let conventional = before.body_at(before.ports().output());
             let mine: Vec<usize> = open
                 .iter()
                 .map(|p| p.body)
@@ -1252,11 +1247,11 @@ impl Train {
                 None
             }
         });
-        let (input, output) = self.lay(stage);
+        let (input, output) = self.lay(shape);
         let body = |train: &Self, entry: usize| train.shape.bodies[entry].body;
         if k == 0 {
             // Taken up as they were: a reaction parked at the output is a
-            // reaction at the stage's, not a body two stages share. Each
+            // reaction at the shape's, not a body two parts share. Each
             // merge closes the numbers up, so the second is read afresh.
             if let Some(&a) = self.parked().first() {
                 self.merge(body(self, input), a);
@@ -1284,22 +1279,22 @@ impl Train {
         }
     }
 
-    /// **A stage laid into the graph beside what is there**: its bodies
+    /// **A shape laid into the graph beside what is there**: its bodies
     /// numbered after every body the train has, in its own slot order —
     /// slot `i` body `next + i - 1` — and what it holds by convention
     /// written as the train's holds, so from here on the train holds it
     /// because it says so. Where its conventional input and output landed
     /// in the graph's list of bodies, which no merge with a body nothing
     /// lists reorders.
-    fn lay(&mut self, mut stage: Shape) -> (usize, usize) {
+    fn lay(&mut self, mut shape: Shape) -> (usize, usize) {
         let next = self.max_body() + 1;
-        let slots: Vec<usize> = stage.bodies.iter().map(|b| b.body).collect();
-        stage.renumber_bodies(|b| slots.iter().position(|&x| x == b).map_or(b, |i| next + i));
-        let ports = stage.ports();
+        let slots: Vec<usize> = shape.bodies.iter().map(|b| b.body).collect();
+        shape.renumber_bodies(|b| slots.iter().position(|&x| x == b).map_or(b, |i| next + i));
+        let ports = shape.ports();
         let (input, output) = (ports.input(), ports.output());
-        let held: Vec<usize> = ports.held.iter().map(|&slot| stage.body_at(slot)).collect();
+        let held: Vec<usize> = ports.held.iter().map(|&slot| shape.body_at(slot)).collect();
         let at = self.shape.bodies.len();
-        self.shape.append(stage);
+        self.shape.append(shape);
         for body in held {
             if !self.held.contains(&body) {
                 self.held.push(body);
@@ -1308,20 +1303,20 @@ impl Train {
         (at + input - 1, at + output - 1)
     }
 
-    /// **A stage laid in at a body** ([`super::Edit::Insert`]): its
+    /// **A shape laid in at a body** ([`super::Edit::Insert`]): its
     /// conventional input made one with `at` — the shaft it runs on —
     /// where given, and chained on from the last part's open output
     /// otherwise ([`Self::chain_on`]).
-    fn insert(&mut self, stage: Shape, at: Option<usize>) -> Result<(), super::EditRefused> {
+    fn insert(&mut self, shape: Shape, at: Option<usize>) -> Result<(), super::EditRefused> {
         let Some(at) = at else {
-            self.chain_on(stage);
+            self.chain_on(shape);
             return Ok(());
         };
         if !self.shape.bodies.iter().any(|b| b.body == at) {
             return Err(super::EditRefused::NoSuchIndex);
         }
         let mut t = self.clone();
-        let (input, _) = t.lay(stage);
+        let (input, _) = t.lay(shape);
         let input = t.shape.bodies[input].body;
         t.try_join(at, input)?;
         *self = t;
@@ -1358,7 +1353,7 @@ impl Train {
                 self.release(body);
                 Ok(())
             }
-            Edit::Insert { stage, at } => self.insert(stage, at),
+            Edit::Insert { shape, at } => self.insert(shape, at),
             edit => {
                 let next = self.max_body() + 1;
                 self.shape.apply(&edit, next)?;

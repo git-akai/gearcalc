@@ -61,7 +61,7 @@ pub use conditions::{
 };
 
 use crate::kinematics::{Body, Condition, GROUND};
-pub use arrangements::{StageFamily, StagePreset};
+pub use arrangements::{Preset, PresetFamily};
 pub use edits::{Edit, EditRefused, Piece, Place};
 pub use groupings::{AxisBody, AxisGroup, Centre, FlowRow, Groupings};
 pub use offers::{Offer, Target};
@@ -1866,7 +1866,7 @@ impl Searched {
     /// The note this deserves, if any — so no caller has to remember the wording
     /// or which of the three states is worth saying out loud.
     pub(crate) fn note(self) -> Option<Note> {
-        (self == Self::FoundNothing).then(|| Note::new(key::STAGE_OPTIMISER_FOUND_NOTHING))
+        (self == Self::FoundNothing).then(|| Note::new(key::PART_OPTIMISER_FOUND_NOTHING))
     }
 }
 
@@ -1917,7 +1917,7 @@ pub(crate) fn distance_notes(target: Option<f64>, nominal: f64, clearance: f64) 
     if let Some(target) = target {
         if (nominal - target).abs() > REACHED {
             out.push(
-                Note::new(key::STAGE_DISTANCE_NOT_REACHED)
+                Note::new(key::PART_DISTANCE_NOT_REACHED)
                     .number("asked", target, 4)
                     .number("reached", nominal, 4),
             );
@@ -1925,7 +1925,7 @@ pub(crate) fn distance_notes(target: Option<f64>, nominal: f64, clearance: f64) 
     }
     if clearance < 0.0 {
         out.push(
-            Note::new(key::STAGE_CLEARANCE_NEGATIVE)
+            Note::new(key::PART_CLEARANCE_NEGATIVE)
                 .number("overlap", -clearance, 4)
                 .number("nominal", nominal, 4),
         );
@@ -2114,10 +2114,10 @@ pub(crate) fn overlap_notes(
         return out;
     }
     if taken && helix_for_overlap(overlap.manual, module, width).is_none() {
-        out.push(Note::new(key::STAGE_OVERLAP_UNREACHABLE).number("ratio", overlap.manual, 3));
+        out.push(Note::new(key::PART_OVERLAP_UNREACHABLE).number("ratio", overlap.manual, 3));
     }
     if !taken && helix_deg == 0.0 {
-        out.push(Note::new(key::STAGE_OVERLAP_NEEDS_HELIX).number("ratio", overlap.manual, 3));
+        out.push(Note::new(key::PART_OVERLAP_NEEDS_HELIX).number("ratio", overlap.manual, 3));
     }
     out
 }
@@ -4616,15 +4616,11 @@ mod tests {
     #[test]
     fn a_part_is_its_own_solve_laid_out() {
         let lib = library();
-        for a in arr::StagePreset::ALL {
-            for b in [
-                None,
-                Some(arr::StagePreset::Spur),
-                Some(arr::StagePreset::Planetary),
-            ] {
+        for a in arr::Preset::ALL {
+            for b in [None, Some(arr::Preset::Spur), Some(arr::Preset::Planetary)] {
                 let presets: Vec<Shape> = b
                     .into_iter()
-                    .map(arr::StagePreset::build)
+                    .map(arr::Preset::build)
                     .chain(std::iter::once(a.build()))
                     .collect();
                 let t = Train::chained(presets, |t| {
@@ -6164,16 +6160,16 @@ mod tests {
     }
 
     /// **Every preset the menu offers, and the hula** — the core's own list
-    /// (`StagePreset::ALL`), so a preset added there is under every law
+    /// (`Preset::ALL`), so a preset added there is under every law
     /// here by being on it, and the arrangement a designer reaches by edits
     /// rather than a button. The hula's grounded ring is left automatic so
     /// the relief laws have a shift to turn on it.
     fn every_preset() -> Vec<Shape> {
         let mut hula = hula_shape([65, 61, 57, 61]);
         hula.members[2].gear.profile_shift = Auto::automatic(0.0);
-        StagePreset::ALL
+        Preset::ALL
             .into_iter()
-            .map(super::arrangements::StagePreset::build)
+            .map(super::arrangements::Preset::build)
             .chain([hula])
             .collect()
     }
@@ -7935,9 +7931,7 @@ mod tests {
         let r = solve_train(&t, &lib).expect("solves");
         let notes = &r.stages[0].notes;
         assert!(
-            notes
-                .iter()
-                .any(|n| n.key == key::STAGE_OVERLAP_NEEDS_HELIX),
+            notes.iter().any(|n| n.key == key::PART_OVERLAP_NEEDS_HELIX),
             "no note for a ratio with no helix to work on: {notes:?}"
         );
         // Give it a helix and the floor bites, and the note goes.
@@ -7948,7 +7942,7 @@ mod tests {
         assert!(!pair
             .notes
             .iter()
-            .any(|n| n.key == key::STAGE_OVERLAP_NEEDS_HELIX));
+            .any(|n| n.key == key::PART_OVERLAP_NEEDS_HELIX));
         let ratio = pair.meshes[0]
             .line
             .as_ref()
@@ -8192,11 +8186,11 @@ mod tests {
         let (clearance, keys) = at(23.0);
         assert!(clearance < 0.0, "this one should not be assemblable");
         assert!(
-            keys.iter().any(|k| k == key::STAGE_DISTANCE_NOT_REACHED),
+            keys.iter().any(|k| k == key::PART_DISTANCE_NOT_REACHED),
             "a distance no shifts reach should say so: {keys:?}"
         );
         assert!(
-            keys.iter().any(|k| k == key::STAGE_CLEARANCE_NEGATIVE),
+            keys.iter().any(|k| k == key::PART_CLEARANCE_NEGATIVE),
             "a pair that cannot be assembled should say so: {keys:?}"
         );
 
@@ -8204,8 +8198,8 @@ mod tests {
         let (clearance, keys) = at(25.0);
         assert!(clearance > 0.0);
         assert!(
-            keys.iter().any(|k| k == key::STAGE_DISTANCE_NOT_REACHED)
-                && !keys.iter().any(|k| k == key::STAGE_CLEARANCE_NEGATIVE),
+            keys.iter().any(|k| k == key::PART_DISTANCE_NOT_REACHED)
+                && !keys.iter().any(|k| k == key::PART_CLEARANCE_NEGATIVE),
             "the distance is unreachable but the pair goes together: {keys:?}"
         );
 
@@ -8218,7 +8212,7 @@ mod tests {
         );
         assert!(
             !keys.iter().any(|k| {
-                k == key::STAGE_DISTANCE_NOT_REACHED || k == key::STAGE_CLEARANCE_NEGATIVE
+                k == key::PART_DISTANCE_NOT_REACHED || k == key::PART_CLEARANCE_NEGATIVE
             }),
             "a distance that is reached should say neither: {keys:?}"
         );
@@ -11060,7 +11054,7 @@ mod a_path_is_what_it_crosses {
     //! is the path across the same stage alone, and a gear off it moves it
     //! only by locking it.
 
-    use super::arrangements::StagePreset;
+    use super::arrangements::Preset;
     use super::tests::across;
     use super::*;
 
@@ -11129,8 +11123,8 @@ mod a_path_is_what_it_crosses {
     #[test]
     fn every_stage_in_every_pair_is_the_path_across_it_alone() {
         let lib = test_library();
-        for a in StagePreset::ALL {
-            for b in StagePreset::ALL {
+        for a in Preset::ALL {
+            for b in Preset::ALL {
                 let name = format!("{a:?} then {b:?}");
                 check(&name, vec![a.build(), b.build()], 0, &lib);
                 check(&name, vec![a.build(), b.build()], 1, &lib);
@@ -11146,7 +11140,7 @@ mod a_path_is_what_it_crosses {
     #[test]
     fn a_coupled_shaft_is_the_body_it_turns_with() {
         let lib = test_library();
-        let stage = StagePreset::Planocentric.build();
+        let stage = Preset::Planocentric.build();
         assert_eq!(
             stage.couplings,
             vec![[3, 4]],

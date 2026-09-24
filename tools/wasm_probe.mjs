@@ -41,8 +41,8 @@ const call = (name, f) => {
 };
 
 const defaults = JSON.parse(w.defaults());
-// A preset's starting stage by name, off the list the menu renders from.
-const preset = (name) => structuredClone(defaults.stages.find((e) => e.preset === name).stage);
+// A preset's starting shape by name, off the list the menu renders from.
+const preset = (name) => structuredClone(defaults.presets.find((e) => e.preset === name).shape);
 const library = JSON.parse(w.default_materials());
 
 // A plain external gear: the tab's own default, with the eccentric throw
@@ -90,8 +90,8 @@ const out = {
   // and the first one is declared as the freedom just touched, which is the one
   // that must survive.
   relieve: call("relieve", () =>
-    defaults.stages.map((e) => {
-      const stage = structuredClone(e.stage);
+    defaults.presets.map((e) => {
+      const stage = structuredClone(e.shape);
       const pin = (a) => (a ? { auto: false, manual: 0.1 } : a);
       // A shape keeps its distance on `distances[0]` and its gears under
       // `members[].gear`.
@@ -134,7 +134,7 @@ const out = {
     const axis = (k, a) => parts()[k].axes[a];
     let t = structuredClone(defaults.train);
     const graph = (e) => (t = edit(t, { graph: e }));
-    graph({ insert: { stage: preset("planetary"), at: null } });
+    graph({ insert: { shape: preset("planetary"), at: null } });
     const out = [["insert", structuredClone(t)]];
     graph({ hold: body(1, 2) });
     out.push(["hold", structuredClone(t)]);
@@ -164,7 +164,7 @@ const out = {
     out.push(["set_edited", structuredClone(t)]);
     // **A chain grown and cut back**: a layshaft laid in at the output, a
     // gear on a new axis at its last gear, and that axis taken away again.
-    graph({ insert: { stage: preset("layshaft"), at: null } });
+    graph({ insert: { shape: preset("layshaft"), at: null } });
     const lay = parts()[2];
     const last = lay.shape.axes.length - 1;
     const onLast = lay.shape.members
@@ -178,7 +178,7 @@ const out = {
     // **A coupling taken off a planocentric and put back**: its shaft goes
     // with the coupling where nothing else names it, and the planet coupled
     // again drives a new one.
-    graph({ insert: { stage: preset("planocentric"), at: null } });
+    graph({ insert: { shape: preset("planocentric"), at: null } });
     const plano = parts().length - 1;
     graph({ remove: { coupling: parts()[plano].couplings[0] } });
     out.push(["uncoupled", structuredClone(t)]);
@@ -196,7 +196,7 @@ const out = {
     const layDistance = parts()[2].distances[0];
     graph({ add_ratio: { distance: layDistance, shared: layInput } });
     out.push(["graph_add_ratio", structuredClone(t)]);
-    graph({ insert: { stage: preset("planetary"), at: 1 } });
+    graph({ insert: { shape: preset("planetary"), at: 1 } });
     out.push(["graph_insert_at", structuredClone(t)]);
     const refusal = (e) => {
       try {
@@ -257,7 +257,7 @@ const out = {
     const t = structuredClone(defaults.train);
     const chained = JSON.parse(
       w.edit_train(
-        JSON.stringify({ train: t, edit: { graph: { insert: { stage: preset("planetary"), at: null } } } }),
+        JSON.stringify({ train: t, edit: { graph: { insert: { shape: preset("planetary"), at: null } } } }),
       ),
     );
     return [

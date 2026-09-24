@@ -8,4 +8,4 @@
  * which is why the family is a reading and not a kind, and why a crossed
  * pair turned to nought is simply a parallel one afterwards.
  */
-export type StageFamily = "parallel" | "skew" | "epicyclic";
+export type PresetFamily = "parallel" | "skew" | "epicyclic";

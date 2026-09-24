@@ -328,7 +328,7 @@ reason, and every one's dry run shown before it is pressed (`Train::offers`,
 `preview_edit`; [reference](reference.md#the-graph)).
 
 **One stage shape.** Every stage is one `Shape` — axes, the train's
-bodies on them, members, meshes, distances — and every menu entry (`StagePreset`:
+bodies on them, members, meshes, distances — and every menu entry (`Preset`:
 a spur pair, an idler, a layshaft; a worm, a crossed pair; a planetary set,
 a Wolfrom, a compound set, a planocentric, meshed planets) is a *preset*
 over it: a list in `arrangements.rs` at sensible teeth, which `defaults`

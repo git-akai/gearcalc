@@ -37,11 +37,11 @@
 //! load at the input reacted at the output, the same from the output, and a
 //! fatigue load at the input.
 
-use gear_core::train::arrangements::StagePreset;
+use gear_core::train::arrangements::Preset;
 use gear_core::train::{solve_train, CaseKind, Duty, Shape, Train, TrainResult};
 
 /// A train of presets in a row, with the three cases between its ends.
-fn chain(presets: &[StagePreset]) -> Train {
+fn chain(presets: &[Preset]) -> Train {
     let stages: Vec<Shape> = presets.iter().map(|p| p.build()).collect();
     let mut train = Train::chained(stages, |_| Vec::new());
     let mut cases = vec![
@@ -68,23 +68,19 @@ fn chain(presets: &[StagePreset]) -> Train {
 }
 
 fn fixtures() -> Vec<(String, Train)> {
-    let name = |p: &StagePreset| format!("{p:?}").to_lowercase();
-    let mut out: Vec<(String, Train)> = StagePreset::ALL
+    let name = |p: &Preset| format!("{p:?}").to_lowercase();
+    let mut out: Vec<(String, Train)> = Preset::ALL
         .iter()
         .map(|p| (name(p), chain(&[*p])))
         .collect();
-    for a in StagePreset::ALL {
-        for b in StagePreset::ALL {
+    for a in Preset::ALL {
+        for b in Preset::ALL {
             out.push((format!("{} then {}", name(&a), name(&b)), chain(&[a, b])));
         }
     }
     out.push((
         "spur then layshaft then compound".to_string(),
-        chain(&[
-            StagePreset::Spur,
-            StagePreset::Layshaft,
-            StagePreset::Compound,
-        ]),
+        chain(&[Preset::Spur, Preset::Layshaft, Preset::Compound]),
     ));
     out
 }
