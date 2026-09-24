@@ -39,27 +39,11 @@
     t,
   } from "./core";
   import { trains, library, type TrainTab, type Selection, type Grouping } from "./state.svelte";
-  import { exportTrain, relieveCase, editTrain } from "./core";
+  import { exportTrain, relieveCase, relieveTrain, editTrain, type Freedom } from "./core";
   import FieldNote from "./FieldNote.svelte";
   import Switch from "./Switch.svelte";
   import { notes, type Notes } from "./notes";
-  import {
-    axisGroups,
-    axisOfBody,
-    bodyName,
-    endsOf,
-    acrossBody,
-    bodyRefName,
-    movableGears,
-    onSlot,
-    memberName,
-    memberListName,
-    memberRefs,
-    isWorm,
-    carried,
-    roleLabel,
-  } from "./members";
-  import { cardsOf, cardView, relieveStage, wholePart } from "./cards";
+  import { axisOfBody, bodyName, carried, gearLabel } from "./members";
   import Offers from "./Offers.svelte";
   import { adds, type Names } from "./offers";
 
@@ -73,7 +57,7 @@
    *  at all, and one of the three carried a justification that went stale the
    *  moment the core stopped needing it.
    *
-   *  `Shape::freedoms` declares them now and `relieveStage` walks them, so this
+   *  `Shape::freedoms` declares them now and `relieve` walks them, so this
    *  file passes on which toggle was just pinned and nothing else. */
 
   let { tab }: { tab: TrainTab } = $props();
@@ -126,36 +110,29 @@
    *  below as a blank rather than as a row that is not there. */
   const solved = $derived(result.result ?? undefined);
   const failure = $derived(result.failure);
-  /** **The cards**: one per part of the train's graph, as the core deals
-   *  them, each standing on the graph's own pieces (`cards.ts`) — so a box
-   *  bound to a card's member writes the train. */
-  const cards = $derived(cardsOf(tab.train, result.topology));
-  /** What the train's inputs last came to, by name — handed back to relief
-   *  so a box it turns given holds the number it showed. An empty list where
-   *  the train has not solved, and the box keeps what it had. The train's,
-   *  whichever card asks: relief is asked of the whole graph. */
-  const figuresOf = (_stage: Shape): Figure[] => result.figures;
 
   // ------------------------------------------- the list and the workspace
 
-  /** **The whole graph as one card** — what the workspace stands on: a
-   *  selection is by the graph's index, so every field snippet and relief
-   *  hook takes the graph's own pieces under the graph's own numbers. */
-  const graph = $derived(cardView(tab.train, wholePart(tab.train)));
+  /** **The train's graph** — what the workspace stands on: a selection is
+   *  by the graph's index, so every field is bound to the graph's own
+   *  pieces under the graph's own numbers, and a box typed into writes the
+   *  train. */
+  const graph = $derived(tab.train.shape);
+  /** **An input just touched, relieved**: the core's rule over the whole
+   *  graph (`relieve`), the input named by the graph's index and handed the
+   *  figures the train last came to, so a box relief turns given holds the
+   *  number it showed. An empty list where the train has not solved, and the
+   *  box keeps what it had. */
+  const relieve = (just: Freedom | null) => relieveTrain(tab.train, just, result.figures);
   /** The case the flow and the workspace are shown for — the view's, held
    *  to the cases the train has. */
   const shownCase = $derived(Math.max(0, Math.min(tab.view.case, tab.train.load_cases.length - 1)));
   /** The shown case's flow, as the core walks it. */
   const flow = $derived(result.flows[shownCase] ?? []);
   /** **A gear by the graph's index**: its role and its number — "Sun (9)" —
-   *  or, where the number is its name, "Gear 3". */
-  const gearName = (i: number): string => {
-    const role = roleLabel(result.names[i]);
-    const number = String(i + 1);
-    return role === null
-      ? t("ui.train_gear_name", { number })
-      : t("ui.train_member_numbered", { name: role, number });
-  };
+   *  or, where the number is its name, "Gear 3" (`members.ts`, which the
+   *  gear tab's adopt list reads too). */
+  const gearName = (i: number): string => gearLabel(result.names, i);
   const meshName = (k: number): string => {
     const m = tab.train.shape.meshes[k];
     return m === undefined ? "" : `${gearName(m.a)} ⇄ ${gearName(m.b)}`;
@@ -205,6 +182,27 @@
     const reaction = c?.loads.find((l) => l.role === "reacted")?.at;
     return solved?.paths.find((p) => p.from === load && p.to === reaction);
   });
+  /** **A part named by its meshes** — what a reader can find it by in the
+   *  list — and shown by selecting its first. */
+  const partName = (p: number): string => (result.topology[p]?.part.meshes ?? []).map(meshName).join(" · ");
+  function showPart(p: number) {
+    const k = result.topology[p]?.part.meshes[0];
+    if (k !== undefined) select({ mesh: k });
+  }
+  /** Every note a part's own solve raised, with the part it is about. */
+  const partNotes = $derived(
+    (solved?.parts ?? []).flatMap((x, part) => x.notes.map((n) => ({ part, note: n }))),
+  );
+  /** **The parts a body is in**, each with the body's place in the part's
+   *  own list of bodies (ground 0) and a name: the part's gears on the
+   *  body, or the carrier's word where it has none there. */
+  const partsThrough = (body: number): { part: number; slot: number; name: string }[] =>
+    result.topology.flatMap((s, part) => {
+      const slot = s.part.shape.bodies.findIndex((x) => x.body === body) + 1;
+      if (slot === 0) return [];
+      const on = s.part.members.filter((i) => tab.train.shape.members[i]?.body === body);
+      return [{ part, slot, name: on.length > 0 ? on.map(gearName).join(" · ") : t("ui.train_the_carrier") }];
+    });
   /** An axis distance by its two axes — "Axis 1 ↔ Axis 2". */
   const distanceName = (d: number): string => {
     const x = tab.train.shape.distances[d];
@@ -261,43 +259,6 @@
     return at >= 0 && next !== undefined && "mesh" in next ? next.mesh.mesh : undefined;
   };
 
-  /** **A stage's port is on a body of the train**, numbered across the
-   *  train as gears are, ground being 0. The select beside a port says
-   *  which — the ground, a numbered body the port shares with another
-   *  stage's, or a body of its own — so a body two stages share is read as
-   *  two ends on one number rather than as a pair of names. */
-  /** Whether a body is held: the train's own list says, every hold stated. */
-  const heldNow = (p: PortSpec): boolean => isHeld(tab.train, p.body);
-  /** Every body some stage has as a port, once, in number order. */
-  const portBodies = $derived<PortSpec[]>(
-    result.topology
-      .flatMap((s) => s.ports)
-      .filter((p, i, all) => all.findIndex((q) => q.body === p.body) === i)
-      .sort((a, b) => a.body - b.body),
-  );
-  /** **Every body the train holds**, by number — the same reading as
-   *  `heldNow`, gathered once so a stage's card can mark a body held
-   *  without asking the train again per row. */
-  const heldBodies = $derived(new Set(portBodies.filter(heldNow).map((p) => p.body)));
-  /** The bodies a port could be put on, and the one it is on: every unheld
-   *  body that has no *other* end on the port's own stage — a stage's two
-   *  ports cannot turn as one — and its own, held or not. */
-  const joinable = (stage: number, p: PortSpec): PortSpec[] =>
-    portBodies.filter(
-      (q) =>
-        q.body === p.body ||
-        (!heldNow(q) && !endsOf(result.topology, q.body).some((e) => e.stage === stage)),
-    );
-  /** **A stage's end moved to another body**, written back through the
-   *  core's one rule (`move_end`): the end is split off where the body ran
-   *  on, then joined to a body or left on one of its own. Holding is not
-   *  among them any more — it is a statement about a *body*, which every
-   *  end of it shares, and it has a button of its own on the body's row. */
-  function moveEnd(stage: number, body: number, key: string) {
-    editTrain(tab.train, {
-      move_end: { stage, body, to: key === "new" ? null : Number(key) },
-    });
-  }
 
   /** Which duty a fatigue case is counted over. Switching seeds the other
    *  shape from the core's own defaults — a fresh case's intermittent duty,
@@ -310,37 +271,28 @@
     editTrain(tab.train, { duty: { case: i, intermittent: m === "intermittent" } });
   }
 
-  /** **The load cases are a list, as the stages are**, added one of each kind
-   *  by the core, between the train's two ends. Unlike the stages, the last
-   *  one may go: a train with no load case is a body line and nothing else,
-   *  every rating row stands empty, and the two buttons under the list are
-   *  how one comes back — where a train with no stage is one the core
-   *  refuses. */
+  /** **The load cases are a list**, added one of each kind by the core,
+   *  between the train's two ends, and shown as it is added. The last one
+   *  may go: a train with no load case is a body line and nothing else,
+   *  every rating row stands empty, and the two buttons on the strip are
+   *  how one comes back. */
   function addCaseOfKind(kind: CaseKindSpec) {
     editTrain(tab.train, { add_case: kind.key });
-    tab.openCases[tab.train.load_cases.length - 1] = true;
+    tab.view.case = tab.train.load_cases.length - 1;
+    select({ case: tab.view.case });
   }
+  /** A case removed, and the strip shows the one that takes its place —
+   *  the next, or the last where it was the last. */
   function removeCase(i: number) {
     tab.train.load_cases.splice(i, 1);
-    const was = { ...tab.openCases };
-    tab.openCases = {};
-    for (const [k, v] of Object.entries(was)) {
-      const at = Number(k);
-      if (at < i) tab.openCases[at] = v;
-      else if (at > i) tab.openCases[at - 1] = v;
-    }
+    const left = tab.train.load_cases.length;
+    tab.view.case = Math.max(0, Math.min(i, left - 1));
+    tab.view.selection = left > 0 ? { case: tab.view.case } : null;
   }
   /** A load case by number, as a stage is; and the words for its kind and its
    *  port, from the same tables the selects offer them from. */
   const caseName = (i: number) => t("ui.train_case_heading", { number: String(i + 1) });
   const kindLabel = (k: CaseKind) => t(CASE_KINDS.find((x) => x.key === k)?.label ?? k);
-  /** A body by reference: its number and every end of it, **as the gear
-   *  tab's adopt list names a member** — "Body 2 (Shape 1 Gear 2 · Stage 2
-   *  Sun)" — so a body is one name wherever a list has it. */
-  const refLabel = (body: number): string => bodyRefName(result.topology, body);
-  /** Every gear of the train in the order a path numbers them — stage by
-   *  stage, member by member — with the name a list gives it. */
-  const gears = $derived(memberRefs(tab.train, result.topology));
   /** The ports a duty's select offers — bodies, by number, which is the
    *  select's key. */
   const portOptionsNow = $derived(portOptions(result.motion));
@@ -399,7 +351,7 @@
     cres: { bodies: CaseBody[] } | undefined,
   ): { key: number; name: string; role: BodyRole; speed: number | null; torque: number }[] => {
     if (!cres) return [];
-    const row = (s: CaseBody) => ({ key: s.at, name: refLabel(s.at), role: s.role, speed: s.speed, torque: s.torque });
+    const row = (s: CaseBody) => ({ key: s.at, name: bodyName(s.at), role: s.role, speed: s.speed, torque: s.torque });
     const first = [0, ...bodies.map((b) => b.body)];
     const lead = first.map((at) => cres.bodies.find((s) => s.at === at)).filter((s) => s !== undefined);
     const rest = cres.bodies.filter((s) => !first.includes(s.at));
@@ -417,13 +369,13 @@
   /** The heading's summary of a case: each given figure at its port —
    *  none while the train has no stages and the entries are parked. */
   const caseSummary = (c: LoadCase): string =>
-    cards.length === 0 ? "" : c.loads
+    tab.train.shape.members.length === 0 ? "" : c.loads
       .filter((l) => l.role === "load")
       .map((l) => {
         const parts: string[] = [];
         if (!l.torque.auto) parts.push(`${num(l.torque.manual, 3)} ${t("ui.train_nm")}`);
         if (!l.speed.auto) parts.push(`${num(l.speed.manual, 0)} ${t("ui.train_rpm")}`);
-        return parts.length ? `${parts.join(" · ")} ${t("ui.train_at_port", { port: refLabel(l.at) })}` : "";
+        return parts.length ? `${parts.join(" · ")} ${t("ui.train_at_port", { port: bodyName(l.at) })}` : "";
       })
       .filter((s) => s !== "")
       .join(" · ");
@@ -434,114 +386,9 @@
   const forCase = <T extends { case: number }>(list: T[] | undefined, i: number) =>
     list?.find((c) => c.case === i);
 
-  /** A stage pushed and joined onward by the core, its cases carried to
-   *  the new end. */
-  function addStagePreset(preset: StagePreset) {
-    const entry = defaults().stages.find((e) => e.preset === preset);
-    if (!entry) return;
-    editTrain(tab.train, { push_stage: entry.stage });
-  }
-
-  /** Deleting the last stage leaves none. A train with no stages is a
-   *  train — its cases are parked on ground with every figure kept, and
-   *  the next stage added takes them up conventionally — so a designer
-   *  swaps their only stage for another without losing their loads. */
-  /** **A stage edited on its card** — a step, a sun or a ring, an axis, a
-   *  pair added or removed, a member moved to another body — by the core's
-   *  rules, which say what else changes: what it renumbers, the cases and
-   *  couplings follow. A refusal is the core's too, and is said under the
-   *  card in the reader's language until the next edit. Graph facts the
-   *  buttons read to disable themselves — the last central on a step, a
-   *  chain's two axes — are layout, and the core is what decides. */
-  let refused = $state<{ stage: number; key: string } | null>(null);
-  function editStage(i: number, edit: StageEdit) {
-    const key = editTrain(tab.train, { stage: { stage: i, edit } });
-    refused = key === null ? null : { stage: i, key };
-  }
   /** The axis a member turns about; whether a carrier carries it is
    *  `members.ts`'s `carried`, the one reading the gear tab shares. */
   const axisOf = (shape: Shape, j: number) => axisOfBody(shape, shape.members[j].body);
-  /** The last gear on a shape's last axis — a chain's end. */
-  const chainEnd = (shape: Shape): number => {
-    const last = shape.axes.length - 1;
-    const on = shape.members.map((_, j) => j).filter((j) => axisOf(shape, j) === last);
-    return on.length > 0 ? on[on.length - 1] : shape.members.length - 1;
-  };
-  const isPlanetGear = carried;
-  /** The members a member meshes with. */
-  const mates = (shape: Shape, j: number) =>
-    shape.meshes.filter((m) => m.a === j || m.b === j).map((m) => (m.a === j ? m.b : m.a));
-  /** Whether a central member is the last one meeting some planet gear —
-   *  the one remove the core refuses, so the button says so first. */
-  const lastOnItsStep = (shape: Shape, j: number) =>
-    mates(shape, j).some(
-      (p) => isPlanetGear(shape, p) && mates(shape, p).every((c) => c === j || isPlanetGear(shape, c)),
-    );
-  /** Whether two meshes sit on one distance: their members' axes are
-   *  the same pair. */
-  const sameDistance = (shape: Shape, x: { a: number; b: number }, y: { a: number; b: number }) => {
-    const pair = (m: { a: number; b: number }) => [axisOf(shape, m.a), axisOf(shape, m.b)].sort();
-    const [p, q] = [pair(x), pair(y)];
-    return p[0] === q[0] && p[1] === q[1];
-  };
-  /** **The distance a mesh runs on**: the one between its two members'
-   *  axes. Every mesh has one — the shape refuses a mesh whose axes have
-   *  no distance, and a distance carrying none — so the search finds it. */
-  const distanceOf = (shape: Shape, m: { a: number; b: number }) => {
-    const [a, b] = [axisOf(shape, m.a), axisOf(shape, m.b)];
-    return shape.distances.findIndex(
-      (d) => (d.axes[0] === a && d.axes[1] === b) || (d.axes[0] === b && d.axes[1] === a),
-    );
-  };
-  /** **The order the cards are dealt in**: on an epicyclic stage, each
-   *  planet gear followed by the central members meshing it — a step and
-   *  what sits on it — so the "+ Sun / + Ring" buttons on a planet gear are
-   *  read beside the members they would add to; a member in a planet–planet
-   *  mesh only is listed after its planet. Anything else keeps the shape's
-   *  order. Layout alone: names and indices are the shape's. */
-  const cardOrder = (shape: Shape): number[] => {
-    if (!shape.axes.some((a) => a.carried_by !== 0)) return shape.members.map((_, j) => j);
-    const dealt = new Set<number>();
-    const out: number[] = [];
-    const deal = (j: number) => {
-      if (!dealt.has(j)) {
-        dealt.add(j);
-        out.push(j);
-      }
-    };
-    shape.members.forEach((_, j) => {
-      if (!isPlanetGear(shape, j)) return;
-      deal(j);
-      for (const c of mates(shape, j)) if (!isPlanetGear(shape, c)) deal(c);
-    });
-    shape.members.forEach((_, j) => deal(j));
-    return out;
-  };
-  /** The cards in groups: each mesh group's members in the dealt order,
-   *  then any member no group names, so every card is dealt once. */
-  const cardGroups = (shape: Shape, groups: number[][]): number[][] => {
-    const order = cardOrder(shape);
-    const out = groups.map((g) => order.filter((j) => g.includes(j)));
-    const rest = order.filter((j) => !groups.some((g) => g.includes(j)));
-    if (rest.length > 0) out.push(rest);
-    return out.filter((g) => g.length > 0);
-  };
-  function removeStage(i: number) {
-    // The stage's bodies leave with it where no other stage has them, and
-    // the core renumbers the rest and everything that names them.
-    editTrain(tab.train, { remove_stage: i });
-    // The expansions are keyed by index, so the ones after the hole move down
-    // with the stages they belong to. Left alone, deleting a stage reopens
-    // whichever stage inherited its number.
-    const was = { ...tab.open };
-    tab.open = {};
-    for (const [k, v] of Object.entries(was)) {
-      const at = Number(k);
-      if (at < i) tab.open[at] = v;
-      else if (at > i) tab.open[at - 1] = v;
-    }
-  }
-
   /** The candidates for one note slot: a blank to reserve the space, the note
    *  itself when the stage has solved, and the out-of-range message when the
    *  value is outside its bound. All are rendered; see the slot's comment. */
@@ -583,22 +430,6 @@
     const on = (d.axes[0] === a && d.axes[1] === b) || (d.axes[0] === b && d.axes[1] === a);
     return on && (shape.members[m.a].ring !== null) !== (shape.members[m.b].ring !== null);
   };
-  /** **An axis by the members on it**, which is how a designer knows one:
-   *  "gear 3" is an axis, and so is "sun". A carrier's axis has no member
-   *  and goes by the body that carries it. */
-  const axisName = (shape: Shape, stage: number, axis: number): string => {
-    const on = shape.members
-      .map((m, j) => (axisOfBody(shape, m.body) === axis ? memberName(result.topology, stage, j) : null))
-      .filter((x) => x !== null);
-    if (on.length > 0) return on.join(" / ");
-    const b = shape.bodies.find((x) => x.axis === axis);
-    return b === undefined ? String(axis + 1) : bodyName(b.body);
-  };
-  /** A stage by number. The *word* is a label and belongs in the catalogue;
-   *  the number is a name and does not. Written here rather than at each place
-   *  it is read, so a heading and a reference to it cannot drift apart. A
-   *  member's name is `members.ts`'s, where the gear tab reads the same one. */
-  const stageName = (i: number) => t("ui.train_stage_heading", { number: String(i + 1) });
   /** **A gear's own note, rendered under the input it is about.**
    *
    *  A hint that names a field and carries a number — a shift raised to clear
@@ -876,6 +707,11 @@
           {@render loadSharing(m)}
         {/if}
         {@render searchToggle(m)}
+        <!-- The floor the efficiency search holds this mesh to, offered
+             while the search is on. -->
+        {#if m.search}
+          {@render numberField("ui.train_min_contact_ratio", () => m.min_contact_ratio, (v) => (m.min_contact_ratio = v), 0.05, "ui.train_epsilon", t("ui.train_note_min_contact_ratio"))}
+        {/if}
         {#if !crossed}
           {@render overlapField(graph, groupMeshes, solved?.meshes ?? [])}
         {/if}
@@ -890,19 +726,41 @@
   <!-- **What the mesh comes to, running down** under the three columns,
        at the workspace's width: a label and a figure per row. -->
   <h4 class="section-heading">{t("ui.train_what_mesh_comes_to")}</h4>
-  <dl class="out comes">{@render meshRows(solved?.meshes[k], [gearName(m.a), gearName(m.b)])}</dl>
+  <dl class="out comes">
+    {@render meshRows(solved?.meshes[k], [gearName(m.a), gearName(m.b)])}
+    {#if worm && solved}
+      <dt>{t("ui.train_lead_angle")}</dt>
+      <dd>
+        {num(solved.members[m.a]?.lead_angle, 4)}° · {num(solved.members[m.b]?.lead_angle, 4)}°
+        <small>{t("ui.train_lead")} {num(solved.members[m.a]?.lead, 4)} {t("ui.train_mm")}</small>
+      </dd>
+    {/if}
+    <!-- **What one more tooth on either gear makes the shown case's path**
+         — the graph's exact answer, so a designer choosing counts sees
+         where a tooth tells and where it does not, and where it locks the
+         path, which a gear of another part can. -->
+    {#if casePath}
+      <dt>{t("ui.train_ratio_per_tooth")}</dt>
+      <dd>
+        {#each [m.a, m.b] as i (i)}
+          {@const r = casePath.per_tooth[i]}
+          <span class="line">{gearName(i)}: {r == null ? t("ui.train_ratio_per_tooth_locked") : num(r, 4)}</span>
+        {/each}
+      </dd>
+    {/if}
+  </dl>
 {/snippet}
 
 {#snippet gearColumn(i: number, k: number, crossed: boolean, worm: boolean)}
   {@const mem = graph.members[i]}
   {@const g = solved?.members[i]}
-  {@const isWormMember = worm && graph.meshes[k].a === i}
+  {@const isWormMember = result.names[i]?.role === "worm"}
   {@render gearCard(gearName(i), mem.gear, g, {
     cut: mem.ring ? "shaper" : "rack",
     cutter: mem.ring ?? undefined,
     member: mem,
     teethLabel: isWormMember ? "ui.train_starts" : undefined,
-    relief: { stage: graph, member: i, figures: result.figures },
+    relief: i,
     pitchDiameter: isWormMember ? mem.pitch_diameter : undefined,
     faceWidth: worm ? "proportion" : crossed ? "continuity" : "rating",
     faceFromContinuity: solved?.meshes[k]?.point?.face_width_for_continuity?.[graph.meshes[k].a === i ? 0 : 1],
@@ -922,7 +780,7 @@
         type="number"
         step="5"
         bind:value={() => dist.angle, finite((v) => (dist.angle = v))}
-        onchange={() => relieveStage(graph, null, result.figures)}
+        onchange={() => relieve(null)}
       />
       <em>°</em>
       <FieldNote notes={notes(dist.angle === 0 ? t("ui.train_note_axes_parallel") : t("ui.train_note_axes_crossed"), null)} />
@@ -935,7 +793,7 @@
       dist.distance,
       dres?.running,
       0.1,
-      () => relieveStage(graph, { distance: d }, result.figures),
+      () => relieve({ distance: d }),
       dres?.sized_by == null ? undefined : t("ui.train_distance_sized_by", { mesh: meshName(dres.sized_by) }),
       "ui.train_mm",
     )}
@@ -947,7 +805,7 @@
       dist.clearance,
       dres?.clearance,
       0.01,
-      () => relieveStage(graph, { clearance: d }, result.figures),
+      () => relieve({ clearance: d }),
       undefined,
       "ui.train_mm",
     )}
@@ -971,12 +829,25 @@
   {#each couplingsOf(b) as c (c.coupling)}
     <button class="gearrow" onclick={() => select({ coupling: c.coupling })}>↔ {t("ui.train_turns_with", { on: bodyName(c.other) })}</button>
   {/each}
+  {@const through = partsThrough(b)}
   <dl class="out">
     {#each solved?.cases ?? [] as c (c.case)}
       {@const x = c.bodies.find((y) => y.at === b)}
       {#if x}
         <dt>{caseName(c.case)}</dt>
-        <dd>{x.speed === null ? roleWord("fixed") : `${num(x.speed, 1)} ${t("ui.train_rpm")}`} · {roleWord(x.role)} {num(x.torque, 4)} {t("ui.train_nm")}</dd>
+        <dd>
+          {x.speed === null ? roleWord("fixed") : `${num(x.speed, 1)} ${t("ui.train_rpm")}`} · {roleWord(x.role)} {num(x.torque, 4)} {t("ui.train_nm")}
+          <!-- **What each part's meshes put on it**, where the train's
+               figure does not say it: a shaft two parts share hands the
+               one's torque to the other and carries no load of the case's
+               own, and a carrier has no gear to read it off. -->
+          {#if through.length > 1 || gearsOn(b).length === 0}
+            {#each through as x2 (x2.part)}
+              {@const sc = solved?.parts[x2.part]?.cases.find((y) => y.case === c.case)}
+              <span class="line">{x2.name}: {num(sc?.torques[x2.slot], 4)} {t("ui.train_nm")}</span>
+            {/each}
+          {/if}
+        </dd>
       {/if}
     {/each}
   </dl>
@@ -1004,6 +875,26 @@
       <span class="gearrow">{gearName(i)}</span>
     {/each}
   {/each}
+  <!-- **How its planets lay out**, where it is replicated: the least tip
+       gap between neighbours against the one asked for; and two checks —
+       even spacing is `N | z_sun + z_ring`, simultaneous meshing the
+       stricter `N | z_sun` *and* `N | z_ring`, and a false answer to the
+       second is not a fault: the planets engage staggered, which is
+       usually preferable. -->
+  {@const lay = solved?.axes[a]?.layout ?? null}
+  {#if lay !== null}
+    <dl class="out">
+      <dt>{t("ui.train_planet_clearance")}</dt>
+      <dd>
+        {num(lay.clearance, 3)} {t("ui.train_mm")}
+        <small class:warn={!lay.clearance_ok}>{t(lay.clearance_ok ? "ui.train_meets_the_minimum" : "ui.train_below_the_minimum")}</small>
+      </dd>
+      <dt>{t("ui.train_even_spacing")}</dt>
+      <dd>{lay.equal_spacing === null ? BLANK : lay.equal_spacing ? t("ui.train_yes") : t("ui.train_no")}</dd>
+      <dt>{t("ui.train_simultaneous_meshing")}</dt>
+      <dd>{lay.simultaneous_meshing === null ? BLANK : lay.simultaneous_meshing ? t("ui.train_yes") : t("ui.train_no")}</dd>
+    </dl>
+  {/if}
 {/snippet}
 
 {#snippet caseEditor(c: LoadCase, i: number)}
@@ -1037,7 +928,7 @@
             <span>{t("ui.train_actuation_range_at")}</span>
             <select value={String(act.at)} onchange={(e) => (act.at = Number(e.currentTarget.value))}>
               {#each portOptionsNow as p (p.body)}
-                <option value={String(p.body)}>{refLabel(p.body)}</option>
+                <option value={String(p.body)}>{bodyName(p.body)}</option>
               {/each}
             </select>
             <em></em>
@@ -1080,7 +971,7 @@
         {@const at = bodyOf(cres, b.body)}
         {@const shared = b.ends.length > 1}
         <div class="mode" class:later={c.kind === "fatigue" || b !== bodies[0]}>
-          <span>{refLabel(b.body)}</span>
+          <span>{bodyName(b.body)}</span>
           {#if role === "fixed"}
             <div class="segmented locked">
               <button class="on" disabled>{t("ui.train_case_fixed")}</button>
@@ -1486,13 +1377,13 @@
     faceLabel?: string;
     /** Catalogue key for the tooth count's label — a worm's teeth are *starts*. */
     teethLabel?: string;
-    /** **Which of the stage's inputs this card's toggles argue with**, so a
-     *  toggle switched here can relieve whichever of them has over-specified:
-     *  the stage, and this member's index in the core's own order. Every
-     *  toggle on the card — the shift, the helix, the face width, a worm's
-     *  diameter — asks the same relief, since the core declares the relations
-     *  and this side only says which input was just touched. */
-    relief?: { stage: Shape; member: number; figures: Figure[] };
+    /** **Which member this card's toggles argue as**, by the graph's index,
+     *  so a toggle switched here can relieve whichever input it has
+     *  over-specified. Every toggle on the card — the shift, the helix, the
+     *  face width, a worm's diameter — asks the same relief, since the core
+     *  declares the relations and this side only says which input was just
+     *  touched. */
+    relief?: number;
     /** **The member this gear is, on a shape**: its module and its tooth
      *  thickness coefficient are the member's rather than the stage's, since
      *  a shape's members need not all share one, and they are drawn on the
@@ -1521,11 +1412,6 @@
      *  leaving this side to subtract. The name says which body that is. A
      *  pair's members have none, and the two figures would be one. */
     carrier?: string;
-    /** **The edits this member takes**, on the shape it is member `member`
-     *  of: its body, and — on an epicyclic stage — a sun or a ring added to
-     *  a planet gear, a step or a central member removed. Parallel members
-     *  are removed as pairs, from the mesh's block. */
-    edits?: { shape: Shape; stage: number; member: number };
   },
 )}
 {@const own = g?.notes ?? []}
@@ -1569,7 +1455,7 @@
       m.module,
       g?.params.module,
       0.1,
-      () => opts.relief && relieveStage(opts.relief.stage, { member: [opts.relief.member, "module"] }, opts.relief.figures),
+      () => opts.relief !== undefined && relieve({ member: [opts.relief, "module"] }),
       undefined,
       "ui.train_mm",
     )}
@@ -1578,7 +1464,7 @@
       m.pressure_angle,
       g?.params.pressure_angle,
       0.5,
-      () => opts.relief && relieveStage(opts.relief.stage, { member: [opts.relief.member, "pressure_angle"] }, opts.relief.figures),
+      () => opts.relief !== undefined && relieve({ member: [opts.relief, "pressure_angle"] }),
       undefined,
       "°",
     )}
@@ -1592,7 +1478,7 @@
       m.thickness_mod,
       g?.params.thickness_mod,
       0.05,
-      () => opts.relief && relieveStage(opts.relief.stage, { member: [opts.relief.member, "thickness_mod"] }, opts.relief.figures),
+      () => opts.relief !== undefined && relieve({ member: [opts.relief, "thickness_mod"] }),
       undefined,
       "ui.train_k",
     )}
@@ -1603,7 +1489,7 @@
       opts.pitchDiameter,
       g?.pitch_diameter,
       0.5,
-      () => opts.relief && relieveStage(opts.relief.stage, { member: [opts.relief.member, "pitch_diameter"] }, opts.relief.figures),
+      () => opts.relief !== undefined && relieve({ member: [opts.relief, "pitch_diameter"] }),
       undefined,
       "ui.train_mm",
     )}
@@ -1619,7 +1505,7 @@
     gear.helix_angle,
     g?.helix_angle,
     1,
-    () => opts.relief && relieveStage(opts.relief.stage, { member: [opts.relief.member, "helix"] }, opts.relief.figures),
+    () => opts.relief !== undefined && relieve({ member: [opts.relief, "helix"] }),
     undefined,
     "°",
   )}
@@ -1702,7 +1588,7 @@
     gear.profile_shift,
     g?.profile_shift,
     0.05,
-    () => opts.relief && relieveStage(opts.relief.stage, { member: [opts.relief.member, "shift"] }, opts.relief.figures),
+    () => opts.relief !== undefined && relieve({ member: [opts.relief, "shift"] }),
     undefined,
     "ui.train_m",
     opts.cut === "shaper"
@@ -1770,7 +1656,7 @@
       gear.face_width,
       opts.faceRecommended,
       1,
-      () => opts.relief && relieveStage(opts.relief.stage, { member: [opts.relief.member, "face_width"] }, opts.relief.figures),
+      () => opts.relief !== undefined && relieve({ member: [opts.relief, "face_width"] }),
       opts.faceRecommended === undefined
         ? null
         : t(opts.faceLabel ? "ui.train_note_worm_length" : "ui.train_note_wheel_width", {
@@ -1790,7 +1676,7 @@
       gear.face_width,
       g?.face_width,
       0.5,
-      () => opts.relief && relieveStage(opts.relief.stage, { member: [opts.relief.member, "face_width"] }, opts.relief.figures),
+      () => opts.relief !== undefined && relieve({ member: [opts.relief, "face_width"] }),
       opts.faceWidth === "continuity"
         ? opts.faceFromContinuity === undefined
           ? t("ui.train_note_no_continuous_width")
@@ -1880,29 +1766,6 @@
     </ul>
   {/if}
 
-  {#if opts.edits}
-    <!-- **What this member can become.** Its body is a select over the
-         bodies on its axis and a new one — a layshaft's engaged pair is the
-         driven gear moved onto the output, two rings turning together are
-         two members on one body. A planet gear takes a sun or a ring, and
-         is a step that can go where it has a fellow; a central member goes
-         unless it is the last its planet gear meets. Nothing is flipped:
-         a ring stays a ring, and a swap is a remove and an add. -->
-    {@const ed = opts.edits}
-    {@const planet = isPlanetGear(ed.shape, ed.member)}
-    {@const sharing = ed.shape.members.filter((x) => x.body === ed.shape.members[ed.member].body).length}
-    {#if ed.shape.axes.some((a) => a.carried_by !== 0)}
-      <div class="edits">
-        {#if planet}
-          <button class="action add" onclick={() => editStage(ed.stage, { add_central: { gear: ed.member, ring: false } })}>{t("ui.train_add_sun")}</button>
-          <button class="action add" onclick={() => editStage(ed.stage, { add_central: { gear: ed.member, ring: true } })}>{t("ui.train_add_ring")}</button>
-          <button class="action danger" disabled={sharing < 2} onclick={() => editStage(ed.stage, { remove_step: { gear: ed.member } })}>{t("ui.train_remove_step")}</button>
-        {:else}
-          <button class="action danger" disabled={lastOnItsStep(ed.shape, ed.member)} onclick={() => editStage(ed.stage, { remove_member: { member: ed.member } })}>{t("ui.train_remove_member")}</button>
-        {/if}
-      </div>
-    {/if}
-  {/if}
 </div>
 {/snippet}
 
@@ -1928,158 +1791,6 @@
      Bound through a getter and a setter rather than an object, because a plain
      `f64` has no object to hold an `auto` flag in — which is the same reason
      `autoNumber` can take one and this cannot. -->
-<!-- **Which body of the train each of a stage's ports is on** — the
-     ground, a body shared with another stage, or one of its own. The ports
-     and their names come from the core (`topology`), so an arrangement
-     with a fourth port is one more row here and no change to this file, and
-     the same rows serve a pair, a set and a Wolfrom alike. A hold written
-     here replaces the stage's convention's holds on the stage — holding a
-     set's carrier releases its ring — which is the core's rule and is read
-     back, not repeated. -->
-{#snippet bodies_of(i: number)}
-  {@const shape = cards[i]}
-  {@const movable = movableGears(shape)}
-  <h4 class="bodies section-heading">{t("ui.train_stage_bodies")}</h4>
-  <!-- **The stage's own three levels, in the order the shape has them**: an
-       axis is a line, a body turns about one, a gear is fixed to a body. So
-       a gear is a row under the body it turns with, and the body is a row
-       under the axis it turns about — each name printed once, in one
-       meaning. What a gear may be moved to follows from where it sits: the
-       other bodies of its own axis. Where a body of this stage sits in the
-       *train* is not asked here but once, in the train's own list of
-       bodies, since a body is the train's and a gear is the stage's. -->
-  <small class="edit-note">{t("ui.train_note_stage_bodies")}</small>
-  {#each axisGroups(shape) as g (g.axis)}
-    <!-- Axes are numbered, not named: a name taken from a preset — a
-         layshaft, a centreline — says more than a shape knows, and what is
-         on the axis is the rows under it. What a number cannot say is
-         written beside it: the body a carried axis rides, and how many
-         times it is replicated, which is the planet count and is nowhere
-         else on the card. -->
-    <div class="axis-line">
-      <span class="axis-name">{t("ui.train_axis_name", { number: String(g.axis + 1) })}</span>
-      {#if g.carriedBy !== null}
-        <span class="chip">{t("ui.train_axis_carried", { body: bodyName(g.carriedBy) })}</span>
-      {/if}
-      {#if g.count > 1}
-        <span class="chip">{t("ui.train_axis_count", { count: String(g.count) })}</span>
-      {/if}
-      <span class="rule"></span>
-    </div>
-    {#each g.bodies as b (b.body)}
-      {@const port = portBodies.find((q) => q.body === b.body)}
-      <div class="bodygrp">
-        <div class="bodyrow">
-          <span class="body-name">{bodyName(b.body)}</span>
-          {#if heldBodies.has(b.body)}<span class="chip held">{t("ui.train_case_fixed")}</span>{/if}
-          <!-- A body another stage also lists is the same body: what it is
-               over there is said here, since that is what makes it shared. -->
-          {#each endsOf(result.topology, b.body).filter((e) => e.stage !== i) as e (e.stage)}
-            <span class="chip">{t("ui.train_port_at", {
-              stage: t("ui.train_stage_heading", { number: String(e.stage + 1) }),
-              on: onSlot(result.topology, e.stage, e.slot, false),
-            })}</span>
-          {/each}
-          <!-- **What is done to the body, on the body's row** — held to the
-               housing, or joined to another body of the train — beside the
-               gears' own menus one level in, which move a *gear* between
-               the bodies of its axis. Two acts, two words, told apart by
-               the row they are on rather than by a heading. Only a port
-               has them: a replicated body is a planet's, with no end for
-               the train to name and nothing to hold it by. -->
-          {#if port !== undefined}
-            <span class="filler"></span>
-            {@const held = heldNow(port)}
-            {@const targets = joinable(i, port).filter((q) => q.body !== b.body)}
-            {@const ends = endsOf(result.topology, b.body)}
-            {#if targets.length > 0 || ends.length > 1}
-              <select
-                class="action move"
-                value=""
-                aria-label={t("ui.train_join_to_of", { body: bodyName(b.body) })}
-                onchange={(ev) => {
-                  const v = ev.currentTarget.value;
-                  ev.currentTarget.value = "";
-                  moveEnd(i, b.body, v);
-                }}
-              >
-                <option value="" disabled>{t("ui.train_join_to")}</option>
-                {#each targets as q (q.body)}
-                  <option value={String(q.body)}>{bodyName(q.body)}</option>
-                {/each}
-                {#if ends.length > 1}
-                  <option value="new">{t("ui.train_own_body")}</option>
-                {/if}
-              </select>
-            {/if}
-            <button
-              class="action"
-              onclick={() => editTrain(tab.train, held ? { release: b.body } : { hold: b.body })}
-            >{held ? t("ui.train_release") : t("ui.train_hold")}</button>
-          {/if}
-          <!-- **An orbiting body may drive a shaft that does not orbit**,
-               through an offset coupling — the pins a cycloidal disc
-               drives — on a new body of the axis its carrier turns about.
-               Offered wherever it is not coupled already; a planet too,
-               since a drive of two discs couples both. -->
-          {#if g.carriedBy !== null && !shape.couplings.some((c) => c.includes(b.body))}
-            {#if port === undefined}<span class="filler"></span>{/if}
-            <button
-              class="action add"
-              aria-label={t("ui.train_couple_of", { body: bodyName(b.body) })}
-              onclick={() => editStage(i, { couple: { body: b.body } })}
-            >{t("ui.train_couple")}</button>
-          {/if}
-        </div>
-        {#if b.members.length === 0 && b.carries}
-          <div class="onbody"><span class="dim">{t("ui.train_carrier")}</span></div>
-        {/if}
-        {#each shape.couplings as c, k (k)}
-          {#if c.includes(b.body)}
-            <div class="onbody">
-              <span class="dim">{t("ui.train_turns_with", { on: bodyName(c[0] === b.body ? c[1] : c[0]) })}</span>
-              <button class="action danger" onclick={() => editStage(i, { uncouple: { coupling: k } })}>{t("ui.train_uncouple")}</button>
-            </div>
-          {/if}
-        {/each}
-        {#each b.members as j (j)}
-          {@const where = movable.find((x) => x.member === j)}
-          <div class="onbody">
-            <span>{memberListName(result.topology, i, j)}</span>
-            <!-- **A menu, not a value.** The body it is on is the row it is
-                 under; a select showing it back would put a reading where
-                 there is only an action. Listed only where there is
-                 somewhere to go. -->
-            {#if where !== undefined}
-              <select
-                class="action move"
-                value=""
-                aria-label={t("ui.train_move_to_of", {
-                  name: memberListName(result.topology, i, j),
-                })}
-                onchange={(e) => {
-                  const v = e.currentTarget.value;
-                  e.currentTarget.value = "";
-                  editStage(i, {
-                    move_body: { member: j, body: v === "own" ? null : Number(v) },
-                  });
-                }}
-              >
-                <option value="" disabled>{t("ui.train_move_to")}</option>
-                {#each where.bodies as x (x)}
-                  <option value={String(x)}>{bodyName(x)}</option>
-                {/each}
-                {#if where.own}
-                  <option value="own">{t("ui.train_own_body")}</option>
-                {/if}
-              </select>
-            {/if}
-          </div>
-        {/each}
-      </div>
-    {/each}
-  {/each}
-{/snippet}
 
 {#snippet numberField(
   key: string,
@@ -2308,7 +2019,7 @@
     shared,
     reports[meshes[0]]?.line?.contact_ratios.overlap,
     0.1,
-    () => relieveStage(stage, { overlap: meshes[0] }, figuresOf(stage)),
+    () => relieve({ overlap: meshes[0] }),
     meshes
       .flatMap((k) => reports[k]?.notes ?? [])
       .filter((n) => n.key === "mesh.overlap_below_one")
@@ -2390,6 +2101,9 @@
       }}
     >
       {caseName(i)} · {kindLabel(c.kind)}{caseSummary(c) ? ` · ${caseSummary(c)}` : ""}
+      {#if c.enabled && solved !== undefined && !(forCase(solved.cases, i)?.solved ?? false)}
+        <span class="warn"> · {t("ui.train_case_incomplete")}</span>
+      {/if}
     </button>
   {/each}
   <span class="grow"></span>
@@ -2411,16 +2125,74 @@
     <dt>{t("ui.train_ratio")}</dt>
     <dd>{Math.abs(casePath.ratio) >= 1 ? `${num(casePath.ratio, 4)} : 1` : `1 : ${num(1 / casePath.ratio, 4)}`}</dd>
     <dt>{t("ui.train_efficiency")}</dt>
-    <dd>{bothWays(casePath.efficiency)}</dd>
+    <dd>
+      {bothWays(casePath.efficiency)}
+      {#if lockedWays(casePath.efficiency)}<small class="warn">{lockedWays(casePath.efficiency)}</small>{/if}
+    </dd>
+    <!-- The play at each end, driven from the other: at the far end
+         driving forward, and at the near end driving back. -->
     <dt>{t("ui.train_backlash")}</dt>
     <dd>
-      <span class="line">{t("ui.train_backlash_at", { angle: num(casePath.backlash.forward.nominal, 5), member: bodyName(casePath.to) })}</span>
-      <span class="line">{t("ui.train_backlash_at", { angle: num(casePath.backlash.backward.nominal, 5), member: bodyName(casePath.from) })}</span>
+      <span class="line">
+        {t("ui.train_backlash_at", { angle: num(casePath.backlash.forward.nominal, 5), member: bodyName(casePath.to) })}
+        <small>{range(num(casePath.backlash.forward.minimum, 5), num(casePath.backlash.forward.maximum, 5))}</small>
+      </span>
+      <span class="line">
+        {t("ui.train_backlash_at", { angle: num(casePath.backlash.backward.nominal, 5), member: bodyName(casePath.from) })}
+        <small>{range(num(casePath.backlash.backward.minimum, 5), num(casePath.backlash.backward.maximum, 5))}</small>
+      </span>
+    </dd>
+    <!-- The power the teeth pass, as a multiple of the power in: one
+         across a pair, and where it is many the path's loss is the
+         meshes' loss that many times over. -->
+    <dt>{t("ui.train_circulation")}</dt>
+    <dd>
+      {t("ui.train_circulation_both", { forward: num(casePath.circulation.forward, 2), backward: num(casePath.circulation.backward, 2) })}
+      <small>{t("ui.train_note_circulation")}</small>
     </dd>
   </dl>
 {:else if solved && tab.train.load_cases.length > 0}
   <p class="notice">{t("ui.train_no_path_for_case")}</p>
 {/if}
+
+<!-- **What the train says of itself**: why there is no answer at all, and
+     what each part's own solve raised — its search, its closures, its
+     planets — each naming the part by its meshes and showing it on a
+     click; and the one train-wide decision about how a gear is judged. -->
+<div class="said">
+  {#if failure || partNotes.length > 0}
+    <ul class="notes">
+      {#if failure}
+        <li class="warn">
+          {#if failure.stage !== null}
+            <button class="link" onclick={() => showPart(failure.stage! - 1)}>{partName(failure.stage - 1)}</button>:
+          {/if}
+          {note(failure.note)}
+        </li>
+      {/if}
+      {#each partNotes as x, i (i)}
+        <li><button class="link" onclick={() => showPart(x.part)}>{partName(x.part)}</button>: {note(x.note)}</li>
+      {/each}
+    </ul>
+  {/if}
+  <!-- Train-wide, because it is one decision about how every gear is
+       judged rather than a property of any part or any load: a planet's
+       root is loaded on both flanks whatever the load does, and a
+       reversing duty loads every root both ways — but the allowance for it
+       is a fraction on an allowable a part is sized against, which this
+       tool asks for rather than applies. Its note says what it does
+       whether or not it is on. -->
+  <div class="grid shared">
+    {@render switchField(
+      "ui.train_reversed_bending",
+      tab.train.reversed_bending,
+      (v) => (tab.train.reversed_bending = v),
+      t("ui.train_note_reversed_bending", {
+        coefficient: defaults().reverse_loading_coefficient.toFixed(2),
+      }),
+    )}
+  </div>
+</div>
 
 <!-- **The list and the workspace.** The list is the train grouped one of
      three ways, each the core's (`groupings`, `flows`): the flow, drawn
@@ -2449,617 +2221,15 @@
     {:else}
       {@render axesList()}
     {/if}
+    {#if tab.train.shape.members.length === 0}
+      <p class="hint">{t("ui.train_no_stages")}</p>
+    {/if}
     <Offers train={tab.train} at={[...selected, atOutput]} kind="adds" {names} materials={ratedUnder()} {made} />
   </section>
   <section class="pane workspace">
     <Offers train={tab.train} at={selected} kind="verbs" {names} materials={ratedUnder()} {made} />
     {@render workspaceOf(tab.view.selection)}
   </section>
-</div>
-
-<section class="train">
-  <div class="paths">
-    <!-- **The train's figures, one row per path** — every path a case
-         asks about, the headline case's first: the ratio off the one motion,
-         the efficiency both ways off the train's flow, the play at each end
-         driven from the other. The table stands whether or not there is an
-         answer in it, so the page holds still while a designer edits; a
-         train whose holds leave its motion a family has no row and says so
-         once, and each load case decides its own. -->
-    <h4 class="section-heading">{t("ui.train_paths")}</h4>
-    {#each solved?.paths ?? [] as p (`${p.from}>${p.to}`)}
-      <h4 class="path section-heading">{t("ui.train_path_between", { from: refLabel(p.from), to: refLabel(p.to) })}</h4>
-      <dl class="out indent">
-        <!-- Signed, since a ratio is read off the graph and an external
-             pair reverses; the magnitude decides which way round the two
-             numbers are written, so a reduction reads as one whichever way
-             it turns. -->
-        <dt>{t("ui.train_ratio")}</dt>
-        <dd>{Math.abs(p.ratio) >= 1 ? `${num(p.ratio, 4)} : 1` : `1 : ${num(1 / p.ratio, 4)}`}</dd>
-        <dt>{t("ui.train_efficiency")}</dt>
-        <dd>
-          {bothWays(p.efficiency)}
-          {#if lockedWays(p.efficiency)}
-            <small class="warn">{lockedWays(p.efficiency)}</small>
-          {/if}
-        </dd>
-        <!-- The play at each end, driven from the other: at the far end
-             driving forward, and at the near end driving back. -->
-        <dt>{t("ui.train_backlash")}</dt>
-        <dd>
-          <span class="line">
-            {t("ui.train_backlash_at", { angle: num(p.backlash.forward.nominal, 5), member: refLabel(p.to) })}
-            <small>{range(num(p.backlash.forward.minimum, 5), num(p.backlash.forward.maximum, 5))}</small>
-          </span>
-          <span class="line">
-            {t("ui.train_backlash_at", { angle: num(p.backlash.backward.nominal, 5), member: refLabel(p.from) })}
-            <small>{range(num(p.backlash.backward.minimum, 5), num(p.backlash.backward.maximum, 5))}</small>
-          </span>
-        </dd>
-        <!-- The power the teeth pass, as a multiple of the power in: one
-             across a pair, and where it is many the path's loss is the
-             meshes' loss that many times over. -->
-        <dt>{t("ui.train_circulation")}</dt>
-        <dd>
-          {t("ui.train_circulation_both", { forward: num(p.circulation.forward, 2), backward: num(p.circulation.backward, 2) })}
-          <small>{t("ui.train_note_circulation")}</small>
-        </dd>
-        <!-- What one more tooth on each gear would make the ratio: the
-             graph's exact answer, so a designer choosing counts sees where
-             a tooth tells and where it does not — and where it locks the
-             path, which a gear of another stage can. -->
-        <dt>{t("ui.train_ratio_per_tooth")}</dt>
-        <dd>
-          {#each p.per_tooth as r, j (j)}
-            <span class="line">{gears[j]?.label ?? BLANK}: {r === null ? t("ui.train_ratio_per_tooth_locked") : num(r, 4)}</span>
-          {/each}
-        </dd>
-      </dl>
-    {/each}
-    {#if solved && solved.paths.length === 0 && cards.length > 0}
-      <p class="notice">{t("ui.train_family_no_figure")}</p>
-    {/if}
-    <!-- **The train's bodies, and what each carries across the stages** —
-         every body some stage has as a port, numbered as the gears are,
-         the held ones said so. A summary and nothing else: what is done
-         *to* a body is done on the card of a stage that has it, where the
-         body is listed with the gears on it and the axis it turns
-         about. -->
-    {#if portBodies.length > 0}
-      <h4 class="section-heading">{t("ui.train_bodies")}</h4>
-      <dl class="out bodies">
-        {#each portBodies as p (p.body)}
-          <dt>{bodyName(p.body)}{#if heldNow(p)} <small>{t("ui.train_case_fixed")}</small>{/if}</dt>
-          <dd>{acrossBody(result.topology, p.body)}</dd>
-        {/each}
-      </dl>
-    {/if}
-  </div>
-  <div class="grid shared">
-    <!-- Train-wide, because it is one decision about how every gear is judged
-         rather than a property of any stage or any load: a planet's root is
-         loaded on both flanks whatever the load does, and a reversing duty
-         loads every root both ways — but the allowance for it is a fraction on
-         an allowable a part is sized against, which this tool asks for rather
-         than applies. Off, the stages say where reversal is present and
-         uncorrected.
-
-         Its note says what it does whether or not it is on: pressing a button
-         to find out what it does is not an answer, and the slot is reserved
-         either way. -->
-    {@render switchField(
-      "ui.train_reversed_bending",
-      tab.train.reversed_bending,
-      (v) => (tab.train.reversed_bending = v),
-      t("ui.train_note_reversed_bending", {
-        coefficient: defaults().reverse_loading_coefficient.toFixed(2),
-      }),
-    )}
-  </div>
-
-  <div class="summary">
-    <!-- Why there is no answer at all — through the catalogue like every other
-         message, naming the stage where one is to blame. -->
-    {#if failure}
-      <ul class="notes">
-        <li class="warn">
-          {failure.stage === null
-            ? note(failure.note)
-            : `${stageName(failure.stage - 1)}: ${note(failure.note)}`}
-        </li>
-      </ul>
-    {/if}
-  </div>
-</section>
-
-<!-- **The load cases, as the stages are: a list, each one an accordion.** A
-     case is a torque at a port, held or not at the far end, judged against one
-     of the two allowables — and any number of them, since a train is rated for
-     every load it will see and not for two. The switch on the heading takes a
-     case out of every rating without losing it, and works with the case
-     collapsed; the heading itself says what the case is, so a closed one still
-     reads. -->
-<div class="stages">
-  {#each tab.train.load_cases as c, i (i)}
-    {@const cres = forCase(solved?.cases, i)}
-    {@const complete = cres?.solved ?? false}
-    <section class="stage" class:off={!c.enabled}>
-      <div class="casehead">
-        <button class="head section-heading" onclick={() => (tab.openCases[i] = !tab.openCases[i])}>
-          <span class="caret aside">{tab.openCases[i] ? "▾" : "▸"}</span>
-          <strong>{caseName(i)}</strong>
-          <span class="kind aside">{kindLabel(c.kind)}</span>
-          <span class="teeth aside">{caseSummary(c)}</span>
-          <!-- **A case the train cannot solve says so where it is closed**:
-               short of a figure, nothing driving it, or nothing holding it —
-               the notes inside say which — and cannot be switched on until it
-               can. A train with no answer at all says nothing here; its
-               failure is on the summary. -->
-          {#if solved && !complete}
-            <span class="eff aside warn">{t("ui.train_case_incomplete")}</span>
-          {/if}
-        </button>
-        <span class="control" class:locked={solved !== undefined && !complete}>
-          <Switch
-            label={t("ui.train_case_enabled")}
-            on={c.enabled}
-            set={(v) => {
-              if (v && solved !== undefined && !complete) return;
-              c.enabled = v;
-            }}
-          />
-        </span>
-      </div>
-      {#if tab.openCases[i]}
-        <div class="body casebody">
-          {@render caseEditor(c, i)}
-        </div>
-      {/if}
-    </section>
-  {/each}
-
-  {#each CASE_KINDS as k (k.key)}
-    <button class="action add" onclick={() => addCaseOfKind(k)}>{t(k.add)}</button>
-  {/each}
-</div>
-
-<div class="stages">
-  {#if cards.length === 0}
-    <p class="notice">{t("ui.train_no_stages")}</p>
-  {/if}
-  {#each cards as stage, i (i)}
-    {@const res = result.cards[i] ?? null}
-    {@const figures = figuresOf(stage)}
-    {@const worm = isWorm(stage)}
-    {@const crossed = stage.distances.some((d) => d.angle !== 0)}
-    {@const family = result.topology[i]?.family ?? "parallel"}
-    {@const epicyclic = family === "epicyclic"}
-    {@const parallel = family === "parallel"}
-    {@const replicated = stage.axes.map((a, k) => (a.count > 1 ? k : -1)).filter((k) => k >= 0)}
-    {@const carriedAxes = stage.axes.map((a, k) => (a.carried_by !== 0 ? k : -1)).filter((k) => k >= 0)}
-    {@const name = (j: number) => memberName(result.topology, i, j)}
-    {@const meshGroups = result.topology[i]?.mesh_groups ?? [stage.members.map((_, j) => j)]}
-    {@const carriers = stage.bodies
-      .map((b, s) => ({ body: b.body, slot: s + 1 }))
-      .filter((x) => !stage.members.some((m) => m.body === x.body))}
-    <section class="stage">
-      <!-- **One stage, whatever it is.** A spur pair, a worm, a crossed pair
-           and a planetary set are the same `Shape` — axes, the bodies on
-           them, members, meshes and distances — and are drawn by the one
-           block below: the shape's own inputs first, then each distance,
-           then each mesh, then a card per member, then what it came to.
-           What a kind used to decide is read off the shape instead: a
-           worm drive is a distance marked as one, a crossed pair is an
-           angle, a set is an axis carried by a body, a ring is a member
-           with a cutter. There is no branch on a kind here because there
-           is no kind in the core to branch on. -->
-      <button class="head section-heading" onclick={() => (tab.open[i] = !tab.open[i])}>
-        <span class="caret aside">{tab.open[i] ? "▾" : "▸"}</span>
-        <strong>{stageName(i)}</strong>
-        <!-- The chip is the family the shape reads as, and the skew
-             family's two presets by name — a spur pair has no chip, since
-             a plain pair is what a stage is unless it says otherwise. -->
-        {#if worm}
-          <span class="kind aside">{t("ui.train_worm")}</span>
-        {:else if crossed}
-          <span class="kind aside">{t("ui.train_crossed")}</span>
-        {:else if epicyclic}
-          <span class="kind aside">{t("ui.train_epicyclic")}</span>
-        {/if}
-        <span class="teeth aside">z {stage.members.map((m) => m.gear.teeth).join(" / ")}</span>
-      </button>
-
-      {#if tab.open[i]}
-        <div class="body">
-          <div class="grid shared">
-            <!-- A replicated axis is a set of planets: how many, and how
-                 close their tips may come — each axis's own, since two
-                 planet axes on one carrier run at their own radii. Asked
-                 only where there is one, and named where there are more. -->
-            {#each carriedAxes as k (k)}
-              <label>
-                <span>{carriedAxes.length > 1 ? t("ui.train_planets_on", { axis: axisName(stage, i, k) }) : t("ui.train_planets")}</span>
-                <input type="number" step="1" min="1" bind:value={() => stage.axes[k].count, finite((v) => (stage.axes[k].count = v))} />
-                <em></em>
-              </label>
-              {#if stage.axes[k].count > 1}
-                {@render numberField(
-                  carriedAxes.length > 1 ? "ui.train_minimum_planet_clearance_on" : "ui.train_minimum_planet_clearance",
-                  () => stage.axes[k].min_planet_clearance,
-                  (v) => (stage.axes[k].min_planet_clearance = v),
-                  0.05,
-                  "ui.train_mm",
-                  t("ui.train_note_planet_clearance"),
-                  carriedAxes.length > 1 ? { axis: axisName(stage, i, k) } : undefined,
-                )}
-              {/if}
-            {/each}
-            <!-- **The structural edits**: a step on each carried axis of an
-                 epicyclic stage; an axis at the end of a parallel chain, and
-                 the last one off again while more than a pair's two are
-                 left. A skew stage has neither: its two axes at an angle
-                 are the whole of it. -->
-            {#if epicyclic}
-              <div class="edits">
-                {#each carriedAxes as k (k)}
-                  <button class="action add" onclick={() => editStage(i, { add_step: { axis: k } })}>{carriedAxes.length > 1 ? `${t("ui.train_add_step")} · ${axisName(stage, i, k)}` : t("ui.train_add_step")}</button>
-                {/each}
-                <small class="edit-note">{t("ui.train_note_add_step")}</small>
-              </div>
-            {/if}
-            {@render bodies_of(i)}
-            {#if parallel}
-              <!-- The axes at the end of the bodies they carry: one more
-                   axis is one more shaft in series. -->
-              <div class="edits">
-                <!-- At the chain's end: the last gear on its last axis, which is
-                     what "one more axis at the end" meant before a new axis
-                     could mesh any gear. -->
-                <button class="action add" onclick={() => editStage(i, { add_axis: { mate: chainEnd(stage) } })}>{t("ui.train_add_axis")}</button>
-                <button class="action danger" disabled={stage.axes.length < 3} onclick={() => editStage(i, { remove_axis: { axis: stage.axes.length - 1 } })}>{t("ui.train_remove_axis")}</button>
-                <small class="edit-note">{t("ui.train_note_add_axis")}</small>
-              </div>
-            {/if}
-          </div>
-          {#if refused?.stage === i}
-            <p class="refused">{t(refused.key)}</p>
-          {/if}
-
-          <!-- **Each mesh group, with its meshes under it.** The members a
-               run of meshes joins share a normal module and a pressure
-               angle — two gears in mesh do, so everything the run joins
-               does — and the core reports the groups (`mesh_groups`, a
-               layer read off the graph): one on a pair or a set, two on a
-               stepped planet, three on a layshaft. The module and the angle
-               are each stated on one gear of the group and followed by the
-               rest, so they sit on the gear cards with the helix, not here;
-               what is here is the group's own, then each of its meshes'. -->
-          {#each meshGroups as group, gi (gi)}
-            {@const inGroup = (m: { a: number; b: number }) => group.includes(m.a) && group.includes(m.b)}
-            {@const groupMeshes = stage.meshes.map((m, k) => (inGroup(m) ? k : -1)).filter((k) => k >= 0)}
-            <!-- One heading per group: a lone mesh is named as the mesh it
-                 is; a run of meshes by the members it joins. -->
-            <h4 class="mesh section-heading">
-              {groupMeshes.length === 1
-                ? t("ui.train_mesh_between", { a: name(stage.meshes[groupMeshes[0]].a), b: name(stage.meshes[groupMeshes[0]].b) })
-                : t("ui.train_mesh_group", { members: group.map(name).join(" / ") })}
-            </h4>
-            <div class="grid shared">
-              <!-- The group's axial contact ratio: one size per group, so
-                   one ratio — on parallel shafts, where a line contact has
-                   an overlap at all. -->
-              {#if !crossed && groupMeshes.length > 0}
-                {@render overlapField(stage, groupMeshes, res?.meshes ?? [])}
-              {/if}
-              <!-- The floor the efficiency search holds the group's meshes
-                   to, offered while the search is on; each mesh's own in
-                   the core, the group's written together here. -->
-              {#if groupMeshes.some((k) => stage.meshes[k].search)}
-                <label>
-                  <span>{t("ui.train_min_contact_ratio")}</span>
-                  <input
-                    type="number"
-                    step="0.05"
-                    bind:value={
-                      () => stage.meshes[groupMeshes[0]].min_contact_ratio,
-                      finite((v) => {
-                        for (const k of groupMeshes) stage.meshes[k].min_contact_ratio = v;
-                      })
-                    }
-                  />
-                  <em>{t("ui.train_epsilon")}</em>
-                  <FieldNote notes={notes(t("ui.train_note_min_contact_ratio"), null)} />
-                </label>
-              {/if}
-              <!-- Each mesh's own inputs, what its flanks rub with: named
-                   for the pair where the group has more than one. -->
-              {#each groupMeshes as k (k)}
-                {@const m = stage.meshes[k]}
-                {@const onDistance = stage.meshes.filter((x) => sameDistance(stage, x, m)).length}
-                {@const pair = { a: name(m.a), b: name(m.b) }}
-                {@render numberField(groupMeshes.length > 1 ? "ui.train_sliding_friction_of" : "ui.train_sliding_friction", () => m.sliding_friction, (v) => (m.sliding_friction = v), 0.01, "", undefined, pair)}
-                {@render numberField(groupMeshes.length > 1 ? "ui.train_static_friction_of" : "ui.train_static_friction", () => m.static_friction, (v) => (m.static_friction = v), 0.01, "", t("ui.train_note_static_friction"), pair)}
-                <!-- A mesh's sharing and its search, beside its friction:
-                     the three things that are the mesh's own. The search
-                     runs over its component, which the note says. -->
-                {#if !crossed}
-                  {@render loadSharing(m, groupMeshes.length > 1 ? pair : undefined)}
-                {/if}
-                {@render searchToggle(m, groupMeshes.length > 1 ? pair : undefined)}
-                <!-- **Add and remove, where the meshes are.** One more
-                     mesh across these same centres is a layshaft's next
-                     ratio, and it belongs beside the mesh it doubles
-                     rather than under the distance that carries both: the
-                     add is offered once per distance, on the last of its
-                     meshes, so a stage whose meshes all share one distance
-                     shows it at the foot of the mesh section and an idler
-                     chain shows one under each of its meshes. It sits on a
-                     row of its own **under** the remove rather than beside
-                     it, so that every mesh's remove is in the same place
-                     down the column and only the last carries a second
-                     row. -->
-                {#if parallel}
-                  {@const lastOnDistance = stage.meshes.every((x, kk) => kk <= k || !sameDistance(stage, x, m))}
-                  <div class="edits">
-                    <button class="action danger" disabled={onDistance < 2} onclick={() => editStage(i, { remove_mesh: { mesh: k } })}>{t("ui.train_remove_mesh")}</button>
-                  </div>
-                  {#if lastOnDistance}
-                    <div class="edits">
-                      <button class="action add" onclick={() => editStage(i, { add_mesh: { distance: distanceOf(stage, m) } })}>{t("ui.train_add_mesh")}</button>
-                      <small class="edit-note">{t("ui.train_note_add_mesh")}</small>
-                    </div>
-                  {/if}
-                {/if}
-              {/each}
-            </div>
-          {/each}
-
-          <!-- **Each distance between two axes**, with what goes with it: the
-               angle the axes cross at, the distance and the clearance —
-               either may be the one given and the other the one derived,
-               which is what an `Auto` says and a plain number could not —
-               and the tolerance band. `Shape::relieved` is what stops both
-               being left automatic. -->
-          {#each stage.distances as d, k (k)}
-            {@const dres = res?.distances[k]}
-            <h4 class="mesh section-heading">
-              {t("ui.train_distance_between", { a: axisName(stage, i, d.axes[0]), b: axisName(stage, i, d.axes[1]) })}
-            </h4>
-            <div class="grid shared">
-              <label>
-                <span>{t("ui.train_axis_angle")}</span>
-                <!-- Crossing the bodies takes the axial contact ratio's box
-                     away — a point contact has no overlap — so the stage is
-                     relieved as after any other change, with nothing just
-                     touched: the core turns a ratio that was given back to
-                     automatic rather than leaving it acting unseen
-                     (`docs/rationale.md#a-hidden-input-is-still-an-input`). -->
-                <input
-                  type="number"
-                  step="5"
-                  bind:value={() => d.angle, finite((v) => (d.angle = v))}
-                  onchange={() => relieveStage(stage, null, figures)}
-                />
-                <em>°</em>
-                <FieldNote notes={
-                  notes(
-                    d.angle === 0 ? t("ui.train_note_axes_parallel") : t("ui.train_note_axes_crossed"),
-                    null,
-                  )
-                } />
-              </label>
-              {#if d.angle !== 0}
-                <!-- A preset's word, and an input because the recommendation
-                     is one a designer takes or leaves: sized as a worm and
-                     its wheel, the members get the conventional proportions
-                     rather than a crossed pair's continuity width. -->
-                {@render switchField(
-                  "ui.train_size_as_worm",
-                  d.worm,
-                  (v) => (d.worm = v),
-                  t("ui.train_note_size_as_worm"),
-                )}
-              {/if}
-              {@render autoNumber(
-                "ui.train_distance",
-                d.distance,
-                dres?.running,
-                0.1,
-                () => relieveStage(stage, { distance: k }, figures),
-                // An automatic distance the tips sized says which mesh
-                // held it open, under the number it opened to.
-                dres?.sized_by == null
-                  ? undefined
-                  : t("ui.train_distance_sized_by", { mesh: String(dres.sized_by + 1) }),
-                "ui.train_mm",
-              )}
-              <!-- The far-side tip gap an internal mesh on this distance
-                   is held to — what sizes the distance at a few teeth of
-                   difference. Offered where there is such a mesh, and
-                   read while the distance is automatic. -->
-              {#if stage.meshes.some((m) => internalOn(stage, m, k))}
-                {@render numberField("ui.train_tip_gap", () => d.tip_clearance, (v) => (d.tip_clearance = v), 0.05, "ui.train_mm", t("ui.train_note_tip_gap"))}
-              {/if}
-              {@render autoNumber(
-                "ui.train_distance_clearance",
-                d.clearance,
-                dres?.clearance,
-                0.01,
-                () => relieveStage(stage, { clearance: k }, figures),
-                undefined,
-                "ui.train_mm",
-              )}
-              <label>
-                <span>{t("ui.train_distance_tolerance_plus")}</span>
-                <input type="number" step="0.01" bind:value={() => d.tolerance_plus, finite((v) => (d.tolerance_plus = v))} />
-                <em>{t("ui.train_mm")}</em>
-              </label>
-              <label>
-                <span>{t("ui.train_distance_tolerance_minus")}</span>
-                <input type="number" step="0.01" bind:value={() => d.tolerance_minus, finite((v) => (d.tolerance_minus = v))} />
-                <em>{t("ui.train_mm")}</em>
-              </label>
-              <!-- **Exposed where it is relevant, present everywhere.** Every
-                   pair has an axial float on the model's side — a helical
-                   gear sliding along its axis opens the flanks by `j sin β_b`
-                   — and a worm's thrust bearing is where it is the dominant
-                   source of backlash. Anything else leaves it at zero unseen. -->
-              {#if d.worm}
-                {@render numberField("ui.train_worm_axial_clearance", () => d.axial_clearance, (v) => (d.axial_clearance = v), 0.01, "ui.train_mm")}
-              {/if}
-            </div>
-          {/each}
-
-          <!-- **One card per member**, in the shape's order. Which of the
-               shifts closes a distance is read off the toggles rather than
-               named by a control of its own: a member left automatic
-               absorbs, and the one in both meshes is preferred. So pinning
-               a planet is how a designer asks for the sun to close it
-               instead; the absorbing member is an automatic one like any
-               other, box and toggle and all. -->
-          <!-- **One row of cards per mesh group**: the members a run of
-               meshes joins (`mesh_groups`, the mesh graph's components)
-               share a grid of their own, so a row never mixes gears of
-               unrelated meshes — a layshaft's pairs two to a row, a set's
-               three — and each grid reflows on its own as the window
-               narrows. Within a group the cards are dealt by step. -->
-          {#each cardGroups(stage, meshGroups) as group, gi (gi)}
-          <div class="gears">
-            {#each group as j (j)}
-              {@const m = stage.members[j]}
-              {@const g = res?.members[j]}
-              {@const isWormMember = worm && stage.meshes[0]?.a === j}
-              {@render gearCard(name(j), m.gear, g, {
-                cut: m.ring ? "shaper" : "rack",
-                cutter: m.ring ?? undefined,
-                member: m,
-                teethLabel: isWormMember ? "ui.train_starts" : undefined,
-                relief: { stage, member: j, figures },
-                // The first member's diameter is the size freedom the helix
-                // reads as — a worm's way of stating its size.
-                pitchDiameter: isWormMember && j === 0 ? m.pitch_diameter : undefined,
-                faceWidth: worm ? "proportion" : crossed ? "continuity" : "rating",
-                faceFromContinuity: res?.meshes[0]?.point?.face_width_for_continuity?.[j],
-                faceRecommended: g?.recommended_face_width ?? undefined,
-                faceLabel: isWormMember ? "ui.train_length" : undefined,
-                // A member on a carried axis turns in its carrier's frame,
-                // and that is the speed its teeth wear at.
-                carrier: carried(stage, j) ? t("ui.train_the_carrier") : undefined,
-                edits: { shape: stage, stage: i, member: j },
-              })}
-            {/each}
-          </div>
-          {/each}
-
-          <!-- No centre-distance row: the distance each pair of axes runs at
-               and the clearance it runs with are the two inputs above, each
-               showing its solved value. And no figure of the stage's own: a
-               ratio, an efficiency, a play and what one more tooth does are a
-               path's, listed under the train. -->
-          <dl class="out">
-            {#if worm && res}
-              <dt>{t("ui.train_lead_angle")}</dt>
-              <dd>
-                {num(res.members[0].lead_angle, 4)}° · {num(res.members[1].lead_angle, 4)}°
-                <small>{t("ui.train_lead")} {num(res.members[0].lead, 4)} mm</small>
-              </dd>
-            {/if}
-            <!-- **The bodies that are not gears.** A member's card prints its
-                 own speed and torque; a carrier is the one body a reader can
-                 see nothing of, and it is regularly the input or the output. -->
-            {#each carriers as x (x.body)}
-              <dt>{bodyName(x.body)}</dt>
-              <dd>
-                {#each res?.cases ?? [] as sc (sc.case)}
-                  <span class="line"
-                    >{caseName(sc.case)}: {num(sc.speeds[x.slot], 1)} {t("ui.train_rpm")} · {num(sc.torques[x.slot], 4)} {t("ui.train_nm")}</span
-                  >
-                {/each}
-              </dd>
-            {/each}
-            <!-- **The closest two planets, wherever they are**: one
-                 allowance for the stage, one figure against it — the least
-                 clearance over every replicated axis, which is the one
-                 that decides. -->
-            {#if replicated.length > 0}
-              {@const closest = (res?.layouts ?? []).reduce<(typeof res extends undefined ? never : NonNullable<typeof res>["layouts"][number]) | undefined>((least, l) => (least === undefined || l.clearance < least.clearance ? l : least), undefined)}
-              <dt>{t("ui.train_planet_clearance")}</dt>
-              <dd>
-                {#if closest}
-                  {num(closest.clearance, 3)} mm
-                  <small class:warn={!closest.clearance_ok}>
-                    {t(closest.clearance_ok ? "ui.train_meets_the_minimum" : "ui.train_below_the_minimum")}{replicated.length > 1 ? ` · ${axisName(stage, i, closest.axis)}` : ""}
-                  </small>
-                {/if}
-              </dd>
-            {/if}
-            {#each replicated as k (k)}
-              {@const lay = res?.layouts.find((l) => l.axis === k)}
-              <!-- Two separate layout checks, so two rows. Even spacing is
-                   `N | z_sun + z_ring`; simultaneous meshing is the stricter
-                   `N | z_sun` *and* `N | z_ring`, and a false answer is not a
-                   fault — it means the planets engage staggered, which is
-                   usually preferable. -->
-              <dt>{replicated.length > 1 ? t("ui.train_even_spacing_on", { axis: axisName(stage, i, k) }) : t("ui.train_even_spacing")}</dt>
-              <dd>{lay?.equal_spacing == null ? BLANK : lay.equal_spacing ? t("ui.train_yes") : t("ui.train_no")}</dd>
-              <dt>{t("ui.train_simultaneous_meshing")}</dt>
-              <dd>{lay?.simultaneous_meshing == null ? BLANK : lay.simultaneous_meshing ? t("ui.train_yes") : t("ui.train_no")}</dd>
-            {/each}
-          </dl>
-
-          <!-- Each mesh, stacked like the readout above rather than a table
-               that lines up with nothing else on the panel — and drawn by the
-               one snippet that draws every mesh, the same rows whether the
-               shafts are parallel or not. The sections stand whether or not
-               the stage solved, and their figures go blank. -->
-          {#each stage.meshes as m, k (k)}
-            <h4 class="mesh section-heading">{t("ui.train_mesh_between", { a: name(m.a), b: name(m.b) })}</h4>
-            <dl class="out indent">
-              {@render meshRows(res?.meshes[k], [name(m.a), name(m.b)])}
-            </dl>
-          {/each}
-
-          {#if (res?.notes.length ?? 0) > 0}
-            <ul class="notes">
-              {#each res?.notes ?? [] as n, i (i)}<li>{note(n)}</li>{/each}
-            </ul>
-          {/if}
-
-          <button
-            class="action danger"
-            onclick={() => removeStage(i)}>{t("ui.train_remove_stage")}</button
-          >
-        </div>
-      {/if}
-    </section>
-  {/each}
-
-  <!-- **One menu, three families, the core's presets under each** — the
-       same native select the gear tab adopts a member with: choosing an
-       entry adds it and the control snaps back to its label, so it reads as
-       a button with a menu and holds no state. The families are the three
-       a shape reads as (parallel axes, skew shafts, epicyclic) and the
-       entries are `defaults().stages`, so a preset added to the core's list
-       appears here by being on it. -->
-  <select
-    class="action add"
-    value=""
-    aria-label={t("ui.train_add_stage")}
-    onchange={(e) => {
-      const preset = e.currentTarget.value as StagePreset;
-      e.currentTarget.value = "";
-      addStagePreset(preset);
-    }}
-  >
-    <option value="" disabled>{t("ui.train_add_stage")}</option>
-    {#each defaults().families as family (family.family)}
-      <optgroup label={t(family.label)}>
-        {#each presetsOf(family.family) as entry (entry.preset)}
-          <option value={entry.preset}>{t(entry.label)}</option>
-        {/each}
-      </optgroup>
-    {/each}
-  </select>
 </div>
 
 <style>
@@ -3089,50 +2259,9 @@
     border-color: var(--warn);
     color: var(--warn);
   }
-  /* Inputs on the left, stacked; what they produce beside them, also stacked.
-     The same shape as a gear card and its readout, without the border or the
-     heading — this is the whole train, so there is nothing to tell it apart
-     from. Falls back to one column when there is no room for two, which is the
-     only place the two are allowed to sit above each other. */
-  .train {
-    border: 1px solid var(--rule);
-    border-radius: 4px;
-    padding: 0.75rem;
-    margin-bottom: 1rem;
-    display: grid;
-    /* Two equal halves, so the results start at the middle of the box — the
-       same split the gear cards below use, and for the same reason: a reader
-       scanning down the page finds the same edge in both. Equal fractions
-       rather than a fixed input width, so it reflows with the window like
-       everything else. */
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-items: start;
-    gap: 0.4rem 2rem;
-  }
-  @media (max-width: 52rem) {
-    .train {
-      grid-template-columns: minmax(0, 1fr);
-    }
-  }
-  .train .summary {
-    min-width: 0;
-  }
+
   /* No top margin here: it is beside the inputs, not below them. */
-  /* The paths table takes the whole width under the two halves: a row is
-     five columns of figures, and half a box folds them. */
-  .train .paths {
-    grid-column: 1 / -1;
-    min-width: 0;
-  }
-  .train .paths dl.bodies {
-    margin: 0.5rem 0 0;
-  }
-  .train .paths h4 {
-    margin: 0;
-  }
-  .train .paths h4.path {
-    margin-top: 0.75rem;
-  }
+
   .grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
@@ -3307,8 +2436,8 @@
   .segmented button.on {
     background: var(--selected);
   }
-  /* A choice the train has taken from the case — a held body, or a reaction
-     on a shaft two stages share — is shown and cannot be pressed. */
+  /* A choice the train has taken from the case — a held body — is shown and
+     cannot be pressed. */
   .segmented button:disabled {
     color: var(--muted);
     cursor: not-allowed;
@@ -3327,20 +2456,7 @@
     margin: 0.75rem 0 0;
     font-size: 0.85rem;
   }
-  /* The bodies' rows sit under their own small heading, in the shared grid. */
-  h4.bodies {
-    margin: 0.75rem 0 0;
-  }
-  /* **One list, three levels** — the shape's own: an axis, the bodies on it,
-     the gears on those. The nesting is the whole of what says which is which,
-     so it is an indent and a ground rather than a rule down the side: a body's
-     row is the tinted one, and what is fixed to it hangs under it. Both lists
-     in this panel are drawn from these — the train's bodies with their ends,
-     a stage's with its gears — because they are the same picture at two
-     levels. */
-  .bodygrp {
-    margin-bottom: 0.4rem;
-  }
+
   .bodyrow {
     display: flex;
     align-items: center;
@@ -3351,51 +2467,9 @@
     border-radius: 3px;
     font-size: 0.8rem;
   }
-  .bodyrow .body-name {
-    font-weight: 600;
-  }
-  .bodyrow .filler {
-    flex: 1 1 auto;
-  }
-  .onbody {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.25rem 0.4rem 0.25rem 1.4rem;
-    font-size: 0.85rem;
-  }
-  .onbody + .onbody {
-    border-top: 1px dotted var(--rule);
-  }
-  .onbody > span:first-child {
-    flex: 1 1 auto;
-    min-width: 0;
-  }
-  .onbody .dim {
-    color: var(--muted);
-  }
-  /* The axis a run of bodies turns about, over them: a number and what a
-     number cannot say, then a rule to the edge. */
-  .axis-line {
-    display: flex;
-    align-items: center;
-    gap: 0.45rem;
-    margin: 0.7rem 0 0.3rem;
-  }
-  .axis-line .axis-name {
-    font-size: 0.7rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--accent);
-  }
-  .axis-line .rule {
-    flex: 1 1 auto;
-    height: 1px;
-    background: var(--rule);
-  }
-  /* What a row states about itself and nothing edits: held, or the other
-     stage that names the same body. */
+
+  /* What a row states about itself and nothing edits: held, carried, how
+     many copies stand round a carrier, idle. */
   .chip {
     font-size: 0.68rem;
     color: var(--muted);
@@ -3408,28 +2482,7 @@
     color: var(--warn);
     border-color: var(--warn);
   }
-  /* A select drawn as a button, as the add menus are: it shows what it does,
-     never what is the case, and snaps back to its label. */
-  select.move {
-    width: max-content;
-    max-width: 12rem;
-  }
-  /* One mesh's readout, or one path's, sitting under its heading. */
-  h4.mesh,
-  h4.path {
-    margin: 0.75rem 0 0;
-  }
-  .out.indent {
-    padding-left: 0.9rem;
-  }
-  /* A readout **directly** under its heading hugs it; one further down the
-     section keeps the standard gap. Written as the adjacency it is, rather than
-     folded into `.indent`, which is about the inset and says nothing about what
-     comes above. */
-  h4.mesh + .out,
-  h4.path + .out {
-    margin-top: 0.2rem;
-  }
+
   .out dt {
     color: var(--muted);
   }
@@ -3449,76 +2502,7 @@
   .warn {
     color: var(--warn) !important;
   }
-  .stages {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-  .stage {
-    border: 1px solid var(--rule);
-    border-radius: 4px;
-  }
-  /* Size, weight and colour are `app.css`'s `.section-heading`, shared with
-     the gear tab's `h2`; the figures beside the name keep their own. */
-  .head {
-    display: flex;
-    align-items: baseline;
-    gap: 0.6rem;
-    width: 100%;
-    text-align: left;
-    border: none;
-    border-radius: 4px;
-    /* The bar keeps the height it had at 0.9 rem: the heading's face is
-       0.8 rem now, and the difference goes into the padding rather than
-       into a shorter bar and a smaller caret. */
-    padding: 0.5rem 0.7rem;
-    /* A button's own face, undone one property at a time rather than with
-       the `font` shorthand, which would reset the size and weight the shared
-       heading class gives it. */
-    font-family: inherit;
-    line-height: 1.2;
-    background: none;
-    color: var(--muted);
-    cursor: pointer;
-  }
-  .head:hover {
-    background: var(--hover);
-  }
-  .head strong {
-    font-weight: inherit;
-  }
-  /* The band of load cases and the band of stages are two lists, and the
-     second stands off from the first's add buttons. */
-  .stages + .stages {
-    margin-top: 1rem;
-  }
-  /* A load case's heading is a button and a switch side by side: the button
-     opens it, the switch takes it out of every rating — and a switch cannot
-     sit inside a button, so the two share a row rather than one wrapping the
-     other. The button keeps the heading's own look and takes the width. */
-  .casehead {
-    display: flex;
-    align-items: center;
-    padding-right: 0.5rem;
-    border-radius: 4px;
-  }
-  /* The whole bar lights, switch included, as a stage's heading does — the
-     row is one heading with two controls on it, not a button beside a gap. */
-  .casehead:hover {
-    background: var(--hover);
-  }
-  .casehead .head {
-    flex: 1;
-    min-width: 0;
-  }
-  .casehead .head:hover {
-    background: none;
-  }
-  /* A case switched off is still a case: its inputs stand, so it is dimmed
-     rather than hidden, and its heading still says what it is. */
-  .stage.off > .casehead {
-    opacity: 0.55;
-  }
+
   /* A switch the case cannot honour yet: the case is short of what the train
      needs to solve it, and switching it on would rate nothing. */
   .control.locked {
@@ -3559,10 +2543,7 @@
   .mode.later {
     margin-top: 0.4rem;
   }
-  .caret {
-    color: var(--muted);
-    font-size: 0.9rem;
-  }
+  
   /* One member's ratings, a row per load case. A table rather than the
      label/figure list the rest of a card uses, because a case is one row of
      several figures and a reader compares down a column. */
@@ -3599,64 +2580,17 @@
     color: var(--muted);
     margin-left: 0;
   }
-  .teeth,
-  .eff {
-    color: var(--muted);
-    font-size: 0.8rem;
-    font-variant-numeric: tabular-nums;
-  }
-  .eff {
-    margin-left: auto;
-  }
-  .body {
-    padding: 0 0.7rem 0.7rem;
-    border-top: 1px solid var(--rule);
-  }
+
   .shared {
     margin-top: 0.6rem;
   }
-  .gears {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
-    gap: 1rem;
-    margin-top: 0.8rem;
-  }
+  
   .gear {
     border: 1px solid var(--rule);
     border-radius: 3px;
     padding: 0.5rem 0.7rem;
   }
-  /* The structural buttons, wherever a block has them: a row of actions,
-     spaced as the stage and case buttons are, spanning a grid's columns. */
-  .edits {
-    grid-column: 1 / -1;
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    flex-wrap: wrap;
-    margin: 0.3rem 0;
-  }
-  /* In a row of edits a remove sits beside its add, not below it. */
-  .edits .action.danger {
-    margin-top: 0;
-  }
-  /* What the row's buttons do, under them, in a note's voice. */
-  .edit-note {
-    flex-basis: 100%;
-    font-size: 0.72rem;
-    color: var(--muted);
-  }
-  /* The one menu that adds a stage is as wide as its longest entry, no
-     wider, like the gear tab's adopt menu. */
-  select.add {
-    width: max-content;
-  }
-  /* The core's reason for refusing an edit, under the stage's shared block. */
-  .refused {
-    color: var(--warn);
-    font-size: 0.8rem;
-    margin: 0.2rem 0 0.4rem;
-  }
+
   /* A second heading in a card opens a second section, so it needs the gap
      between sections above it — the first one is against the card's own top
      padding and needs none. */
@@ -3793,11 +2727,21 @@
     background: none;
     color: var(--muted);
   }
-  /* A stage's or a case's remove sits below its inputs, apart from them. */
+  /* A case's remove sits below its inputs, apart from them. */
   .action.danger {
     margin-top: 0.6rem;
   }
 
+  /* What the train says of itself, under its path: why it has no answer,
+     each part's notes, and the switch every gear is judged by. */
+  .said {
+    margin: 0.5rem 0 0.75rem;
+  }
+  .said .notes {
+    margin: 0 0 0.5rem;
+    padding-left: 1.1rem;
+    font-size: 0.82rem;
+  }
   /* **The case strip, the path box, the list and the workspace** — the
      canvas's page: cases as chips across the top, the shown case's path
      under them, the list on the left and the selected piece on the right. */
@@ -3845,8 +2789,15 @@
     border-radius: 4px;
     background: var(--panel);
   }
+  .pathbox {
+    max-width: 40rem;
+  }
   .pathbox dd {
     text-align: right;
+  }
+  /* A note under a figure wraps under it, and does not widen the box. */
+  .pathbox dd small {
+    display: block;
   }
   .panes {
     display: grid;

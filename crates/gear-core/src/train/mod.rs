@@ -3487,10 +3487,10 @@ fn paths_of(
             )
         })
     };
-    // **One more tooth on each gear**, gears numbered across the train:
-    // the same motion asked of the system with that one count raised.
+    // **One more tooth on each gear**, by the graph's index for it: the
+    // same motion asked of the system with that one count raised.
     let per_tooth = |from: Body, to: Body| -> Vec<Option<f64>> {
-        let mut out = Vec::new();
+        let mut out = vec![None; train.shape.members.len()];
         for (k, part) in parts.iter().enumerate() {
             for i in 0..part.shape.members.len() {
                 let raising = |j: usize, m: usize, z: u32| if (j, m) == (k, i) { z + 1 } else { z };
@@ -3504,7 +3504,7 @@ fn paths_of(
                     let (a, b) = (s.values[from].to_f64(), s.values[to].to_f64());
                     (b != 0.0).then(|| a / b).filter(|r| r.is_finite())
                 });
-                out.push(raised);
+                out[part.members[i]] = raised;
             }
         }
         out
@@ -3934,8 +3934,8 @@ pub struct PathReport {
     /// goes ([`flow::Flow::mesh_powers`]). An offset coupling passes power
     /// and has no teeth, so it counts for nothing here.
     pub circulation: Directional<f64>,
-    /// **The ratio one more tooth on each gear would give**, gears numbered
-    /// across the train — the graph's exact answer at `z_i + 1`, which is
+    /// **The ratio one more tooth on each gear would give**, each gear by
+    /// the graph's index for it — the graph's exact answer at `z_i + 1`, which is
     /// what a designer choosing counts wants beside the ratio: where a tooth
     /// moves it a lot, and where not at all. `None` where that one tooth
     /// leaves the path no motion or locks it.
@@ -11173,10 +11173,10 @@ mod a_path_is_what_it_crosses {
             close(pc.forward, c.forward) && close(pc.backward, c.backward),
             "{name}: circulation {pc:?} vs {c:?}"
         );
-        let offset: usize = train.stages()[..k].iter().map(|s| s.members.len()).sum();
+        let part = &train.parts()[k];
         let mine = alone.ratio_per_tooth.as_ref().unwrap();
         for (i, want) in mine.iter().enumerate() {
-            let got = path.per_tooth[offset + i];
+            let got = path.per_tooth[part.members[i]];
             assert!(
                 match (got, *want) {
                     (Some(a), Some(b)) => close(a, b),
@@ -11192,7 +11192,7 @@ mod a_path_is_what_it_crosses {
         // rings' counts together and lock it, and a stage after it shares
         // the body it locks.
         for (j, got) in path.per_tooth.iter().enumerate() {
-            if j < offset || j >= offset + mine.len() {
+            if !part.members.contains(&j) {
                 assert!(
                     got.is_none_or(|g| close(g, ratio)),
                     "{name}: gear {j} moved {got:?} from {ratio}"

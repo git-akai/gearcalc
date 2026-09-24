@@ -1,76 +1,30 @@
-// The members of a geartrain, numbered and named the one way both panels use.
+// The members and bodies of a geartrain, named the one way both panels use.
 //
-// Gear numbering runs across the whole train — card 1's members first, then
-// card 2's — counting every member a card has: two on a pair, three on a
-// set, four on a hula stage. It used to be `stage × 2 + which + 1`, which is
-// right only while every stage before this one is a pair, and it lived in the
-// geartrain panel alone; the gear tab's *adopt* list needs the same numbers,
-// so they are written once here and both panels read them.
-//
-// A card is a part of the train's one graph, and the parts arrive with every
-// solve (`StagePorts.part`): what is read here of a card is its part's shape,
-// in the part's own numbering.
+// A gear goes by the graph's number for it, from 1 — the index the core names
+// it by, plus one — and by its role where the core reads it one off the graph
+// (`Shape::member_names`, laid out train-wide): "Gear 3", "Sun (4)",
+// "Planet 1 (12)". A body goes by the train's number for it, which is the one
+// a file writes and a case names. The names arrive with every solve
+// (`TrainOutcome.names`), and the gear tab's *adopt* list reads the same ones,
+// so a gear is one name wherever a list has it.
 
-import {
-  solveTrain,
-  t,
-  type MemberName,
-  type Shape,
-  type StagePorts,
-  type Train,
-} from "./core";
+import { solveTrain, t, type MemberName, type Shape, type Train } from "./core";
 
-/** One member of a train, as a list can show it. */
+/** One member of a train, as the gear tab's adopt list shows it. */
 export interface MemberRef {
-  /** The card's index in the train, and the member's in the core's order. */
-  stage: number;
-  member: number;
   /** The member's index in the train's graph — what the core names it by. */
   index: number;
-  /** The gear number across the train, from 1. */
-  number: number;
-  /** "gear 3", "Sun (4)", "Wormwheel (6)" — the card's name, numbered. */
+  /** "Gear 3", "Sun (4)", "Wormwheel (6)". */
   label: string;
   /** Whether a gear tab can hold it. A worm is a thread with proportions of
    *  its own, and the tab is offered it greyed rather than not at all. */
   adoptable: boolean;
 }
 
-/** How many members a stage has, in the core's member order. */
-export function memberCount(stage: Shape): number {
-  return stage.members.length;
-}
-
-/** The gear number of one member, counting every member of the cards
- *  before it — one number per gear across the train, which is what the
- *  adopt list and the case rows name a gear by. */
-export function gearNumber(topology: StagePorts[], stage: number, member: number): number {
-  let n = member + 1;
-  for (let i = 0; i < stage; i++) n += topology[i]?.part.members.length ?? 0;
-  return n;
-}
-
-/** **The name a member goes by in a list** — the adopt list's, and a
- *  case's rows and delivered table use the same: "Gear 3" on a pair, and
- *  the role with its number elsewhere, "Sun (5)". */
-export function memberListName(topology: StagePorts[], stage: number, member: number): string {
-  const role = roleName(topology, stage, member);
-  const number = String(gearNumber(topology, stage, member));
-  return role === null
-    ? t("ui.train_gear_name", { number })
-    : t("ui.train_member_numbered", { name: role, number });
-}
-
 /** The axis a body turns about in a shape, or `undefined` where the shape
  *  does not list the body. */
 export function axisOfBody(shape: Shape, body: number): number | undefined {
   return shape.bodies.find((b) => b.body === body)?.axis;
-}
-
-/** A body's slot in a stage — the stage's own numbering of it, ground 0
- *  and the first listed 1 — or 0 where the stage does not list it. */
-export function slotOf(shape: Shape, body: number): number {
-  return shape.bodies.findIndex((b) => b.body === body) + 1;
 }
 
 /** Whether a member's axis is carried — turns in a frame that is not the
@@ -80,19 +34,7 @@ export function carried(shape: Shape, member: number): boolean {
   return axis !== undefined && axis.carried_by !== 0;
 }
 
-/** Whether a shape is a worm drive: its first distance says so, as a preset's
- *  word, and the worm is the first member of the first mesh on it. */
-export const isWorm = (shape: Shape): boolean => shape.distances[0]?.worm === true;
-
-/** **What each member of a train is**, as the core reads it off the shape —
- *  one rule, in Rust, that the harness and this side both read
- *  (`Shape::member_names`). It arrives with every solve's topology, which
- *  needs no geometry and is present whether or not the train solved. */
-export function memberNames(train: Train): StagePorts[] {
-  return solveTrain(train).topology;
-}
-
-/** The word for a role, numbered where the shape has more than one of it;
+/** The word for a role, numbered where the train has more than one of it;
  *  `null` where the name *is* the number — a gear with no role. */
 export function roleLabel(name: MemberName | undefined): string | null {
   if (name === undefined) return null;
@@ -116,95 +58,14 @@ export function roleLabel(name: MemberName | undefined): string | null {
   return name.ordinal === null ? word : `${word} ${name.ordinal}`;
 }
 
-/** The card's own name for a member, without its number. `null` where the
- *  name *is* the number — a pair's gears. */
-function roleName(topology: StagePorts[], stage: number, member: number): string | null {
-  return roleLabel(topology[stage]?.members[member]);
-}
-
-/** **One axis of a stage, the bodies on it and the gears on those** — the
- *  shape's own three levels, read off it in one pass. A card is drawn in
- *  this order because it is the order the shape is in: a gear is fixed to
- *  a body, a body turns about an axis, and what a gear may be moved to is
- *  what else is on its axis. */
-export interface AxisGroup {
-  /** The shape's index for it, and the number a name goes by, from 1. */
-  axis: number;
-  /** The body whose frame it stands still in, `null` where that is ground
-   *  — a carried axis is a planet's, and what carries it is a body of
-   *  this stage like any other. */
-  carriedBy: number | null;
-  /** How many times it is replicated about the axis it is carried round:
-   *  the planet count, which nothing else on the card says. */
-  count: number;
-  bodies: {
-    body: number;
-    /** The members fixed to it, in the shape's order. */
-    members: number[];
-    /** Whether it carries an axis of its own — a carrier, which is what a
-     *  body with no gear on it generally is. */
-    carries: boolean;
-  }[];
-}
-
-/** Every axis of a stage with what sits on it, in the shape's order. */
-export function axisGroups(shape: Shape): AxisGroup[] {
-  return shape.axes.map((a, axis) => ({
-    axis,
-    carriedBy: a.carried_by === 0 ? null : a.carried_by,
-    count: a.count,
-    bodies: shape.bodies
-      .filter((b) => b.axis === axis)
-      .map((b) => ({
-        body: b.body,
-        members: shape.members.flatMap((m, j) => (m.body === b.body ? [j] : [])),
-        carries: shape.axes.some((x) => x.carried_by === b.body),
-      })),
-  }));
-}
-
-/** **Where a gear of this stage could be moved to**, which is the question
- *  a body answers that the train knows nothing about. The gear's own body
- *  is not among them: it is the row the gear is already listed under, and
- *  offering it back would be an option that does nothing.
- *
- *  A gear may go to a body on its own axis that carries no axis itself (a
- *  gear fixed to the carrier of the planets it meshes locks the stage, and
- *  the core refuses it), and, where it shares its body with another gear,
- *  to a body of its own.
- *
- *  **Two gears meshing the same member may not share a body**, and that is
- *  a filter rather than a refusal: turning as one, they hold their common
- *  mate to two ratios at once, so the stage is locked by construction
- *  rather than by its numbers. It is what a set's sun and ring would do,
- *  and offering it would put a control on every epicyclic card whose only
- *  answer is a refusal. The gears of a layshaft's ratios mesh *different*
- *  members of the layshaft, so its ratios stay on offer: that is how one
- *  is engaged. */
-export function movableGears(
-  shape: Shape,
-): { member: number; bodies: number[]; own: boolean }[] {
-  const partners = (j: number) =>
-    shape.meshes.filter((m) => m.a === j || m.b === j).map((m) => (m.a === j ? m.b : m.a));
-  return shape.members
-    .map((m, member) => {
-      const axis = axisOfBody(shape, m.body);
-      const mine = partners(member);
-      const bodies = shape.bodies
-        .filter(
-          (b) =>
-            b.axis === axis &&
-            b.body !== m.body &&
-            !shape.axes.some((a) => a.carried_by === b.body) &&
-            shape.members.every(
-              (x, k) => x.body !== b.body || !partners(k).some((p) => mine.includes(p)),
-            ),
-        )
-        .map((b) => b.body);
-      const own = shape.members.some((x, k) => k !== member && x.body === m.body);
-      return { member, bodies, own };
-    })
-    .filter((g) => g.bodies.length > 0 || g.own);
+/** **A gear by the graph's index**: its role and its number — "Sun (9)" —
+ *  or, where the number is its name, "Gear 3". */
+export function gearLabel(names: MemberName[], i: number): string {
+  const role = roleLabel(names[i]);
+  const number = String(i + 1);
+  return role === null
+    ? t("ui.train_gear_name", { number })
+    : t("ui.train_member_numbered", { name: role, number });
 }
 
 /** **A body's own name**: "Body 4", numbered across the train as the core
@@ -214,89 +75,14 @@ export function bodyName(body: number): string {
   return body === 0 ? t("ui.train_ground") : t("ui.train_body_name", { number: String(body) });
 }
 
-/** **The cards a body is listed on**, with its slot in each, in card
- *  order — read off the parts themselves, so a name needs no motion. */
-export function endsOf(topology: StagePorts[], body: number): { stage: number; slot: number }[] {
-  return topology
-    .map((s, stage) => ({ stage, slot: slotOf(s.part.shape, body) }))
-    .filter((e) => e.slot > 0);
-}
-
-/** **What sits on a slot** of a stage, for the line under its name: the
- *  members on it by their list names, or the carrier where it carries an
- *  axis and no gear. Read off the shape; the core's label names the first
- *  of them. */
-export function onSlot(topology: StagePorts[], stage: number, slot: number, numbered = true): string {
-  const shape = topology[stage].part.shape;
-  const body = shape.bodies[slot - 1]?.body;
-  const gears = shape.members
-    .map((m, j) =>
-      m.body === body
-        ? numbered
-          ? memberListName(topology, stage, j)
-          : memberName(topology, stage, j)
-        : null,
-    )
-    .filter((x) => x !== null);
-  if (gears.length > 0) return gears.join(" · ");
-  if (shape.axes.some((a) => a.carried_by === body)) return t("ui.train_carrier");
-  // A shaft with no gear that an offset coupling turns: what it turns with.
-  const coupled = shape.couplings.find((c) => c.includes(body));
-  if (coupled !== undefined) {
-    const other = coupled[0] === body ? coupled[1] : coupled[0];
-    return t("ui.train_turns_with", { on: onSlot(topology, stage, slotOf(shape, other), numbered) });
-  }
-  return "";
-}
-
-/** **Everything on a body, across the train**: each end's stage and what
- *  it carries — "Stage 1 Gear 2 · Stage 2 Sun" — which is what says at a
- *  glance what is linked to what. */
-export function acrossBody(topology: StagePorts[], body: number): string {
-  if (body === 0) return t("ui.train_ground");
-  return endsOf(topology, body)
-    .map((e) =>
-      t("ui.train_port_at", {
-        stage: t("ui.train_stage_heading", { number: String(e.stage + 1) }),
-        on: onSlot(topology, e.stage, e.slot, false),
-      }),
-    )
-    .join(" · ");
-}
-
-/** **A body in a reference**: its name and, in parentheses, every end of
- *  it — "Body 2 (Shape 1 Gear 2 · Stage 2 Sun)" — since a body bridges
- *  stages and a reference has to say what it is on each. */
-export function bodyRefName(topology: StagePorts[], body: number): string {
-  if (body === 0) return t("ui.train_ground");
-  return t("ui.train_body_with", { body: bodyName(body), on: acrossBody(topology, body) });
-}
-
-/** The name a member's card carries: "gear 3" on a pair, the role elsewhere. */
-export function memberName(topology: StagePorts[], stage: number, member: number): string {
-  const role = roleName(topology, stage, member);
-  const number = String(gearNumber(topology, stage, member));
-  return role === null ? t("ui.train_gear_name", { number }) : role;
-}
-
-/** Every member of a train, in order, with the label a list shows. */
-export function memberRefs(train: Train, topology: StagePorts[] = memberNames(train)): MemberRef[] {
-  const out: MemberRef[] = [];
-  topology.forEach((s, i) => {
-    const stage = s.part.shape;
-    for (let j = 0; j < memberCount(stage); j++) {
-      const number = gearNumber(topology, i, j);
-      out.push({
-        stage: i,
-        member: j,
-        index: s.part.members[j],
-        number,
-        label: memberListName(topology, i, j),
-        // A worm is a thread with proportions of its own: the first member
-        // of the first mesh on a distance marked as a worm drive.
-        adoptable: !(isWorm(stage) && stage.meshes[0]?.a === j),
-      });
-    }
-  });
-  return out;
+/** **Every gear of a train**, in the graph's order, as the adopt list shows
+ *  them — named by the core's reading of the graph, which needs no geometry
+ *  and arrives whether or not the train solved. */
+export function memberRefs(train: Train): MemberRef[] {
+  const names = solveTrain(train).names;
+  return train.shape.members.map((_, index) => ({
+    index,
+    label: gearLabel(names, index),
+    adoptable: names[index]?.role !== "worm",
+  }));
 }

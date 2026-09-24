@@ -685,8 +685,7 @@ export function exportLibrary(
  *  which gives way first are facts about the geometry, so Rust decides all
  *  of it — this used to be three functions here, one per stage type, each
  *  restating a relation the core already enforces, and none of them tested.
- *  Every index is the train's graph's; a card names its inputs in its own and
- *  reads them through its part first (`cards.ts`).
+ *  Every index is the train's graph's.
  *
  *  Written **in place**, leaf by leaf, rather than by replacing the graph: the
  *  caller holds a reactive proxy and a wholesale swap would detach every input

@@ -120,7 +120,7 @@ of a gear is worth more than knowing what it does.
 | `crates/gear-io` | DXF export · the TOML material library and geartrain documents (`train::convert` reads one written as stages, once) · the string catalogues |
 | `crates/gear-wasm` | The boundary. 23 entry points, JSON in and JSON out, all pure — `tools/wasm_boundary.json` lists them, and `check_wasm.sh` fails on one it does not |
 | `crates/gear-cli` | The development harness. `gear-cli help` prints its subcommands, from the `COMMANDS` table that *is* its dispatch |
-| `web/src` | Svelte 5 + TypeScript. Layout and event handling **only** — `cards.ts` is the bookkeeping that stands a card on the graph's own objects, and decides nothing; `Offers.svelte` lists what the core offers at the selection (`offers.ts` names it) — the adds as the one menu, the rest as a strip of verbs, each entry's dry run on hover |
+| `web/src` | Svelte 5 + TypeScript. Layout and event handling **only** — `members.ts` names a gear, a body and an axis the one way both panels do, from the core's reading of the graph; `Offers.svelte` lists what the core offers at the selection (`offers.ts` names it) — the adds as the one menu, the rest as a strip of verbs, each entry's dry run on hover |
 | `web/src/wire` | **Generated** by `ts-rs`. Never edited by hand |
 | `tools/` | The checks that live outside the Rust suite |
 | `handoff_inbound/` | Prior Python work. **Reference only** — do not build on it |

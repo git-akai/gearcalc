@@ -623,6 +623,25 @@ could select it — a coupled shaft now says what it turns with, its
 workspace links to the coupling, and the body offers the coupling's
 removal.
 
+**Phase 7, step 5a — the cards leave the panel.** Done: the stage cards,
+the paths-and-bodies block and the case accordions are gone, and what only
+they showed has a place in the list and the workspace — the path's power
+through the teeth and its play's tolerance band in the path box; each
+part's notes, and why the train has no answer, under it, each naming its
+part by its meshes and showing it on a click; the reversed-bending switch
+beside them; a case that cannot solve said on its chip; a search's floor,
+a worm's lead, and what one more tooth on either gear makes the shown
+case's path, on the mesh; the torque each part's meshes put on a body
+where the train's figure does not say it — a shaft two parts share, a
+carrier — on the body; the planets' layout on the axis. `cards.ts` is
+gone: the workspace stands on the graph itself and relief is the train's.
+No "Stage N" is said anywhere — a body is its number, a gear its role and
+number (`members.ts`, which the gear tab's adopt list reads too), and the
+sidebar counts gears. **Found on the way**: `PathReport::per_tooth` was
+still numbered part by part — the cards' order — among fields numbered by
+the graph; it is by the graph's index now, which a chain built in order
+never told apart, so the corpus held.
+
 **Phase 6 — results and the boundary.** `TrainResult` per member, mesh,
 distance, axis and path, with `topology` carrying the groupings;
 `relieve_stage` → `relieve`; `adopt_member` by member; bindings; the probe.

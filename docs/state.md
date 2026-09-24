@@ -308,11 +308,11 @@ already flags. `tools/iso_6336_3_stack.py` multiplies the set out
 **The train is one graph.** A train stores one `Shape` — every axis, body,
 member, mesh, distance and coupling once — beside its holds and its cases,
 and what a stage was is a **part** of it (`Shape::parts`), read off the
-graph and dealt to the panel as its cards with every solve; `solve_train`
-solves part by part and a stage asked alone is one card (`Part::whole`). A
-join makes one body on one axis and keeps every part's own order; an edit
-on a card is read through its part's maps (`Shape::edit_part`); the panel's
-cards stand on the graph's own objects (`web/src/cards.ts`). A file written
+graph with every solve; `solve_train` solves part by part and a stage
+asked alone is one part (`Part::whole`). A join makes one body on one axis
+and keeps every part's own order; an edit on a card is read through its
+part's maps (`Shape::edit_part`); the panel stands on the graph's own
+objects, one list and one workspace. A file written
 as stages is refused by name and converted once by `gear-cli convert`
 (`graph_of`): the elevation drive the tool wrote before converts to the file
 it writes of the drive now, every figure bit for bit. Held by laws on every
@@ -571,21 +571,21 @@ importing into SOLIDWORKS · geartrain presets under three families: parallel
 axes (spur/helical, idler, layshaft), skew shafts (worm, crossed), epicyclic
 (planetary, Wolfrom, compound, planocentric, meshed planets), all one shape
 and all one list of what sits where (`arrangements`), the hula an
-arrangement of the epicyclic family the harness names · a stage
-edited on its card — a step, a sun or a ring, an axis, a mesh, an offset
-coupling from an orbiting body to a shaft on the centre line — by the
-core's rules, the cases following, a planocentric and a hula one step and
-a coupling apart, the cards dealt by step and by mesh
-group, each mesh above the distance it runs at · **a train's bodies are its one vocabulary for what
-turns**: numbered across the train as the gears are, a stage listing the
-bodies on its axes and a body on two stages being what a coupling used to
-say, listed with what each carries — **read at the train, edited at the
-stage**: the train's block states every body and what it carries, and a
-stage's card is the shape's three levels, an axis, the bodies on it and
-the gears on each, where a body's row holds it or joins it to another and
-a gear's row moves it to another body of its axis — which is how a
-layshaft's ratio is engaged · stages and load cases start collapsed ·
-geartrains
+arrangement of the epicyclic family the harness names · **a train is
+one list and one workspace**: the list is the graph grouped three ways —
+the flow each case walks, the centres, the axes — and the workspace is
+the piece selected: a mesh as its two gears either side of it and the
+distance it runs at, with what it comes to running down under them; a
+body, an axis, a centre, a coupling, a case · **what can be done to a
+piece is the core's to offer** — a gear at any gear, another ratio, a
+step, an offset coupling from an orbiting body to a shaft on the centre
+line, a stage laid in at a body, a gear moved to another body of its axis
+(which is how a layshaft's ratio is engaged), a join, a hold, a piece
+removed with what goes with it — each tried on a copy, a refusal said
+with its reason, and its dry run shown before it is pressed; a
+planocentric and a hula one step and a coupling apart · **a train's
+bodies are its one vocabulary for what turns**: numbered across the train,
+each on one axis, held, joined or coupled as a body · geartrains
 exported and imported as TOML, inputs only · gear tabs with external and internal
 kinds, and eccentric in the same developer mode.
 

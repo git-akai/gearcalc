@@ -286,7 +286,7 @@
   <div class="actions">
     <!-- **A member of an open geartrain, adopted as a tab.** One native
          select, grouped by geartrain in the sidebar's order, a member per
-         option under the numbering its cards carry; a worm is listed greyed,
+         option under the name the geartrain's list gives it; a worm is listed greyed,
          so a reader sees why it is not offered. Choosing one makes the tab
          and the control snaps back to its label, so it reads as a button
          with a menu and holds no state of its own. -->
@@ -305,10 +305,8 @@
       <option value="" disabled>{t("ui.gear_from_train")}</option>
       {#each trains.tabs as source, i (source.id)}
         <optgroup label={source.name || t("ui.train_unnamed")}>
-          {#each memberRefs(source.train) as ref (ref.number)}
-            <option value={`${i}:${ref.index}`} disabled={!ref.adoptable}>
-              {t("ui.gear_from_train_member", { stage: String(ref.stage + 1), member: ref.label })}
-            </option>
+          {#each memberRefs(source.train) as ref (ref.index)}
+            <option value={`${i}:${ref.index}`} disabled={!ref.adoptable}>{ref.label}</option>
           {/each}
         </optgroup>
       {/each}

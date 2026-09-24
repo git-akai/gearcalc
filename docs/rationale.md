@@ -238,8 +238,8 @@ mesh removed that leaves two parts is two cards.
 
 - **A card's indices are not the graph's.** An edit is asked in the card's
   numbering and read through its part's maps (`Shape::edit_part`); the
-  panel's cards stand on the graph's own objects (`web/src/cards.ts`), so a
-  box writes the train and relief copies back leaf by leaf as it did. What
+  panel stands on the graph's own objects, so a box writes the train and
+  relief copies back leaf by leaf as it did. What
   an edit reads of *its* stage — the gears on an axis it removes, whether a
   gear is alone on its body — it reads among the card's gears, which a law
   holds every add on every preset to.

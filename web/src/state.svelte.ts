@@ -27,7 +27,7 @@ import {
 /** How a gear's drawing is being looked at.
  *
  *  **Not an input**, and beside `params` rather than in it, for the same reason
- *  `TrainTab.open` is beside `train`: it changes no number, and what leaves the
+ *  `TrainTab.view` is beside `train`: it changes no number, and what leaves the
  *  application — the DXF, and a train's TOML — must not carry a view
  *  preference. It lives on the tab rather than in the canvas because the panel
  *  is rebuilt whenever a reader looks at something else, so a zoom held in the
@@ -78,24 +78,17 @@ export interface TrainTab {
   id: number;
   name: string;
   train: Train;
-  /** Which stages are expanded, by index.
+  /** **What the reader is looking at** — the grouping the list is drawn in,
+   *  the case it is shown for, and the piece selected.
    *
    *  **Not an input**, and deliberately beside `train` rather than in it: it
    *  changes no number, and what is exported is `train` alone, so a view
    *  preference cannot leak into a document that describes a gearbox
    *  (`docs/rationale.md`). It lives on the tab rather than in the panel
    *  because the panel is rebuilt whenever a reader looks at something else,
-   *  and coming back to a train with every stage slammed shut is the kind of
-   *  small forgetting that makes two tabs tiring to compare. It dies with the
+   *  and coming back to a train with nothing selected is the kind of small
+   *  forgetting that makes two tabs tiring to compare. It dies with the
    *  session, like every other thing here that is not the language. */
-  open: Record<number, boolean>;
-  /** Which load cases are expanded, by index — the same thing as `open`, for
-   *  the other list the panel draws as an accordion. */
-  openCases: Record<number, boolean>;
-  /** **What the reader is looking at** — the grouping the list is drawn in,
-   *  the case it is shown for, and the piece selected — kept on the tab like
-   *  `open`, so leaving a train and coming back finds the same thing
-   *  selected. Not an input: nothing here reaches the core or a file. */
   view: TrainView;
 }
 
@@ -289,7 +282,7 @@ export const workspace = new Workspace();
 function freshTrain(name = t("ui.train_default_name")): TrainTab {
   // The stages closed, as the load cases are: each heading says what its
   // stage is, and a stage added by the menu opens itself.
-  return { id: nextTrainId++, name, train: defaultTrain(), open: {}, openCases: {}, view: freshView() };
+  return { id: nextTrainId++, name, train: defaultTrain(), view: freshView() };
 }
 
 /** The geartrain tabs.
@@ -373,8 +366,6 @@ class Trains {
       id: nextTrainId++,
       name: r.ok.document.name,
       train: r.ok.document.train,
-      open: {},
-      openCases: {},
       view: freshView(),
     };
     this.tabs.push(t);

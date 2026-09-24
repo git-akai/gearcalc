@@ -451,8 +451,8 @@ fn report(name: &str, train: &Train, r: &TrainResult) {
             p.backlash.backward.nominal,
         );
         // What the teeth pass over what comes in, both ways, and what one
-        // more tooth on each gear would make the ratio, gears numbered
-        // across the train.
+        // more tooth on each gear would make the ratio, each gear by the
+        // graph's index for it.
         println!(
             "    power through the teeth {:>10.6} / {:<10.6}   one more tooth: {}",
             p.circulation.forward,
