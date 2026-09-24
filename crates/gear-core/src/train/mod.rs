@@ -232,22 +232,6 @@ pub struct MeshReport {
     /// [`Directional::locked`] reads them rather than a separate flag that
     /// could disagree.
     pub efficiency: Directional<f64>,
-    /// **The same efficiency against the static coefficient**, which decides
-    /// whether a drive breaks away and nothing else
-    /// ([`Directional::once_moving`]). [`Self::efficiency`] is this mesh's
-    /// own figure with the rule applied; a path applies it to its whole flow
-    /// ([`PathReport`]), since a train can hold at rest where no one of its
-    /// meshes does — power circulating through a high reduction multiplies
-    /// every mesh's friction.
-    ///
-    /// **Carried and not reported**: the static figure's only job is the
-    /// sign, and it is no efficiency of anything that moves
-    /// (`docs/rationale.md#two-friction-coefficients-because-there-are-two-questions`).
-    /// It is on the report because the train builds its flow from each
-    /// mesh's, as it does its backlash from [`Self::row_play`].
-    #[cfg_attr(feature = "serde", serde(skip))]
-    #[cfg_attr(feature = "typescript", ts(skip))]
-    pub efficiency_at_rest: Directional<f64>,
     /// The coefficient of friction at which each direction stops driving,
     /// read along the path; a **negative** value means no friction locks the
     /// pair that way — a value rather than a missing one.
@@ -456,7 +440,6 @@ pub(crate) struct LineMesh {
     /// Transverse operating pressure angle, degrees — the report's unit.
     pub operating_pressure_angle: f64,
     pub efficiency: Directional<f64>,
-    pub efficiency_at_rest: Directional<f64>,
     /// One contact per load case, in the loads' order.
     pub contact: Vec<ContactPatch>,
     /// The power through the mesh per load case, in the loads' order.
@@ -493,7 +476,6 @@ pub(crate) fn line_mesh_report(cases: &[CaseLoad], m: LineMesh) -> MeshReport {
         // No friction locks a line contact — see the field.
         locking_friction: Directional::of(|_| -1.0),
         efficiency: m.efficiency,
-        efficiency_at_rest: m.efficiency_at_rest,
         sliding_ratio: 0.0,
         cases: cases
             .iter()
@@ -941,12 +923,14 @@ impl Rated {
     pub(crate) fn into_case(
         self,
         torque: f64,
+        on_body: f64,
         speeds: (f64, f64),
         cycles: Option<Cycles>,
     ) -> GearCase {
         GearCase {
             case: self.case,
             torque,
+            on_body,
             speed: speeds.0,
             speed_against_carrier: speeds.1,
             cycles,
@@ -1338,6 +1322,13 @@ pub struct GearCase {
     /// load referred by the ratio and cut by the loss the mesh takes carrying
     /// it *that* way, which for a locked mesh is nought.
     pub torque: f64,
+    /// **What this gear's meshes put on its body**, N·m, signed as the
+    /// train's body torques are: the gears on one shaft sum to the shaft's
+    /// own load or reaction, so where a shaft carries two gears this is what
+    /// it hands from the one to the other — which the case's figure for the
+    /// body, being the external torque, does not say. Whichever parts the
+    /// body lies between.
+    pub on_body: f64,
     /// Rotational speed, rpm, from the case's speed at its port.
     pub speed: f64,
     /// Speed **relative to the carrier of its mesh**, rpm — what its teeth
@@ -3056,6 +3047,9 @@ pub struct CaseLoad {
     /// delivers onward where another takes it up.
     pub speeds: Vec<f64>,
     pub torques: Vec<f64>,
+    /// Per member of the part: the torque its meshes put on its body, signed
+    /// as a body's torques are — [`GearCase::on_body`].
+    pub on_members: Vec<f64>,
     /// Per local body: revolutions over a fatigue case's duty; `None` on an
     /// ultimate case, which has no cycles to count.
     pub turns: Option<Vec<f64>>,
@@ -3072,7 +3066,8 @@ impl CaseLoad {
 
     /// A case carrying nothing: every torque nought, every body still.
     #[must_use]
-    pub fn nothing(case: usize, kind: CaseKind, meshes: usize, shafts: usize) -> Self {
+    pub fn nothing(case: usize, kind: CaseKind, wiring: &Wiring) -> Self {
+        let (meshes, shafts) = (wiring.meshes.len(), wiring.slots.len());
         Self {
             case,
             kind,
@@ -3081,6 +3076,7 @@ impl CaseLoad {
             mesh_powers: vec![0.0; meshes],
             speeds: vec![0.0; shafts],
             torques: vec![0.0; shafts],
+            on_members: vec![0.0; wiring.mounts.len()],
             turns: None,
             reversing_actuations: None,
         }
@@ -3843,8 +3839,8 @@ pub struct PathReport {
     /// that crosses one preset of three is rated on that preset alone. A path
     /// through a self-locking mesh cannot be back-driven at all, and
     /// [`Directional::locked`] on this pair says so. **Whether it breaks
-    /// away** is the same flow against every mesh's static friction
-    /// ([`MeshReport::efficiency_at_rest`], [`Directional::once_moving`]):
+    /// away** is the same flow against every mesh's static friction — each
+    /// mesh's efficiency at rest, off its cut ([`Directional::once_moving`]):
     /// a path that cannot start delivers nothing, and one that can runs on
     /// sliding friction.
     pub efficiency: Directional<f64>,
@@ -3916,10 +3912,9 @@ pub struct AxisReport {
     pub layout: Option<shape::LayoutReport>,
 }
 
-/// **What is a part's own** — its junction's, where it is one: the speed and
-/// the torque its meshes put on each of its bodies in each case, which on a
-/// shaft two parts share is what the one hands the other, and what its
-/// search and its closures came to.
+/// **What is a part's own** — what its search and its closures came to, and
+/// the speed and the torque its meshes put on each of its bodies in each
+/// case.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(
@@ -3928,7 +3923,13 @@ pub struct AxisReport {
     ts(export, export_to = "core/")
 )]
 pub struct PartReport {
-    /// Per case, per body of the part, ground first.
+    /// Per case, per body of the part, ground first — **the harness's**:
+    /// what the corpus prints part by part ([`TrainResult::by_part`]). The
+    /// panel reads what a shaft's gears carry off each gear
+    /// ([`GearCase::on_body`]), whichever parts the shaft lies between, so
+    /// this stays on this side.
+    #[cfg_attr(feature = "serde", serde(skip))]
+    #[cfg_attr(feature = "typescript", ts(skip))]
     pub cases: Vec<shape::SlotCase>,
     pub notes: Vec<Note>,
 }
@@ -4333,12 +4334,7 @@ fn solve_parts(
                     return;
                 }
                 for (k, w) in wirings.iter().enumerate() {
-                    per_part[k].push(CaseLoad::nothing(
-                        index,
-                        case.kind,
-                        w.meshes.len(),
-                        w.slots.len(),
-                    ));
+                    per_part[k].push(CaseLoad::nothing(index, case.kind, w));
                 }
             };
         if loads.is_empty() {
@@ -4496,12 +4492,15 @@ fn solve_parts(
         for (k, w) in wirings.iter().enumerate().filter(|_| case.enabled) {
             let mine = &mesh_of_part[k];
             let mut torques = vec![0.0; w.slots.len()];
+            let mut on_members = vec![0.0; w.mounts.len()];
             for (j, &g) in mine.iter().enumerate() {
                 let [on_a, on_b, on_frame] = flow.on_shafts(g, &meshes[g]);
                 let m = &w.meshes[j];
                 torques[w.mounts[m.a].spins_with] += on_a;
                 torques[w.mounts[m.b].spins_with] += on_b;
                 torques[w.frame(j).unwrap_or(GROUND)] += on_frame;
+                on_members[m.a] += on_a;
+                on_members[m.b] += on_b;
             }
             for (&[a, b], &g) in w.couplings.iter().zip(&coupling_of_part[k]) {
                 let [on_a, on_b, _] = flow.on_shafts(g, &meshes[g]);
@@ -4516,6 +4515,7 @@ fn solve_parts(
                 mesh_powers: mine.iter().map(|&g| flow.mesh_powers[g]).collect(),
                 speeds: (0..w.slots.len()).map(|l| speeds[port(k, l)]).collect(),
                 torques,
+                on_members,
                 turns: turns
                     .as_ref()
                     .map(|t| (0..w.slots.len()).map(|l| t[port(k, l)]).collect()),
@@ -4609,6 +4609,77 @@ mod tests {
         let result = super::solve_train(train, lib)?;
         let by_part = result.by_part(train);
         Ok(Solved { result, by_part })
+    }
+
+    /// **A shaft's gears carry its own load between them.** What each gear's
+    /// meshes put on its body ([`GearCase::on_body`]) sums to the body's own
+    /// torque in the case ([`CaseBody::torque`]) on every body that carries
+    /// no axis and turns with no coupling — the shaft's statics, whichever
+    /// parts it lies between: the shaft between two presets hands
+    /// one gear's torque to the next, and a layshaft's countershaft does the
+    /// same inside one part. On every preset alone and after a pair and a
+    /// layshaft, in every case that solved.
+    #[test]
+    fn a_shafts_gears_carry_its_own_load_between_them() {
+        let lib = library();
+        let mut bodies = 0;
+        for a in arr::Preset::ALL {
+            for b in [None, Some(arr::Preset::Spur), Some(arr::Preset::Layshaft)] {
+                let presets: Vec<Shape> = b
+                    .into_iter()
+                    .map(arr::Preset::build)
+                    .chain(std::iter::once(a.build()))
+                    .collect();
+                let t = Train::chained(presets, |t| {
+                    t.chain_ends()
+                        .map(|(x, y)| {
+                            vec![
+                                LoadCase::ultimate(x, y, 1.0, 1000.0),
+                                LoadCase::back_driving(x, y, 0.6),
+                            ]
+                        })
+                        .unwrap_or_default()
+                });
+                let Ok(r) = solve_train(&t, &lib) else {
+                    continue;
+                };
+                for c in r.cases.iter().filter(|c| c.solved) {
+                    for body in &c.bodies {
+                        let at = body.at;
+                        if at == GROUND
+                            || t.shape.axes.iter().any(|x| x.carried_by == at)
+                            || t.shape.couplings.iter().any(|p| p.contains(&at))
+                        {
+                            continue;
+                        }
+                        let on: Vec<f64> = t
+                            .shape
+                            .members
+                            .iter()
+                            .enumerate()
+                            .filter(|(_, m)| m.body == at)
+                            .map(|(i, _)| {
+                                r.members[i]
+                                    .cases
+                                    .iter()
+                                    .find(|g| g.case == c.case)
+                                    .map_or(0.0, |g| g.on_body)
+                            })
+                            .collect();
+                        let scale = on.iter().fold(body.torque.abs(), |m, x| m.max(x.abs()));
+                        let sum: f64 = on.iter().sum::<f64>() - body.torque;
+                        assert!(
+                            sum.abs() <= 1e-9 * (1.0 + scale),
+                            "{a:?} after {b:?}, case {}, body {at}: gears {on:?} and the body's {} do not balance",
+                            c.case,
+                            body.torque
+                        );
+                        bodies += 1;
+                    }
+                }
+            }
+        }
+        assert!(bodies > 200, "only {bodies} bodies balanced");
     }
 
     /// **A part's view is its own solve**: the view the train's result gives

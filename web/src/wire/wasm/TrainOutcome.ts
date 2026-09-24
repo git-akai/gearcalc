@@ -33,11 +33,10 @@ export type TrainOutcome = { result: TrainResult | null, failure: TrainFailure |
 figures: Array<Figure>, 
 /**
  * **Every part** of the train's graph — the pieces that close apart —
- * in its own numbering with where each of its pieces is in the graph,
- * and its ports: what the panel names a part by (its meshes), and how
- * it reads what a part's meshes put on each of its bodies
- * (`TrainResult::parts`, by the part's own numbering). Present on
- * success and failure alike: it needs no geometry.
+ * in its own numbering with where each of its pieces is in the graph:
+ * what the panel names a part by (its meshes) where the part's notes
+ * or a failure name one. Present on success and failure alike: it
+ * needs no geometry.
  */
 parts: Array<Part>, 
 /**

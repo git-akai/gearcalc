@@ -18,8 +18,8 @@ ratio: number,
  * that crosses one preset of three is rated on that preset alone. A path
  * through a self-locking mesh cannot be back-driven at all, and
  * [`Directional::locked`] on this pair says so. **Whether it breaks
- * away** is the same flow against every mesh's static friction
- * ([`MeshReport::efficiency_at_rest`], [`Directional::once_moving`]):
+ * away** is the same flow against every mesh's static friction — each
+ * mesh's efficiency at rest, off its cut ([`Directional::once_moving`]):
  * a path that cannot start delivers nothing, and one that can runs on
  * sliding friction.
  */

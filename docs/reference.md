@@ -3073,14 +3073,16 @@ reporting `adjusted` where a file asked for what nothing can honour
 ([rationale](rationale.md#a-file-is-adjusted-to-what-the-tool-can-honour)).
 **`solve_train` answers per piece**: every gear, mesh, axis distance and axis
 by the graph's index (`TrainResult::members`, `meshes`, `distances`,
-`axes`), what is a part's own — the torque its meshes put on each of its
-bodies per case, which on a shaft two parts share is what the one hands the
-other, and its notes — the paths and the cases, the figures relief seeds from
-by the graph's freedoms; and `parts` beside it, the train's parts in their
-own numbering, which is how the panel reads what a part's meshes put on
-each of its bodies. `TrainResult::part` lays the result back out in a
-part's own numbering for the harness, which prints the corpus part by part,
-and a law holds it to the part's own solve.
+`axes`) — each gear's case carrying what its meshes put on its body
+(`GearCase::on_body`), so a shaft's gears show what it hands from one to the
+next whichever parts it lies between — what is a part's own (its notes), the
+paths and the cases, and the figures relief seeds from by the graph's
+freedoms; and `parts` beside it, the train's parts in their own numbering,
+which is how the panel names a part by its meshes. `TrainResult::part` lays
+the result back out in a part's own numbering for the harness, which prints
+the corpus part by part — every part's bodies with the torque its meshes put
+on each, which stays on this side — and a law holds it to the part's own
+solve.
 `adopt_member` is the one that hands a train's member — named by the graph's
 index — to the gear tab: it solves the train and returns
 `GearResult::params`, **the tooth as built** —

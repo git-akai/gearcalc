@@ -199,16 +199,6 @@
   const partNotes = $derived(
     (solved?.parts ?? []).flatMap((x, part) => x.notes.map((n) => ({ part, note: n }))),
   );
-  /** **The parts a body is in**, each with the body's place in the part's
-   *  own list of bodies (ground 0) and a name: the part's gears on the
-   *  body, or the carrier's word where it has none there. */
-  const partsThrough = (body: number): { part: number; slot: number; name: string }[] =>
-    result.parts.flatMap((s, part) => {
-      const slot = s.shape.bodies.findIndex((x) => x.body === body) + 1;
-      if (slot === 0) return [];
-      const on = s.members.filter((i) => tab.train.shape.members[i]?.body === body);
-      return [{ part, slot, name: on.length > 0 ? on.map(gearName).join(" · ") : t("ui.train_the_carrier") }];
-    });
   /** An axis distance by its two axes — "Axis 1 ↔ Axis 2". */
   const distanceName = (d: number): string => {
     const x = tab.train.shape.distances[d];
@@ -818,7 +808,7 @@
   {#each couplingsOf(b) as c (c.coupling)}
     <button class="gearrow" onclick={() => select({ coupling: c.coupling })}>↔ {t("ui.train_turns_with", { on: bodyName(c.other) })}</button>
   {/each}
-  {@const through = partsThrough(b)}
+  {@const gears = gearsOn(b)}
   <dl class="out">
     {#each solved?.cases ?? [] as c (c.case)}
       {@const x = c.bodies.find((y) => y.at === b)}
@@ -826,14 +816,17 @@
         <dt>{caseName(c.case)}</dt>
         <dd>
           {x.speed === null ? roleWord("fixed") : `${num(x.speed, 1)} ${t("ui.train_rpm")}`} · {roleWord(x.role)} {num(x.torque, 4)} {t("ui.train_nm")}
-          <!-- **What each part's meshes put on it**, where the train's
-               figure does not say it: a shaft two parts share hands the
-               one's torque to the other and carries no load of the case's
-               own, and a carrier has no gear to read it off. -->
-          {#if through.length > 1 || gearsOn(b).length === 0}
-            {#each through as x2 (x2.part)}
-              {@const sc = solved?.parts[x2.part]?.cases.find((y) => y.case === c.case)}
-              <span class="line">{x2.name}: {num(sc?.torques[x2.slot], 4)} {t("ui.train_nm")}</span>
+          <!-- **What each gear's meshes put on it**, where the shaft
+               carries more than one: its gears carry its own load between
+               them, so a shaft between two gears hands the one's torque to
+               the other — which the case's figure, being the external
+               torque, does not say. Whichever parts the shaft lies
+               between: a countershaft inside a layshaft reads as the shaft
+               between two presets does. -->
+          {#if gears.length > 1}
+            {#each gears as i (i)}
+              {@const g = solved?.members[i]?.cases.find((y) => y.case === c.case)}
+              <span class="line">{gearName(i)}: {num(g?.on_body, 4)} {t("ui.train_nm")}</span>
             {/each}
           {/if}
         </dd>

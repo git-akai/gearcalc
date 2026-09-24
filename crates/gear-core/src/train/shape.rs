@@ -2650,7 +2650,6 @@ const PATH_SAMPLES: usize = 2048;
 struct PointMesh {
     coprime: bool,
     efficiency: Directional<f64>,
-    efficiency_at_rest: Directional<f64>,
     locking_friction: Directional<f64>,
     /// One contact per load case, in the loads' order.
     contact: Vec<super::ContactPatch>,
@@ -2739,7 +2738,6 @@ fn point_mesh_report(
         contact_ratio,
         locking_friction: m.locking_friction,
         efficiency: m.efficiency,
-        efficiency_at_rest: m.efficiency_at_rest,
         sliding_ratio: s.sliding_ratio,
         cases: cases
             .iter()
@@ -3010,12 +3008,6 @@ pub struct LayoutReport {
 
 /// Every body's speed and torque in one load case.
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-#[cfg_attr(
-    feature = "typescript",
-    derive(ts_rs::TS),
-    ts(export, export_to = "core/")
-)]
 pub struct SlotCase {
     pub case: usize,
     /// Per local body, ground first.
@@ -3779,6 +3771,7 @@ pub fn rate(
                     });
                     r.into_case(
                         member_torque(i, c),
+                        c.on_members[i],
                         (c.speeds[shaft], c.speeds[shaft] - c.speeds[frame]),
                         cycles,
                     )
@@ -3829,7 +3822,6 @@ pub fn rate(
                         ),
                         operating_pressure_angle: l.operating.alpha_w.to_degrees(),
                         efficiency,
-                        efficiency_at_rest: at_rest[k],
                         // Every line contact was rated above; the map is
                         // over the option so nothing here can panic.
                         contact: rated_contact[k].as_ref().map_or_else(Vec::new, |stress| {
@@ -3869,7 +3861,6 @@ pub fn rate(
                     PointMesh {
                         coprime,
                         efficiency,
-                        efficiency_at_rest: at_rest[k],
                         locking_friction: p.locking_friction(face_of(k, &final_width)),
                         contact: rated_point[k].clone().unwrap_or_default(),
                         case_power,

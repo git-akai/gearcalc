@@ -18,6 +18,15 @@ case: number,
  */
 torque: number, 
 /**
+ * **What this gear's meshes put on its body**, N·m, signed as the
+ * train's body torques are: the gears on one shaft sum to the shaft's
+ * own load or reaction, so where a shaft carries two gears this is what
+ * it hands from the one to the other — which the case's figure for the
+ * body, being the external torque, does not say. Whichever parts the
+ * body lies between.
+ */
+on_body: number, 
+/**
  * Rotational speed, rpm, from the case's speed at its port.
  */
 speed: number, 

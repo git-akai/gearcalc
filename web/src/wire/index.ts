@@ -81,7 +81,6 @@ export type { Ranges } from "./core/Ranges";
 export type { Shape } from "./core/Shape";
 export type { ShiftRange } from "./core/ShiftRange";
 export type { Sinusoid } from "./core/Sinusoid";
-export type { SlotCase } from "./core/SlotCase";
 export type { Target } from "./core/Target";
 export type { TipRoom } from "./core/TipRoom";
 export type { Train } from "./core/Train";

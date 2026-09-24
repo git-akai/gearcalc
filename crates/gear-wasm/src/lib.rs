@@ -783,11 +783,10 @@ pub struct TrainOutcome {
     /// this list back with the graph, and never learns which field is which.
     pub figures: Vec<gear_core::train::Figure>,
     /// **Every part** of the train's graph — the pieces that close apart —
-    /// in its own numbering with where each of its pieces is in the graph,
-    /// and its ports: what the panel names a part by (its meshes), and how
-    /// it reads what a part's meshes put on each of its bodies
-    /// (`TrainResult::parts`, by the part's own numbering). Present on
-    /// success and failure alike: it needs no geometry.
+    /// in its own numbering with where each of its pieces is in the graph:
+    /// what the panel names a part by (its meshes) where the part's notes
+    /// or a failure name one. Present on success and failure alike: it
+    /// needs no geometry.
     pub parts: Vec<gear_core::train::graph::Part>,
     /// **The train's ports** — every body a case may address, in number
     /// order, and whether the train holds it — present whether or not the
@@ -2413,27 +2412,22 @@ mod tests {
         let req = serde_json::json!({ "train": train });
 
         let v = solved(&req.to_string());
-        // One part: the graph's order is the part's, and what the part's
-        // meshes put on its bodies is the part's own.
+        // One part: the graph's order is the part's.
         let stage = &v["parts"][0];
 
         // Ring held, sun driving: the classical 1 + z_r/z_s.
         assert!((v["paths"][0]["ratio"].as_f64().unwrap() - 3.5).abs() < 1e-12);
 
-        // Five local bodies, the held one exactly still, and the torques
-        // balancing — in the first load case, at its own speed.
-        let shafts = &stage["cases"][0];
-        let speeds = shafts["speeds"].as_array().unwrap();
-        assert_eq!(speeds.len(), 5);
-        assert_eq!(speeds[0].as_f64().unwrap(), 0.0, "the ground is still");
-        assert_eq!(speeds[3].as_f64().unwrap(), 0.0, "the ring is held");
-        assert!((speeds[1].as_f64().unwrap() - 3000.0).abs() < 1e-9);
-        let sum: f64 = shafts["torques"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|t| t.as_f64().unwrap())
-            .sum();
+        // Five bodies, ground and the held ring still, the sun at the case's
+        // own speed, and every external torque — ground's reaction among
+        // them — balancing, in the first load case.
+        let bodies = v["cases"][0]["bodies"].as_array().unwrap();
+        assert_eq!(bodies.len(), 5);
+        let body = |at: u64| bodies.iter().find(|b| b["at"] == at).unwrap();
+        assert!(body(0)["speed"].is_null(), "the ground is still");
+        assert!(body(3)["speed"].is_null(), "the ring is held");
+        assert!((body(1)["speed"].as_f64().unwrap() - 3000.0).abs() < 1e-9);
+        let sum: f64 = bodies.iter().map(|b| b["torque"].as_f64().unwrap()).sum();
         assert!(sum.abs() < 1e-9, "torques must balance, got {sum}");
 
         // The planet's shift is *solved*, not sent: 24 + 2x18 = 60 is the ideal
@@ -2578,13 +2572,12 @@ mod tests {
         }
         // The crank offset was sized by one of the meshes' tips.
         assert!(stage["distances"][0]["sized_by"].is_number());
-        // The bodies are in equilibrium, and the drive says so in the
-        // vocabulary a stage says anything in.
-        let sum: f64 = v["parts"][0]["cases"][0]["torques"]
+        // The bodies are in equilibrium, ground's reaction among them.
+        let sum: f64 = v["cases"][0]["bodies"]
             .as_array()
             .unwrap()
             .iter()
-            .map(|t| t.as_f64().unwrap())
+            .map(|b| b["torque"].as_f64().unwrap())
             .sum();
         assert!(sum.abs() < 1e-9, "torques must balance, got {sum}");
         assert!(
