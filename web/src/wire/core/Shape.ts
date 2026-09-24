@@ -6,15 +6,14 @@ import type { Member } from "./Member";
 import type { MeshInput } from "./MeshInput";
 
 /**
- * The stage.
+ * **The graph**: a train's, a part's, or a preset's before it is laid in.
  */
 export type Shape = { axes: Array<Axis>, 
 /**
- * **The bodies on this stage's axes**, in the stage's order — what a
- * stage has of the train's bodies: a body that runs on into another
- * stage is listed there too, on that stage's axis. Nothing here is a
- * stage's own; the train numbers bodies once, and a stage's members
- * and carriers name them.
+ * **The bodies on the shape's axes**, each once, in the shape's order —
+ * which is the order its slots count in. The train numbers bodies once,
+ * and the members and carriers name them; a part lists the bodies it
+ * has, and a body two parts share is listed in each.
  */
 bodies: Array<BodyOn>, members: Array<Member>, meshes: Array<MeshInput>, distances: Array<Distance>, 
 /**
@@ -23,7 +22,7 @@ bodies: Array<BodyOn>, members: Array<Member>, meshes: Array<MeshInput>, distanc
  * centre line, an Oldham coupling, a Schmidt coupling. No geometry and
  * no play: a row in the motion, `ω_a = ω_b`, and a lossless way through
  * the flow. What lets an orbiting body drive a shaft that does not
- * orbit, and never what a stage has to have: one is added and taken
+ * orbit, and never what a shape has to have: one is added and taken
  * away like a step ([`super::Edit::Couple`], and a removal).
  */
 couplings: Array<[number, number]>, };

@@ -44,7 +44,7 @@ total: Exact | null,
 free: Array<number>, 
 /**
  * Bodies whose condition said nothing the structure had not already
- * said. Not a fault — a ring held and also fixed by its stage is a
+ * said. Not a fault — a ring held and also fixed by its set is a
  * designer being explicit — but worth a reader's knowing.
  */
 redundant: Array<number>, };

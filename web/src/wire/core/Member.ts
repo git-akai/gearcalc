@@ -8,7 +8,7 @@ import type { MemberGear } from "./MemberGear";
  */
 export type Member = { 
 /**
- * The train's body it spins with, one of this stage's [`BodyOn`]s.
+ * The train's body it spins with, one of the shape's [`BodyOn`]s.
  */
 body: number, gear: MemberGear, 
 /**

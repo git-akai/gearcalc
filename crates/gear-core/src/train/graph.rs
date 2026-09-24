@@ -482,7 +482,7 @@ mod tests {
 
     use super::super::arrangements::{epicyclic, external, Central, Preset};
     use super::super::wiring::teeth_of;
-    use super::super::{shape::solve_shape, test_library, Reversal, Train};
+    use super::super::{shape, test_library, Reversal, Train};
     use super::*;
     use crate::kinematics::{Condition, System};
     use crate::ratio::Ratio;
@@ -694,7 +694,9 @@ mod tests {
                     part.distances, pieces.distances,
                     "{name}: stage {k}'s distances"
                 );
-                let solve = |s: &Shape| solve_shape(s, &[], &lib, Reversal::default()).unwrap();
+                let solve = |s: &Shape| {
+                    shape::rate(&shape::cut(s, &lib).unwrap(), &[], Reversal::default()).unwrap()
+                };
                 let (mine, theirs) = (solve(&part.shape), solve(&stages[k]));
                 assert_eq!(
                     format!(

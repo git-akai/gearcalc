@@ -1,5 +1,5 @@
 //! **Where the power goes, mesh by mesh, with loss** — one model for every
-//! shape a stage can take.
+//! shape a train can take.
 //!
 //! The ideal answer is the rowspace of the kinematic matrix
 //! ([`crate::kinematics::System::torques`]): every mesh transmits its torque
@@ -38,7 +38,7 @@
 //! # No gear here
 //!
 //! This module takes bodies, signed counts, speeds and efficiencies, and
-//! returns torques. The stage that calls it knows which member is a ring and
+//! returns torques. The train that calls it knows which member is a ring and
 //! how many planets there are; this knows only that a count is negative and a
 //! mesh is one of `paths` alike.
 
@@ -141,7 +141,7 @@ pub struct Flow {
     /// that each mesh's loss is `(1 − η)` of it exactly. One on a
     /// pair's mesh, where all of it crosses; under one on a set's, where the
     /// carrier carries part of it bodily; and many times one where power
-    /// circulates — a hula stage at hundreds to one, whose two meshes each
+    /// circulates — a hula at hundreds to one, whose two meshes each
     /// pass a large multiple of the input to cancel to the output, which is
     /// where its efficiency goes.
     pub mesh_powers: Vec<f64>,
@@ -151,8 +151,8 @@ impl Flow {
     /// **What mesh `k` puts on its three bodies** — `a`'s, `b`'s and the
     /// frame's — the driver's whole, the driven member's under `η`, and the
     /// frame's the negative sum: the moment balance of the three bodies. Summed
-    /// over a stage's meshes, a body's is the torque that stage delivers on
-    /// it — the external load at a port, what it passes on at a coupling.
+    /// over a part's meshes, a body's is the torque that part delivers on
+    /// it — the external load at a port, what it passes on to the next.
     #[must_use]
     pub fn on_shafts(&self, k: usize, mesh: &MeshFlow) -> [f64; 3] {
         let t = if mesh.za == 0.0 {
@@ -192,7 +192,7 @@ pub enum Refused {
 /// `None` where no known torque does any work, where no assignment of
 /// directions is self-consistent, or
 /// where the known torques do not determine the mesh torques, which is a
-/// stage with more free bodies than a rating can be taken under. A stage
+/// train with more free bodies than a rating can be taken under. A mesh
 /// that locks in this direction is **not** `None`: its locked mesh holds,
 /// the flow through it stops there, and the efficiency is nought.
 ///

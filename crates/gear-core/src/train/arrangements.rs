@@ -57,8 +57,8 @@ impl Builder {
         self.shape.push_axis(carrier, count)
     }
 
-    /// A body on an axis — the train's number for it, which on a stage
-    /// built alone is its slot in the stage's own numbering.
+    /// A body on an axis — the train's number for it, which on a preset
+    /// built alone is its slot in the preset's own numbering.
     pub fn body(&mut self, axis: usize) -> usize {
         let next = self.shape.max_body() + 1;
         self.shape.push_body(axis, next)
@@ -159,17 +159,17 @@ pub fn layshaft(input: (u32, u32), pairs: &[(u32, u32)], engaged: usize) -> Shap
     b.build()
 }
 
-/// **A member on the central axis of an epicyclic stage**, or the carrier —
+/// **A member on the central axis of an epicyclic set**, or the carrier —
 /// what sits on the axis the planets go round, in the order it is listed.
 ///
-/// The order is the body order, and the body order is what a stage's
+/// The order is the body order, and the body order is what a preset's
 /// conventions read (`Shape::ports`): the first ring listed is held, the
 /// first body not held is the input and the next the output. So a list
 /// is an arrangement *and* the way it is conventionally used, and every
 /// textbook arrangement below is one list with nothing else stated.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Central {
-    /// The carrier, on its own body. One per stage.
+    /// The carrier, on its own body. One per set.
     Carrier,
     /// An external gear meshing the planet gear `on` (an index into the
     /// planet gears as [`epicyclic`] flattens them, axis by axis).
@@ -182,13 +182,13 @@ pub enum Central {
     Coupled { to: usize },
 }
 
-/// **The one epicyclic stage**: a carrier, `planets` carried axes each
+/// **The one epicyclic builder**: a carrier, `planets` carried axes each
 /// replicated `count` times and each carrying the gears it lists (a step
 /// each, on one body — a negative count a ring, the crate's own sign for
 /// one), the central members and the carrier in [`Central`]'s order, and
 /// `planet_meshes` between planet gears on different axes. A simple set, a
 /// Wolfrom, a stepped planet, a planocentric, meshed planets and a
-/// Ravigneaux are lists; so is a hula stage, at one planet with two steps
+/// Ravigneaux are lists; so is a hula, at one planet with two steps
 /// and a ring on each.
 ///
 /// Bodies: the centrals in list order (the carrier among them), then one
@@ -218,7 +218,7 @@ pub fn epicyclic(
         .iter()
         .position(|c| *c == Central::Carrier)
         .map(|i| shafts[i])
-        .expect("an epicyclic stage has a carrier");
+        .expect("an epicyclic set has a carrier");
     let axes: Vec<usize> = planets
         .iter()
         .map(|_| b.carried_axis(carrier, count))
@@ -309,7 +309,7 @@ pub fn line(teeth: &[u32]) -> Shape {
     b.build()
 }
 
-/// **Stating one reading of a stage's size** — the three a pair has, as a
+/// **Stating one reading of a shape's size** — the three a pair has, as a
 /// builder over any shape: its first member's helix, its first member's
 /// pitch diameter, or neither and let a given distance or a given overlap
 /// decide. At most one stands; relief keeps it so, and each of these puts
@@ -383,8 +383,8 @@ impl Shape {
         self.axes.len() - 1
     }
 
-    /// **A new body on an axis**, numbered after every body the stage
-    /// names — which on a stage built alone is its slot, and in a train is
+    /// **A new body on an axis**, numbered after every body the shape
+    /// names — which on a preset built alone is its slot, and in a train is
     /// whatever the train hands down (`next`, the first number free).
     pub(crate) fn push_body(&mut self, axis: usize, next: usize) -> usize {
         let body = next.max(self.max_body() + 1);
@@ -425,7 +425,7 @@ impl Shape {
     /// Two members in mesh, the ring second as the mesh's kind is read,
     /// running as the shape's meshes already run — the first mesh's
     /// friction, sharing and search, or the crate's where there is none — so
-    /// a mesh an edit adds to a searched stage is searched with it.
+    /// a mesh an edit adds beside searched meshes is searched with them.
     pub(crate) fn push_mesh(&mut self, a: usize, b: usize) {
         let (a, b) = if self.members[a].ring.is_some() {
             (b, a)
@@ -472,7 +472,7 @@ pub(crate) fn external(teeth: u32) -> i32 {
     i32::try_from(teeth).unwrap_or(i32::MAX)
 }
 
-/// **A hula stage**: a stepped Wolfrom at one planet, on a crank — the
+/// **A hula**: a stepped Wolfrom at one planet, on a crank — the
 /// grounded gear, the two that ride the wobble body, the output, in that
 /// order, each mesh internal with the larger of its pair the ring — at the
 /// proportions the family runs at: teeth cut to 0.7 of a module over a 1.0
@@ -594,9 +594,9 @@ pub fn stepped(sun: u32, planets: [u32; 2], rings: [u32; 2], count: u32) -> Shap
 /// cycloidal disc drives. The ratio is `−z_p / (z_r − z_p)`.
 ///
 /// Carrier, ring, the coupled shaft — the output — then the planet's own
-/// body. The coupling is the stage's to lose: a step on the planet and a
+/// body. The coupling is the graph's to lose: a step on the planet and a
 /// ring on it, the coupling taken away, and the second ring is the output
-/// of a hula stage.
+/// of a hula.
 #[must_use]
 pub fn planocentric(planet: u32, ring: u32) -> Shape {
     epicyclic(
@@ -760,7 +760,7 @@ pub fn planetary(sun: u32, planet: u32, ring: u32, count: u32) -> Shape {
     shape
 }
 
-/// **A worm feeding a spur pair in one stage**: the worm on its own axis at
+/// **A worm feeding a spur pair in one shape**: the worm on its own axis at
 /// a right angle to a wheel body that also carries a pinion, and the gear
 /// the pinion drives on a third axis parallel to it. Two distances, one at
 /// an angle; a point contact and a line contact in one shape, which is what

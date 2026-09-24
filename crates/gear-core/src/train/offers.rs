@@ -31,7 +31,7 @@ use crate::note::Note;
     ts(export, export_to = "core/")
 )]
 pub enum Target {
-    /// Nothing selected: the stages a train takes at its output.
+    /// Nothing selected: the presets a train takes at its output.
     Train,
     Member(usize),
     Mesh(usize),
@@ -60,7 +60,7 @@ pub struct Offer {
 
 impl Train {
     /// **Every edit the graph offers at `at`**, in the order a menu lists
-    /// them — what it adds, then the stages it takes, then what it moves,
+    /// them — what it adds, then the presets it takes, then what it moves,
     /// joins and holds, then what it takes away — each tried on a copy
     /// ([the module](self)).
     #[must_use]

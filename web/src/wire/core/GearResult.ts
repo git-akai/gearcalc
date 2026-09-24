@@ -6,11 +6,11 @@ import type { Note } from "./Note";
 import type { Ranges } from "./Ranges";
 
 /**
- * What a stage does to one of its gears.
+ * What the solve does to one gear.
  */
 export type GearResult = { 
 /**
- * **The tooth as built** — the parameters the stage cut this member
+ * **The tooth as built** — the parameters the solve cut this member
  * with, every automatic value resolved and every convention applied: the
  * shift in force, the addendum the tip allows, the helix with the hand
  * this member has, a planet's `2 − k`. What the gear tab receives when it
@@ -84,7 +84,7 @@ clamps: Array<Note>,
  * a root loaded on both flanks and a notch outside the `Y_S` fit's band are
  * statements about how the number was arrived at, not about the part.
  *
- * **Per gear rather than per stage**, and that is not filing. A stage note
+ * **Per gear rather than per part**, and that is not filing. A part's note
  * naming a member has to carry the member's name in its own text, and two
  * members raising the same note give one list two entries with one key —
  * which a keyed list in the front end cannot render (`docs/corrections.md`).

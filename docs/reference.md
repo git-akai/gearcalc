@@ -2690,11 +2690,11 @@ axis. The coupling is the graph's to lose: an orbiting body is coupled to
 a new shaft on its carrier's axis and uncoupled again, and a planocentric
 with a step on its planet, a ring on the step and its coupling taken away
 is a hula stage — each reached from the other by the graph's edits. Both
-are
-readings of **one list**: the motion report's `bodies` is every body of the
-train, ground first, each with its ends (the stages it is listed on and
-what it is there), whether a case may address it (`port`), whether the
-train holds it (`held`), and what it turns at. A picker offers the ports
+are readings of **one list**: the motion report's `bodies` is every body of
+the train, ground first, each with whether a case may address it (`port`),
+whether the train holds it (`held`), and what it turns at — and not which
+parts it lies between, which is the solve's to derive and nothing a
+designer reads. A picker offers the ports
 that are not held; a case has a row per port; a planet is in the list with
 `port` false, since it has a speed and nothing can be attached to it. (It
 was three lists — the speeds, the port bodies, the open ports — keyed by

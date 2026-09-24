@@ -16,7 +16,6 @@ export type { AxisReport } from "./core/AxisReport";
 export type { Backlash } from "./core/Backlash";
 export type { Basis } from "./core/Basis";
 export type { BetweenPins } from "./core/BetweenPins";
-export type { BodyEnd } from "./core/BodyEnd";
 export type { BodyOn } from "./core/BodyOn";
 export type { BodyReport } from "./core/BodyReport";
 export type { BodyRole } from "./core/BodyRole";

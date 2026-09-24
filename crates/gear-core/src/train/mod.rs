@@ -1,16 +1,20 @@
-//! Geartrains: a stage at a time, and the accumulation along the shaft line.
+//! Geartrains: one graph, its load cases, and what they come to.
 //!
-//! **One stage shape.** A stage is a [`shape::Shape`] — axes, the bodies on
-//! them, members, meshes and distances. What stays here is the vocabulary
-//! every stage shares ([`Backlash`], [`TrainError`], the duty cycle,
-//! [`GearResult`], [`MeshReport`]), relief over a stage's inputs, and the
-//! train that strings stages together.
+//! **The train is one graph.** A [`Train`] is a [`shape::Shape`] — axes, the
+//! bodies on them, members, meshes, distances and couplings — with what it
+//! holds and the cases it is loaded by. The graph falls into parts
+//! ([`Train::parts`]), which close, search and rate apart and are never the
+//! designer's to state; one motion and one flow run across all of them
+//! ([`solve_train`]), and a train's figures are a path's ([`PathReport`]).
+//! What stays here is the vocabulary every part shares ([`Backlash`],
+//! [`TrainError`], the duty cycle, [`GearResult`], [`MeshReport`]), relief
+//! over the graph's inputs, and the solve.
 //!
 //! **A kind is a preset, not a model.** A spur pair, a crossed pair, a worm
 //! and a planetary set are lists of what sits where
 //! ([`arrangements::pair`], [`arrangements::crossed`], [`arrangements::worm`],
-//! [`arrangements::planetary`]), and the solve reads what a stage *is* off
-//! the shape. A line contact and a point contact are one
+//! [`arrangements::planetary`]), laid into the graph like anything else, and
+//! the solve reads what a piece *is* off the shape. A line contact and a point contact are one
 //! [`MeshReport`]: the physics is one model with the shaft angle as a
 //! parameter — one Hertz answer, one friction balance, one backlash
 //! projection, one interference relation, each holding at the limit — so the
@@ -57,7 +61,7 @@ pub mod shape;
 mod wiring;
 
 pub use conditions::{
-    BodyEnd, BodyReport, Exact, MotionError, MotionReport, PortBody, Ports, Term, TrainMotion,
+    BodyReport, Exact, MotionError, MotionReport, PortBody, Ports, Term, TrainMotion,
 };
 
 use crate::kinematics::{Body, Condition, GROUND};
@@ -169,7 +173,7 @@ impl Backlash {
     }
 }
 
-/// **What one mesh reports**, whatever stage it is in and whichever way its
+/// **What one mesh reports**, whatever part it is in and whichever way its
 /// bodies run.
 ///
 /// One type, because the physics is one model with the shaft angle as a
@@ -204,7 +208,7 @@ pub struct MeshReport {
     /// teeth together.
     ///
     /// A property of a *mesh*, which is why it is here: a pair reports one
-    /// (its one mesh being the stage), and a set with two meshes has two
+    /// (its one mesh being the pair), and a set with two meshes has two
     /// answers. An epicyclic set's separate question — each central member
     /// against the *planet count* — is a different check with a different
     /// reason, and it stays where it is.
@@ -296,7 +300,7 @@ pub struct MeshReport {
     /// stay continuous, a helical pair without full axial overlap, a sharing
     /// model that is extrapolating, a screw pair that locks or nearly does,
     /// or one that loses more than it keeps. A set has two meshes and says
-    /// which, which a note on the stage could not.
+    /// which, which a note on the set could not.
     pub notes: Vec<Note>,
     /// What a line contact has and a point does not.
     pub line: Option<LineContact>,
@@ -629,7 +633,7 @@ impl MeshReport {
     /// The one gap, read by **drive direction** rather than by member.
     ///
     /// `backlash` is per member — "the one gap seen from each of its ends" — and
-    /// a *stage* reports it per direction, because the output of a forward drive
+    /// a *path* reads it per direction, because the output of a forward drive
     /// is the second member and of a backward drive the first. Two indexings of
     /// two numbers, and this is the conversion, in one place: it was written out
     /// in the spur stage as a `match` inside a `Directional::of`, which is the
@@ -647,14 +651,14 @@ impl MeshReport {
 /// clamp.
 ///
 /// Severing truncates the profile, so `Tooth` records it as a clamp and every
-/// stage's member list has carried it. Undercut short of severing alters
+/// member's result has carried it. Undercut short of severing alters
 /// nothing — the tooth is exactly the one the inputs describe — which is why it
 /// is not a clamp, and why nothing was reporting it: a gear tab has shown it
 /// since undercut existed, and the same gear inside a geartrain said nothing at
 /// all. So it goes where a remark about a member goes, beside the notch band
 /// and the reversed root.
 ///
-/// It matters most exactly where a stage cannot prevent it. `no undercut` bounds
+/// It matters most exactly where the solve cannot prevent it. `no undercut` bounds
 /// a shift somebody chooses; a shift that a *relation* leaves over answers to no
 /// bound at all — a hula pinion whose ring was pinned, an epicyclic absorber —
 /// so the control can be on, the tooth undercut, and the two never meet.
@@ -729,7 +733,7 @@ pub(crate) struct Bending {
     /// the figure is shown. The model is still the one the designer asked for;
     /// what they are owed is knowing it is extrapolating.
     ///
-    /// A *mesh's* finding, so a stage raises it once per mesh rather than once
+    /// A *mesh's* finding, so a part raises it once per mesh rather than once
     /// per member; a member's own findings — its notch band, its rim — go in
     /// its own list.
     pub note: Option<Note>,
@@ -812,7 +816,7 @@ pub(crate) fn rim_below_minimum(rim: Option<crate::strength::RimSupport>) -> Opt
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Loading {
     /// Root bending stress this mesh produces on the member, MPa at
-    /// [`Self::measured_at`], under the torque the stage solved at. `None`
+    /// [`Self::measured_at`], under the torque the part is rated at. `None`
     /// where the section has no rating — a ring with no fillet is the ordinary
     /// way to get here.
     pub bending: Option<f64>,
@@ -825,7 +829,7 @@ pub(crate) struct Loading {
     ///
     /// Equal to [`Self::measured_at`] in two quite different cases, and it is
     /// worth knowing which: during the probe pass, when no width has been
-    /// settled and none is needed ([`MemberRating::asks`]); and for a stage
+    /// settled and none is needed ([`MemberRating::asks`]); and for a rating
     /// that evaluated its stresses at the width it ended with, where there is
     /// nothing to scale and the figures are the ones its own arithmetic
     /// produced, bit for bit.
@@ -847,7 +851,7 @@ impl Loading {
     /// Bending is inversely linear in width and contact goes as the inverse
     /// square root of it, so a change of width is a scale rather than a second
     /// solve — and where the two widths are equal this is the identity, which
-    /// is what lets a stage that evaluated at its final width keep its own
+    /// is what lets a rating that evaluated at its final width keep its own
     /// digits to the bit.
     fn at_width(self) -> (Option<f64>, f64) {
         let by = self.measured_at / self.carried_at;
@@ -857,11 +861,11 @@ impl Loading {
     /// **The same loading under `k` times the torque.**
     ///
     /// Bending is linear in torque and contact goes as its square root
-    /// (docs/reference.md#load-cases), so where a stage's power split does not
+    /// (docs/reference.md#load-cases), so where a part's power split does not
     /// depend on the *magnitude* of what passes through it — which the shape's
     /// flow guarantees, being linear in the torque through it, and is a fact
     /// about the flow rather than about gearing — a second load case is this
-    /// rather than a second solve. A stage whose flow
+    /// rather than a second solve. A flow that
     /// does not have that property builds each case's loadings itself, which is
     /// why they are held per case rather than as one list and a factor.
     pub(crate) fn under(self, k: f64) -> Self {
@@ -885,7 +889,7 @@ pub(crate) struct CaseLoadings {
 
 /// **What one member's ratings come to**, over every mesh it is in.
 ///
-/// The stage asks the same questions of every member it builds — two
+/// The rating asks the same questions of every member it builds — two
 /// stresses in every load case, and the width each of those would need — and
 /// each of the stage types that preceded it had been writing the arithmetic
 /// out for itself. What genuinely differs between members is what the meshes
@@ -911,7 +915,7 @@ pub(crate) struct MemberRating<'a> {
     /// the special case.
     ///
     /// Per case rather than one list and a factor, because "the next case is
-    /// this one times a number" is a claim about a *stage's power flow* rather
+    /// this one times a number" is a claim about a *power flow* rather
     /// than about gearing. It holds for the shape's flow and
     /// [`Loading::for_cases`] is how it says so; a flow that did not scale with
     /// what passes through it would build each case for itself, and would need
@@ -929,7 +933,7 @@ pub(crate) struct Rated {
 }
 
 impl Rated {
-    /// The case's readout, once the stage has said what else it knows of the
+    /// The case's readout, once the part has said what else it knows of the
     /// member in it: its torque at its own radius, its speed in the fixed
     /// frame and against its carrier, and how often its teeth are engaged
     /// over the case's duty — which for a held ring is not nought while its
@@ -1023,7 +1027,7 @@ impl MemberRating<'_> {
     /// Takes no width, because the answer does not depend on one: a minimum
     /// width is a stress inverted, and the stress it inverts scales with the
     /// width it was measured at by exactly the amount that cancels
-    /// (docs/reference.md#contact-stress). So a stage can size a member from a
+    /// (docs/reference.md#contact-stress). So a rating can size a member from a
     /// probe pass, before it has a width to size it at.
     pub(crate) fn asks(&self) -> Vec<(CaseKind, Widths)> {
         self.rated()
@@ -1084,16 +1088,18 @@ fn coefficient<'de, D: serde::Deserializer<'de>>(d: D) -> Result<f64, D::Error> 
 
 // -------------------------------------------------- the shared member ---
 //
-// `MemberGear` is what every member of a stage is described with, so it lives
+// `MemberGear` is what every member of the train is described with, so it lives
 // here with the rest of the shared vocabulary rather than in the preset that
 // happened to need it first. It was declared in `spur.rs` and re-exported from
 // this module, which read as though the parallel-axis stage owned it — and this
 // module's own comment says it holds "what every stage shares".
 
-/// One gear of a stage.
+/// **One gear of the train**: what is its own to state.
 ///
-/// Note what is *absent*: module, pressure angle and helix angle live on the
-/// stage, because they are shared.
+/// Note what is *absent*: its module, pressure angle and tooth thickness
+/// coefficient are its [`shape::Member`]'s, which the gears a run of meshes
+/// joins share ([`Shape::share`]), and which body it is fixed to is the
+/// member's too.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
@@ -1104,22 +1110,22 @@ fn coefficient<'de, D: serde::Deserializer<'de>>(d: D) -> Result<f64, D::Error> 
 )]
 pub struct MemberGear {
     pub teeth: u32,
-    /// The shift, and who decides it: **automatic means the stage does**, not
+    /// The shift, and who decides it: **automatic means the solve does**, not
     /// that undercut does. What it resolves to when nothing else constrains it
     /// is [`MemberGear::no_undercut`]'s business.
     pub profile_shift: Auto<f64>,
     /// **The shift may not go below the least that clears undercut.**
     ///
     /// A constraint rather than a source, which is what lets it combine with
-    /// everything else: it bounds a shift a designer typed, a shift the stage
-    /// solved from a centre distance or a crank offset, and a shift the
+    /// everything else: it bounds a shift a designer typed, a shift the solve
+    /// reached from a centre distance or a crank offset, and a shift the
     /// efficiency search chose, all in the same words.
     ///
     /// The bound is the **true** minimum from [`minimum_profile_shift`], which
     /// on a comfortable tooth count is negative — so a deliberate negative
     /// shift is left alone and only a genuinely undercut one is raised. That is
     /// deliberate: negative shift is a decision about centre distance or
-    /// balance, and this is a question about undercut. Where the *stage* is
+    /// balance, and this is a question about undercut. Where the *solve* is
     /// choosing and nothing else decides, the answer is instead
     /// [`automatic_profile_shift`] — the same bound taken no lower than zero,
     /// because a shift chosen for no reason should not thin a tooth that needed
@@ -1166,12 +1172,12 @@ pub struct MemberGear {
     pub root_radius: f64,
     /// Helix angle, degrees, signed by hand — and who decides it.
     ///
-    /// **Automatic means the stage does**, through whatever relates this
+    /// **Automatic means the solve does**, through whatever relates this
     /// member's helix to the rest of it: a pair's two are bound by
     /// `β₁ + β₂ = Σ` and the first member's by its pitch diameter, a set's
-    /// three by the hands its two meshes require, a hula stage's four by its
-    /// two internal meshes. So at most one member of a stage states a helix
-    /// and the others follow — or none does, and the stage's own relation
+    /// three by the hands its two meshes require, a hula's four by its
+    /// two internal meshes. So at most one member of a part states a helix
+    /// and the others follow — or none does, and the part's own relation
     /// decides: a given centre distance with both shifts pinned sizes a pair's
     /// first member, and a given axial contact ratio with every face width
     /// given sizes the helix any kind needs to reach it
@@ -1179,7 +1185,7 @@ pub struct MemberGear {
     /// the first member's stands at its box.
     pub helix_angle: Auto<f64>,
     /// Automatic takes the larger of the enabled minimums below, and the
-    /// width a given axial contact ratio needs where the stage has one.
+    /// width a given axial contact ratio needs where its mesh has one.
     pub face_width: Auto<f64>,
     /// Which of the four ratings an automatic face width is sized from.
     pub face_sources: FaceSources,
@@ -1214,7 +1220,7 @@ impl MemberGear {
     /// Every source switched off leaves nothing to invert, so the width stands
     /// at the number in its box ([`FaceSources::width_for`]) — said rather than
     /// divided by, which is what a zero width was. Every kind used to raise it
-    /// on the stage, naming the gear; it is the gear's, drawn under its own
+    /// on the part, naming the gear; it is the gear's, drawn under its own
     /// face-width field.
     pub(crate) fn face_width_note(&self) -> Option<Note> {
         (self.face_width.auto && !self.face_sources.any())
@@ -1259,7 +1265,7 @@ impl MemberGear {
         let depth = self.working_depth.resolve(self.dedendum);
         if !self.no_undercut {
             // Nothing asked of the shift. Given, it is taken as typed; left to
-            // the stage with no objective either, there is no reason to move
+            // the solve with no objective either, there is no reason to move
             // the tooth at all.
             let given = (!self.profile_shift.auto).then_some(self.profile_shift.manual);
             return ShiftAsked {
@@ -1361,7 +1367,7 @@ pub struct GearCase {
     pub min_face_width: Widths,
 }
 
-/// What a stage does to one of its gears.
+/// What the solve does to one gear.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(
@@ -1370,7 +1376,7 @@ pub struct GearCase {
     ts(export, export_to = "core/")
 )]
 pub struct GearResult {
-    /// **The tooth as built** — the parameters the stage cut this member
+    /// **The tooth as built** — the parameters the solve cut this member
     /// with, every automatic value resolved and every convention applied: the
     /// shift in force, the addendum the tip allows, the helix with the hand
     /// this member has, a planet's `2 − k`. What the gear tab receives when it
@@ -1422,7 +1428,7 @@ pub struct GearResult {
     /// a root loaded on both flanks and a notch outside the `Y_S` fit's band are
     /// statements about how the number was arrived at, not about the part.
     ///
-    /// **Per gear rather than per stage**, and that is not filing. A stage note
+    /// **Per gear rather than per part**, and that is not filing. A part's note
     /// naming a member has to carry the member's name in its own text, and two
     /// members raising the same note give one list two entries with one key —
     /// which a keyed list in the front end cannot render (`docs/corrections.md`).
@@ -1440,7 +1446,7 @@ pub struct GearResult {
     pub ranges: Ranges,
 }
 
-/// The facts a stage has about one of its members, gathered so that assembling
+/// The facts the rating has about one member, gathered so that assembling
 /// a [`GearResult`] is one expression rather than one per stage type.
 ///
 /// # Why this exists
@@ -1464,14 +1470,14 @@ pub(crate) struct MemberFacts<'a> {
     pub input: &'a MemberGear,
     /// Every load case's readout, from [`Rated::into_case`].
     ///
-    /// **The torque in each is given by the stage rather than derived here**,
+    /// **The torque in each is given by the flow rather than derived here**,
     /// and that is the finding. Three stage types referred a back-driving load by
     /// scaling this member's *forward* torque, which is exact wherever the
     /// forward torque is a geometric projection or the two directional
     /// efficiencies agree — true of every parallel-axis mesh. A worm stage is
     /// neither: its wheel's forward torque carries a forward efficiency of 62 %
     /// that a backward load does not share, and its backward efficiency is
-    /// zero. So the stage projects each case's torque through its flow in that
+    /// zero. So the flow projects each case's torque through the meshes in that
     /// case's direction, and this holds no formula a caller could need to
     /// disagree with.
     pub cases: Vec<GearCase>,
@@ -1486,7 +1492,7 @@ pub(crate) struct MemberFacts<'a> {
 }
 
 impl GearResult {
-    /// One member's result, from what the stage knows about it.
+    /// One member's result, from what the rating knows about it.
     ///
     /// Every member comes through here, so a field cannot be filled two ways
     /// — see [`MemberFacts`] for the one that was.
@@ -1546,7 +1552,7 @@ impl GearResult {
     }
 }
 
-/// Why a stage could not be solved.
+/// Why a train, or a part of it, could not be solved.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TrainError {
     /// The screw pair cannot exist — see [`crate::screw::ScrewError`].
@@ -1571,7 +1577,7 @@ pub enum TrainError {
     /// fine, and the kinematics is unaffected, which is why a train reports its
     /// ratios through this.
     NoCommonDistance,
-    /// **The stage's members and meshes do not describe a mechanism.**
+    /// **The part's members and meshes do not describe a mechanism.**
     ///
     /// The one refusal here a *design* can reach is a member with no teeth —
     /// `MemberGear::teeth` is a `u32` and nothing stops a designer typing zero.
@@ -1594,7 +1600,7 @@ pub enum TrainError {
     /// ratio can hold, and a ratio is refused rather than wrapped.
     Overflow,
     /// **A load case enters by a body no load can be put on**: ground, a
-    /// held body, a body the train does not have, or one of a stage's
+    /// held body, a body the train does not have, or one of a part's
     /// bodies that is not a port — a planet's. Zero-based, as the cases are
     /// indexed; the front end numbers from 1.
     LoadPort { case: usize },
@@ -1641,7 +1647,7 @@ impl From<MotionError> for TrainError {
     }
 }
 
-/// So the wiring can refuse in the vocabulary the stage refuses in.
+/// So the wiring can refuse in the vocabulary the solve refuses in.
 impl From<WiringError> for TrainError {
     fn from(e: WiringError) -> Self {
         Self::Wiring(e)
@@ -1655,7 +1661,7 @@ fn located(key: &'static str, at: usize) -> Note {
 }
 
 impl crate::note::Explain for TrainError {
-    /// Why the stage could not be solved, as a key and its values.
+    /// Why the train could not be solved, as a key and its values.
     ///
     /// The nested cases delegate rather than restating: a mesh that will not
     /// mesh says so once, wherever it is asked.
@@ -1751,10 +1757,10 @@ impl std::fmt::Display for TrainError {
                     k + 1
                 ),
                 WiringError::NotAMesh(k) => {
-                    write!(f, "mesh {} is not a mesh this stage has", k + 1)
+                    write!(f, "mesh {} is not a mesh this shape has", k + 1)
                 }
                 WiringError::NotACoupling(k) => {
-                    write!(f, "coupling {} joins no two bodies this stage has", k + 1)
+                    write!(f, "coupling {} joins no two bodies this shape has", k + 1)
                 }
             },
             Self::UnknownMaterial(n) => write!(f, "no material named {n:?} in the library"),
@@ -7274,7 +7280,7 @@ mod tests {
 
     /// **The train's bodies are numbered across it, each with its ends**:
     /// three pairs in a chain are four bodies, the two inner ones with an
-    /// end on each of two stages, and only the outer two are ends of the
+    /// end on each of two parts, and only the outer two are ends of the
     /// train; a set's held ring is a body no case can name.
     #[test]
     fn the_bodies_are_numbered_across_the_train_each_with_its_ends() {
@@ -7286,7 +7292,7 @@ mod tests {
         let bodies = t.bodies();
         let ends: Vec<(usize, Vec<usize>)> = bodies
             .iter()
-            .map(|b| (b.body, b.ends.iter().map(|(k, _)| *k).collect()))
+            .map(|b| (b.body, t.ends_of(b.body).iter().map(|(k, _)| *k).collect()))
             .collect();
         assert_eq!(
             ends,
@@ -7385,8 +7391,8 @@ mod tests {
     }
 
     /// **The open ports are what a load can enter by**: every body the
-    /// train does not hold, once, under the earliest stage's name — a body
-    /// two stages share is a take-off between them — and a released ring,
+    /// train does not hold, once — a body two parts share is a take-off
+    /// between them — and a released ring,
     /// un-held and shared with nothing, is another. A chain has two ends; a
     /// set with its ring released has three open ports and no ends.
     #[test]
@@ -7397,7 +7403,7 @@ mod tests {
         assert_eq!(
             ports
                 .iter()
-                .map(|p| (p.body, p.ends[0].0))
+                .map(|p| (p.body, t.ends_of(p.body)[0].0))
                 .collect::<Vec<_>>(),
             vec![
                 (at(0, 1), 0),
@@ -7420,7 +7426,11 @@ mod tests {
             ports.iter().map(|p| p.body).collect::<Vec<_>>(),
             vec![1, 2, 3]
         );
-        assert_eq!(ports[2].ends[0].1, BodyLabel::Member { member: 2 });
+        let (k, slot) = t.ends_of(3)[0];
+        assert_eq!(
+            t.parts()[k].shape.wiring().slots[slot],
+            BodyLabel::Member { member: 2 }
+        );
         assert_eq!(
             t.chain_ends(),
             Some((1, 2)),
@@ -9362,7 +9372,7 @@ mod tests {
 
     /// **An epicyclic member is engaged once per turn against the carrier**, per
     /// planet — for every member and both epicyclic presets, which is the whole of
-    /// the rule a member's cycles are counted by ([`shape::solve_shape`]).
+    /// the rule a member's cycles are counted by ([`shape::rate`]).
     ///
     /// Checked against arithmetic the stage shares nothing with: the counts a
     /// member's own speed and the carrier's give, taken from the result's speed

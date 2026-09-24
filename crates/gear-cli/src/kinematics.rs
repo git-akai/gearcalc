@@ -423,9 +423,9 @@ fn graph(train: &Train) {
             "    {:<6} {:<9} of {:<7} speed {}{terms}",
             port(s.body),
             named(train, s.body),
-            s.ends.first().map_or_else(
+            train.ends_of(s.body).first().map_or_else(
                 || "the train".to_string(),
-                |e| format!("part {}", e.part + 1)
+                |&(k, _)| format!("part {}", k + 1)
             ),
             s.speed.text,
         );

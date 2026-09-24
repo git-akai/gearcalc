@@ -1,25 +1,25 @@
-//! **The stage every preset is a tick pattern of** — axes, bodies on them,
-//! members on the bodies, meshes between members, and one distance per pair
-//! of axes that mesh.
+//! **The graph a train is, and every preset a tick pattern of** — axes,
+//! bodies on them, members on the bodies, meshes between members, and one
+//! distance per pair of axes that mesh.
 //!
 //! A spur pair is two axes fixed in ground with one mesh between them. A
 //! planetary set is a central axis and a planet axis carried by a body on
 //! the central one, replicated `N` times, with two meshes on the one
-//! distance between the axes. A hula stage is the same with `N = 1`, both
-//! meshes internal and a compound planet. A layshaft transmission is two
-//! ground axes with several meshes on one distance. None of these is a type
-//! here: the shape says which frames there are, and everything else — the
-//! wiring the kinematics reads, the closure the shifts obey, where the power
-//! goes — is derived from it once (`geartrain-refactor-plan.md`, *One stage
-//! shape*).
+//! distance between the axes. A hula is the same with `N = 1`, both meshes
+//! internal and a compound planet. A layshaft transmission is two ground
+//! axes with several meshes on one distance. None of these is a type here:
+//! the shape says which frames there are, and everything else — the wiring
+//! the kinematics reads, the closure the shifts obey, where the power goes —
+//! is derived from it once. A train is one of these, and so is each part it
+//! falls into ([`Shape::parts`]), which is what the solve closes, searches
+//! and rates.
 //!
 //! # One distance per pair of axes
 //!
 //! Every mesh between a member on axis `A` and a member on axis `B` runs at
 //! the distance between those axes, in the frame both stand still in. That is
-//! the law `train/planetary.rs` writes for a planet's carrier radius and
-//! `train/hula.rs` writes for its crank offset, and it is not an epicyclic
-//! law: a layshaft's pairs obey it in ground. Automatic, the distance is what
+//! the law a planet's carrier radius obeys and a hula's crank offset, and it
+//! is not an epicyclic law: a layshaft's pairs obey it in ground. Automatic, the distance is what
 //! the shifts leave and every mesh past the first has one automatic shift
 //! that *absorbs* the difference; given, every mesh on it has a shift sum to
 //! reach ([`crate::mesh::shift_sum_for`]).
@@ -123,7 +123,7 @@ fn ground_if_null<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Body, D::Err
     Ok(s.unwrap_or(GROUND))
 }
 
-/// A body of the train on one of this stage's axes. The `i`th listed is
+/// A body of the train on one of the shape's axes. The `i`th listed is
 /// slot `i + 1` of the wiring; ground is slot 0 and is not listed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -135,9 +135,9 @@ fn ground_if_null<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Body, D::Err
 )]
 pub struct BodyOn {
     /// The train's body — one number across the train, ground being 0 —
-    /// that turns on this axis in this stage. Its position in the list is
-    /// the stage's own numbering of it for the kinematics, ground 0 and
-    /// the first listed 1.
+    /// that turns on this axis. Its position in the list is the shape's
+    /// own numbering of it for the kinematics, ground 0 and the first
+    /// listed 1.
     pub body: usize,
     pub axis: usize,
 }
@@ -152,7 +152,7 @@ pub struct BodyOn {
     ts(export, export_to = "core/")
 )]
 pub struct Member {
-    /// The train's body it spins with, one of this stage's [`BodyOn`]s.
+    /// The train's body it spins with, one of the shape's [`BodyOn`]s.
     pub body: usize,
     pub gear: MemberGear,
     /// **Normal module, mm — given on one member of a mesh group, and
@@ -259,8 +259,7 @@ pub struct Distance {
     pub axes: [usize; 2],
     /// The angle between the two axes, degrees: 0 for parallel, 90 for a
     /// worm and its wheel. A mesh on crossed axes is a point contact with a
-    /// model of its own ([`super::crossed`]), and the rest of the stage
-    /// cannot yet share a member with it.
+    /// model of its own ([`super::crossed`]).
     pub angle: f64,
     /// **Size the two members as a worm and its wheel** — the worm's length
     /// and the wheel's face from the conventional proportions — rather than
@@ -288,7 +287,7 @@ pub struct Distance {
     pub axial_clearance: f64,
 }
 
-/// The stage.
+/// **The graph**: a train's, a part's, or a preset's before it is laid in.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
@@ -299,11 +298,10 @@ pub struct Distance {
 )]
 pub struct Shape {
     pub axes: Vec<Axis>,
-    /// **The bodies on this stage's axes**, in the stage's order — what a
-    /// stage has of the train's bodies: a body that runs on into another
-    /// stage is listed there too, on that stage's axis. Nothing here is a
-    /// stage's own; the train numbers bodies once, and a stage's members
-    /// and carriers name them.
+    /// **The bodies on the shape's axes**, each once, in the shape's order —
+    /// which is the order its slots count in. The train numbers bodies once,
+    /// and the members and carriers name them; a part lists the bodies it
+    /// has, and a body two parts share is listed in each.
     pub bodies: Vec<BodyOn>,
     pub members: Vec<Member>,
     pub meshes: Vec<MeshInput>,
@@ -313,7 +311,7 @@ pub struct Shape {
     /// centre line, an Oldham coupling, a Schmidt coupling. No geometry and
     /// no play: a row in the motion, `ω_a = ω_b`, and a lossless way through
     /// the flow. What lets an orbiting body drive a shaft that does not
-    /// orbit, and never what a stage has to have: one is added and taken
+    /// orbit, and never what a shape has to have: one is added and taken
     /// away like a step ([`super::Edit::Couple`], and a removal).
     #[cfg_attr(feature = "serde", serde(default))]
     pub couplings: Vec<[usize; 2]>,
@@ -338,12 +336,11 @@ impl Default for Shape {
 // ------------------------------------------------------------ the shape ---
 
 impl Shape {
-    /// **A body's slot in this stage**, where the stage has it — the
-    /// stage's own numbering of the bodies on its axes, ground 0 and the
-    /// first listed 1, which is what the stage's kinematics and its
-    /// conventions count in.
+    /// **A body's slot in this shape**, where the shape has it — its own
+    /// numbering of the bodies on its axes, ground 0 and the first listed 1,
+    /// which is what its kinematics and its conventions count in.
     ///
-    /// The one lookup: [`Self::slot`] reads ground for a body the stage
+    /// The one lookup: [`Self::slot`] reads ground for a body the shape
     /// does not have, which is what a frame wants; this says which, which
     /// is what a case naming a body wants.
     pub(crate) fn slot_if_any(&self, body: usize) -> Option<Body> {
@@ -353,12 +350,12 @@ impl Shape {
             .map(|i| i + 1)
     }
 
-    /// As [`Self::slot_if_any`], ground for a body the stage does not have.
+    /// As [`Self::slot_if_any`], ground for a body the shape does not have.
     pub(crate) fn slot(&self, body: usize) -> Body {
         self.slot_if_any(body).unwrap_or(GROUND)
     }
 
-    /// The train's body at one of this stage's slots; ground at 0.
+    /// The train's body at one of the shape's slots; ground at 0.
     pub(crate) fn body_at(&self, slot: Body) -> usize {
         if slot == GROUND {
             GROUND
@@ -394,7 +391,7 @@ impl Shape {
         self.slot(self.axes[axis].carried_by)
     }
 
-    /// The largest body number this stage names, ground where it names
+    /// The largest body number the shape names, ground where it names
     /// none — what a fresh body is numbered after.
     #[must_use]
     pub fn max_body(&self) -> usize {
@@ -403,7 +400,7 @@ impl Shape {
 
     /// **Every body renumbered** by `map` — the bodies on the axes, the
     /// members' and the carriers' — as the train renumbers when a body goes
-    /// or a stage's bodies are given train numbers.
+    /// or a preset's bodies are given train numbers.
     pub fn renumber_bodies(&mut self, map: impl Fn(usize) -> usize) {
         for b in &mut self.bodies {
             b.body = map(b.body);
@@ -427,7 +424,7 @@ impl Shape {
     /// turns about — and ground otherwise ([`super::wiring`]).
     ///
     /// **Asked of the member's meshes, not of its axis.** It was the first
-    /// carrier on the member's axis, which inside one stage is the same
+    /// carrier on the member's axis, which inside one preset is the same
     /// answer — every central member of a set meshes its planets — and on
     /// a graph is not: a gear on a sun's shaft meshing a pinion on a fixed
     /// axis turns about the same line as the carrier and meshes in ground.
@@ -724,8 +721,8 @@ impl Shape {
     /// from an axis that is not carried; a worm and its wheel are the two
     /// ends of the first mesh on a distance marked as a worm drive; anything
     /// else is a gear that goes by its number. Numbered where a role is
-    /// shared — a Wolfrom's two rings, a Ravigneaux's two suns, a hula
-    /// stage's two wobble gears — by the order the shape lists them.
+    /// shared — a Wolfrom's two rings, a Ravigneaux's two suns, a hula's
+    /// two wobble gears — by the order the shape lists them.
     #[must_use]
     pub fn member_names(&self) -> Vec<MemberName> {
         let carried = |i: usize| self.is_planet_gear(i);
@@ -1082,7 +1079,7 @@ impl Shape {
     /// **The mesh groups**: the connected components of the mesh graph, in
     /// member order — two gears in mesh share a normal module and a pressure
     /// angle, so everything a run of meshes joins does. One group for a pair
-    /// or a set; two for a hula stage or a stepped planet, whose meshes do
+    /// or a set; two for a hula or a stepped planet, whose meshes do
     /// not join; three for a layshaft's three pairs. A **layer over the
     /// graph**, read off it and never stored: what a panel offers one box
     /// for and writes to every member of.
@@ -1713,7 +1710,7 @@ impl Shape {
         Ok((held, bound_by))
     }
 
-    /// **The shifts the stage settles on**: closed where nothing is searched,
+    /// **The shifts the shape settles on**: closed where nothing is searched,
     /// searched for efficiency over the free ones where that was asked —
     /// and, first, every automatic distance the tips size opened out to
     /// where they clear ([`Self::sized`]).
@@ -2644,7 +2641,7 @@ impl PointBuilt {
     }
 }
 
-/// Quadrature points for the friction balance the stage reports: the
+/// Quadrature points for the friction balance a point contact reports: the
 /// trapezium rule's residual is below 1e-9 here (`train::crossed`).
 const PATH_SAMPLES: usize = 2048;
 
@@ -3049,21 +3046,6 @@ pub struct ShapeResult {
     pub members: Vec<GearResult>,
     pub meshes: Vec<MeshReport>,
     pub notes: Vec<Note>,
-}
-
-/// **A shape solved alone**, under the loads its bodies are handed: cut
-/// ([`cut`]) and rated ([`rate`]).
-///
-/// # Errors
-///
-/// As [`cut`] and [`rate`].
-pub fn solve_shape(
-    shape: &Shape,
-    cases: &[super::CaseLoad],
-    lib: &MaterialLibrary,
-    reversal: super::Reversal,
-) -> Result<ShapeResult, TrainError> {
-    rate(&cut(shape, lib)?, cases, reversal)
 }
 
 /// **A shape cut**: everything about it no load case moves — the shifts its
@@ -3939,10 +3921,10 @@ pub fn rate(
     Ok(result)
 }
 
-// -------------------------------------------------- what a stage owes ---
+// -------------------------------------------------- what a shape owes ---
 
 /// **What the shape declares so the machinery above it can serve it** — the
-/// whole of what a stage owes, and once a trait with one implementor.
+/// whole of what a stage owed, once a trait with one implementor.
 ///
 /// Six questions: which gears it has, which inputs relief may turn and by
 /// what name, how its helix may be stated, which of its inputs argue with

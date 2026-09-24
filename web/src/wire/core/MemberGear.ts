@@ -4,14 +4,16 @@ import type { FaceSources } from "./FaceSources";
 import type { Overrides } from "./Overrides";
 
 /**
- * One gear of a stage.
+ * **One gear of the train**: what is its own to state.
  *
- * Note what is *absent*: module, pressure angle and helix angle live on the
- * stage, because they are shared.
+ * Note what is *absent*: its module, pressure angle and tooth thickness
+ * coefficient are its [`shape::Member`]'s, which the gears a run of meshes
+ * joins share ([`Shape::share`]), and which body it is fixed to is the
+ * member's too.
  */
 export type MemberGear = { teeth: number, 
 /**
- * The shift, and who decides it: **automatic means the stage does**, not
+ * The shift, and who decides it: **automatic means the solve does**, not
  * that undercut does. What it resolves to when nothing else constrains it
  * is [`MemberGear::no_undercut`]'s business.
  */
@@ -20,15 +22,15 @@ profile_shift: Auto<number>,
  * **The shift may not go below the least that clears undercut.**
  *
  * A constraint rather than a source, which is what lets it combine with
- * everything else: it bounds a shift a designer typed, a shift the stage
- * solved from a centre distance or a crank offset, and a shift the
+ * everything else: it bounds a shift a designer typed, a shift the solve
+ * reached from a centre distance or a crank offset, and a shift the
  * efficiency search chose, all in the same words.
  *
  * The bound is the **true** minimum from [`minimum_profile_shift`], which
  * on a comfortable tooth count is negative — so a deliberate negative
  * shift is left alone and only a genuinely undercut one is raised. That is
  * deliberate: negative shift is a decision about centre distance or
- * balance, and this is a question about undercut. Where the *stage* is
+ * balance, and this is a question about undercut. Where the *solve* is
  * choosing and nothing else decides, the answer is instead
  * [`automatic_profile_shift`] — the same bound taken no lower than zero,
  * because a shift chosen for no reason should not thin a tooth that needed
@@ -80,12 +82,12 @@ min_tip_width: number, dedendum: number, root_radius: number,
 /**
  * Helix angle, degrees, signed by hand — and who decides it.
  *
- * **Automatic means the stage does**, through whatever relates this
+ * **Automatic means the solve does**, through whatever relates this
  * member's helix to the rest of it: a pair's two are bound by
  * `β₁ + β₂ = Σ` and the first member's by its pitch diameter, a set's
- * three by the hands its two meshes require, a hula stage's four by its
- * two internal meshes. So at most one member of a stage states a helix
- * and the others follow — or none does, and the stage's own relation
+ * three by the hands its two meshes require, a hula's four by its
+ * two internal meshes. So at most one member of a part states a helix
+ * and the others follow — or none does, and the part's own relation
  * decides: a given centre distance with both shifts pinned sizes a pair's
  * first member, and a given axial contact ratio with every face width
  * given sizes the helix any kind needs to reach it
@@ -95,7 +97,7 @@ min_tip_width: number, dedendum: number, root_radius: number,
 helix_angle: Auto<number>, 
 /**
  * Automatic takes the larger of the enabled minimums below, and the
- * width a given axial contact ratio needs where the stage has one.
+ * width a given axial contact ratio needs where its mesh has one.
  */
 face_width: Auto<number>, 
 /**

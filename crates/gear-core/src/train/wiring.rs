@@ -1,13 +1,13 @@
-//! **Where a stage's slots and meshes sit**, so that one solver serves every
+//! **Where a shape's slots and meshes sit**, so that one solver serves every
 //! kind.
 //!
 //! [`crate::kinematics`] holds the mathematics and knows nothing about gears;
-//! this is the declaration that connects a stage to it. A stage answers, in
+//! this is the declaration that connects a shape to it. A shape answers, in
 //! its own numbering — its **slots**, ground 0 and then the bodies it lists
 //! in order — which slot each of its members spins with and in whose frame
 //! that member's axis stands still, and which members mesh. Nothing else: no
 //! module, no shift, no centre distance, and nothing about which train body
-//! a slot is (the stage's own list of bodies says, and the train hands
+//! a slot is (the shape's own list of bodies says, and the train hands
 //! `add_to` the lookup). **A
 //! ratio needs tooth counts and topology, and this is the topology.**
 //!
@@ -50,7 +50,7 @@
 //!
 //! Two different things, and neither covers the other:
 //!
-//! - **the declaration** — that *this* stage's bodies, frames and mesh kinds
+//! - **the declaration** — that *this* shape's bodies, frames and mesh kinds
 //!   are the ones it actually has — was checked against each retired stage
 //!   type's own kinematics, in `train::tests`, and is checked now against
 //!   Pennestrì's closed form and the reference tables. Six wiring faults
@@ -70,7 +70,7 @@ use crate::mesh::MeshKind;
 ///
 /// It was a `&'static str` — `"sun"`, `"crank"`, `"wobble"` — which is English
 /// in the core (rule 2) and a *role* rather than a fact. A general epicyclic
-/// stage has no sun; it has central members and carriers, and this is the list
+/// set has no sun; it has central members and carriers, and this is the list
 /// that survives that: ground, the body a member spins with, or a carrier —
 /// a frame that is nobody's body. The front end names the second after the
 /// member (`gearNumber`) and the third with its own word, as it already does.
@@ -91,9 +91,9 @@ pub enum BodyLabel {
     /// — a compound planet, a wobble body — it is the first of them.
     Member { member: usize },
     /// A frame that carries meshes and is no member's body: a set's carrier,
-    /// a hula stage's crank. Numbered within the stage.
+    /// a hula's crank. Numbered within the shape.
     Carrier { index: usize },
-    /// **Nothing on it**: a body a stage lists with no member and no axis
+    /// **Nothing on it**: a body a shape lists with no member and no axis
     /// to carry — a gearbox's output while no gear is engaged, which is
     /// what neutral is. It turns as nothing decides, and the motion says
     /// so by being a family one condition short.
@@ -133,7 +133,7 @@ pub struct Mount {
 /// One mesh, by member index.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct MeshSpec {
-    /// Indices into the stage's members, in [`super::ShapeResult::members`]
+    /// Indices into the shape's members, in [`super::ShapeResult::members`]
     /// order. On an internal mesh `b` is the **ring**, which is
     /// [`MeshKind::Internal`]'s own convention and the order every kind here
     /// already builds its meshes in.
@@ -149,14 +149,14 @@ pub struct MeshSpec {
     pub a: usize,
     pub b: usize,
     pub kind: MeshKind,
-    /// How many parallel instances of this mesh the stage has — the planet
+    /// How many parallel instances of this mesh the shape has — the planet
     /// count. It changes no speed and no ratio, every instance being identical;
     /// it is what a member's engagements are counted over
-    /// (a member's cycles, in [`super::shape::solve_shape`]).
+    /// (a member's cycles, in [`super::shape::rate`]).
     pub paths: u32,
 }
 
-/// **What a stage owes the one solver**: its slots, where its members sit, and
+/// **What a shape owes the one solver**: its slots, where its members sit, and
 /// what meshes what.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Wiring {
@@ -188,7 +188,7 @@ pub enum WiringError {
     /// A member or body index a wiring names and does not have, or a gear
     /// meshing itself. A preset's defect rather than a design's.
     NotAMesh(usize),
-    /// A coupling naming a body the stage does not have, or one body twice.
+    /// A coupling naming a body the shape does not have, or one body twice.
     NotACoupling(usize),
 }
 
@@ -246,10 +246,10 @@ impl Wiring {
     /// **The system this wiring and these tooth counts make**, with `teeth` one
     /// entry per member in the same order as [`Self::mounts`].
     ///
-    /// `at` says what this stage's slots are in a larger system, so a train
-    /// can lay several stages over one set of bodies — a stage lists its
+    /// `at` says what this shape's slots are in a larger system, so a train
+    /// can lay each of its parts over one set of bodies — a part lists its
     /// bodies and answers this off that list ([`super::shape::Shape::body_at`]);
-    /// a stage asked about on its own passes the identity.
+    /// a shape asked about on its own passes the identity.
     ///
     /// # Errors
     ///
@@ -292,7 +292,7 @@ impl Wiring {
         Ok(())
     }
 
-    /// The system for this stage on its own, against its own ground.
+    /// The system for this shape on its own, against its own ground.
     ///
     /// # Errors
     ///
@@ -304,7 +304,7 @@ impl Wiring {
     }
 }
 
-/// **Every constrainable member a stage has, as tooth counts** — the companion
+/// **Every constrainable member a shape has, as tooth counts** — the companion
 /// of [`super::member_inputs`], and the argument [`Wiring::alone`] wants.
 pub(crate) fn teeth_of<'a>(members: impl IntoIterator<Item = &'a MemberGear>) -> Vec<u32> {
     members.into_iter().map(|g| g.teeth).collect()

@@ -17,12 +17,12 @@
 
 use crate::auto::automatic_profile_shift;
 
-/// **What a gear's two shift controls come to**, read once so every stage reads
+/// **What a gear's two shift controls come to**, read once so every shape reads
 /// them the same way.
 ///
 /// The two are different kinds of thing and this is where that is written down:
 /// `profile_shift.auto` says *who decides*, `no_undercut` says *what the answer
-/// must satisfy however it is decided*. Every stage here needs all three of the
+/// must satisfy however it is decided*. Every shape needs all three of the
 /// values below — the bound for its search, what it may not overrule, and what
 /// to report when there is nothing to search — and each had been working them
 /// out for itself.
@@ -121,12 +121,12 @@ pub(crate) fn undercut_bound(
 impl ShiftAsked {
     /// **The note a raised shift owes its reader.**
     ///
-    /// `no undercut` bounds a shift a designer typed as well as one the stage
+    /// `no undercut` bounds a shift a designer typed as well as one the search
     /// chose, which is what lets it mean one thing everywhere — but a number
     /// that was not taken as given has to say so, or the field and the gear
     /// disagree in silence. It is the gear's own note, drawn under its own
     /// field, so it names no gear: it used to carry a tooth count for a list
-    /// at the foot of the stage it no longer sits in.
+    /// at the foot of the stage card it no longer sits in.
     pub(crate) fn note(&self) -> Option<crate::note::Note> {
         self.raised.then(|| {
             crate::note::Note::new(crate::note::key::GEAR_SHIFT_RAISED_FOR_UNDERCUT).number(

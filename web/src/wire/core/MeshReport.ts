@@ -8,7 +8,7 @@ import type { PointContact } from "./PointContact";
 import type { TipRoom } from "./TipRoom";
 
 /**
- * **What one mesh reports**, whatever stage it is in and whichever way its
+ * **What one mesh reports**, whatever part it is in and whichever way its
  * bodies run.
  *
  * One type, because the physics is one model with the shaft angle as a
@@ -38,7 +38,7 @@ export type MeshReport = {
  * teeth together.
  *
  * A property of a *mesh*, which is why it is here: a pair reports one
- * (its one mesh being the stage), and a set with two meshes has two
+ * (its one mesh being the pair), and a set with two meshes has two
  * answers. An epicyclic set's separate question — each central member
  * against the *planet count* — is a different check with a different
  * reason, and it stays where it is.
@@ -134,7 +134,7 @@ tips: TipRoom | null,
  * stay continuous, a helical pair without full axial overlap, a sharing
  * model that is extrapolating, a screw pair that locks or nearly does,
  * or one that loses more than it keeps. A set has two meshes and says
- * which, which a note on the stage could not.
+ * which, which a note on the set could not.
  */
 notes: Array<Note>, 
 /**

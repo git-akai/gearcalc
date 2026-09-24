@@ -28551,7 +28551,6 @@
        "bodies": [
         {
          "body": 0,
-         "ends": [],
          "port": false,
          "held": false,
          "speed": {
@@ -28562,11 +28561,6 @@
         },
         {
          "body": 1,
-         "ends": [
-          {
-           "part": 0
-          }
-         ],
          "port": true,
          "held": false,
          "speed": {
@@ -28577,11 +28571,6 @@
         },
         {
          "body": 2,
-         "ends": [
-          {
-           "part": 0
-          }
-         ],
          "port": true,
          "held": false,
          "speed": {
@@ -31025,7 +31014,6 @@
        "bodies": [
         {
          "body": 0,
-         "ends": [],
          "port": false,
          "held": false,
          "speed": {
@@ -31036,11 +31024,6 @@
         },
         {
          "body": 1,
-         "ends": [
-          {
-           "part": 0
-          }
-         ],
          "port": true,
          "held": false,
          "speed": {
@@ -31051,14 +31034,6 @@
         },
         {
          "body": 2,
-         "ends": [
-          {
-           "part": 0
-          },
-          {
-           "part": 1
-          }
-         ],
          "port": true,
          "held": false,
          "speed": {
@@ -31069,11 +31044,6 @@
         },
         {
          "body": 3,
-         "ends": [
-          {
-           "part": 1
-          }
-         ],
          "port": true,
          "held": false,
          "speed": {
@@ -31084,11 +31054,6 @@
         },
         {
          "body": 4,
-         "ends": [
-          {
-           "part": 1
-          }
-         ],
          "port": true,
          "held": true,
          "speed": {
@@ -31099,11 +31064,6 @@
         },
         {
          "body": 5,
-         "ends": [
-          {
-           "part": 1
-          }
-         ],
          "port": false,
          "held": false,
          "speed": {

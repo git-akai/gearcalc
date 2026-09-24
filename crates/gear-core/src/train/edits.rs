@@ -48,7 +48,7 @@ pub enum Edit {
     /// **Another ratio across a distance**: a gear on `shared` — a body on
     /// one of the distance's two axes — meshing a gear on a new body of the
     /// other, the two copying the distance's first mesh. Which body the
-    /// ratios share is asked: it is what makes the stage a layshaft.
+    /// ratios share is asked: it is what makes the pairs a layshaft.
     AddRatio { distance: usize, shared: usize },
     /// **A step**: one more gear on the planet body of carried `axis`, with
     /// a ring meshing it at the radius the axis runs at.
@@ -134,7 +134,7 @@ pub enum EditRefused {
     /// inside a planocentric, whose planet all but fills its ring.
     NoRoom,
     /// The body carries an axis: a gear on the carrier of the planets it
-    /// meshes locks the stage.
+    /// meshes locks the set.
     CarriesAnAxis,
     /// The body is coupled already.
     Coupled,
@@ -282,7 +282,7 @@ impl Shape {
         self.axes.iter().any(|a| a.carried_by == body)
     }
 
-    /// The axis a body of this stage sits on.
+    /// The axis a body of this shape sits on.
     fn axis_of_body(&self, body: usize) -> Option<usize> {
         self.axis_of_slot(self.slot(body))
     }
@@ -741,7 +741,7 @@ impl Shape {
             None => self.push_body(axis, next),
         };
         self.members[member].body = to;
-        // **The body it leaves stays.** A body a stage lists is a port the
+        // **The body it leaves stays.** A body the graph lists is a port the
         // train may hold, share or load, and dropping it because its gear
         // moved would take the coupling with it — which is how engaging a
         // layshaft's other ratio used to lose the output. A body with
@@ -785,7 +785,7 @@ impl Shape {
 
     // ---------------------------------------------------------- the drops ---
 
-    /// A body off the stage where nothing is on it, it carries no axis and
+    /// A body off the graph where nothing is on it, it carries no axis and
     /// no coupling turns it — with nothing left to say what it is.
     fn drop_if_bare(&mut self, body: usize) {
         if self.members_on_body(body).is_empty()
@@ -796,7 +796,7 @@ impl Shape {
         }
     }
 
-    /// A member gone, with its meshes, and its body off the stage where it
+    /// A member gone, with its meshes, and its body off the graph where it
     /// was alone on it, the body carries no axis and no coupling turns it
     /// from a fixed axis — a shaft a planet's turn is taken off to stays
     /// with its coupling, while a planet body left with nothing on it goes

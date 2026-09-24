@@ -9,8 +9,7 @@ export type Distance = { axes: [number, number],
 /**
  * The angle between the two axes, degrees: 0 for parallel, 90 for a
  * worm and its wheel. A mesh on crossed axes is a point contact with a
- * model of its own ([`super::crossed`]), and the rest of the stage
- * cannot yet share a member with it.
+ * model of its own ([`super::crossed`]).
  */
 angle: number, 
 /**
