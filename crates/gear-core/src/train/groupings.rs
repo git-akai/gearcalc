@@ -180,10 +180,15 @@ impl Train {
                 .filter(|&b| !orbits(b))
                 .collect()
         };
+        // **A case that did not solve has no shares**: its meshes carry
+        // nothing the flow can read, so none is idle either, and the walk
+        // is the graph's own order from the case's load.
+        let solved = result.cases.iter().any(|c| c.case == case && c.solved);
         let share = |k: usize| -> Option<f64> {
             result
                 .meshes
                 .get(k)
+                .filter(|_| solved)
                 .and_then(|m| m.cases.iter().find(|x| x.case == case))
                 .map(|x| x.power_through.abs())
         };
@@ -390,6 +395,31 @@ mod tests {
             all.sort_unstable();
             assert_eq!(bodies, all, "{name}");
         }
+    }
+
+    /// **A case that does not solve calls no mesh idle.** A layshaft's
+    /// case idles one ratio; with its reaction taken out nothing reacts
+    /// the load, the case does not solve, and its flow is the graph walked
+    /// from the load in its own order — every mesh a step, none a branch
+    /// said to carry nothing, since nothing is known of what any carries.
+    #[test]
+    fn a_case_that_does_not_solve_calls_no_mesh_idle() {
+        let lib = test_library();
+        let idle = |rows: &[FlowRow]| rows.iter().any(|r| matches!(r, FlowRow::Idle { .. }));
+        let mut t = Train::chained(vec![StagePreset::Layshaft.build()], |t| {
+            vec![LoadCase::ultimate(t.port(0, 1), t.port(0, 2), 1.0, 1000.0)]
+        });
+        let r = solve_train(&t, &lib).unwrap();
+        assert!(
+            r.cases[0].solved && idle(&t.flows(&r)[0]),
+            "one ratio idles"
+        );
+        t.load_cases[0].loads.retain(super::super::Load::is_load);
+        let r = solve_train(&t, &lib).unwrap();
+        assert!(!r.cases[0].solved, "nothing reacts the load");
+        let rows = &t.flows(&r)[0];
+        assert!(!idle(rows), "{rows:?}");
+        assert!(matches!(rows[0], FlowRow::Body { body } if body == t.port(0, 1)));
     }
 
     /// **A case's flow says every body once and every mesh once**, and

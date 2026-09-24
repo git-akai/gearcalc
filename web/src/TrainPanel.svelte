@@ -154,16 +154,25 @@
   /** **What a body does in the case shown**: its speed, and the torque a load
    *  or a reaction puts on it — the core's figures, said. */
   const bodyInCase = (body: number): string => {
-    const b = solved?.cases[shownCase]?.bodies.find((x) => x.at === body);
+    const c = forCase(solved?.cases, shownCase);
+    const b = c?.solved ? c.bodies.find((x) => x.at === body) : undefined;
     if (b === undefined) return "";
     const speed = b.speed === null ? roleWord("fixed") : `${num(b.speed, 1)} ${t("ui.train_rpm")}`;
     return b.role === "load" || b.role === "reacted"
       ? `${speed} · ${roleWord(b.role)} ${num(b.torque, 4)} ${t("ui.train_nm")}`
       : speed;
   };
-  /** Whether a mesh carries none of the shown case's power. */
+  /** Whether a mesh carries none of the shown case's power — which a case
+   *  that did not solve says of none. */
   const idleInCase = (k: number): boolean =>
+    (forCase(solved?.cases, shownCase)?.solved ?? false) &&
     (solved?.meshes[k]?.cases.find((c) => c.case === shownCase)?.power_through ?? 1) === 0;
+  /** **Why the shown case does not solve**, where it does not — its own
+   *  notes, which the list says above the rows it can then give no figure. */
+  const shownUnsolved = $derived.by(() => {
+    const c = forCase(solved?.cases, shownCase);
+    return c === undefined || c.solved ? null : c.notes;
+  });
   const select = (to: Selection) => (tab.view.selection = to);
   const isSelected = (s: Selection): boolean =>
     JSON.stringify(tab.view.selection) === JSON.stringify(s);
@@ -2212,6 +2221,11 @@
     <p class="hint">
       {t({ flow: "ui.train_note_flow", centres: "ui.train_note_centres", axes: "ui.train_note_axes" }[tab.view.grouping])}
     </p>
+    {#if shownUnsolved !== null && tab.view.grouping === "flow"}
+      <p class="notice warn">
+        {t("ui.train_case_incomplete")}{shownUnsolved.length > 0 ? `: ${shownUnsolved.map(note).join(" · ")}` : ""}
+      </p>
+    {/if}
     {#if tab.view.grouping === "flow"}
       {@render flowList()}
     {:else if tab.view.grouping === "centres"}
@@ -2508,17 +2522,18 @@
     cursor: not-allowed;
   }
   /* **A case's inputs on the left, what it comes to on the right** — the
-     inputs in the one column every stage's shared block uses, and the table
-     beside them where the width allows, under them where it does not. */
+     inputs in one column, and the table beside them where the workspace
+     is wide enough for both, under them where it is not: the workspace's
+     width, not the window's, since the list takes a share of the window. */
   .casebody {
     display: grid;
-    grid-template-columns: minmax(0, 34rem) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
     gap: 0.6rem 1.5rem;
     align-items: start;
   }
-  @media (max-width: 60rem) {
+  @container (min-width: 60rem) {
     .casebody {
-      grid-template-columns: minmax(0, 1fr);
+      grid-template-columns: minmax(0, 34rem) minmax(0, 1fr);
     }
   }
   .casebody > .action {

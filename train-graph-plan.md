@@ -664,6 +664,26 @@ with. The join refusal says what it is — two bodies **geared to each
 other** — and a preview no longer counts parts, which nothing on screen
 names; `TrainResult::cards` is `by_part`, the harness's.
 
+**Phase 7, step 5c — the flows, driven.** Done, in the browser against
+the running app, one session end to end: the default pair's mesh removed,
+taking both gears, and from nothing a spur pair, a layshaft and a set laid
+in at the output from the one add menu, the cases carried to each new
+output (−41.8961 : 1); the layshaft's other ratio engaged in the two moves
+it is on the machine — the idle gear onto the output, previewed as the
+lock it is while both are engaged, then the engaged one off to a body of
+its own (−96.6423 : 1), the shaft nothing named any more given up; the
+set's ring released and its carrier held, previewed as the case entries
+it takes, the case reacted at the ring (+82.8363 : 1, the set reversing);
+one mesh tuned, a tooth on the first pinion (78.2343 : 1, 17/18 of it);
+and a case read from its chip. **Found by them**: a case that did not
+solve showed every mesh idle and every body at 0 rpm — the flow read no
+power as "idle", and the list printed the unsolved case's zeros as figures
+— so a case that did not solve has no shares in the core's flow (a law,
+run against the old code first) and no figures in the list, which says why
+it does not solve above its rows; and the case editor, laid out by the
+window's width in the accordion it came from, is laid out by the
+workspace's.
+
 **Phase 6 — results and the boundary.** `TrainResult` per member, mesh,
 distance, axis and path, with `topology` carrying the groupings;
 `relieve_stage` → `relieve`; `adopt_member` by member; bindings; the probe.
