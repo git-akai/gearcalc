@@ -44,9 +44,9 @@
   import Offers from "./Offers.svelte";
   import { adds, type Names } from "./offers";
 
-  /** **Resolving an over-determined stage is the core's rule, not this file's.**
+  /** **Resolving an over-determined shape is the core's rule, not this file's.**
    *
-   *  Which of a stage's inputs argue with each other, how many may stand and
+   *  Which of a shape's inputs argue with each other, how many may stand and
    *  which gives way first are facts about the geometry, and they lived here as
    *  three functions — one per stage type — each restating a relation Rust
    *  already enforces. That is an engineering rule outside Rust and the same
@@ -89,7 +89,7 @@
     input.value = "";
   }
 
-  // Which stages are expanded lives on the **tab**, so looking at another
+  // What the panel is showing lives on the **tab**, so looking at another
   // train — or at a gear — and coming back finds the panel as it was left.
   // Read through `tab` at each use rather than aliased, so there is one object
   // and no question about which of the two a write lands on.
@@ -299,8 +299,8 @@
     tab.view.case = Math.max(0, Math.min(i, left - 1));
     tab.view.selection = left > 0 ? { case: tab.view.case } : null;
   }
-  /** A load case by number, as a stage is; and the words for its kind and its
-   *  port, from the same tables the selects offer them from. */
+  /** A load case by number; and the words for its kind and its port, from
+   *  the same tables the selects offer them from. */
   const caseName = (i: number) => t("ui.train_case_heading", { number: String(i + 1) });
   const kindLabel = (k: CaseKind) => t(CASE_KINDS.find((x) => x.key === k)?.label ?? k);
   /** The ports a duty's select offers — bodies, by number, which is the
@@ -377,7 +377,7 @@
       }[r],
     );
   /** The heading's summary of a case: each given figure at its port —
-   *  none while the train has no stages and the entries are parked. */
+   *  none while the train is empty and the entries are parked. */
   const caseSummary = (c: LoadCase): string =>
     tab.train.shape.members.length === 0 ? "" : c.loads
       .filter((l) => l.role === "load")
@@ -399,11 +399,7 @@
   /** The axis a member turns about; whether a carrier carries it is
    *  `members.ts`'s `carried`, the one reading the gear tab shares. */
   const axisOf = (shape: Shape, j: number) => axisOfBody(shape, shape.members[j].body);
-  /** The candidates for one note slot: a blank to reserve the space, the note
-   *  itself when the stage has solved, and the out-of-range message when the
-   *  value is outside its bound. All are rendered; see the slot's comment. */
-
-  /** **A figure a stage has only once it has solved.**
+  /** **A figure the train has only once it has solved.**
    *
    *  Blank while it has not, rather than absent: a readout that disappears
    *  takes its label with it, so the panel a designer is editing changes shape
@@ -426,7 +422,6 @@
   const count = (v: number | null | undefined) => (v == null ? BLANK : v.toLocaleString());
   const pct = (v: number | null | undefined) => (v == null ? BLANK : (100 * v).toFixed(3));
   const n = (v: number | null | undefined) => (v == null ? BLANK : v.toFixed(3));
-  /** "lo to hi" — one shape, so the word between two numbers is written once. */
   /** "lo to hi" — one shape, so the word between two numbers is written once,
    *  and the brackets too: every reader of this wrapped it in a pair, which is
    *  a pair of brackets that would have been left stranded round a blank. */
@@ -444,14 +439,13 @@
    *
    *  A hint that names a field and carries a number — a shift raised to clear
    *  undercut, an addendum held down to keep a tip — is one the reader wants
-   *  beside that field, not in a list at the foot of the stage where it has to
-   *  be matched back up by tooth count. The stage's list keeps what is about
-   *  the stage. */
+   *  beside that field, not in a list at the foot of the card where it has to
+   *  be matched back up by tooth count. The card's list keeps the rest. */
   const clampNote = (from: Note[], keys: readonly string[]) =>
     from.filter((n) => keys.includes(n.key)).map(note).join(" · ") || undefined;
 
-  /** Which of a gear's notes belong to which of its fields. One table, so a
-   *  stage that lists what is left over can subtract exactly what was drawn
+  /** Which of a gear's notes belong to which of its fields. One table, so the
+   *  card's list of what is left over can subtract exactly what was drawn
    *  rather than repeating the keys. */
   const FIELD_NOTES = {
     profile_shift: ["gear.shift_raised_for_undercut"],
@@ -530,17 +524,6 @@
 
 </script>
 
-<!-- A value + automatic toggle, locked while automatic (docs/rationale.md#inputs-are-the-only-state).
-     When automatic the field shows the SOLVED value, greyed, so a computed
-     number is never mistaken for one that was chosen. Turning the toggle off
-     leaves `manual` where it was, so the field does not jump. -->
-<!-- A material property: the value the calculation used, greyed while it is the
-     library's and un-greyed once replaced, so a default is never mistaken for a
-     considered choice. Editing makes an override; the cross clears it.
-
-     The number shown is Rust's — it has already chosen between the dry and
-     conditioned states, which is an engineering decision and not this side's to
-     make. -->
 {#snippet flowList()}
   {#each flow as row, r (r)}
     {#if "body" in row}
@@ -766,7 +749,6 @@
   {@const g = solved?.members[i]}
   {@const isWormMember = result.names[i]?.role === "worm"}
   {@render gearCard(gearName(i), mem.gear, g, {
-    cut: mem.ring ? "shaper" : "rack",
     cutter: mem.ring ?? undefined,
     member: mem,
     teethLabel: isWormMember ? "ui.train_starts" : undefined,
@@ -1066,6 +1048,13 @@
     <button class="action danger" onclick={() => removeCase(i)}>{t("ui.train_remove_case")}</button>
 {/snippet}
 
+<!-- A material property: the value the calculation used, greyed while it is the
+     library's and un-greyed once replaced, so a default is never mistaken for a
+     considered choice. Editing makes an override; the cross clears it.
+
+     The number shown is Rust's — it has already chosen between the dry and
+     conditioned states, which is an engineering decision and not this side's to
+     make. -->
 {#snippet property(
   label: string,
   gear: MemberGear,
@@ -1101,11 +1090,6 @@
   </label>
 {/snippet}
 
-<!-- Every note a control can show, stacked in one grid cell with the ones that
-     do not apply hidden. The slot is then as tall as the tallest of them at
-     this width, so a note arriving or leaving — a value going out of range, a
-     stage failing to solve — moves nothing below it. The blank candidate is
-     what reserves the space when there is no note at all. -->
 <!-- A boolean that belongs in a column of fields. The switch carries the
      field's own name rather than a bare "on" beside a label that would then say
      it twice, and sits at the right edge the inputs share — where the actuation
@@ -1134,23 +1118,16 @@
 {/snippet}
 
 
-<!-- One gear card, used by every stage that has gears. A sun, a planet, a ring
-     and a spur gear take the same inputs and produce the same readout, so they
-     are one definition rather than several that drift apart — which is what had
-     happened to the planetary section. What genuinely differs is passed in: a
-     ring's root belongs to its cutter, a planet's shift is solved rather than
-     chosen, and a member may have something of its own to report. -->
-<!-- **What one mesh reports**, drawn once for every mesh of every stage.
+<!-- **What one mesh reports**, drawn once for every mesh.
 
      A `MeshReport` is the same shape whether it is a spur pair's, a worm's, an
-     epicyclic set's sun–planet pair or a hula stage's: the shared rows first,
+     epicyclic set's sun–planet pair or a hula's: the shared rows first,
      then the little only a line contact has (the transverse decomposition and
      the operating angle) or only a point contact has (the zone as the faces
      leave it, the parallel counterpart). A crossed pair used to have a readout
      of its own beside this one, and before that the spur stage did — each a
      second place the same row could be drawn differently. `members` names the
-     two ends the one gap is seen from, in the order the mesh was built;
-     `notes` is the stage's, for the lock notes drawn beside the efficiency. -->
+     two ends the one gap is seen from, in the order the mesh was built. -->
 {#snippet meshRows(m: MeshReport | undefined, members: [string, string])}
   <dt>{t("ui.train_coprime")}</dt>
   <dd>{m === undefined ? BLANK : m.coprime ? t("ui.train_yes") : t("ui.train_no")}</dd>
@@ -1259,6 +1236,13 @@
       </span>
     {/each}
   </dd>
+  <!-- The room an internal mesh's tips have on the side away from contact
+       — what sizes the distance at a few teeth of difference, and a large
+       number nobody reads on an ordinary ring. -->
+  {#if m?.tips}
+    <dt>{t("ui.train_far_side_gap")}</dt>
+    <dd>{num(m.tips.far_gap, 4)} {t("ui.train_mm")}</dd>
+  {/if}
   <!-- **Which conditions bite, and nothing when none do.** Drawn for **every**
        mesh. A tip reaching past the usable end of the flank it meshes with
        is the classical interference condition and belongs to any pair; it was
@@ -1270,13 +1254,6 @@
 
        Named by member rather than by the classical pair, because the classical
        names describe which member is a ring and the condition does not. -->
-  <!-- The room an internal mesh's tips have on the side away from contact
-       — what sizes the distance at a few teeth of difference, and a large
-       number nobody reads on an ordinary ring. -->
-  {#if m?.tips}
-    <dt>{t("ui.train_far_side_gap")}</dt>
-    <dd>{num(m.tips.far_gap, 4)} {t("ui.train_mm")}</dd>
-  {/if}
   {#if m}
     <dt>{t("ui.train_interference")}</dt>
     <dd>
@@ -1356,14 +1333,17 @@
   </div>
 {/snippet}
 
+<!-- One gear card, for every gear of the train. A sun, a planet, a ring
+     and a spur gear take the same inputs and produce the same readout, so they
+     are one definition rather than several that drift apart — which is what had
+     happened to the planetary section. What genuinely differs is passed in: a
+     ring's root belongs to its cutter, a planet's shift is solved rather than
+     chosen, and a member may have something of its own to report. -->
 {#snippet gearCard(
   title: string,
   gear: MemberGear,
   g: GearResult | undefined,
   opts: {
-    /** "shaper" for a ring, whose root and fillet are the tool's rather than
-     *  inputs of its own; anything else is rack-generated. */
-    cut?: "rack" | "shaper";
     /** **What decides this gear's face width**, which is one question with
      *  three answers rather than a flag with two.
      *
@@ -1385,13 +1365,11 @@
      *  face width, a worm's diameter — asks the same relief, since the core
      *  declares the relations and this side only says which input was just
      *  touched. */
-    relief?: number;
-    /** **The member this gear is, on a shape**: its module and its tooth
-     *  thickness coefficient are the member's rather than the stage's, since
-     *  a shape's members need not all share one, and they are drawn on the
-     *  card under the tooth count. A hula stage's are per mesh and it passes
-     *  none. */
-    member?: Member;
+    relief: number;
+    /** **The member this gear is**: its module, its pressure angle and its
+     *  tooth thickness coefficient are the member's, drawn on the card under
+     *  the tooth count. */
+    member: Member;
     /** **A worm's pitch diameter**, drawn on its card right under its starts:
      *  the same size freedom as the helix angles read as a size, which is a
      *  worm's reading and a gear's only by derivation. */
@@ -1401,10 +1379,10 @@
     /** **The tool this ring is shaped with.**
      *
      *  A ring has no meaningful geometry without one, so its cutter belongs in
-     *  its card rather than in a block of its own beside the stage's shared
-     *  inputs — where a reader had to know which of the section's gears it was
-     *  about. Given only for `cut: "shaper"`, which is the only kind of member
-     *  that has one. */
+     *  its card rather than in a block of its own beside the mesh's inputs —
+     *  where a reader had to know which gear it was about. Given for a ring,
+     *  the one member a tool shapes rather than a rack generates, whose root
+     *  and fillet are the tool's rather than inputs of its own. */
     cutter?: Cutter;
     /** **The carrier this member's teeth see**, where it has one.
      *
@@ -1418,7 +1396,9 @@
 )}
 {@const own = g?.notes ?? []}
 {@const mat = library.materials.material.find((m) => m.name === gear.material)}
-{@const spare = (g?.notes ?? []).filter((n) => !UNDER_A_FIELD.includes(n.key))}
+{@const spare = own.filter((n) => !UNDER_A_FIELD.includes(n.key))}
+{@const shaper = opts.cutter !== undefined}
+{@const m = opts.member}
 <div class="gear">
   <!-- **A heading names the fields under it**, and nothing else — so a card
        whose ring is shaped by a tool opens with that tool's heading and the
@@ -1444,54 +1424,51 @@
     <span>{t(opts.teethLabel ?? "ui.train_tooth_count")}</span>
     <input type="number" step="1" bind:value={() => gear.teeth, finite((v) => (gear.teeth = v))} />
   </label>
-  {#if opts.member}
-    {@const m = opts.member}
-    <!-- **The module and the pressure angle, stated on one gear of a mesh
-         group and followed by the rest** — the helix's rule with the
-         relation made equality: a tooth is cut at one of each, so the gears
-         a run of meshes joins share them. Touching one here makes it the
-         group's, and relief hands the rest to it; automatic shows what the
-         group is cut at. -->
-    {@render autoNumber(
-      "ui.train_normal_module",
-      m.module,
-      g?.params.module,
-      0.1,
-      () => opts.relief !== undefined && relieve({ member: [opts.relief, "module"] }),
-      undefined,
-      "ui.train_mm",
-    )}
-    {@render autoNumber(
-      "ui.train_pressure_angle",
-      m.pressure_angle,
-      g?.params.pressure_angle,
-      0.5,
-      () => opts.relief !== undefined && relieve({ member: [opts.relief, "pressure_angle"] }),
-      undefined,
-      "°",
-    )}
-    <!-- One coefficient per member, given on one member of each mesh and
-         automatic on the other, which follows the mesh's rule — the two sum
-         to 2 across an external mesh, a ring takes its pinion's. Relief keeps
-         at most one of a mesh's two given, so touching this one is what hands
-         the mate over; the automatic box shows what it came to. -->
-    {@render autoNumber(
-      "ui.train_tooth_thickness_mod",
-      m.thickness_mod,
-      g?.params.thickness_mod,
-      0.05,
-      () => opts.relief !== undefined && relieve({ member: [opts.relief, "thickness_mod"] }),
-      undefined,
-      "ui.train_k",
-    )}
-  {/if}
+  <!-- **The module and the pressure angle, stated on one gear of a mesh
+       group and followed by the rest** — the helix's rule with the
+       relation made equality: a tooth is cut at one of each, so the gears
+       a run of meshes joins share them. Touching one here makes it the
+       group's, and relief hands the rest to it; automatic shows what the
+       group is cut at. -->
+  {@render autoNumber(
+    "ui.train_normal_module",
+    m.module,
+    g?.params.module,
+    0.1,
+    () => relieve({ member: [opts.relief, "module"] }),
+    undefined,
+    "ui.train_mm",
+  )}
+  {@render autoNumber(
+    "ui.train_pressure_angle",
+    m.pressure_angle,
+    g?.params.pressure_angle,
+    0.5,
+    () => relieve({ member: [opts.relief, "pressure_angle"] }),
+    undefined,
+    "°",
+  )}
+  <!-- One coefficient per member, given on one member of each mesh and
+       automatic on the other, which follows the mesh's rule — the two sum
+       to 2 across an external mesh, a ring takes its pinion's. Relief keeps
+       at most one of a mesh's two given, so touching this one is what hands
+       the mate over; the automatic box shows what it came to. -->
+  {@render autoNumber(
+    "ui.train_tooth_thickness_mod",
+    m.thickness_mod,
+    g?.params.thickness_mod,
+    0.05,
+    () => relieve({ member: [opts.relief, "thickness_mod"] }),
+    undefined,
+    "ui.train_k",
+  )}
   {#if opts.pitchDiameter}
     {@render autoNumber(
       "ui.train_pitch_diameter",
       opts.pitchDiameter,
       g?.pitch_diameter,
       0.5,
-      () => opts.relief !== undefined && relieve({ member: [opts.relief, "pitch_diameter"] }),
+      () => relieve({ member: [opts.relief, "pitch_diameter"] }),
       undefined,
       "ui.train_mm",
     )}
@@ -1501,13 +1478,13 @@
        its meshes require — so at most one member states it and the rest
        follow; none stated is the shaft angle shared evenly, or what a given
        distance or a given axial contact ratio decides. Automatic shows the
-       angle the stage arrived at. -->
+       angle the solve arrived at. -->
   {@render autoNumber(
     "ui.train_helix_angle",
     gear.helix_angle,
     g?.helix_angle,
     1,
-    () => opts.relief !== undefined && relieve({ member: [opts.relief, "helix"] }),
+    () => relieve({ member: [opts.relief, "helix"] }),
     undefined,
     "°",
   )}
@@ -1528,7 +1505,7 @@
     0.05,
     "ui.train_m",
     undefined,
-    opts.cut === "shaper"
+    shaper
       ? undefined
       : {
           label: "ui.train_no_sharp_tip",
@@ -1538,18 +1515,18 @@
         },
     // What the bound came to, where it had something to say. A hint that names
     // an input belongs under that input rather than in a list at the foot of
-    // the stage — and in the warning colour, because the number in the box is
+    // the card — and in the warning colour, because the number in the box is
     // not the number the gear has.
     clampNote(own, FIELD_NOTES.addendum),
   )}
-  {#if gear.no_sharp_tip && opts.cut !== "shaper"}
+  {#if gear.no_sharp_tip && !shaper}
     <label class="sub">
       <span>{t("ui.train_minimum_tip_width")}</span>
       <input type="number" step="0.02" bind:value={() => gear.min_tip_width, finite((v) => (gear.min_tip_width = v))} />
       <em>{t("ui.train_mm")}</em>
     </label>
   {/if}
-  {#if opts.cut !== "shaper"}
+  {#if !shaper}
     <label class:invalid={g && outside(gear.dedendum, g.ranges.dedendum)}>
       <span>{t("ui.train_dedendum")}</span>
       <input type="number" step="0.05" bind:value={() => gear.dedendum, finite((v) => (gear.dedendum = v))} />
@@ -1590,10 +1567,10 @@
     gear.profile_shift,
     g?.profile_shift,
     0.05,
-    () => opts.relief !== undefined && relieve({ member: [opts.relief, "shift"] }),
+    () => relieve({ member: [opts.relief, "shift"] }),
     undefined,
     "ui.train_m",
-    opts.cut === "shaper"
+    shaper
       ? undefined
       : {
           label: "ui.train_no_undercut",
@@ -1606,7 +1583,7 @@
   <!-- The depth the undercut question is asked at, so it is offered exactly
        while that question is being asked — which is now the constraint's
        business rather than the `auto` toggle's. -->
-  {#if gear.no_undercut && opts.cut !== "shaper"}
+  {#if gear.no_undercut && !shaper}
       <!-- Automatic is the gear's own dedendum, which asks the same question the
            profile generator answers: is the flank undercut *at all*? A fixed 1
            module — what this used to be — asks whether it is undercut within a
@@ -1625,15 +1602,15 @@
     )}
   {/if}
   {#if !gear.profile_shift.auto}
-    {@const r = opts.cut === "shaper" ? undefined : g?.ranges.profile_shift}
+    {@const r = shaper ? undefined : g?.ranges.profile_shift}
     <p class="hint">
       <!-- A shaper-cut ring's bounds are not the rack's shown here — its own
            base circle, its cutter's reach and the generation limit are what
            limit it (docs/reference.md#internal-gears) — and the core does not report those for a
-           stage member yet. It shows no bound rather than the wrong one. -->
+           train's member yet. It shows no bound rather than the wrong one. -->
       <FieldNote notes={
         notes(
-          opts.cut === "shaper"
+          shaper
             ? null
             : r
               ? t("ui.bound_profile_shift", {
@@ -1658,7 +1635,7 @@
       gear.face_width,
       opts.faceRecommended,
       1,
-      () => opts.relief !== undefined && relieve({ member: [opts.relief, "face_width"] }),
+      () => relieve({ member: [opts.relief, "face_width"] }),
       opts.faceRecommended === undefined
         ? null
         : t(opts.faceLabel ? "ui.train_note_worm_length" : "ui.train_note_wheel_width", {
@@ -1678,7 +1655,7 @@
       gear.face_width,
       g?.face_width,
       0.5,
-      () => opts.relief !== undefined && relieve({ member: [opts.relief, "face_width"] }),
+      () => relieve({ member: [opts.relief, "face_width"] }),
       opts.faceWidth === "continuity"
         ? opts.faceFromContinuity === undefined
           ? t("ui.train_note_no_continuous_width")
@@ -1696,7 +1673,7 @@
          allowable, or fatigue). Per kind rather than per case: however many
          loads of a kind there are, the width is the largest any enabled one
          asks for. With none enabled there is nothing to invert and the width
-         stands at its box, which the stage says in a note rather than hiding. -->
+         stands at its box, which the gear's note says rather than hiding it. -->
     <div class="subtoggles">
       <Switch
         label={t("ui.train_from_bending_ultimate")}
@@ -1730,7 +1707,7 @@
   </label>
 
   <!-- **The material's own figures are the library's, not the solve's.**
-       Reading them off the result meant that a stage which failed to build hid
+       Reading them off the result meant that a train which failed to build hid
        every override box a designer would reach for to make it build — inputs
        withheld for want of an answer they do not depend on. -->
   <div class="props">
@@ -1775,14 +1752,6 @@
      other piece of chrome. Passing the English through as an argument is how
      five labels stayed hard-coded through the extraction that caught the other
      185: they are not markup, so nothing scanning markup could see them. -->
-<!-- `after` is how a stage says that its inputs constrain one another: the
-     toggle flips, then the stage relieves whatever that has over-specified
-     (`relieve`). Stages that have no such rule pass nothing and behave as they
-     always have. -->
-<!-- **A number with a bound on it, and nothing deciding it.** The same row as
-     `autoNumber` without the `auto` switch: the bound stands in that column,
-     which is where a switch that qualifies the box belongs whether it says who
-     chose the number or what the number has to satisfy. -->
 <!-- **A plain number with a label and a unit** — the third of the row family.
      `autoNumber` is one whose source can be the tool, `boundedNumber` one with a
      range on it, and this is one that is simply typed. It was the only member
@@ -1818,6 +1787,10 @@
   </label>
 {/snippet}
 
+<!-- **A number with a bound on it, and nothing deciding it.** The same row as
+     `autoNumber` without the `auto` switch: the bound stands in that column,
+     which is where a switch that qualifies the box belongs whether it says who
+     chose the number or what the number has to satisfy. -->
 {#snippet boundedNumber(
   key: string,
   get: () => number,
@@ -1832,7 +1805,7 @@
   constraint: { label: string; title: string; on: boolean; set: (v: boolean) => void } | undefined,
   /** **A bound that actually moved this number.** Rendered in the warning
    *  colour and in front of the remark, because it is the same kind of finding
-   *  the stage and mesh lists draw attention to and the reader has not got what
+   *  the part and mesh lists draw attention to and the reader has not got what
    *  they asked for. */
   warn?: string | null,
 )}
@@ -1868,6 +1841,13 @@
   </label>
 {/snippet}
 
+<!-- A value + automatic toggle, locked while automatic (docs/rationale.md#inputs-are-the-only-state).
+     When automatic the field shows the SOLVED value, greyed, so a computed
+     number is never mistaken for one that was chosen. Turning the toggle off
+     leaves `manual` where it was, so the field does not jump. -->
+<!-- `after` is how a card says that its inputs constrain one another: the
+     toggle flips, then the core relieves whatever that has over-specified
+     (`relieve`). An input no rule binds passes nothing. -->
 {#snippet autoNumber(
   key: string,
   a: Auto<number>,
@@ -1922,7 +1902,7 @@
           // to fall back to, and `params::Auto` says seeding it from the
           // solved value is the front end's job — which it was not doing, so
           // a centre distance turned manual dropped to the stale zero it was
-          // created with and the stage fell over. Seeded to the digits shown
+          // created with and the solve fell over. Seeded to the digits shown
           // rather than the full value, so what the reader saw is what they
           // now hold; the gear tab's throw and amplitude do the same.
           if (!v && a.auto && shown !== null) a.manual = shown;
@@ -1953,12 +1933,6 @@
   </label>
 {/snippet}
 
-<!-- **What the automatic shifts are chosen for.** Off, they are the least that
-     clears undercut, which is the smallest admissible pair rather than the best
-     one; on, they are chosen to lose least with that undercut shift as a floor.
-     The contact ratio comes with it because it is the constraint the answer sits
-     against: sliding loss falls with the length of the path, so without a floor
-     the least-loss pair is always the one whose teeth barely reach. -->
 <!-- **How the load is divided while two tooth pairs are engaged**, a mesh's
      own: the ramp is a model of one contact, so two meshes on one gear can be
      rated under different ones.
@@ -1988,32 +1962,32 @@
   </label>
 {/snippet}
 
-<!-- **The axial contact ratio, as an input**, on every stage with a line
-     contact. Automatic it shows what the helix and the width the mesh carries
+<!-- **The axial contact ratio, as an input**, on every mesh group with a
+     line contact. Automatic it shows what the helix and the width the mesh carries
      come to; given, it is a floor under an automatic face width, or — with
      every width given — the thing that decides the helix, and the core's
      relief keeps those readings from arguing. The mesh's finding that the
      ratio is below one is drawn here, beside the box it is about, rather than
      under a contact-ratio row that already prints the figure. -->
-{#snippet overlapField(stage: Shape, meshes: number[], reports: (MeshReport | undefined)[])}
+{#snippet overlapField(shape: Shape, meshes: number[], reports: (MeshReport | undefined)[])}
   <!-- **One box for a mesh group's ratio.** The datum is each mesh's
        (`MeshInput.overlap`); the group's meshes carry one number, so the
        box reads the first and writes them all — an `Auto` with accessors,
        which is what the field binds to. The core reads the group's first
        mesh as the size reading and every mesh's as a floor. -->
-  {@const first = stage.meshes[meshes[0]]}
+  {@const first = shape.meshes[meshes[0]]}
   {@const shared: Auto<number> = {
     get auto() {
       return first.overlap.auto;
     },
     set auto(v: boolean) {
-      for (const k of meshes) stage.meshes[k].overlap.auto = v;
+      for (const k of meshes) shape.meshes[k].overlap.auto = v;
     },
     get manual() {
       return first.overlap.manual;
     },
     set manual(v: number) {
-      for (const k of meshes) stage.meshes[k].overlap.manual = v;
+      for (const k of meshes) shape.meshes[k].overlap.manual = v;
     },
   }}
   {@render autoNumber(
@@ -2033,6 +2007,12 @@
   )}
 {/snippet}
 
+<!-- **What the automatic shifts are chosen for.** Off, they are the least that
+     clears undercut, which is the smallest admissible pair rather than the best
+     one; on, they are chosen to lose least with that undercut shift as a floor.
+     The contact ratio comes with it because it is the constraint the answer sits
+     against: sliding loss falls with the length of the path, so without a floor
+     the least-loss pair is always the one whose teeth barely reach. -->
 {#snippet searchToggle(m: { search: boolean }, pair?: { a: string; b: string })}
   {@render switchField(
     pair ? "ui.train_optimise_efficiency_of" : "ui.train_optimise_efficiency",
@@ -2242,8 +2222,8 @@
 </div>
 
 <style>
-  /* The bar, the delete strip and every `.action` — a stage or a case added
-     or removed — are `app.css`'s, shared with the gear tab, and a `.head` is
+  /* The bar, the delete strip and every `.action` — an edit made or a case
+     added or removed — are `app.css`'s, shared with the gear tab, and a `.head` is
      a heading that happens to be a button; this serves the buttons that show
      a state, and leaves those to their own rules rather than outranking them
      by being scoped (`:not()` counts toward specificity, so this would). */
@@ -2276,10 +2256,10 @@
     grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
     gap: var(--field-gap) 1rem;
   }
-  /* A stage's shared inputs stack, not flow into columns. Wrapped into two or
+  /* The shared inputs stack, not flow into columns. Wrapped into two or
      three columns a field's note sat beside the *next* field's box, and the
-     column count changed with the window, so the same stage read differently at
-     two widths. One column reads the way the gear cards below it do. */
+     column count changed with the window, so the same inputs read differently
+     at two widths. One column reads the way the gear cards below it do. */
   .grid.shared {
     display: flex;
     flex-direction: column;
@@ -2294,8 +2274,8 @@
   /* The same box every other row has. These were 9 rem, on an argument
      about long field names wrapping that a narrower box does not bear on —
      the label column is what is left of the block after the box, so a
-     narrower box gives a name *more* room — and a stage's row was the one
-     place in the application with a box of its own width. */
+     narrower box gives a name *more* room — and the shared rows were the one
+     place in the application with a box of their own width. */
   .grid.shared > label {
     grid-template-columns: 1fr var(--field-box) var(--unit-cell);
   }

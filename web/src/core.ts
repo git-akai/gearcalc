@@ -593,7 +593,7 @@ export interface TrainDocument {
 }
 
 /** What reading a geartrain came to: the document, and whether Rust adjusted
- *  it on the way in — a toggle the file had given that no stage can honour,
+ *  it on the way in — a toggle the file had given that nothing can honour,
  *  turned back automatic with its number kept. */
 export interface Imported {
   document: TrainDocument;
@@ -728,7 +728,7 @@ export function relieveCase(
 }
 
 /** Write every leaf of `from` that differs into `into`, in place, shape-blind:
- *  the two are the same stage before and after relief, so they have the same
+ *  the two are the same shape before and after relief, so they have the same
  *  shape, and only toggles and the numbers relief seeded can differ. */
 function assignLeaves(into: Record<string, unknown>, from: Record<string, unknown>): void {
   for (const key of Object.keys(from)) {
@@ -743,9 +743,9 @@ function assignLeaves(into: Record<string, unknown>, from: Record<string, unknow
 }
 
 /** **One member of a geartrain, as a gear tab would hold it** — the tooth the
- *  stage cut, with whether it is a ring and the cutter that cut it. Rust
+ *  train cut, with whether it is a ring and the cutter that cut it. Rust
  *  solves the train to answer, because the tooth as built is an output: a
- *  shift the stage chose, an addendum a tip width held down, a helix shared
+ *  shift the search chose, an addendum a tip width held down, a helix shared
  *  out of a shaft angle. *Adopt*, not import: `importTrain` reads a document
  *  this tool wrote, and this reads a member of a train that is open. */
 export function adoptMember(
@@ -761,7 +761,7 @@ export function adoptMember(
   }
 }
 
-/** A fresh geartrain, one spur stage in it. */
+/** A fresh geartrain, one spur pair in it. */
 export function defaultTrain(): Train {
   return defaults().train;
 }

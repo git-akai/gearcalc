@@ -198,7 +198,7 @@ class Workspace {
   adoptError = $state<string | null>(null);
 
   /** **A new tab holding one member of an open geartrain** — the tooth the
-   *  stage cut, as Rust reports it, with the member's kind and, for a ring,
+   *  train cut, as Rust reports it, with the member's kind and, for a ring,
    *  its cutter. Named *"<train> - <member>"*, and selected, like a tab made
    *  any other way; the rest of the tab is a fresh one's.
    *
@@ -280,8 +280,6 @@ export function setKind(tab: GearTab, kind: GearKind) {
 export const workspace = new Workspace();
 
 function freshTrain(name = t("ui.train_default_name")): TrainTab {
-  // The stages closed, as the load cases are: each heading says what its
-  // stage is, and a stage added by the menu opens itself.
   return { id: nextTrainId++, name, train: defaultTrain(), view: freshView() };
 }
 
@@ -344,7 +342,7 @@ class Trains {
   /** Set when the last import failed, so the panel can say why. */
   importError = $state<string | null>(null);
   /** Set when the last import was adjusted to what the tool can honour — a
-   *  toggle the file gave that no stage reads, turned back automatic by Rust
+   *  toggle the file gave that nothing reads, turned back automatic by Rust
    *  on the way in — so the panel says so in one sentence. */
   importAdjusted = $state(false);
 

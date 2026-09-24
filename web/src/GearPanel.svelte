@@ -870,7 +870,7 @@
   }
 
   /* Size, weight and colour are `app.css`'s `.section-heading`, shared with
-     the geartrain's stage and case headings. */
+     the geartrain's headings. */
   h2 {
     margin: 1.25rem 0 0.5rem;
   }
