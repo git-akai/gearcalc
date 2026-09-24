@@ -99,8 +99,8 @@ pub struct MateRef {
 
 /// The depth the undercut question is asked at when a request does not say.
 ///
-/// **The gear's own dedendum**, which is what a stage does and for the reason a
-/// stage does it: that is the depth the profile generator's `undercut` flag
+/// **The gear's own dedendum**, which is what a train's member does and for the
+/// reason it does: that is the depth the profile generator's `undercut` flag
 /// actually answers about, so the reported threshold and the reported flag agree
 /// by construction (docs/reference.md#automatic-values).
 ///
@@ -109,7 +109,7 @@ pub struct MateRef {
 /// value, not to pick a convention: the two differ by a quarter of a module on
 /// an ordinary gear, and they differ in **sign**. A default 17-tooth gear on the
 /// ISO 53 rack read "undercut below `x = −0.2443`" on the gear tab and "below
-/// `+0.0057`" as a member of a stage, and the generator agrees with the second —
+/// `+0.0057`" as a member of a train, and the generator agrees with the second —
 /// at `x = −0.1` it reports the flank undercut while the tab's own threshold
 /// said it was not.
 ///
@@ -791,7 +791,7 @@ pub struct TrainOutcome {
     pub parts: Vec<gear_core::train::graph::Part>,
     /// **The train's motion** — exact ratios, every body's speed, mobility —
     /// present whenever the tooth counts and topology give one, which is
-    /// whether or not the geometry solved. A train mid-edit whose stage will
+    /// whether or not the geometry solved. A train mid-edit whose gears will
     /// not close still turns, and this is what says at what.
     pub motion: Option<gear_core::train::MotionReport>,
     /// **The train's centres and its axes** — two of the three groupings a
@@ -1166,7 +1166,7 @@ fn defaults_impl() -> Result<String, String> {
             // The three loads a fresh train used to hold as fields, between
             // the pair's two gears: a peak at the first, reacted at the
             // second; a load from the second, held still, with the first
-            // reacting it — through a stage that locks, nothing reaches it;
+            // reacting it — through a mesh that locks, nothing reaches it;
             // and a fatigue load a fifth of the peak — a running load rather
             // than the stall the ultimate case is, so a fresh tab shows the
             // two ratings answering different questions.
@@ -1271,8 +1271,8 @@ pub fn export_materials(library_json: &str) -> Result<String, JsError> {
 /// Import a geartrain: TOML text in, `{ document: { name, train }, adjusted }`
 /// JSON out.
 ///
-/// `adjusted` says whether any stage was relieved on the way in — a toggle
-/// the file had given that no stage can honour, such as a crossed pair's
+/// `adjusted` says whether the train was relieved on the way in — a toggle
+/// the file had given that nothing can honour, such as a crossed pair's
 /// axial contact ratio, turned back automatic with its number kept. The panel
 /// says so in one sentence; the values are the file's own throughout
 /// (`gear_io::train`, *What is adjusted on import*).
@@ -1283,7 +1283,7 @@ pub fn export_materials(library_json: &str) -> Result<String, JsError> {
 /// names the line.
 ///
 /// The train's **inputs** are what the file holds; everything derived is
-/// recomputed by `solve_train` once the tab exists. A stage may name a material
+/// recomputed by `solve_train` once the tab exists. A member may name a material
 /// this library does not have — that is not an import failure, and `solve_train`
 /// reports it by name.
 ///
@@ -1310,16 +1310,16 @@ pub fn export_train(document_json: &str) -> Result<String, JsError> {
 ///
 /// `{ train, materials, member }` JSON in — a train request with the
 /// member's index in the train's graph — and `{ params, internal, cutter }`
-/// out: the tooth the stage cut that
+/// out: the tooth the train cut that
 /// member with, every automatic value resolved and every convention applied
 /// (`GearResult::params`), whether it is a ring, and the pinion cutter that
 /// cut it where it is. The gear tab **adopts** the member — a word chosen so
 /// it cannot be mistaken for the TOML `import_train`, which reads a document
-/// this tool wrote — and shows the tooth the stage rated rather than a
+/// this tool wrote — and shows the tooth the train rated rather than a
 /// rebuild from the inputs.
 ///
 /// The train is solved here, in microseconds, because the tooth as built is
-/// an output: a shift the stage chose, an addendum a tip width held down, a
+/// an output: a shift the search chose, an addendum a tip width held down, a
 /// helix shared out of a shaft angle. Nothing on the other side of the
 /// boundary could know those, and nothing should try.
 ///
@@ -1352,7 +1352,7 @@ struct AdoptRequest {
     ts(export, export_to = "wasm/")
 )]
 pub struct Adopted {
-    /// The tooth as the stage cut it.
+    /// The tooth as the train cut it.
     pub params: GearParams,
     /// Whether the member is a ring — cut by a pinion cutter — and so the
     /// tab's *internal* kind.
@@ -1472,7 +1472,7 @@ fn relieve_impl(input: &str) -> Result<String, String> {
 /// statics equation short of the bodies that carry one, every figure relief
 /// turned derived seeded from what the case comes to
 /// ([`Train::relieve_case`]). The same relation [`relieve`] keeps on a
-/// stage's geometry, kept on a case's loads: a pair with a speed at each end
+/// shape's geometry, kept on a case's loads: a pair with a speed at each end
 /// has asked for a contradiction, and the one not this moment pinned gives
 /// way. A case with fewer given than that is left short — relief never
 /// invents a given — and [`solve_train`] says so on the case.
@@ -1518,7 +1518,7 @@ fn relieve_case_impl(input: &str) -> Result<String, String> {
 ///   ([`gear_core::train::Edit`]: a gear at a body, a new body or a new
 ///   axis; a ratio on the body asked; a step; a coupling; a member, mesh,
 ///   axis, body or coupling removed with what goes with it; a gear moved;
-///   a join, a hold, a release; a stage inserted at a body or at the
+///   a join, a hold, a release; a preset inserted at a body or at the
 ///   train's output), every index the graph's
 ///   ([`gear_core::train::Train::edit`]) — what the core offers at a piece
 ///   is [`offers`]'s;
@@ -1754,7 +1754,7 @@ mod tests {
     /// number, because the number is a consequence and the agreement is the
     /// claim. 533 tests passed against the disagreement.
     #[test]
-    fn a_gear_tab_and_a_stage_member_bound_the_same_gear_alike() {
+    fn a_gear_tab_and_a_train_member_bound_the_same_gear_alike() {
         let d: serde_json::Value = serde_json::from_str(&defaults_impl().unwrap()).unwrap();
         let mut stage = preset(&d, "spur");
         // Whatever the shipped default gear is, asked of both surfaces. Read
@@ -1947,7 +1947,7 @@ mod tests {
     /// then showing the tooth the stage rated, which is the whole point of
     /// adopting rather than retyping.
     #[test]
-    fn a_member_adopted_is_the_tooth_the_stage_cut() {
+    fn a_member_adopted_is_the_tooth_the_train_cut() {
         let d: serde_json::Value = serde_json::from_str(&defaults_impl().unwrap()).unwrap();
         let request = |kind: &str, member: usize| {
             let mut train = d["train"].clone();
@@ -2398,7 +2398,7 @@ mod tests {
     /// bodies (the ground, then sun, carrier, ring, planet), a *solved* planet
     /// shift, and two meshes each with their own answers.
     #[test]
-    fn a_planetary_stage_crosses_the_boundary_with_its_own_shape() {
+    fn a_planetary_set_crosses_the_boundary_with_its_own_shape() {
         let d: serde_json::Value = serde_json::from_str(&defaults_impl().unwrap()).unwrap();
         let mut set = preset(&d, "planetary");
         set["members"][0]["gear"]["teeth"] = 24.into();
@@ -2523,7 +2523,7 @@ mod tests {
     /// literal here would be a fourth copy of the boundary and would go stale
     /// the way the hand-written mirror did (`docs/corrections.md`).
     #[test]
-    fn a_hula_stage_crosses_the_boundary_carrying_its_ratings() {
+    fn a_hula_crosses_the_boundary_carrying_its_ratings() {
         let train = serde_json::json!({
             "train": train_json(&[hula_stage()], (2.0, 3000.0), 0.0, (1.0, 3000.0), 1.0)
         });
@@ -2991,7 +2991,7 @@ mod tests {
     }
 
     #[test]
-    fn a_two_stage_train_crosses_the_boundary() {
+    fn a_train_of_two_presets_crosses_the_boundary() {
         // The shape the UI will send: a train, and no library, meaning "use the
         // one you ship with" — with the stage the panel seeds, at the tooth
         // counts of the regression canary.

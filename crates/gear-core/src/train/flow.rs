@@ -529,7 +529,7 @@ mod tests {
     /// and the efficiency, whichever way it is driven; and a mesh that cannot
     /// be driven backward is a stage that locks.
     #[test]
-    fn a_pair_is_one_mesh_and_a_locked_mesh_is_a_locked_stage() {
+    fn a_pair_is_one_mesh_and_a_locked_mesh_is_a_locked_pair() {
         let mesh = |backward: f64| MeshFlow {
             a: 1,
             b: 2,

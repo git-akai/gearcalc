@@ -95,10 +95,10 @@ pub type Body = usize;
 /// from a turning frame, which is a coherent question with a coherent answer.
 ///
 /// **Why it is body zero** is the only thing special about it, and it is a
-/// bookkeeping fact rather than a physical one: every stage needs the *same*
-/// one, so that a fixed-axis mesh in stage 1 and a grounded ring in stage 3 are
-/// held against one frame rather than two (a stage lists the train bodies
-/// on its axes and numbers its own slots off that list, and every stage's
+/// bookkeeping fact rather than a physical one: every part needs the *same*
+/// one, so that a fixed-axis mesh in one part and a grounded ring in another
+/// are held against one frame rather than two (a part lists the train bodies
+/// on its axes and numbers its own slots off that list, and every part's
 /// slot 0 is this one).
 ///
 /// **A train here has no housing.** An element is fixed to ground, carries a
@@ -160,7 +160,7 @@ pub enum Refusal {
 /// silently is a trap — so it is **named** rather than folded into the number.
 /// The commonest one is ground itself, in a train made only of epicyclic
 /// meshes — nothing in one meshes against it — and it stops being untouched
-/// the moment a fixed-axis stage joins the train.
+/// the moment a fixed-axis mesh joins the train.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Mobility {
     /// `bodies − rank`: how many independent conditions the train needs.
@@ -365,7 +365,7 @@ impl System {
 
     /// Rigidly connect two bodies: `ω_a − ω_b = 0`.
     ///
-    /// A coaxial output coupling, a locked clutch and a stage's shaft line are
+    /// A coaxial output coupling, a locked clutch and a train's shaft line are
     /// one mechanism, which is why there is one method. **Grounding is not one
     /// of them** — that is [`Condition::Ground`], a boundary rather than a
     /// structural edit, so a body can be held and released without the train

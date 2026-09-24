@@ -16,15 +16,15 @@ export type TrainResult = {
  * it one motion: every path an enabled case uses, from each of its
  * loads to each of its reactions, once each, in case order — the
  * headline case's first. Empty where the motion is
- * a family (a differential, an isolated stage), which is still rated:
- * each case's loads decide its motion, and every stage rates under
+ * a family (a differential, a part joined to nothing), which is still
+ * rated: each case's loads decide its motion, and every part rates under
  * that; what a family has none of is a figure read under one motion.
  */
 paths: Array<PathReport>, 
 /**
  * Every load case, in the train's order — the ones switched off too,
  * solved at the train level alone so a panel can say whether one
- * could be switched on; no stage rates a case that is off.
+ * could be switched on; no part rates a case that is off.
  */
 cases: Array<TrainCase>, 
 /**

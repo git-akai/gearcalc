@@ -1652,7 +1652,7 @@ mod hula {
     /// coefficients says the closed form is the same statement, which is what
     /// makes it safe to design against.
     #[test]
-    fn the_stage_efficiency_is_the_reduction_and_the_meshes() {
+    fn the_hula_efficiency_is_the_reduction_and_the_meshes() {
         for n in [7_u32, 12, 18] {
             for mu in [0.08, 0.04, 0.02, 0.01] {
                 let r = Fixture {

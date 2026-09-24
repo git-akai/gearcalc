@@ -272,18 +272,18 @@
 //! contact ratio given, a pair with its distance and both shifts and a helix
 //! pinned at once. An input that stands given and is read by nothing is the
 //! thing this tool refuses to have (`docs/rationale.md#what-a-stage-owes-relief`),
-//! so every stage read is **relieved** exactly as a stage in the panel is after
-//! any change — by the core, with nothing just touched — and the reader says
+//! so every train read is **relieved** exactly as the panel's is after any
+//! change — by the core, with nothing just touched — and the reader says
 //! whether that moved anything ([`Imported::adjusted`]). A hand-edited value
 //! is never changed; only which toggles stand, and only where the file asked
-//! for a contradiction or for an input the stage has no use for. The
+//! for a contradiction or for an input the graph has no use for. The
 //! precedent: a file is *adjusted to what the tool can honour*, once, on the
 //! way in, and the reader is told in one sentence rather than left to find
 //! a box that does nothing.
 //!
 //! # What is *not* checked on import
 //!
-//! A stage names its materials by name, and the library that has them is the
+//! A member names its material by name, and the library that has them is the
 //! user's own. Import therefore does not verify that they exist: the file is
 //! valid, the library is simply a different document, and the train solve
 //! already reports an unknown material by name where the user can act on it. The
@@ -343,20 +343,20 @@ const HEADER: &str = "\
 #[derive(Clone, Debug, Serialize)]
 pub struct Imported {
     pub document: TrainDocument,
-    /// Whether any stage was relieved on the way in — a toggle the file had
-    /// given that the stage cannot honour, turned back automatic (the module
+    /// Whether the train was relieved on the way in — a toggle the file had
+    /// given that the graph cannot honour, turned back automatic (the module
     /// documentation, *What is adjusted on import*). The values are the
     /// file's own throughout.
     pub adjusted: bool,
 }
 
-/// Parse a geartrain from TOML, relieved of anything it asks for that no stage
-/// can honour.
+/// Parse a geartrain from TOML, relieved of anything it asks for that the
+/// graph cannot honour.
 ///
 /// # Errors
 ///
-/// [`TrainError::Parse`] if the document is not a geartrain. A train with no
-/// stages is a train — its cases wait for one — and reads as written.
+/// [`TrainError::Parse`] if the document is not a geartrain. An empty train
+/// is a train — its cases wait for a preset — and reads as written.
 pub fn from_toml(src: &str) -> Result<Imported, TrainError> {
     let document: TrainDocument = toml::from_str(src).map_err(TrainError::Parse)?;
     Ok(relieved(document))
@@ -532,7 +532,7 @@ mod tests {
     /// rather than field by field, so a field added later is covered without
     /// anyone remembering to add it here.
     #[test]
-    fn a_train_of_every_stage_kind_round_trips_unchanged() {
+    fn a_train_of_every_preset_round_trips_unchanged() {
         let doc = document();
         let text = to_toml(&doc).unwrap();
         let back = from_toml(&text).unwrap();
@@ -606,7 +606,7 @@ mod tests {
     /// A train with no stages is a train, and round-trips as one: a designer
     /// who removed the last stage and saved keeps the cases.
     #[test]
-    fn a_train_without_stages_reads_as_written() {
+    fn an_empty_train_reads_as_written() {
         let mut doc = document();
         doc.train.shape = Shape::default();
         doc.train.held.clear();
@@ -747,7 +747,7 @@ mod tests {
     /// sentence the reader is owed. Every value the file gave is untouched,
     /// and a file that asks for nothing impossible is not adjusted.
     #[test]
-    fn a_file_asking_for_what_no_stage_honours_is_adjusted_and_says_so() {
+    fn a_file_asking_for_what_nothing_honours_is_adjusted_and_says_so() {
         let mut doc = document();
         let mesh = doc.train.parts()[1].meshes[0];
         doc.train.shape.meshes[mesh].overlap = Auto::fixed(1.5);

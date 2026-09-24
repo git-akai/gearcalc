@@ -43,7 +43,7 @@ parts: Array<Part>,
 /**
  * **The train's motion** — exact ratios, every body's speed, mobility —
  * present whenever the tooth counts and topology give one, which is
- * whether or not the geometry solved. A train mid-edit whose stage will
+ * whether or not the geometry solved. A train mid-edit whose gears will
  * not close still turns, and this is what says at what.
  */
 motion: MotionReport | null, 

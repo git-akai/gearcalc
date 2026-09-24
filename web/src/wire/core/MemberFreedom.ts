@@ -3,7 +3,7 @@
 /**
  * One of a member's constrainable inputs.
  *
- * A helix here is one reading of **the size of the stage's teeth along the
+ * A helix here is one reading of **the size of the teeth along the
  * axis**: every member's is bound to the others', so a pair's first member
  * is as big as its helix makes it, which is what absorbs a centre distance
  * once both shifts are pinned.

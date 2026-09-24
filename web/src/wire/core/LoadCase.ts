@@ -12,7 +12,7 @@ import type { Load } from "./Load";
  * running and a different idea with different implications. A fatigue case
  * carries one of those as [`Self::duty`]; the case is not it.
  *
- * A train carries any number of these, as it carries any number of stages,
+ * A train carries any number of these, as it carries any number of gears,
  * and for the same reason: the two loads it used to hold — a peak at the input
  * and a back-driving one at the output — were the first two entries of this
  * list with their ports and directions written into the field names. A case

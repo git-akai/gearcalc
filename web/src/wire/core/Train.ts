@@ -7,7 +7,7 @@ import type { Shape } from "./Shape";
  */
 export type Train = { 
 /**
- * Every load the train is rated for. Any number, as the stages are any
+ * Every load the train is rated for. Any number, as the gears are any
  * number — including none, which is a shaft line with nothing rated on
  * it; a case switched off is kept and takes part in nothing.
  */

@@ -13,7 +13,7 @@ export type TrainCase = {
  */
 case: number, 
 /**
- * Every body of every stage, ground first, in the train's order.
+ * Every body of the train, ground first, in number order.
  */
 bodies: Array<CaseBody>, 
 /**

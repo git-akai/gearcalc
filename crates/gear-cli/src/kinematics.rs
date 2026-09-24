@@ -2,9 +2,9 @@
 //! any of it moves.**
 //!
 //! This was the characterisation the geartrain refactor was measured against:
-//! the plan (`geartrain-refactor-plan.md`) replaced three hand-written
-//! kinematic models — `planetary::power`, the hula stage's mapping onto it, and
-//! `solve_train`'s chain walk — with one graph, and the only honest way to know
+//! it replaced three hand-written kinematic models — `planetary::power`, the
+//! hula stage's mapping onto it, and `solve_train`'s chain walk — with one
+//! graph, and the only honest way to know
 //! whether that reproduced them was to have written them down first. It is
 //! the record the graph is still held to, in the golden corpus.
 //!
@@ -18,11 +18,11 @@
 //! What is here is exactly the set of facts a graph over bodies and meshes has
 //! to produce:
 //!
-//! - per train — total ratio, efficiency and backlash both ways, and where each
-//!   load case ends up;
-//! - per stage — ratio, efficiency and backlash both ways;
-//! - per body of an epicyclic preset — speed and torque in every case,
-//!   **including the body that is not a gear**;
+//! - per path a case asks for — ratio, efficiency and backlash both ways,
+//!   the power through the teeth, and what one more tooth on each gear does;
+//! - per case — what each body is in it and what it carries;
+//! - per body of each part — speed and torque in every case, **including the
+//!   body that is not a gear**;
 //! - per member — its speed, its speed *against the frame of its mesh*, its
 //!   torque and its cycles, in every case;
 //! - per mesh — efficiency both ways, the contact ratio its loss is read over,
@@ -30,9 +30,9 @@
 //!
 //! # Why the members and the meshes are read through the shape
 //!
-//! `ShapeResult::members()` and `::meshes()` answer for any stage, and
-//! everything below reads through them so that this harness cannot be the
-//! place an arrangement is forgotten. Which members a mesh joins and in whose
+//! A part's result lists every member and every mesh alike, whatever the
+//! arrangement, and everything below walks those lists so that this harness
+//! cannot be the place an arrangement is forgotten. Which members a mesh joins and in whose
 //! frame, and what each body is called, are read off the shape ([`member_role`])
 //! rather than off a result type of the arrangement's own — the two readings
 //! that were per type went with the types.
@@ -46,7 +46,7 @@ use gear_core::train::{
 /// reacted at the other, and a fatigue case counted over a continuous duty.
 ///
 /// **Both ports, because torque distributes differently from each.** Which way
-/// a stage is driven decides where `η₀` multiplies in an epicyclic set and
+/// a set is driven decides where `η₀` multiplies in an epicyclic set and
 /// which flank a screw pair presses, so a characterisation taken from one end
 /// records half the model.
 fn loads(input: usize, output: usize) -> Vec<LoadCase> {
@@ -94,8 +94,8 @@ fn member(s: &str) -> usize {
 }
 
 /// **An arrangement as a train states it**: a lone set with one body held
-/// — one line, since a hold on a stage replaces the stage's conventional
-/// hold, so holding the carrier releases the ring without a word about it —
+/// — one line, the train's holds being exactly what it states, so holding
+/// the carrier leaves the ring free without a word about it —
 /// and its loads between the other two, the input named first. The set
 /// itself carries no arrangement; what drives it is a load, and nothing
 /// more.
@@ -335,30 +335,26 @@ fn fixtures() -> Vec<(String, Train)> {
 type SlotLine = Vec<(usize, f64, f64)>;
 
 /// **Every slot's speed and torque per case**, named as the harness names
-/// a stage's bodies: a shape's from its own per-slot cases.
-fn slot_cases(stage: &Shape, r: &ShapeResult) -> Vec<(String, SlotLine)> {
-    {
-        {
-            let w = stage.wiring();
-            (1..w.slots.len())
-                .map(|i| {
-                    (
-                        labelled(stage, w.slots[i]),
-                        r.cases
-                            .iter()
-                            .map(|c| (c.case, c.speeds[i], c.torques[i]))
-                            .collect(),
-                    )
-                })
-                .collect()
-        }
-    }
+/// a part's bodies: a shape's from its own per-slot cases.
+fn slot_cases(shape: &Shape, r: &ShapeResult) -> Vec<(String, SlotLine)> {
+    let w = shape.wiring();
+    (1..w.slots.len())
+        .map(|i| {
+            (
+                labelled(shape, w.slots[i]),
+                r.cases
+                    .iter()
+                    .map(|c| (c.case, c.speeds[i], c.torques[i]))
+                    .collect(),
+            )
+        })
+        .collect()
 }
 
 /// **What the graph says**, from tooth counts and topology alone.
 ///
 /// Printed for every fixture whether or not the geometry solved, because it
-/// needs none of it: a train whose stage cannot be built still turns at a
+/// needs none of it: a train whose gears cannot be built still turns at a
 /// ratio, and the two rows under `no answer:` below are the whole of the fault
 /// the refactor opens on, recorded so that fixing it is a diff here.
 ///
@@ -555,18 +551,17 @@ pub fn named(train: &Train, body: usize) -> String {
             }
         }
         Some(&(k, slot)) => {
-            let stages = train.part_shapes();
-            let stage = &stages[k];
-            labelled(stage, stage.wiring().slots[slot])
+            let shape = &train.part_shapes()[k];
+            labelled(shape, shape.wiring().slots[slot])
         }
     }
 }
 
-/// What a stage calls one of its bodies, from the label its wiring gives
+/// What a part calls one of its bodies, from the label its wiring gives
 /// the slot: ground, carrier, or the member's role ([`member_role`]).
-fn labelled(stage: &Shape, label: gear_core::train::BodyLabel) -> String {
+fn labelled(shape: &Shape, label: gear_core::train::BodyLabel) -> String {
     use gear_core::train::BodyLabel;
-    match (label, stage) {
+    match (label, shape) {
         (BodyLabel::Ground, _) => "ground".into(),
         // A shaft with nothing on it: a gearbox in neutral.
         (BodyLabel::Bare, _) => "bare".into(),

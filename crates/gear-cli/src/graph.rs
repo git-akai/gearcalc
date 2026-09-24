@@ -42,13 +42,13 @@ use gear_core::train::{solve_train, CaseKind, Duty, Shape, Train, TrainResult};
 
 /// A train of presets in a row, with the three cases between its ends.
 fn chain(presets: &[Preset]) -> Train {
-    let stages: Vec<Shape> = presets.iter().map(|p| p.build()).collect();
-    let mut train = Train::chained(stages, |_| Vec::new());
+    let shapes: Vec<Shape> = presets.iter().map(|p| p.build()).collect();
+    let mut train = Train::chained(shapes, |_| Vec::new());
     let mut cases = vec![
         train.fresh_case(CaseKind::Ultimate, 2.0, 3000.0),
         {
             // From the output: the input declared free, so the case holds a
-            // load only a stage that locks can hold.
+            // load only a mesh that locks can hold.
             let forward = train.fresh_case(CaseKind::Ultimate, 0.6, 0.0);
             let (input, output) = (forward.loads[0].at, forward.loads[1].at);
             gear_core::train::LoadCase::back_driving(input, output, 0.6)
@@ -132,14 +132,13 @@ fn report(name: &str, train: &Train, r: &TrainResult) {
             );
         }
     }
-    // Members and meshes numbered across the train, in stage order — the
-    // order a flattened graph lists them in.
+    // Members and meshes numbered across the train, part by part — which on
+    // a chain of presets is the order the graph lists them in.
     let mut member = 0;
     let mut mesh = 0;
     let mut distance = 0;
     for (k, s) in r.by_part(train).iter().enumerate() {
-        let stages = train.part_shapes();
-        let shape = &stages[k];
+        let shape = &train.part_shapes()[k];
         for g in &s.members {
             member += 1;
             println!(

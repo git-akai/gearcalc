@@ -63,7 +63,7 @@ pub struct MinimumShift {
 /// | 1.00 module | 17.10 → **18 teeth**, the classical rule |
 /// | 1.25 module, a full standard dedendum | 21.37 → **22 teeth** |
 ///
-/// **A stage's `working_depth` follows its own dedendum**, and is `Auto` so it
+/// **A member's `working_depth` follows its own dedendum**, and is `Auto` so it
 /// can be told otherwise. It used to be a fixed 1 module — the classical rule —
 /// and the two ask different questions, as the table shows. The dedendum is the
 /// one the profile generator answers, so following it makes the automatic shift
@@ -853,7 +853,7 @@ pub fn searchable_shift(at: &dyn Fn(f64) -> GearParams, floor: Option<f64>) -> O
 ///
 /// A centre distance fixes the *sum* and says nothing about the division. With
 /// the optimiser on, the division is what `shifts_for_efficiency` searches over.
-/// With it off there is no objective to search against, and the stage still has
+/// With it off there is no objective to search against, and the solve still has
 /// to answer — so the division follows a stated rule instead.
 ///
 /// # The rule: the even split, projected onto what the members can be cut at
@@ -925,9 +925,9 @@ pub fn divide_shift_sum(
 
 /// **Which of a fixed set of numbers a search still has to choose.**
 ///
-/// A stage hands its searcher some numbers already decided and some not, and
+/// A shape hands its searcher some numbers already decided and some not, and
 /// then has to map whatever the search hands back onto the full set. That
-/// mapping was written out twice, identically, in two stages — and it is the
+/// mapping was written out twice, identically, in two stage types — and it is the
 /// kind of thing that stays identical right up until one of them is edited.
 ///
 /// `None` is a number left free; `Some` is one a designer gave, which a search
@@ -992,13 +992,13 @@ impl<const N: usize> Freedoms<N> {
 /// the shift: it is below the least that clears undercut, the flank is undercut
 /// anyway, the tooth comes to a point before its tip, or the root round asked
 /// for no longer fits the space. One place for them, so that a bound added here
-/// reaches every stage that chooses shifts rather than only the search it was
+/// reaches every mesh whose shifts are chosen rather than only the search it was
 /// written in — which is how the root round came to bound a pair and not an
 /// epicyclic set.
 ///
 /// A **ring is not asked**: its root and its fillet are its shaper's rather than
 /// inputs of its own (docs/reference.md#internal-gears), so three of the four
-/// mean nothing there and the fourth is asked of the tool instead. A stage's
+/// mean nothing there and the fourth is asked of the tool instead. A shape's
 /// internal meshes carry their own bounds — the tip margin, and the
 /// interference flags a `RingMesh` reports — which are about the pair rather
 /// than about one member.
@@ -1147,8 +1147,8 @@ impl Cut<'_> {
 pub struct MeshTrial<'a> {
     /// The two members, in the order the mesh was built.
     pub members: [Cut<'a>; 2],
-    /// The mesh as it **runs**, opened by whatever clearance the stage assembles
-    /// at — not as the shifts leave it, or the search would optimise a contact
+    /// The mesh as it **runs**, opened by whatever clearance its distance
+    /// assembles at — not as the shifts leave it, or the search would optimise a contact
     /// ratio nobody measures.
     pub mesh: &'a crate::mesh::Mesh,
     /// The path of contact on that mesh, read through member 1.
@@ -1157,7 +1157,7 @@ pub struct MeshTrial<'a> {
     /// monotonically with path length, so without it the least-loss mesh is
     /// always the one whose teeth barely reach and the constraint *is* the
     /// answer; how much margin a design wants over continuous contact is the
-    /// stage's decision, not this one's.
+    /// mesh's input, not this one's decision.
     pub min_contact_ratio: f64,
     pub friction: f64,
 }
@@ -1170,7 +1170,7 @@ pub struct CrossedTrial<'a> {
     pub members: [Cut<'a>; 2],
     pub screw: &'a crate::screw::Screw,
     /// The zone the **teeth** leave at the running distance — not the faces,
-    /// which the stage sizes to the answer; `None` where they never meet.
+    /// which the rating sizes to the answer; `None` where they never meet.
     pub path: Option<&'a crate::screw::CrossedPath>,
     /// The distance the pair runs at.
     pub centre: f64,
@@ -1317,7 +1317,7 @@ impl MeshTrial<'_> {
     /// # It is asked at the zero-backlash distance, which is the tighter one
     ///
     /// [`crate::ring::mesh_with`] solves the pair's own centre distance from its
-    /// shifts, and a stage then assembles at that distance *opened* by its
+    /// shifts, and a shape then assembles at that distance *opened* by its
     /// running clearance. Opening it can only move the tips apart, so a pair
     /// that clears here clears where it runs. The bias is stated in
     /// `docs/state.md` with the rest.
@@ -1348,10 +1348,10 @@ pub struct Bounds {
     /// The transverse contact ratio the pair must keep. Loss falls
     /// monotonically with path length, so without this the least-loss pair is
     /// always the one whose teeth barely reach and the constraint *is* the
-    /// answer; it belongs to the stage, not to this function, because how much
+    /// answer; it belongs to the mesh, not to this function, because how much
     /// margin a design wants over continuous contact is a design decision.
     pub min_contact_ratio: f64,
-    /// How far the stage opens the zero-backlash distance to assemble, so the
+    /// How far the distance opens the zero-backlash one to assemble, so the
     /// pair is rated where it actually touches.
     pub clearance: f64,
 }
@@ -1510,7 +1510,7 @@ pub fn shifts_for_efficiency(
         }
         let [pa, pb] = pair(x);
         let (a, b) = (Tooth::new(pa), Tooth::new(pb));
-        // **The pair as it runs, not as its shifts leave it.** The stage opens
+        // **The pair as it runs, not as its shifts leave it.** The solve opens
         // the zero-backlash distance by its assembly clearance and rates
         // contact there (docs/reference.md#axis-distance-and-backlash); so
         // does this, or the search would optimise a contact ratio nobody
@@ -1596,11 +1596,11 @@ fn member<'a>(tooth: &'a Tooth, floor: Option<f64>, given: Option<f64>) -> Cut<'
 /// ([`crate::screw::CrossedPath::flank_interference`]), and contact that does
 /// not stay continuous; the internal pair's tip question does not arise. The
 /// objective is [`crate::screw::CrossedPath::efficiency`], forward, on the zone
-/// the *teeth* leave — not the faces, which the stage sizes to the answer.
+/// the *teeth* leave — not the faces, which the rating sizes to the answer.
 ///
 /// The shift sum enters through the rack law
 /// ([`crate::screw::ScrewParams::profile_shifts`]), so `screw_at` is the pair
-/// at those shifts and the zero-backlash distance is its own; the stage opens
+/// at those shifts and the zero-backlash distance is its own; the solve opens
 /// it by the clearance as it does everywhere.
 ///
 /// # Errors
@@ -1664,7 +1664,7 @@ pub fn crossed_shifts_for_efficiency(
 
 /// Quadrature points for the friction balance **inside the search**.
 ///
-/// The stage reports the balance at 2048 points, where the trapezium rule's
+/// The rating reports the balance at 2048 points, where the trapezium rule's
 /// residual is below 1e-9 (`train::crossed`). A search does not need that: it
 /// resolves shifts to `Search::resolution`, and the objective moves by
 /// hundredths of a point per module of shift, so a residual of 1e-7 is a
@@ -1682,7 +1682,7 @@ const SEARCH_SAMPLES: usize = 256;
 /// range rather than penalising one.
 ///
 /// It is here, rather than inside the one function that first needed it,
-/// because every stage that chooses shifts for efficiency chooses a different
+/// because every shape that chooses shifts for efficiency chooses a different
 /// number of them against a different objective: a pair has its mesh, and an
 /// epicyclic has two meshes whose shifts a shared centre distance ties
 /// together, so only the search is common.
@@ -1818,7 +1818,7 @@ impl Search {
     /// caller passed [`Self::refined`].
     ///
     /// Recovered from `starts`, which `refined` scales by exactly `k`. It exists
-    /// so a caller whose search has *outer* structure — the hula stage solves a
+    /// so a caller whose search has *outer* structure — a hula solves a
     /// crank and chooses the splits, and does that a few times round — can scale
     /// that structure by the same effort rather than carrying an effort of its
     /// own that nothing lines up with.

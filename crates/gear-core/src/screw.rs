@@ -677,7 +677,7 @@ impl Screw {
     ///
     /// The path of contact is built on this, and so is backlash: a displacement
     /// opens a gap only through its component along `n̂`, so the two
-    /// displacements a stage knows about — the centre line, and a worm's float
+    /// displacements a pair knows about — the centre line, and a worm's float
     /// along its own axis — are projections of this same vector rather than two
     /// formulas that can drift apart. `n̂ₓ` comes out `sin α_n` at every shaft
     /// angle and `n̂_z` is `sin β_b1` by construction.
@@ -711,7 +711,7 @@ impl Screw {
     }
 
     /// The same path at an **operating** centre distance, which is generally not
-    /// the zero-backlash one a stage is designed around.
+    /// the zero-backlash one a pair is designed around.
     ///
     /// # Why this is not simply the above with a different number in it
     ///

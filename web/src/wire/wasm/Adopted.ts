@@ -7,7 +7,7 @@ import type { CutterRef } from "./CutterRef";
  */
 export type Adopted = { 
 /**
- * The tooth as the stage cut it.
+ * The tooth as the train cut it.
  */
 params: GearParams, 
 /**

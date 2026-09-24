@@ -107,7 +107,7 @@ impl MeshKind {
     /// as its centres separate; an internal pair's part as they come together,
     /// because the pinion moves *out* of the ring's teeth toward its centre.
     /// So a positive clearance is a larger distance on one kind and a smaller
-    /// one on the other, and every stage that opens a mesh asks this rather
+    /// one on the other, and every distance that opens a mesh asks this rather
     /// than adding.
     #[must_use]
     pub fn run_at(self, zero_backlash: f64, clearance: f64) -> f64 {

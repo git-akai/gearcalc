@@ -5,7 +5,7 @@ import type { Directional } from "./Directional";
 /**
  * **One path of the train**: what it comes to between two of its open
  * bodies, with nothing loaded anywhere else — the three questions a stage
- * answers of itself, asked of the whole graph.
+ * once answered of itself, asked of the whole graph.
  */
 export type PathReport = { from: number, to: number, 
 /**
@@ -15,8 +15,8 @@ ratio: number,
 /**
  * Driving `from` with `to` holding the load and every other open body
  * free, and the reverse — the train's flow at unit load, so a path
- * that crosses one stage of three is rated on that stage alone. A path
- * through a self-locking stage cannot be back-driven at all, and
+ * that crosses one preset of three is rated on that preset alone. A path
+ * through a self-locking mesh cannot be back-driven at all, and
  * [`Directional::locked`] on this pair says so. **Whether it breaks
  * away** is the same flow against every mesh's static friction
  * ([`MeshReport::efficiency_at_rest`], [`Directional::once_moving`]):

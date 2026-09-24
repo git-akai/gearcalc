@@ -4563,7 +4563,7 @@ mod tests {
         let mut ring_won = false;
         for ring_face in [10.0_f64, 3.0] {
             let stage = {
-                let mut s = stage_of(24, 18, 60, 0.0);
+                let mut s = set_of(24, 18, 60, 0.0);
                 s.members[2].gear.face_width = Auto::fixed(ring_face);
                 s
             };
@@ -4649,7 +4649,7 @@ mod tests {
     /// `Err(NoRootSection)` — and the message blamed undercut, which nothing
     /// here is.
     #[test]
-    fn a_ring_with_no_notch_costs_its_bending_rather_than_the_stage() {
+    fn a_ring_with_no_notch_costs_its_bending_rather_than_the_set() {
         let lib = test_library();
         for k in [1.3_f64, 1.4, 1.5, 1.7] {
             let stage = {
@@ -4690,7 +4690,7 @@ mod tests {
         }
     }
 
-    fn stage_of(sun: u32, planet: u32, ring: u32, helix: f64) -> Shape {
+    fn set_of(sun: u32, planet: u32, ring: u32, helix: f64) -> Shape {
         let mut s = arr::planetary(sun, planet, ring, 3);
         s.members[0].gear.helix_angle = Auto::fixed(helix);
         s
@@ -4698,7 +4698,7 @@ mod tests {
 
     fn solved(sun: u32, planet: u32, ring: u32) -> crate::train::Alone {
         solve_set(
-            &stage_of(sun, planet, ring, 0.0),
+            &set_of(sun, planet, ring, 0.0),
             2.0,
             3000.0,
             &test_library(),
@@ -4890,7 +4890,7 @@ mod tests {
         // the ideal 21 to well under a micron while the two zero-backlash
         // distances part by twice the clearance.
         let lib = test_library();
-        let mut exact = stage_of(24, 18, 60, 0.0);
+        let mut exact = set_of(24, 18, 60, 0.0);
         exact.distances[0].clearance = Auto::fixed(0.0);
         let exact = solve_set(&exact, 2.0, 0.0, &lib).unwrap();
         assert!(exact.members[1].profile_shift.abs() < 1e-12);
@@ -5010,7 +5010,7 @@ mod tests {
     }
 
     #[test]
-    fn the_stage_reports_the_classical_ratios() {
+    fn the_set_reports_the_classical_ratios() {
         let want = [
             (
                 PlanetaryShaft::Sun,
@@ -5033,7 +5033,7 @@ mod tests {
         ];
         for (input, fixed, output, ratio) in want {
             // The same stage, asked six things.
-            let stage = stage_of(24, 18, 60, 0.0);
+            let stage = set_of(24, 18, 60, 0.0);
             let r = crate::train::solve_alone(
                 &crate::train::Train::alone(&stage, 2.0, 0.0)
                     .arranged_as(Arrangement { input, fixed }),
@@ -5054,7 +5054,7 @@ mod tests {
     /// algebra.
     #[test]
     fn a_held_carrier_gives_exactly_the_product_of_the_mesh_efficiencies() {
-        let stage = stage_of(24, 18, 60, 0.0);
+        let stage = set_of(24, 18, 60, 0.0);
         let carrier_held = Arrangement {
             input: PlanetaryShaft::Sun,
             fixed: PlanetaryShaft::Carrier,
@@ -5127,7 +5127,7 @@ mod tests {
         let lib = test_library();
         for (s, p, r) in [(24u32, 18u32, 60u32), (17, 17, 52), (30, 15, 62)] {
             // Ring held: the sun and the carrier are the two possible outputs.
-            let stage = stage_of(s, p, r, 0.0);
+            let stage = set_of(s, p, r, 0.0);
             let asked = |input| {
                 let arrangement = Arrangement {
                     input,
@@ -5164,7 +5164,7 @@ mod tests {
     #[test]
     fn both_meshes_contribute_to_the_output_backlash() {
         let lib = test_library();
-        let base = stage_of(24, 18, 60, 0.0);
+        let base = set_of(24, 18, 60, 0.0);
         let tight = solve_set(&base, 2.0, 0.0, &lib).unwrap();
 
         // More clearance opens both meshes, so the output must loosen.
@@ -5190,7 +5190,7 @@ mod tests {
         // angles no longer move together.
         let b = &tight.backlash.unwrap().forward;
         assert!(b.minimum <= b.nominal && b.nominal <= b.maximum);
-        let off = stage_of(24, 18, 61, 0.0);
+        let off = set_of(24, 18, 61, 0.0);
         let off = solve_set(&off, 2.0, 0.0, &lib).unwrap();
         let b = &off.backlash.unwrap().forward;
         assert!(
@@ -5325,7 +5325,7 @@ mod tests {
         // A single planet has no neighbour to clear, and says so rather than
         // reporting a gap of nothing.
         let one = {
-            let mut s = stage_of(24, 18, 60, 0.0);
+            let mut s = set_of(24, 18, 60, 0.0);
             s.axes[1].count = 1;
             s
         };
@@ -5339,7 +5339,7 @@ mod tests {
     #[test]
     fn a_helical_set_reports_everything_a_spur_one_does() {
         for helix in [10.0, 20.0, 30.0] {
-            let stage = stage_of(24, 18, 60, helix);
+            let stage = set_of(24, 18, 60, helix);
             let r = solve_set(&stage, 2.0, 0.0, &test_library())
                 .unwrap_or_else(|e| panic!("helix={helix}: {e}"));
             assert!(
@@ -5367,7 +5367,7 @@ mod tests {
     /// case rather than an exceptional one.
     #[test]
     fn an_impossible_set_is_refused() {
-        assert!(solve_set(&stage_of(24, 18, 200, 0.0), 2.0, 0.0, &test_library()).is_err());
+        assert!(solve_set(&set_of(24, 18, 200, 0.0), 2.0, 0.0, &test_library()).is_err());
     }
 
     /// The thickness invariants differ between the two meshes and both hold from
@@ -5378,7 +5378,7 @@ mod tests {
     #[test]
     fn one_thickness_modification_satisfies_both_invariants() {
         for k in [0.9, 1.0, 1.15] {
-            let mut shape = stage_of(24, 18, 60, 0.0);
+            let mut shape = set_of(24, 18, 60, 0.0);
             for given in 0..3 {
                 for (i, m) in shape.members.iter_mut().enumerate() {
                     m.thickness_mod = if i == given {
@@ -5413,7 +5413,7 @@ mod tests {
         // Both free: a shift given by hand is a constraint, and a set with two
         // of them has nothing left to search.
         let free = || {
-            let mut s = stage_of(24, 18, 60, 0.0);
+            let mut s = set_of(24, 18, 60, 0.0);
             s.members[0].gear.profile_shift = Auto::automatic(0.0);
             s.members[2].gear.profile_shift = Auto::automatic(0.0);
             s
@@ -5468,7 +5468,7 @@ mod tests {
     /// A shift given by hand is a constraint the search may not overrule.
     #[test]
     fn a_given_shift_survives_the_search() {
-        let mut stage = stage_of(24, 18, 60, 0.0);
+        let mut stage = set_of(24, 18, 60, 0.0);
         stage.set_search(true);
         stage.members[0].gear.profile_shift = Auto::automatic(0.0);
         stage.members[2].gear.profile_shift = Auto::fixed(0.25);
@@ -5498,7 +5498,7 @@ mod pressure_angle {
     /// A layshaft's second pair at 25° runs at 25° and its first at 20°,
     /// each mesh reporting its own operating angle above its own reference.
     #[test]
-    fn two_mesh_groups_of_one_stage_run_at_two_pressure_angles() {
+    fn two_mesh_groups_of_one_part_run_at_two_pressure_angles() {
         let mut shape = layshaft((17, 43), &[(41, 19)], 0);
         for j in [2, 3] {
             shape.members[j].pressure_angle = Auto::fixed(25.0);
@@ -5757,7 +5757,7 @@ mod hula_recorded {
     }
 
     #[test]
-    fn the_shipped_hula_stage_reports_the_figures_the_documents_quote() {
+    fn the_shipped_hula_reports_the_figures_the_documents_quote() {
         let r = solve(&shipped(), 2.0, 1000.0);
         close(3721.0 / 16.0, r.ratio.unwrap(), 1e-9, "the reduction");
         close(

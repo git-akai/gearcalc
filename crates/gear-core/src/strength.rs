@@ -1538,7 +1538,7 @@ fn worst_over_cycle<T: ToothOutline + ?Sized>(
 /// **one quantity, computed twice, agreeing until it mattered.**
 ///
 /// A mesh below a contact ratio of 1 is already reported
-/// (`stage.transverse_contact_ratio_below_one`); what this fixes is that it was
+/// (`mesh.contact_ratio_below_one`); what this fixes is that it was
 /// also rated at a point on no tooth.
 fn highest_single_pair(eps_n: f64) -> f64 {
     (eps_n - 1.0).max(0.0)

@@ -112,7 +112,7 @@ impl EllipticalContact {
 /// **A zero load is a load.** The patch closes to a point and the pressure with
 /// it, which is the limit of `a, b ∝ F^⅓` and `p = 3F/2πab ∝ F^⅓` taken at zero
 /// rather than an expression that happens to read `0/0` there. It is reached
-/// whenever a stage is asked what it does at rest — a train's operating torque
+/// whenever a mesh is asked what it does at rest — a train's operating torque
 /// may legitimately be nought — and refusing it cost a worm stage its whole
 /// solve (`docs/corrections.md`).
 ///
@@ -259,7 +259,7 @@ pub fn elliptical_contact(
 /// an error: at `curvature_along = 0` the ellipse is infinitely long and presses
 /// with **exactly zero**. A zero `line_length` is the same statement from the
 /// other end — a face of no width carries its load on no line — and its value is
-/// an infinite pressure. Both are honest, and a stage that resolves to a zero
+/// an infinite pressure. Both are honest, and a member that resolves to a zero
 /// face width because no rating was enabled to size it therefore still reports,
 /// with the infinity saying plainly what a zero-width gear does.
 ///

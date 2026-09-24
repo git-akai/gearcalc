@@ -267,7 +267,7 @@ impl Directional<f64> {
     /// predicate that names one direction in its own signature is a predicate
     /// that will one day be asked the other and answer wrongly. The name for
     /// **this** direction's answer belongs to the reader, and
-    /// `stage.self_locking` is still what the catalogue calls
+    /// `mesh.self_locking` is still what the catalogue calls
     /// `locked().backward` on a worm.
     #[must_use]
     pub fn locked(&self) -> Directional<bool> {

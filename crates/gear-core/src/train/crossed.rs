@@ -154,16 +154,6 @@ mod tests {
         super::super::test_library()
     }
 
-    /// A stage solved alone, under its own conventions.
-    fn solve_pair_stage(
-        stage: &Shape,
-        torque: f64,
-        speed: f64,
-        lib: &MaterialLibrary,
-    ) -> Result<crate::train::Alone, TrainError> {
-        crate::train::solve_alone(&crate::train::Train::alone(stage, torque, speed), lib)
-    }
-
     /// The old worm entry point, as the tests were written against it: the
     /// pair as a worm drive, whatever its own distance says.
     fn solve_worm(
@@ -174,7 +164,7 @@ mod tests {
     ) -> Result<crate::train::Alone, TrainError> {
         let mut s = stage.clone();
         s.distances[0].worm = true;
-        solve_pair_stage(&s, torque, speed, lib)
+        super::super::solve_preset(&s, torque, speed, lib)
     }
 
     /// The old crossed-gear entry point, likewise: the pair as two gears.
@@ -186,7 +176,7 @@ mod tests {
     ) -> Result<crate::train::Alone, TrainError> {
         let mut s = stage.clone();
         s.distances[0].worm = false;
-        solve_pair_stage(&s, torque, speed, lib)
+        super::super::solve_preset(&s, torque, speed, lib)
     }
 
     /// A stage with one member's inputs edited.
@@ -206,7 +196,7 @@ mod tests {
     }
 
     fn solved(stage: &Shape) -> crate::train::Alone {
-        solve_pair_stage(stage, 2.0, 0.0, &library()).unwrap()
+        super::super::solve_preset(stage, 2.0, 0.0, &library()).unwrap()
     }
 
     /// **The same teeth with their bodies brought parallel**, as an efficiency
@@ -223,7 +213,7 @@ mod tests {
             s.set_search(false);
             s.with_additional_helix(stage.helix_angles()[0])
         };
-        solve_pair_stage(&flat, 2.0, 0.0, &library())
+        super::super::solve_preset(&flat, 2.0, 0.0, &library())
             .expect("the parallel counterpart is buildable")
             .meshes[0]
             .efficiency
@@ -515,7 +505,7 @@ mod tests {
 
     /// The stage's headline numbers, and the one it deliberately does not have.
     #[test]
-    fn a_worm_stage_reports_contact_and_two_efficiencies_and_no_bending() {
+    fn a_worm_drive_reports_contact_and_two_efficiencies_and_no_bending() {
         let r = solved(&arr::worm(1, 40));
         // Negative: a worm is an external mesh, its wheel turns the other way,
         // and a ratio is signed now — it is the graph's rather than `z₂/z₁`.
@@ -934,7 +924,7 @@ mod tests {
     /// too — and the pair reported as self-locking is the one whose reported
     /// backward efficiency is not positive.
     #[test]
-    fn the_stage_counts_all_the_sliding_and_can_only_lose_by_it() {
+    fn the_pair_counts_all_the_sliding_and_can_only_lose_by_it() {
         use crate::params::Auto;
         use crate::train::MemberGear;
 
@@ -1239,7 +1229,7 @@ mod tests {
     /// not move — and this compares the two routes rather than asserting
     /// remembered numbers, so it keeps meaning something as the model changes.
     #[test]
-    fn a_crossed_spur_stage_is_the_screw_stage_it_used_to_be_entered_as() {
+    fn a_crossed_spur_pair_is_the_screw_pair_it_used_to_be_entered_as() {
         use crate::params::Auto;
         use crate::train::MemberGear;
 
@@ -1313,7 +1303,7 @@ mod tests {
     /// a shaft angle at all. Asserted on the geometry the mesh is built from,
     /// so it holds whatever the solve does with it.
     #[test]
-    fn a_parallel_stage_is_the_shaft_angles_zero() {
+    fn a_parallel_pair_is_the_shaft_angles_zero() {
         for additional in [0.0_f64, 12.5, -30.0] {
             let stage = arr::pair([17, 43]).with_additional_helix(additional);
             let (b1, b2) = {
@@ -1372,7 +1362,7 @@ mod tests {
 
         let mut last = f64::INFINITY;
         for clearance in [0.08_f64, 0.04, 0.02, 0.01, 0.005] {
-            let parallel = solve_pair_stage(&stage(0.0, clearance), 2.0, 0.0, &lib)
+            let parallel = super::super::solve_preset(&stage(0.0, clearance), 2.0, 0.0, &lib)
                 .expect("a parallel pair")
                 .meshes[0]
                 .backlash_by_drive()
@@ -1427,7 +1417,7 @@ mod tests {
             s.distances[0].tolerance_minus = 0.0;
             s
         };
-        let parallel = solve_pair_stage(&float(0.0), 2.0, 0.0, &lib)
+        let parallel = super::super::solve_preset(&float(0.0), 2.0, 0.0, &lib)
             .expect("a parallel pair")
             .meshes[0]
             .backlash_by_drive();
@@ -1458,7 +1448,7 @@ mod tests {
         }
         // ...and on a spur gear the term is nothing, since `β_b = 0`.
         let spur = float(0.0).with_additional_helix(0.0);
-        let play = solve_pair_stage(&spur, 2.0, 0.0, &lib)
+        let play = super::super::solve_preset(&spur, 2.0, 0.0, &lib)
             .expect("a spur pair")
             .meshes[0]
             .backlash_by_drive()
@@ -1568,7 +1558,8 @@ mod tests {
         );
 
         // The parallel limit: near, and not on, for the reason above.
-        let parallel = solve_pair_stage(&optimised(crossed(0.0)), 2.0, 0.0, &lib).unwrap();
+        let parallel =
+            super::super::solve_preset(&optimised(crossed(0.0)), 2.0, 0.0, &lib).unwrap();
         let near = solve_crossed(&optimised(crossed(0.01)), 2.0, 0.0, &lib).unwrap();
         for i in 0..2 {
             assert!(
@@ -1643,7 +1634,7 @@ mod tests {
             .with_additional_helix(20.0)
         };
         let shortfall = |clearance: f64| {
-            let parallel = solve_pair_stage(&stage(0.0, clearance), 2.0, 0.0, &lib)
+            let parallel = super::super::solve_preset(&stage(0.0, clearance), 2.0, 0.0, &lib)
                 .expect("a parallel pair")
                 .meshes[0]
                 .backlash_by_drive()
@@ -1745,11 +1736,12 @@ mod tests {
     /// coefficient reaches it — asserted over a range wide enough to include
     /// dry steel on steel.
     #[test]
-    fn a_parallel_stage_passes_the_breakaway_rule_untouched() {
+    fn a_parallel_pair_passes_the_breakaway_rule_untouched() {
         let lib = super::super::test_library();
-        let reference = solve_pair_stage(&arr::pair([17, 43]), 2.0, 0.0, &lib).expect("a stage");
+        let reference =
+            super::super::solve_preset(&arr::pair([17, 43]), 2.0, 0.0, &lib).expect("a stage");
         for statik in [0.0_f64, 0.06, 0.16, 0.5, 0.9] {
-            let r = solve_pair_stage(
+            let r = super::super::solve_preset(
                 &({
                     let mut s = arr::pair([17, 43]);
                     s.meshes[0].static_friction = statik;
@@ -1791,7 +1783,7 @@ mod tests {
     /// well and gets worse (68.430 → 67.525 % from zero to 0.3 mm). Asserting a
     /// direction here would be asserting one of those two cases.
     #[test]
-    fn a_worm_stage_is_rated_at_the_centre_distance_it_runs_at() {
+    fn a_worm_drive_is_rated_at_the_centre_distance_it_runs_at() {
         let stage = |clearance: f64| {
             let mut s = arr::worm(1, 40);
             s.distances[0].clearance = Auto::fixed(clearance);

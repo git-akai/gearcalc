@@ -9,7 +9,7 @@ import type { Freedom } from "./Freedom";
  * numbers would have to be ignored. This says which inputs are in that
  * argument and how many may stand.
  *
- * # Why the *stage* declares this rather than the front end
+ * # Why the *shape* declares this rather than the front end
  *
  * It was three functions in TypeScript, one per stage type, each restating a
  * relation the core already enforces. That is two faults at once: an
@@ -20,12 +20,12 @@ import type { Freedom } from "./Freedom";
  * The arrangements genuinely differ in *what* is related, which is why this
  * is a declaration and not a constant: a pair relates its distance to its two
  * shifts, an epicyclic set relates its three shifts to each other through the
- * two distances that must agree, and a hula stage relates each mesh's pair
+ * two distances that must agree, and a hula relates each mesh's pair
  * separately because its crank fixes their difference one mesh at a time.
  *
  * What does **not** differ is the resolution: too many given means the first
  * one in `order` that the designer is not this moment touching goes back to
- * automatic. Least precious first, and stated by the stage.
+ * automatic. Least precious first, and stated by the shape.
  */
 export type FreedomGroup = { 
 /**
@@ -41,7 +41,7 @@ given_at_most: number,
  * neither has anything to derive from. One of the two has to be a number
  * somebody gave.
  *
- * A stage with **no** distance input would say `0` here — its clearance
+ * A shape with **no** distance input would say `0` here — its clearance
  * could never be derived, because there is nothing to derive it from. That
  * is the same statement, counted; every distance has the input, so none
  * says it.

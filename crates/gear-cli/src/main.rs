@@ -20,13 +20,6 @@ mod matrix;
 use gear_core::train::arrangements as arr;
 use gear_core::{GearParams, Tooth};
 
-/// The English catalogue, for turning a [`Note`](gear_core::note::Note) into a
-/// sentence.
-///
-/// The harness has no locale to choose from and does not want one — it exists to
-/// show what the core computed. Built per call rather than cached: this is a
-/// development tool printing a handful of lines, and a `OnceLock` here would be
-/// machinery in place of a parse that costs nothing.
 /// A worm stage at the preset with these counts and this worm diameter — what
 /// every worm command here builds from.
 fn worm_stage(starts: u32, wheel_teeth: u32, worm_diameter: f64) -> gear_core::train::Shape {
@@ -63,12 +56,12 @@ fn play_or_nan(
     })
 }
 
-/// **A stage of two members and one mesh, read as the pair it is** — the
-/// harness's own view of a shape's result, so the commands that build pairs
+/// **A part of two members and one mesh, read as the pair it is** — the
+/// harness's own view of a part's result, so the commands that build pairs
 /// print them by the names a pair has. Nothing in the core has this shape
-/// any more; a stage's result is a shape's ([`gear_core::train::shape`]).
+/// any more; a part's result is a shape's ([`gear_core::train::shape`]).
 struct Pair<'a> {
-    /// The path's across it, where the pair is asked alone; a stage of a
+    /// The path's across it, where the pair is asked alone; a part of a
     /// longer train has none of its own, and its paths are the train's.
     ratio: Option<f64>,
     centre_distance: f64,
@@ -95,7 +88,7 @@ fn pair(s: &gear_core::train::ShapeResult, ratio: Option<f64>) -> Option<Pair<'_
     })
 }
 
-/// **A stage of three members and two meshes, read as the set it is** — sun,
+/// **A part of three members and two meshes, read as the set it is** — sun,
 /// planet, ring; sun–planet, planet–ring — for the commands that build one.
 struct SetView<'a> {
     ratio: f64,
@@ -117,8 +110,7 @@ struct SetView<'a> {
 }
 
 /// The set a shape's result is, where it is one.
-fn set_view(r: &gear_core::train::Alone) -> Option<SetView<'_>> {
-    let s = r;
+fn set_view(s: &gear_core::train::Alone) -> Option<SetView<'_>> {
     if s.members.len() != 3 || s.meshes.len() != 2 {
         return None;
     }
@@ -141,17 +133,7 @@ fn set_view(r: &gear_core::train::Alone) -> Option<SetView<'_>> {
     })
 }
 
-/// A set through the shape, as the commands here build one.
-fn solve_set(
-    stage: &gear_core::train::Shape,
-    torque: f64,
-    speed: f64,
-    lib: &gear_core::material::MaterialLibrary,
-) -> Result<gear_core::train::Alone, gear_core::train::TrainError> {
-    gear_core::train::solve_alone(&gear_core::train::Train::alone(stage, torque, speed), lib)
-}
-
-/// **A stage of four members on a crank, read as the hula stage it is** —
+/// **A part of four members on a crank, read as the hula it is** —
 /// the grounded gear, the two on the wobble body, the output; two meshes at
 /// one crank offset — for the commands that build one. The list
 /// (`arrangements::hula`) keeps its members as the two wobble gears, then
@@ -175,19 +157,17 @@ struct HulaView<'a> {
     /// Speeds and torques per case on the grounded gear's body, the crank
     /// and the output — the shape's bodies 2, 1 and 3.
     cases: Vec<(usize, [f64; 3], [f64; 3])>,
-    /// Each member with whether it is a ring, in the stage's order.
+    /// Each member with whether it is a ring, in the hula's reading order.
     gears: Vec<(&'a gear_core::train::GearResult, bool)>,
     meshes: &'a [gear_core::train::MeshReport],
     notes: &'a [gear_core::note::Note],
 }
 
-/// The hula stage a shape's result is.
+/// The hula a shape's result is.
 fn hula_view<'a>(
-    stage: &'a gear_core::train::Shape,
-    r: &'a gear_core::train::Alone,
+    shape: &'a gear_core::train::Shape,
+    s: &'a gear_core::train::Alone,
 ) -> Option<HulaView<'a>> {
-    let shape = stage;
-    let s = r;
     if s.members.len() != 4 || s.meshes.len() != 2 {
         return None;
     }
@@ -245,28 +225,27 @@ fn ring_cutter_teeth(shape: &gear_core::train::shape::Shape, mesh: usize) -> u32
         .map_or(0, |c| c.teeth)
 }
 
-/// A hula stage through the shape under its own arrangement — crank driven,
-/// grounded gear held, output out — whatever its counts make the rings.
+/// A hula asked alone under its own arrangement — crank driven, grounded
+/// gear held, output out — whatever its counts make the rings.
 fn solve_hula(
     shape: &gear_core::train::shape::Shape,
     torque: f64,
     speed: f64,
     lib: &gear_core::material::MaterialLibrary,
-) -> Result<(gear_core::train::Shape, gear_core::train::Alone), gear_core::train::TrainError> {
-    // The crank driven, the fixed ring held, the output ring out.
+) -> Result<gear_core::train::Alone, gear_core::train::TrainError> {
     let train = gear_core::train::Train::alone(shape, torque, speed).arranged(&[2], 1, 3);
-    let r = gear_core::train::solve_alone(&train, lib)?;
-    Ok((shape.clone(), r))
+    gear_core::train::solve_alone(&train, lib)
 }
 
-/// A pair through the shape, as the commands here build one.
-fn solve_pair(
-    stage: &gear_core::train::Shape,
+/// **A preset asked alone**, as the commands here ask one: a train of one,
+/// loaded at its conventional input and reacted at its output.
+fn solve(
+    shape: &gear_core::train::Shape,
     torque: f64,
     speed: f64,
     lib: &gear_core::material::MaterialLibrary,
 ) -> Result<gear_core::train::Alone, gear_core::train::TrainError> {
-    gear_core::train::solve_alone(&gear_core::train::Train::alone(stage, torque, speed), lib)
+    gear_core::train::solve_alone(&gear_core::train::Train::alone(shape, torque, speed), lib)
 }
 
 /// The mesh a pair reports, checked to be the point contact these commands
@@ -292,6 +271,13 @@ fn transverse(m: &gear_core::train::MeshReport) -> &gear_core::train::LineContac
         .expect("this command builds parallel-axis meshes, which report a line contact")
 }
 
+/// The English catalogue, for turning a [`Note`](gear_core::note::Note) into a
+/// sentence.
+///
+/// The harness has no locale to choose from and does not want one — it exists to
+/// show what the core computed. Built per call rather than cached: this is a
+/// development tool printing a handful of lines, and a `OnceLock` here would be
+/// machinery in place of a parse that costs nothing.
 fn words() -> gear_io::strings::Catalogue {
     gear_io::strings::Catalogue::english()
 }
@@ -717,14 +703,14 @@ fn hula_report(n: u32, clearance: f64, m_outer: f64, m_inner: f64, cutter_teeth:
         }
     }
 
-    let (as_stage, solved) = match solve_hula(&stage, 2.0, 1000.0, &lib) {
+    let solved = match solve_hula(&stage, 2.0, 1000.0, &lib) {
         Ok(r) => r,
         Err(e) => {
             eprintln!("that stage has no geometry: {e}");
             return;
         }
     };
-    let Some(result) = hula_view(&as_stage, &solved) else {
+    let Some(result) = hula_view(&stage, &solved) else {
         eprintln!("that stage is not a hula stage");
         return;
     };
@@ -1157,7 +1143,7 @@ fn hula_band(z0: u32, clearance_in_modules: f64) {
                             m.gear.profile_shift = gear_core::params::Auto::fixed(x);
                         }
                     }
-                    let Ok((as_stage, r)) = solve_hula(&stage, 2.0, 1000.0, &lib) else {
+                    let Ok(r) = solve_hula(&stage, 2.0, 1000.0, &lib) else {
                         continue;
                     };
                     // **The whole question**, through the one method that asks
@@ -1175,15 +1161,15 @@ fn hula_band(z0: u32, clearance_in_modules: f64) {
                     if best.as_ref().is_none_or(|(_, _, _, _, b)| {
                         ways_or_nan(r.efficiency).forward > ways_or_nan(b.efficiency).forward
                     }) {
-                        best = Some((x, cutter, addendum, as_stage, r));
+                        best = Some((x, cutter, addendum, stage, r));
                     }
                 }
             }
         }
         match best {
             None => println!("{d:>3} {n:>6} {module:>7.3}   nothing admissible"),
-            Some((x, cutter, h, as_stage, r)) => {
-                let v = hula_view(&as_stage, &r).expect("a hula stage");
+            Some((x, cutter, h, stage, r)) => {
+                let v = hula_view(&stage, &r).expect("a hula stage");
                 println!(
                     "{d:>3} {n:>6} {module:>7.3} {h:>5.1} {cutter:>6} {x:>+7.2} {:>9.4}% {:>7.2}% {:>8.2} {:>7.4} {:>9.5}",
                     v.fixed_carrier_efficiency * 100.0,
@@ -1246,14 +1232,14 @@ fn hula_sweep(n: u32, clearance: f64, mesh_index: usize) {
     let lib = gear_io::default_library();
     let teeth = [n + 1, n, n - 1, n];
     let stage = hula_stage(teeth, [1.0, 1.0], clearance);
-    let (as_stage, solved) = match solve_hula(&stage, 2.0, 1000.0, &lib) {
+    let solved = match solve_hula(&stage, 2.0, 1000.0, &lib) {
         Ok(r) => r,
         Err(e) => {
             eprintln!("that stage has no geometry: {e}");
             return;
         }
     };
-    let Some(result) = hula_view(&as_stage, &solved) else {
+    let Some(result) = hula_view(&stage, &solved) else {
         eprintln!("that stage is not a hula stage");
         return;
     };
@@ -1577,7 +1563,7 @@ fn shifts_report(z1: u32, z2: u32) {
         s.set_search(on);
         s
     };
-    let solved = |on: bool, at: Option<f64>| solve_pair(&stage(on, at), 2.0, 0.0, &lib);
+    let solved = |on: bool, at: Option<f64>| solve(&stage(on, at), 2.0, 0.0, &lib);
 
     println!("pair z {z1}/{z2}  module 1  alpha 20 deg  mu 0.06\n");
     println!(
@@ -1619,7 +1605,7 @@ fn shifts_report(z1: u32, z2: u32) {
         "a mm", "x1", "x2", "sum", "eps", "eta fwd"
     );
     let free_at = best.centre_distance;
-    // **What the stage has to say about the distance**, printed under the row it
+    // **What the part has to say about the distance**, printed under the row it
     // is about. This is how a distance no admissible shifts reach comes to be in
     // the change detector rather than only in a test (F55) — and most rows say
     // nothing, which is the point.
@@ -1650,11 +1636,11 @@ fn shifts_report(z1: u32, z2: u32) {
     // walked: a distance given by hand with nothing asked to move.
     //
     // It is a different rule, not a different answer to the same one. With the
-    // shifts free the stage closes the pair a clearance *inside* the distance
+    // shifts free the solve closes the pair a clearance *inside* the distance
     // given, so the designer gets both the housing and the play; with nothing
     // free there is nothing to absorb it, the shifts stay at their undercut
     // floor, and the clearance is not read at all
-    // (`solve_spur_stage`, where the centre distance is settled). It was the
+    // (`Shape::plan`, where a distance's closure is settled). It was the
     // one combination no recorded case walked.
     println!("\n...and with the shift optimiser off");
     println!(
@@ -1709,8 +1695,8 @@ fn epicyclic_shifts_report() {
         hula.set_search(true);
         match solve_hula(&hula, 2.0, 1000.0, &lib) {
             Err(e) => println!("{d:<12} {e}"),
-            Ok((as_stage, r)) => {
-                let v = hula_view(&as_stage, &r).expect("a hula stage");
+            Ok(r) => {
+                let v = hula_view(&hula, &r).expect("a hula stage");
                 println!(
                     "{d:<12} {:>9.4} {:>9.4} {:>10.4} %   {}",
                     v.gears[1].0.profile_shift,
@@ -1766,7 +1752,7 @@ fn epicyclic_shifts_report() {
         let mut stage = hula_stage([n + 1, n, n - 1, n], [1.0, 1.0], 0.3);
         stage.set_search(true);
         match solve_hula(&stage, 2.0, 1000.0, &lib) {
-            Ok((_, r)) => {
+            Ok(r) => {
                 // The two wobble gears' shifts: the list's members 0 and 1.
                 let members = &r.members;
                 println!(
@@ -1869,12 +1855,12 @@ fn train_report(mode: Option<&str>) {
         // **`toggles` reverses the duty**, which is the switch that lets a
         // reversed root reach a member at all — and holds a load from the end
         // at the far port, the preset; every other mode declares the start
-        // free beside it, so the load is held only by a stage that locks —
+        // free beside it, so the load is held only by a mesh that locks —
         // the other thing a case can be asked, and one the core answers by
         // name.
         //
-        // Every mode's train is two stages, so its ends are the first
-        // stage's first gear and the second stage's second.
+        // Every mode's train is two presets in a row, so its ends are the
+        // first one's first gear and the second one's second.
         |t| {
             let (start, end) = (t.port(0, 1), t.port(1, 2));
             vec![
@@ -2071,13 +2057,13 @@ fn print_gear_cases(cases: &[gear_core::train::GearCase]) {
     }
 }
 
-/// A pair with its bodies parallel: line contact, a bending rating.
-/// A pair's ratio where it has one of its own, as the stage line prints it.
+/// A pair's ratio where it has one of its own, as a part's line prints it.
 fn ratio_of(s: &Pair) -> String {
     s.ratio
         .map_or_else(String::new, |r| format!("  ratio {r:.4}"))
 }
 
+/// A pair with its bodies parallel: line contact, a bending rating.
 fn print_line_pair(k: usize, kind: &str, s: &Pair, line: &gear_core::train::LineContact) {
     let mesh = s.mesh;
     let helix = s.gears[0].helix_angle;
@@ -3194,7 +3180,7 @@ fn worm_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, shaft_angle_de
 fn worm_stage_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, torque: f64) {
     let stage = worm_stage(starts, wheel_teeth, worm_diameter);
     let lib = gear_io::default_library();
-    let solved = match solve_pair(&stage, torque, 0.0, &lib) {
+    let solved = match solve(&stage, torque, 0.0, &lib) {
         Ok(r) => r,
         Err(e) => {
             eprintln!("cannot solve that stage: {e}");
@@ -3257,7 +3243,7 @@ fn worm_stage_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, torque: 
 /// Through the shape, one ring count at a time — the planet closing the set
 /// as it closes any automatic distance — rather than through a ring search
 /// of its own: the sweep is the same walk with the same closure, and the
-/// row a count does not admit says why in the stage's own words.
+/// row a count does not admit says why in the part's own words.
 fn planetary_report(sun: u32, planet: u32, planets: u32, sun_shift: f64, ring_shift: f64) {
     use gear_core::params::Auto;
     use gear_core::train::TrainError;
@@ -3346,7 +3332,7 @@ fn planetary_report(sun: u32, planet: u32, planets: u32, sun_shift: f64, ring_sh
         );
     }
 
-    // Why the list stops where it does, in the stage's own words.
+    // Why the list stops where it does, in the part's own words.
     match refused {
         Some((ring, e)) => println!("\nwhy it stops: z_ring {ring}: {e}"),
         None => println!("\nwhy it stops: the sweep's own limit, four times the ideal ring"),
@@ -3485,7 +3471,7 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
         return;
     }
     let stage = base.clone();
-    if let Ok(solved) = solve_set(&stage, 2.0, 3000.0, &lib) {
+    if let Ok(solved) = solve(&stage, 2.0, 3000.0, &lib) {
         let r = set_view(&solved).expect("a set");
         println!();
         for (which, mesh) in [("sun-planet", r.sun_planet), ("planet-ring", r.planet_ring)] {
@@ -3506,7 +3492,7 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
     //
     // Here rather than nowhere because a path the harness never walks is a path
     // the change detector cannot see, which this project has recorded six times.
-    let free = solve_set(&base, 2.0, 3000.0, &lib);
+    let free = solve(&base, 2.0, 3000.0, &lib);
     if let Ok(free) = free {
         let free = set_view(&free).expect("a set");
         println!("\naxis distance given, shifts chosen to reach it");
@@ -3518,7 +3504,7 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
             let asked = free.centre_distance + 0.1 * f64::from(step);
             let mut stage = base.clone();
             stage.distances[0].distance = gear_core::Auto::fixed(asked);
-            match solve_set(&stage, 2.0, 3000.0, &lib) {
+            match solve(&stage, 2.0, 3000.0, &lib) {
                 Err(e) => println!("{asked:<12.4} {e}"),
                 Ok(solved) => {
                     let r = set_view(&solved).expect("a set");
@@ -3578,7 +3564,7 @@ fn crossed_report(z1: u32, z2: u32, shaft_angle: f64) {
             println!("{beta1:>7.1} {:>7} — no such pair", shaft_angle - beta1);
             continue;
         };
-        match solve_pair(&stage, 2.0, 0.0, &lib) {
+        match solve(&stage, 2.0, 0.0, &lib) {
             Err(e) => println!(
                 "{beta1:>7.1} {:>7.1}  {e}",
                 g.wheel_helix_angle_rad.to_degrees()
@@ -3659,7 +3645,7 @@ fn crossed_report(z1: u32, z2: u32, shaft_angle: f64) {
         ("least shift that clears undercut", &even),
         ("least loss", &free),
     ] {
-        match solve_pair(stage, 2.0, 0.0, &lib).map(|solved| {
+        match solve(stage, 2.0, 0.0, &lib).map(|solved| {
             let r = pair(&solved, solved.ratio).expect("a pair");
             (
                 r.gears[0].profile_shift,

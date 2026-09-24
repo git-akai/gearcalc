@@ -864,7 +864,7 @@ impl Ring {
 /// teeth have to pass each other on the way in — not a comparison of tip
 /// circles, and a first attempt at it as one produced a figure that was negative
 /// for every meshing pair, which is the signature of a formula that means
-/// nothing. It needs its own derivation and belongs with the planetary stage
+/// nothing. It needs its own derivation and belongs with the planetary set
 /// that will actually ask.
 ///
 /// # The one relation everything here comes from
@@ -1010,7 +1010,7 @@ pub fn mesh_with(ring: &Ring, pinion: &Tooth) -> Option<RingMesh> {
 ///
 /// Every verdict here moves with the distance — the operating angle, the two
 /// contact radii, both interference conditions and the room the tips have —
-/// and a stage that assembles with a clearance is owed them where it
+/// and a pair that assembles with a clearance is owed them where it
 /// assembled, which for an internal pair is a clearance *inside* its
 /// zero-backlash distance ([`crate::mesh::MeshKind::run_at`]). Read at zero
 /// backlash instead, the tip room came out looser than the pair has: the
