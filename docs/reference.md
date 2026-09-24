@@ -2549,7 +2549,10 @@ train is what a coupling said, said once.)
 **The train's own figures are per path.** Where its holds leave it one
 motion, a row for each path that is asked about — in case order, every path
 an enabled case uses, from each of its loads to each of its reactions, once
-each, so the first is the **headline case's** — between two open bodies: the
+each and **a direction each** — a case that loads the far end and reacts the
+near one asks for the path the other way round, whose ratio, efficiencies
+and play are read from the other end — so the first is the **headline
+case's** — between two open bodies: the
 **ratio** off that motion, driven at the one with the other free; the **efficiency** off the
 train's flow at unit load — the first driving, the second holding the load,
 every other body free — and the reverse, so a path that crosses one preset of

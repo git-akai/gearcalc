@@ -1,5 +1,7 @@
 train  path b1 -> b3   ratio 6.0317:1   efficiency 96.482 % forward / 96.482 % backward
        backlash at b3   0.07432 deg  (min 0.00000, max 0.14903)   at b1   0.44829 deg  (min 0.00000, max 0.89889)
+train  path b3 -> b1   ratio 0.1658:1   efficiency 96.482 % forward / 96.482 % backward
+       backlash at b1   0.44829 deg  (min 0.00000, max 0.89889)   at b3   0.07432 deg  (min 0.00000, max 0.14903)
        case 1  ultimate 2.000 Nm / 3000 rpm at b1 + reacted at b3
               fixed    ground ground                          -        9.6390 Nm
               load     b1  first                 3000.00 rpm        2.0000 Nm

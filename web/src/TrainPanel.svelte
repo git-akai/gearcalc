@@ -1131,19 +1131,19 @@
         </small>
       {/if}
     {/if}
-    {#each contactNotes(m) as n, i (i)}
-      <small class="warn">{note(n)}</small>
-    {/each}
   </dd>
+  {#each contactNotes(m) as n, i (i)}
+    <dd class="note"><small class="warn">{note(n)}</small></dd>
+  {/each}
   <!-- Both ways, one to a line, as a path's efficiency is. -->
   <dt>{t("ui.train_mesh_efficiency")}</dt>
   <dd>
     <span class="line">{t("ui.train_driven_forward", { percent: pct(m?.efficiency.forward) })}</span>
     <span class="line">{t("ui.train_driven_backward", { percent: pct(m?.efficiency.backward) })}</span>
-    {#each efficiencyNotes(m) as n, i (i)}
-      <small class="warn">{note(n)}</small>
-    {/each}
   </dd>
+  {#each efficiencyNotes(m) as n, i (i)}
+    <dd class="note"><small class="warn">{note(n)}</small></dd>
+  {/each}
   <!-- One gap, seen from each of its two ends, each with its tolerance band
        and on a line of its own — the way a path writes its play. -->
   <dt>{t("ui.train_mesh_backlash")}</dt>
@@ -2087,8 +2087,8 @@
         <dd>
           <span class="line">{t("ui.train_circulation_forward", { times: num(casePath.circulation.forward, 2) })}</span>
           <span class="line">{t("ui.train_circulation_backward", { times: num(casePath.circulation.backward, 2) })}</span>
-          <small>{t("ui.train_note_circulation")}</small>
         </dd>
+        <dd class="note"><small>{t("ui.train_note_circulation")}</small></dd>
       </dl>
     {:else if solved && tab.train.load_cases.length > 0}
       <p class="notice">{t("ui.train_no_path_for_case")}</p>
@@ -2426,9 +2426,22 @@
   .out dt {
     color: var(--muted);
   }
+  /* A figure stands against the readout's right edge, as the gear tab's
+     do, so a column of them reads down its last digit. */
   .out dd {
     margin: 0;
+    text-align: right;
     font-variant-numeric: tabular-nums;
+  }
+  /* **A figure's note runs the readout's whole width** on a row of its own,
+     rather than folding into the figure's column under a label that has
+     nothing to say beside it. */
+  .out dd.note {
+    grid-column: 1 / -1;
+  }
+  .out dd.note small {
+    display: block;
+    margin-left: 0;
   }
   .out small {
     color: var(--muted);
@@ -2764,9 +2777,6 @@
     padding: 0.5rem 0 0;
     border-top: 1px solid var(--rule);
   }
-  .pathbox dd {
-    text-align: right;
-  }
   /* A note under a figure wraps under it, and does not widen the box. */
   .pathbox dd small {
     display: block;
@@ -2951,7 +2961,7 @@
   .ws-head {
     display: flex;
     align-items: baseline;
-    gap: 0.6rem;
+    gap: 0 0.6rem;
     flex-wrap: wrap;
     margin-bottom: 0.5rem;
   }

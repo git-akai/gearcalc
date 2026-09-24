@@ -3344,8 +3344,8 @@ pub fn loaded_cycles(turns: Turns) -> Cycles {
 
 /// **The train's figures, one row per path** — see [`PathReport`]: every
 /// path an enabled case uses, from each of its loads to each of its
-/// reactions, once each, in case order — so the first is the headline
-/// case's. Empty where the train's holds leave its motion a family, since
+/// reactions, once each and a direction each, in case order — so the
+/// first is the headline case's. Empty where the train's holds leave its motion a family, since
 /// a ratio between two ports of a mechanism with two freedoms needs a
 /// third held, and which is the designer's to say.
 #[allow(clippy::too_many_arguments)]
@@ -3367,12 +3367,13 @@ fn paths_of(
     // conventional ends used to be a row of their own, present whether or
     // not any case loaded them — a reading nobody had stated.)
     let mut wanted: Vec<(usize, usize)> = Vec::new();
+    // **A path has a direction**: its ratio is the one end's turns per the
+    // other's, its efficiency and its play are read driving from the one and
+    // then from the other, so a case that loads the far end and reacts the
+    // near one asks for the path the other way round, and gets it — it was
+    // once taken for the same pair, and the case said it walked no path.
     let mut want = |a: usize, b: usize| {
-        if a != b
-            && !wanted
-                .iter()
-                .any(|&(x, y)| (x, y) == (a, b) || (x, y) == (b, a))
-        {
+        if a != b && !wanted.contains(&(a, b)) {
             wanted.push((a, b));
         }
     };
@@ -3887,8 +3888,8 @@ pub struct PathReport {
 pub struct TrainResult {
     /// **The train's own figures, one row per path**, where its holds leave
     /// it one motion: every path an enabled case uses, from each of its
-    /// loads to each of its reactions, once each, in case order — the
-    /// headline case's first. Empty where the motion is
+    /// loads to each of its reactions, once each and a direction each, in
+    /// case order — the headline case's first. Empty where the motion is
     /// a family (a differential, a part joined to nothing), which is still
     /// rated: each case's loads decide its motion, and every part rates under
     /// that; what a family has none of is a figure read under one motion.

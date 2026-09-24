@@ -1,6 +1,8 @@
 == pair ==
   path b1    -> b2    ratio      -2.529412   efficiency  98.344976 / 98.344976  %   backlash   0.038950 / 0.098522   deg
     power through the teeth   1.000000 / 1.000000     one more tooth: -2.388889 -2.588235
+  path b2    -> b1    ratio      -0.395349   efficiency  98.344976 / 98.344976  %   backlash   0.098522 / 0.038950   deg
+    power through the teeth   1.000000 / 1.000000     one more tooth: -0.418605 -0.386364
   case 1       2.0000 Nm /   3000.00 rpm at b1     +reacted at b2   
     fixed    ground ground                          -  torque    -6.975099
     load     b1  first                  3000.0000 rpm  torque     2.000000
@@ -37,6 +39,8 @@
 == helical ==
   path b1    -> b2    ratio      -2.529412   efficiency  98.389569 / 98.389569  %   backlash   0.038879 / 0.098341   deg
     power through the teeth   1.000000 / 1.000000     one more tooth: -2.388889 -2.588235
+  path b2    -> b1    ratio      -0.395349   efficiency  98.389569 / 98.389569  %   backlash   0.098341 / 0.038879   deg
+    power through the teeth   1.000000 / 1.000000     one more tooth: -0.418605 -0.386364
   case 1       2.0000 Nm /   3000.00 rpm at b1     +reacted at b2   
     fixed    ground ground                          -  torque    -6.977355
     load     b1  first                  3000.0000 rpm  torque     2.000000
@@ -73,6 +77,8 @@
 == worm ==
   path b1    -> b2    ratio     -40.000000   efficiency  61.804609 / 0.000000   %   backlash   0.155124 / 6.204966   deg
     power through the teeth   1.000000 / 1.000000     one more tooth: -20.000000 -41.000000
+  path b2    -> b1    ratio      -0.025000   efficiency   0.000000 / 61.804609  %   backlash   6.204966 / 0.155124   deg
+    power through the teeth   1.000000 / 1.000000     one more tooth: -0.050000 -0.024390
   case 1       2.0000 Nm /   3000.00 rpm at b1     +reacted at b2   
     fixed    ground ground                          -  torque   -51.443687
     load     b1  first                  3000.0000 rpm  torque     2.000000
@@ -109,6 +115,8 @@
 == set-sun-carrier ==
   path b1    -> b3    ratio      -6.000000   efficiency  97.295446 / 97.295446  %   backlash   0.048678 / 0.292068   deg
     power through the teeth   1.978385 / 1.994450     one more tooth: -5.538462 -6.000000 -6.083333
+  path b3    -> b1    ratio      -0.166667   efficiency  97.295446 / 97.295446  %   backlash   0.292068 / 0.048678   deg
+    power through the teeth   1.994450 / 1.978385     one more tooth: -0.180556 -0.166667 -0.164384
   case 1       2.0000 Nm /   3000.00 rpm at b1     +reacted at b3   
     fixed    ground ground                          -  torque     0.000000
     load     b1  sun                    3000.0000 rpm  torque     2.000000
@@ -164,6 +172,8 @@
 == set-sun-ring ==
   path b1    -> b2    ratio       7.000000   efficiency  97.681810 / 97.672819  %   backlash   0.041724 / 0.292068   deg
     power through the teeth   1.695758 / 1.716159     one more tooth: 6.538462 7.000000 7.083333
+  path b2    -> b1    ratio       0.142857   efficiency  97.672819 / 97.681810  %   backlash   0.292068 / 0.041724   deg
+    power through the teeth   1.716159 / 1.695758     one more tooth: 0.152941 0.142857 0.141176
   case 1       2.0000 Nm /   3000.00 rpm at b1     +reacted at b2   
     fixed    ground ground                          -  torque     0.000000
     load     b1  sun                    3000.0000 rpm  torque     2.000000
@@ -219,6 +229,8 @@
 == set-carrier-sun ==
   path b2    -> b3    ratio       0.857143   efficiency  99.604466 / 99.613635  %   backlash   0.048678 / 0.041724   deg
     power through the teeth   0.289334 / 0.284921     one more tooth: 0.847059 0.857143 0.858824
+  path b3    -> b2    ratio       1.166667   efficiency  99.613635 / 99.604466  %   backlash   0.041724 / 0.048678   deg
+    power through the teeth   0.284921 / 0.289334     one more tooth: 1.180556 1.166667 1.164384
   case 1       2.0000 Nm /   3000.00 rpm at b2     +reacted at b3   
     fixed    ground ground                          -  torque     0.000000
     fixed    b1  sun                             -  torque    -0.292495
@@ -274,6 +286,8 @@
 == set-carrier-ring ==
   path b2    -> b1    ratio       0.142857   efficiency  97.672819 / 97.681810  %   backlash   0.292068 / 0.041724   deg
     power through the teeth   1.716159 / 1.695758     one more tooth: 0.152941 0.142857 0.141176
+  path b1    -> b2    ratio       7.000000   efficiency  97.681810 / 97.672819  %   backlash   0.041724 / 0.292068   deg
+    power through the teeth   1.695758 / 1.716159     one more tooth: 6.538462 7.000000 7.083333
   case 1       2.0000 Nm /   3000.00 rpm at b2     +reacted at b1   
     fixed    ground ground                          -  torque     0.000000
     reacted  b1  sun                    21000.0000 rpm  torque    -0.279065
@@ -329,6 +343,8 @@
 == set-ring-sun ==
   path b3    -> b2    ratio       1.166667   efficiency  99.613635 / 99.604466  %   backlash   0.041724 / 0.048678   deg
     power through the teeth   0.284921 / 0.289334     one more tooth: 1.180556 1.166667 1.164384
+  path b2    -> b3    ratio       0.857143   efficiency  99.604466 / 99.613635  %   backlash   0.048678 / 0.041724   deg
+    power through the teeth   0.289334 / 0.284921     one more tooth: 0.847059 0.857143 0.858824
   case 1       2.0000 Nm /   3000.00 rpm at b3     +reacted at b2   
     fixed    ground ground                          -  torque     0.000000
     fixed    b1  sun                             -  torque     0.324318
@@ -384,6 +400,8 @@
 == set-ring-carrier ==
   path b3    -> b1    ratio      -0.166667   efficiency  97.295446 / 97.295446  %   backlash   0.292068 / 0.048678   deg
     power through the teeth   1.994450 / 1.978385     one more tooth: -0.180556 -0.166667 -0.164384
+  path b1    -> b3    ratio      -6.000000   efficiency  97.295446 / 97.295446  %   backlash   0.048678 / 0.292068   deg
+    power through the teeth   1.978385 / 1.994450     one more tooth: -5.538462 -6.000000 -6.083333
   case 1       2.0000 Nm /   3000.00 rpm at b3     +reacted at b1   
     fixed    ground ground                          -  torque     0.000000
     reacted  b1  sun                    -18000.0000 rpm  torque     0.324318
@@ -439,6 +457,8 @@
 == hula ==
   path b1    -> b3    ratio     232.562500   efficiency  81.919641 / 77.908095  %   backlash   0.065428 / 15.216172  deg
     power through the teeth 379.296745 / 463.460222   one more tooth: 49.116883 -75.938776 -90.756098 49.116883
+  path b3    -> b1    ratio       0.004300   efficiency  77.908095 / 81.919641  %   backlash  15.216172 / 0.065428   deg
+    power through the teeth 463.460222 / 379.296745   one more tooth: 0.020360 -0.013169 -0.011019 0.020360
   case 1       2.0000 Nm /   3000.00 rpm at b1     +reacted at b3   
     fixed    ground ground                          -  torque     0.000000
     load     b1  carrier                3000.0000 rpm  torque     2.000000
@@ -498,6 +518,8 @@
 == layshaft ==
   path b1    -> b2    ratio       2.366224   efficiency  96.998856 / 96.998856  %   backlash   0.099391 / 0.235181   deg
     power through the teeth   1.983450 / 1.986312     one more tooth: 2.234767 2.421252 2.366224 2.366224 2.447818 2.292279 2.366224 2.366224
+  path b2    -> b1    ratio       0.422614   efficiency  96.998856 / 96.998856  %   backlash   0.235181 / 0.099391   deg
+    power through the teeth   1.986312 / 1.983450     one more tooth: 0.447474 0.413009 0.422614 0.422614 0.408527 0.436247 0.422614 0.422614
   case 1       2.0000 Nm /   3000.00 rpm at b1     +reacted at b2   
     fixed    ground ground                          -  torque     2.590420
     load     b1  member 1               3000.0000 rpm  torque     2.000000
@@ -582,6 +604,8 @@
 == wormpair ==
   path b1    -> b2    ratio     101.176471   efficiency  60.781728 / 0.000000   %   backlash   0.055440 / 5.609180   deg
     power through the teeth   1.618046 / 1.983450     one more tooth: 50.588235 103.705882 95.555556 103.529412
+  path b2    -> b1    ratio       0.009884   efficiency   0.000000 / 60.781728  %   backlash   5.609180 / 0.055440   deg
+    power through the teeth   1.983450 / 1.618046     one more tooth: 0.019767 0.009643 0.010465 0.009659
   case 1       2.0000 Nm /   3000.00 rpm at b1     +reacted at b2   
     fixed    ground ground                          -  torque   120.993614
     load     b1  first                  3000.0000 rpm  torque     2.000000
@@ -638,6 +662,8 @@
 == wolfrom ==
   path b1    -> b3    ratio      61.000000   efficiency  45.356184 / 0.000000   %   backlash   0.048937 / 2.985130   deg
     power through the teeth  54.142533 / 99.120284    one more tooth: 61.000000 locked 31.000000
+  path b3    -> b1    ratio       0.016393   efficiency   0.000000 / 45.356184  %   backlash   2.985130 / 0.048937   deg
+    power through the teeth  99.120284 / 54.142533    one more tooth: 0.016393 locked 0.032258
   case 1       2.0000 Nm /   3000.00 rpm at b1     +reacted at b3   
     fixed    ground ground                          -  torque     0.000000
     load     b1  carrier                3000.0000 rpm  torque     2.000000
@@ -693,6 +719,8 @@
 == stepped ==
   path b1    -> b3    ratio      88.500000   efficiency  65.548466 / 0.000000   %   backlash   0.056749 / 5.022252   deg
     power through the teeth  33.083841 / 50.046629    one more tooth: 85.971429 150.450000 63.000000 38.846535 -206.500000
+  path b3    -> b1    ratio       0.011299   efficiency   0.000000 / 65.548466  %   backlash   5.022252 / 0.056749   deg
+    power through the teeth  50.046629 / 33.083841    one more tooth: 0.011632 0.006647 0.015873 0.025742 -0.004843
   case 1       2.0000 Nm /   3000.00 rpm at b1     +reacted at b3   
     fixed    ground ground                          -  torque     0.000000
     load     b1  sun                    3000.0000 rpm  torque     2.000000
@@ -764,6 +792,8 @@
 == planocentric ==
   path b1    -> b3    ratio     -10.000000   efficiency  97.155934 / 97.080449  %   backlash   0.095762 / 0.957619   deg
     power through the teeth  10.715593 / 11.000000    one more tooth: -15.500000 -7.500000
+  path b3    -> b1    ratio      -0.100000   efficiency  97.080449 / 97.155934  %   backlash   0.957619 / 0.095762   deg
+    power through the teeth  11.000000 / 10.715593    one more tooth: -0.064516 -0.133333
   case 1       2.0000 Nm /   3000.00 rpm at b1     +reacted at b3   
     fixed    ground ground                          -  torque     0.000000
     load     b1  carrier                3000.0000 rpm  torque     2.000000
@@ -814,6 +844,8 @@
 == meshed-planets ==
   path b1    -> b2    ratio      -3.000000   efficiency  93.358179 / 93.466662  %   backlash   0.069648 / 0.208944   deg
     power through the teeth   3.922025 / 3.879367     one more tooth: -2.840000 -3.000000 -3.000000 -3.041667
+  path b2    -> b1    ratio      -0.333333   efficiency  93.466662 / 93.358179  %   backlash   0.208944 / 0.069648   deg
+    power through the teeth   3.879367 / 3.922025     one more tooth: -0.352113 -0.333333 -0.333333 -0.328767
   case 1       2.0000 Nm /   3000.00 rpm at b1     +reacted at b2   
     fixed    ground ground                          -  torque     0.000000
     load     b1  sun                    3000.0000 rpm  torque     2.000000
@@ -881,6 +913,8 @@
 == ravigneaux-small-sun ==
   path b1    -> b2    ratio       4.444444   efficiency  97.918525 / 97.905870  %   backlash   0.041706 / 0.185361   deg
     power through the teeth   1.534831 / 1.553631     one more tooth: 4.263158 4.444444 4.444444 4.444444 4.500000
+  path b2    -> b1    ratio       0.225000   efficiency  97.905870 / 97.918525  %   backlash   0.185361 / 0.041706   deg
+    power through the teeth   1.553631 / 1.534831     one more tooth: 0.234568 0.225000 0.225000 0.225000 0.222222
   case 1       2.0000 Nm /   3000.00 rpm at b1     +reacted at b2   
     fixed    ground ground                          -  torque     0.000000
     load     b1  sun 1                  3000.0000 rpm  torque     2.000000
@@ -960,6 +994,8 @@
 == ravigneaux-large-sun ==
   path b3    -> b2    ratio      -1.066667   efficiency  91.481430 / 91.818656  %   backlash   0.156564 / 0.167001   deg
     power through the teeth   5.707116 / 5.518598     one more tooth: -1.066667 -1.066667 -1.066667 -1.000000 -1.100000
+  path b2    -> b3    ratio      -0.937500   efficiency  91.818656 / 91.481430  %   backlash   0.167001 / 0.156564   deg
+    power through the teeth   5.518598 / 5.707116     one more tooth: -0.937500 -0.937500 -0.937500 -1.000000 -0.909091
   case 1       2.0000 Nm /   3000.00 rpm at b3     +reacted at b2     +free at b1   
     fixed    ground ground                          -  torque     0.000000
     free     b1  sun 1                  -12500.0000 rpm  torque     0.000000
@@ -1039,6 +1075,8 @@
 == ravigneaux-ring-free ==
   path b1    -> b2    ratio       2.666667   efficiency  96.521026 / 96.446859  %   backlash   0.104114 / 0.277636   deg
     power through the teeth   1.838539 / 1.880253     one more tooth: 2.578947 2.666667 2.666667 2.722222 2.666667
+  path b2    -> b1    ratio       0.375000   efficiency  96.446859 / 96.521026  %   backlash   0.277636 / 0.104114   deg
+    power through the teeth   1.880253 / 1.838539     one more tooth: 0.387755 0.375000 0.375000 0.367347 0.375000
   case 1       2.0000 Nm /   3000.00 rpm at b1     +reacted at b2   
     fixed    ground ground                          -  torque     0.000000
     load     b1  sun 1                  3000.0000 rpm  torque     2.000000
@@ -1118,6 +1156,8 @@
 == chain ==
   path b1    -> b3    ratio       6.031674   efficiency  96.374575 / 96.374575  %   backlash   0.072802 / 0.439117   deg
     power through the teeth   1.983450 / 1.979964     one more tooth: 5.696581 6.171946 5.600840 6.226244
+  path b3    -> b1    ratio       0.165791   efficiency  96.374575 / 96.374575  %   backlash   0.439117 / 0.072802   deg
+    power through the teeth   1.979964 / 1.983450     one more tooth: 0.175544 0.162023 0.178545 0.160610
   case 1       2.0000 Nm /   3000.00 rpm at b1     +reacted at b3   
     fixed    ground ground                          -  torque     9.626001
     load     b1  first                  3000.0000 rpm  torque     2.000000
@@ -1174,6 +1214,8 @@
 == mixed ==
   path b1    -> b6    ratio     708.235294   efficiency  59.372692 / 0.000000   %   backlash   0.156306 / 110.701676 deg
     power through the teeth   3.628345 / 1.000000     one more tooth: 668.888889 724.705882 661.538462 708.235294 716.666667 354.117647 725.941176
+  path b6    -> b1    ratio       0.001412   efficiency   0.000000 / 59.372692  %   backlash 110.701676 / 0.156306   deg
+    power through the teeth   1.000000 / 3.628345     one more tooth: 0.001495 0.001380 0.001512 0.001412 0.001395 0.002824 0.001378
   case 1       2.0000 Nm /   3000.00 rpm at b1     +reacted at b6   
     fixed    ground ground                          -  torque   868.039987
     load     b1  first                  3000.0000 rpm  torque     2.000000
@@ -1269,6 +1311,8 @@
 == set-then-pair ==
   path b1    -> b5    ratio      15.176471   efficiency  95.685183 / 95.685183  %   backlash   0.058195 / 0.883197   deg
     power through the teeth   2.951339 / 2.961441     one more tooth: 14.009050 15.176471 15.387255 14.333333 15.529412
+  path b5    -> b1    ratio       0.065891   efficiency  95.685183 / 95.685183  %   backlash   0.883197 / 0.058195   deg
+    power through the teeth   2.961441 / 2.951339     one more tooth: 0.071382 0.065891 0.064989 0.069767 0.064394
   case 1       2.0000 Nm /   3000.00 rpm at b1     +reacted at b5   
     fixed    ground ground                          -  torque    40.718721
     load     b1  sun                    3000.0000 rpm  torque     2.000000
@@ -1344,6 +1388,8 @@
 == pair-then-set ==
   path b1    -> b4    ratio      15.176471   efficiency  95.685183 / 95.685183  %   backlash   0.055170 / 0.837281   deg
     power through the teeth   2.945642 / 2.967404     one more tooth: 14.333333 15.529412 14.009050 15.176471 15.387255
+  path b4    -> b1    ratio       0.065891   efficiency  95.685183 / 95.685183  %   backlash   0.837281 / 0.055170   deg
+    power through the teeth   2.967404 / 2.945642     one more tooth: 0.069767 0.064394 0.071382 0.065891 0.064989
   case 1       2.0000 Nm /   3000.00 rpm at b1     +reacted at b4   
     fixed    ground ground                          -  torque    -6.975099
     load     b1  first                  3000.0000 rpm  torque     2.000000
