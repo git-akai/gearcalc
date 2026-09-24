@@ -249,6 +249,10 @@ pub struct MeshReport {
     /// pitch line speed — the lengthwise sliding crossed shafts have, and
     /// **exactly zero** on parallel ones, where the pitch point is the one
     /// place with no sliding at all and every loss is along the profile.
+    /// **Not sent**: the harness's and the core's; the panel reads a crossed
+    /// pair's sliding as a speed per case.
+    #[cfg_attr(feature = "serde", serde(skip))]
+    #[cfg_attr(feature = "typescript", ts(skip))]
     pub sliding_ratio: f64,
     /// **What every load case does to this mesh**: the Hertzian contact — one
     /// patch the two members share, an ellipse on crossed shafts and a line on
@@ -262,7 +266,10 @@ pub struct MeshReport {
     /// its distance's minus, running and plus tolerance in turn. What a
     /// play referred to any body of the train is read from
     /// ([`kinematics::System::play`]), so a path's backlash sums every mesh
-    /// it crosses and none it does not ([`PathReport`]).
+    /// it crosses and none it does not ([`PathReport`]). **Not sent**: the
+    /// path's, read in the core.
+    #[cfg_attr(feature = "serde", serde(skip))]
+    #[cfg_attr(feature = "typescript", ts(skip))]
     pub row_play: [f64; 3],
     /// **Whether each member's flank is reached past its usable end** by the
     /// other member's tip, in the order the mesh was built.
@@ -303,6 +310,11 @@ pub struct MeshReport {
 pub struct MeshCase {
     /// Index into the train's list of load cases.
     pub case: usize,
+    /// The one patch the two members share in this case. **Not sent**: each
+    /// member's own contact stress is on its card, which is this or worse,
+    /// and the patch is the harness's and the core's to read.
+    #[cfg_attr(feature = "serde", serde(skip))]
+    #[cfg_attr(feature = "typescript", ts(skip))]
     pub contact: ContactPatch,
     /// **The power crossing this mesh, over the power the case puts in** —
     /// the train's flow's own figure ([`flow::Flow::mesh_powers`]): one on a
@@ -363,12 +375,6 @@ pub struct PointContact {
 /// line, since a line is the ellipse with one curvature at zero
 /// ([`crate::hertz::peak_pressure`]).
 #[derive(Clone, Copy, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-#[cfg_attr(
-    feature = "typescript",
-    derive(ts_rs::TS),
-    ts(export, export_to = "core/")
-)]
 pub struct ContactPatch {
     /// Peak Hertzian pressure, MPa — the worst anywhere on the path. On a line
     /// contact that is the envelope over both members' governing points, each
@@ -548,7 +554,11 @@ pub struct TipRoom {
     /// How much room the tips have where their circles cross, as an angle of
     /// **pinion** rotation, degrees. Negative is the overlap, and infinite where
     /// the tip circles do not cross at all — the ordinary case, where there is
-    /// no place for the tips to meet.
+    /// no place for the tips to meet. **Not sent**: the panel reads whether
+    /// the tips clear ([`Self::tip_interference`]), and the harness the
+    /// margin.
+    #[cfg_attr(feature = "serde", serde(skip))]
+    #[cfg_attr(feature = "typescript", ts(skip))]
     pub tip_margin: f64,
     /// **The far-side gap**, mm: the room between the pinion's tip and the
     /// ring's on the side away from contact, `r_tip,ring − r_tip,pinion +
@@ -3859,7 +3869,10 @@ pub struct PathReport {
     /// the graph's index for it — the graph's exact answer at `z_i + 1`, which is
     /// what a designer choosing counts wants beside the ratio: where a tooth
     /// moves it a lot, and where not at all. `None` where that one tooth
-    /// leaves the path no motion or locks it.
+    /// leaves the path no motion or locks it. **Not sent**: the harness
+    /// records it; the panel shows none of it.
+    #[cfg_attr(feature = "serde", serde(skip))]
+    #[cfg_attr(feature = "typescript", ts(skip))]
     pub per_tooth: Vec<Option<f64>>,
 }
 

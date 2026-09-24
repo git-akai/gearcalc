@@ -767,12 +767,6 @@ impl std::error::Error for MeasurementError {}
 /// surfaces*, so the pin diameter **adds**; inside a ring they seat in opposing
 /// spaces and you measure *between their inner surfaces*, so it **subtracts**.
 #[derive(Clone, Copy, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-#[cfg_attr(
-    feature = "typescript",
-    derive(ts_rs::TS),
-    ts(export, export_to = "core/")
-)]
 pub struct BetweenPins {
     pub pin_diameter: f64,
     /// Nominal measurement, mm.

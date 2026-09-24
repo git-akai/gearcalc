@@ -190,13 +190,6 @@ impl<T: Copy> Auto<T> {
 /// silently — check [`Clamps::any`] when a number looks wrong, because the
 /// geometry may not be the geometry that was asked for.
 #[derive(Clone, Debug, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
-#[cfg_attr(
-    feature = "typescript",
-    derive(ts_rs::TS),
-    ts(export, export_to = "core/")
-)]
 pub struct Clamps {
     pub notes: Vec<crate::note::Note>,
 }

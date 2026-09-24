@@ -2466,14 +2466,20 @@ mod tests {
         let meshes = v["meshes"].as_array().unwrap();
         assert_eq!(meshes.len(), 2);
         for (k, mesh) in meshes.iter().enumerate() {
-            assert!(mesh["contact_ratio"].as_f64().unwrap() > 1.0);
-            // The two cases that carry a load press the flanks; the one from
-            // the end carries nothing and presses with exactly nothing.
+            assert!(mesh["contact_ratio"].as_f64().unwrap() > 1.0, "mesh {k}");
+        }
+        // The two cases that carry a load press every member's flanks; the
+        // one from the end carries nothing and presses with exactly nothing.
+        for who in 0..3 {
             for (case, loaded) in [(0, true), (1, false), (2, true)] {
-                let pressure = mesh["cases"][case]["contact"]["at_pitch_point"]
+                let pressure = v["members"][who]["cases"][case]["contact_stress"]
                     .as_f64()
                     .unwrap();
-                assert_eq!(pressure > 0.0, loaded, "mesh {k} case {case}: {pressure}");
+                assert_eq!(
+                    pressure > 0.0,
+                    loaded,
+                    "member {who} case {case}: {pressure}"
+                );
             }
         }
         for who in 0..3 {
@@ -2562,13 +2568,14 @@ mod tests {
                     > 0.0
             );
             assert!(mesh["line"]["operating_pressure_angle"].as_f64().unwrap() > 0.0);
-            assert!(
-                mesh["cases"][0]["contact"]["at_pitch_point"]
-                    .as_f64()
-                    .unwrap()
-                    > 0.0
-            );
             assert!(mesh["tips"]["far_gap"].as_f64().unwrap() > 0.0, "mesh {m}");
+        }
+        // Every gear presses its flanks in the case that loads it.
+        for (i, gear) in gears.iter().enumerate() {
+            assert!(
+                gear["cases"][0]["contact_stress"].as_f64().unwrap() > 0.0,
+                "gear {i}"
+            );
         }
         // The crank offset was sized by one of the meshes' tips.
         assert!(stage["distances"][0]["sized_by"].is_number());
@@ -2616,9 +2623,10 @@ mod tests {
         let (spur, worm) = (&v["meshes"][0], &v["meshes"][1]);
         assert!(spur["line"].is_object() && spur["point"].is_null());
         assert!(worm["point"].is_object() && worm["line"].is_null());
-        // The sliding a line contact has at its pitch point is exactly none.
-        assert_eq!(spur["sliding_ratio"], 0.0);
-        assert!(worm["sliding_ratio"].as_f64().unwrap() > 1.0);
+        // The sliding a line contact has at its pitch point is exactly none;
+        // a worm's is the thread running along the wheel's teeth.
+        assert_eq!(spur["cases"][0]["sliding_velocity"], 0.0);
+        assert!(worm["cases"][0]["sliding_velocity"].as_f64().unwrap() > 0.0);
         assert!(
             v["members"][0]["cases"][0]["bending_stress"]
                 .as_f64()
@@ -2631,12 +2639,15 @@ mod tests {
             "a worm stage's members are gears like any other"
         );
         let mesh = worm;
-        assert!(
-            mesh["cases"][0]["contact"]["max_pressure"]
-                .as_f64()
-                .unwrap()
-                > 0.0
-        );
+        for i in [2, 3] {
+            assert!(
+                v["members"][i]["cases"][0]["contact_stress"]
+                    .as_f64()
+                    .unwrap()
+                    > 0.0,
+                "the worm's gear {i} presses its flanks"
+            );
+        }
         let eff = &mesh["efficiency"];
         assert!(eff["backward"].as_f64().unwrap() < eff["forward"].as_f64().unwrap());
         // ...while the spur stage puts the same number in both, which is the

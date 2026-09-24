@@ -360,9 +360,10 @@ distance that gives it, the shifts following: the hula stage's crank, sized
 by the shape for every arrangement with an internal mesh, and held to the
 figures its own solver recorded before it retired.
 Two figures the graph makes free are reported on every path beside its
-ratio and efficiency: what one more tooth on each gear would make the
-ratio, and the power through the teeth over the power in — summed on the
-path, and per mesh in each case. A part has no figure of its own: what a
+ratio and efficiency: the power through the teeth over the power in —
+summed on the path, and per mesh in each case — and what one more tooth on
+each gear would make the ratio, which the harness records and the panel
+does not show. A part has no figure of its own: what a
 stage had was a second motion under its own convention, and it went once a
 law held it to the path across the stage's ends. A load on a body two parts
 share goes the way that holds it, as a load anywhere does, and is refused
@@ -535,7 +536,9 @@ alone, so its face width will not satisfy contact until a designer says which
 rating should decide it — the figures are on screen, and the minimum face width
 each rating asks for is beside them. The two gears of a mesh are rated at different points on the path
 — each where its own dedendum is loaded alone — so they carry different contact
-stresses; the shared pitch-point figure is reported at the mesh. An automatic
+stresses, each on its own card; the one patch they share — its pitch-point
+figure, its size and where on the path it is worst — is the harness's, and
+the panel does not repeat it. An automatic
 width answers to the mesh, not to one gear, and so does the width a member is
 *rated* at — the narrower face carries the pair, so that is the width the load
 is spread over. A case's loads are followed by one flow across every mesh,

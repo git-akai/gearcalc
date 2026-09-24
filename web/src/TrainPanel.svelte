@@ -627,20 +627,9 @@
     {@render axisWorkspace(sel.axis)}
   {:else if sel !== null && "case" in sel && tab.train.load_cases[sel.case] !== undefined}
     {@const c = tab.train.load_cases[sel.case]}
-    {@const complete = forCase(solved?.cases, sel.case)?.solved ?? false}
     <div class="ws-head">
       <h4 class="section-heading">{caseName(sel.case)} · {kindLabel(c.kind)}</h4>
       <small>{caseSummary(c)}</small>
-      <span class="control" class:locked={solved !== undefined && !complete}>
-        <Switch
-          label={t("ui.train_case_enabled")}
-          on={c.enabled}
-          set={(v) => {
-            if (v && solved !== undefined && !complete) return;
-            c.enabled = v;
-          }}
-        />
-      </span>
     </div>
     <div class="casebody">{@render caseEditor(c, sel.case)}</div>
   {:else if sel !== null && "coupling" in sel && tab.train.shape.couplings[sel.coupling] !== undefined}
@@ -677,9 +666,10 @@
     {/if}
   </div>
   <div class="ws">
-    <div class="col first">{@render gearColumn(m.a, k, crossed, worm)}</div>
+    <!-- **The mesh's own inputs, above the gears it joins** — under the
+         workspace's head, which already names the mesh, so the card needs
+         no heading of its own. -->
     <div class="col meshcol">
-      <h4 class="section-heading">{t("ui.train_mesh_column")}</h4>
       <div class="grid shared">
         {@render numberField("ui.train_sliding_friction", () => m.sliding_friction, (v) => (m.sliding_friction = v), 0.01, "")}
         {@render numberField("ui.train_static_friction", () => m.static_friction, (v) => (m.static_friction = v), 0.01, "", t("ui.train_note_static_friction"))}
@@ -697,15 +687,15 @@
         {/if}
       </div>
       {#if dist !== undefined && d !== undefined}
-        <h4 class="section-heading">{t("ui.train_distance_between", { a: axisLabel(dist.axes[0]), b: axisLabel(dist.axes[1]) })}</h4>
+        <h4 class="section-heading later">{t("ui.train_distance_between", { a: axisLabel(dist.axes[0]), b: axisLabel(dist.axes[1]) })}</h4>
         {@render distanceFields(d)}
       {/if}
     </div>
+    <div class="col first">{@render gearColumn(m.a, k, crossed, worm)}</div>
     <div class="col second">{@render gearColumn(m.b, k, crossed, worm)}</div>
   </div>
-  <!-- **What the mesh comes to, running down** under the three columns,
-       at the workspace's width: a label and a figure per row. -->
-  <h4 class="section-heading">{t("ui.train_what_mesh_comes_to")}</h4>
+  <!-- **What the mesh comes to, running down** under the cards, at the
+       workspace's width: a label and a figure per row. -->
   <dl class="out comes">
     {@render meshRows(solved?.meshes[k], [gearName(m.a), gearName(m.b)])}
     {#if worm && solved}
@@ -713,19 +703,6 @@
       <dd>
         {num(solved.members[m.a]?.lead_angle, 4)}° · {num(solved.members[m.b]?.lead_angle, 4)}°
         <small>{t("ui.train_lead")} {num(solved.members[m.a]?.lead, 4)} {t("ui.train_mm")}</small>
-      </dd>
-    {/if}
-    <!-- **What one more tooth on either gear makes the shown case's path**
-         — the graph's exact answer, so a designer choosing counts sees
-         where a tooth tells and where it does not, and where it locks the
-         path, which a gear of another part can. -->
-    {#if casePath}
-      <dt>{t("ui.train_ratio_per_tooth")}</dt>
-      <dd>
-        {#each [m.a, m.b] as i (i)}
-          {@const r = casePath.per_tooth[i]}
-          <span class="line">{gearName(i)}: {r == null ? t("ui.train_ratio_per_tooth_locked") : num(r, 4)}</span>
-        {/each}
       </dd>
     {/if}
   </dl>
@@ -1199,33 +1176,6 @@
       {/each}
     </dd>
   {/if}
-  <!-- The one patch both members share: same normal force, same E*, one
-       instant — an ellipse on crossed shafts, a line on parallel ones, and
-       the same rows either way, once per load case. Each member's own rating
-       is on its card and is this or worse. -->
-  <dt>{t("ui.train_contact_stress")}</dt>
-  <dd>
-    {#each m?.cases ?? [] as c (c.case)}
-      <span class="line">
-        {caseName(c.case)}: {num(c.contact.max_pressure, 1)} {t("ui.train_mpa")}
-        <small>
-          {t("ui.train_patch", {
-            length: num(c.contact.patch_length, 4),
-            width: num(c.contact.patch_width, 4),
-          })} ·
-          {Math.abs(c.contact.worst_position) < 1e-9
-            ? t("ui.train_worst_at_pitch_point")
-            : t("ui.train_worst_along_the_path", {
-                position: num(c.contact.worst_position, 3),
-              })}
-          · {t("ui.train_pitch_point_alone_gives", {
-            stress: num(c.contact.at_pitch_point, 1),
-          })}
-          · ρ {num(1 / c.contact.curvature_across, 3)} mm
-        </small>
-      </span>
-    {/each}
-  </dd>
   <!-- The room an internal mesh's tips have on the side away from contact
        — what sizes the distance at a few teeth of difference, and a large
        number nobody reads on an ordinary ring. -->
@@ -2070,25 +2020,40 @@
          reaction, with what the train comes to along it. -->
     <section class="pane cases">
       <h4 class="section-heading">{t("ui.train_cases")}</h4>
+      <!-- **A case to a bar**: its name, what it loads and whether it solves
+           on the part that shows it, and its switch at the end — which will
+           not turn on a case the train cannot solve, since a case that is
+           on is one every rating answers to. -->
       <div class="case-list">
         {#each tab.train.load_cases as c, i (i)}
-          <button
-            class="case"
-            class:on={i === shownCase}
-            class:off={!c.enabled}
-            onclick={() => {
-              tab.view.case = i;
-              select({ case: i });
-            }}
-          >
-            <span class="case-name">{caseName(i)} · {kindLabel(c.kind)}</span>
-            {#if caseSummary(c)}
-              <span class="case-sum">{caseSummary(c)}</span>
-            {/if}
-            {#if c.enabled && solved !== undefined && !(forCase(solved.cases, i)?.solved ?? false)}
-              <span class="case-sum warn">{t("ui.train_case_incomplete")}</span>
-            {/if}
-          </button>
+          {@const complete = forCase(solved?.cases, i)?.solved ?? false}
+          <div class="case" class:on={i === shownCase} class:off={!c.enabled}>
+            <button
+              class="case-pick"
+              onclick={() => {
+                tab.view.case = i;
+                select({ case: i });
+              }}
+            >
+              <span class="case-name">{caseName(i)} · {kindLabel(c.kind)}</span>
+              {#if caseSummary(c)}
+                <span class="case-sum">{caseSummary(c)}</span>
+              {/if}
+              {#if c.enabled && solved !== undefined && !complete}
+                <span class="case-sum warn">{t("ui.train_case_incomplete")}</span>
+              {/if}
+            </button>
+            <span class="control" class:locked={solved !== undefined && !complete}>
+              <Switch
+                label={t("ui.train_case_enabled")}
+                on={c.enabled}
+                set={(v) => {
+                  if (v && solved !== undefined && !complete) return;
+                  c.enabled = v;
+                }}
+              />
+            </span>
+          </div>
         {/each}
       </div>
       <div class="case-adds">
@@ -2213,11 +2178,12 @@
 
 <style>
   /* The bar, the delete strip and every `.action` — an edit made or a case
-     added or removed — are `app.css`'s, shared with the gear tab, and a `.head` is
-     a heading that happens to be a button; this serves the buttons that show
-     a state, and leaves those to their own rules rather than outranking them
-     by being scoped (`:not()` counts toward specificity, so this would). */
-  button:not(.action):not(.head) {
+     added or removed — are `app.css`'s, shared with the gear tab, and a case's
+     `.case-pick` is the case's bar rather than a button drawn on it; this
+     serves the buttons that show a state, and leaves those to their own rules
+     rather than outranking them by being scoped (`:not()` counts toward
+     specificity, so this would). */
+  button:not(.action):not(.case-pick) {
     font: inherit;
     font-size: 0.8rem;
     padding: 0.25rem 0.6rem;
@@ -2227,10 +2193,10 @@
     color: var(--fg);
     cursor: pointer;
   }
-  button:not(.action):not(.head):hover:not(:disabled) {
+  button:not(.action):not(.case-pick):hover:not(:disabled) {
     background: var(--hover);
   }
-  button:not(.action):not(.head):disabled {
+  button:not(.action):not(.case-pick):disabled {
     color: var(--muted);
     cursor: default;
   }
@@ -2510,9 +2476,6 @@
   .delivered {
     margin-top: 0.6rem;
   }
-  .delivered h4 {
-    margin: 0;
-  }
   .delivered table.cases td.role {
     color: var(--muted);
   }
@@ -2551,6 +2514,12 @@
     border-bottom: 1px solid var(--rule);
     white-space: normal;
   }
+  /* A row's case sits level with its first line of figures, as the cells
+     beside it do — a heading's units go under its name, a row's notes under
+     its figure. */
+  table.cases tbody th {
+    vertical-align: top;
+  }
   table.cases td {
     padding: 0.15rem 0.6rem 0.15rem 0;
     vertical-align: top;
@@ -2571,15 +2540,18 @@
     padding: 0.5rem 0.7rem;
   }
 
-  /* A second heading in a card opens a second section, so it needs the gap
-     between sections above it — the first one is against the card's own top
-     padding and needs none. */
-  .gear h4.later {
-    margin-top: 0.8rem;
-  }
-  /* Its face is `app.css`'s `.section-heading`; only the margin is its own. */
-  .gear h4 {
+  /* **A heading's gap is its place in its box**, everywhere in the panel:
+     one that opens a pane, a card or a workspace sits against the box's own
+     padding, and one that opens a later section of the same box — a gear's
+     title under its ring's cutter, an axis distance under its mesh's inputs
+     — stands a section's gap under what went before. Its face is
+     `app.css`'s `.section-heading`; only the margin is its own. The gear tab
+     keeps the same rule at its own scale. */
+  h4.section-heading {
     margin: 0 0 0.4rem;
+  }
+  h4.section-heading.later {
+    margin-top: 0.8rem;
   }
   .sub {
     font-size: 0.78rem;
@@ -2737,22 +2709,31 @@
     gap: 0.3rem;
     margin-top: 0.4rem;
   }
-  /* A case to a row: its name and kind, what it loads, and whether it
-     solves, one under the other. */
+  /* A case to a bar: its name and kind, what it loads and whether it
+     solves, one under the other, and its switch at the end. */
   .case {
     display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.05rem;
-    width: 100%;
-    text-align: left;
-    font: inherit;
-    font-size: 0.8rem;
+    align-items: center;
+    gap: 0.5rem;
     padding: 0.3rem 0.55rem;
     border: 1px solid var(--rule);
     border-radius: 4px;
     background: var(--bg);
-    color: var(--fg);
+  }
+  .case-pick {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.05rem;
+    flex: 1;
+    min-width: 0;
+    padding: 0;
+    text-align: left;
+    font: inherit;
+    font-size: 0.8rem;
+    border: 0;
+    background: transparent;
+    color: inherit;
     cursor: pointer;
   }
   .case .case-name {
@@ -2991,31 +2972,24 @@
     border: 0;
     cursor: pointer;
   }
-  /* **The workspace lays itself out by its own width**: the two gears
-     either side of the mesh where there is room for three columns, the two
-     gears side by side with the mesh under them where there is room for
-     two, and one above the other where there is not — a gear's card read
-     across to its mate's wherever it can be. */
+  /* **The workspace lays itself out by its own width**: the mesh's own
+     card across the top, and its two gears under it side by side where
+     there is room for two, one above the other where there is not — a
+     gear's card read across to its mate's wherever it can be. */
   .workspace {
     container-type: inline-size;
   }
   .ws {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: "first" "mesh" "second";
+    grid-template-areas: "mesh" "first" "second";
     gap: 0.7rem;
     align-items: start;
   }
   @container (min-width: 44rem) {
     .ws {
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      grid-template-areas: "first second" "mesh mesh";
-    }
-  }
-  @container (min-width: 72rem) {
-    .ws {
-      grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr) minmax(0, 1fr);
-      grid-template-areas: "first mesh second";
+      grid-template-areas: "mesh mesh" "first second";
     }
   }
   .ws .col {
@@ -3032,11 +3006,12 @@
   }
   .out.comes {
     max-width: 48rem;
+    margin-top: 0.7rem;
   }
+  /* A card as a gear's is: its border tells it apart, and nothing else. */
   .ws .meshcol {
     border: 1px solid var(--rule);
-    border-radius: 4px;
-    padding: 0.4rem 0.6rem;
-    background: var(--panel);
+    border-radius: 3px;
+    padding: 0.5rem 0.7rem;
   }
 </style>

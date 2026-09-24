@@ -43,13 +43,6 @@ export type TipRoom = {
  */
 tip_interference: boolean, 
 /**
- * How much room the tips have where their circles cross, as an angle of
- * **pinion** rotation, degrees. Negative is the overlap, and infinite where
- * the tip circles do not cross at all — the ordinary case, where there is
- * no place for the tips to meet.
- */
-tip_margin: number, 
-/**
  * **The far-side gap**, mm: the room between the pinion's tip and the
  * ring's on the side away from contact, `r_tip,ring − r_tip,pinion +
  * a`. At a few teeth of difference it is what the distance is sized to

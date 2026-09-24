@@ -83,13 +83,6 @@ efficiency: Directional<number>,
  */
 locking_friction: Directional<number>, 
 /**
- * Sliding speed at the pitch point as a multiple of the first member's
- * pitch line speed — the lengthwise sliding crossed shafts have, and
- * **exactly zero** on parallel ones, where the pitch point is the one
- * place with no sliding at all and every loss is along the profile.
- */
-sliding_ratio: number, 
-/**
  * **What every load case does to this mesh**: the Hertzian contact — one
  * patch the two members share, an ellipse on crossed shafts and a line on
  * parallel ones — and the sliding speed at that case's speed.
@@ -100,15 +93,6 @@ cases: Array<MeshCase>,
  * built: the pinion-side member first, then the other.
  */
 backlash: [Backlash, Backlash], 
-/**
- * **The mesh's play as its row in the kinematics sees it**, radians of
- * the row — `j |Σz| / a` on a line contact, plus the axial float's — at
- * its distance's minus, running and plus tolerance in turn. What a
- * play referred to any body of the train is read from
- * ([`kinematics::System::play`]), so a path's backlash sums every mesh
- * it crosses and none it does not ([`PathReport`]).
- */
-row_play: [number, number, number], 
 /**
  * **Whether each member's flank is reached past its usable end** by the
  * other member's tip, in the order the mesh was built.

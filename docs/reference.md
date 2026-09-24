@@ -2568,7 +2568,8 @@ exactly, and the driving side's power is what the figure counts so that it
 is; and **the ratio one more tooth on each gear would give**, gears numbered
 across the train — the graph's exact answer at `z + 1`, which is where a
 tooth tells and where it does not: a planet's moves a set's ratio by
-nothing, and a gear off the path moves it only by locking it. **Whether a
+nothing, and a gear off the path moves it only by locking it. The harness
+records it; the panel does not show it. **Whether a
 path breaks away** is its own flow against every mesh's static friction
 ([the friction balance](#the-friction-balance)), since a train can hold at
 rest where none of its meshes does. Every other pair of open bodies is a

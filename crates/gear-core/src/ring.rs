@@ -94,13 +94,6 @@ impl Default for Cutter {
 /// from [`Ring::trochoid_at`] rather than being stored, so there is one place
 /// the curve is defined.
 #[derive(Clone, Copy, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
-#[cfg_attr(
-    feature = "typescript",
-    derive(ts_rs::TS),
-    ts(export, export_to = "core/")
-)]
 pub struct Fillet {
     /// Cutter travel at the flank/fillet junction.
     pub s_j: f64,

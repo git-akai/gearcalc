@@ -3445,23 +3445,23 @@
    "ok": [
     [
      "en",
-     531
+     523
     ],
     [
      "de",
-     531
+     523
     ],
     [
      "pt",
-     531
+     523
     ],
     [
      "zh-Hans",
-     531
+     523
     ],
     [
      "zh-Hant",
-     531
+     523
     ]
    ]
   },
@@ -27610,11 +27610,7 @@
          "circulation": {
           "forward": 1,
           "backward": 1
-         },
-         "per_tooth": [
-          "-2.3888888888888888",
-          "-2.5882352941176472"
-         ]
+         }
         }
        ],
        "cases": [
@@ -28048,47 +28044,19 @@
           "forward": -1,
           "backward": -1
          },
-         "sliding_ratio": 0,
          "cases": [
           {
            "case": 0,
-           "contact": {
-            "max_pressure": "904.34765443247124",
-            "at_pitch_point": "821.68357675559616",
-            "worst_position": "-0.72692830932574104",
-            "patch_length": "0.29172318165974342",
-            "patch_width": "0.060422545642846825",
-            "curvature_along": 0,
-            "curvature_across": "0.57719271777557857"
-           },
            "power_through": 1,
            "sliding_velocity": 0
           },
           {
            "case": 1,
-           "contact": {
-            "max_pressure": "3114.4852381402852",
-            "at_pitch_point": "2829.7982061263888",
-            "worst_position": "-0.72692830932574104",
-            "patch_length": "0.29172318165974342",
-            "patch_width": "0.20808936202040657",
-            "curvature_along": 0,
-            "curvature_across": "0.57719271777557857"
-           },
            "power_through": 1,
            "sliding_velocity": 0
           },
           {
            "case": 2,
-           "contact": {
-            "max_pressure": "404.43656612069890",
-            "at_pitch_point": "367.46806672413584",
-            "worst_position": "-0.72692830932574104",
-            "patch_length": "0.29172318165974342",
-            "patch_width": "0.027021783886197845",
-            "curvature_along": 0,
-            "curvature_across": "0.57719271777557857"
-           },
            "power_through": 1,
            "sliding_velocity": 0
           }
@@ -28104,11 +28072,6 @@
            "minimum": 0,
            "maximum": "0.078094292479929425"
           }
-         ],
-         "row_play": [
-          0,
-          "0.029231941903833384",
-          "0.058609108823979295"
          ],
          "flank_interference": [
           false,
@@ -28665,14 +28628,7 @@
          "circulation": {
           "forward": "2.6676931020525156",
           "backward": "2.6928872256775085"
-         },
-         "per_tooth": [
-          "-16.722222222222221",
-          "-18.117647058823529",
-          "-16.538461538461540",
-          "-17.705882352941178",
-          "-17.916666666666668"
-         ]
+         }
         }
        ],
        "cases": [
@@ -29675,47 +29631,19 @@
           "forward": -1,
           "backward": -1
          },
-         "sliding_ratio": 0,
          "cases": [
           {
            "case": 0,
-           "contact": {
-            "max_pressure": "2421.0155296522539",
-            "at_pitch_point": "2199.7167682531458",
-            "worst_position": "-0.72692830932574104",
-            "patch_length": "0.040704893618717354",
-            "patch_width": "0.16175628987975388",
-            "curvature_along": 0,
-            "curvature_across": "0.57719271777557857"
-           },
            "power_through": 1,
            "sliding_velocity": 0
           },
           {
            "case": 1,
-           "contact": {
-            "max_pressure": "3114.4852381402852",
-            "at_pitch_point": "2829.7982061263888",
-            "worst_position": "-0.72692830932574104",
-            "patch_length": "0.040704893618717354",
-            "patch_width": "0.20808936202040657",
-            "curvature_along": 0,
-            "curvature_across": "0.57719271777557857"
-           },
            "power_through": "0.97672819043691816",
            "sliding_velocity": 0
           },
           {
            "case": 2,
-           "contact": {
-            "max_pressure": "1082.7110597770193",
-            "at_pitch_point": "983.74324501203682",
-            "worst_position": "-0.72692830932574104",
-            "patch_length": "0.040704893618717354",
-            "patch_width": "0.072339611991858163",
-            "curvature_along": 0,
-            "curvature_across": "0.57719271777557857"
-           },
            "power_through": 1,
            "sliding_velocity": 0
           }
@@ -29731,11 +29659,6 @@
            "minimum": 0,
            "maximum": "0.078094292479929425"
           }
-         ],
-         "row_play": [
-          0,
-          "0.029231941903833384",
-          "0.058609108823979295"
          ],
          "flank_interference": [
           false,
@@ -29764,47 +29687,19 @@
           "forward": -1,
           "backward": -1
          },
-         "sliding_ratio": 0,
          "cases": [
           {
            "case": 0,
-           "contact": {
-            "max_pressure": "2643.8814990780147",
-            "at_pitch_point": "2429.8377577660135",
-            "worst_position": "-0.48867180655713893",
-            "patch_length": "0.053046288244698217",
-            "patch_width": "0.13351391312389368",
-            "curvature_along": 0,
-            "curvature_across": "0.76365975913284279"
-           },
            "power_through": "0.84295693986664233",
            "sliding_velocity": 0
           },
           {
            "case": 1,
-           "contact": {
-            "max_pressure": "3467.3666984990218",
-            "at_pitch_point": "3186.6551231480903",
-            "worst_position": "-0.48867180655713893",
-            "patch_length": "0.053046288244698217",
-            "patch_width": "0.17509926080783855",
-            "curvature_along": 0,
-            "curvature_across": "0.76365975913284279"
-           },
            "power_through": "0.85569163387443536",
            "sliding_velocity": 0
           },
           {
            "case": 2,
-           "contact": {
-            "max_pressure": "1182.3797512784975",
-            "at_pitch_point": "1086.6564801320947",
-            "worst_position": "-0.48867180655713893",
-            "patch_length": "0.053046288244698217",
-            "patch_width": "0.059709237137405502",
-            "curvature_along": 0,
-            "curvature_across": "0.76365975913284279"
-           },
            "power_through": "0.84295693986664255",
            "sliding_velocity": 0
           }
@@ -29820,11 +29715,6 @@
            "minimum": "-8.9055531080978457e-15",
            "maximum": "0.11682706389021100"
           }
-         ],
-         "row_play": [
-          "-4.6629367034256575e-15",
-          "0.030487649550596799",
-          "0.061170507609658704"
          ],
          "flank_interference": [
           false,
@@ -29853,47 +29743,19 @@
           "forward": -1,
           "backward": -1
          },
-         "sliding_ratio": 0,
          "cases": [
           {
            "case": 0,
-           "contact": {
-            "max_pressure": "1161.9600075331196",
-            "at_pitch_point": "981.19759421155004",
-            "worst_position": "-1.1736989589106406",
-            "patch_length": "0.053046288244698217",
-            "patch_width": "0.29722612315699520",
-            "curvature_along": 0,
-            "curvature_across": "0.15076087484409292"
-           },
            "power_through": "0.82473616218587287",
            "sliding_velocity": 0
           },
           {
            "case": 1,
-           "contact": {
-            "max_pressure": "1544.9083238802950",
-            "at_pitch_point": "1304.5718620617299",
-            "worst_position": "-1.1736989589106406",
-            "patch_length": "0.053046288244698217",
-            "patch_width": "0.39518323243738945",
-            "curvature_along": 0,
-            "curvature_across": "0.15076087484409292"
-           },
            "power_through": "0.86046740136615474",
            "sliding_velocity": 0
           },
           {
            "case": 2,
-           "contact": {
-            "max_pressure": "519.64431279604457",
-            "at_pitch_point": "438.80490400325590",
-            "worst_position": "-1.1736989589106406",
-            "patch_length": "0.053046288244698217",
-            "patch_width": "0.13292356321355311",
-            "curvature_along": 0,
-            "curvature_across": "0.15076087484409292"
-           },
            "power_through": "0.82473616218587298",
            "sliding_velocity": 0
           }
@@ -29910,18 +29772,12 @@
            "maximum": "0.048677943287595324"
           }
          ],
-         "row_play": [
-          "0.061170507609668023",
-          "0.030682858059066564",
-          "4.6629367034256575e-15"
-         ],
          "flank_interference": [
           true,
           false
          ],
          "tips": {
           "tip_interference": false,
-          "tip_margin": "2.0230945329989174",
           "far_gap": "40.315337340751441"
          },
          "notes": [],

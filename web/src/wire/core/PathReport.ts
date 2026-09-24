@@ -38,12 +38,4 @@ backlash: Directional<Backlash>,
  * goes ([`flow::Flow::mesh_powers`]). An offset coupling passes power
  * and has no teeth, so it counts for nothing here.
  */
-circulation: Directional<number>, 
-/**
- * **The ratio one more tooth on each gear would give**, each gear by
- * the graph's index for it — the graph's exact answer at `z_i + 1`, which is
- * what a designer choosing counts wants beside the ratio: where a tooth
- * moves it a lot, and where not at all. `None` where that one tooth
- * leaves the path no motion or locks it.
- */
-per_tooth: Array<number | null>, };
+circulation: Directional<number>, };

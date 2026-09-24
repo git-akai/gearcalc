@@ -31,7 +31,6 @@ import type {
   ClassRef,
   ContactRatios,
   LineContact,
-  ContactPatch,
   PointContact,
   Cutter,
   CutterRef,
@@ -39,6 +38,7 @@ import type {
   Directional,
   GearParams,
   GearRequest,
+  TrainRequest,
   GearResult,
   GearSummary,
   LoadSharing,
@@ -110,7 +110,6 @@ export type {
   ClassRef,
   ContactRatios,
   LineContact,
-  ContactPatch,
   PointContact,
   Cutter,
   CutterRef,
@@ -118,6 +117,7 @@ export type {
   Directional,
   GearParams,
   GearRequest,
+  TrainRequest,
   GearResult,
   GearSummary,
   LoadSharing,
@@ -767,8 +767,8 @@ export function defaultTrain(): Train {
  *  bad JSON, a panicking module, nothing a designer typed. */
 export function solveTrain(train: Train, materials?: MaterialLibrary): TrainOutcome {
   try {
-    const body = JSON.stringify({ train, materials: materials ?? null });
-    return JSON.parse(solve_train(body)) as TrainOutcome;
+    const req: TrainRequest = { train, materials };
+    return JSON.parse(solve_train(JSON.stringify(req))) as TrainOutcome;
   } catch (e) {
     return {
       result: null,
