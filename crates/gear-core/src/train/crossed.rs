@@ -141,7 +141,7 @@ pub mod proportions {
 mod tests {
     use super::super::arrangements as arr;
     use super::super::shape::{Shape, ShapeResult};
-    use super::super::{MeshReport, StageGear, TrainError};
+    use super::super::{MemberGear, MeshReport, TrainError};
     use super::*;
     use crate::contact::{Directional, Drive};
     use crate::material::{contact_modulus, Material, MaterialLibrary};
@@ -190,7 +190,7 @@ mod tests {
     }
 
     /// A stage with one member's inputs edited.
-    fn member(mut stage: Shape, i: usize, edit: impl FnOnce(&mut StageGear)) -> Shape {
+    fn member(mut stage: Shape, i: usize, edit: impl FnOnce(&mut MemberGear)) -> Shape {
         edit(&mut stage.members[i].gear);
         stage
     }
@@ -720,13 +720,13 @@ mod tests {
     #[test]
     fn the_width_a_crossed_pair_reports_for_continuity_buys_exactly_continuous_contact() {
         use crate::params::Auto;
-        use crate::train::StageGear;
+        use crate::train::MemberGear;
 
         let lib = super::super::test_library();
-        let gear = |teeth: u32, face: Auto<f64>| StageGear {
+        let gear = |teeth: u32, face: Auto<f64>| MemberGear {
             teeth,
             face_width: face,
-            ..StageGear::default()
+            ..MemberGear::default()
         };
         let stage = |face: Auto<f64>| {
             let mut s = arr::pair([17, 43]);
@@ -856,21 +856,21 @@ mod tests {
     #[test]
     fn rating_along_the_path_is_never_kinder_than_the_pitch_point() {
         use crate::params::Auto;
-        use crate::train::StageGear;
+        use crate::train::MemberGear;
 
         let lib = super::super::test_library();
         let crossed = |face: f64| {
             let mut s = arr::pair([17, 43]);
             s.distances[0].angle = 90.0;
-            s.members[0].gear = StageGear {
+            s.members[0].gear = MemberGear {
                 teeth: 17,
                 face_width: Auto::fixed(face),
-                ..StageGear::default()
+                ..MemberGear::default()
             };
-            s.members[1].gear = StageGear {
+            s.members[1].gear = MemberGear {
                 teeth: 23,
                 face_width: Auto::fixed(face),
-                ..StageGear::default()
+                ..MemberGear::default()
             };
             s
         };
@@ -936,7 +936,7 @@ mod tests {
     #[test]
     fn the_stage_counts_all_the_sliding_and_can_only_lose_by_it() {
         use crate::params::Auto;
-        use crate::train::StageGear;
+        use crate::train::MemberGear;
 
         let lib = super::super::test_library();
 
@@ -976,15 +976,15 @@ mod tests {
         let crossed = {
             let mut s = arr::pair([17, 43]);
             s.distances[0].angle = 60.0;
-            s.members[0].gear = StageGear {
+            s.members[0].gear = MemberGear {
                 teeth: 17,
                 face_width: Auto::fixed(12.0),
-                ..StageGear::default()
+                ..MemberGear::default()
             };
-            s.members[1].gear = StageGear {
+            s.members[1].gear = MemberGear {
                 teeth: 43,
                 face_width: Auto::fixed(12.0),
-                ..StageGear::default()
+                ..MemberGear::default()
             };
             s
         };
@@ -1008,22 +1008,22 @@ mod tests {
     #[test]
     fn a_crossed_pair_loses_more_the_further_its_shafts_are_turned() {
         use crate::params::Auto;
-        use crate::train::StageGear;
+        use crate::train::MemberGear;
 
         let lib = super::super::test_library();
         let stage = |sigma: f64| {
             ({
                 let mut s = arr::pair([17, 43]);
                 s.distances[0].angle = sigma;
-                s.members[0].gear = StageGear {
+                s.members[0].gear = MemberGear {
                     teeth: 17,
                     face_width: Auto::fixed(60.0),
-                    ..StageGear::default()
+                    ..MemberGear::default()
                 };
-                s.members[1].gear = StageGear {
+                s.members[1].gear = MemberGear {
                     teeth: 43,
                     face_width: Auto::fixed(60.0),
-                    ..StageGear::default()
+                    ..MemberGear::default()
                 };
                 s
             })
@@ -1241,13 +1241,13 @@ mod tests {
     #[test]
     fn a_crossed_spur_stage_is_the_screw_stage_it_used_to_be_entered_as() {
         use crate::params::Auto;
-        use crate::train::StageGear;
+        use crate::train::MemberGear;
 
         let lib = super::super::test_library();
-        let gear = |teeth: u32| StageGear {
+        let gear = |teeth: u32| MemberGear {
             teeth,
             face_width: Auto::fixed(8.0),
-            ..StageGear::default()
+            ..MemberGear::default()
         };
         let mut s = arr::pair([17, 43]);
         s.distances[0].angle = 90.0;
@@ -1347,7 +1347,7 @@ mod tests {
     fn the_crossed_backlash_meets_the_parallel_law_at_its_limit() {
         use crate::params::Auto;
 
-        use crate::train::StageGear;
+        use crate::train::MemberGear;
 
         let lib = super::super::test_library();
         let stage = |sigma: f64, clearance: f64| {
@@ -1355,15 +1355,15 @@ mod tests {
                 let mut s = arr::pair([17, 43]);
                 s.distances[0].angle = sigma;
                 s.distances[0].clearance = Auto::fixed(clearance);
-                s.members[0].gear = StageGear {
+                s.members[0].gear = MemberGear {
                     teeth: 17,
                     face_width: Auto::fixed(8.0),
-                    ..StageGear::default()
+                    ..MemberGear::default()
                 };
-                s.members[1].gear = StageGear {
+                s.members[1].gear = MemberGear {
                     teeth: 43,
                     face_width: Auto::fixed(8.0),
-                    ..StageGear::default()
+                    ..MemberGear::default()
                 };
                 s
             })
@@ -1522,10 +1522,10 @@ mod tests {
             ({
                 let mut s = arr::pair([17, 43]);
                 s.distances[0].angle = sigma;
-                for (m, g) in s.members.iter_mut().zip([17u32, 43].map(|z| StageGear {
+                for (m, g) in s.members.iter_mut().zip([17u32, 43].map(|z| MemberGear {
                     teeth: z,
                     face_width: Auto::fixed(30.0),
-                    ..StageGear::default()
+                    ..MemberGear::default()
                 })) {
                     m.gear = g;
                 }
@@ -1620,7 +1620,7 @@ mod tests {
     fn the_shortfall_at_the_limit_is_second_order_in_the_error() {
         use crate::params::Auto;
 
-        use crate::train::StageGear;
+        use crate::train::MemberGear;
 
         let lib = super::super::test_library();
         let stage = |sigma: f64, clearance: f64| {
@@ -1628,15 +1628,15 @@ mod tests {
                 let mut s = arr::pair([17, 43]);
                 s.distances[0].angle = sigma;
                 s.distances[0].clearance = Auto::fixed(clearance);
-                s.members[0].gear = StageGear {
+                s.members[0].gear = MemberGear {
                     teeth: 17,
                     face_width: Auto::fixed(8.0),
-                    ..StageGear::default()
+                    ..MemberGear::default()
                 };
-                s.members[1].gear = StageGear {
+                s.members[1].gear = MemberGear {
                     teeth: 43,
                     face_width: Auto::fixed(8.0),
-                    ..StageGear::default()
+                    ..MemberGear::default()
                 };
                 s
             })
@@ -1835,7 +1835,7 @@ mod tests {
     #[test]
     fn a_centre_distance_error_slides_a_crossed_pairs_contact_off_its_face() {
         use crate::params::Auto;
-        use crate::train::StageGear;
+        use crate::train::MemberGear;
 
         let lib = super::super::test_library();
         let stage = |sigma: f64, clearance: f64| {
@@ -1843,15 +1843,15 @@ mod tests {
                 let mut s = arr::pair([17, 43]);
                 s.distances[0].angle = sigma;
                 s.distances[0].clearance = Auto::fixed(clearance);
-                s.members[0].gear = StageGear {
+                s.members[0].gear = MemberGear {
                     teeth: 17,
                     face_width: Auto::fixed(12.0),
-                    ..StageGear::default()
+                    ..MemberGear::default()
                 };
-                s.members[1].gear = StageGear {
+                s.members[1].gear = MemberGear {
                     teeth: 43,
                     face_width: Auto::fixed(12.0),
-                    ..StageGear::default()
+                    ..MemberGear::default()
                 };
                 s
             })

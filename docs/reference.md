@@ -2508,18 +2508,17 @@ cancel it. There was a third word too, *driven*, from when the train was a
 chain with a head; what drives is a load on an open port, and both words
 are gone.)
 
-**A body two stages share is written, never assumed.** A file lists every
+**A body two presets share is written, never assumed.** A file lists every
 body once, by number, on its axis, and a train the panel builds writes each
-one: adding a stage lays its preset into the graph, numbers its bodies after
-every body the train has, joins its conventional input to the last part's
-remaining open output — or with the body the designer names — and carries
-every case entry there to the new stage's output (`push_stage`,
-`insert`). Two bodies are made one by the train's rule (`join`, the lower
+one: adding a preset lays it into the graph, numbers its bodies after every
+body the train has, joins its conventional input to the train's remaining
+open output — or with the body the designer names — and carries every case
+entry there to the preset's output (`chain_on`, `insert`). Two bodies are made one by the train's rule (`join`, the lower
 number kept); a gear sharing a body is moved off it onto one of its own,
 and a part's end split off where a train is built in code (`split`). A hold
 is a statement about the *body*, which every end of it shares (`hold`,
-`release`). Adding a stage writes what the preset holds by convention as
-holds of the train's.
+`release`). Adding a preset writes what it holds by convention as holds of
+the train's.
 
 **A join makes one body on one axis.** The two axes the ends turned about
 become one line, every body and distance on the later moved to the earlier,

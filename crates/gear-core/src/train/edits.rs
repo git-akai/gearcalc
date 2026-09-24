@@ -20,7 +20,7 @@
 //! every distance carries a mesh, and a carrier's body is never removed.
 
 use super::shape::{Member, Shape};
-use super::StageGear;
+use super::MemberGear;
 use crate::kinematics::GROUND;
 use crate::params::Auto;
 
@@ -75,7 +75,7 @@ pub enum Edit {
     /// **A stage laid into the train**, its bodies numbered after the
     /// train's: its conventional input made one with `at` where given, and
     /// otherwise with the last part's remaining open output, the case
-    /// entries there carried to its own ([`super::Train::push_stage`]).
+    /// entries there carried to its own ([`super::Train::chain_on`]).
     Insert { stage: Shape, at: Option<usize> },
 }
 
@@ -504,7 +504,7 @@ impl Shape {
         let module = self.members[mate].normal_module();
         self.members.push(Member {
             body,
-            gear: StageGear {
+            gear: MemberGear {
                 teeth,
                 profile_shift: Auto::automatic(0.0),
                 ..self.members[mate].gear.clone()
@@ -1253,7 +1253,7 @@ mod tests {
         let output = t.port(0, 2);
         let input = t.port(0, 1);
         assert_eq!(t.ends_of(output).len(), 2, "the output runs on");
-        let shape = t.stages()[0].clone();
+        let shape = t.part_shapes()[0].clone();
         let axis = shape.axis_of_slot(shape.slot(output));
         let engaged = shape
             .members_on_body(output)
@@ -1303,16 +1303,16 @@ mod tests {
             to: None,
         })
         .unwrap();
-        assert_eq!(t.stages()[0].members_on_body(output), vec![idle]);
+        assert_eq!(t.part_shapes()[0].members_on_body(output), vec![idle]);
         assert_eq!(t.ends_of(output).len(), 2, "the output is the output");
         assert_eq!(t.port(0, 2), output, "...where it was");
 
         // **A bare body nothing names is given up**: the same first move on
         // a stage of its own, with no train to mean the shaft to be there.
         let mut alone = Train::chained(vec![lay()], |_| Vec::new());
-        let was = alone.stages()[0].bodies.len();
+        let was = alone.part_shapes()[0].bodies.len();
         let (on, to) = {
-            let stages = alone.stages();
+            let stages = alone.part_shapes();
             let s = &stages[0];
             (s.members_on_body(alone.port(0, 2))[0], s.members[idle].body)
         };
@@ -1323,7 +1323,7 @@ mod tests {
             })
             .unwrap();
         assert_eq!(
-            alone.stages()[0].bodies.len(),
+            alone.part_shapes()[0].bodies.len(),
             was - 1,
             "the shaft nothing named is given up"
         );
@@ -1346,13 +1346,13 @@ mod tests {
         assert_eq!(t.ends_of(3).len(), 2);
         t.hold(t.port(0, 2));
         t.edit(Edit::Remove(Piece::Member(1))).unwrap();
-        assert_eq!(t.stages()[0].members.len(), 2);
+        assert_eq!(t.part_shapes()[0].members.len(), 2);
         assert_eq!(t.port(0, 2), 2, "ring 2 closed up to body 2");
         assert_eq!(
             t.ends_of(2).len(),
             2,
             "ring 2 still runs on to the spur: {:?}",
-            t.stages()[1].bodies
+            t.part_shapes()[1].bodies
         );
         assert!(
             t.held.is_empty(),

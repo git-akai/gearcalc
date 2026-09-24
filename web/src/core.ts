@@ -68,7 +68,7 @@ import type {
   SlotCase,
   Axis,
   BodyOn,
-  StageGear,
+  MemberGear,
   ToleranceOut,
   Train,
   TrainResult,
@@ -152,7 +152,7 @@ export type {
   SlotCase,
   Axis,
   BodyOn,
-  StageGear,
+  MemberGear,
   ToleranceOut,
   Train,
   TrainResult,
@@ -788,7 +788,7 @@ export function defaultTrain(): Train {
  *  A geartrain halfway through an edit is regularly one that cannot be built,
  *  and the panel has to go on showing every input that produced it — so the
  *  refusal comes back as a value, carrying a `Note` the catalogue renders and
- *  the stage it happened in. The `throw` path is for a boundary that broke:
+ *  the part it happened in. The `throw` path is for a boundary that broke:
  *  bad JSON, a panicking module, nothing a designer typed. */
 export function solveTrain(train: Train, materials?: MaterialLibrary): TrainOutcome {
   try {
@@ -805,7 +805,7 @@ export function solveTrain(train: Train, materials?: MaterialLibrary): TrainOutc
           key: "ui.train_boundary_failed",
           values: { detail: e instanceof Error ? e.message : String(e) },
         },
-        stage: null,
+        part: null,
       },
       figures: [],
       parts: [],

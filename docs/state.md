@@ -1167,7 +1167,7 @@ Not a queue with a head; this is what a next session would pick from.
   of the set it was calibrated in, not of the factor, and this project has been
   caught by that once.
 - **Wire `rim_thickness` into the boundary and the UI.** The model is complete
-  and gated in `gear-core`, the input is a field on `StageGear` so it already
+  and gated in `gear-core`, the input is a field on `MemberGear` so it already
   crosses as a wire type, and `gear-cli strength … <rim>` exercises it. What is
   left is a form field on the gear card, a serde-defaulted `null` in the tab
   state, and one label plus one unit in five string catalogues. Nothing about

@@ -61,7 +61,7 @@
 //!   and shares no expression with any of this: the mesh sense there is
 //!   which tangent the two circles admit, not [`MeshKind::sign`].
 
-use super::StageGear;
+use super::MemberGear;
 use crate::kinematics::{Body, MeshRow, System};
 use crate::mesh::MeshKind;
 
@@ -180,7 +180,7 @@ pub enum WiringError {
     /// frames turn against each other.
     NoCommonFrame(usize),
     /// **A member with no teeth**, by index. The one refusal here a *design*
-    /// can reach — `StageGear::teeth` is a `u32` and nothing stops a designer
+    /// can reach — `MemberGear::teeth` is a `u32` and nothing stops a designer
     /// typing zero — and it is checked before any geometry, because a gear with
     /// no teeth used to be reported as *"the tooth is too undercut to have a
     /// root section"*, which describes a tooth that exists.
@@ -306,6 +306,6 @@ impl Wiring {
 
 /// **Every constrainable member a stage has, as tooth counts** — the companion
 /// of [`super::member_inputs`], and the argument [`Wiring::alone`] wants.
-pub(crate) fn teeth_of<'a>(members: impl IntoIterator<Item = &'a StageGear>) -> Vec<u32> {
+pub(crate) fn teeth_of<'a>(members: impl IntoIterator<Item = &'a MemberGear>) -> Vec<u32> {
     members.into_iter().map(|g| g.teeth).collect()
 }

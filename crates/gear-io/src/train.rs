@@ -733,7 +733,7 @@ mod tests {
             s.members[part.members[0]].gear.face_width = Auto::automatic(4.0);
         }
         let back = from_toml(&to_toml(&doc).unwrap()).unwrap().document;
-        let s = &back.train.stages()[0];
+        let s = &back.train.part_shapes()[0];
         let d = s.distances[0].distance;
         assert!(!d.auto && (d.manual - 31.5).abs() < 1e-12);
         let w = s.members[0].gear.face_width;
@@ -753,7 +753,7 @@ mod tests {
         doc.train.shape.meshes[mesh].overlap = Auto::fixed(1.5);
         let back = from_toml(&to_toml(&doc).unwrap()).unwrap();
         assert!(back.adjusted);
-        let w = &back.document.train.stages()[1];
+        let w = &back.document.train.part_shapes()[1];
         assert!(
             w.meshes[0].overlap.auto,
             "a crossed pair's ratio cannot stand given"
@@ -772,11 +772,9 @@ mod tests {
         // degree of freedom — is one too many, and the last gives way with
         // its number kept.
         let mut doc = document();
-        while doc.train.parts().len() > 1 {
-            doc.train.remove_stage(1);
-        }
-        doc.train.held.clear();
-        doc.train.load_cases.truncate(1);
+        doc.train = Train::chained(vec![arr::pair([17, 43]).with_additional_helix(15.0)], |t| {
+            vec![LoadCase::ultimate(t.port(0, 1), t.port(0, 2), 1.0, 1000.0)]
+        });
         // The reaction at the pair's second gear made a load with both
         // figures given.
         let (first, second) = (doc.train.port(0, 1), doc.train.port(0, 2));

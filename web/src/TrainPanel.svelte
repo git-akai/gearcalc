@@ -22,7 +22,7 @@
     outside,
     type Auto,
     type Overrides,
-    type StageGear,
+    type MemberGear,
     type Shape,
     type Member,
     type Value,
@@ -1077,7 +1077,7 @@
 
 {#snippet property(
   label: string,
-  gear: StageGear,
+  gear: MemberGear,
   key: keyof Overrides,
   used: Value | undefined,
   step: number,
@@ -1367,7 +1367,7 @@
 
 {#snippet gearCard(
   title: string,
-  gear: StageGear,
+  gear: MemberGear,
   g: GearResult | undefined,
   opts: {
     /** "shaper" for a ring, whose root and fillet are the tool's rather than
@@ -2183,8 +2183,8 @@
         <ul class="notes">
           {#if failure}
             <li class="warn">
-              {#if failure.stage !== null}
-                <button class="link" onclick={() => showPart(failure.stage! - 1)}>{partName(failure.stage - 1)}</button>:
+              {#if failure.part !== null}
+                <button class="link" onclick={() => showPart(failure.part! - 1)}>{partName(failure.part - 1)}</button>:
               {/if}
               {note(failure.note)}
             </li>

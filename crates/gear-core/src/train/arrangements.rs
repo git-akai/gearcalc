@@ -20,7 +20,7 @@ use super::shape::{
     default_min_contact_ratio, default_overlap, default_planet_clearance, Axis, BodyOn, Distance,
     Member, MeshInput, Shape,
 };
-use super::StageGear;
+use super::MemberGear;
 use crate::contact::LoadSharing;
 use crate::kinematics::{Body, GROUND};
 use crate::params::Auto;
@@ -409,9 +409,9 @@ impl Shape {
         );
         self.members.push(Member {
             body,
-            gear: StageGear {
+            gear: MemberGear {
                 teeth,
-                ..StageGear::default()
+                ..MemberGear::default()
             },
             module: Auto::automatic(module),
             pressure_angle: Auto::automatic(pressure_angle),

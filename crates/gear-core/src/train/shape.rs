@@ -38,7 +38,7 @@
 use super::wiring::{BodyLabel, MeshSpec, Mount, Wiring};
 use super::{
     ContactRatios, Freedom, FreedomGroup, GearResult, Loading, MemberFacts, MemberFreedom,
-    MemberRating, MeshReport, Ports, Reading, StageGear, TrainError, PROBE,
+    MemberGear, MemberRating, MeshReport, Ports, Reading, TrainError, PROBE,
 };
 use crate::contact::{efficiency, ContactPath, Directional, Drive, LoadSharing};
 use crate::kinematics::{Body, GROUND};
@@ -153,7 +153,7 @@ pub struct BodyOn {
 pub struct Member {
     /// The train's body it spins with, one of this stage's [`BodyOn`]s.
     pub body: usize,
-    pub gear: StageGear,
+    pub gear: MemberGear,
     /// **Normal module, mm — given on one member of a mesh group, and
     /// followed by the rest.** Every mesh a member is in shares it, so the
     /// members a run of meshes joins ([`Shape::mesh_groups`]) are cut at one
@@ -3871,7 +3871,7 @@ pub fn solve_shape_after(
 /// trait that stated the six went after them: one shape answers them.
 impl Shape {
     /// The gears in the order [`ShapeResult::members`] reports them.
-    pub fn gears(&self) -> Vec<&StageGear> {
+    pub fn gears(&self) -> Vec<&MemberGear> {
         self.members.iter().map(|m| &m.gear).collect()
     }
 
@@ -3891,7 +3891,7 @@ impl Shape {
                 Freedom::Member(i, MemberFreedom::PitchDiameter),
                 &mut m.pitch_diameter,
             ));
-            let StageGear {
+            let MemberGear {
                 profile_shift,
                 helix_angle,
                 face_width,
@@ -4401,7 +4401,7 @@ mod tests {
     /// direct evaluation at that width gives, and this asks for one.
     ///
     /// **Nothing asked before, and the reason is a coincidence of two
-    /// constants**: `PROBE` is 10.0 and `StageGear`'s default face width is
+    /// constants**: `PROBE` is 10.0 and `MemberGear`'s default face width is
     /// 10.0, so every shipped case scales by exactly one and the exponent could
     /// be anything. Perturbing it to 0.51 left all 558 tests and all 27 golden
     /// files unchanged. *Two unrelated numbers that happen to be equal will hide

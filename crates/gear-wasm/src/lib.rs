@@ -826,7 +826,7 @@ pub struct TrainFailure {
     /// `parts` deals them — the panel names it by its meshes. `None`
     /// where the fault is the train's own rather than any one part's — an
     /// empty train, say.
-    pub stage: Option<u32>,
+    pub part: Option<u32>,
 }
 
 fn solve_train_impl(input: &str) -> Result<String, String> {
@@ -861,17 +861,15 @@ fn solve_train_impl(input: &str) -> Result<String, String> {
             motion,
         },
         Err(e) => {
-            let stage = match &e {
-                gear_core::train::TrainError::InStage { stage, .. } => {
-                    u32::try_from(*stage + 1).ok()
-                }
+            let part = match &e {
+                gear_core::train::TrainError::InPart { part, .. } => u32::try_from(*part + 1).ok(),
                 _ => None,
             };
             TrainOutcome {
                 result: None,
                 failure: Some(TrainFailure {
                     note: e.note(),
-                    stage,
+                    part,
                 }),
                 figures: Vec::new(),
                 parts,
@@ -3184,10 +3182,7 @@ mod tests {
             v["result"].is_null(),
             "a mesh at no distance is not a train"
         );
-        assert_eq!(
-            v["failure"]["stage"], 2,
-            "the second stage is the one to fix"
-        );
+        assert_eq!(v["failure"]["part"], 2, "the second part is the one to fix");
         assert!(
             v["failure"]["note"]["key"]
                 .as_str()

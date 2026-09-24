@@ -1308,7 +1308,7 @@ fn hula_sweep(n: u32, clearance: f64, mesh_index: usize) {
 /// to.
 fn elevation_drive() -> gear_io::TrainDocument {
     use gear_core::params::Auto;
-    use gear_core::train::{Duty, Load, LoadCase, LoadRole, StageGear, Train};
+    use gear_core::train::{Duty, Load, LoadCase, LoadRole, MemberGear, Train};
 
     gear_io::TrainDocument {
         name: "Elevation drive".to_string(),
@@ -1316,14 +1316,14 @@ fn elevation_drive() -> gear_io::TrainDocument {
             vec![
                 ({
                     let mut s = arr::pair([17, 43]);
-                    s.members[0].gear = StageGear {
+                    s.members[0].gear = MemberGear {
                         teeth: 17,
                         face_width: Auto::automatic(0.0),
-                        ..StageGear::default()
+                        ..MemberGear::default()
                     };
-                    s.members[1].gear = StageGear {
+                    s.members[1].gear = MemberGear {
                         teeth: 43,
-                        ..StageGear::default()
+                        ..MemberGear::default()
                     };
                     s
                 })
@@ -1562,14 +1562,14 @@ fn convert_report(path: Option<&str>) {
 /// that cost.
 fn shifts_report(z1: u32, z2: u32) {
     use gear_core::params::Auto;
-    use gear_core::train::StageGear;
+    use gear_core::train::MemberGear;
 
     let lib = gear_io::default_library();
     let stage = |on: bool, at: Option<f64>| {
         let mut s = arr::pair([17, 43]);
-        for (m, g) in s.members.iter_mut().zip([z1, z2].map(|teeth| StageGear {
+        for (m, g) in s.members.iter_mut().zip([z1, z2].map(|teeth| MemberGear {
             teeth,
-            ..StageGear::default()
+            ..MemberGear::default()
         })) {
             m.gear = g;
         }
@@ -1785,17 +1785,17 @@ fn epicyclic_shifts_report() {
 
 fn train_report(mode: Option<&str>) {
     use gear_core::params::Auto;
-    use gear_core::train::{solve_train, Duty, LoadCase, StageGear, Train};
+    use gear_core::train::{solve_train, Duty, LoadCase, MemberGear, Train};
 
     let lib = gear_io::default_library();
-    let auto_width = |teeth: u32| StageGear {
+    let auto_width = |teeth: u32| MemberGear {
         teeth,
         face_width: Auto::automatic(0.0),
-        ..StageGear::default()
+        ..MemberGear::default()
     };
     let mut train = Train::chained(
         if mode == Some("toggles") {
-            let toggled = |teeth: u32, undercut: bool, sharp: bool| StageGear {
+            let toggled = |teeth: u32, undercut: bool, sharp: bool| MemberGear {
                 teeth,
                 no_undercut: undercut,
                 no_sharp_tip: sharp,
@@ -1805,7 +1805,7 @@ fn train_report(mode: Option<&str>) {
                     ..gear_core::material::Overrides::default()
                 },
                 face_width: Auto::automatic(0.0),
-                ..StageGear::default()
+                ..MemberGear::default()
             };
             vec![
                 ({
@@ -1973,10 +1973,10 @@ fn train_report(mode: Option<&str>) {
         // rows for every line contact and for every point.
         match pair(s, None) {
             Some(res) => match res.mesh.line {
-                Some(line) => print_line_pair(k, kind_name(&train.stages()[k]), &res, &line),
-                None => print_point_pair(k, kind_name(&train.stages()[k]), &res, res.mesh),
+                Some(line) => print_line_pair(k, kind_name(&train.part_shapes()[k]), &res, &line),
+                None => print_point_pair(k, kind_name(&train.part_shapes()[k]), &res, res.mesh),
             },
-            None => println!("\nstage {}: not a pair", k + 1),
+            None => println!("\npart {}: not a pair", k + 1),
         }
     }
 }
@@ -2083,7 +2083,7 @@ fn print_line_pair(k: usize, kind: &str, s: &Pair, line: &gear_core::train::Line
     let helix = s.gears[0].helix_angle;
     let ratios = &line.contact_ratios;
     println!(
-        "\nstage {}  {}  z {}/{}  beta {} deg{}  a_w {:.4} mm{}",
+        "\npart {}  {}  z {}/{}  beta {} deg{}  a_w {:.4} mm{}",
         k + 1,
         kind,
         s.gears[0].params.teeth,
@@ -2149,7 +2149,7 @@ fn kind_name(stage: &gear_core::train::Shape) -> &'static str {
 /// A pair with its shafts crossed: point contact, two efficiencies.
 fn print_point_pair(k: usize, kind: &str, s: &Pair, m: &gear_core::train::MeshReport) {
     println!(
-        "\nstage {}  {}  z {}/{}{}  a {:.4} mm  lead angle {:.4} deg",
+        "\npart {}  {}  z {}/{}{}  a {:.4} mm  lead angle {:.4} deg",
         k + 1,
         kind,
         s.gears[0].params.teeth,
@@ -3561,7 +3561,7 @@ fn crossed_report(z1: u32, z2: u32, shaft_angle: f64) {
         for g in stage.members.iter_mut().map(|m| &mut m.gear) {
             g.face_width = gear_core::params::Auto::fixed(10.0);
             g.profile_shift = gear_core::params::Auto::fixed(0.0);
-            g.root_radius = gear_core::train::StageGear::default().root_radius;
+            g.root_radius = gear_core::train::MemberGear::default().root_radius;
         }
         stage
     };

@@ -15,4 +15,4 @@ note: Note,
  * where the fault is the train's own rather than any one part's — an
  * empty train, say.
  */
-stage: number | null, };
+part: number | null, };

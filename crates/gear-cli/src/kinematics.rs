@@ -39,7 +39,7 @@
 
 use gear_core::train::arrangements as arr;
 use gear_core::train::{
-    solve_train, Duty, LoadCase, Shape, ShapeResult, StageGear, Train, TrainResult,
+    solve_train, Duty, LoadCase, MemberGear, Shape, ShapeResult, Train, TrainResult,
 };
 
 /// The loads every fixture is rated for, between two bodies: one from each,
@@ -64,11 +64,11 @@ fn loads(input: usize, output: usize) -> Vec<LoadCase> {
 
 /// A member with an automatic face width, so nothing in a fixture is sized by a
 /// number typed here.
-fn gear(teeth: u32) -> StageGear {
-    StageGear {
+fn gear(teeth: u32) -> MemberGear {
+    MemberGear {
         teeth,
         face_width: gear_core::params::Auto::automatic(0.0),
-        ..StageGear::default()
+        ..MemberGear::default()
     }
 }
 
@@ -425,7 +425,7 @@ fn graph(train: &Train) {
             named(train, s.body),
             s.ends.first().map_or_else(
                 || "the train".to_string(),
-                |e| format!("stage {}", e.stage + 1)
+                |e| format!("part {}", e.part + 1)
             ),
             s.speed.text,
         );
@@ -495,8 +495,8 @@ fn report(name: &str, train: &Train, r: &TrainResult) {
         }
     }
     for (k, s) in r.by_part(train).iter().enumerate() {
-        println!("  stage {}", k + 1);
-        for (label, cases) in slot_cases(&train.stages()[k], s) {
+        println!("  part {}", k + 1);
+        for (label, cases) in slot_cases(&train.part_shapes()[k], s) {
             for (case, speed, torque) in cases {
                 println!(
                     "    slot {label:<9} case {}  speed {:>14.6}  torque {:>14.6}",
@@ -555,7 +555,7 @@ pub fn named(train: &Train, body: usize) -> String {
             }
         }
         Some(&(k, slot)) => {
-            let stages = train.stages();
+            let stages = train.part_shapes();
             let stage = &stages[k];
             labelled(stage, stage.wiring().slots[slot])
         }

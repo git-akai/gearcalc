@@ -747,7 +747,7 @@ mod tests {
         // helix, which is why this case carries an addendum rather than an
         // angle.
         for (teeth, addendum) in [(17_u32, 1.0_f64), (60, 1.35)] {
-            let gear = gear_core::train::StageGear {
+            let gear = gear_core::train::MemberGear {
                 teeth,
                 addendum,
                 profile_shift: gear_core::params::Auto::fixed(0.0),
@@ -773,7 +773,7 @@ mod tests {
         // rated, which is the point of the message: the figure is given and the
         // reader is told where it stands.
         for rim in [Some(1.0_f64), None] {
-            let gear = gear_core::train::StageGear {
+            let gear = gear_core::train::MemberGear {
                 teeth: 23,
                 rim_thickness: rim,
                 ..Default::default()
@@ -796,7 +796,7 @@ mod tests {
         // the clamps a cutter raises live out here even though the `Y_S` band
         // that first brought this case no longer belongs to any stage.
         for (teeth, root_radius) in [(300_u32, 0.0_f64), (17, 0.38)] {
-            let gear = gear_core::train::StageGear {
+            let gear = gear_core::train::MemberGear {
                 teeth,
                 root_radius,
                 ..Default::default()
@@ -818,7 +818,7 @@ mod tests {
         // addendum on a small pinion comes to a point, so the tip-width bound
         // cuts it down.
         {
-            let gear = |teeth: u32| gear_core::train::StageGear {
+            let gear = |teeth: u32| gear_core::train::MemberGear {
                 teeth,
                 addendum: 1.6,
                 min_tip_width: 0.4,
@@ -936,11 +936,11 @@ mod tests {
                 let crossed = {
                     let mut s = stage.clone();
                     s.distances[0].angle = sigma;
-                    s.members[0].gear = gear_core::train::StageGear {
+                    s.members[0].gear = gear_core::train::MemberGear {
                         face_width: gear_core::params::Auto::automatic(0.0),
                         ..stage.members[0].gear.clone()
                     };
-                    s.members[1].gear = gear_core::train::StageGear {
+                    s.members[1].gear = gear_core::train::MemberGear {
                         face_width: gear_core::params::Auto::automatic(0.0),
                         ..stage.members[1].gear.clone()
                     };
@@ -1073,7 +1073,7 @@ mod tests {
             (17, 18, 0.5, -1.6),
         ] {
             // **The ring's tooth count too**, which the version before this
-            // left at `StageGear`'s own 17 while setting the sun and the
+            // left at `MemberGear`'s own 17 while setting the sun and the
             // planet — a ring that does not close the set it is in.
             let stage = {
                 let mut s = arr::planetary(sun, planet, sun + 2 * planet, 3);
@@ -1215,7 +1215,7 @@ mod tests {
                 }
             }
             // An automatic face width with every rating switched off.
-            let no_source = gear_core::train::StageGear {
+            let no_source = gear_core::train::MemberGear {
                 face_width: gear_core::params::Auto::automatic(0.0),
                 face_sources: gear_core::train::FaceSources {
                     bending: gear_core::train::ByKind {
@@ -1449,7 +1449,7 @@ mod tests {
             // (the sun cannot turn); a constraint on a body no stage has;
             // and a chain whose tooth counts multiply past `i128`.
             {
-                use gear_core::train::{LoadCase, StageGear, Train};
+                use gear_core::train::{LoadCase, MemberGear, Train};
                 let set = |held: Vec<usize>| {
                     let mut t = Train::chained(vec![arr::planetary(12, 30, 72, 3)], |t| {
                         vec![LoadCase::ultimate(t.port(0, 1), t.port(0, 2), 2.0, 3000.0)]
@@ -1457,9 +1457,9 @@ mod tests {
                     t.held = held;
                     t
                 };
-                let huge = |teeth| StageGear {
+                let huge = |teeth| MemberGear {
                     teeth,
-                    ..StageGear::default()
+                    ..MemberGear::default()
                 };
                 let wide = Train::chained(
                     (0..6)
@@ -1485,7 +1485,7 @@ mod tests {
                             TrainError::Overdetermined { .. }
                                 | TrainError::NoSuchBody { .. }
                                 | TrainError::Overflow
-                                | TrainError::InStage { .. }
+                                | TrainError::InPart { .. }
                         ),
                         "{what}: {e:?}"
                     );
@@ -1632,7 +1632,7 @@ mod tests {
     /// of the code: the looking never happened. They raised the ring's addendum,
     /// where a ring's tip is `r − m(h_a − x)` and reaches its base circle on a
     /// **short** addendum against a negative shift — and they left the ring's
-    /// tooth count at `StageGear`'s own 17 while setting the sun's and the
+    /// tooth count at `MemberGear`'s own 17 while setting the sun's and the
     /// planet's, which is a ring that does not close the set it is in.
     ///
     /// *A case that cannot solve is not a case*, and an `if let Ok` around one

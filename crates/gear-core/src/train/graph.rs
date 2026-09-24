@@ -445,53 +445,6 @@ impl Shape {
         });
     }
 
-    /// **A part taken out**: its members with their meshes, its distances
-    /// and couplings, every body no other part lists, and every axis left
-    /// with no body and no distance on it.
-    pub(crate) fn remove_part(&mut self, part: &Part) {
-        let others: Vec<usize> = self
-            .parts()
-            .into_iter()
-            .filter(|p| p.members != part.members)
-            .flat_map(|p| p.shape.bodies.into_iter().map(|b| b.body))
-            .collect();
-        let mut members = part.members.clone();
-        members.sort_unstable();
-        for &i in members.iter().rev() {
-            self.meshes.retain(|m| m.a != i && m.b != i);
-            for m in &mut self.meshes {
-                if m.a > i {
-                    m.a -= 1;
-                }
-                if m.b > i {
-                    m.b -= 1;
-                }
-            }
-            self.members.remove(i);
-        }
-        let mut distances = part.distances.clone();
-        distances.sort_unstable();
-        for &d in distances.iter().rev() {
-            self.distances.remove(d);
-        }
-        let mut couplings = part.couplings.clone();
-        couplings.sort_unstable();
-        for &c in couplings.iter().rev() {
-            self.couplings.remove(c);
-        }
-        let gone: Vec<usize> = part
-            .shape
-            .bodies
-            .iter()
-            .map(|b| b.body)
-            .filter(|b| !others.contains(b))
-            .collect();
-        self.bodies.retain(|b| !gone.contains(&b.body));
-        self.couplings
-            .retain(|c| !c.iter().any(|b| gone.contains(b)));
-        self.drop_empty_axes();
-    }
-
     /// Every axis with no body and no distance on it taken out, the axes
     /// after each numbered down.
     pub(crate) fn drop_empty_axes(&mut self) {

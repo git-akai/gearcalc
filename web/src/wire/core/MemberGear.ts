@@ -9,11 +9,11 @@ import type { Overrides } from "./Overrides";
  * Note what is *absent*: module, pressure angle and helix angle live on the
  * stage, because they are shared.
  */
-export type StageGear = { teeth: number, 
+export type MemberGear = { teeth: number, 
 /**
  * The shift, and who decides it: **automatic means the stage does**, not
  * that undercut does. What it resolves to when nothing else constrains it
- * is [`StageGear::no_undercut`]'s business.
+ * is [`MemberGear::no_undercut`]'s business.
  */
 profile_shift: Auto<number>, 
 /**

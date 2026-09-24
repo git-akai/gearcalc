@@ -199,7 +199,7 @@ impl Train {
             held: Vec::new(),
         };
         for stage in stages {
-            train.push_stage(stage);
+            train.chain_on(stage);
         }
         train.load_cases = cases(&train);
         train
@@ -216,7 +216,7 @@ impl Train {
     /// **Each part's shape**, in part order — what a stage was, read off
     /// the graph.
     #[must_use]
-    pub fn stages(&self) -> Vec<Shape> {
+    pub fn part_shapes(&self) -> Vec<Shape> {
         self.parts().into_iter().map(|p| p.shape).collect()
     }
 
@@ -338,7 +338,7 @@ impl Train {
     /// that left the train with its stage, or with the member that was
     /// alone on it. A hold goes whatever is left, since it holds nothing;
     /// a case's entries wait on a train with no stages for the first to
-    /// take them up ([`Self::push_stage`]).
+    /// take them up ([`Self::chain_on`]).
     fn drop_orphans(&mut self) {
         let on_a_stage = |b: usize| b == GROUND || self.shape.bodies.iter().any(|x| x.body == b);
         self.held.retain(|&b| on_a_stage(b));
@@ -359,7 +359,7 @@ impl Train {
     /// nodes of the train's system. A body only a case or a hold names is
     /// no node: it would turn freely, and a train with stages has none
     /// ([`Self::drop_orphans`]), so a hold at one is a hold at nothing.
-    fn stage_bodies(&self) -> usize {
+    fn nodes(&self) -> usize {
         self.shape.max_body() + 1
     }
 
@@ -376,22 +376,6 @@ impl Train {
         self.system_counting(&self.parts(), |_, _, z| z)
     }
 
-    /// **The system with one gear a tooth larger** — gear `member` of stage
-    /// `stage` — which is what a path's *one more tooth* asks.
-    ///
-    /// # Errors
-    ///
-    /// As [`Self::system`].
-    pub fn system_raising(&self, stage: usize, member: usize) -> Result<System, MotionError> {
-        self.system_counting(&self.parts(), |k, i, z| {
-            if (k, i) == (stage, member) {
-                z + 1
-            } else {
-                z
-            }
-        })
-    }
-
     /// The system part by part — each part's rows in its own order, which
     /// is the order its results and a path's play read them in — and then
     /// every coupling no part keeps: a join that could not be coaxial,
@@ -404,7 +388,7 @@ impl Train {
         if parts.is_empty() {
             return Err(MotionError::Empty);
         }
-        let mut system = System::new(self.stage_bodies());
+        let mut system = System::new(self.nodes());
         for (k, part) in parts.iter().enumerate() {
             let teeth: Vec<u32> = super::teeth_of(part.shape.gears())
                 .into_iter()
@@ -457,7 +441,7 @@ impl Train {
     ///
     /// [`MotionError::Conflicts`] at the hold that locked a part.
     fn check_parts(&self, parts: &[Part]) -> Result<(), MotionError> {
-        let conditions = self.conditions(self.stage_bodies())?;
+        let conditions = self.conditions(self.nodes())?;
         for (k, part) in parts.iter().enumerate() {
             let stage = &part.shape;
             let w = stage.wiring();
@@ -696,7 +680,7 @@ impl From<Ratio> for Exact {
     }
 }
 
-/// One end of a body: the stage it is listed on, and what it is there.
+/// One end of a body: the part it is listed on.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(
@@ -705,7 +689,7 @@ impl From<Ratio> for Exact {
     ts(export, export_to = "core/")
 )]
 pub struct BodyEnd {
-    pub stage: usize,
+    pub part: usize,
 }
 
 /// One body of the train's motion, for the front end.
@@ -841,7 +825,7 @@ impl Train {
             }
             self.ends_of(body)
                 .into_iter()
-                .map(|(stage, _)| BodyEnd { stage })
+                .map(|(part, _)| BodyEnd { part })
                 .collect()
         };
         Some(MotionReport {
@@ -1073,9 +1057,9 @@ impl Train {
     /// uncoupled from another part's body, where a join that could not be
     /// coaxial coupled it ([`Self::join`]). The end's number is returned —
     /// the body's own where it was the part's alone.
-    pub fn split(&mut self, stage: usize, body: usize) -> usize {
+    pub fn split(&mut self, part: usize, body: usize) -> usize {
         let parts = self.parts();
-        let Some(part) = parts.get(stage) else {
+        let Some(part) = parts.get(part) else {
             return body;
         };
         if part.shape.slot_if_any(body).is_none() {
@@ -1183,22 +1167,6 @@ impl Train {
         case
     }
 
-    /// **A stage removed.** Its bodies leave with it where no other stage
-    /// has them, and every case entry and hold at those goes too — except
-    /// on the last stage, whose cases stay parked at their bodies, every
-    /// figure kept, for the first stage pushed to take up again
-    /// ([`Self::push_stage`]), so a designer who swaps their only stage for
-    /// another keeps their loads. The bodies left are numbered densely
-    /// again.
-    pub fn remove_stage(&mut self, k: usize) {
-        let Some(part) = self.parts().into_iter().nth(k) else {
-            return;
-        };
-        self.shape.remove_part(&part);
-        self.drop_orphans();
-        self.prune();
-    }
-
     /// **Every body with nothing on it that nothing else names, given up**,
     /// and every axis that leaves with nothing on it — a set's carrier
     /// that carried the planets a removal took.
@@ -1264,7 +1232,7 @@ impl Train {
     /// chain's end is at its new end, which is what the chain did without
     /// saying so. **The first stage takes up the parked cases** at its
     /// conventional input and output.
-    pub fn push_stage(&mut self, stage: Shape) {
+    pub fn chain_on(&mut self, stage: Shape) {
         let parts = self.parts();
         let k = parts.len();
         let open = self.open_ports();
@@ -1343,10 +1311,10 @@ impl Train {
     /// **A stage laid in at a body** ([`super::Edit::Insert`]): its
     /// conventional input made one with `at` — the shaft it runs on —
     /// where given, and chained on from the last part's open output
-    /// otherwise ([`Self::push_stage`]).
+    /// otherwise ([`Self::chain_on`]).
     fn insert(&mut self, stage: Shape, at: Option<usize>) -> Result<(), super::EditRefused> {
         let Some(at) = at else {
-            self.push_stage(stage);
+            self.chain_on(stage);
             return Ok(());
         };
         if !self.shape.bodies.iter().any(|b| b.body == at) {

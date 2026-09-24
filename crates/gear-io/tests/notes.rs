@@ -10,7 +10,7 @@
 //! that owns the sentence owns the check on it.
 
 use gear_core::contact::LoadSharing;
-use gear_core::train::{arrangements, solve_alone, StageGear, Train};
+use gear_core::train::{arrangements, solve_alone, MemberGear, Train};
 
 /// **The sharing note's number, and its lack of a sign.**
 ///
@@ -23,7 +23,7 @@ use gear_core::train::{arrangements, solve_alone, StageGear, Train};
 fn the_sharing_note_quotes_a_number_the_sweep_still_produces() {
     let lib = gear_io::default_library();
     let rated = |teeth: u32, addendum: f64, model: LoadSharing| {
-        let g = StageGear {
+        let g = MemberGear {
             teeth,
             addendum,
             profile_shift: gear_core::params::Auto::fixed(0.0),

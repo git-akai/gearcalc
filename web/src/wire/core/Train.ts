@@ -34,7 +34,7 @@ shape: Shape,
 /**
  * **The bodies held to ground**, every one stated. A preset's
  * conventional hold — a set's ring — is written here when it is
- * inserted ([`Train::push_stage`]), so a body is held exactly where
+ * inserted ([`Train::chain_on`]), so a body is held exactly where
  * this says, and released by taking it out. It was a list of
  * constraints laid over each stage's conventions, which held what
  * nobody had written and needed a *free* to say otherwise.
