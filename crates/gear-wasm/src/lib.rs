@@ -2719,10 +2719,6 @@ mod tests {
         "cycles",
         // A body the train fixes has no speed to report.
         "speed",
-        // Nothing held the crank open at the clearance minimum.
-        "binding_mesh",
-        // A single planet has no neighbour to clear.
-        "planet_clearance",
         // An axis nothing is replicated round has no layout.
         "layout",
         // A layout's assembly rule is known for one gear on the axis meshing
@@ -2751,11 +2747,6 @@ mod tests {
         "pointed",
         // A material value with nothing to say beyond its number.
         "note",
-        // One tooth more on a gear leaves no mechanism, or locks the path —
-        // a Wolfrom's rings brought level, or a gear another stage shares a
-        // body with locking that stage and the path's motion with it — and a
-        // ratio of infinity is no figure.
-        "per_tooth",
         // An **external** mesh's tips meet on the line of centres or not at
         // all, so the three ways an internal mesh's teeth can foul are not
         // three answers of `false` there — they are questions that do not

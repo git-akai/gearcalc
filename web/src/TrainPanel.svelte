@@ -397,7 +397,7 @@
   /** **A box cleared keeps the number it held.** A number input with its
    *  text deleted binds `null`, which the core refuses as a train — an
    *  `f64` cannot be nothing — and a load on a named body then vanished
-   *  from the card with the motion it was listed under, unfixable but by
+   *  from its case with every figure the case showed, unfixable but by
    *  deleting the case. The box may stand blank while the designer types;
    *  the train keeps its last number until a new one is there. Not a
    *  default: no number is written here that was not already in the box. */

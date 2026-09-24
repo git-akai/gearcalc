@@ -362,8 +362,9 @@ figures its own solver recorded before it retired.
 Two figures the graph makes free are reported on every path beside its
 ratio and efficiency: the power through the teeth over the power in —
 summed on the path, and per mesh in each case — and what one more tooth on
-each gear would make the ratio, which the harness records and the panel
-does not show. A part has no figure of its own: what a
+each gear would make the ratio, which the harness records and the boundary
+does not carry. A path has a direction: a case loaded at the output walks
+its own row, from the output to the input, beside the forward case's. A part has no figure of its own: what a
 stage had was a second motion under its own convention, and it went once a
 law held it to the path across the stage's ends. A load on a body two parts
 share goes the way that holds it, as a load anywhere does, and is refused
@@ -538,7 +539,7 @@ each rating asks for is beside them. The two gears of a mesh are rated at differ
 — each where its own dedendum is loaded alone — so they carry different contact
 stresses, each on its own card; the one patch they share — its pitch-point
 figure, its size and where on the path it is worst — is the harness's, and
-the panel does not repeat it. An automatic
+does not cross the boundary. An automatic
 width answers to the mesh, not to one gear, and so does the width a member is
 *rated* at — the narrower face carries the pair, so that is the width the load
 is spread over. A case's loads are followed by one flow across every mesh,
@@ -580,9 +581,11 @@ and all one list of what sits where (`arrangements`), the hula an
 arrangement of the epicyclic family the harness names · **a train is
 one list and one workspace**: the list is the graph grouped three ways —
 the flow each case walks, the centres, the axes — and the workspace is
-the piece selected: a mesh as its two gears either side of it and the
-distance it runs at, with what it comes to running down under them; a
-body, an axis, a centre, a coupling, a case · **what can be done to a
+the piece selected: a mesh as its own card above its two gears — its
+inputs and the distance it runs at, with what it comes to beside them, or
+under them where the window is narrow; a body, with what each of its gears
+puts on it where it carries more than one; an axis, a centre, a coupling, a
+case · **what can be done to a
 piece is the core's to offer** — a gear at any gear, another ratio, a
 step, an offset coupling from an orbiting body to a shaft on the centre
 line, a preset laid in at a body, a gear moved to another body of its axis
@@ -1107,6 +1110,14 @@ future reader knows it was read and set aside rather than missed.
 Not a queue with a head; this is what a next session would pick from.
 
 - **Further UI work**, as it is asked for.
+- **A path's ratio under one is inverted in TypeScript**, against the first
+  standing rule: the path row prints `r : 1` where `|r| ≥ 1` and otherwise
+  `1 : ` the panel's own `1 / r`. It came from the chain's total-ratio row
+  and was carried to the path's; a path having a direction makes it common,
+  since every back-driving case's row is a forward row's reciprocal. Either
+  the row prints `r : 1` always — the figure the harness prints, and what a
+  speed-up's ratio is — or the core states the form it is read in; the
+  first moves no number and needs no field.
 - **The two panels' remaining differences of style**, catalogued when their
   top bars were made one (`app.css`, *the bar at the top of a tab*) and
   trimmed when the section headings, the names' contrast, the field-box
@@ -1128,11 +1139,11 @@ Not a queue with a head; this is what a next session would pick from.
     `FieldNote` at 0.72 rem, but the geartrain's `.hint` for a note that has no
     label to sit in pulls itself up by `calc(--note-gap − --field-gap)` and
     right-aligns; the gear tab has no such note;
-  - **readouts** — the gear tab's `dl` is `max-content 1fr` at `0.15rem 1rem`
-    with values right-aligned; the geartrain's `.out` is `auto 1fr` at
-    `0.15rem 0.75rem` with values left-aligned, an annotation in a muted
-    `small`, and an `.indent` variant under a mesh heading. Both tabular at
-    normal weight now; the alignment is the visible half;
+  - **readouts** — both right-align their figures now, tabular at normal
+    weight; what is left is the grid, `max-content 1fr` at `0.15rem 1rem` on
+    the gear tab and `auto 1fr` at `0.15rem 0.75rem` on the geartrain, whose
+    readouts also carry an annotation in a muted `small` and a note under a
+    row that takes the readout's whole width (`dd.note`);
   - **the list of notes** at the foot of a section — `0.75rem 0 0` margin,
     1.1 rem indent, 0.8 rem on the gear tab; `0.5rem 0 0`, 1 rem, 0.78 rem on
     the geartrain;
@@ -1143,8 +1154,8 @@ Not a queue with a head; this is what a next session would pick from.
   - **error and notice paragraphs** — the same tokens, but only the geartrain
     has a `.notice` (an import adjusted); the gear tab's adopt failure uses
     `.error` and has no quieter slot;
-  - **cards** — a mesh's two gears sit in bordered `.gear` columns either
-    side of it in the workspace; the gear tab's sections are unbordered,
+  - **cards** — a mesh's workspace is three bordered cards, the mesh's own
+    above its two gears side by side; the gear tab's sections are unbordered,
     which is a difference of content rather than of style.
 - **Where a gear tab and a train's member still differ in what they describe**,
   noted while the tab learned to adopt a member. Back end only — the tab
