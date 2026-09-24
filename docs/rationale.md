@@ -66,7 +66,7 @@ Outputs are recomputed, never stored, so nothing can go stale. A full solve is
 microseconds. In exchange: no cache invalidation, no dependency graph, no
 field-updates-field wiring, and outputs that cannot disagree with inputs.
 
-Shared-within-a-stage values live once on the stage, so `k₂ = 2 − k₁` is derived
+What a mesh shares lives once, on one side of it, so `k₂ = 2 − k₁` is derived
 and the invariant is unwritable rather than merely tested. A planetary set makes
 the point harder: its two meshes want *different* invariants and share the
 planet, so one stored `k` fixes all three.
@@ -86,7 +86,7 @@ reproduces the other.
   sweeps nothing and takes the point the unshared reading always took.
 - A member in one mesh is a member in a list of one, so a planet in two needs no
   arm of its own ([the rating](reference.md#load-cases)).
-- A load case is the worst one a mesh carries, scaled — wherever the stage's
+- A load case is the worst one a mesh carries, scaled — wherever the part's
   power split does not depend on the magnitude passing through it, which is a
   property of the shape's flow — linear in the torque through it — rather than
   one assumed of gearing.
@@ -183,7 +183,7 @@ nothing about loads — and `screw.rs` a **pair**.
 genuinely not a stage of a geartrain, it needs its own noun rather than this
 one stretched.
 
-### An orbiting output is a coupling, and a coupling is the stage's to lose
+### An orbiting output is a coupling, and a coupling is the graph's to lose
 
 A planocentric reducer's output was its planet's own body — an orbiting
 port — and whatever followed it in a train was joined to that body. A stage
@@ -213,7 +213,7 @@ the edits rather than a property of the preset.
 **What would change it:** an output mechanism with a ratio of its own — a
 pin-and-roller output that is not 1:1 — would be a mesh, not a coupling.
 
-### A train is one graph, and a stage is a part of it
+### A train is one graph, and a part is how it falls apart
 
 A train was a list of stages, each with axes of its own, and a body two
 stages listed was what joined them. That let one shaft stand on two axes —
@@ -223,12 +223,12 @@ readings of every question, the stage's and the train's. **Stored as one
 graph, a body has one axis**: a train is one `Shape`, every preset laid
 into it, and a join makes the two axes one line.
 
-**A stage is what the graph falls apart into**, read off it and never
-stored: its parts, the pieces that close, search and rate apart
-(`Shape::parts`) — gears joined by meshes, meshes by the distances they
-share. Nothing a part closes, sizes, searches or rates reads another, so a
-part's result is its stage's result with no slicing, and a train built stage
-by stage falls apart into exactly its stages, each solving as the preset
+**A part is what the graph falls apart into**, read off it and never
+stored: the pieces that close, search and rate apart (`Shape::parts`) —
+gears joined by meshes, meshes by the distances they share — which is what
+a stage was. Nothing a part closes, sizes, searches or rates reads another,
+so a part's result is its own with no slicing, and a train built preset by
+preset falls apart into exactly its presets, each solving as the preset
 alone does; laws hold both, and a file written as stages is converted to
 the graph a chain of the same stages builds now (`graph_of`, `gear-cli
 convert`). Parts that are derived follow the graph without being told: a
@@ -237,16 +237,16 @@ mesh removed that leaves two parts is two.
 **What it costs, and where it is paid:**
 
 - **Nothing on screen is a part.** The panel shows the graph's pieces — a
-  mesh, a body, an axis — by the graph's own indices, and a stage is what a
-  preset laid in and nothing after it: an edit is the graph's (`Edit`),
+  mesh, a body, an axis — by the graph's own indices, and a preset is what
+  it laid in and nothing after it: an edit is the graph's (`Edit`),
   offered at a piece and never asked of a stage, so there is no second
   numbering to read an edit through, and a box bound to a piece writes the
   train. The part stays in the core, the unit a result is closed,
   searched and rated in, and the harness prints the corpus part by part.
 - **A part lists what it has something on.** A layshaft's output with no
-  gear engaged is the next stage's input and nothing of the layshaft's
+  gear engaged is the next preset's input and nothing of the layshaft's
   part, so in neutral that part has no end of it. The shaft stays — the
-  next stage's gear names it — and a gear engaged onto it brings the end
+  next preset's gear names it — and a gear engaged onto it brings the end
   back.
 - **A preset asked alone is a train of one**, solved part by part as any
   train is (`solve_alone`); a preset is one part, which a law holds every
@@ -282,12 +282,14 @@ nothing on screen is one, and an edit is offered at a piece
 ([the graph](reference.md#the-graph), *what a piece offers*), never asked
 of a stage.
 
-The word stays where it names a footprint or a reading of one: the preset
-menu (`Preset`), an arrangement's name (a hula stage), the harness
-printing its corpus part by part (`TrainResult::by_part`), a part's
-conventional ends (`StageBoundary`, derived, never stored) and the load a
-part is handed (`CaseLoad`). None is stored, so none can disagree with the
-gears.
+The word stays where it names an arrangement — a worm stage, a hula stage
+([an arrangement is a stage](#an-arrangement-is-a-stage)) — and nowhere it
+would name a piece of the train or a unit of the solve: the menu offers
+**presets** (`Preset`), the harness prints its corpus part by part
+(`TrainResult::by_part`), a part is handed its load as a `CaseLoad`, and a
+part's conventional ends are read off its shape when a chain or a fresh
+case wants them and never stored. None of it is stored, so none can
+disagree with the gears.
 
 **What it costs:** a preset cannot be removed *as a stage* — its pieces
 are removed, and a removal takes what goes with it, so a set goes with its
@@ -476,7 +478,7 @@ a *solution* rather than a fit would retire one of the ten; none is known.
 **`auto::maximise` is a search, and it has tuning parameters.** The paragraph
 above says "each monotone, each bracketed, none an optimiser, none with a tuning
 parameter", and that is true of the ten solves and was read for a while as
-though it were true of the crate. It is not. Every stage that chooses profile
+though it were true of the crate. It is not. Every shape that chooses profile
 shifts for efficiency calls a bounded box sweep followed by a multi-start pattern
 walk, carrying a search span, a scan step, a stopping resolution, a work budget,
 a start count and a first step size. The tables in
@@ -695,7 +697,7 @@ name of getting closer to it. Three mixings, not one:
   designed-for case.
 - **`ε_β ≤ 0,3` with `β ≥ 20°`**: 0,78–0,94×. **Below** ISO — the one regime
   where the derived model is unconservative against the standard. It is already
-  flagged: a helical stage without full axial overlap raises
+  flagged: a helical mesh without full axial overlap raises
   `mesh.overlap_below_one`, for a reason arrived at independently (a gear
   helical in form that still transfers load like a spur gear). That note is now
   also the marker for this.
@@ -784,7 +786,7 @@ two answers, which is the fault this whole document is mostly about.
 ratio of 2 or more** there is no single-pair zone at all: two pairs are always
 engaged, the ramp never reaches a full share, and it relieves the tooth by about
 a third. That is a large number from an uncalibrated model in the
-unconservative direction, so the stage reports `mesh.load_sharing_out_of_band`
+unconservative direction, so the mesh reports `mesh.load_sharing_out_of_band`
 beside the figure. It is not a hypothetical regime — a standard tooth cannot
 reach it at any helix angle, but an ordinary **high-contact-ratio** design
 (addendum 1.35) reaches it immediately, and that is exactly the design a user
@@ -844,7 +846,7 @@ gearing. A worm is a screw gear with very few starts and a high lead angle.
 specification's own arrangement: `β₁ = Σ/2 + β_add`, `β₂ = Σ/2 − β_add`. And a
 worm is that stage with its first member's size stated as a pitch diameter
 rather than a helix angle — the same freedom read another way, `d = z m_n /
-cos β`. One stage; what the worm preset adds is the words *starts* and
+cos β`. One shape; what the worm preset adds is the words *starts* and
 *wheel*, and the worm's conventional proportions
 ([one stage, one result](#one-stage-one-result)).
 
@@ -912,7 +914,7 @@ stages of this kind fail by wear and heat far more often than by tooth breakage.
 
 ### Two friction coefficients, because there are two questions
 
-Whether a stage turns at all is decided at rest against a **static** coefficient;
+Whether a mesh turns at all is decided at rest against a **static** coefficient;
 how well it turns once moving is decided against the **sliding** one.
 `Directional::once_moving` is the whole rule, and the static figure is never
 itself reported — its only job is the sign.
@@ -1178,9 +1180,9 @@ from the day this entry was written; the epicyclic set and the hula stage went
 on rating their meshes — path, stresses, efficiency, the interference verdicts
 and the tip room — at zero backlash, which the shipped hula stage turned into a
 crank held open until its tip margin was exactly nought and then run a clearance
-inside it. Every stage rates where it runs now, and the shape sizes a distance
+inside it. Every mesh rates where it runs now, and the shape sizes a distance
 for the far-side gap *as built*, each distance's running clearance being
-geometry the stage has to know (`DistanceReport::clearance`).
+geometry the part has to know (`DistanceReport::clearance`).
 
 **What would change this:** nothing about the direction. If a fourth mesh kind
 arrives whose flanks part some other way, it is a third value of the sign and
@@ -1208,9 +1210,9 @@ survive forever fails gears that are fine and passes none that are not. So a
 load case has a **kind**, and the kind is the allowable it is judged against —
 plus the one thing that follows from it: an ultimate load is survived once and
 counts no cycles, a fatigue load is spent over a duty and may reverse the roots.
-Nothing else about a stage knows which kind it is looking at.
+Nothing else about a rating knows which kind it is looking at.
 
-**The cases are a list, as the stages are.** The train used to hold exactly
+**The cases are a list, as the gears are.** The train used to hold exactly
 two loads, and their ports and directions were written into the field names:
 `input_torque` entered at the input and drove forward, `back_driving_torque`
 entered at the output and drove backward, and the rating folded the two into a
@@ -1233,8 +1235,9 @@ case sizes the part, however many overlap. The clamps went with it too: an
 operating torque was held to the peak and a note said so, and there is no peak
 to hold a case to now, cases being absolute and free to exceed one another.
 
-**Every case is scaled at its own torque.** The stage solves its power flow
-once at unit torque in each direction and scales it — a power flow being
+**Every case is scaled at its own torque.** The power flow was once solved
+at unit torque in each direction and scaled — the train now solves each
+case's flow at its own loads — a power flow being
 linear in the torque through it — and every rating once at the largest torque
 a mesh carries in any case, each case being that scaled. The latter is the same "second case costs a
 multiply" the two-case model had, with the reference chosen so the shipped
@@ -1338,7 +1341,7 @@ difference is an output rather than a branch.
 `Directional::of(|d| …)` is the shape this takes almost everywhere: one
 expression, evaluated at both directions, so a change reaches both by
 construction. `Directional::once_moving` is the same idea one level up — every
-kind asks whether the stage breaks away at all, and the geometry decides whether
+path asks whether its whole flow breaks away at all, and the geometry decides whether
 it bites.
 
 **Measured, and it is not a tidiness argument.** An epicyclic set solves its
@@ -1371,8 +1374,8 @@ each end is its own case, carrying its direction beside its torque
 ([a load case is a torque, a port and a kind](#a-load-case-is-a-torque-a-port-and-a-kind--and-a-train-carries-a-list-of-them)),
 and there is no maximum across directions left to take in either order.
 
-**And what a mesh carries belongs to the mesh, not the stage.** Two meshes of
-one stage need not agree about which case loads them hardest, so a set's sun
+**And what a mesh carries belongs to the mesh, not the part.** Two meshes of
+one part need not agree about which case loads them hardest, so a set's sun
 mesh and ring mesh each scale from their own worst.
 
 **Zero is a torque, as it is a speed.** A mechanism that is held rather than
@@ -1440,7 +1443,7 @@ reacted where the case does not load them, and every other open port — a
 released ring, a layshaft's idler, a hula's wobble body — is free unless it
 is loaded, since a reaction there is a thing a designer attaches and says so
 by loading it. A port loaded with a torque of nought is a port turning and
-carrying nothing, which is how the core is asked whether a stage locks; the
+carrying nothing, which is how the core is asked whether a mesh locks; the
 panel does not offer it, because relief takes a torque given past the statics
 back, and the same question is on the path as its backward efficiency.
 
@@ -1450,7 +1453,7 @@ that body" — and the answer is that the law restates the declaration. With
 a port allowed a torque, the rowspace supplies one; with it allowed none,
 there is none; and whether it is allowed one is exactly what loading it says.
 What *is* derivable is where the reaction lands once the ports are declared
-— a self-locking stage holding it first, the reacted ends otherwise — and
+— a self-locking mesh holding it first, the reacted ends otherwise — and
 every body's torque is reported per case so it can be read off.
 
 **Why the solve cuts before it rates.** A part's torques depend on the ratio
@@ -1474,7 +1477,7 @@ The usual allowance is a fraction on the allowable —
 number a part is sized against, which is exactly what
 [no ISO/AGMA correction factors](#no-isoagma-correction-factors) refuses to
 apply on a designer's behalf. So it is a train-wide switch, **off by default**,
-and where it is off the stage says which members the reversal reaches.
+and where it is off each member the reversal reaches says so.
 
 **Two things reverse a root, and they do not stack.** A planet always is loaded
 both ways — the sun drives one flank and the ring the other, whatever the load
@@ -1605,7 +1608,7 @@ latter covering only unfilled grades in any case.
 ### Equal planet load sharing is assumed
 
 Real sets need a floating member, and the remedy is a mesh-load factor of exactly
-the kind refused above. It is stated in the notes of every stage with a
+the kind refused above. It is stated in the notes of every part with a
 replicated axis rather than left in a document.
 
 ### A rating that cannot be taken costs the rating, not the stage
@@ -1617,7 +1620,7 @@ the efficiencies, the cycles, and the other members' bending are all still
 answerable. So the missing input costs the one figure that needed it.
 
 **The reachable case is ordinary, which is what settles it.** A planetary set
-gives its ring `k = 2 − k_stage`, so a stage thickness modification of 1.4 puts
+gives its ring `k = 2 − k_sun`, so a sun thickness modification of 1.4 puts
 the ring at 0.6 — thick enough that the cutter which would leave its space comes
 to a point before its own tip. Refusing the whole set there would throw away
 nine sound figures over one absent one.
@@ -1655,13 +1658,10 @@ is an **input** the specification omitted, and inventing a default for it would
 be choosing a machine on the user's behalf.
 
 It is the **train's** input now, not the set's: which body is held is a
-constraint on a port, laid over what the stage holds *by convention* — the
-ring, for a set, and the panel's select shows that hold as the choice it
-is, so the default is named rather than invented. A convention is the
-weakest statement there is and gives way to any statement of its kind about
-the same stage: holding the carrier releases the ring without a word about
-it. A statement the designer made does not give way — two holds on one set
-lock it, and the train says which hold closed it rather than quietly
+statement on a body, written into the train's holds when the preset is laid
+in — the ring, for a set — so the default is named rather than invented and
+is the designer's to take away like any hold they wrote. A statement does
+not give way to another — two holds on one set lock it, and the train says which hold closed it rather than quietly
 dropping one. That asymmetry is the whole of "relief over constraints": the
 machinery that relieves a *number* exists because an automatic value has
 nothing to say for itself, and a constraint a designer wrote has. Which
@@ -1670,9 +1670,10 @@ one of its open ports, and a load case says so.
 
 ### One stage, one result
 
-A stage is a `Shape` — axes, the train's bodies on them, members on the
-bodies, meshes between members, one distance per pair of axes that mesh — and its result is
-one `ShapeResult`: a `GearResult` per member, a `MeshReport` per mesh, a
+A preset is a `Shape` — axes, the train's bodies on them, members on the
+bodies, meshes between members, one distance per pair of axes that mesh — as
+the train is and each part it falls into, and a part's result is one
+`ShapeResult`: a `GearResult` per member, a `MeshReport` per mesh, a
 `DistanceReport` per distance, `MemberRating` over the meshes each member is
 in. A spur pair, a worm and a planetary set are **lists of what sits
 where** like every other arrangement — `arrangements::pair`, `::worm`,
@@ -1684,7 +1685,7 @@ designer uses, converted into the shape — and each carried a stage-level
 module, pressure angle, overlap and contact-ratio floor that the shape had
 already moved onto its members and its meshes, which is what decided it:
 the second spelling could state what the first no longer could. The hula
-stage went the same way, `arrangements::hula`, its corpus unmoved. None of them is a type in the core: a stage *is* a `Shape`. The
+stage went the same way, `arrangements::hula`, its corpus unmoved. None of them is a type in the core: a preset *is* a `Shape`. The
 enum over it went too — one variant, forty-eight match arms and an
 `as_shape()` that could not be `None`, buying a `kind = "shape"` a file
 could only ever write one value of.
@@ -1706,8 +1707,8 @@ moves the wheel's shift as DIN 3975 has it — none of which the separate type
 could carry — and a **crossed gear pair**, which had inherited the thread's
 poverty, could say its flank had been eaten into where the same pinion with
 parallel shafts already could ([corrections](corrections.md#the-log)). *That
-is a gear* is not a qualification here: every member of every stage is a
-`GearResult`, and `StageResult::members()` is the walk over them.
+is a gear* is not a qualification here: every member of every part is a
+`GearResult`, and the train's result lists every one of them (`TrainResult::members`).
 
 **A walk that names the arrangements forgets one.** A sweep over "every number
 every member reports", written field-path by field-path across five types, can
@@ -1721,7 +1722,7 @@ projection with no efficiency in it, so its backward share is the same fraction
 for both members; a crossed pair's output carries a forward efficiency the
 backward load does not share, so its two members differ by exactly
 `1/η_forward`. The invariant that does hold everywhere is the weaker one —
-every member of a stage that reacts a load reports a share of it, finite, and
+every member of a part that reacts a load reports a share of it, finite, and
 signed like its own torque — and it is the one asserted.
 
 **A new arrangement is new kinematics and nothing else.** That was the claim
@@ -1741,7 +1742,7 @@ lists of what sits where (`train/arrangements.rs`) with no code of their own.
 
 **What would change it:** an arrangement the shape cannot lay out — a member
 on two axes, a mesh that is not two members — is a change to `shape.rs`, and
-the rule is that it is still not a type: the six questions a stage answers
+the rule is that it is still not a type: the six questions a shape answers
 are the whole of what it owes, and the shape answers them. (They were a
 trait, `Constrained`, while there might have been a second implementor.
 There was never one, so they are the shape's own methods.)
@@ -1847,16 +1848,16 @@ does not move the page; a figure that cannot change while you look at it needs
 none of that, and asking for it right-aligns the annotation away from the value
 it belongs to and reserves a line for nothing.
 
-**A mesh reports what a mesh has, and a stage what a stage has.** Efficiency and
+**A mesh reports what a mesh has, and a path what a path has.** Efficiency and
 backlash exist at both levels and are different quantities there — a pair's own
 loss against what the arrangement does with it, a pair's own play against what
 that play comes to at a body — so each is a row where it belongs and neither is
 mentioned in the other's annotation. A stage whose efficiency note quoted the
 meshes' product was answering, in small type beside the wrong number, a question
 the mesh rows answer in full: the epicyclic set and the hula stage both did
-it, and the stage's is the case that shows why it misleads, since the two figures
-are 99 % and 27 % and only one of them is the stage's. Both directions are given at
-both levels for the same reason they are given anywhere here — a stage that
+it, and a hula is the case that shows why it misleads, since the two figures
+are 99 % and 27 % and only one of them is the path's. Both directions are given at
+both levels for the same reason they are given anywhere here — a path that
 cannot be back-driven says so by reporting the zero, not by omitting the column.
 
 **Checked by measurement**, because screenshots are not pixel-deterministic here:
@@ -1875,8 +1876,8 @@ Three things a solve can remark on, and the catalogue's sections are those
 three: a **gear** (`[gear]` — a bound that moved its number, a root loaded
 both ways, a rim too thin to rate, a face nothing sizes), a **mesh** (`[mesh]`
 — contact that does not stay continuous, a helical pair short of full overlap,
-a sharing model extrapolating, a screw pair that locks), and the **stage**
-(`[stage]` — its distance, its search, its planets). Each is carried on the
+a sharing model extrapolating, a screw pair that locks), and the **part**
+(`[part]` — its distances, its search, its planets). Each is carried on the
 result of the thing it names and drawn there: a gear's under the field it is
 about or on its card, a mesh's beside the figure it is about, a part's under
 the train's path, naming the part by its meshes. Nothing names what it is about, because where it is drawn
@@ -1913,7 +1914,7 @@ failure. Both rows are gone.
 **What is not a repeat** is a figure the input does not show: a worm's lead
 angle, a hula mesh's far-side gap *as built* against the minimum it was asked
 to keep. And **which figure the box shows is the same on every preset**: the
-distance the stage runs at, the nominal in the annotation. The hula's was the
+distance as it runs, the nominal in the annotation. The hula's was the
 one exception, showing the zero-backlash offset and annotating the running one,
 which read as a different kind of number from the box beside it.
 
@@ -1921,7 +1922,7 @@ which read as a different kind of number from the box beside it.
 holds its `manual` while `auto` is on so the field has something to fall back
 to, and seeding it from the solved value is the front end's job — which the
 geartrain panel was not doing, so a axis distance turned manual dropped to
-the zero it was created with and the stage fell over. It is seeded to the
+the zero it was created with and the solve fell over. It is seeded to the
 digits shown, so what the reader saw is what they now hold, the way the gear
 tab's throw and amplitude already were.
 
@@ -1932,7 +1933,7 @@ are all either given or the crank's — so their `auto` toggles are relieved
 back to given at once, by the same relation the solve enforces, rather than
 offered and silently disregarded. And a control that is never read says so
 the same way: a crossed pair has no axial overlap, so its ratio's toggle is
-relieved back to automatic — by the core, on any change to the stage, which
+relieved back to automatic — by the core, on any change to the train, which
 is why relief can be asked with nothing *just* touched. The panel used to
 reset that toggle itself when the shaft angle moved, and it was the one
 relief rule left written in TypeScript.
@@ -1947,13 +1948,13 @@ from a toggle another group moves, and a walk that settled only because its
 groups were written in a lucky order. None of it wrong, all of it the shape
 that made the next stage type cost the same again.
 
-So a stage answers six questions — the shape's own methods, once a trait
+So a shape answers six questions — its own methods, once a trait
 while a second implementor was still imaginable — and nothing else: which members it has; every input relief may turn, by name; how its
 helix may be *stated* — the readings, in relief order; which of its inputs
 argue with each other; where its bodies and meshes sit; and which of them a
 train may address. Everything that walks those — counting, relieving, seeding
 a box from what it showed, reading the helix the readings state, lining a
-stage's inputs up against its result — is written once above the shape. A
+shape's inputs up against its result — is written once above the shape. A
 member's inputs are resolved once for every member by `Freedom::Member(i, _)`,
 so a per-member input that arrives is one line, not one per preset.
 
@@ -1981,11 +1982,13 @@ that found the crossed pair's ratio standing given and read by nothing.
 
 ### Deleting the last of anything leaves a fresh one
 
-A gear tab, a geartrain, and a stage of one: removing the last replaces it
-with a default rather than refusing. The stage's button used to grey out at
-one, which is a rule the reader has to infer from a control that stopped
-working; a train with no stages is one the core refuses, and the honest thing
-to do with that is not to arrive there.
+A gear tab and a geartrain tab: removing the last replaces it with a
+default rather than refusing. A button that greys out at one is a rule the
+reader has to infer from a control that stopped working. A train's own
+pieces are the other way round, because an emptied train is a state the core
+answers: it solves to nothing, its cases wait at the bodies they named, and
+the add menu offers a preset to begin again — so removing its last gear is
+an edit like any other.
 
 **A load case is the one exception, because none is a state the core answers.**
 A train with no load case is a shaft line — ratios, efficiencies and backlash
@@ -1996,7 +1999,7 @@ how a case comes back.
 
 ### A control that exposes an assumption must not default to it
 
-A stage's `working_depth` — the depth the undercut question is asked at — follows
+A member's `working_depth` — the depth the undercut question is asked at — follows
 its own dedendum rather than the classical 1 module. The whole point of the field
 is that "17 teeth at 20°" answers *is it undercut within a module?* and not *is
 it undercut at all?*, and it shipped defaulting to the first.
@@ -2007,16 +2010,16 @@ generator's own `undercut` flag **by construction** rather than by coincidence.
 ### A member is adopted, not imported
 
 The gear tab can take one member of an open geartrain as a new tab. It is the
-same part described twice — a stage member is a `GearParams` with a rating
-around it — so the tab should show the tooth the stage rated, and the way to
-guarantee that is to hand over the parameters the stage *built* rather than
+same part described twice — a train's member is a `GearParams` with a rating
+around it — so the tab should show the tooth the train rated, and the way to
+guarantee that is to hand over the parameters the train *built* rather than
 the ones it was *given*: `GearResult::params`, filled once where every member's
-result is made, carrying the shift the stage chose, the addendum a tip
+result is made, carrying the shift the search chose, the addendum a tip
 width held down, the helix shared out of a shaft angle with this member's
 hand, a planet's `2 − k`. The tab solves those with no guard left to fire —
-a test holds that nothing clamps — and quotes the stage's own pitch diameter.
+a test holds that nothing clamps — and quotes the train's own pitch diameter.
 
-Which members are rings is the stage's to say, not the tab's to infer from a
+Which members are rings is the shape's to say, not the tab's to infer from a
 tooth count: `Shape::member_cutter` names the pinion cutter where there is
 one, and a member with a cutter is internal and takes it. A worm is refused —
 a thread's proportions are its own and the tab has no model of them — and the
@@ -2024,7 +2027,7 @@ list shows it greyed rather than omitting it, so a reader sees why.
 
 The word is *adopt*. `import_train` reads a document this tool wrote, and the
 two must not be confused in the code or the catalogue: one crosses a file
-boundary and is checked for what a file can say that no stage honours; the
+boundary and is checked for what a file can say that nothing honours; the
 other reads a train that is open and cannot say anything of the kind.
 
 One native `<select>`, grouped by geartrain in the sidebar's order with a
@@ -2038,24 +2041,24 @@ index is the one number a gear has.
 
 ### A file is adjusted to what the tool can honour
 
-A file can say what the panel cannot. The panel relieves a stage on every
+A file can say what the panel cannot. The panel relieves the train on every
 change, so a crossed pair with its axial contact ratio given, or a pair with
 its distance, both shifts and a helix all pinned, cannot be built there — but
 a hand-edited document can say either, and reading it faithfully would put a
 box on screen that stands given and is read by nothing, the exact state
 relief exists to prevent.
 
-So every stage a file describes is relieved on the way in, by the same
+So every train a file describes is relieved on the way in, by the same
 `relieved(None)` the panel asks after a shaft angle moves, and the reader is
 told in one sentence — *the imported file has been adjusted to meet the
 requirements of the tool* — where anything moved. Two things are fixed by
 that sentence being the whole of it. **No value is changed**: a toggle the
-stage cannot honour goes back to automatic and its number stays in the box,
+graph cannot honour goes back to automatic and its number stays in the box,
 so nothing the person typed is lost, only the claim that it was being read.
 And **the adjustment is once, on the way in**: the document in the tab is one
 the panel would have produced, and exporting it and reading it again adjusts
 nothing, which the test holds. The precedent is for whatever else a file may
-one day say that a stage has no use for: relieve it into what can be honoured,
+one day say that the graph has no use for: relieve it into what can be honoured,
 keep the numbers, say so once, and never refuse a whole train over one toggle.
 
 ### An input that moves no number needs saying so
@@ -2103,7 +2106,7 @@ and reads either way rather than being written twice.
 written, whose keys the string tests check in both directions, but the boundary
 handed over its `Display` — English prose written in Rust, which made the
 failure the one thing the application said in a language nobody chose. It
-crosses as a note and the stage it happened in, like every other message, and
+crosses as a note and the part it happened in, like every other message, and
 only a boundary that actually broke is still thrown.
 
 ### A view preference belongs to the tab, not to the panel
@@ -2112,7 +2115,7 @@ The panel, and with it the canvas, is rebuilt whenever a reader looks at another
 gear — so anything the drawing remembers about *being looked at* has to live
 where the tab does, or a glance erases it. The zoom, the pan and the reference
 circles on screen did not, and coming back to a gear found it framed from
-scratch with the circles switched back on. Which stage of a train is expanded
+scratch with the circles switched back on. What a train's panel is showing
 had already been moved for exactly this reason; this is the same fact a second
 time, now in one shape: a `GearView` beside `params`.
 
@@ -2167,8 +2170,8 @@ stage preset was three hand-written buttons and four hand-written accessors
 for a default, then a row each in a TypeScript table; it is now a variant of
 `Preset` in `gear-core`, which knows its family, the catalogue key of its
 name and the shape it starts as, and `defaults()` crosses the whole list under
-its three families — parallel axes, skew shafts, epicyclic — so the "add
-stage" menu renders from the list and a preset added in the core is on the
+its three families — parallel axes, skew shafts, epicyclic — so the add
+menu renders from the list and a preset added in the core is on the
 menu by being on the list. The families are what a shape *reads as*
 (`Shape::family`), never a stored kind: a spur pair is the epicyclic family
 with its carrier held and no ring, and a crossed pair turned to nought is a

@@ -505,7 +505,7 @@ mod tests {
 
     /// The stage's headline numbers, and the one it deliberately does not have.
     #[test]
-    fn a_worm_drive_reports_contact_and_two_efficiencies_and_no_bending() {
+    fn a_worm_stage_reports_contact_and_two_efficiencies_and_no_bending() {
         let r = solved(&arr::worm(1, 40));
         // Negative: a worm is an external mesh, its wheel turns the other way,
         // and a ratio is signed now — it is the graph's rather than `z₂/z₁`.
@@ -1783,7 +1783,7 @@ mod tests {
     /// well and gets worse (68.430 → 67.525 % from zero to 0.3 mm). Asserting a
     /// direction here would be asserting one of those two cases.
     #[test]
-    fn a_worm_drive_is_rated_at_the_centre_distance_it_runs_at() {
+    fn a_worm_stage_is_rated_at_the_centre_distance_it_runs_at() {
         let stage = |clearance: f64| {
             let mut s = arr::worm(1, 40);
             s.distances[0].clearance = Auto::fixed(clearance);

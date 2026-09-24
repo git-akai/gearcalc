@@ -242,7 +242,7 @@ worth keeping because each was a model change rather than a fix:
 
 Load cases moved neither canary, three times: when the second case arrived,
 when the pair of them became a list, and when a case became a list of loads
-solved as one flow. All are single-load reports, and a stage asked for one
+solved as one flow. All are single-load reports, and a preset asked for one
 torque answers with the figure it always did — which is the check that a case
 was added rather than substituted for the first. The corpus's train reports
 moved in layout each time — every body's role, speed and torque per case now
@@ -308,7 +308,8 @@ already flags. `tools/iso_6336_3_stack.py` multiplies the set out
 **The train is one graph.** A train stores one `Shape` — every axis, body,
 member, mesh, distance and coupling once — beside its holds and its cases,
 and what a stage was is a **part** of it (`Shape::parts`), read off the
-graph with every solve; `solve_train` solves part by part, and a preset
+graph with every solve; `solve_train` cuts every part, runs one motion and
+one flow across them all, and rates each part under its share, and a preset
 asked alone is a train of one solved the same way — a preset is one part. A join makes one body on one axis
 and keeps every part's own order; every edit is the graph's (`Edit`), by
 the graph's indices; the panel stands on the graph's own objects, one list
@@ -321,14 +322,14 @@ builds now, turns as the stages did body for body, and falls apart into
 the stages, each solving as it did — and by the probe, whose every edit,
 asked as the graph's own, records the train the stage's edit it replaced
 recorded, byte for byte
-([rationale](rationale.md#a-train-is-one-graph-and-a-stage-is-a-part-of-it)).
+([rationale](rationale.md#a-train-is-one-graph-and-a-part-is-how-it-falls-apart)).
 The panel edits the graph through what the core offers at the piece
 selected — each offer an edit tried on a copy, a refused one said with its
 reason, and every one's dry run shown before it is pressed (`Train::offers`,
 `preview_edit`; [reference](reference.md#the-graph)).
 
-**One stage shape.** Every stage is one `Shape` — axes, the train's
-bodies on them, members, meshes, distances — and every menu entry (`Preset`:
+**One shape.** The train and every preset are one `Shape` — axes, the
+train's bodies on them, members, meshes, distances — and every menu entry (`Preset`:
 a spur pair, an idler, a layshaft; a worm, a crossed pair; a planetary set,
 a Wolfrom, a compound set, a planocentric, meshed planets) is a *preset*
 over it: a list in `arrangements.rs` at sensible teeth, which `defaults`
@@ -336,7 +337,7 @@ crosses under the family the shape reads as. The hula stage is the
 arrangement `arrangements::hula`, a stepped Wolfrom at one planet, and no
 preset. There is no
 type in the core to branch on, and no enum over the shape either.
-What a stage is, the solve reads off the shape — a mesh is internal because a member has a cutter, a set is an axis
+What a piece is, the solve reads off the shape — a mesh is internal because a member has a cutter, a set is an axis
 carried by a body and replicated, a worm is a distance marked as one — and
 the panel names the members the same way (`members.ts`). Closing the
 distances is one plan over every member's role (given, free, reaches,
@@ -352,7 +353,7 @@ mesh the plane script does not lay out — re-derived from rigid-body
 velocities along the base circles' common tangent in
 `tools/train_kinematics.py`. A distance at an angle is a point contact
 the shape builds beside its line contacts, so a worm is a mesh like any
-other and a stage that locks backward is a stage whose flow holds there.
+other and a mesh that locks backward is one whose flow holds there.
 An automatic distance is what the shifts leave, opened out where an internal
 mesh's tips would cross at it — or, where a far-side gap was asked, the least
 distance that gives it, the shifts following: the hula stage's crank, sized
@@ -361,11 +362,11 @@ figures its own solver recorded before it retired.
 Two figures the graph makes free are reported on every path beside its
 ratio and efficiency: what one more tooth on each gear would make the
 ratio, and the power through the teeth over the power in — summed on the
-path, and per mesh in each case. A stage has no figure of its own: what it
-had was a second motion under its own convention, and it went once a law
-held it to the path across the stage's ends. A load
-on a body two stages share goes the way that holds it, and is refused only
-where it would be held at both ends.
+path, and per mesh in each case. A part has no figure of its own: what a
+stage had was a second motion under its own convention, and it went once a
+law held it to the path across the stage's ends. A load on a body two parts
+share goes the way that holds it, as a load anywhere does, and is refused
+only where it would be held at both ends.
 Retiring the stage types into it moved four figures, each recorded in
 [corrections](corrections.md#the-log) with its size: a set's driven-side
 meshes pressed `η` short (0.55 % on the ring's bending); a backward case read
@@ -436,8 +437,8 @@ is raised — and it says so when it is. A search is floored at the automatic
 value instead, for a reason that is measured rather than tidy
 ([reference](reference.md#efficiency-parallel-axes)). Where the bound cannot
 reach at all — a shift a *relation* leaves over, which nobody chose and nothing
-can move — the tooth is reported undercut instead, on every rack-cut member of
-every stage. A ring has only the first control: its flank is its shaper's, and
+can move — the tooth is reported undercut instead, on every rack-cut member.
+A ring has only the first control: its flank is its shaper's, and
 undercut is not a question that can be asked of it. A mesh has one shift to
 give, and which member gives it is what the toggles say.
 
@@ -449,31 +450,32 @@ is a closed-form solve on the tips, and an addendum moving with the shift would
 put an iteration inside it.
 
 **Every parallel-axis mesh reports the same things**, from one type rather than a
-copy per stage type: the operating pressure angle, all three contact ratios,
+copy per stage type, as it once was: the operating pressure angle, all three contact ratios,
 whether the pair hunts, the efficiency both ways, the contact stress the two
 members share, and the one gap seen from each of its ends. A crossed pair has
 none of it — its line of action slides rather than turning, so there is no such
 angle and no contact ratio to report.
 
 **And every member is rated over every mesh it is in**, likewise once rather
-than once per stage: two stresses in every load case, the face width each of
+than once per stage type: two stresses in every load case, the face width each of
 those would need, and the worst mesh answering figure by figure. Most members are
 in one mesh, a planet is in two, and adding a third is adding a list entry rather
 than an arm to an expression. The loadings are held **per load case** rather than
 as one list and a factor, because "the next case is this one times a number"
-is a claim about a stage's *power flow* and not about gearing — the shape's
+is a claim about a *power flow* and not about gearing — the shape's
 flow, linear in the torque through it, can make it, and one that could not
 would build each case for itself with nothing added.
 
-**A stage that cannot be built still shows what built it.** A geartrain
+**A train that cannot be built still shows what built it.** A geartrain
 mid-edit is regularly one that will not solve, so every input, note and label
 stands and only the figures go blank — a readout that vanishes takes its label
 with it and moves the page at the moment it most needs to hold still. The
-refusal itself crosses as a `Note` and the stage it happened in, so it reads in
+refusal itself crosses as a `Note` and the part it happened in, so it reads in
 the catalogue's words like every other message and names where to look
 ([rationale](rationale.md#an-input-does-not-wait-on-an-answer)).
 
-**Profile shifts chosen for efficiency.** A stage-level toggle, off by default,
+**Profile shifts chosen for efficiency.** A mesh's toggle, off by default — and
+every mesh sharing a gear or a distance with it searched with it —
 that chooses the automatic shifts to lose least instead of taking the least that
 clears undercut — which becomes a floor rather than the answer, and is worth up
 to 1.6 points of mesh efficiency on an ordinary pair. Whatever is given
@@ -483,7 +485,7 @@ visibly rather than silently ignored. The spur pair, the planetary set and the
 hula stage each have their own free variables and their own objective over
 one shared search; a crossed pair's shifts are placed by the constraints alone,
 since the search is the parallel-axis mesh's. Two bounds that
-never bit near zero shift do here — a contact-ratio floor, which is a stage input
+never bit near zero shift do here — a contact-ratio floor, which is a mesh input
 because the answer sits against it, and bottom clearance, which reads the
 dedendum the designer already specified ([reference](reference.md#efficiency-parallel-axes)).
 
@@ -520,15 +522,15 @@ bending alone — a ring included, which had no shared section of its own. Below
 virtual contact ratio of 2 the model finds the point the unshared rating already
 took and reports the same tooth, which is the model rather than a fault; a hula
 stage cannot reach that band at any proportion it can be built at. **Load cases
-are a list**, as the stages are: any number, each an ultimate or a fatigue load
-— the allowable it is judged against — entering at the start or the end, held
-by the far end or by nothing but a stage that locks, at its own torque and
-speed, a fatigue case with its own duty; every stress, cycle count and width
+are a list**, as the gears are: any number, each an ultimate or a fatigue load
+— the allowable it is judged against — with its entries on any of the train's
+open bodies, each a load, a reaction or free, at its own torque and speed, a
+fatigue case with its own duty; every stress, cycle count and width
 is reported per case, and the automatic face width is the largest ask of every
 enabled case of a kind a gear's four toggles switch on. A fresh train carries
 three — the peak, the load from the end and the operating duty it used to hold
 as fields, at the same defaults. **Neither contact rating is enabled by
-default**: both are computed and shown, but a fresh stage is sized from bending
+default**: both are computed and shown, but a fresh gear is sized from bending
 alone, so its face width will not satisfy contact until a designer says which
 rating should decide it — the figures are on screen, and the minimum face width
 each rating asks for is beside them. The two gears of a mesh are rated at different points on the path
@@ -536,11 +538,11 @@ each rating asks for is beside them. The two gears of a mesh are rated at differ
 stresses; the shared pitch-point figure is reported at the mesh. An automatic
 width answers to the mesh, not to one gear, and so does the width a member is
 *rated* at — the narrower face carries the pair, so that is the width the load
-is spread over. A load from either port is carried toward the other by one
-walk, attenuated by each mesh's efficiency in the direction it travels, and
-finds the stage that holds it — a self-locking worm from the end, a
-forward-locked crossed pair from the start — or the far end, or reports that
-nothing does. A reversing intermittent duty rounds its cycles within one
+is spread over. A case's loads are followed by one flow across every mesh,
+each mesh's loss taken in the direction it turns, and a load finds what
+holds it — a reacted body, a self-locking worm from the end, a forward-locked
+crossed pair from the start — or the case reports that nothing does, or that
+two ends would divide it by a stiffness this model does not state. A reversing intermittent duty rounds its cycles within one
 actuation and splits contact between the flanks. **Reversed bending is a
 train-wide switch, off by default**: a planet's root is loaded both ways
 whatever the load does, a reversing duty loads every root both ways in its
@@ -580,7 +582,7 @@ distance it runs at, with what it comes to running down under them; a
 body, an axis, a centre, a coupling, a case · **what can be done to a
 piece is the core's to offer** — a gear at any gear, another ratio, a
 step, an offset coupling from an orbiting body to a shaft on the centre
-line, a stage laid in at a body, a gear moved to another body of its axis
+line, a preset laid in at a body, a gear moved to another body of its axis
 (which is how a layshaft's ratio is engaged), a join, a hold, a piece
 removed with what goes with it — each tried on a copy, a refusal said
 with its reason, and its dry run shown before it is pressed; a
@@ -605,7 +607,7 @@ been. They are not a backlog.
 |---|---|
 | **Crossed-axis bending** | The beam formula has no honest reading of a point load on a wide tooth, and choosing an effective width is a convention that multiplies a stress. [rationale](rationale.md#a-worm-stage-reports-no-bending-stress) |
 | **ISO/AGMA correction factors** | Narrow validated bands, balanced only as a complete set, against `σ_Flim` values this project does not have. [rationale](rationale.md#no-isoagma-correction-factors). `Y_S` and `Y_B` are the exceptions and are applied, neither being half of a pair; `Y_β`, `f_ε` and `Y_DT` are declined and recorded in full below |
-| **Equal planet load sharing** | The remedy is a mesh-load factor of the kind above. Said in the notes of every stage with a replicated axis. |
+| **Equal planet load sharing** | The remedy is a mesh-load factor of the kind above. Said in the notes of every part with a replicated axis. |
 | **An S-N curve per material** | The two points it needs do not exist for six of the eight materials. [rationale](rationale.md#material-data-ships-estimates-deliberately) |
 | **Radial assembly** | Attempted, diagnosed and shelved with its findings; it blocks nothing, and planets are commonly installed axially. |
 
@@ -621,7 +623,7 @@ been. They are not a backlog.
 | Span over teeth for a ring | Takeable in principle, rare in practice, not derived. Between-pins is done and the tab says which is which |
 | Worm profile drawing and DXF | A crossed pair draws as its two helical gears already |
 | A planetary **set's** drawing | The viewport draws single gears; a set needs the carrier and N planets placed. **Not planned** — nothing depends on it, and the set's numbers are all reported without it |
-| A ring's own bounds for a stage member | The gear card shows a rack's buildable range, which is not a ring's, so it shows nothing there and says so |
+| A ring's own bounds for a train's member | The gear card shows a rack's buildable range, which is not a ring's, so it shows nothing there and says so |
 | A coupled glass POM grade | Can be added if one is wanted; it must be *coupled*, not filled |
 | **Two carried axes placed round the carrier** | A meshed-planet or Ravigneaux set has three distances — centre to each planet axis and between them — and each closes on its own shifts; nothing checks the three form a triangle, and the planet-clearance layout places one axis's planets without the other's. A preset carries it, the figures it reports are the meshes', and a layout that does not close is a fault this tool does not yet name |
 | **A part's order when two parts share two bodies** | A join keeps every part's own order of bodies (`Train::keep_orders`); two parts that share two bodies in opposite orders cannot both keep theirs, and the earlier-listed part's stands. Nothing the panel offers builds it |
@@ -712,7 +714,7 @@ whose size is unmeasured is a debt still owed, and is marked as one.
   either way.
 - **`Y_S`'s notch band, `1 ≤ q_s < 8`**, read from ISO 6336-3:2019, 7.2 — it
   was a citation of a citation for a year and the two agree. It bounds the **ISO
-  comparison set only**; no stage applies `Y_S`, so no stage reports the band.
+  comparison set only**; nothing the train rates applies `Y_S`, so nothing reports the band.
   `K_f` states none. And ISO's own 7.1: `Y_S` is derived from external spur
   gears at `α_n = 20°` and gives "approximate values" elsewhere — which is one
   more reason the comparison set is a comparison rather than the default, since
@@ -893,7 +895,7 @@ already says so on its own account.
 
 ### Is the tangent construction still earning its place?
 
-Asked directly, because nothing in a *rating* reaches it: no stage, no wasm
+Asked directly, because nothing in a *rating* reaches it: no train, no wasm
 entry point and no part of the application selects `CriticalSection` or
 `RootStressModel`, so from the product's side both ISO pieces are unreachable.
 
@@ -1110,29 +1112,29 @@ Not a queue with a head; this is what a next session would pick from.
   than a diff; the gear tab's treatment is the one to keep unless the
   geartrain's has a reason:
   - **number boxes** — the gear tab's are right-aligned (`text-align: right`,
-    padding `0.2rem 0.4rem`, background `--bg`); a stage's are left-aligned
+    padding `0.2rem 0.4rem`, background `--bg`); the geartrain's are left-aligned
     at `0.15rem 0.3rem` on no background, so a column of figures lines up on
     its decimal point on one tab and on its first digit on the other. The
     gear tab's is the one to keep;
   - **the field grid** — a single column on the gear tab (`.grid`: flex
     column, `--field-gap` between rows, and `--field-gap` again between
-    groups); a stage's inputs flow in `repeat(auto-fill, minmax(15rem, 1fr))`
+    groups); the geartrain's inputs flow in `repeat(auto-fill, minmax(15rem, 1fr))`
     at `--field-gap 1rem`, and its shared block is one column capped at
-    34 rem. A choice about how many inputs a stage has, and may stay;
+    34 rem. A choice about how many inputs a piece has, and may stay;
   - **notes outside a label** — both tabs draw a field's note through
-    `FieldNote` at 0.72 rem, but a stage's `.hint` for a note that has no
+    `FieldNote` at 0.72 rem, but the geartrain's `.hint` for a note that has no
     label to sit in pulls itself up by `calc(--note-gap − --field-gap)` and
     right-aligns; the gear tab has no such note;
   - **readouts** — the gear tab's `dl` is `max-content 1fr` at `0.15rem 1rem`
-    with values right-aligned; a stage's `.out` is `auto 1fr` at
+    with values right-aligned; the geartrain's `.out` is `auto 1fr` at
     `0.15rem 0.75rem` with values left-aligned, an annotation in a muted
     `small`, and an `.indent` variant under a mesh heading. Both tabular at
     normal weight now; the alignment is the visible half;
   - **the list of notes** at the foot of a section — `0.75rem 0 0` margin,
     1.1 rem indent, 0.8 rem on the gear tab; `0.5rem 0 0`, 1 rem, 0.78 rem on
-    a stage;
+    the geartrain;
   - **buttons that show a state** — the gear tab's `button:disabled` is
-    `opacity: 0.5`, a stage's is `color: --muted`; the `Switch` is one
+    `opacity: 0.5`, the geartrain's is `color: --muted`; the `Switch` is one
     component on both, and the `auto` and `no undercut` toggles keep their
     small size by design;
   - **error and notice paragraphs** — the same tokens, but only the geartrain
@@ -1141,18 +1143,18 @@ Not a queue with a head; this is what a next session would pick from.
   - **cards** — a mesh's two gears sit in bordered `.gear` columns either
     side of it in the workspace; the gear tab's sections are unbordered,
     which is a difference of content rather than of style.
-- **Where a gear tab and a stage member still differ in what they describe**,
+- **Where a gear tab and a train's member still differ in what they describe**,
   noted while the tab learned to adopt a member. Back end only — the tab
-  needs none of the stage's solvers — and the same `GearParams` throughout:
-  - a stage caps the addendum at what `min_tip_width` allows and raises the
+  needs none of the train's solvers — and the same `GearParams` throughout:
+  - a train caps the addendum at what `min_tip_width` allows and raises the
     shift to clear undercut, each behind a toggle; the gear tab reports both
     conditions in its ranges and applies neither, which is right for a tab
     that is a free drawing but is a difference a reader will meet the moment
     they adopt a member and lower its shift;
-  - a stage asks the undercut question at a `working_depth` the designer may
+  - a train asks the undercut question at a `working_depth` the designer may
     set; the gear tab asks it at the dedendum and offers no box;
-  - a stage enforces `k₂ = 2 − k₁` across a mesh; the gear tab's `k` is free;
-  - the gear tab alone has the eccentric feature and the metrology; a stage
+  - a train enforces `k₂ = 2 − k₁` across a mesh; the gear tab's `k` is free;
+  - the gear tab alone has the eccentric feature and the metrology; a train
     alone has a material, a face width and a rim. None of those is a drift.
 
   Kept as they are, on purpose: the exposed behaviour is right on both
@@ -1180,7 +1182,7 @@ Not a queue with a head; this is what a next session would pick from.
   it is the next thing a member-over-meshes model makes askable.
 - **Arrangements that need more than the shape has.** `MemberRating` and
   `MeshReport` are per member and per mesh rather than per named role, and
-  every stage is one shape — so an arrangement is a list of what sits where,
+  every preset is one shape — so an arrangement is a list of what sits where,
   every menu preset is one, and a designer permutes one piece by piece — a
   worm's wheel meshing a spur on a parallel axis, the harness's
   `worm_and_pair`, is one edit at the wheel now. What an arrangement can

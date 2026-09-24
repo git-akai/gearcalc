@@ -4,8 +4,8 @@ A **map**, not a summary. The four documents in `docs/` say what the tool
 computes, why, what was once wrong and what is built; this says where things are
 and what it costs to change them.
 
-It exists because the project is about 22,700 lines of production code carrying
-14,900 lines of comment, alongside 6,200 lines of standalone document — **prose
+It exists because the project is about 22,400 lines of production code carrying
+14,800 lines of comment, alongside 6,200 lines of standalone document — **prose
 and code are about 1 to 1**. That ratio is the reason the model
 decisions here are auditable and it is not a target to reduce. What it does mean
 is that finding the right file matters more here than in most codebases, and
@@ -19,9 +19,10 @@ test modules split off and blank lines dropped, beside `docs/*.md` without
 `history/`, and takes the figure at any tree. It reads 16,100 / 12,900 / 5,000
 at the tree the audit closed on, 17,100 / 13,600 / 5,100 where the
 train-as-graph branch began, 21,900 / 14,700 / 6,100 once the train stored
-one graph, and 22,700 / 14,900 / 6,200 at the branch's head, the cards
-retired — so that branch added about 5,600 lines of production code against
-1,300 of comment: 0.24 of comment a line, a third of the crate's own 0.66.
+one graph, and 22,400 / 14,800 / 6,200 at the branch's head, the cards
+retired and what the stage left behind taken out — so that branch added
+about 5,300 lines of production code against 1,200 of comment: 0.23 of
+comment a line, a third of the crate's own 0.66.
 The reason is where it went: `shape.rs` gained 2,900 lines of solve for
 what five stage types used to do separately, while `planetary.rs`, `hula.rs`, `pair.rs` and
 `crossed.rs` gave up 2,800 between them — the comment those carried went
@@ -75,7 +76,7 @@ of a gear is worth more than knowing what it does.
 | `involute.rs` | `inv α = tan α − α`, and its safeguarded inverse | " |
 | `elliptic.rs` | Carlson symmetric elliptic integrals | " |
 | `ratio.rs` | An exact rational, `i128`, overflow refused rather than wrapped | " |
-| `kinematics.rs` | **Bodies, meshes and what relates them** — one matrix read four ways: speeds, mobility, torques, play. A gear reaches it as a signed tooth count | " — no geometry, no stage, no loss |
+| `kinematics.rs` | **Bodies, meshes and what relates them** — one matrix read four ways: speeds, mobility, torques, play. A gear reaches it as a signed tooth count | " — no geometry, no shape, no loss |
 | `hertz.rs` | General Hertzian contact; line contact is the degenerate value | " — a concave body is a negative radius, which is why there is no internal case |
 | `plane.rs` | The normal and transverse planes, the identities between them, the basic rack | tooth counts |
 | `params.rs` | A gear's inputs, and the record of any guard that altered them | how any of them is used |
@@ -89,11 +90,11 @@ of a gear is worth more than knowing what it does.
 | `contact.rs` | The path of contact and how load is shared along it | stress |
 | `screw.rs` | Crossed-axis screw gearing — one model for a worm and a crossed pair | that a worm is special |
 | `planetary.rs` | The set's **vocabulary** — sun, carrier, ring; an arrangement — and Pennestrì's closed form, the independent check the shape's flow is held to on every arrangement, and `carrier_driven_efficiency`, the 3K family's closed form the hula laws hold the flow to. No solve: the set's closure is the shape's | tooth form, geometry |
-| `strength.rs` | The critical section, both notch models, `Y_F`, `K_f`, Hertz beside it. `ToothOutline` is the seam that makes one model serve a tooth and a ring | which stage is asking |
+| `strength.rs` | The critical section, both notch models, `Y_F`, `K_f`, Hertz beside it. `ToothOutline` is the seam that makes one model serve a tooth and a ring | which part is asking |
 | `metrology.rs` | Span over teeth, over-pins, and what they take round a revolution | tolerances (that is `jgma.rs`) |
 | `jgma.rs` | JGMA 116-02 tolerance tables, transcribed and checked | how a tolerance is used |
 | `material.rs` | Elastic constants and stress allowables | where the numbers came from (that is the `basis` field) |
-| `auto.rs` | Automatic values: the undercut shift, the tip-width addendum, admissible ranges, and `maximise` | what a stage is |
+| `auto.rs` | Automatic values: the undercut shift, the tip-width addendum, admissible ranges, and `maximise` | what a shape is |
 | `verify.rs` | The cut simulated from the cutter alone — the instrument, not the model | the model it checks |
 | `testing.rs` | Numerical helpers the tests check closed forms against | *(test-only)* |
 
@@ -102,7 +103,7 @@ of a gear is worth more than knowing what it does.
 | File | Answers |
 |---|---|
 | `mod.rs` | **The train, and what it comes to**: one graph (`Train::shape`), its holds and its load cases — each a list of `Load`s on the train's open ports, given or derived — solved in `solve_train` (`solve_parts`): every part cut once, one motion and one flow across the whole graph, and each part rated under its share of it, a `CaseLoad`. `TrainCase` is what a case comes to body by body; `PathReport` what the train comes to along each path a case asks for (`paths_of`) — its ratio, its efficiency with breaking away asked of the whole flow, its play, the power through its teeth, and what one more tooth on each gear does, by the graph's index; `Train::relieve_case` is the relief that keeps a case to the train's mobility. `TrainResult` answers per piece — every gear, mesh, distance and axis by the graph's index, what is a part's own (`PartReport`), and `part`/`by_part`, a part's view laid back out for the harness — through `MemberRating`, `Bending`, `MeshReport`, `GearResult` and its `GearCase` per load; the engagement rule; `Train::alone`, a preset asked alone as a train of one (its bodies numbered by its slots, cased at its conventional ends, solved part by part as any train — a preset is one part; `arranged` asks it held elsewhere, `solve_alone` reads the part and its first path, as `Alone`); and **relief** — `Freedom`, `Reading`, `FreedomGroup` and the walk over them, which the shape feeds and never writes. Six questions are the whole of what a shape owes (`shape.rs`, once the `Constrained` trait): the fifth is its wiring and the sixth its ports |
-| `graph.rs` | **What the graph falls apart into**: `Shape::parts`, the pieces that close, search and rate apart — members joined by meshes, meshes by the distances they share — each a `Part` carrying its shape in its own numbering and where every piece of it is in the graph: what a stage was, and the solve's unit, never the designer's. the graph's own surgery (`append`, `merge_axes`); and **`graph_of`, a file of stages as one shape** — a body two stages shared listed once, the fixed axes it turned about one line, a join that cannot be coaxial an offset coupling — which is how a file written as stages converts (`gear-cli convert`); its laws hold the converted graph to what a chain builds, to the stages' motion body for body, and to their solves part by part |
+| `graph.rs` | **What the graph falls apart into**: `Shape::parts`, the pieces that close, search and rate apart — members joined by meshes, meshes by the distances they share — each a `Part` carrying its shape in its own numbering and where every piece of it is in the graph: what a stage was, and the solve's unit, never the designer's; the graph's own surgery (`append`, `merge_axes`); and **`graph_of`, a file of stages as one shape** — a body two stages shared listed once, the fixed axes it turned about one line, a join that cannot be coaxial an offset coupling — which is how a file written as stages converts (`gear-cli convert`); its laws hold the converted graph to what a chain builds, to the stages' motion body for body, and to their solves part by part |
 | `shape.rs` | **The graph, and the solve that reads it**: axes (carried or not, replicated or not), the train's bodies on them (`BodyOn` — a body's place in a part's list is the part's slot for it), members, meshes, distances, couplings — and the solve that reads what to do off them: mesh kind from a cutter, frame from the axes, wiring and ports from the bodies; each shift's role (given, free, reaches, absorbs) and the plan that closes every distance, an automatic one sized by its tips where they would cross or a gap is asked; the search in sum-and-division coordinates, per component where meshes share nothing, with the teeth it cut kept; the helix read once per part and propagated; every mesh built as a line contact or, on a distance at an angle, a point contact (`BuiltContact`, the one seam between the two models); the solve in two halves — `cut`, everything no load moves, each mesh's efficiency with it, and `rate`, each member and mesh pressed with its driver's force in each case; what each member is (`member_names`) and whether its planets assemble (`assembly`). **No figure of its own**: a ratio, an efficiency, a play and what a tooth more does are a path's. The train is one of these, and so is every preset |
 | `conditions.rs` | **What the train holds, and its bodies**: `held`, every body the train holds, each stated — a preset's conventional hold written when it is laid in — on a body numbered across the train, ground 0, which every part, case and hold names; `Train::parts` and `part_shapes` (the parts and their shapes, read off the graph), `port`, `slot` and `member` (a part's slot or gear in the graph), and `Train::chained`, the constructor that lays a chain's presets into the graph; each with an `_of(parts)` form for a caller holding the parts it solves by. `Train::motion` (the shaft line, driven at the headline case's first load — `headline`, `headline_load` — every body's exact speed and the headline path's ratio, and no part's: a ratio is a path's; a part its holds lock is refused at the hold that locked it, `check_parts`), `open_ports`, `bodies` (every port body with its ends), `motion_report` (**one list of bodies** — `port`, `held`, speed, terms — which the picker and the case rows filter), `chain_ends` (where a case starts on a train with none: the first part's conventional input and the last part's conventional output, read with the holds); and the train's **edits** — `Train::edit` (the graph's, `edits.rs`'s `Edit`, which the panel asks through `edit_train`; the join, the hold and the insert of them made here, the rest on the shape), `join`, `split` (a part's end of a shared body made its own, for a train built in code), `hold`, `release`, `chain_on` (a preset laid in, `lay`, and joined onward) and `insert` (at a body named), `fresh_case`, `set_duty` — each a rule about what else has to change: a join is one body on one axis, the two axes one line (`merge`), every part keeping its own order of bodies (`keep_orders`), refused across an axis distance and between two bodies geared to each other, an offset coupling where an end orbits; every remove closes the numbers up (`drop_bare`, `drop_orphans`, `prune`). Nothing is driven but by a load |
 | `edits.rs` | **The graph's edits** — `Edit`: a gear meshing any gear at a body, a new body or a new axis (`Place`), sized to the distance it crosses; a ratio on the body asked; a step; a coupling; a piece removed with what goes with it (`Piece`: a gear left meshing nothing, a body left bare, a distance with no mesh, an axis with nothing on it); a gear moved — each made on a copy and kept whole or refused whole (`Shape::apply`, `transact`), a planet never left meeting nothing on its carrier's axis, a body it adds numbered after the train's (`next`); a join, a hold and an insert are the train's (`Train::edit`, in `conditions.rs`), where a body nothing names any more leaves the train and the numbers close up. **A gear moved off a body does not take the body with it** — a body is a port the train may hold, share or load, and dropping it because its gear moved is how engaging a layshaft's other ratio lost the output; a body nothing names at all is given up by `Train::drop_bare`, a level up, where what else names it can be seen. A refusal (`EditRefused`) names its invariant, crosses as its catalogue key and changes nothing. No kind flips: a swap is a remove and an add, sized by the core |
@@ -231,7 +232,7 @@ Four in `tooth.rs`, and the tests that hold each:
 And elsewhere:
 
 - **`CriticalSection::TangentAngle` and `RootStressModel::Iso6336` look like dead
-  code.** No stage reaches them. They are the *instrument* — `gear-cli matrix`
+  code.** No rating reaches them. They are the *instrument* — `gear-cli matrix`
   runs both coherent sets, and it is the only way this tool can be checked
   against a published standard. They go when that command does.
 - **`verify.rs` is in the library rather than in `tests/`** so the CLI can sweep
@@ -246,7 +247,7 @@ And elsewhere:
   each fail there). Measured by perturbing each and seeing what fired, not
   assumed. It is where a law belongs that decides it: a profile law wants the
   whole grid `tests/common` builds, a guard's value wants a recorded output,
-  and a stage's law wants every preset.
+  and a law about a shape wants every preset.
 - **One note nothing can fire** is named in `strings.rs`'s `UNFIRED` with
   its evidence. Live code, a live message, deliberately not deleted on
   suspicion — and the evidence carries the breadth of the search that found

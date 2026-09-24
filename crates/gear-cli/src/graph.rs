@@ -1,6 +1,6 @@
 //! **Every preset, alone and after every other, read by what the graph has
 //! and never by stage** — the record the train-as-graph refactor was held
-//! to (docs/rationale.md#a-train-is-one-graph-and-a-stage-is-a-part-of-it).
+//! to (docs/rationale.md#a-train-is-one-graph-and-a-part-is-how-it-falls-apart).
 //!
 //! # Why it prints nothing a stage owns
 //!

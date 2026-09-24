@@ -327,7 +327,7 @@ second: the path, the operating pressure angle, the operating radii, the
 relative curvature, the stresses, the efficiency integral, and an internal
 pair's interference verdicts and tip room (`ring::mesh_at`). Only **backlash**
 keeps the design mesh, because it measures play against the zero-backlash
-reference. Every stage rates where it runs — the two epicyclic stage types
+reference. Every mesh rates where it runs — the two epicyclic stage types
 rated at zero backlash for as long as a pair had not.
 
 | | how the distance enters |
@@ -493,18 +493,18 @@ Above that minimum two different worms reach the same centres — a thin one wit
 a fast lead and a fat one with a slow one — and the tool takes the branch the
 designer's own number is on, which is the only choice under which nudging the
 target moves the answer smoothly. Below it there is no worm at all, and the
-stage says so. On parallel shafts there is no turning point: the distance only
+part says so. On parallel shafts there is no turning point: the distance only
 grows with the helix, and a helical pair cut to fit a standard axis distance
 is the same request with one branch.
 
 That is one of the two bounds `train::FreedomGroup` carries. The other counts how
 many may be *given*, and the pair of them is what makes an over- or
-under-determined stage resolve itself: too many given turns one automatic, too
-many automatic pins one, in the order the stage declares. An entry of a group
+under-determined shape resolve itself: too many given turns one automatic, too
+many automatic pins one, in the order the shape declares. An entry of a group
 is one input stated one or more ways — a pair's size is either helix or the
 first pitch diameter, and the ratio where every face is given — counted once,
 given while any of its readings is, and within it at most one reading stands.
-A stage with **no** distance input would say `automatic_at_most = 0` for its
+A shape with **no** distance input would say `automatic_at_most = 0` for its
 clearance and so could never derive it — the same statement counted rather
 than special-cased, and since every distance has the input, none says it.
 The shape declares its groups, its readings and its inputs, and the walk
@@ -513,7 +513,7 @@ over them is written once
 
 The objective and the constraints are not the same kind of thing, and failing at
 one must not discard the other: where the optimiser's own conditions — a minimum
-contact ratio, a tool that leaves the members alone — admit nothing, the stage
+contact ratio, a tool that leaves the members alone — admit nothing, the solve
 falls back to what the *constraints* imply, not to what it would have built with
 no distance given at all.
 
@@ -707,7 +707,7 @@ optimum is as often at an end of the admissible interval.
 <!-- figures: gear-cli shifts 13 61 -->
 **What it is worth depends entirely on what the mesh feeds.** On an ordinary
 pair it is six to fourteen hundredths of a point — 98.345 % to 98.488 % on
-17/43, 98.223 % to 98.287 % on 13/61 — which is real and small. On a stage whose reduction
+17/43, 98.223 % to 98.287 % on 13/61 — which is real and small. On an arrangement whose reduction
 comes from two meshes nearly cancelling it is worth thirty to fifty times that at
 the output, because `η = 1/[R(1 − η₀) + η₀]` multiplies the mesh loss by the
 reduction. That is the whole reason a high-ratio design bothers to optimise its
@@ -745,7 +745,7 @@ Two bounds have never had to bite before, because near zero shift they do not:
 
 - **A contact ratio floor.** Loss falls monotonically with the length of the
   path, so the least-loss pair is always the one whose teeth barely reach and the
-  floor is the answer rather than a guard. It is therefore a stage input. 1.2 is
+  floor is the answer rather than a guard. It is therefore a mesh's input. 1.2 is
   the usual design minimum for a pair; the hula stage defaults to continuous
   contact instead, because a mesh of one tooth of difference has so short a path
   that 1.2 would forbid the mechanism rather than constrain it.
@@ -754,16 +754,16 @@ Two bounds have never had to bite before, because near zero shift they do not:
   addendum *is* the 0.25 of clearance — so the bound reads the clearance the
   designer specified rather than inventing an input for it.
 
-Each stage differs only in what is free and what it is worth:
+Each arrangement differs only in what is free and what it is worth:
 
-| stage | free | objective |
+| arrangement | free | objective |
 |---|---|---|
 | spur | both shifts | the mesh's own efficiency |
 | planetary | the sun's and the ring's, the planet's following | `η₀`, since `power` rises with it either way |
 | hula | each mesh's division of its shift | the two meshes' product |
 | worm, crossed | both shifts — the worm's pinned at the preset | the friction balance along the line of action ([Crossed axes](#crossed-axes)), on the zone the teeth leave |
 
-The searches share `auto::maximise`: what differs between stages is how many
+The searches share `auto::maximise`: what differs between arrangements is how many
 numbers are free and what they are worth, not how to look for them, and a
 crossed pair differs from a parallel one in nothing but the objective —
 `crossed_shifts_for_efficiency` is `shifts_for_efficiency` with the mesh
@@ -779,7 +779,7 @@ a point (`gear-cli crossed 17 43 5`). At the parallel limit it lands near the
 parallel search and not on it, because the contact-ratio floor is a
 normal-line count on a point contact and a transverse one on a line. And
 `auto::Freedoms` is the one mapping from what a search hands back onto the full
-set. Each rates the geometry the stage would *build* — the addendum held to the
+set. Each rates the geometry the shape would *build* — the addendum held to the
 tip width it has to keep, at the distance the pair runs at rather than its
 zero-backlash one — so what is optimised is what is reported.
 
@@ -815,7 +815,7 @@ passes `None` and the first two go unasked.
 ### Who decides a shift, and what it must satisfy
 
 Every gear that is cut by a rack carries two controls, and they are different
-kinds of thing. **`auto` is a source** — this shift is not given, the stage
+kinds of thing. **`auto` is a source** — this shift is not given, the solve
 decides it. **`no undercut` is a constraint** — whatever decides it, it may not
 undercut. They combine rather than compete:
 
@@ -855,7 +855,7 @@ true minimum let the hula stage's split walk out to −1.79 and come back
 with less stage efficiency than it started with.
 
 A ring has neither control's second half: its flank is its shaper's rather than
-a rack's, so it is given or it is the stage's to choose, and undercut is not a
+a rack's, so it is given or it is the solve's to choose, and undercut is not a
 question that can be asked of it.
 
 **The other end of the tooth is the same shape.** An addendum's only automatic
@@ -873,25 +873,25 @@ with an analytic derivative; an addendum that moved with the shift — which mov
 with the offset — would put a tip-width solve inside that root-find and take the
 derivative away with it. So there the bound *reports*: it says what the tooth
 would have to be and leaves the number alone. One control, one meaning, honoured
-by whatever the stage is able to move.
+by whatever the solve is able to move.
 
 **A note that names an input is drawn under that input.** A shift raised to
 clear undercut and an addendum held down to keep a tip both name a field and
 carry a number, so they reach the reader beside that field rather than in a list
-at the foot of the stage to be matched back up by tooth count. The stage's list
-keeps what is about the stage.
+at the foot of the part to be matched back up by tooth count. The part's list
+keeps what is about the part.
 
 **And where a bound cannot reach, the finding is reported instead.** `no
 undercut` bounds a shift somebody *chooses*; a shift a relation leaves over is
 chosen by nobody — an epicyclic absorber, or a hula pinion whose ring was pinned
 — and answers to no bound at all. The control can be on, the tooth undercut, and
-the two never meet. So every rack-cut stage member says whether its flank has
+the two never meet. So every rack-cut member says whether its flank has
 been eaten into, which is a remark about the part rather than a clamp: nothing
 was altered, and the tooth is exactly the one the inputs describe. Severing is
 the other side of it and *is* a clamp, since it truncates the profile.
 
 **Where a clearance is read.** A clearance is taken by whatever is free to
-absorb it, and each stage reports what it took rather than leaving a reader to
+absorb it, and each part reports what it took rather than leaving a reader to
 work it out. The axis distance absorbs it when the distance is automatic; the
 shifts absorb it when they are being chosen, closing the pair to zero backlash a
 clearance *inside* a given housing; and with neither free the input goes unread
@@ -901,7 +901,7 @@ leaves it unread.
 
 ## Crossed axes
 
-One model covers a worm stage and a crossed helical pair, and one stage
+One model covers a worm stage and a crossed helical pair, and one shape
 too: a worm is a pair whose first member states its pitch diameter
 rather than its helix angle — the same reading of the same size — with the
 shift, addendum, dedendum and root round every other member has, and a root
@@ -920,7 +920,7 @@ balance along its path, its play is the projection below, and its contact
 is rated on the torque of whichever member the flow says drives it. What it
 does not have is a bending rating ([rationale](rationale.md#a-worm-stage-reports-no-bending-stress)), and its face
 is a proportion or the box rather than a rating. A worm can therefore sit
-in a stage with other meshes on other distances, and a self-locking mesh
+in a train with other meshes on other distances, and a self-locking mesh
 under a load from its driven side **holds**: the flow's driver presses the
 flanks, the driven shaft delivers nought, and the mesh's efficiency that way
 is nought.
@@ -1027,15 +1027,15 @@ returns both. Only the backward one has a common name. A **negative** threshold
 means no friction locks the pair that way, which is the usual answer forwards;
 it is a value, not a missing one.
 
-**Two friction coefficients.** Whether a stage turns at all is decided at rest
+**Two friction coefficients.** Whether a mesh turns at all is decided at rest
 against a **static** coefficient; how well it turns once moving is decided
 against the **sliding** one. `Directional::once_moving` is the whole rule, and
 the static figure is never itself reported. A path asks it of its **whole
 flow**, since a train can hold at rest where none of its meshes does
 ([rationale](rationale.md#two-friction-coefficients-because-there-are-two-questions)).
 
-**The flank load comes from the torque the stage was given**, on the member it
-was given on, in the direction that gives it. `T₁` and `T₂` above are one
+**The flank load comes from the torque the flow hands the mesh**, on the member it
+presses, in the direction that gives it. `T₁` and `T₂` above are one
 balance, so the input torque read on the worm and the output torque read on the
 wheel are the same normal force everywhere the pair transmits. They part company
 at the one place that matters: a pair whose forward efficiency is **clamped to
@@ -1275,8 +1275,8 @@ Every declined factor's formulae and bands are recorded in
 [`state.md`](state.md), so the decision can be revisited without the standard.
 
 The `Y_S` fit is stated over `1 ≤ q_s < 8`, and outside it the correction is
-taken at the boundary. **No stage reports that any more**, because no stage
-applies `Y_S`: the band belongs to a fit reached only by asking for the ISO set
+taken at the boundary. **Nothing reports that any more**, because nothing the
+train rates applies `Y_S`: the band belongs to a fit reached only by asking for the ISO set
 explicitly, and a note about a factor the rating does not use is worse than no
 note. `K_f` states no band. The
 same clause (7.1) says the fit is derived from **external spur gears at
@@ -1763,7 +1763,7 @@ reads a given axis distance through, and a closed form rather than an
 iteration.
 
 Which member absorbs is read off the shift toggles rather than named by a
-control of its own, by [the stage's](#the-graph) one rule: **the member left
+control of its own, by [the graph's](#the-graph) one rule: **the member left
 automatic with the most leverage on the difference absorbs**, and on a set that
 is the planet, which moves the two distances apart at twice any other member's
 rate. Pinning the planet is therefore how a designer asks the sun to close it
@@ -1800,8 +1800,8 @@ T_ring/T_sun = −i₀ η₀^w      T_carrier = −(T_sun + T_ring)
 η  = |T_out ω_out| / |T_in ω_in|
 ```
 
-This is `planetary::power`, the closed form the stage's mesh-by-mesh flow
-([the graph](#the-graph)) is held to on every arrangement; the stage itself
+This is `planetary::power`, the closed form the train's mesh-by-mesh flow
+([the graph](#the-graph)) is held to on every arrangement; the flow itself
 assumes a direction per mesh and keeps the consistent assignment, which is
 the same decision made mesh by mesh. **`w` is not known in advance**, since
 it depends on a torque that is itself being solved for, so both values are
@@ -2473,7 +2473,7 @@ the graph and never stored. A train built preset by
 preset falls apart into exactly its presets, each part solving as the
 preset alone does; a part that shares a body with another is joined to it
 by that body and nothing else — a pair's output and the next set's sun.
-There is no chain in the model and no head to it — no first stage that is
+There is no chain in the model and no head to it — no first preset that is
 driven, no last one that is the output. What turns is a load case's to say
 ([Load cases](#load-cases)); what the train itself says is which bodies are
 held. A train's **ports** are every body a load can enter by — each body
@@ -2484,7 +2484,7 @@ some part has as a port that is not held.
 There is no housing in the model: a body is fixed to ground or free to do
 what the rest decides, and ground is one more body that happens to be held
 — the same row in the same matrix as any other. A set, which used to carry
-"sun in, ring fixed" as a field, carries none; the stage answers instead
+"sun in, ring fixed" as a field, carries none; the shape answers instead
 which of its slots are **ports** — the ones a train may address — and which
 of those a preset holds *by convention*.
 
@@ -2536,22 +2536,15 @@ away again.
 A case entry at either end of a join keeps its role — a reaction is a
 reaction at the body the join makes, as at any other; a hold drops every
 case entry at the body, there being nothing a case can say of ground. A part that
-shares no body is an isolated stage, which is legal: the graph has two
+shares no body is a part apart, which is legal: the graph has two
 components, each needs a given speed, and every case says so. Two slots of
 one part on one body is a mesh turning against itself, and a join that
-would make one changes nothing. Every remove — a stage, a member, a
-body's last end — closes the numbers up, so a body's number is its place
+would make one changes nothing. Every remove — a member, a mesh, an axis,
+a body's last end — closes the numbers up, so a body's number is its place
 in the list as a gear's is. (The chain used to be supplied by a rule at
 every solve whenever a file listed no couplings, and rewired itself as
 holds changed; then it was a list of couplings; a body's number across the
 train is what a coupling said, said once.)
-
-**A stage's input and output are its own reporting convention.** Which way
-its ratio, its efficiency both ways and its play are read: the body shared
-with an earlier stage is its input, failing that the body the first case's
-first load is at, failing that its first open port; the body shared with a
-later stage is its output, failing that the next open port. They decide
-nothing about a load case.
 
 **The train's own figures are per path.** Where its holds leave it one
 motion, a row for each path that is asked about — in case order, every path
@@ -2559,8 +2552,8 @@ an enabled case uses, from each of its loads to each of its reactions, once
 each, so the first is the **headline case's** — between two open bodies: the
 **ratio** off that motion, driven at the one with the other free; the **efficiency** off the
 train's flow at unit load — the first driving, the second holding the load,
-every other body free — and the reverse, so a path that crosses one stage of
-three is that stage's alone, where a product over the stages could not say
+every other body free — and the reverse, so a path that crosses one preset of
+three is that preset's alone, where a product over the presets could not say
 so; and the **play** at the second driven from the first and the reverse,
 each mesh's own play through the kinematics' coefficients
 (`MeshReport::row_play`, `System::play`), so a mesh the path does not cross
@@ -2615,12 +2608,12 @@ a planet, and nobody reads a differential per turn of a planet. Re-basing the
 family changes nothing about which motions it contains. A family has no
 figure of its own and is rated under its cases ([Load cases](#load-cases)).
 Each way the conditions can fail has its own sentence — two holds that lock a
-stage, named at the hold that closed it; a body the train does not have; and
+part, named at the hold that closed it; a body the train does not have; and
 tooth counts whose product outgrows an exact ratio, refused rather than
 wrapped.
 
 **A ratio says two things, and only one of them refers a load.** Its *size* is
-how much a torque is multiplied by across the stage and how much a play is
+how much a torque is multiplied by across a path and how much a play is
 divided by on the way to the output; its *sign* is whether the output turns the
 other way, which is a fact about the shaft line. Every referral below takes the
 size, `|i|`. Taking the sign instead handed the stage after a reversing one a
@@ -2630,7 +2623,7 @@ it refused — and made an upstream stage's play *subtract* rather than add
 
 **Every ratio and every speed here is signed, and comes from one place.** The
 shaft line is solved as a graph of bodies and meshes — one row per mesh in
-the frame carrying its axes — so a stage's ratio, its members'
+the frame carrying its axes — so a path's ratio, its members'
 speeds and each member's speed against the frame of its mesh are readings of
 one answer rather than three arithmetics that have to agree. They did not: a
 pair worked its second member's speed out as `1/i` and reported it turning
@@ -2642,7 +2635,7 @@ referral, an accumulated backlash, a tooth count, a sweep stated in degrees,
 and the speed at which two surfaces rub.
 
 **Backlash accumulates referred to the body it is read at**, so the last
-stage before it dominates — and it accumulates as a **sum of magnitudes**,
+mesh before it dominates — and it accumulates as a **sum of magnitudes**,
 because two independent sources of lost motion add up whichever way their
 shafts turn. On a chain read at its output that is the classical
 
@@ -2656,7 +2649,7 @@ what there is.
 ### Load cases
 
 A train carries any number of **load cases**, as it carries any number of
-stages, and every stress, cycle count and minimum face width is reported once
+gears, and every stress, cycle count and minimum face width is reported once
 per enabled case. A case is:
 
 ```text
@@ -2667,14 +2660,14 @@ loads      one per declared port   each: at (a body, by number), role (load | re
 duty       a fatigue case's        how the load is applied over the train's life
 ```
 
-**A train with no stages is a train.** It solves to nothing rated and
-every case unsolved; the last stage removed leaves each case's entries
-parked at the bodies they named — numbers no stage has — with every figure
-kept, and the first stage pushed takes them up at its conventional input
+**An empty train is a train.** It solves to nothing rated and every case
+unsolved; the last gear removed leaves each case's entries parked at the
+bodies they named — numbers the graph no longer has — with every figure
+kept, and the first preset laid in takes them up at its conventional input
 and output, the back-driving case still from the output. A fresh case on a
 train with no two ends is parked the same way, at two bodies of its own.
 
-**Ports and bodies.** A **port** is every slot of a stage that is not
+**Ports and bodies.** A **port** is every slot of a part that is not
 replicated — a set's sun, carrier and ring, a layshaft, and a single
 orbiting member, a hula's wobble body — and the train's *open ports* are
 the port bodies it does not fix.
@@ -2736,7 +2729,7 @@ take-off between two presets is a reaction or a load there, and a second
 reaction on one line is a division by stiffness this model does not make,
 which the case says and rates nothing. A free port beside a given torque
 nothing else holds is the question
-whether a stage locks, asked on purpose and answered by name. A fresh case
+whether a mesh locks, asked on purpose and answered by name. A fresh case
 is written between the train's two ends — a load at the first, a reaction at
 the second — and switched off, so that adding one moves no figure until the
 designer has written it; a train with no two ends gets a case with nothing
@@ -2756,7 +2749,7 @@ given speed drives its port at one turn with every other given port still,
 and the family is that scaled and summed), and the torques on the loads and
 the reacted ends together are `m` short of all given — one statics equation
 per degree of freedom — so a pair with one load and one reacted end has one
-torque given, a take-off between two stages two; a port declared free counts
+torque given, a take-off between two presets two; a port declared free counts
 as the reaction it declines to be, so the given torque beside it stands.
 **Relief** turns only the loads' figures — a reaction or a free port is a
 declaration — and keeps it so after every toggle, sparing the figure just touched and turning the others in load
@@ -2773,10 +2766,10 @@ among the unknowns, a derived load or a reacted end.
 **A family is rated.** A train whose motion under its own constraints is a
 family — a differential: a set with its ring released and only its sun
 driven — has no ratio, efficiency or play of its own, since each is read
-under one motion; those figures are absent on the train and on every stage
-whose boundary is a family, and the panel says so once. Its cases are rated
+under one motion; those figures are absent on a train whose holds leave a
+family, and the panel says so once. Its cases are rated
 as any other's: two given speeds and one given torque decide a
-differential's motion and flow, and every stage rates under that.
+differential's motion and flow, and every part rates under that.
 
 ```text
 ultimate   judged against  ultimate_allowable      survive it once; no cycles
@@ -2788,8 +2781,8 @@ can reverse the roots, and nothing else: where a load enters, what holds it and
 how big it is are the same questions for either kind. Cases may overlap or
 exceed one another freely; nothing is clamped against anything.
 
-**Carrying a load.** A case is solved as **one flow across every stage's
-meshes at once** ([the graph](#the-graph) says how a flow is found): the given torques
+**Carrying a load.** A case is solved as **one flow across every mesh of the
+train at once** ([the graph](#the-graph) says how a flow is found): the given torques
 known, the derived loads, the reacted ends, the fixed bodies and ground
 unknown, and the direction of the flow read off the case's speeds — a load
 held still takes its direction from the sign of its torque, so a stall case
@@ -2797,16 +2790,16 @@ rates as one turning the way it pushes. Each mesh's driver is whichever side
 the flow puts power across it from, its driven side under that direction's
 `η`, so a self-locking worm **holds** a load from its wheel where it stands —
 its driver pressing the flanks, nothing beyond it seeing any — and a load put
-on a body two stages share divides by what holds it at each end, the pair
+on a body two presets share divides by what holds it at each end, the pair
 carrying its part backward and the set its part forward. Two ends that could
 both hold the same load are a division by stiffness this model does not make,
 and the case says so by name (`train.load_shared`) and rates nothing; a
 load at a body that is not an open port — ground, a held body, a planet —
-is refused by name. Every stage is then handed what the flow puts on its meshes and its
-bodies, and rates that.
+is refused by name. Every part is then rated under what the flow puts on its meshes
+and its bodies.
 
 **Every rating is per case, at that case's torque and in that case's
-direction.** Which way a stage is driven decides how a load distributes through
+direction.** Which way a set is driven decides how a load distributes through
 it — where each mesh's `η` multiplies, which flank a screw pair presses — so a
 case's direction is carried beside its torque rather than folded into a
 magnitude first. The shape solves its power flow once in each direction at
@@ -2820,7 +2813,7 @@ A gear reports, per case, the torque its teeth carry at its own radius, its
 speed, its speed **against the carrier of its mesh** (its own speed on a pair;
 a held ring's is not zero while its speed is), its cycles on a fatigue case,
 both stresses and the widths each would need. A mesh reports its contact per
-case, and a stage every body's speed and torque per case.
+case, and a part every body's speed and torque per case.
 
 **Load sharing.** A mesh input, `LoadSharing`, **off by default**, on every
 mesh that reports a bending stress — a model of one contact, so two meshes on
@@ -2842,7 +2835,7 @@ without.
 Above a virtual contact ratio of 2 there is no single-pair zone, the ramp never
 reaches a full share, and it moves the figure by up to a quarter in *either*
 direction — which the
-stage reports, per mesh, since a set can have one mesh in the band and one out.
+mesh reports, per mesh, since a set can have one mesh in the band and one out.
 
 The share is `RAMP_MIN + (RAMP_MAX − RAMP_MIN)·t` with
 `t = min(d, ε_αn − d)/(ε_αn − 1)` clamped to `[0,1]`, and it is written as that
@@ -2864,7 +2857,7 @@ enabled case of a kind that is switched on: the highest case sizes the part,
 however many overlap. Ultimate contact is off by default — see
 [rationale](rationale.md#a-contact-pressure-is-not-a-tensile-stress). With none
 enabled there is nothing to invert, so the width **stands at the number in its
-box** and the stage says so: an automatic value with nothing to choose between
+box** and the gear says so: an automatic value with nothing to choose between
 has nothing to choose, and the alternative is a zero every rating is then divided
 by.
 
@@ -2905,7 +2898,7 @@ the planet's root to 45.6 MPa where the sun mesh gives 16.6.
 face carries the pair, so each automatic width resolves to the largest ask any
 member of that mesh has. A member in two meshes — a planet — answers to both.
 A given axial contact ratio is one ask more, `b = ε_β π m_n / sin |β|`, taken
-by every parallel mesh in the stage at the stage's helix: it raises a width the
+by every parallel mesh of its group at the group's helix: it raises a width the
 strength asks leave narrower and touches one they leave wider not at all, and
 with every face given it has nothing to raise and sizes the helix instead
 ([which is given](#which-of-the-three-numbers-is-given-and-which-follows)). At zero
@@ -2922,7 +2915,7 @@ roles set by its direction — so a member at the far end of a mesh carries the
 load referred by the ratio and cut by the loss the mesh takes carrying it
 *that* way, which for a locked mesh is nought.
 
-A case may legitimately be **zero**, and a stage carrying nothing rates at
+A case may legitimately be **zero**, and a preset carrying nothing rates at
 nothing rather than refusing to answer.
 
 ### Tooth cycles
@@ -2966,7 +2959,7 @@ A simple pair has no carrier and one path, so this is the member's own
 revolutions and nothing more. An epicyclic set has both: in the carrier's frame
 the arm stands still and everything else turns past it, which is what makes the
 relative speed the one that counts — for a sun, a ring, a planet, a hula stage's
-grounded gear and its wobble body alike. The ratio is taken of the stage's
+grounded gear and its wobble body alike. The ratio is taken of the train's
 **unit** kinematics rather than of a case's speeds, so a case held still is
 still engaged by every sweep its duty counts. The consequence worth stating is
 the one a per-member reading cannot: **a shaft that does not turn is still
@@ -3055,7 +3048,7 @@ structs. **Inputs only**, so files stay small and cannot go stale. A geartrain
 document is `{ name, train }`, and its train is the one graph — `[train.shape]`,
 with its axes, bodies, members, meshes, distances and couplings — beside its
 holds and its load cases; an unknown material is not an import failure, and a
-train with nothing in it reads as written, its cases waiting for a stage. A
+train with nothing in it reads as written, its cases waiting for a preset. A
 file written before the train was one graph lists `[[train.stages]]`, and is
 refused by name; `gear-cli convert <file>` rewrites it once as the graph a
 chain of the same stages builds now, figure for figure.
@@ -3124,8 +3117,8 @@ A value that does not exist crosses as `Maybe::Unavailable`, carrying a `Note` �
 a stable key and the values its sentence needs — exactly as a clamp does.
 
 **Where a note is carried says what it is about.** `[clamp]` and `[gear]`
-notes are on the gear's result, `[mesh]` notes on the `MeshReport`, `[stage]`
-notes on the stage's and `[train]` notes on the train's
+notes are on the gear's result, `[mesh]` notes on the `MeshReport`, `[part]`
+notes on the part's and `[train]` notes on the train's
 ([rationale](rationale.md#a-note-lives-with-the-thing-it-is-about)); none names
 the thing it is about, and a panel draws each where it belongs.
 
@@ -3149,7 +3142,7 @@ not the plan: a test holds every shipped file to English's exact key set and to
 the same placeholders in each message.
 
 **Nothing the application says is written in the front end**, including the
-words around a number: a stage heading, a gear's name, the two halves of a
+words around a number: a heading, a gear's name, the two halves of a
 directional efficiency, the word between the ends of a range, and the name a
 fresh tab starts with. `tools/check_strings.py` holds the catalogue and the
 sources to each other in both directions; what it cannot see is a sentence that
