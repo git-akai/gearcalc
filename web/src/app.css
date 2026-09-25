@@ -36,10 +36,12 @@
      gap before it is part of the same measurement, so both live here and the
      inset is derived from them: the two panels had drifted a tenth of a rem
      apart on the gap alone, which put everything measured from it out by the
-     same tenth. Its width is the widest unit it holds in any language, German
-     "Stunden" (3.13 rem at a unit's 12 px); a material's provenance marker,
-     which once trailed its unit and made the cell 3.5, stands before the box. */
-  --unit-cell: 3.2rem;
+     same tenth. Its width is the widest unit it holds in any language,
+     "module" and "módulo" (2.81 rem at a unit's 12 px). A material's
+     provenance marker, which once trailed its unit and made the cell 3.5,
+     stands before the box, and hours are "h" in every language, German
+     "Stunden" having held it at 3.2. */
+  --unit-cell: 2.9rem;
   --row-gap: 0.4rem;
   /* The width of a number box in a field row, shared for the reason the unit
      cell is: the two panels had one at 7 rem and the other at 6 rem, so the
