@@ -32,6 +32,8 @@
      note gap, one figure to the next a little apart, so a readout of several
      rows reads as rows. They were one gap for both, and ran together. */
   --readout-gap: 0.35rem;
+  /* One step of a list's depth: a mesh under its body, a body under its axis. */
+  --list-indent: 1.2rem;
 
   /* The trailing cell every field row keeps for its unit. Shared because every
      row template in the application ends with it, and because what stops one

@@ -512,19 +512,19 @@
       </button>
     {:else if "mesh" in row}
       {@const k = row.mesh.mesh}
-      <button class="fm" class:sel={isSelected({ mesh: k })} onclick={() => select({ mesh: k })}>
+      <button class="fm in1" class:sel={isSelected({ mesh: k })} onclick={() => select({ mesh: k })}>
         <span class="arrow">↓</span> {meshName(k)}
       </button>
     {:else if "idle" in row}
       {@const k = row.idle.mesh}
-      <button class="fm idle" class:sel={isSelected({ mesh: k })} onclick={() => select({ mesh: k })}>
+      <button class="fm idle in1" class:sel={isSelected({ mesh: k })} onclick={() => select({ mesh: k })}>
         <span class="arrow">↳</span> {meshName(k)}
         <small>{t("ui.train_idle_to", { body: bodyName(row.idle.to) })} · {bodyInCase(row.idle.to)}</small>
       </button>
     {:else if "junction" in row}
       {@const j = row.junction}
       {@const axes = (result.parts[j.part]?.axes ?? []).map((a) => result.groupings.axes[a]).filter((a) => a !== undefined)}
-      <div class="junction" class:sel={isSelected({ junction: j.part })}>
+      <div class="junction in1" class:sel={isSelected({ junction: j.part })}>
         <button class="fm" onclick={() => select({ junction: j.part })}>
           <span class="arrow">↓</span> {j.meshes.map(meshName).join(" · ")}
         </button>
@@ -555,7 +555,7 @@
       </div>
     {:else if "coupling" in row}
       {@const c = row.coupling.coupling}
-      <button class="fm" class:sel={isSelected({ coupling: c })} onclick={() => select({ coupling: c })}>
+      <button class="fm in1" class:sel={isSelected({ coupling: c })} onclick={() => select({ coupling: c })}>
         <span class="arrow">↔</span> {t("ui.train_turns_with", { on: bodyName(row.coupling.to) })}
       </button>
     {/if}
@@ -569,7 +569,7 @@
       <span class="fig">{num(solved?.distances[c.distance]?.running, 4)} {t("ui.train_mm")}</span>
     </button>
     {#each c.meshes as k (k)}
-      <button class="gearrow" class:sel={isSelected({ mesh: k })} onclick={() => select({ mesh: k })}>
+      <button class="gearrow in1" class:sel={isSelected({ mesh: k })} onclick={() => select({ mesh: k })}>
         {meshName(k)}
         {#if idleInCase(k)}<span class="chip">{t("ui.train_idle")}</span>{/if}
       </button>
@@ -579,28 +579,27 @@
 
 {#snippet axesList()}
   {#each result.groupings.axes as a (a.axis)}
-    <div class="axisrow">
-      <button class="axisname" class:sel={isSelected({ axis: a.axis })} onclick={() => select({ axis: a.axis })}>{axisLabel(a.axis)}</button>
+    <button class="axishead" class:sel={isSelected({ axis: a.axis })} onclick={() => select({ axis: a.axis })}>
+      <span class="name">{axisLabel(a.axis)}</span>
       {#if a.carried_by !== null}<span class="chip">{t("ui.train_carried_by_body", { body: bodyName(a.carried_by) })}</span>{/if}
       {#if a.count > 1}<span class="chip">{t("ui.train_axis_count", { count: String(a.count) })}</span>{/if}
-      <span class="rule"></span>
-    </div>
+    </button>
     {#each a.bodies as b (b.body)}
-      <button class="bodyrow" class:sel={isSelected({ body: b.body })} onclick={() => select({ body: b.body })}>
+      <button class="bodyrow in1" class:sel={isSelected({ body: b.body })} onclick={() => select({ body: b.body })}>
         <span class="name">{bodyName(b.body)}</span>
         {#if isHeld(tab.train, b.body)}<span class="chip held">{t("ui.train_case_fixed")}</span>{/if}
       </button>
       {#each b.members as i (i)}
         {@const first = tab.train.shape.meshes.findIndex((m) => m.a === i || m.b === i)}
-        <button class="gearrow" class:sel={first >= 0 && isSelected({ mesh: first })} onclick={() => first >= 0 && select({ mesh: first })}>
+        <button class="gearrow in2" class:sel={first >= 0 && isSelected({ mesh: first })} onclick={() => first >= 0 && select({ mesh: first })}>
           {gearName(i)} <span class="z">z {tab.train.shape.members[i].gear.teeth}</span>
         </button>
       {/each}
       {#if b.members.length === 0 && b.carries.length > 0}
-        <small class="gearrow dim">{t("ui.train_the_carrier")}</small>
+        <small class="gearrow dim in2">{t("ui.train_the_carrier")}</small>
       {/if}
       {#each couplingsOf(b.body) as c (c.coupling)}
-        <button class="gearrow" class:sel={isSelected({ coupling: c.coupling })} onclick={() => select({ coupling: c.coupling })}>
+        <button class="gearrow in2" class:sel={isSelected({ coupling: c.coupling })} onclick={() => select({ coupling: c.coupling })}>
           ↔ {t("ui.train_turns_with", { on: bodyName(c.other) })}
         </button>
       {/each}
@@ -2186,8 +2185,10 @@
      `.case-pick` is the case's bar rather than a button drawn on it; this
      serves the buttons that show a state, and leaves those to their own rules
      rather than outranking them by being scoped (`:not()` counts toward
-     specificity, so this would). */
-  button:not(.action):not(.case-pick) {
+     specificity, so this would). **One `:not()` with a list**, which counts
+     as its one class: two counted two, and outranked a selected row's
+     `.fb.sel`, so no row in the lists showed it was selected. */
+  button:not(.action, .case-pick) {
     font: inherit;
     font-size: var(--text-m);
     padding: 0.25rem 0.6rem;
@@ -2197,7 +2198,7 @@
     color: var(--fg);
     cursor: pointer;
   }
-  button:not(.action):not(.case-pick):hover:not(:disabled) {
+  button:not(.action, .case-pick):hover:not(:disabled) {
     background: var(--hover);
   }
   .danger:hover {
@@ -2845,7 +2846,8 @@
   }
   .fb,
   .cen,
-  .bodyrow {
+  .bodyrow,
+  .axishead {
     display: grid;
     grid-template-columns: auto 1fr auto;
     align-items: baseline;
@@ -2864,7 +2866,8 @@
   }
   .fb .name,
   .cen .name,
-  .bodyrow .name {
+  .bodyrow .name,
+  .axishead .name {
     font-weight: 600;
   }
   /* A body's row under its axis is its name and, where the train holds it,
@@ -2888,7 +2891,7 @@
     text-align: left;
     font: inherit;
     font-size: var(--text-m);
-    padding: 0.25rem 0.45rem 0.25rem 1.2rem;
+    padding: 0.25rem 0.45rem;
     border: 1px solid transparent;
     border-radius: 3px;
     background: none;
@@ -2911,7 +2914,7 @@
     color: var(--muted);
   }
   .junction {
-    margin: 0.1rem 0 0.1rem 1.2rem;
+    margin: 0.1rem 0;
     padding: 0.2rem 0.4rem 0.35rem;
     border: 1px dashed var(--accent);
     border-radius: 4px;
@@ -2946,32 +2949,25 @@
   .fb.sel,
   .cen.sel,
   .bodyrow.sel,
+  .axishead.sel,
+  .fm.sel,
+  .gearrow.sel,
   .junction.sel {
     background: var(--selected);
     border-color: var(--accent);
   }
-  .axisrow {
+  /* **An axis heads its bodies as a row of the list**, full width like the
+     rest, its chips beside its name — it was a small label with a rule
+     running out from it, which read as a heading rather than a thing that
+     can be picked. Its groups keep a little air between them. */
+  .axishead {
     display: flex;
-    align-items: center;
+    align-items: baseline;
     gap: 0.5rem;
-    margin: 0.7rem 0 0.3rem;
+    margin-top: 0.6rem;
   }
-  .axisname {
-    font: inherit;
-    font-size: var(--text-s);
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--accent);
-    background: none;
-    border: 1px solid transparent;
-    border-radius: 3px;
-    cursor: pointer;
-  }
-  .axisrow .rule {
-    flex: 1 1 auto;
-    height: 1px;
-    background: var(--rule);
+  .axishead:first-child {
+    margin-top: 0;
   }
   .chip {
     font-size: var(--text-xs);
@@ -3065,5 +3061,18 @@
     flex: 1 1 21rem;
     min-width: 0;
     margin: 0;
+  }
+  /* **A list's depth, as a step in**: what hangs off a row sits one step in
+     from it — a mesh from the body it leaves, a body from its axis — and a
+     gear on a body two from its axis. The box moves, not only its text, so
+     the eye follows the depth down the left edge. Last in the sheet, so it
+     outranks each row's own margin. */
+  .in1 {
+    margin-left: var(--list-indent);
+    width: calc(100% - var(--list-indent));
+  }
+  .in2 {
+    margin-left: calc(2 * var(--list-indent));
+    width: calc(100% - 2 * var(--list-indent));
   }
 </style>
