@@ -795,7 +795,9 @@
       {#if x}
         <dt>{caseName(c.case)}</dt>
         <dd>
-          {x.speed === null ? roleWord("fixed") : `${num(x.speed, 1)} ${t("ui.train_rpm")}`} · {roleWord(x.role)} {num(x.torque, 4)} {t("ui.train_nm")}
+          <!-- A fixed body has no speed, and says so once, by its role. -->
+          {#if x.speed !== null}{num(x.speed, 1)} {t("ui.train_rpm")} ·{/if}
+          {roleWord(x.role)} {num(x.torque, 4)} {t("ui.train_nm")}
           <!-- **What each gear's meshes put on it**, where the shaft
                carries more than one: its gears carry its own load between
                them, so a shaft between two gears hands the one's torque to
@@ -932,7 +934,7 @@
         <div class="mode" class:later={c.kind === "fatigue" || b !== bodies[0]}>
           <span>{bodyName(b.body)}</span>
           {#if role === "fixed"}
-            <div class="segmented locked">
+            <div class="segmented">
               <button class="on" disabled>{t("ui.train_case_fixed")}</button>
             </div>
           {:else}
@@ -2191,10 +2193,6 @@
   button:not(.action):not(.case-pick):hover:not(:disabled) {
     background: var(--hover);
   }
-  button:not(.action):not(.case-pick):disabled {
-    color: var(--muted);
-    cursor: default;
-  }
   .danger:hover {
     border-color: var(--warn);
     color: var(--warn);
@@ -2298,10 +2296,9 @@
   /* The **input box** is the anchor, not the text after it. With an `auto`
      trailing column the boxes shifted left or right by however wide a unit
      happened to be — "module" against "°" — so nothing lined up down a column.
-     Every trailing column below is a fixed width, and where a row has two of
-     them (a material property carries a unit *and* a provenance marker) they
-     sum with their gap to the same width, so every box in a card shares an
-     edge. */
+     Every trailing column below is the one fixed width, so every box in a
+     card shares an edge — which is why a material property's provenance
+     marker stands ahead of its box rather than beside its unit. */
   label {
     display: grid;
     grid-template-columns: 1fr var(--field-box) var(--unit-cell);
@@ -2315,7 +2312,11 @@
   /* An input's name is at full contrast, as on the gear tab; what is lower
      contrast is a note, a unit, a readout's name. The names here were muted,
      which put an input and its readout at the same weight. */
-  input[type="number"],
+  /* A number box is `app.css`'s, as on the gear tab; a select is drawn to
+     match it. Both fill the column the row gives them. */
+  input[type="number"] {
+    width: 100%;
+  }
   select {
     font: inherit;
     font-size: 0.85rem;
@@ -2323,7 +2324,6 @@
     padding: 0.15rem 0.3rem;
     border: 1px solid var(--rule);
     border-radius: 3px;
-    background: none;
     color: var(--fg);
     font-variant-numeric: tabular-nums;
   }
@@ -2376,36 +2376,12 @@
   .segmented button.on {
     background: var(--selected);
   }
-  /* A choice the train has taken from the case — a held body — is shown and
-     cannot be pressed. */
-  .segmented button:disabled {
-    color: var(--muted);
-    cursor: not-allowed;
-  }
-  .segmented button:disabled:hover {
-    background: none;
-  }
-  .segmented button.on:disabled {
-    color: var(--fg);
-    background: var(--selected);
-  }
   .out {
     display: grid;
     grid-template-columns: auto 1fr;
     gap: 0.15rem 0.75rem;
     margin: 0.75rem 0 0;
     font-size: 0.85rem;
-  }
-
-  .bodyrow {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.25rem 0.4rem;
-    background: var(--panel);
-    border: 1px solid var(--rule);
-    border-radius: 3px;
-    font-size: 0.8rem;
   }
 
   /* What a row states about itself and nothing edits: held, carried, how
@@ -2459,8 +2435,8 @@
   /* A switch the case cannot honour yet: the case is short of what the train
      needs to solve it, and switching it on would rate nothing. */
   .control.locked {
-    opacity: 0.45;
-    cursor: not-allowed;
+    opacity: 0.5;
+    cursor: default;
   }
   /* **A case's inputs on the left, what it comes to on the right** — the
      inputs in one column, and the table beside them where the workspace
@@ -2617,14 +2593,35 @@
   .props {
     margin: 0.2rem 0 0.4rem;
   }
-  /* More specific than `.gear label`, which would otherwise win and collapse
-     the basis marker onto its own line. */
+  /* **A material's figure, with where it came from ahead of the box** — the
+     marker (`d` a datasheet's, `e` an estimate, …) or the × that restores
+     the library's value, in a column of its own before the box, so the box
+     and its unit keep the edge and the unit cell every other row has. They
+     used to trail the unit, and the two together were the widest thing any
+     row's trailing cell held, which set that cell for every row on both
+     tabs. More specific than `.gear label`, which would otherwise win. */
   .gear .prop {
-    /* 2.2 + 0.4 gap + 0.9 = 3.5rem, the same trailing width as a plain row, so
-       these boxes share the edge with the ones above them. */
-    grid-template-columns: 1fr var(--field-box) 2.2rem 0.9rem;
+    grid-template-columns: 1fr auto var(--field-box) var(--unit-cell);
     font-size: 0.78rem;
     margin-bottom: 0.15rem;
+  }
+  /* Read in columns, not in source order, as an `auto` field is: the box is
+     written first so the row's label is for the box and not for the ×. */
+  .prop > * {
+    grid-row: 1;
+  }
+  .prop > span {
+    grid-column: 1;
+  }
+  .prop > .basis,
+  .prop > .clear {
+    grid-column: 2;
+  }
+  .prop > input {
+    grid-column: 3;
+  }
+  .prop > em:not(.basis) {
+    grid-column: 4;
   }
   .basis {
     width: 1ch;
@@ -2666,12 +2663,6 @@
   .grid.shared > label:has(> select) {
     grid-template-columns: 1fr var(--field-box-wide) var(--unit-cell);
   }
-  .notes {
-    margin: 0.5rem 0 0;
-    padding-left: 1rem;
-    font-size: 0.78rem;
-    color: var(--warn);
-  }
   .error {
     color: var(--warn);
   }
@@ -2697,10 +2688,9 @@
   .said {
     margin: 0;
   }
+  /* The list's own place in the column: the column's gap above it. */
   .said .notes {
     margin: 0 0 0.5rem;
-    padding-left: 1.1rem;
-    font-size: 0.82rem;
   }
   /* **The list's column and the workspace** — the canvas's page: the
      cases, what the train says of itself and the list one above the other,
@@ -2772,7 +2762,6 @@
   .pathbox {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);
-    column-gap: 1rem;
     margin: 0.7rem 0 0;
     padding: 0.5rem 0 0;
     border-top: 1px solid var(--rule);
@@ -2859,6 +2848,12 @@
   .cen .name,
   .bodyrow .name {
     font-weight: 600;
+  }
+  /* A body's row under its axis is its name and, where the train holds it,
+     the chip that says so — two of the three columns, so the chip stands at
+     its own width beside the name rather than filling the middle one. */
+  .bodyrow .chip {
+    justify-self: start;
   }
   .fb .on {
     color: var(--muted);

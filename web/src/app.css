@@ -36,8 +36,10 @@
      gap before it is part of the same measurement, so both live here and the
      inset is derived from them: the two panels had drifted a tenth of a rem
      apart on the gap alone, which put everything measured from it out by the
-     same tenth. */
-  --unit-cell: 3.5rem;
+     same tenth. Its width is the widest unit it holds in any language, German
+     "Stunden" (3.13 rem at a unit's 12 px); a material's provenance marker,
+     which once trailed its unit and made the cell 3.5, stands before the box. */
+  --unit-cell: 3.2rem;
   --row-gap: 0.4rem;
   /* The width of a number box in a field row, shared for the reason the unit
      cell is: the two panels had one at 7 rem and the other at 6 rem, so the
@@ -165,13 +167,16 @@ header.tab-bar .actions button.danger,
 .action.danger {
   color: var(--warn);
 }
-header.tab-bar .actions button:disabled,
-.action:disabled {
+/* **A button that cannot be pressed is dimmed to half**, whatever it is and
+   on either tab — an action, a tab's own, a segment a train has chosen for
+   the case. A switch that cannot be turned is dimmed the same way by its
+   panel, having no `disabled` of its own to carry it. */
+button:disabled {
   opacity: 0.5;
   cursor: default;
 }
-/* `.action` is the same button below the bar — a stage or a load case added
-   or removed — so an action on the page and an action on the tab read as one
+/* `.action` is the same button below the bar — an edit made, or a load case
+   added or removed — so an action on the page and an action on the tab read as one
    kind of thing. A control that shows a *state* (a switch, an `auto` toggle)
    is not one of these and keeps its own size and highlight. */
 
@@ -186,7 +191,7 @@ header.tab-bar .actions button:disabled,
 }
 
 /* **A number box reads down its last digit, its stepper on the left**, on
-   either tab: a column of boxes lines up as a column of figures does, and
+   either tab, and is drawn once here for both: a column of boxes lines up as a column of figures does, and
    the stepper stands clear of the digits rather than against the last of
    them. The stepper sits on the side `direction` says; `plaintext` then
    lays the figure out by its own characters, which keeps a minus sign in
@@ -195,6 +200,24 @@ input[type="number"] {
   direction: rtl;
   unicode-bidi: plaintext;
   text-align: right;
+  font: inherit;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+  padding: 0.15rem 0.3rem;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  background: none;
+  color: var(--fg);
+}
+
+/* **The notes at the foot of a section**, on either tab: what a solve says
+   of the thing above it, in the warning colour, a little under the size of
+   the rows it follows. */
+.notes {
+  margin: 0.5rem 0 0;
+  padding-left: 1rem;
+  font-size: 0.8rem;
+  color: var(--warn);
 }
 /* A select drawn as a button: no value shows, only its label, since choosing
    an entry acts at once and the control returns to the label. */

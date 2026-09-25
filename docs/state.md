@@ -1112,15 +1112,12 @@ Not a queue with a head; this is what a next session would pick from.
 - **Further UI work**, as it is asked for.
 - **The two panels' remaining differences of style**, catalogued when their
   top bars were made one (`app.css`, *the bar at the top of a tab*) and
-  trimmed when the section headings, the names' contrast, the field-box
-  widths, the lower action buttons and the viewport's resize followed. What
-  is left, with the two values so the next alignment is a decision rather
-  than a diff; the gear tab's treatment is the one to keep unless the
-  geartrain's has a reason:
-  - **number boxes** — right-aligned on both, the stepper on the left
-    (`app.css`, one rule for both tabs); what is left is the box itself,
-    padding `0.2rem 0.4rem` on `--bg` on the gear tab and `0.15rem 0.3rem`
-    on no background on the geartrain;
+  trimmed as the section headings, the names' contrast, the field-box
+  widths, the lower action buttons and the viewport's resize followed — and
+  then the number box, the readouts' gap, the list of notes and a control
+  that cannot be pressed, each now one rule in `app.css` or one value on
+  both tabs, the geartrain's kept where the two differed. What is left, with
+  the two values so the next alignment is a decision rather than a diff:
   - **the field grid** — a single column on the gear tab (`.grid`: flex
     column, `--field-gap` between rows, and `--field-gap` again between
     groups); the geartrain's inputs flow in `repeat(auto-fill, minmax(15rem, 1fr))`
@@ -1130,25 +1127,13 @@ Not a queue with a head; this is what a next session would pick from.
     `FieldNote` at 0.72 rem, but the geartrain's `.hint` for a note that has no
     label to sit in pulls itself up by `calc(--note-gap − --field-gap)` and
     right-aligns; the gear tab has no such note;
-  - **readouts** — both right-align their figures now, tabular at normal
-    weight; what is left is the grid's column gap, the least room between a
-    name and its figure and so seen only where a row is full: `1rem` on the
-    gear tab's and on the geartrain's path box, `0.75rem` on the geartrain's
-    other readouts (the mesh card's, a body's, a replicated axis's). The
-    geartrain's also carry an annotation in a muted `small` and a note under
-    a row that takes the readout's whole width (`dd.note`);
-  - **the list of notes** at the foot of a section — `0.75rem 0 0` margin,
-    1.1 rem indent, 0.8 rem on the gear tab; `0.5rem 0 0`, 1 rem, 0.78 rem on
-    the geartrain;
-  - **a control that cannot be pressed** — dimmed to half on both where it
-    is a button: the gear tab's *Export DXF*, the sidebar's and the bar's
-    `.action`s, and an offer the core refuses. The geartrain's own two
-    differ: a case's switch while the case cannot solve dims to `0.45`, and
-    a held body's *Fixed* keeps its full contrast on the selected background,
-    since it states a choice rather than refusing one. The geartrain's
-    `button:disabled` rule, `color: --muted`, reaches no button; the `Switch`
-    is one component on both, and the `auto` and `no undercut` toggles keep
-    their small size by design;
+  - **readouts' name column** — `max-content` on the gear tab, so a name
+    never wraps, and `auto` on the geartrain, where one may in a narrow
+    card; the geartrain's also carry an annotation in a muted `small` and a
+    note under a row that takes the readout's whole width (`dd.note`);
+  - **text sizes** — eleven between 0.68 and 0.85 rem across the two tabs,
+    listed with what uses each when the list of notes was set at 0.8, and
+    not yet reduced;
   - **error and notice paragraphs** — the same tokens, but only the geartrain
     has a `.notice` (an import adjusted); the gear tab's adopt failure uses
     `.error` and has no quieter slot;

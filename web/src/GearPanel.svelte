@@ -843,10 +843,6 @@
   button:hover:not(:disabled) {
     background: var(--hover);
   }
-  button:disabled {
-    opacity: 0.5;
-    cursor: default;
-  }
   button.danger {
     color: var(--warn);
   }
@@ -951,12 +947,12 @@
     grid-template-columns: 1fr auto var(--field-box) var(--unit-cell);
   }
 
-  input[type="number"],
+  /* A number box is `app.css`'s, as on the geartrain; a select is drawn to
+     match it, on the page's own background rather than the platform's. */
   select {
     font: inherit;
     font-size: 0.85rem;
-    font-variant-numeric: tabular-nums;
-    padding: 0.2rem 0.4rem;
+    padding: 0.15rem 0.3rem;
     border: 1px solid var(--rule);
     border-radius: 3px;
     background: var(--bg);
@@ -980,7 +976,7 @@
   dl {
     display: grid;
     grid-template-columns: max-content 1fr;
-    gap: 0.15rem 1rem;
+    gap: 0.15rem 0.75rem;
     margin: 0;
     font-size: 0.85rem;
   }
@@ -999,12 +995,6 @@
     text-align: right;
   }
 
-  .notes {
-    margin: 0.75rem 0 0;
-    padding-left: 1.1rem;
-    font-size: 0.8rem;
-    color: var(--warn);
-  }
   .error {
     color: var(--warn);
   }
