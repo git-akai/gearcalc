@@ -976,7 +976,7 @@
   dl {
     display: grid;
     grid-template-columns: max-content 1fr;
-    gap: 0.15rem 0.75rem;
+    gap: var(--readout-gap) 0.75rem;
     margin: 0;
     font-size: var(--text-l);
   }

@@ -2386,7 +2386,7 @@
   .out {
     display: grid;
     grid-template-columns: auto 1fr;
-    gap: 0.15rem 0.75rem;
+    gap: var(--readout-gap) 0.75rem;
     margin: 0.75rem 0 0;
     font-size: var(--text-l);
   }
@@ -2421,6 +2421,9 @@
      nothing to say beside it. */
   .out dd.note {
     grid-column: 1 / -1;
+    /* The note is the figure's above it, so it sits as near as a line of
+       that figure does rather than a row's gap away. */
+    margin-top: calc(var(--note-gap) - var(--readout-gap));
   }
   .out dd.note small {
     display: block;
