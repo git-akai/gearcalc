@@ -144,7 +144,7 @@
   }
   .none button {
     font: inherit;
-    font-size: 0.85rem;
+    font-size: var(--text-l);
     padding: 0.3rem 0.7rem;
     border: 1px solid var(--rule);
     border-radius: 3px;

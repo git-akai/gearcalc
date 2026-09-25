@@ -580,7 +580,9 @@ axes (spur/helical, idler, layshaft), skew shafts (worm, crossed), epicyclic
 and all one list of what sits where (`arrangements`), the hula an
 arrangement of the epicyclic family the harness names · **a train is
 one list and one workspace**: the list is the graph grouped three ways —
-the flow each case walks, the centres, the axes — and the workspace is
+the flow each case walks, a set's bodies named under its junction and
+each selecting its body, a held one included; the centres; the axes — and
+the workspace is
 the piece selected: a mesh as its own card above its two gears — its
 inputs and the distance it runs at, with what it comes to beside them, or
 under them where the window is narrow; a body, with what each of its gears
@@ -1116,7 +1118,8 @@ Not a queue with a head; this is what a next session would pick from.
   widths, the lower action buttons and the viewport's resize followed — and
   then the number box, the readouts' gap, the list of notes and a control
   that cannot be pressed, each now one rule in `app.css` or one value on
-  both tabs, the geartrain's kept where the two differed. What is left, with
+  both tabs, the geartrain's kept where the two differed; and the text,
+  whose eleven sizes are four (`app.css`, `--text-xs` to `--text-l`). What is left, with
   the two values so the next alignment is a decision rather than a diff:
   - **the field grid** — a single column on the gear tab (`.grid`: flex
     column, `--field-gap` between rows, and `--field-gap` again between
@@ -1124,16 +1127,13 @@ Not a queue with a head; this is what a next session would pick from.
     at `--field-gap 1rem`, and its shared block is one column capped at
     34 rem. A choice about how many inputs a piece has, and may stay;
   - **notes outside a label** — both tabs draw a field's note through
-    `FieldNote` at 0.72 rem, but the geartrain's `.hint` for a note that has no
+    `FieldNote` at `--text-s`, but the geartrain's `.hint` for a note that has no
     label to sit in pulls itself up by `calc(--note-gap − --field-gap)` and
     right-aligns; the gear tab has no such note;
   - **readouts' name column** — `max-content` on the gear tab, so a name
     never wraps, and `auto` on the geartrain, where one may in a narrow
     card; the geartrain's also carry an annotation in a muted `small` and a
     note under a row that takes the readout's whole width (`dd.note`);
-  - **text sizes** — eleven between 0.68 and 0.85 rem across the two tabs,
-    listed with what uses each when the list of notes was set at 0.8, and
-    not yet reduced;
   - **error and notice paragraphs** — the same tokens, but only the geartrain
     has a `.notice` (an import adjusted); the gear tab's adopt failure uses
     `.error` and has no quieter slot;

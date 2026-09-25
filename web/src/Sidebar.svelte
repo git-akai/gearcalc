@@ -239,7 +239,7 @@
     width: 100%;
     text-align: left;
     font: inherit;
-    font-size: 0.85rem;
+    font-size: var(--text-l);
     padding: 0.3rem 0.5rem;
     border: 1px solid transparent;
     border-radius: 3px;
@@ -261,12 +261,12 @@
   }
   .teeth {
     color: var(--muted);
-    font-size: 0.75rem;
+    font-size: var(--text-s);
     font-variant-numeric: tabular-nums;
   }
   .add {
     font: inherit;
-    font-size: 0.8rem;
+    font-size: var(--text-m);
     width: 100%;
     text-align: left;
     padding: 0.3rem 0.5rem;
@@ -290,12 +290,12 @@
     flex: 1;
   }
   .library .detail {
-    font-size: 0.7rem;
+    font-size: var(--text-xs);
     color: var(--muted);
     margin: 0.35rem 0 0 0.25rem;
   }
   .library .err {
-    font-size: 0.7rem;
+    font-size: var(--text-xs);
     color: var(--warn);
     margin: 0.35rem 0 0 0.25rem;
   }
@@ -308,7 +308,7 @@
   .language select {
     max-width: 100%;
     font: inherit;
-    font-size: 0.75rem;
+    font-size: var(--text-s);
     width: 100%;
     padding: 0.25rem 0.4rem;
     border: 1px solid var(--rule);
@@ -339,7 +339,7 @@
   }
   .version {
     margin-top: auto;
-    font-size: 0.7rem;
+    font-size: var(--text-xs);
     color: var(--muted);
     padding-left: 0.25rem;
   }

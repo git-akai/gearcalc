@@ -528,14 +528,21 @@
         <button class="fm" onclick={() => select({ junction: j.part })}>
           <span class="arrow">↓</span> {j.meshes.map(meshName).join(" · ")}
         </button>
+        <!-- **Each line names a body, and selects it** — the planets', the
+             carrier, a member the train holds: a held body carries no
+             power and so has no row of its own in the flow, and this line
+             is where the flow says it is, so it is where its workspace, and
+             its Release, are reached from. -->
         {#each axes.filter((a) => a.carried_by !== null) as a (a.axis)}
           {#each a.bodies as b (b.body)}
-            <small class="line">{t("ui.train_junction_planets", { body: bodyName(b.body), count: String(a.count) })} · {bodyInCase(b.body)}</small>
+            <button class="line" class:sel={isSelected({ body: b.body })} onclick={() => select({ body: b.body })}>
+              {t("ui.train_junction_planets", { body: bodyName(b.body), count: String(a.count) })} · {bodyInCase(b.body)}
+            </button>
           {/each}
         {/each}
         {#each j.terminals.filter((tb) => !flow.some((x) => "body" in x && x.body.body === tb)) as tb (tb)}
           {@const on = onBody(tb)}
-          <small class="line">
+          <button class="line" class:sel={isSelected({ body: tb })} onclick={() => select({ body: tb })}>
             {#if axes.some((a) => a.carried_by === tb)}
               {t("ui.train_junction_carrier", { body: bodyName(tb) })} · {bodyInCase(tb)}
             {:else if isHeld(tab.train, tb)}
@@ -543,7 +550,7 @@
             {:else}
               {t("ui.train_junction_end", { on, body: bodyName(tb) })} · {bodyInCase(tb)}
             {/if}
-          </small>
+          </button>
         {/each}
       </div>
     {:else if "coupling" in row}
@@ -1632,7 +1639,7 @@
       />
     </div>
   {/if}
-  <label>
+  <label class="material">
     <span>{t("ui.train_material")}</span>
     <select bind:value={gear.material}>
       {#each library.materials.material as m (m.name)}
@@ -2182,7 +2189,7 @@
      specificity, so this would). */
   button:not(.action):not(.case-pick) {
     font: inherit;
-    font-size: 0.8rem;
+    font-size: var(--text-m);
     padding: 0.25rem 0.6rem;
     border: 1px solid var(--rule);
     border-radius: 3px;
@@ -2307,7 +2314,7 @@
        the box above it. */
     column-gap: var(--row-gap);
     row-gap: var(--note-gap);
-    font-size: 0.85rem;
+    font-size: var(--text-l);
   }
   /* An input's name is at full contrast, as on the gear tab; what is lower
      contrast is a note, a unit, a readout's name. The names here were muted,
@@ -2319,7 +2326,7 @@
   }
   select {
     font: inherit;
-    font-size: 0.85rem;
+    font-size: var(--text-l);
     width: 100%;
     padding: 0.15rem 0.3rem;
     border: 1px solid var(--rule);
@@ -2343,7 +2350,7 @@
   }
   em {
     color: var(--muted);
-    font-size: 0.75rem;
+    font-size: var(--text-s);
     font-style: normal;
   }
   /* The actuation control ends where the switches and the inputs do, for the
@@ -2355,7 +2362,7 @@
     grid-template-columns: 1fr auto var(--unit-cell);
     align-items: center;
     gap: var(--row-gap);
-    font-size: 0.85rem;
+    font-size: var(--text-l);
   }
   /* The row's name is an input's name — at full contrast like every other;
      it was the one left muted when the labels changed. */
@@ -2364,7 +2371,7 @@
   }
   .segmented button {
     border-radius: 0;
-    font-size: 0.75rem;
+    font-size: var(--text-s);
   }
   .segmented button:first-child {
     border-radius: 3px 0 0 3px;
@@ -2381,13 +2388,13 @@
     grid-template-columns: auto 1fr;
     gap: 0.15rem 0.75rem;
     margin: 0.75rem 0 0;
-    font-size: 0.85rem;
+    font-size: var(--text-l);
   }
 
   /* What a row states about itself and nothing edits: held, carried, how
      many copies stand round a carrier, idle. */
   .chip {
-    font-size: 0.68rem;
+    font-size: var(--text-xs);
     color: var(--muted);
     border: 1px solid var(--rule);
     border-radius: 999px;
@@ -2481,7 +2488,7 @@
     width: 100%;
     margin-top: 0.5rem;
     border-collapse: collapse;
-    font-size: 0.8rem;
+    font-size: var(--text-m);
     font-variant-numeric: tabular-nums;
     /* A figure and its unit stay on one line; a card too narrow for every
        column scrolls the table rather than folding "30000.0 rpm" in two. */
@@ -2538,7 +2545,7 @@
     margin-top: 0.8rem;
   }
   .sub {
-    font-size: 0.78rem;
+    font-size: var(--text-s);
   }
   /* The name alone: an `auto` row's switches are spans too, and sit where
      their columns put them. */
@@ -2568,7 +2575,7 @@
     /* Carried explicitly now that this is not a `<label>`: the row gap is what
        pairs a note to the control above it, and the size is every field row's. */
     row-gap: var(--note-gap);
-    font-size: 0.85rem;
+    font-size: var(--text-l);
     /* **Stretch, explicitly.** `label` sets `align-items: center` for its grid
        rows, where it means "centre the box against its label vertically". On a
        flex column it means "centre every child horizontally", which is not a
@@ -2602,7 +2609,7 @@
      tabs. More specific than `.gear label`, which would otherwise win. */
   .gear .prop {
     grid-template-columns: 1fr auto var(--field-box) var(--unit-cell);
-    font-size: 0.78rem;
+    font-size: var(--text-s);
     margin-bottom: 0.15rem;
   }
   /* Read in columns, not in source order, as an `auto` field is: the box is
@@ -2633,7 +2640,7 @@
     opacity: 0.9;
   }
   .clear {
-    font-size: 0.75rem;
+    font-size: var(--text-s);
     line-height: 1;
     padding: 0.05rem 0.3rem;
     color: var(--muted);
@@ -2645,7 +2652,7 @@
        the field gap above it to sit as close as an in-label note does. It ends
        where an in-label note does, which is the row's own edge. */
     margin: calc(var(--note-gap) - var(--field-gap)) 0 var(--field-gap);
-    font-size: 0.72rem;
+    font-size: var(--text-s);
     color: var(--muted);
     text-align: right;
   }
@@ -2662,6 +2669,14 @@
   .gear label:has(> select),
   .grid.shared > label:has(> select) {
     grid-template-columns: 1fr var(--field-box-wide) var(--unit-cell);
+  }
+  /* **A material's name is longer than a word** — the shipped library's
+     longest, "4340 Hardened Steel", needs 11 rem where the wide box is 10.5 —
+     so its box takes more of its own name's share, and ends where every box
+     does: nothing else in the card moves. A longer name imported still
+     truncates. */
+  .gear label.material {
+    grid-template-columns: 1fr 12rem var(--unit-cell);
   }
   .error {
     color: var(--warn);
@@ -2728,7 +2743,7 @@
     padding: 0;
     text-align: left;
     font: inherit;
-    font-size: 0.8rem;
+    font-size: var(--text-m);
     border: 0;
     background: transparent;
     color: inherit;
@@ -2738,7 +2753,7 @@
     font-weight: 600;
   }
   .case .case-sum {
-    font-size: 0.74rem;
+    font-size: var(--text-s);
     color: var(--muted);
   }
   .case .case-sum.warn {
@@ -2805,7 +2820,7 @@
   }
   .seg button {
     font: inherit;
-    font-size: 0.78rem;
+    font-size: var(--text-s);
     padding: 0.2rem 0.7rem;
     border: 0;
     border-right: 1px solid var(--rule);
@@ -2821,7 +2836,7 @@
     font-weight: 600;
   }
   .pane .hint {
-    font-size: 0.72rem;
+    font-size: var(--text-s);
     color: var(--muted);
     margin: 0.3rem 0 0.5rem;
   }
@@ -2835,7 +2850,7 @@
     width: 100%;
     text-align: left;
     font: inherit;
-    font-size: 0.8rem;
+    font-size: var(--text-m);
     padding: 0.3rem 0.45rem;
     margin: 0.15rem 0;
     border: 1px solid var(--rule);
@@ -2869,7 +2884,7 @@
     width: 100%;
     text-align: left;
     font: inherit;
-    font-size: 0.82rem;
+    font-size: var(--text-m);
     padding: 0.25rem 0.45rem 0.25rem 1.2rem;
     border: 1px solid transparent;
     border-radius: 3px;
@@ -2889,7 +2904,7 @@
     margin-left: 0.4rem;
   }
   .gearrow .z {
-    font-size: 0.72rem;
+    font-size: var(--text-s);
     color: var(--muted);
   }
   .junction {
@@ -2897,15 +2912,32 @@
     padding: 0.2rem 0.4rem 0.35rem;
     border: 1px dashed var(--accent);
     border-radius: 4px;
-    font-size: 0.8rem;
+    font-size: var(--text-m);
   }
   .junction .fm {
     padding-left: 0;
     font-weight: 600;
   }
-  .junction .line {
+  /* **A line under a junction selects the body it names**, and reads as
+     the line it was until it is pointed at: no border, the muted colour,
+     its text where it stood — the margins give the highlight room either
+     side without moving the words. Written as `button.line` to outrank the
+     panel's own button rule, which would draw it as a box. */
+  .junction button.line {
     display: block;
+    width: calc(100% + 0.6rem);
+    margin: 0 -0.3rem;
+    padding: 0.05rem 0.3rem;
+    text-align: left;
+    font-size: var(--text-s);
+    border: 0;
+    background: none;
     color: var(--muted);
+    cursor: pointer;
+  }
+  .junction button.line.sel {
+    background: var(--selected);
+    color: var(--fg);
   }
   .sel,
   .fb.sel,
@@ -2923,7 +2955,7 @@
   }
   .axisname {
     font: inherit;
-    font-size: 0.72rem;
+    font-size: var(--text-s);
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
@@ -2939,7 +2971,7 @@
     background: var(--rule);
   }
   .chip {
-    font-size: 0.68rem;
+    font-size: var(--text-xs);
     color: var(--muted);
     border: 1px solid var(--rule);
     border-radius: 999px;
@@ -2971,7 +3003,7 @@
   .ws-head .link {
     margin-left: auto;
     font: inherit;
-    font-size: 0.8rem;
+    font-size: var(--text-m);
     color: var(--accent);
     background: none;
     border: 0;

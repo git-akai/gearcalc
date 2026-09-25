@@ -34,7 +34,7 @@
      when the visible one changes. */
   small {
     grid-area: 1 / 1;
-    font-size: 0.72rem;
+    font-size: var(--text-s);
     color: var(--muted);
   }
   small.err {

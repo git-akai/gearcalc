@@ -2346,7 +2346,11 @@ which is what is geometrically coupled and the unit the shifts close over;
 each, which is what turns with what; and each case's **flow** — the bodies
 in the order its power reaches them from its load, the meshes carrying it,
 most first, an epicyclic part as one junction joining its bodies, and a
-mesh carrying none of it an idle branch. A case that did not solve has no
+mesh carrying none of it an idle branch. The panel names a junction's
+bodies under it — the planets', the carrier, a member the train holds —
+and each line selects its body: a held body carries no power and has no
+row of its own, and its line is where it is reached, and released, from the
+list a train opens on. A case that did not solve has no
 shares, so its flow is the graph walked from its load in its own order and
 calls no mesh idle. Laws: every mesh at one centre, every body on one axis,
 and every body and every mesh said once in every case's flow, entered at

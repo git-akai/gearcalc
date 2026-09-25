@@ -224,7 +224,7 @@
   }
   .menu h5 {
     margin: 0.4rem 0 0.1rem;
-    font-size: 0.72rem;
+    font-size: var(--text-s);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.06em;
@@ -241,7 +241,7 @@
   }
   .run h6 {
     margin: 0.3rem 0 0 0.4rem;
-    font-size: 0.74rem;
+    font-size: var(--text-s);
     font-weight: 600;
     color: var(--muted);
   }
@@ -272,11 +272,11 @@
   }
   .refusal {
     color: var(--warn);
-    font-size: 0.78rem;
+    font-size: var(--text-s);
   }
   .hint {
     color: var(--muted);
-    font-size: 0.78rem;
+    font-size: var(--text-s);
     margin: 0;
   }
   .pop {
@@ -290,13 +290,13 @@
     background: var(--bg);
     box-shadow: 0 3px 10px rgba(27, 31, 36, 0.12);
     padding: 0.55rem 0.65rem;
-    font-size: 0.76rem;
+    font-size: var(--text-s);
     line-height: 1.45;
     pointer-events: none;
   }
   .pop h6 {
     margin: 0 0 0.25rem;
-    font-size: 0.76rem;
+    font-size: var(--text-s);
   }
   .pop p {
     margin: 0;

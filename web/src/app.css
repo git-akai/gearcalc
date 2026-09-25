@@ -52,6 +52,21 @@
   /* What stops one cell short of the row's edge, which is where every input box
      ends. */
   --unit-inset: calc(var(--unit-cell) + var(--row-gap));
+
+  /* **Four sizes of text, and every size in the application is one of
+     them** — a title aside. There were eleven between 0.68 and 0.85 rem, five
+     of them within a pixel of each other, each chosen where it was written.
+     By what the text is: */
+  /* what a thing states about itself — a chip, a small toggle, a count */
+  --text-xs: 0.7rem;
+  /* what is said of something else — a note under a field, a hint, a unit,
+     a summary, an annotation beside a figure */
+  --text-s: 0.75rem;
+  /* what is picked or pressed — a list's rows, a button, a heading, the
+     notes at a section's foot */
+  --text-m: 0.8rem;
+  /* what is read and typed — a field, its name, a readout */
+  --text-l: 0.85rem;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -148,7 +163,7 @@ header.tab-bar .actions select,
 .tab-confirm button,
 .action {
   font: inherit;
-  font-size: 0.8rem;
+  font-size: var(--text-m);
   padding: 0.25rem 0.7rem;
   border: 1px solid var(--rule);
   border-radius: 3px;
@@ -180,10 +195,16 @@ button:disabled {
    kind of thing. A control that shows a *state* (a switch, an `auto` toggle)
    is not one of these and keeps its own size and highlight. */
 
+/* A `small` is secondary text wherever it sits: left to the browser it is
+   five sixths of its parent, which made a size per parent. */
+small {
+  font-size: var(--text-s);
+}
+
 /* **A section heading**, on either tab: small capitals, bold, muted — the
    gear tab's sections and the geartrain's lists and workspaces alike. */
 .section-heading {
-  font-size: 0.8rem;
+  font-size: var(--text-m);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -201,7 +222,7 @@ input[type="number"] {
   unicode-bidi: plaintext;
   text-align: right;
   font: inherit;
-  font-size: 0.85rem;
+  font-size: var(--text-l);
   font-variant-numeric: tabular-nums;
   padding: 0.15rem 0.3rem;
   border: 1px solid var(--rule);
@@ -216,7 +237,7 @@ input[type="number"] {
 .notes {
   margin: 0.5rem 0 0;
   padding-left: 1rem;
-  font-size: 0.8rem;
+  font-size: var(--text-m);
   color: var(--warn);
 }
 /* A select drawn as a button: no value shows, only its label, since choosing
@@ -235,5 +256,5 @@ header.tab-bar .actions select {
   margin-bottom: 1rem;
   border: 1px solid var(--warn);
   border-radius: 4px;
-  font-size: 0.85rem;
+  font-size: var(--text-l);
 }

@@ -219,7 +219,7 @@
     display: flex;
     align-items: center;
     gap: 1rem;
-    font-size: 0.75rem;
+    font-size: var(--text-s);
     color: var(--muted);
   }
   .hint {
@@ -227,7 +227,7 @@
   }
   button {
     font: inherit;
-    font-size: 0.75rem;
+    font-size: var(--text-s);
     padding: 0.15rem 0.5rem;
     border: 1px solid var(--rule);
     border-radius: 3px;

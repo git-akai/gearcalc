@@ -832,7 +832,7 @@
      tab; what follows serves the buttons below them. */
   button {
     font: inherit;
-    font-size: 0.8rem;
+    font-size: var(--text-m);
     padding: 0.25rem 0.7rem;
     border: 1px solid var(--rule);
     border-radius: 3px;
@@ -896,7 +896,7 @@
        to the box it belongs to. They are not the same measurement. */
     column-gap: var(--row-gap);
     row-gap: var(--note-gap);
-    font-size: 0.85rem;
+    font-size: var(--text-l);
   }
   /* A select holding words, not a number, needs the room the number column does
      not: "Internal (ring)" was arriving as "Internal (rin". It takes that room
@@ -951,7 +951,7 @@
      match it, on the page's own background rather than the platform's. */
   select {
     font: inherit;
-    font-size: 0.85rem;
+    font-size: var(--text-l);
     padding: 0.15rem 0.3rem;
     border: 1px solid var(--rule);
     border-radius: 3px;
@@ -964,7 +964,7 @@
   em {
     font-style: normal;
     color: var(--muted);
-    font-size: 0.75rem;
+    font-size: var(--text-s);
   }
 
   /* The label column is `max-content`, so a name never wraps. It was `1fr`
@@ -978,7 +978,7 @@
     grid-template-columns: max-content 1fr;
     gap: 0.15rem 0.75rem;
     margin: 0;
-    font-size: 0.85rem;
+    font-size: var(--text-l);
   }
   dt {
     color: var(--muted);

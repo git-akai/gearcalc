@@ -38,7 +38,7 @@
      own name is a field in its own right, and reads like one. */
   button {
     font: inherit;
-    font-size: 0.75rem;
+    font-size: var(--text-s);
     padding: 0.25rem 0.6rem;
     border: 1px solid var(--rule);
     border-radius: 3px;
@@ -47,7 +47,7 @@
        what says a switch is on is the fill behind it, not the strength of its
        text. Muted-when-off reads as a smaller word rather than an unlit one,
        and next to a segmented control that never mutes it looked like a
-       different size of type. It is the same size — 0.75rem, both of them. */
+       different size of type. It is the same size — `--text-s`, both of them. */
     color: var(--fg);
     cursor: pointer;
     /* Where it sits, the row decides: nothing is asserted here, so a row that
@@ -61,7 +61,7 @@
      they name a mode rather than a field, and stay out of the way of the number
      they qualify. */
   button.small {
-    font-size: 0.7rem;
+    font-size: var(--text-xs);
     padding: 0.1rem 0.35rem;
     color: var(--muted);
   }
