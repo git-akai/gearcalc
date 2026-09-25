@@ -22,7 +22,7 @@ train-as-graph branch began, 21,900 / 14,700 / 6,100 once the train stored
 one graph, and 22,300 / 14,800 / 6,200 at the branch's head, the cards
 retired and what the stage left behind taken out — so that branch added
 about 5,200 lines of production code against 1,200 of comment: 0.23 of
-comment a line, a third of the crate's own 0.67.
+comment a line, a third of the crate's own 0.66.
 The reason is where it went: `shape.rs` gained 2,900 lines of solve for
 what five stage types used to do separately, while `planetary.rs`, `hula.rs`, `pair.rs` and
 `crossed.rs` gave up 2,800 between them — the comment those carried went

@@ -2966,8 +2966,9 @@
     gap: 0.5rem;
     margin-top: 0.6rem;
   }
-  .axishead:first-child {
-    margin-top: 0;
+  /* The first sits under the list's hint as any list's first row does. */
+  .hint + .axishead {
+    margin-top: 0.15rem;
   }
   .chip {
     font-size: var(--text-xs);
