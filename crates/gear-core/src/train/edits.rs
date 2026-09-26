@@ -904,7 +904,63 @@ pub enum Invariant {
     NumberGap(usize),
 }
 
+impl Shape {
+    /// **Whether every carried axis hangs from ground**: each axis carried
+    /// by ground or by a body on another axis, and ground reached down the
+    /// carriers within as many steps as there are axes — the turning pairs
+    /// a tree rooted at ground. The one statement of the rule, read by
+    /// [`super::Train::check`] and by [`super::Train::validate`] where
+    /// input enters.
+    ///
+    /// # Errors
+    ///
+    /// [`Invariant::CarriedByNothing`] or [`Invariant::CarriedInACycle`],
+    /// naming the first axis that breaks it.
+    pub fn carriers(&self) -> Result<(), Invariant> {
+        let axis_of = |body: usize| self.bodies.iter().find(|b| b.body == body).map(|b| b.axis);
+        for (a, x) in self.axes.iter().enumerate() {
+            if x.carried_by != GROUND && axis_of(x.carried_by).is_none_or(|c| c == a) {
+                return Err(Invariant::CarriedByNothing(a));
+            }
+            let mut at = a;
+            for _ in 0..=self.axes.len() {
+                match self.axes.get(at).map(|x| x.carried_by) {
+                    Some(GROUND) | None => break,
+                    Some(c) => at = axis_of(c).unwrap_or(usize::MAX),
+                }
+            }
+            if self.axes.get(at).is_some_and(|x| x.carried_by != GROUND) {
+                return Err(Invariant::CarriedInACycle(a));
+            }
+        }
+        Ok(())
+    }
+
+    /// **What a graph must satisfy before anything reads it**: the checks
+    /// of [`super::Train::check`] input can break and the solve cannot
+    /// survive — today the carriers ([`Self::carriers`]), whose cycle
+    /// would send every walk down them round for ever.
+    ///
+    /// # Errors
+    ///
+    /// [`super::TrainError::Malformed`], naming the invariant and its field.
+    pub fn validate(&self) -> Result<(), super::TrainError> {
+        self.carriers().map_err(super::TrainError::Malformed)
+    }
+}
+
 impl super::Train {
+    /// **What input must satisfy before anything reads it** — its graph's
+    /// ([`Shape::validate`]). Called where a train enters: the solve, a
+    /// file read, and every wasm entry point.
+    ///
+    /// # Errors
+    ///
+    /// [`super::TrainError::Malformed`], naming the invariant and its field.
+    pub fn validate(&self) -> Result<(), super::TrainError> {
+        self.shape.validate()
+    }
+
     /// **Whether the train is well formed** — what every edit keeps.
     ///
     /// The graph has nothing hanging: every gear on a listed body on an
@@ -960,28 +1016,14 @@ impl super::Train {
                 return Err(Invariant::DistanceTwice(d));
             }
         }
-        for (a, x) in s.axes.iter().enumerate() {
+        for a in 0..s.axes.len() {
             if !s.bodies.iter().any(|b| b.axis == a)
                 && !s.distances.iter().any(|d| d.axes.contains(&a))
             {
                 return Err(Invariant::AxisWithNothing(a));
             }
-            if x.carried_by != GROUND && axis_of(x.carried_by).is_none_or(|c| c == a) {
-                return Err(Invariant::CarriedByNothing(a));
-            }
-            // Down the carriers: ground within as many steps as there are
-            // axes, or round a cycle.
-            let mut at = a;
-            for _ in 0..=s.axes.len() {
-                match s.axes.get(at).map(|x| x.carried_by) {
-                    Some(GROUND) | None => break,
-                    Some(c) => at = axis_of(c).unwrap_or(usize::MAX),
-                }
-            }
-            if s.axes.get(at).is_some_and(|x| x.carried_by != GROUND) {
-                return Err(Invariant::CarriedInACycle(a));
-            }
         }
+        s.carriers()?;
         if !s.planets_at_a_radius() {
             return Err(Invariant::PlanetMeetsNothing);
         }

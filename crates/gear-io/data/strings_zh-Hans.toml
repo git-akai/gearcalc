@@ -113,6 +113,9 @@ train_overdetermined = "第 {body} 号体上两个条件不能同时成立：所
 train_no_such_body = "某个约束或载荷工况指向齿轮系中不存在的体：第 {body} 号体"
 train_overflow = "沿轴系的齿数乘积超出了精确比值所能表示的范围"
 train_tips_unclearable = "啮合 {mesh}：没有轴间距能使齿顶脱开"
+train_malformed = "轮系的图结构不完整"
+train_malformed_carried_by = "轴 {axis}：其 carried_by 未指向另一轴上的任何体"
+train_malformed_carried_by_cycle = "轴 {axis}：其 carried_by 经由各级行星架又回到自身"
 
 [ui]
 app_core_failed = "计算内核加载失败：{reason}"

@@ -285,12 +285,14 @@ impl Shape {
                 .filter_map(|&i| axis_of_body(self.members[i].body))
                 .chain(distances.iter().flat_map(|&d| self.distances[d].axes))
                 .collect();
-            // A carried axis brings its carrier's.
+            // A carried axis brings its carrier's, once: an axis enters the
+            // list at most once, so the closure ends on a carrier cycle too,
+            // which `Train::validate` refuses.
             let mut k = 0;
             while k < axes.len() {
                 let carrier = self.axes[axes[k]].carried_by;
                 if carrier != GROUND {
-                    if let Some(a) = axis_of_body(carrier) {
+                    if let Some(a) = axis_of_body(carrier).filter(|a| !axes.contains(a)) {
                         axes.push(a);
                     }
                 }
@@ -726,6 +728,25 @@ mod tests {
                     "{name}: stage {k}'s layouts"
                 );
             }
+        }
+    }
+
+    /// **A carrier cycle closes**: a carried axis brings its carrier's axis
+    /// once, so an axis carried by a body on itself, or two axes each
+    /// carried by the other's body, still deal their parts in as many steps
+    /// as there are axes. Refusing the cycle is [`super::super::Train::validate`]'s.
+    #[test]
+    fn a_carrier_cycle_closes_in_as_many_steps_as_there_are_axes() {
+        let base = Preset::Spur.build();
+        let mut own = base.clone();
+        own.axes[0].carried_by = 1;
+        let mut two = base;
+        two.axes[0].carried_by = 2;
+        two.axes[1].carried_by = 1;
+        for s in [own, two] {
+            let parts = s.parts();
+            assert_eq!(parts.len(), 1);
+            assert_eq!(parts[0].axes, vec![0, 1]);
         }
     }
 }

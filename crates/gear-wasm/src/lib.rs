@@ -828,10 +828,41 @@ pub struct TrainFailure {
     pub part: Option<u32>,
 }
 
+/// **A graph as it enters**, refused by the catalogue key of the invariant
+/// it breaks ([`gear_core::train::Shape::validate`]) before anything walks
+/// it — the key crosses, as an edit's refusal does.
+fn entering(shape: &gear_core::train::Shape) -> Result<(), String> {
+    use gear_core::note::Explain;
+    shape.validate().map_err(|e| e.note().key)
+}
+
 fn solve_train_impl(input: &str) -> Result<String, String> {
     use gear_core::note::Explain;
     let req: TrainRequest =
         serde_json::from_str(input).map_err(|e| format!("bad train request: {e}"))?;
+    // A graph that describes no train is the train's failure, with nothing
+    // read off it.
+    if let Err(e) = req.train.validate() {
+        let outcome = TrainOutcome {
+            result: None,
+            failure: Some(TrainFailure {
+                note: e.note(),
+                part: None,
+            }),
+            figures: Vec::new(),
+            parts: Vec::new(),
+            ports: Vec::new(),
+            flows: Vec::new(),
+            groupings: gear_core::train::Groupings {
+                centres: Vec::new(),
+                axes: Vec::new(),
+            },
+            names: Vec::new(),
+            mesh_groups: Vec::new(),
+        };
+        return serde_json::to_string(&outcome)
+            .map_err(|e| format!("could not encode result: {e}"));
+    }
     let lib = req.materials.unwrap_or_else(gear_io::default_library);
     let parts = req.train.parts();
     let ports = req.train.bodies();
@@ -969,7 +1000,11 @@ fn export_materials_impl(library_json: &str) -> Result<String, String> {
 }
 
 fn import_train_impl(toml_text: &str) -> Result<String, String> {
-    let imported = gear_io::train::from_toml(toml_text).map_err(|e| e.to_string())?;
+    use gear_core::note::Explain;
+    let imported = gear_io::train::from_toml(toml_text).map_err(|e| match e {
+        gear_io::train::TrainError::Malformed(e) => e.note().key,
+        e => e.to_string(),
+    })?;
     serde_json::to_string(&imported).map_err(|e| e.to_string())
 }
 
@@ -1377,6 +1412,7 @@ pub struct AdoptOutcome {
 
 fn adopt_member_impl(input: &str) -> Result<String, String> {
     let req: AdoptRequest = serde_json::from_str(input).map_err(|e| e.to_string())?;
+    entering(&req.train.shape)?;
     // A member the train does not have, or a worm, is a defect on the other
     // side of the boundary — the panel lists what can be adopted — so each
     // is a refusal rather than an outcome.
@@ -1458,6 +1494,7 @@ struct RelieveRequest {
 
 fn relieve_impl(input: &str) -> Result<String, String> {
     let req: RelieveRequest = serde_json::from_str(input).map_err(|e| e.to_string())?;
+    entering(&req.shape)?;
     serde_json::to_string(&req.shape.relieved_from(req.just, &req.figures))
         .map_err(|e| e.to_string())
 }
@@ -1496,6 +1533,7 @@ struct RelieveCaseRequest {
 
 fn relieve_case_impl(input: &str) -> Result<String, String> {
     let mut req: RelieveCaseRequest = serde_json::from_str(input).map_err(|e| e.to_string())?;
+    entering(&req.train.shape)?;
     req.train
         .relieve_case(req.case, req.just, &req.library)
         .map_err(|e| format!("{e:?}"))?;
@@ -1555,6 +1593,7 @@ struct EditRequest {
 
 fn edit_train_impl(input: &str) -> Result<String, String> {
     let EditRequest { mut train, edit } = serde_json::from_str(input).map_err(|e| e.to_string())?;
+    entering(&train.shape)?;
     // **A refusal crosses as its catalogue key**, which is what the panel
     // says beside the verb; its `Display` is English for a log.
     apply_edit(&mut train, edit).map_err(|e| e.key().to_string())?;
@@ -1618,6 +1657,7 @@ fn preview_edit_impl(input: &str) -> Result<String, String> {
         materials,
         edit,
     } = serde_json::from_str(input).map_err(|e| e.to_string())?;
+    entering(&train.shape)?;
     let lib = materials.unwrap_or_else(gear_io::default_library);
     let mut after = train.clone();
     let made = apply_edit(&mut after, edit);
@@ -1654,6 +1694,7 @@ struct OffersRequest {
 
 fn offers_impl(input: &str) -> Result<String, String> {
     let OffersRequest { train, at } = serde_json::from_str(input).map_err(|e| e.to_string())?;
+    entering(&train.shape)?;
     serde_json::to_string(&train.offers(at)).map_err(|e| e.to_string())
 }
 
@@ -1826,6 +1867,54 @@ mod tests {
         }
         let v = solved(&serde_json::json!({ "train": stored }).to_string());
         assert_eq!(v["paths"][0]["reads"], want, "absent is ground");
+    }
+
+    /// **A carrier cycle is refused at every entry that takes a train**, by
+    /// the catalogue key that names the field, before anything walks the
+    /// carriers — a solve says so as the train's failure, every other entry
+    /// as its error, and a file as its import's.
+    #[test]
+    fn a_carrier_cycle_is_refused_at_every_entry_by_its_key() {
+        use gear_core::train::{LoadCase, Preset, Train};
+        const KEY: &str = "error.train_malformed_carried_by_cycle";
+        let mut t = Train::chained(vec![Preset::Spur.build()], |_| {
+            vec![LoadCase::ultimate(1, 2, 2.0, 3000.0)]
+        });
+        t.shape.axes[0].carried_by = 2;
+        t.shape.axes[1].carried_by = 1;
+        let train = serde_json::to_value(&t).unwrap();
+        let lib = serde_json::to_value(gear_io::default_library()).unwrap();
+        let solved: serde_json::Value = serde_json::from_str(
+            &solve_train_impl(&serde_json::json!({ "train": train }).to_string()).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(solved["failure"]["note"]["key"], KEY);
+        let refused = [
+            edit_train_impl(
+                &serde_json::json!({ "train": train, "edit": { "add_case": "ultimate" } })
+                    .to_string(),
+            ),
+            preview_edit_impl(
+                &serde_json::json!({ "train": train, "edit": { "add_case": "ultimate" } })
+                    .to_string(),
+            ),
+            offers_impl(&serde_json::json!({ "train": train, "at": "train" }).to_string()),
+            relieve_case_impl(
+                &serde_json::json!({ "train": train, "library": lib, "case": 0 }).to_string(),
+            ),
+            relieve_impl(&serde_json::json!({ "shape": train["shape"] }).to_string()),
+            adopt_member_impl(&serde_json::json!({ "train": train, "member": 0 }).to_string()),
+            import_train_impl(
+                &gear_io::train::to_toml(&gear_io::TrainDocument {
+                    name: "cycle".into(),
+                    train: t.clone(),
+                })
+                .unwrap(),
+            ),
+        ];
+        for (i, r) in refused.into_iter().enumerate() {
+            assert_eq!(r, Err(KEY.to_string()), "entry {i}");
+        }
     }
 
     #[test]

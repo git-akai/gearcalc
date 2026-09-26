@@ -1615,6 +1615,10 @@ pub enum TrainError {
     /// ([`shape::Distance::tip_clearance`]). Zero-based, as the meshes are
     /// indexed; the front end numbers from 1.
     TipsUnclearable { mesh: usize },
+    /// **The graph is not well formed**, at the invariant named: input
+    /// that describes no train, refused where it enters
+    /// ([`Train::validate`]) before anything reads it.
+    Malformed(Invariant),
     /// **Which part could not be solved**, wrapped around why.
     ///
     /// A part that fails takes the flow with it: every part the train's one
@@ -1692,6 +1696,17 @@ impl crate::note::Explain for TrainError {
             Self::LoadPort { case } => {
                 Note::new(key::ERROR_TRAIN_LOAD_PORT).text("case", (case + 1).to_string())
             }
+            // Each field a refusal can name has its own key; the axis is
+            // numbered from one, as the panel numbers axes.
+            Self::Malformed(Invariant::CarriedByNothing(axis)) => {
+                Note::new(key::ERROR_TRAIN_MALFORMED_CARRIED_BY)
+                    .count("axis", u32::try_from(*axis + 1).unwrap_or(u32::MAX))
+            }
+            Self::Malformed(Invariant::CarriedInACycle(axis)) => {
+                Note::new(key::ERROR_TRAIN_MALFORMED_CARRIED_BY_CYCLE)
+                    .count("axis", u32::try_from(*axis + 1).unwrap_or(u32::MAX))
+            }
+            Self::Malformed(_) => Note::new(key::ERROR_TRAIN_MALFORMED),
             // Which part it is belongs to the reader rather than to the
             // reason, so the note is the cause's and the part reaches the
             // front end through the error's own shape.
@@ -1778,6 +1793,17 @@ impl std::fmt::Display for TrainError {
                 f,
                 "the tooth counts along the shaft line multiply past what an exact ratio holds"
             ),
+            Self::Malformed(Invariant::CarriedByNothing(axis)) => write!(
+                f,
+                "axis {}: carried_by names no body on another axis",
+                axis + 1
+            ),
+            Self::Malformed(Invariant::CarriedInACycle(axis)) => write!(
+                f,
+                "axis {}: carried_by carries it round, through its carriers, by itself",
+                axis + 1
+            ),
+            Self::Malformed(e) => write!(f, "the train's graph is not well formed: {e:?}"),
             Self::LoadPort { case } => write!(
                 f,
                 "load case {}: enters by a shaft no load can be put on — ground, a held \
@@ -4178,6 +4204,7 @@ impl TrainResult {
 /// cut or rated. An empty train is no error: it solves to nothing, its
 /// cases waiting.
 pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, TrainError> {
+    train.validate()?;
     solve_parts(train, &train.parts(), lib).map(|(r, _)| r)
 }
 

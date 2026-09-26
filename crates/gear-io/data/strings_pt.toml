@@ -118,6 +118,9 @@ train_overdetermined = "duas condições não podem valer ao mesmo tempo no corp
 train_no_such_body = "uma restrição ou caso de carga nomeia um corpo que o trem não tem: corpo {body}"
 train_overflow = "os números de dentes ao longo da linha de eixos multiplicam-se além do que uma razão exacta pode conter"
 train_tips_unclearable = "engrenamento {mesh}: nenhuma distância liberta os dentes"
+train_malformed = "o grafo do trem não está bem formado"
+train_malformed_carried_by = "eixo {axis}: o seu carried_by não nomeia nenhum corpo noutro eixo"
+train_malformed_carried_by_cycle = "eixo {axis}: o seu carried_by leva-o, pelos seus portadores, de volta a si próprio"
 
 [ui]
 app_core_failed = "Falha ao carregar o núcleo de cálculo: {reason}"

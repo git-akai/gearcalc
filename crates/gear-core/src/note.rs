@@ -245,7 +245,13 @@ pub mod key {
     pub const ERROR_TRAIN_OVERFLOW: &str = "error.train_overflow";
     /// `error.train_load_port`
     pub const ERROR_TRAIN_LOAD_PORT: &str = "error.train_load_port";
-    /// `error.train_load_shared`
+    /// `error.train_malformed`
+    pub const ERROR_TRAIN_MALFORMED: &str = "error.train_malformed";
+    /// `error.train_malformed_carried_by`
+    pub const ERROR_TRAIN_MALFORMED_CARRIED_BY: &str = "error.train_malformed_carried_by";
+    /// `error.train_malformed_carried_by_cycle`
+    pub const ERROR_TRAIN_MALFORMED_CARRIED_BY_CYCLE: &str =
+        "error.train_malformed_carried_by_cycle";
     /// `error.train_tips_unclearable`
     pub const ERROR_TRAIN_TIPS_UNCLEARABLE: &str = "error.train_tips_unclearable";
 
@@ -333,6 +339,9 @@ pub mod key {
         ERROR_TRAIN_OVERFLOW,
         ERROR_TRAIN_LOAD_PORT,
         ERROR_TRAIN_TIPS_UNCLEARABLE,
+        ERROR_TRAIN_MALFORMED,
+        ERROR_TRAIN_MALFORMED_CARRIED_BY,
+        ERROR_TRAIN_MALFORMED_CARRIED_BY_CYCLE,
     ];
 }
 

@@ -308,6 +308,10 @@ pub enum TrainError {
     Parse(toml::de::Error),
     /// The document could not be written back out.
     Serialise(toml::ser::Error),
+    /// The document parses but describes no train: its graph breaks an
+    /// invariant input must keep ([`Train::validate`]). Carries the core's
+    /// refusal, whose note names the field.
+    Malformed(gear_core::train::TrainError),
 }
 
 impl std::fmt::Display for TrainError {
@@ -315,6 +319,11 @@ impl std::fmt::Display for TrainError {
         match self {
             Self::Parse(e) => write!(f, "geartrain file is not valid: {e}"),
             Self::Serialise(e) => write!(f, "geartrain could not be written: {e}"),
+            Self::Malformed(e) => {
+                use gear_core::note::Explain;
+                let words = crate::strings::Catalogue::english().render(&e.note());
+                write!(f, "geartrain file is not valid: {words}")
+            }
         }
     }
 }
@@ -355,10 +364,12 @@ pub struct Imported {
 ///
 /// # Errors
 ///
-/// [`TrainError::Parse`] if the document is not a geartrain. An empty train
+/// [`TrainError::Parse`] if the document is not a geartrain, and
+/// [`TrainError::Malformed`] if its graph describes none. An empty train
 /// is a train — its cases wait for a preset — and reads as written.
 pub fn from_toml(src: &str) -> Result<Imported, TrainError> {
     let document: TrainDocument = toml::from_str(src).map_err(TrainError::Parse)?;
+    document.train.validate().map_err(TrainError::Malformed)?;
     Ok(relieved(document))
 }
 
@@ -418,7 +429,8 @@ struct StagedDocument {
 /// # Errors
 ///
 /// [`TrainError::Parse`] if the document is not a geartrain written as
-/// stages.
+/// stages, and [`TrainError::Malformed`] if the graph they make describes
+/// none.
 pub fn convert(src: &str) -> Result<Imported, TrainError> {
     let old: StagedDocument = toml::from_str(src).map_err(TrainError::Parse)?;
     let train = old.train;
@@ -436,14 +448,16 @@ pub fn convert(src: &str) -> Result<Imported, TrainError> {
         .max()
         .unwrap_or(0);
     let graph = gear_core::train::graph::graph_of(&train.stages, named + 1);
+    let train = Train {
+        load_cases: train.load_cases,
+        reversed_bending: train.reversed_bending,
+        shape: graph.shape,
+        held: train.held,
+    };
+    train.validate().map_err(TrainError::Malformed)?;
     Ok(relieved(TrainDocument {
         name: old.name,
-        train: Train {
-            load_cases: train.load_cases,
-            reversed_bending: train.reversed_bending,
-            shape: graph.shape,
-            held: train.held,
-        },
+        train,
     }))
 }
 
@@ -647,6 +661,65 @@ mod tests {
         let r = gear_core::train::solve_train(train, &crate::default_library()).unwrap();
         let ratio = r.total().unwrap().ratio;
         assert!((ratio - 708.235_294_118).abs() < 1e-8, "{ratio}");
+    }
+
+    /// **A carrier cycle is refused where it enters, naming the field.**
+    /// A pair whose first axis is carried by the body on it, and one whose
+    /// two axes each carry the other, read as files, both come back as the
+    /// refusal [`Train::validate`] gives — the one [`Train::check`] reads —
+    /// and a file of stages whose first axis carries itself converts to the
+    /// same refusal; none walks the carriers round for ever.
+    #[test]
+    fn a_carrier_cycle_in_a_file_is_refused_and_named() {
+        use gear_core::note::Explain;
+        use gear_core::train::{Invariant, Preset};
+        let spur = |carriers: [usize; 2]| {
+            let mut t = Train::chained(vec![Preset::Spur.build()], |_| {
+                vec![LoadCase::ultimate(1, 2, 2.0, 3000.0)]
+            });
+            t.shape.axes[0].carried_by = carriers[0];
+            t.shape.axes[1].carried_by = carriers[1];
+            to_toml(&TrainDocument {
+                name: "cycle".into(),
+                train: t,
+            })
+            .unwrap()
+        };
+        for (carriers, key, invariant) in [
+            (
+                [1, 0],
+                "error.train_malformed_carried_by",
+                Invariant::CarriedByNothing(0),
+            ),
+            (
+                [2, 1],
+                "error.train_malformed_carried_by_cycle",
+                Invariant::CarriedInACycle(0),
+            ),
+        ] {
+            match from_toml(&spur(carriers)) {
+                Err(TrainError::Malformed(e)) => {
+                    assert_eq!(e.note().key, key, "{carriers:?}");
+                    assert_eq!(
+                        e,
+                        gear_core::train::TrainError::Malformed(invariant),
+                        "{carriers:?}"
+                    );
+                }
+                other => panic!("{carriers:?}: a carrier cycle must be refused, not {other:?}"),
+            }
+        }
+        let staged = include_str!("../tests/data/elevation_drive_staged.toml").replacen(
+            "carried_by = 0",
+            "carried_by = 1",
+            1,
+        );
+        match convert(&staged) {
+            Err(TrainError::Malformed(e)) => {
+                assert_eq!(e.note().key, "error.train_malformed_carried_by");
+            }
+            other => panic!("a self-carried stage must be refused, not {other:?}"),
+        }
     }
 
     /// **A field the shape no longer has is refused, not dropped.**

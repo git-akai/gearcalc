@@ -205,6 +205,9 @@ train_overdetermined = "two conditions cannot both hold at body {body}: what it 
 train_no_such_body = "a constraint or load case names a body the train does not have: body {body}"
 train_overflow = "the tooth counts along the shaft line multiply past what an exact ratio can hold"
 train_tips_unclearable = "mesh {mesh}: no distance clears the teeth"
+train_malformed = "the train's graph is not well formed"
+train_malformed_carried_by = "axis {axis}: its carried_by names no body on another axis"
+train_malformed_carried_by_cycle = "axis {axis}: its carried_by carries it round, through its carriers, back to itself"
 
 [ui]
 app_core_failed = "The calculation core failed to load: {reason}"

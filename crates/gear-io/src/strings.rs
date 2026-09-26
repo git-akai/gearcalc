@@ -1392,6 +1392,24 @@ mod tests {
                 }
             }
             err(TrainError::UnknownMaterial("nothing by that name".into()).note());
+            // **A graph that describes no train**: an axis carried by a body
+            // on itself, and two axes each carried by the other's body, both
+            // refused by the model where they enter; the general key, for an
+            // invariant with no field of its own yet, fired directly.
+            {
+                use gear_core::train::{Invariant, LoadCase, Preset, Train};
+                for carriers in [[1, 0], [2, 1]] {
+                    let mut t = Train::chained(vec![Preset::Spur.build()], |_| {
+                        vec![LoadCase::ultimate(1, 2, 2.0, 3000.0)]
+                    });
+                    t.shape.axes[0].carried_by = carriers[0];
+                    t.shape.axes[1].carried_by = carriers[1];
+                    let e = gear_core::train::solve_train(&t, &lib).expect_err("a carrier cycle");
+                    assert!(matches!(e, TrainError::Malformed(_)), "{e:?}");
+                    err(e.note());
+                }
+                err(TrainError::Malformed(Invariant::NumberGap(3)).note());
+            }
             err(TrainError::NoRootSection.note());
             if let Err(e) = gear_core::train::solve_train(
                 &Train::chained(Vec::new(), |_| {
