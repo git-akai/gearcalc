@@ -1037,3 +1037,34 @@ fn inspection_data_varies_around_an_eccentric_gear_and_not_around_an_ordinary_on
         assert!(previous > 0.0, "z={teeth}: the span never varied at all");
     }
 }
+
+/// **A tool that cut has a tip, and a space it cut takes a pin.** Where the
+/// rack's tooth would close before the commanded depth the depth stops there,
+/// so the sharp tip width is never negative and the smallest pin that measures
+/// is never zero. Before, a pointed rack reported a negative tip and a pin
+/// range starting at nothing: 2,039 of 30,000 fuzz gears did.
+#[test]
+fn every_tool_has_a_tip_and_every_space_a_smallest_pin() {
+    use gear_core::metrology::{pin_diameter_range, Space};
+    for p in Grid::new()
+        .teeth(&[9, 17, 40])
+        .shifts(&[-0.3, 0.0, 0.6])
+        .pressure_angle(&[14.5, 20.0, 25.0, 40.0])
+        .dedendum(&[1.25, 2.0, 3.0])
+        .thickness_mod(THICKNESS_MODS)
+        .build()
+    {
+        let g = Tooth::new(p);
+        let tag = format!(
+            "z={} x={} a={} hf={} k={}",
+            p.teeth, p.profile_shift, p.pressure_angle, p.dedendum, p.thickness_mod
+        );
+        // Rounding only: the capped tip is `2ρ_min(1 − sin α)/cos α` wide, a
+        // few thousand-millionths of a module, and read back through a tangent.
+        let w = cutter_tip_width(&g);
+        assert!(w >= -1e-12 * p.module, "tip width {w:.3e} at {tag}");
+        if let Some((lo, _)) = pin_diameter_range(&Space::of(&g)) {
+            assert!(lo > 0.0, "a pin of no diameter measures at {tag}");
+        }
+    }
+}

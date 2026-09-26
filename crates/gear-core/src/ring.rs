@@ -394,13 +394,14 @@ impl Ring {
         // bottom of every tooth space. It bit whenever no fillet was cut to
         // truncate the flank first — a thickness modification of 0.6 on a
         // 43-tooth ring put the root 0.14 mm beyond the crossing, and 0.4 put it
-        // 0.48 mm beyond. An external gear has never been able to do this,
-        // because its pointed-tooth cap is unconditional; a ring's was missing.
+        // 0.48 mm beyond. An external gear's space closes the same way when the
+        // rack's tooth comes to a point before its depth, and `Rack::wanted_by`
+        // stops the depth there under the same key.
         if let Some(alpha_close) = crate::involute::inv_inverse(half_pitch - psi_b) {
             let rf_max = rb / alpha_close.cos();
             if rf > rf_max {
                 rf = rf_max;
-                clamps.push(Note::new(key::CLAMP_RING_SPACE_CLOSED).number("radius", rf_max, 4));
+                clamps.push(Note::new(key::CLAMP_SPACE_CLOSED).number("radius", rf_max, 4));
             }
         }
         let rf = rf;
@@ -1604,9 +1605,10 @@ mod tests {
     /// centreline comes back through its own reflection: the outline stops being
     /// a simple closed curve and draws as an inverted spur at the bottom of
     /// every space — geometry that would go into a DXF and that no tool can
-    /// leave. An external gear has never been able to do this, because its
-    /// pointed-tooth cap is unconditional; a ring's root had no such cap, so the
-    /// flank ran to the root circle whether or not the space had already closed.
+    /// leave. The flank ran to the root circle whether or not the space had
+    /// already closed. An external gear did the same when its rack's tooth came
+    /// to a point before the depth (`geometry_laws::the_outline_is_a_simple_closed_curve`),
+    /// and both now stop the root where the space closes, as `clamp.space_closed`.
     ///
     /// The case that reaches it is a **thick** ring tooth — a low thickness
     /// modification — where the cutter's own tooth comes to a point, no fillet
@@ -1645,7 +1647,7 @@ mod tests {
                     }
                     // ...and the truncation is reported wherever it happened,
                     // rather than the part quietly coming back shorter.
-                    let closed = g.clamps.iter().any(|n| n.is(key::CLAMP_RING_SPACE_CLOSED));
+                    let closed = g.clamps.iter().any(|n| n.is(key::CLAMP_SPACE_CLOSED));
                     let reaches = g.involute_at(g.u_j).1;
                     assert_eq!(
                         closed,
@@ -1690,7 +1692,7 @@ mod tests {
                     )
                 };
                 let plain = at(1.0);
-                let closed = |g: &Ring| g.clamps.iter().any(|n| n.is(key::CLAMP_RING_SPACE_CLOSED));
+                let closed = |g: &Ring| g.clamps.iter().any(|n| n.is(key::CLAMP_SPACE_CLOSED));
                 for k in [0.7, 0.85, 1.15, 1.3] {
                     let g = at(k);
                     // **Where the space itself closes, the root is truncated by

@@ -68,8 +68,8 @@ pub mod key {
     pub const CLAMP_RING_SPACE_CAPPED: &str = "clamp.ring_space_capped";
     /// `clamp.ring_space_raised`
     pub const CLAMP_RING_SPACE_RAISED: &str = "clamp.ring_space_raised";
-    /// `clamp.ring_space_closed`
-    pub const CLAMP_RING_SPACE_CLOSED: &str = "clamp.ring_space_closed";
+    /// `clamp.space_closed`
+    pub const CLAMP_SPACE_CLOSED: &str = "clamp.space_closed";
     /// `clamp.ring_tip_raised`
     pub const CLAMP_RING_TIP_RAISED: &str = "clamp.ring_tip_raised";
     /// `clamp.tip_capped_pointed`
@@ -288,7 +288,7 @@ pub mod key {
         CLAMP_RING_FULLY_FILLETED,
         CLAMP_RING_SPACE_CAPPED,
         CLAMP_RING_SPACE_RAISED,
-        CLAMP_RING_SPACE_CLOSED,
+        CLAMP_SPACE_CLOSED,
         CLAMP_RING_TIP_RAISED,
         CLAMP_TIP_CAPPED_POINTED,
         CLAMP_TOOTH_SEVERED,

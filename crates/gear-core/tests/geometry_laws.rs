@@ -18,8 +18,8 @@ use gear_core::{inv, inv_from_roll, GearParams, Tooth};
 
 mod common;
 use common::{
-    Grid, AWKWARD_SHIFTS, AWKWARD_TEETH, HELIX_ANGLES, MODULES, PRESSURE_ANGLES, ROOT_RADII,
-    THICKNESS_MODS,
+    Grid, AWKWARD_SHIFTS, AWKWARD_TEETH, DEDENDA, HELIX_ANGLES, MODULES, PRESSURE_ANGLES,
+    ROOT_RADII, THICKNESS_MODS,
 };
 
 /// The awkward regions: tiny tooth counts, both signs of shift, sharp and
@@ -31,6 +31,8 @@ fn grid() -> Vec<GearParams> {
         .pressure_angle(PRESSURE_ANGLES)
         .helix_angle(HELIX_ANGLES)
         .root_radius(ROOT_RADII)
+        .dedendum(DEDENDA)
+        .thickness_mod(THICKNESS_MODS)
         .build()
 }
 
@@ -119,14 +121,16 @@ fn involute_tooth_thickness_law_holds_on_the_flank() {
 fn fillet_cap_guarantees_a_nonnegative_root_arc() {
     for p in grid() {
         let g = Tooth::new(p);
+        let corner = g.theta0;
         assert!(
-            g.theta0 <= g.half_pitch + 1e-9,
-            "root arc is negative ({} > {}) at z={} x={} rho={}",
-            g.theta0,
+            corner < g.half_pitch,
+            "root arc is negative ({corner} > {}) at z={} x={} rho={} hf={} k={}",
             g.half_pitch,
             p.teeth,
             p.profile_shift,
-            p.root_radius
+            p.root_radius,
+            p.dedendum,
+            p.thickness_mod
         );
     }
 }
@@ -265,10 +269,9 @@ fn thickness_modification_leaves_radial_dimensions_alone() {
             // and the same reason both times.
             let truncated = |t: &Tooth| {
                 t.severed
-                    || t.clamps
-                        .notes
-                        .iter()
-                        .any(|n| n.is(key::CLAMP_TIP_CAPPED_POINTED))
+                    || t.clamps.notes.iter().any(|n| {
+                        n.is(key::CLAMP_TIP_CAPPED_POINTED) || n.is(key::CLAMP_SPACE_CLOSED)
+                    })
             };
             if truncated(&g) || truncated(&base) {
                 assert!(
@@ -843,7 +846,13 @@ fn a_gear_at_its_minimum_shift_is_on_the_edge_of_undercut_and_not_over_it() {
             p.thickness_mod,
             p.dedendum
         );
-        if g.clamps.fired(key::CLAMP_DEDENDUM_RAISED) || g.clamps.fired(key::CLAMP_DEDENDUM_CAPPED)
+        if [
+            key::CLAMP_DEDENDUM_RAISED,
+            key::CLAMP_DEDENDUM_CAPPED,
+            key::CLAMP_SPACE_CLOSED,
+        ]
+        .iter()
+        .any(|k| g.clamps.fired(k))
         {
             continue; // the tool no longer follows the shift; nothing clears it
         }
@@ -1012,4 +1021,103 @@ fn the_trochoid_turns_once() {
         "only {cases} undercut teeth; too few to mean anything"
     );
     println!("{cases} undercut teeth; most turns in theta: {worst} at {at}");
+}
+
+/// **The drawn outline is a simple closed curve**: no two of its spans cross,
+/// and no arc runs backwards.
+///
+/// A rack whose tooth comes to a point before the commanded depth used to be
+/// driven to that depth anyway, which set its corner past mid-space: the root
+/// arc's bulge went negative and the fillets crossed each other, 17 times on a
+/// z17 gear at 40°, with every input inside its published range.
+#[test]
+fn the_outline_is_a_simple_closed_curve() {
+    for p in Grid::new()
+        .teeth(&[5, 12, 17, 40])
+        .shifts(&[-0.5, 0.0, 0.6])
+        .pressure_angle(&[14.5, 20.0, 25.0, 30.0, 40.0])
+        .dedendum(DEDENDA)
+        .thickness_mod(THICKNESS_MODS)
+        .root_radius(&[0.0, 0.38])
+        .build()
+    {
+        let gear = Gear::new(p);
+        let outline = gear.outline(1e-3);
+        let tag = format!(
+            "z={} x={} a={} hf={} k={} rho={}",
+            p.teeth, p.profile_shift, p.pressure_angle, p.dedendum, p.thickness_mod, p.root_radius
+        );
+        assert!(
+            outline.iter().all(|v| v.bulge >= 0.0),
+            "an arc runs clockwise on a counter-clockwise outline at {tag}"
+        );
+        let profile = gear.profile(120);
+        let n = common::crossings(&profile[..profile.len() - 1]);
+        assert_eq!(n, 0, "{n} crossings at {tag}");
+    }
+}
+
+/// **The root stops where the rack's tooth closes, and says so exactly there.**
+///
+/// A rack's tooth narrows toward its tip, and past a certain depth it has
+/// come to a point: at a sharp corner that is `h_f = π/(4 tan α_n) − x_s`,
+/// whatever the shift, tooth count or helix. Asked deeper, the tool reaches no
+/// further, and the root is held at that depth with `clamp.space_closed`. The
+/// root radius is continuous through the cap — it stops moving rather than
+/// jumping — and the note fires on one side of it only.
+#[test]
+fn the_depth_stops_where_the_racks_tooth_closes() {
+    use gear_core::note::key;
+    let mut reached = 0;
+    for p in Grid::new()
+        .teeth(&[9, 17, 40])
+        .shifts(&[-0.3, 0.0, 0.6])
+        .pressure_angle(&[14.5, 20.0, 25.0, 40.0])
+        .helix_angle(&[0.0, 25.0])
+        .thickness_mod(THICKNESS_MODS)
+        .build()
+    {
+        let an = p.pressure_angle.to_radians();
+        let closes = std::f64::consts::PI / (4.0 * an.tan()) - p.thickness_shift();
+        // Either side by far more than the smallest round moves it (1e-9 m),
+        // and far less than anything a designer types.
+        let step = 1e-6;
+        let at = |h: f64| Tooth::new(GearParams { dedendum: h, ..p });
+        let (short, past) = (at(closes - step), at(closes + step));
+        // The axis can stop the root first, and a clamped thickness or depth
+        // is not the tooth the closed form describes.
+        let other = [
+            key::CLAMP_DEDENDUM_CAPPED,
+            key::CLAMP_DEDENDUM_RAISED,
+            key::CLAMP_TOOTH_THICKNESS_CAPPED,
+            key::CLAMP_TOOTH_THICKNESS_RAISED,
+        ];
+        if other
+            .iter()
+            .any(|k| short.clamps.fired(k) || past.clamps.fired(k))
+        {
+            continue;
+        }
+        reached += 1;
+        let tag = format!(
+            "z={} x={} a={} b={} k={}",
+            p.teeth, p.profile_shift, p.pressure_angle, p.helix_angle, p.thickness_mod
+        );
+        assert!(
+            !short.clamps.fired(key::CLAMP_SPACE_CLOSED)
+                && past.clamps.fired(key::CLAMP_SPACE_CLOSED),
+            "the note does not change sides at h_f = {closes:.6} at {tag}"
+        );
+        assert!(
+            (short.rf - past.rf).abs() <= 2.0 * step * p.module,
+            "the root jumps {:.3e} mm across the cap at {tag}",
+            short.rf - past.rf
+        );
+        let deeper = at(closes + 1.0);
+        assert!(
+            (deeper.rf - past.rf).abs() < 1e-12 * p.module,
+            "the root moves past the cap at {tag}"
+        );
+    }
+    assert!(reached > 0, "no case reached the cap");
 }

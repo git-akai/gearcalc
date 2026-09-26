@@ -83,6 +83,76 @@ fn profile_is_bounded_from_both_sides_by_the_cutter() {
     );
 }
 
+/// Rows past the main grid's corner, one axis at a time rather than as a
+/// product — the main grid is already the suite's slowest test. Each row is
+/// where a rack's tooth comes to a point before the ISO depth: steep pressure
+/// angles, a deep dedendum, a thick tooth.
+fn pointed_rack_rows() -> Vec<GearParams> {
+    let row = || {
+        Grid::new()
+            .teeth(&[5, 9, 17, 31])
+            .shifts(&[-0.2, 0.0, 0.5])
+            .root_radius(&[0.0, 0.38])
+    };
+    [
+        row().pressure_angle(&[30.0, 35.0, 40.0]).build(),
+        row().dedendum(&[2.0]).build(),
+        row().thickness_mod(&[1.3]).build(),
+    ]
+    .concat()
+}
+
+/// **The gate holds where the rack comes to a point.** Its cutter is built
+/// from the inputs and the tool, so a tooth whose depth was driven past the
+/// rack's closing point shows as a root the rack never reached — 4e-2 to
+/// 0.37 mm of deviation — until the depth stops there.
+#[test]
+fn profile_is_bounded_by_the_cutter_where_the_rack_comes_to_a_point() {
+    let mut closed = 0;
+    for p in pointed_rack_rows() {
+        let g = Tooth::new(p);
+        closed += usize::from(g.clamps.fired(gear_core::note::key::CLAMP_SPACE_CLOSED));
+        let rep = check_cut(&g, 150);
+        let tag = format!(
+            "z={} x={} a={} hf={} k={} rho={}",
+            p.teeth, p.profile_shift, p.pressure_angle, p.dedendum, p.thickness_mod, p.root_radius
+        );
+        assert!(
+            rep.penetration <= PENETRATION_LIMIT,
+            "penetration {:.3e} mm at {tag}",
+            rep.penetration
+        );
+        assert!(
+            rep.deviation < DEVIATION_LIMIT,
+            "deviation {:.3e} mm at {tag}",
+            rep.deviation
+        );
+    }
+    assert!(closed > 0, "no row reached the rack's closing depth");
+}
+
+/// The root the gate's own cutter reaches, where the rack's tooth closes above
+/// the asked depth: `r − b_point`, `b_point = (π m_t − s_t)/(2 tan α_t)` at a
+/// sharp corner. At z20, α30°, h_f 1.4 that is 8.6397 mm; driving the rack to
+/// the asked depth put the root at 8.600.
+#[test]
+fn the_root_is_where_the_racks_tooth_closes() {
+    let g = Tooth::new(GearParams {
+        teeth: 20,
+        pressure_angle: 30.0,
+        dedendum: 1.4,
+        root_radius: 0.0,
+        ..Default::default()
+    });
+    let b_point = (std::f64::consts::PI * g.mt - g.st) / (2.0 * g.alpha_t.tan());
+    assert!(
+        (g.rf - (g.r - b_point)).abs() < 1e-8,
+        "root at {} against {}",
+        g.rf,
+        g.r - b_point
+    );
+}
+
 /// The gate's rack is rebuilt from the inputs and the settled tool, never from
 /// the tooth, so a tooth that is wrong in a way its own derived quantities agree
 /// with is still a tooth that rack did not cut.

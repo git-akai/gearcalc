@@ -16,14 +16,17 @@ use gear_core::auto::admissible_ranges;
 use gear_core::gear::Gear;
 use gear_core::{GearParams, Tooth};
 
-/// Finite, ordered radii and a closed outline — the minimum for a gear to be a
-/// gear at all.
+mod common;
+
+/// Finite, ordered radii and a closed outline that does not cross itself — the
+/// minimum for a gear to be a gear at all.
 fn is_constructible(p: GearParams) -> bool {
     let g = Tooth::new(p);
     let finite = [g.r, g.rb, g.ra, g.rf, g.st].iter().all(|v| v.is_finite());
     let outline = Gear::new(p).profile(120);
     let closed = outline.len() > 8 && outline.first() == outline.last();
-    finite && g.ra > g.rf && g.rf > 0.0 && closed
+    let simple = common::crossings(&outline[..outline.len() - 1]) == 0;
+    finite && g.ra > g.rf && g.rf > 0.0 && closed && simple
 }
 
 #[test]
@@ -46,6 +49,19 @@ fn the_specifications_ranges_are_conventional_not_mathematical() {
                 ..Default::default()
             }),
             "alpha={pressure_angle} should be constructible"
+        );
+    }
+    // ...and past about 65° the ISO dedendum is deeper than the rack's tooth
+    // reaches before it comes to a point, so the root stops there and says so.
+    for pressure_angle in [70.0, 85.0] {
+        assert!(
+            Tooth::new(GearParams {
+                pressure_angle,
+                ..Default::default()
+            })
+            .clamps
+            .fired(gear_core::note::key::CLAMP_SPACE_CLOSED),
+            "alpha={pressure_angle}: the rack's tooth closes above the dedendum"
         );
     }
     // Helix angle: the specification says +-45.
@@ -126,17 +142,24 @@ fn the_geometric_bounds_are_exactly_where_the_generator_starts_clamping() {
                     ..p
                 },
                 "clamp.dedendum_capped"
+            ) && !clamped(
+                GearParams {
+                    dedendum: hi - eps,
+                    ..p
+                },
+                "clamp.space_closed"
             ),
             "clamped inside the dedendum ceiling"
         );
+        // Two things end the dedendum, and the ceiling is whichever comes
+        // first: the root reaching for the axis, or the rack's tooth coming to
+        // a point before it gets there.
+        let past = GearParams {
+            dedendum: hi + eps,
+            ..p
+        };
         assert!(
-            clamped(
-                GearParams {
-                    dedendum: hi + eps,
-                    ..p
-                },
-                "clamp.dedendum_capped"
-            ),
+            clamped(past, "clamp.dedendum_capped") || clamped(past, "clamp.space_closed"),
             "no clamp above the dedendum ceiling"
         );
 

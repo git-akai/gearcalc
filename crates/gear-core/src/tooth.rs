@@ -486,15 +486,26 @@ impl Tooth {
             (3.0 * psi_b).cbrt(),
             Tol::default(),
         );
+        let mut pointed = None;
         if let Some(u_point) = u_point {
             let ra_point = rb * f64::hypot(1.0, u_point);
             if ra > ra_point {
                 ra = ra_point;
+                pointed = Some(u_point);
                 clamps.push(Note::new(key::CLAMP_TIP_CAPPED_POINTED).number("radius", ra, 4));
             }
         }
         let ra = ra.max(rb * (1.0 + guard::TIP_ABOVE_BASE_FRACTION));
-        let u_tip = crate::involute::roll_at_radius(ra, rb);
+        // A pointed tip is a point: the flanks meet on the centreline, at the
+        // roll that was solved for, rather than at a tip land a rounding wide
+        // and of either sign.
+        let (u_tip, theta_a) = pointed.map_or_else(
+            || {
+                let u = crate::involute::roll_at_radius(ra, rb);
+                (u, psi_b - inv_from_roll(u))
+            },
+            |u| (u, 0.0),
+        );
 
         // ---- flank / fillet junction ------------------------------------
         //
@@ -525,7 +536,7 @@ impl Tooth {
             ac,
             ra,
             u_tip,
-            theta_a: psi_b - inv_from_roll(u_tip),
+            theta_a,
             l,
             undercut,
             u_j: 0.0,
@@ -919,6 +930,19 @@ impl Rack {
         }
     }
 
+    /// How deep below the rolling line the rack's tooth can reach with a tip
+    /// round `rho` still fitting between its flanks, mm.
+    ///
+    /// The fit is linear in the depth: `ρ(1 − sin α_t)/cos α_t + b_d tan α_t ≤
+    /// (π m_t − s_t)/2`, so its limit is closed form. At a sharp corner it is
+    /// `m(π/(4 tan α_n) − x − x_s)`: a tool depth, `b_d + m x`, that depends on
+    /// neither the shift nor the tooth count.
+    #[must_use]
+    pub fn deepest(st: f64, rho: f64, alpha_t: f64, mt: f64) -> f64 {
+        let (ca, sa) = (alpha_t.cos(), alpha_t.sin());
+        ((std::f64::consts::PI * mt - st) / 2.0 - rho * (1.0 - sa) / ca) / alpha_t.tan()
+    }
+
     /// The tool a single tooth asks for, and the clamps that asking raised.
     ///
     /// This is the settling [`Tooth::new`] used to do inline. It is a free
@@ -950,6 +974,18 @@ impl Rack {
             bd = guard::MAX_CUTTER_DEPTH_FRACTION_OF_R * r;
             notes.push(Note::new(key::CLAMP_DEDENDUM_CAPPED));
         }
+        // The rack's tooth narrows toward its tip, and deeper than `deepest` it
+        // has come to a point before the depth asked: the smallest round no
+        // longer fits, and the tool reaches no further. Held where the smallest
+        // round is the fraction of what fits that every round is held to, so a
+        // root arc remains; the depth itself takes no margin, and the root
+        // radius stops moving rather than jumping.
+        let rho_min = guard::MIN_FILLET_MODULES * m;
+        let deepest = Self::deepest(st, rho_min / guard::FILLET_FRACTION_OF_MAX, alpha_t, mt);
+        if bd > deepest {
+            bd = deepest;
+            notes.push(Note::new(key::CLAMP_SPACE_CLOSED).number("radius", r - bd, 4));
+        }
 
         // The round has to fit both the depth and the space the tooth leaves.
         let Settled { rho_fit, .. } = Self::settle(st, bd, alpha_t, mt);
@@ -957,10 +993,10 @@ impl Rack {
         let rho_cap =
             (guard::FILLET_FRACTION_OF_MAX * bd).min(guard::FILLET_FRACTION_OF_MAX * rho_fit);
         if rho > rho_cap {
-            rho = rho_cap.max(guard::MIN_FILLET_MODULES * m);
+            rho = rho_cap.max(rho_min);
             notes.push(Note::new(key::CLAMP_FILLET_CAPPED).number("radius", rho, 4));
         }
-        let rho = rho.max(guard::MIN_FILLET_MODULES * m);
+        let rho = rho.max(rho_min);
 
         // Stored against the *reference* pitch circle rather than this tooth's
         // rolling line, so one value serves every shift: `b_d = depth − m x`.

@@ -156,10 +156,10 @@ guards begin to clamp.
 | Pressure angle | `0 < α < 90°` | `x_s → ∞` below, `r_b → 0` above |
 | Tooth count | `z ≥ 1` | |
 | Helix angle | `\|β\| < 90°` | `m_t → ∞` at the limit |
-| Thickness mod. | `0 < k < 2` | a rack whose tooth or space has no width is not a rack |
+| Thickness mod. | `0 < k < 2` | a rack whose tooth or space has no width at the datum line is not a rack; below it the tooth narrows, and the dedendum's bound says where it closes |
 | Profile shift | computed, below | |
 | Addendum | `h_a > max(−h_f, (r_b − r)/m − x)` | tooth must have height; tip must clear the base circle |
-| Dedendum | `−h_a < h_f < x + 0.9 r/m` | positive height; root circle off the axis |
+| Dedendum | `−h_a < h_f < min(x + 0.9 r/m, π/(4 tan α_n) − x_s)` | positive height; root circle off the axis; no deeper than the rack's tooth reaches before it comes to a point (at a sharp corner; the smallest round moves it by ~1e-9 m) |
 | Root radius | `ρ ≤ 0.95 · min(b_d, ρ_max)/m_t` | the round must fit both the depth and the space |
 | Angular shift | see below | one tool must reach every tooth |
 

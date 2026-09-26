@@ -183,3 +183,116 @@ pub const MODULES: &[f64] = &[0.5, 1.0, 3.7, 12.0];
 
 /// Either side of nominal. `k = 1` is the unmodified rack.
 pub const THICKNESS_MODS: &[f64] = &[0.7, 1.0, 1.3];
+
+/// Dedenda, in modules: shallow, the ISO 53 rack, and two deep enough that a
+/// rack's tooth comes to a point before it reaches them at ordinary pressure
+/// angles (h_f > π/(4 tan α_n) − x_s, 2.16 at 20°).
+pub const DEDENDA: &[f64] = &[0.3, 1.25, 2.0, 3.0];
+
+// ---------------------------------------------------------------------------
+// Reading a drawn outline back as points, and asking whether it is simple.
+// ---------------------------------------------------------------------------
+
+/// The circle a bulged span `a → b` lies on: `(centre, radius, included angle)`.
+///
+/// From the chord and the bulge alone — the DXF definition, `bulge = tan(θ/4)`,
+/// positive counter-clockwise — so it shares nothing with how the outline was
+/// drawn. `None` for a straight span.
+pub fn arc_of(a: [f64; 2], b: [f64; 2], bulge: f64) -> Option<([f64; 2], f64, f64)> {
+    if bulge == 0.0 {
+        return None;
+    }
+    let theta = 4.0 * bulge.atan();
+    let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
+    let chord = f64::hypot(dx, dy);
+    // Signed distance from the chord's midpoint to the centre, to the left of
+    // travel: `c/2 · (1 − b²)/(2b)`.
+    let h = chord / 2.0 * (1.0 - bulge * bulge) / (2.0 * bulge);
+    let (nx, ny) = (-dy / chord, dx / chord);
+    let centre = [(a[0] + b[0]) / 2.0 + nx * h, (a[1] + b[1]) / 2.0 + ny * h];
+    let radius = f64::hypot(a[0] - centre[0], a[1] - centre[1]);
+    Some((centre, radius, theta))
+}
+
+/// A closed outline as points, each bulged span replaced by `per_arc` chords
+/// along its true arc.
+pub fn flatten(outline: &[gear_core::Vertex], per_arc: usize) -> Vec<[f64; 2]> {
+    let n = outline.len();
+    let mut out = Vec::with_capacity(n * 2);
+    for i in 0..n {
+        let v = outline[i];
+        let w = outline[(i + 1) % n];
+        let (a, b) = ([v.x, v.y], [w.x, w.y]);
+        out.push(a);
+        if let Some((c, radius, theta)) = arc_of(a, b, v.bulge) {
+            let start = (a[1] - c[1]).atan2(a[0] - c[0]);
+            for k in 1..per_arc {
+                #[allow(clippy::cast_precision_loss)]
+                let t = start + theta * k as f64 / per_arc as f64;
+                out.push([c[0] + radius * t.cos(), c[1] + radius * t.sin()]);
+            }
+        }
+    }
+    out
+}
+
+/// How many pairs of non-adjacent segments of a closed polyline cross.
+///
+/// Proper crossings only — each segment's ends strictly either side of the
+/// other. A vertex repeated to rounding (within `1e-12` of the outline's size)
+/// is read once, since two spans meeting through a zero-length one would
+/// otherwise "cross" by an ulp; whether an outline repeats a vertex is a law
+/// of its own. Segments are swept in order of their least `x`, so only pairs
+/// whose extents overlap are compared: the count is exact and the cost is near
+/// linear on an outline, where crossings can only be local.
+pub fn crossings(points: &[[f64; 2]]) -> usize {
+    let size = points
+        .iter()
+        .map(|p| f64::hypot(p[0], p[1]))
+        .fold(0.0, f64::max);
+    let mut kept: Vec<[f64; 2]> = Vec::with_capacity(points.len());
+    for &p in points {
+        let near = |q: &[f64; 2]| f64::hypot(p[0] - q[0], p[1] - q[1]) <= 1e-12 * size;
+        if !kept.last().is_some_and(near) {
+            kept.push(p);
+        }
+    }
+    while kept.len() > 1
+        && f64::hypot(
+            kept[0][0] - kept[kept.len() - 1][0],
+            kept[0][1] - kept[kept.len() - 1][1],
+        ) <= 1e-12 * size
+    {
+        kept.pop();
+    }
+    let points = &kept;
+    let n = points.len();
+    let seg = |i: usize| (points[i], points[(i + 1) % n]);
+    let cross = |o: [f64; 2], a: [f64; 2], b: [f64; 2]| {
+        (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+    };
+    let mut order: Vec<usize> = (0..n).collect();
+    let lo_x = |i: usize| seg(i).0[0].min(seg(i).1[0]);
+    let hi_x = |i: usize| seg(i).0[0].max(seg(i).1[0]);
+    order.sort_by(|&a, &b| lo_x(a).total_cmp(&lo_x(b)));
+    let mut count = 0;
+    for (k, &i) in order.iter().enumerate() {
+        let (p, q) = seg(i);
+        for &j in &order[k + 1..] {
+            if lo_x(j) > hi_x(i) {
+                break;
+            }
+            let adjacent = (i + 1) % n == j || (j + 1) % n == i;
+            if adjacent {
+                continue;
+            }
+            let (r, s) = seg(j);
+            let (d1, d2) = (cross(p, q, r), cross(p, q, s));
+            let (d3, d4) = (cross(r, s, p), cross(r, s, q));
+            if d1 * d2 < 0.0 && d3 * d4 < 0.0 {
+                count += 1;
+            }
+        }
+    }
+    count
+}

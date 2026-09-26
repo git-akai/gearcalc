@@ -118,7 +118,10 @@ those is a limit of the mathematics; all four were convention.
 `tests/extremes.rs` is the standing evidence.
 
 The converse also holds: a *cutter* whose corner rounds overlap is not a tool,
-and a body with `T ω ≤ 0` is not an input. Both are refused.
+and a body with `T ω ≤ 0` is not an input. Both are refused. A rack whose tooth
+comes to a point before the depth asked *is* a tool — one that reaches no
+deeper — so the root stops where its tooth closes and says so
+(`clamp.space_closed`), as a ring's root does where its space closes.
 
 **And it cuts against convenience.** The buildable shift range runs past the
 depth the dedendum asked for, because a deeper hob cuts that gear perfectly well

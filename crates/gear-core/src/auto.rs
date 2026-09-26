@@ -528,7 +528,10 @@ fn tighter(a: Bound, b: Bound) -> Bound {
 ///   positive height. Also `r_a > r_b`, which binds only at extreme negative
 ///   addendum.
 /// - **Dedendum**, lower: the same condition read the other way, `h_f > −h_a`.
-///   Upper: the root circle must stay off the axis, `m(h_f − x) < r`.
+///   Upper: the root circle must stay off the axis, `m(h_f − x) < 0.9 r`, and
+///   the rack's tooth must not come to a point before it reaches the depth,
+///   [`Rack::deepest`] — `π/(4 tan α_n) − x_s` at a sharp corner, whatever the
+///   shift.
 /// - **Root radius**, upper: the tip round must fit both the cutter depth and
 ///   the tooth space. The space limit is
 ///   `ρ_max = w_tip cos α_t / (2(1 − sin α_t))` — the fit the prior work records
@@ -667,13 +670,17 @@ fn ranges_at_shift(p: &GearParams, working_depth: f64) -> Ranges {
     let above_root = -p.dedendum;
     let above_base = (rb * (1.0 + guard::TIP_ABOVE_BASE_FRACTION) - r) / p.module - x;
 
-    // Dedendum: positive height, and a root circle that does not reach the axis.
+    // Dedendum: positive height, a root circle that does not reach the axis, and
+    // no deeper than the rack's tooth reaches before it comes to a point.
     let root_positive = x + guard::MAX_CUTTER_DEPTH_FRACTION_OF_R * r / p.module;
 
     // Root radius: the tip round must fit the cutter depth and the tooth space.
     let bd = p.module * (p.dedendum - x);
     let st = p.module * (PI / 2.0 + 2.0 * (x + p.thickness_shift()) * an.tan()) / beta.cos();
     let rho_fit = Rack::settle(st, bd, alpha_t, mt).rho_fit;
+    let rho_min = guard::MIN_FILLET_MODULES * p.module;
+    let tool_closes =
+        x + Rack::deepest(st, rho_min / guard::FILLET_FRACTION_OF_MAX, alpha_t, mt) / p.module;
     let rho_max = guard::FILLET_FRACTION_OF_MAX * bd.min(rho_fit);
 
     Ranges {
@@ -692,7 +699,7 @@ fn ranges_at_shift(p: &GearParams, working_depth: f64) -> Ranges {
 
         profile_shift: admissible_profile_shift(p, working_depth),
         addendum: Bound::between(Some(above_root.max(above_base)), None),
-        dedendum: Bound::between(Some(-p.addendum), Some(root_positive)),
+        dedendum: Bound::between(Some(-p.addendum), Some(root_positive.min(tool_closes))),
         root_radius: Bound::between(Some(0.0), Some((rho_max / mt).max(0.0))),
         angular_shift: admissible_angular_shift(p),
     }
