@@ -162,16 +162,38 @@ impl Backlash {
     /// it differently — so it is the argument, and the three lines around it are
     /// not.
     pub fn banded(nominal: f64, minus: f64, plus: f64, angular: impl Fn(f64) -> f64) -> Self {
-        let (lo, mid, hi) = (
+        Self::of_ends([
             angular(nominal - minus),
             angular(nominal),
             angular(nominal + plus),
-        );
-        Self {
-            nominal: mid,
-            minimum: lo.min(mid).min(hi),
-            maximum: lo.max(mid).max(hi),
-        }
+        ])
+    }
+
+    /// **One source's band**, from its play at the minus end, the running
+    /// point and the plus end: the extremes of the three.
+    #[must_use]
+    pub fn of_ends(ends: [f64; 3]) -> Self {
+        Self::of_sources([ends])
+    }
+
+    /// **Independent sources stacked**, each given at its minus end, its
+    /// running point and its plus end: the nominal is the sum of the
+    /// running points, and each end the sum of every source's own extreme
+    /// — sources that do not move together reach their worst case at once.
+    #[must_use]
+    pub fn of_sources(sources: impl IntoIterator<Item = [f64; 3]>) -> Self {
+        sources.into_iter().fold(
+            Self {
+                nominal: 0.0,
+                minimum: 0.0,
+                maximum: 0.0,
+            },
+            |b, [lo, mid, hi]| Self {
+                nominal: b.nominal + mid,
+                minimum: b.minimum + lo.min(mid).min(hi),
+                maximum: b.maximum + lo.max(mid).max(hi),
+            },
+        )
     }
 }
 
@@ -3437,10 +3459,17 @@ fn paths_of(
         .filter(|&s| base[s] == Condition::Ground)
         .collect();
     // Every mesh's play in the row's own units at the three band points,
-    // in the flow's mesh order, which is each part's in turn.
+    // in the flow's mesh order, which is each part's in turn — and the
+    // graph's distance each is on, the source its play moves with.
     let row_play: Vec<[f64; 3]> = rated
         .iter()
         .flat_map(|r| r.meshes.iter().map(|m| m.row_play))
+        .collect();
+    let distance_of: Vec<Option<usize>> = parts
+        .iter()
+        .flat_map(|p| {
+            (0..p.shape.meshes.len()).map(|j| p.shape.distance_of(j).map(|d| p.distances[d]))
+        })
         .collect();
     // The flow driving `from` against `to` through `meshes`: its
     // efficiency, and the power its meshes pass over the power in.
@@ -3492,22 +3521,31 @@ fn paths_of(
             .and_then(Result::ok)
             .map_or(0.0, |s| s.values[read].to_f64().abs())
     };
+    // **The band, one source per distance**: the meshes on one distance
+    // move together as it runs at its minus end, its running point or its
+    // plus end, and distances apart are independent, so each reaches its
+    // own extreme at once. A mesh with no distance is a source of its own.
     let backlash_at = |read: Body, from: Body| -> Backlash {
-        Backlash::banded(0.0, 1.0, 1.0, |t| {
-            let band = if t < 0.0 {
-                0
-            } else if t > 0.0 {
-                2
-            } else {
-                1
+        let mut sources: Vec<(Result<usize, usize>, [f64; 3])> = Vec::new();
+        for (k, play) in row_play.iter().enumerate() {
+            let c = coefficient(k, read, from);
+            let source = distance_of.get(k).copied().flatten().ok_or(k);
+            let at = match sources.iter().position(|(s, _)| *s == source) {
+                Some(i) => i,
+                None => {
+                    sources.push((source, [0.0; 3]));
+                    sources.len() - 1
+                }
             };
-            row_play
-                .iter()
-                .enumerate()
-                .map(|(k, play)| coefficient(k, read, from) * play[band])
-                .sum::<f64>()
-                .to_degrees()
-        })
+            for (sum, p) in sources[at].1.iter_mut().zip(play) {
+                *sum += c * p;
+            }
+        }
+        Backlash::of_sources(
+            sources
+                .into_iter()
+                .map(|(_, ends)| ends.map(f64::to_degrees)),
+        )
     };
     let mut out = Vec::new();
     for (from, to) in wanted {
@@ -11241,6 +11279,173 @@ mod tests {
             }
             for g in &spur(&r.by_part[0]).members {
                 assert_eq!(g.face_width, 7.0);
+            }
+        }
+    }
+
+    /// Every path's band, each way, as `[nominal, minimum, maximum]` in
+    /// degrees, in the order the solve lists its paths.
+    fn bands(t: &Train) -> Vec<[f64; 3]> {
+        solve_train(t, &test_library())
+            .unwrap_or_else(|e| panic!("{e}"))
+            .paths
+            .iter()
+            .flat_map(|p| [p.backlash.forward, p.backlash.backward])
+            .map(|b| [b.nominal, b.minimum, b.maximum])
+            .collect()
+    }
+
+    /// The trains the band laws sweep: every preset alone, every
+    /// arrangement of a set, the hula, and every ordered pair of presets in
+    /// a chain, each with a case along its conventional ends.
+    fn band_trains() -> Vec<(String, Train)> {
+        use crate::planetary::{Arrangement, PlanetaryShaft};
+        let mut out: Vec<(String, Train)> = Vec::new();
+        for p in Preset::ALL {
+            out.push((format!("{p:?}"), Train::alone(&p.build(), 2.0, 3000.0)));
+        }
+        let set = arr::planetary(12, 30, 72, 3);
+        for input in PlanetaryShaft::ALL {
+            for fixed in PlanetaryShaft::ALL {
+                if input != fixed {
+                    let arrangement = Arrangement { input, fixed };
+                    out.push((
+                        format!("{arrangement:?}"),
+                        Train::alone(&set, 2.0, 3000.0).arranged_as(arrangement),
+                    ));
+                }
+            }
+        }
+        out.push(("hula".into(), Train::alone(&hula(), 2.0, 3000.0)));
+        for a in Preset::ALL {
+            for b in Preset::ALL {
+                let mut t = Train::chained(vec![a.build(), b.build()], |_| Vec::new());
+                let mut case = t.fresh_case(CaseKind::Ultimate, 2.0, 3000.0);
+                case.enabled = true;
+                t.load_cases.push(case);
+                out.push((format!("{a:?}+{b:?}"), t));
+            }
+        }
+        out
+    }
+
+    /// **A path's backlash band is the sum of each distance's own**: the
+    /// meshes on one distance move together, and independent distances
+    /// stack to their worst case. So the band with every tolerance is the
+    /// bands with each distance's tolerance alone, summed end by end, less
+    /// the nominal counted once too often per extra distance — which
+    /// contains every corner of the tolerance box and reaches each end at
+    /// one. A distance alone is read at its own three points, the route no
+    /// fold can get wrong, so the law holds the fold to it. Every preset,
+    /// every arrangement of a set, and every ordered pair of presets.
+    #[test]
+    fn a_path_band_is_each_distance_band_summed() {
+        let mut stacked = 0;
+        for (name, t) in band_trains() {
+            let all = bands(&t);
+            assert!(!all.is_empty(), "{name}: no path to read a band on");
+            let d = t.shape.distances.len();
+            let alone: Vec<Vec<[f64; 3]>> = (0..d)
+                .map(|keep| {
+                    let mut u = t.clone();
+                    for (j, x) in u.shape.distances.iter_mut().enumerate() {
+                        if j != keep {
+                            x.tolerance_plus = 0.0;
+                            x.tolerance_minus = 0.0;
+                        }
+                    }
+                    bands(&u)
+                })
+                .collect();
+            for (p, b) in all.iter().enumerate() {
+                let extra = (d.max(1) - 1) as f64 * b[0];
+                let sum = |e: usize| alone.iter().map(|a| a[p][e]).sum::<f64>() - extra;
+                let scale = b[2].abs().max(1e-3);
+                for (e, what) in [(1, "minimum"), (2, "maximum")] {
+                    assert!(
+                        (b[e] - sum(e)).abs() <= 1e-9 * scale,
+                        "{name}: path row {p}: {what} {:.6} against {:.6} summed",
+                        b[e],
+                        sum(e)
+                    );
+                }
+                if d > 1 && (b[2] - b[1]) > 1e-9 {
+                    stacked += 1;
+                }
+            }
+        }
+        assert!(
+            stacked > 0,
+            "no train stacks two distances: the law is vacuous"
+        );
+    }
+
+    /// **Widening a tolerance never narrows the band**: each distance's
+    /// tolerances doubled in turn, every path's band each way contains the
+    /// one it had.
+    #[test]
+    fn widening_a_tolerance_never_narrows_a_band() {
+        for (name, t) in band_trains() {
+            let before = bands(&t);
+            for d in 0..t.shape.distances.len() {
+                let mut u = t.clone();
+                u.shape.distances[d].tolerance_plus *= 2.0;
+                u.shape.distances[d].tolerance_minus *= 2.0;
+                for (p, (a, b)) in before.iter().zip(bands(&u)).enumerate() {
+                    assert!(
+                        b[1] <= a[1] + 1e-12 && b[2] >= a[2] - 1e-12,
+                        "{name}: distance {d} widened, path row {p}: {a:?} became {b:?}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// **The bands the audit measured**, at the shipped proportions: the
+    /// meshed-planet set alone, whose three distances stack to a band from
+    /// nought, a pair ahead of a planocentric at ±0.02 mm, and a planetary
+    /// set, whose one distance holds its path's play stationary at every
+    /// tolerance.
+    #[test]
+    fn the_stacked_bands_the_audit_measured() {
+        let deg = |b: &Backlash| [b.minimum, b.maximum];
+        let meshed = solve_train(
+            &Train::alone(&Preset::MeshedPlanets.build(), 2.0, 3000.0),
+            &test_library(),
+        )
+        .unwrap();
+        let got = deg(&meshed.paths[0].backlash.forward);
+        assert!(
+            (got[0] - 0.0).abs() < 5e-7 && (got[1] - 0.139_563).abs() < 5e-7,
+            "{got:?}"
+        );
+        let mut t = Train::chained(
+            vec![Preset::Spur.build(), Preset::Planocentric.build()],
+            |_| Vec::new(),
+        );
+        for x in &mut t.shape.distances {
+            x.tolerance_plus = 0.02;
+            x.tolerance_minus = 0.02;
+        }
+        let mut case = t.fresh_case(CaseKind::Ultimate, 2.0, 3000.0);
+        case.enabled = true;
+        t.load_cases.push(case);
+        let r = solve_train(&t, &test_library()).unwrap();
+        let got = deg(&r.paths[0].backlash.forward);
+        assert!(
+            (got[0] - 0.0).abs() < 5e-7 && (got[1] - 0.197_206).abs() < 5e-7,
+            "{got:?}"
+        );
+        // A set's two meshes share one distance and move together: its
+        // path's play is stationary there, whatever the tolerance.
+        for tol in [0.0, 0.02, 0.05, 0.2] {
+            let mut set = Preset::Planetary.build();
+            set.distances[0].tolerance_plus = tol;
+            set.distances[0].tolerance_minus = tol;
+            let r = solve_train(&Train::alone(&set, 2.0, 3000.0), &test_library()).unwrap();
+            let b = r.paths[0].backlash.forward;
+            for v in [b.nominal, b.minimum, b.maximum] {
+                assert!((v - 0.041_724).abs() < 5e-7, "planetary at ±{tol}: {b:?}");
             }
         }
     }

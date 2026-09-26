@@ -2568,8 +2568,10 @@ so; and the **play** at the second driven from the first and the reverse,
 each mesh's own play through the kinematics' coefficients
 (`MeshReport::row_play`, `System::play`), so a mesh the path does not cross
 adds nothing — each mesh's angular backlash at **its own** distance plus a
-helical member's axial slide, the band being every distance at the same end
-of its own tolerance. Beside them, two figures the graph makes free: **the
+helical member's axial slide. The band is summed per distance: the meshes on
+one distance move together through its minus end, running point and plus end,
+and distances apart are independent, so each end of the band is every
+distance at its own worst end at once. Beside them, two figures the graph makes free: **the
 power through the teeth** over the power in, both ways — one across a
 pair, `6/7` across a set's sun mesh with the ring held (the carrier carrying
 the rest bodily), and `η |R − 1|` across each of a hula's, which is where its

@@ -3540,23 +3540,6 @@ pub fn rate(
             }
         }
     };
-    // **Each mesh's play at its own distance**, and the band is every
-    // distance at the same end of its own tolerance at once: `t` is −1, 0
-    // or +1 and each mesh reads its distance's minus, running or plus. A
-    // first draft evaluated every mesh at the *first* distance, which on a
-    // shape with one distance is the same thing and on a Ravigneaux put a
-    // planet–planet mesh 7 mm from where it runs.
-    let at_band = |k: usize, t: f64| -> f64 {
-        let d = &shape.distances[shape.distance_of(k).unwrap_or(0)];
-        built.meshes[k].running
-            + if t < 0.0 {
-                -d.tolerance_minus
-            } else if t > 0.0 {
-                d.tolerance_plus
-            } else {
-                0.0
-            }
-    };
     let member_backlash = |k: usize, side: MeshSide| -> super::Backlash {
         let m = shape.meshes[k];
         let z = f64::from(match side {
@@ -3808,7 +3791,13 @@ pub fn rate(
                 member_backlash(k, MeshSide::First),
                 member_backlash(k, MeshSide::Second),
             ];
-            let row_play = [-1.0, 0.0, 1.0].map(|t| play_of(k, at_band(k, t)));
+            // Each mesh's play at its own distance's minus end, running
+            // point and plus end: the three a path's band folds per distance.
+            let row_play = {
+                let d = &shape.distances[shape.distance_of(k).unwrap_or(0)];
+                let running = built.meshes[k].running;
+                [-d.tolerance_minus, 0.0, d.tolerance_plus].map(|dx| play_of(k, running + dx))
+            };
             match &bm.contact {
                 BuiltContact::Line(l) => super::line_mesh_report(
                     cases,
