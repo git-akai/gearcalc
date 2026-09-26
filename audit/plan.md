@@ -154,7 +154,7 @@ Then T11.14 and, last, T11.13.
 
 **Tasks.** The tracks run in parallel; inside a track, follow the order given.
 - **Tooth and tool:** T03.7 → T03.8; T03.9, T03.10, T03.12, T12.14; T03.13 → T03.14; T03.15 comes after T05.17's first steps.
-- **Outline and eccentric:** T04.6; T04.8 decides whether T04.9, T04.10 → T04.11, T04.12 and T04.13 are done or deleted.
+- **Outline and eccentric:** T04.6, T04.8; T04.9, T04.10 → T04.11, T04.12, T04.13.
 - **Internal gears:** T05.7, T05.11, T05.14, T05.15; T05.9 → T05.10; T10.10 (with T05.3) → T05.12 → T05.13; then T05.17.
 - **Parallel mesh:** T06.5 → T06.6 → T06.7; T08.7 before T06.6; T06.8 → T06.9; T06.2, T06.10, T07.19.
 - **Crossed and worm:** T07.6 → T07.7 → T07.18; T07.4, T07.5, T07.8 → T07.15; T07.9, T07.12 → T07.13 (with T15.9, after T15.2); T07.14, T07.16, T07.17.
@@ -186,7 +186,7 @@ Then T11.14 and, last, T11.13.
 **Goal.** One home per fact, in the present tense, with every figure generated or gated.
 
 **Tasks.**
-- Structural first: T18.1, T18.3 → T18.4, T18.24; T18.13 → T18.14; T18.15, T18.16, T18.17.
+- Structural first: T18.1, T18.28, T18.3 → T18.4, T18.24; T18.13 → T18.14; T18.15, T18.16, T18.17.
 - Then the instances, each after its code: T18.5, T18.6, T18.7 → T18.8, T18.9, T18.10, T18.11, T18.12, T18.18, T18.19, T18.20, T18.21, T18.22, T18.23, T18.25, T18.26, T18.27.
 - From the other workstreams: T03.11, T05.16, T07.10, T07.11, T09.11, T10.20, T12.17, T14.19, T20.9, T21.1.
 
@@ -203,7 +203,7 @@ Then T11.14 and, last, T11.13.
 
 **Tasks.** Parallel except where arrows show order.
 - Loss, loads and planets: T21.2, T21.4 → T21.5, T21.6, T21.8.
-- Materials and tolerances: T21.7, T21.3, T09.12.
+- Materials and tolerances: T21.7, T21.3. T09.12 is parked until the ISO 1328-2 text is in hand.
 - Contact: T21.9 → T21.12, T21.11, T21.13 → T21.14, T21.15.
 - Export: T21.10, T04.14.
 - UI: T19.5 → T19.6, T19.16, T19.17.
@@ -211,31 +211,16 @@ Then T11.14 and, last, T11.13.
 
 **Exit.** Each feature has its law or published-example gate (for example c′ ≈ 14 and c_γ ≈ 20 N/(mm·µm) for T21.13), and is off or neutral by default.
 
-## Decisions for the owner
+## Open decisions
 
-1. **Restated prose against "the ratio is not a target."** Recommended: replace that sentence with *one home per fact*, enforced by `check_restatement.py` (T18.1, T18.14, T18.17). The derivations stay; restatements become links. Trade-off: the prose ratio falls, and a reader follows a link instead of reading the argument in place.
-2. **Efficiency model.** Recommended: weight the loss by load per unit contact-line length (T06.8). It is closed form, equals Ohlendorf at ε_β = 0 and today's value at integer ε_β, and has no spur/helical branch. Trade-off: the corpus moves (canary 98.741 → 98.919 %, Wolfrom ≈ 45.4 → 49.4 %). The alternative keeps today's model and records its +16.5 % spur loss bias.
-3. **Tolerance standard.** Recommended: keep the JGMA tables as the default, since all 294 cells check, once they are stored as printed (T09.1). Add ISO 1328-2:2020 as a user-selected second standard (T09.12) once its formula has been read from the standard itself. Trade-off: two standards to maintain, and their grades do not map onto each other.
-4. **Stable IDs or renumber maps.** Recommended: `Train::edit` returns what it made and how it renumbered (T13.11). No renumbering has been shown wrong, and stable IDs would change the file format. Trade-off: undo (T19.5) must replay renumber maps.
-5. **The eccentric gear (T04.8).** It costs about 550 lines of code and 460 of comment, it is reachable only in developer mode, and no train builds it. Recommended: cut it unless it is on the product path. Cutting turns six tasks into one deletion; keeping it costs about two weeks (T04.9–T04.13).
-6. **Allowables.** Recommended:
-   - each fatigue value states its load ratio and specimen kind, and 0.7 applies only to R = 0 data (T08.4);
-   - add a contact allowable estimated from hardness, with a quality grade the user can see (T08.6);
-   - keep contact sizing off by default, but raise a note whenever σ_H exceeds the allowable.
-
-   Trade-off: defaulting contact sizing on would triple the canary's minimum width.
-7. **Shift floor.** Recommended: floor every member at x_min, and make non-negativity an explicit per-member option (T12.6). Trade-off: some searched designs move, and eight tests that encode the current refusals must be rewritten.
-8. **Defaults that are rules of thumb.** Recommended:
-   - clearance and tolerance in modules, with ISO/TR 10064-2 backlash as a named option (T15.3), which changes today's zero default minimum backlash;
-   - the near-locking margin as an input (T15.9);
-   - K_γ as an explicit input (T21.2);
-   - the worm's locking reported as figures, not a verdict (T07.13).
-
-   Trade-off: more inputs on the panel.
-9. **Relief seeding (T15.8).** Recommended: seed the exact figure and display at one significant-figure count that the core exports. This changes the recorded intent "the digits they saw"; the alternative rounds to significant figures in one helper.
-10. **By-hand scripts in CI.** Recommended: yes, once T16.2 makes them read the crate. They cost about 20 s.
+1. **Efficiency model (T06.8).** Weight the loss by load per unit contact-line length, holding the total at the transmitted force at every instant. It is closed form, equals Ohlendorf's H_V at ε_β = 0 and today's value at integer ε_β, and has no spur/helical branch. It lowers spur loss by about 14 % (canary 98.741 → 98.919 %, Wolfrom ≈ 45.4 → 49.4 %). The alternative is to keep today's model and record its bias in state.md: +12–19 % spur loss.
+2. **Allowables (T08.4, T08.6).** Each fatigue value states its load ratio, and the 0.7 reversed fraction applies only to R = 0 data. Contact gets its own allowable, which for the steels is higher than the bending figure it borrows today. Contact sizing stays off by default, and a note is raised whenever σ_H exceeds the allowable. The open question is how the contact allowable is sourced: estimated from hardness with a visible quality grade, taken from a datasheet, or bounded by mechanics alone (subsurface yield, shakedown).
+3. **Shift floor (T12.6).** The search floors every member at max(x_min, 0): a non-negativity rule rides inside "no undercut". The open question is whether to drop that hidden floor and leave the single floor the option names, x_min.
+4. **Worm locking (T07.13).** A back-driven worm whose static friction exceeds its locking threshold reports 0 % efficiency, although it runs at a positive efficiency once moving. The open question is whether the running figure is reported beside the self-locking note.
 
 ## What not to touch
+
+The named components below are recorded in a verified register (T18.28), which states what each was checked against and fails a gate when its code changes without the record. The general properties at the end of the list (robustness, layering, the boundary, the gates) belong to this audit only; they are not registered.
 
 These parts were checked against independent computations and hold. Do not re-audit them; change them only through the tasks above.
 - **Root finders**: Brent and bracketed Newton match Numerical Recipes step for step, and a switch to Chandrupatla or TOMS748 gains nothing. **Carlson** R_F/R_D are accurate to ≤ 3.3 ε. The inverse-involute seed's 0.4 is exact. **Ratio** normalises correctly. The **plane.rs** identities are exact.

@@ -31,6 +31,7 @@
 | T18.25 Test prose and the coverage claims about tests | lens-tests-geometry#9, lens-tests-train#10, lens-docs-accuracy-1#18 | low | S | — |
 | T18.26 Remaining stale pointers | lens-docs-accuracy-2#11, added3#16 (unverified), added2#36, graph-ops#9 | low | S | — |
 | T18.27 The worm-bending rationale, on its one real reason | crossed-worm#7 | low | S | — |
+| T18.28 A verified register, gated against the code it covers | plan.md#what-not-to-touch | medium | M | T18.1, T16.14 |
 
 ### T18.1 One home per fact: the map's head, README, state.md
 
@@ -361,3 +362,16 @@ Keep "why this is a named function" paragraphs and the wasm entry-point contract
 The optional ISO/TS 14521-style root-shear figure is a feature for T07.20.
 
 **Proof.** Review against the cited standards' formula, τ_F = F_tm2/(b₂H m_x)·Y_ε Y_F Y_γ Y_K.
+
+### T18.28 A verified register, gated against the code it covers
+
+**Change.** Add a "Verified" section to docs/state.md. That is the one document allowed to hold dated claims, and a verification is dated. It carries one entry per named component in plan.md's "What not to touch": root finders, Carlson integrals, ratio, plane identities, tooth generation, ring geometry, mesh geometry, Hertz, bending, kinematics and flow, the screw at the pitch point, metrology, the graph's partition and round trip, the search's determinism, and the DXF container. General properties are not registered: robustness, layering, the boundary and the gates. Each entry states:
+- the claim, in one sentence;
+- the independent check that settled it and the agreement it reached, as a command or test to re-run;
+- the files and items it covers;
+- the commit it was last verified at.
+
+The register's heading states the rule: **editing covered code means re-running the entry's check and updating the entry in the same change, or deleting the entry.** CLAUDE.md's "To change X" table gains one row pointing at it.
+
+**Proof.** Add `tools/check_verified.py`, run in CI. For each entry, it fails when any covered file has changed since the entry's commit (per `git log`) unless the entry's commit is bumped in the same change. A fixture entry pointed at a touched file fails. The register starts green at the commit that adds it.
+

@@ -15,7 +15,7 @@
 | T09.9 Cutter tip width from the settled tool; small API fixes | added#13, metrology#18(a,c) | low | S | — |
 | T09.10 Delete the unread `limits` fields | metrology#13 | low | S | — |
 | T09.11 Labels that say what is measured | metrology#16 | low | S | — |
-| T09.12 ISO 1328-2 as a user-selected second standard | metrology#4 | low | M | T09.1 |
+| T09.12 ISO 1328-2 as a user-selected second standard (parked until sourced) | metrology#4 | low | M | T09.1 |
 
 ### T09.1 JGMA bands stored as printed
 
@@ -124,4 +124,6 @@ Solve it with `solve::newton_bracketed`; at c = 1 it is linear and exact in one 
 
 **Change.** Add `Standard::{Jgma116_02, Iso1328_2}`, chosen by the user, with JGMA staying the default. Implement ISO as `base(m_n, d) · 2^((Q−Q₀)/2)`, unrounded, with the standard's rounding as an explicit option. Target ISO 1328-2:2020, which is current and covers d ≤ 600 mm; if the 1997 edition is used instead, label it withdrawn. Its grade-5 forms are F_i'' = 3.2 m_n + 1.01 √d + 6.4 and f_i'' = 2.96 m_n + 0.01 √d + 0.8. Put the validity bounds in `Ranges`, and say when a gear is outside them. The summary names the standard and grade in force. Grades cannot be mapped between the two standards: a JGMA fine grade's total corresponds to about ISO g+5.6, but its tooth-to-tooth to about g+7.5.
 
-**Proof.** A handful of printed Annex cells, recomputed at the geometric-mean m and d with the rounding, are equal. Continuity in m and d. Exactly √2 per grade before rounding, for ISO only and never applied to JGMA data. The 2020 formula must first be read from the standard itself.
+**Proof.** A handful of printed Annex cells, recomputed at the geometric-mean m and d with the rounding, are equal. Continuity in m and d. Exactly √2 per grade before rounding, for ISO only and never applied to JGMA data.
+
+**Parked.** Starts only once the ISO 1328-2 text is in hand, so the formula and the Annex cells come from the standard itself. The forms quoted above are secondary transcriptions. JGMA stays the default whether or not this lands.

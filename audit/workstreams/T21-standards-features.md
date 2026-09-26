@@ -5,7 +5,7 @@
 | Task | Findings | Sev | Effort | Needs |
 |---|---|---|---|---|
 | T21.1 Disclose every departure with size and sign; record what is out of scope | lens-standards#3, lens-standards#5, lens-standards#8, lens-standards#9, lens-feature-gaps#8, lens-feature-gaps#9, lens-feature-gaps#11, lens-feature-gaps#12 | medium | M | — |
-| T21.2 An explicit planet load-share factor K_γ per replicated axis | lens-standards#3 | medium | M | T21.1 |
+| T21.2 Planet load-share factor K_γ, a train-level model input | lens-standards#3 | medium | M | T21.1 |
 | T21.3 Tooth-thickness deviations: one input for the play band and metrology | lens-feature-gaps#3 | medium | M | T09.10, T10.1 |
 | T21.4 Power lost per mesh in watts, and the train's total | lens-feature-gaps#8 | low | S | — |
 | T21.5 Per-body bearing loss as an explicit input | lens-standards#5 | medium | M | T21.4 |
@@ -42,9 +42,9 @@
 
 **Proof.** Run the check on the current tree before any edit. It must fail on at least one current entry (for example the entries [strength#16] names), and it must pass once the edits land. `tools/check_doc_links.py` and `tools/check_strings.py` stay green.
 
-### T21.2 An explicit planet load-share factor K_γ per replicated axis
+### T21.2 An explicit planet load-share factor K_γ, a train-level model input
 
-**Change.** Add `load_share_factor: f64` to a replicated axis in `train/shape.rs`, default 1, validated ≥ 1 through the shared input validation ([lens-numerical-robustness#5], T01). In `pressing_torque_at_a` (shape.rs:3288), rate the most-loaded instance at `K_γ · |mesh_torques[k]| / paths(k)`. The flow is untouched. Add a line in `inputs`, the field in `TrainPanel.svelte`, and one label ×5. An "estimate from AGMA 6123" fill is allowed only as a labelled population table, and only once the table is transcribed with its source.
+**Change.** Add `load_share_factor: f64` to the train's model inputs, beside `Reversal`, with default 1 and validation ≥ 1 through the shared input validation ([lens-numerical-robustness#5], T01). It is one figure for the train, applied to every replicated axis. In `pressing_torque_at_a` (shape.rs:3288), rate the most-loaded instance at `K_γ · |mesh_torques[k]| / paths(k)`. The flow is untouched. Add a line in `inputs`, the field in `TrainPanel.svelte`, and one label ×5. An "estimate from AGMA 6123" fill is allowed only as a labelled population table, and only once the table is transcribed with its source.
 
 **Proof.** A law over every preset with a replicated axis: at K_γ = k, every planet-mesh bending stress scales by k, contact scales by √k, and every flow total and path figure is bit-identical. At K_γ = 1 the golden corpus does not move.
 

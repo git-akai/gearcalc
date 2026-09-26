@@ -6,7 +6,7 @@
 |---|---|---|---|---|
 | T15.1 Defaults defined once, in the core | lens-magic-numbers#3, wasm-boundary#7, graph-ops#14, added2#37, added2#24, lens-magic-numbers#4, lens-magic-numbers#6, graph-ops#11, gear-io#12 | low | S | — |
 | T15.2 Give the default friction a source and a basis | lens-magic-numbers#1 | medium | M | T15.1 |
-| T15.3 Length defaults in modules; backlash band as a named option | lens-standards#6 | medium | L | T15.1 |
+| T15.3 Tooth-scaled defaults in modules; positional ones stay in mm | lens-standards#6 | medium | L | T15.1 |
 | T15.4 One stopping rule in `solve.rs`, and a solve that returns a chosen side | primitives#4, ablate-constants-rating#14 | low | S | — |
 | T15.5 `grow_bracket` and `bisect_predicate`; closed brackets where they exist | lens-magic-numbers#11, primitives#13, ablate-constants-geometry#8, ablate-constants-geometry#9, primitives#12 | low | M | T15.4 |
 | T15.6 Tip sizing returns the clear side exactly (no 1e-9 lean) | ablate-constants-rating#12, added2#106, ablate-constants-geometry#12, lens-magic-numbers#14, lens-continuity#9 | low | S | T15.4 |
@@ -45,14 +45,13 @@ The target is a friction that is a property of the material pair, carrying a `Ba
 
 **Proof.** The materials law ("every non-datasheet value carries a note") is extended to the friction default and fails today. `check_doc_links.py` passes.
 
-### T15.3 Length defaults in modules; backlash band as a named option
+### T15.3 Tooth-scaled defaults in modules; positional ones stay in mm
 **Change.**
-- Express `min_tip_width` (mod.rs:1306, 0.1 mm) in modules.
-- Express the running clearance and tolerance band (`push_distance`, 0.02 mm ± 0.02 mm) in modules, or give the clearance an automatic value from ISO/TR 10064-2's j_bn,min = (2/3)(0.06 + 0.0005·a + 0.03·m_n): 0.070 mm for the default m = 1, a = 30 pair, 0.190 mm at m = 5, a = 150. That table targets coarse pitch (m_n ≳ 1.5), so at m = 1 it is a rule of thumb. It must appear as a named, user-visible option with a note, not as a silent default.
-- Keep `default_planet_clearance` (0.3 mm) absolute: it is a physical gap.
+- Express `min_tip_width` (mod.rs:1306, 0.1 mm) in modules: it is a property of the tooth.
+- Keep the running clearance and its tolerance band (`push_distance`, 0.02 mm ± 0.02 mm) and `default_planet_clearance` (0.3 mm) in mm. They are positional tolerances, set by the process and the housing rather than by the tooth, and a designer states them in mm. Define each once, in the core (T15.1), with that reason next to it.
 - The standard way to take backlash off a fixed housing is a thickness allowance on both gears. That needs lifting the k1 + k2 = 2 rule (state.md:764–770). Its backlash is closed form, j_t = (2 − k1 − k2)·πm/2, and the tips already read x + x_s. Coordinate with T21.3 and T10.1 [lens-feature-gaps#3, mesh-contact#0]. The absolute 1.75 mm pin default is T09.7 [metrology#14].
 
-**Proof.** A scaling law over explicitly scaled inputs (every length ×s, including `face_width`) scales every length output by s. It fails today because of the mm defaults. A test that the default pair's minimum backlash is ≥ the stated option's value, where that option is on. Today it is −0.00000.
+**Proof.** A scaling law over explicitly scaled inputs: every length ×s, including `face_width`, and the positional tolerances passed in scaled rather than taken from their mm defaults. Every length output must scale by s. Today it fails on `min_tip_width`.
 
 ### T15.4 One stopping rule in `solve.rs`, and a solve that returns a chosen side
 **Change.** State the rule once and make both solvers read it the same way. Today Brent stops at a bracket ≤ x_tol + 4ε|b| and Newton at a step < x_tol + 2ε|x|. The 1e-15 absolute floor governs for |x| < 2.25, so Brent's relative error on a root of 1e-9 is 1.8e-7. Either:
@@ -109,14 +108,14 @@ In `shaper::largest_tip_round` (shaper.rs:432–450), solve the raw corner angle
 ### T15.8 One seed rule for relief, shared with the panel
 **Change.** Three sites seed with `(v·1e4).round()/1e4` (mod.rs:2359, 3661, 3664). A fourth copy is `toFixed(4)` at TrainPanel.svelte:1814. This rounding is absolute for every unit, so 7.46e-5 N·m seeds as 0.0001 (+34 %), and pinning a box moves quantities the designer did not touch.
 
-Recommended: seed the exact figure, and have the panel format every box, given or automatic, at one display precision the core exports as a named significant-figure count. That changes the recorded intent "the digits they saw" and is the owner's call. The alternative keeps rounding, but to significant figures in one Rust `seed()` helper, with the panel formatting to the same count. The display side is T19.7 [web#9]; change both together.
+Seed the exact figure. The panel formats every box, given or automatic, at one display precision the core exports as a named significant-figure count. The display side is T19.7 [web#9]; change both together, and reword the recorded intent "the digits they saw" in rationale.md.
 
-**Proof.** A law over every preset and toggle: `relieved_from` followed by a solve reproduces every figure to 1e-12 relative (exact seeding), or to 1e-6 (significant figures), across torques from 1e-6 to 1e6. It fails today on Spur, Compound, Worm and Crossed (the Compound minimum backlash changes sign). `a_box_relief_pins_is_seeded_from_its_figure`'s 0.1235 becomes the exact value.
+**Proof.** A law over every preset and toggle: `relieved_from` followed by a solve reproduces every figure to 1e-12 relative, across torques from 1e-6 to 1e6. It fails today on Spur, Compound, Worm and Crossed (the Compound minimum backlash changes sign). `a_box_relief_pins_is_seeded_from_its_figure`'s 0.1235 becomes the exact value.
 
 ### T15.9 State the self-locking note thresholds; margin as an input
 **Change.** In `point_mesh_report` (shape.rs:2700, 2709):
 - Name `LOW_EFFICIENCY = 0.5`. It is definitional: η_back = 2 − 1/η_fwd at the pitch point.
-- Name the near-locking margin 0.8, whose value nothing argues. Frame it as the allowance for uncertainty in static μ and make it a user-visible input with default 0.8, per the owner's rule on rules of thumb.
+- Name the near-locking margin 0.8, whose value nothing argues. Frame it as the allowance for uncertainty in static μ, and make it a user-visible input with default 0.8. It belongs in the train's model inputs, beside `Reversal` and K_γ (T21.2): it judges a verdict about the whole train, not a property of one mesh.
 - Pass the margin into the note as `{margin}` in all five catalogues.
 - Document both next to "locked backwards" in reference.md, including that the efficiency note reads sliding μ while locking reads static μ. That is why the two notes can disagree near the line.
 

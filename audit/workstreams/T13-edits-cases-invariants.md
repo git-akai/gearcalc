@@ -14,7 +14,7 @@
 | T13.8 One validated way to hold, release, join and set a duty; refusal keys that say why | graph-ops#7, added2#82, edit-ops#12, lens-errors-policy#15 | low | S | T13.3 |
 | T13.9 Refuse the adds that are certain dead ends | edit-ops#7, added2#38 | low | S | T13.1 |
 | T13.10 Pin the preview's comparison | edit-ops#4 | low | S | — |
-| T13.11 `Train::edit` reports what it made and how it renumbered | lens-architecture#4, edit-ops#4 (path identity) | low | M | T13.2, T13.10 |
+| T13.11 `Train::edit` reports what it made and how it renumbered; state is path-independent | lens-architecture#4, edit-ops#4 (path identity) | low | M | T13.2, T13.10 |
 | T13.12 One rule for a bare body | edit-ops#10 | low | S | — |
 | T13.13 An Insert names its preset | edit-ops#13 | low | S | — |
 | T13.14 `LoadCase` API: `arranged` keeps its promise, first-entry accessors go | train-mod-b#12, train-mod-b#13 | low | S | — |
@@ -96,7 +96,8 @@ Add the new keys to all five catalogues.
 ### T13.11 `Train::edit` reports what it made and how it renumbered
 **Change.** `Train::edit` returns `EditOutcome { made: Vec<PieceRef>, renumbered: Renumbering }`, built from the maps that `prune`/`merge` already compute (T13.2 exposes `merge`'s). `edit_train` passes it through. `TrainPanel.svelte:249-254`'s `made()` becomes a lookup instead of restating "the lower body survives a join" and "the first new mesh is at the old count" in TypeScript. The preview then matches the headline path by its mapped (from, to) ends, not by (case index, entry count). Newtype indices (`BodyId`, `SlotId`, …) that serialize as plain numbers can follow as a separate, optional step.
 **Proof.** Law: for every offered edit on every preset, each piece named in `made` exists afterwards, and `renumbered` maps every surviving old index to the same piece, compared by content. `check_bindings.sh --write` and `check_wasm.sh --write`.
-**Notes.** Stable never-renumbered ids, which would bump the file format, are not justified: the TypeScript rules agree with the core today, and nothing shows a wrong renumbering.
+**Principle.** The state is a function of the train, not of the edits that built it. Renumbering is what keeps this true: after every edit the indices are dense and canonical, so two routes to one train give one state. Stable, never-renumbered ids would break that, so they are not used.
+**Second proof.** A path-independence law: for every preset, a train reached by a seeded sequence of offered edits and the same train built directly serialize identically once each is canonicalised.
 
 ### T13.12 One rule for a bare body
 **Change.** Add one `Shape::is_bare(body)`: no member, carries no axis, and not held by a coupling from a fixed axis (the orbiting exception stated once). `clear_axis`, `drop_if_bare` and `drop_member` (`edits.rs:667-680, 790-826`) call it, and `Train::drop_bare` (`conditions.rs:1120-1143`) adds only "named by a hold or case". Unified this way, the gear-core suite passed 604/604. That shows the differences between the four rules are unpinned. It does not show they don't matter.

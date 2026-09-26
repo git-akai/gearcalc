@@ -11,7 +11,7 @@
 | T04.5 CI reads back every kind of DXF and checks each arc | gear-io#2, added#37, tools-ci#15 | medium | M | T04.1, T04.4 |
 | T04.6 Eccentric backlash through the one backlash law | lens-unification#0, gear-outline#4 | medium | S | — |
 | T04.7 One chord-tolerance floor, reported, with its bound sent from Rust | added#19, added2#103, wasm-boundary#12, gear-outline#12, ablate-constants-geometry#11, added2#81 | low | M | T04.3 |
-| T04.8 Decide whether to keep the eccentric gear | ablate-features#15 | info | S | — |
+| T04.8 Keep the eccentric gear, behind the developer knock | ablate-features#15 | info | S | — |
 | T04.9 State λ's two operating modes | gear-outline#3 | medium | M | T04.8 |
 | T04.10 λ: seam and crossing law, a published bound, root identity by section | gear-outline#6, gear-outline#10, added#25 | medium | M | T04.1, T04.8 |
 | T04.11 A root displacement that cannot fold the fillet | gear-outline#5 | medium | M | T04.3, T04.10 |
@@ -108,9 +108,9 @@ Today the tolerance is missed silently, by 19.7× at z17 1e-10 and 98× at z17 m
 
 **Notes.** A degenerate gear (m = 0 or NaN) gives 1,114,146 vertices [added2#81]. With the non-finite stop the outline refuses it. The params gate that refuses it at the boundary is T02.6 and T01.6 [lens-errors-policy#9, lens-numerical-robustness#4]. The comments that credit the floor with the cap's work (T18.23 [added#20]) and the redundant wall-clock assert (T16.8 [added2#86]) land with this task.
 
-### T04.8 Decide whether to keep the eccentric gear
+### T04.8 Keep the eccentric gear, behind the developer knock
 
-**Change.** Decide whether to keep the eccentric gear before T04.9–T04.13 are funded. It costs about 550 lines of code and 460 of comment across gear.rs, metrology's `*_at`/`_around`, auto.rs and gear-wasm, plus about 30 tests of its own. It is reachable only from the single-gear tab in developer mode, and every train member is built at `angular_shift: 0.0` (shape.rs:1027). Keeping it means about two weeks of the tasks below. Cutting it turns T04.6 and T04.9–T04.13 into one deletion and reduces T04.4 to its signature change.
+**Change.** The eccentric gear stays: no other tool offers it. It stays behind the developer-mode knock on the single-gear tab, and train members keep `angular_shift: 0.0` (shape.rs:1027). T04.9–T04.13 bring it to the standard of the rest; they are about two weeks of work. State the knock and its reason once, in rationale.md#unfinished-work-is-knocked-for-not-switched-on.
 
 **Notes.** Do not split the eccentric results into a separate optional result. That would bring back the branch rule 4 removed, and at Δx = 0 `Gear::new` already generates one distinct tooth.
 
