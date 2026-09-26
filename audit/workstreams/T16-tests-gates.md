@@ -34,6 +34,7 @@
 | T16.28 Flow order and idle rules pinned | lens-tests-train#9, edit-ops#3 | low | S | T16.3 |
 | T16.29 Small train-test fixes | lens-tests-train#8, added2#107, edit-ops#11 | low | S | — |
 | T16.30 Every gate is a flake check | tools-ci#12 | low | M | T16.2, T16.14, T16.17 |
+| T16.31 Kill the surviving mutants | mutation.md | medium | L | T16.6, T16.13 |
 
 ### T16.1 check_figures matches rows, not a bag of numbers
 **Change.** In `tools/check_figures.py` (:425–441) the outputs of all tagged commands are joined into one string, and a documented number passes if it equals any number in that string at the document's precision. Instead, each table row's strong figures (two or more decimals) must appear as an ordered subsequence of the number stream of *one* tagged command. Keep the bag rule for prose blocks only. Reorder the columns of `reference.md:640-641` to the `gear-cli shifts` order (Σx … ε, η), or allow an explicit per-block `unordered` flag with a stated reason. Delete the dead branch at :399–402. For the 8 `figures-by-test` markers, which today only check that `fn name(` occurs somewhere (a comment would do): require `#[test]` directly above the fn, extract its body, and require every number in the tagged block to appear among that body's literals at the document's precision. Longer term, have a harness command print each such table and gate it as `figures:`, so only one copy of the literal exists (`arrangements.rs:1399` and `reference.md:1924` hold two today).
@@ -275,6 +276,10 @@ Name the idle threshold (`1e-9` absolute today) and make it relative to the case
 
 Whether the by-hand scripts run in CI is a separate policy decision; once T16.2 makes them fail on a crate defect, they cost about 20 s. Then update CLAUDE.md's "`nix flake check` is **not** all of them" and README ([lens-docs-accuracy-1#6], [added2#56]).
 **Proof.** `nix flake check` fails on each mutation named in T16.1, T16.14, T16.17 and T16.18. CI saves the release gear-cli build and the check_bindings compile.
+
+### T16.31 Kill the surviving mutants
+**Change.** Add the 18 laws in [`../mutation.md`](../mutation.md). The first is a module-similarity law: every length scales with m and every angle is unchanged. It runs every fixture at m ≠ 1 as well as at 1, and on its own it kills nine survivors across six files. The others add a both-sides sweep of every threshold and note, one fixture per refusal that breaks only its rule, and a fired-counter on every assertion inside a branch. Delete the 12 equivalent survivors that sit in dead code with their removal tasks (T12.5, T17.2, T17.5, T17.7, T05.12). Allowlist the rest, each with its reason.
+**Proof.** Re-run cargo-mutants with `--test-workspace` on the same shards. Every mutant classed as a gap is caught.
 
 ### Declined
 - lens-tests-train#12: the grid it would trim is deliberate (the fourfold-budget `assert_eq` on every set). It is not what sets the wall time; T16.10 is.

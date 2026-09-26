@@ -16,7 +16,7 @@ The plan makes the gates able to fail first, then fixes the 27 high-severity wro
 - **38 auditors**: 21 subsystem slices (primitives, tooth form, ring, outline, mesh contact, crossed/worm, strength, metrology, shape, train, flow, search, edits, graph, gear-io, wasm boundary, web, CLI, tools/CI and others), 14 cross-cutting lenses (unification, continuity, magic numbers, errors policy, numerical robustness, performance, architecture, standards, feature gaps, docs accuracy ×2, docs clarity, tests ×2) and 3 ablations (dead features, geometry constants, rating constants).
 - **Adversarial verification** of every finding by a second agent that tried to refute it. Findings raised during verification were verified in turn, except 25 from the last round, which stay unverified.
 - **Execution reproduction** of the 36 high-severity findings: 35 reproduced, 1 in part.
-- **Mutation testing**: 1,025 gear-core mutants sampled. 144 of the 974 viable ones survived the suite (14.8 %). The most survivors were in `auto.rs` (26 of 86), `ring.rs` (17/83), `metrology.rs` (14/53), `verify.rs` (14/72), `solve.rs` (13/30) and `train/mod.rs` (13/67).
+- **Mutation testing**: 1,223 gear-core mutants sampled, across the library and `train/`. 181 of the 1,161 viable ones survived the suite (15.6 %). Counted per mutant there are 184: 69 cannot change any output, 26 touch only the harness or a test oracle, and 89 are real gaps. The gaps are concentrated in `train/shape.rs` (14), `auto.rs` (12), `train/mod.rs` (9) and `gear.rs` (8). Most survive for one of two reasons. Every fixture sits at module 1, where m·x and x/m agree. And a threshold is approached from one side only. [`mutation.md`](mutation.md) classifies every survivor and gives the 18 laws that kill the gaps.
 - **Perturbation of 130 constants** (61 geometry, 69 rating). 38 were caught by the suite, 39 only by the golden corpus, and 53 by neither.
 - **Coverage**: 88.1 % of workspace lines. Every gear-core file is at 93 % or more. `gear-cli/src/main.rs` is at 0.9 %.
 
@@ -166,12 +166,12 @@ Then T11.14 and, last, T11.13.
 - **Structure:** T14.5 → T14.10; T14.8 → T14.9; T14.11, T14.15 → T14.16, T14.18, T14.20.
 - **Numerics:** T15.1 → T15.2, T15.3, T15.4 → T15.5, T15.6 → T15.7; T15.8, T15.10, T15.11, T15.12, T15.14, T15.15, T15.16, T15.17, T15.18.
 - **Dead code:** T17.2, then T17.4, T17.5, T17.7, T17.8, T17.9, T17.10, T17.11.
-- **Tests:** T16.9, T16.10 → T16.11 → T16.12 (with T05.2), T16.20, T16.22, T16.23, T16.24, T16.25, T16.26, T16.27, T16.28, T16.29, then T16.30.
+- **Tests:** T16.9, T16.10 → T16.11 → T16.12 (with T05.2), T16.20, T16.22, T16.23, T16.24, T16.25, T16.26, T16.27, T16.28, T16.29, then T16.30 and T16.31.
 - **Harness:** T20.2, T20.3, T20.5, T20.7 → T20.8, T20.10, T20.11, T20.12.
 - **UI:** T19.13, T19.14, T19.15.
 
 **Exit.**
-- At least 92 % of the gear-core mutation sample is caught (85.2 % today). Every survivor, and every survivor of a sample of `train/*.rs`, is either killed or allowlisted with a reason.
+- Every survivor in [`mutation.md`](mutation.md) that is classed as a gap is killed by a law (T16.31). Every survivor classed as equivalent is deleted with its dead code or allowlisted with a reason. The re-run sample, including `train/*.rs` and run with `--test-workspace`, is at least 92 % caught (84.4 % today).
 - All 130 perturbed constants are either caught by a law or deleted; none is left that is caught by neither.
 - The dead-pub allowlist holds only the reference oracles.
 - Permutation laws over meshes, members, distances and relief groups are green.
