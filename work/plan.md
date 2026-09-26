@@ -163,7 +163,16 @@ absences of PC-31. Also PC-30's silent `teeth.max(1)` clamps, which become refus
 - Spike **S-C** (unified contact geometry) runs as a research track beside G/R/L. It uses Python
   prototypes against both closed forms and produces a report before any code lands. If it succeeds,
   it replaces the `Path` interface's two implementations.
-- Before C, `structure.rs` puts the train into the kinematic-graph representation (principle 9).
+- The graph work follows [`design-graph.md`](design-graph.md), steps M1–M12.
+  - M1–M4 are behaviour-neutral: disjoint sets, one incidence index, carrier-tree validation, and the
+    transfer vertex computed beside today's frame.
+  - M5 switches each mesh's frame to its transfer vertex. That is H2's structural cure, replacing
+    Stage 1's interim refusal.
+  - M8 is redesign F; M9 rebuilds the flow view from F's result.
+  - M10 is redesign C.
+  - M11 makes gears stand-alone, after G, R and K exist.
+  - petgraph is not used: it lacks matching, DM and a cycle basis, and would need a second copy of
+    the graph.
 
 **Stage 4 — The audit's remaining Phase 4 tasks** that no redesign replaced: rating, metrology, edits,
 numerics, dead code, the CLI harness and the UI. Afterwards: re-run mutation testing (target ≥ 92 %
