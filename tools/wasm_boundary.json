@@ -3445,23 +3445,23 @@
    "ok": [
     [
      "en",
-     526
+     532
     ],
     [
      "de",
-     526
+     532
     ],
     [
      "pt",
-     526
+     532
     ],
     [
      "zh-Hans",
-     526
+     532
     ],
     [
      "zh-Hant",
-     526
+     532
     ]
    ]
   },
@@ -8192,7 +8192,7 @@
         "angle": 0,
         "worm": false,
         "distance": {
-         "auto": false,
+         "auto": true,
          "manual": "0.10000000000000001"
         },
         "clearance": {
@@ -10674,7 +10674,7 @@
         "angle": 0,
         "worm": false,
         "distance": {
-         "auto": false,
+         "auto": true,
          "manual": "0.10000000000000001"
         },
         "clearance": {
@@ -10694,7 +10694,7 @@
         "angle": 0,
         "worm": false,
         "distance": {
-         "auto": false,
+         "auto": true,
          "manual": "0.10000000000000001"
         },
         "clearance": {
@@ -28453,7 +28453,8 @@
          ],
          "running": "30.025652520608507",
          "clearance": "0.019999999999999574",
-         "sized_by": null
+         "sized_by": null,
+         "stagger": null
         }
        ],
        "axes": [
@@ -28979,9 +28980,9 @@
            "maximum": "0.052880278886497017"
           },
           "backward": {
-           "nominal": "0.83728095683881798",
+           "nominal": "0.83728095683881809",
            "minimum": "0.73875937459991980",
-           "maximum": "0.93629199675503538"
+           "maximum": "0.93629199675503560"
           }
          },
          "circulation": {
@@ -29002,9 +29003,9 @@
          },
          "backlash": {
           "forward": {
-           "nominal": "0.83728095683881798",
+           "nominal": "0.83728095683881809",
            "minimum": "0.73875937459991980",
-           "maximum": "0.93629199675503538"
+           "maximum": "0.93629199675503560"
           },
           "backward": {
            "nominal": "0.047288293243388395",
@@ -30186,7 +30187,8 @@
          ],
          "running": "30.025652520608507",
          "clearance": "0.019999999999999574",
-         "sized_by": null
+         "sized_by": null,
+         "stagger": null
         },
         {
          "nominal": [
@@ -30195,7 +30197,8 @@
          ],
          "running": "21.145278775291828",
          "clearance": "0.019999999999999574",
-         "sized_by": null
+         "sized_by": null,
+         "stagger": null
         }
        ],
        "axes": [
@@ -31716,6 +31719,22 @@
      }
     },
     "adjusted": false
+   }
+  },
+  "carrier_cycle": {
+   "import_train": {
+    "refused": "error.train_malformed_carried_by_cycle"
+   },
+   "solve_train": {
+    "ok": {
+     "note": {
+      "key": "error.train_malformed_carried_by_cycle",
+      "values": {
+       "axis": "1"
+      }
+     },
+     "part": null
+    }
    }
   },
   "export_materials": {

@@ -21,6 +21,7 @@ torque: Auto<number>,
 /**
  * rpm, given or derived from the other loads through the motion. A
  * given nought is a load held still; the flow then takes its direction
- * from the torque's sign.
+ * from its impending motion, signed so the given torques do positive
+ * work on it.
  */
 speed: Auto<number>, };

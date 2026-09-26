@@ -11605,7 +11605,7 @@ mod tests {
                 .map(|c| {
                     c.bodies
                         .iter()
-                        .map(|b| (b.at, ((b.torque * 1e9).round() as i64) as u64))
+                        .map(|b| (b.at, b.torque.to_bits()))
                         .collect()
                 })
                 .collect()

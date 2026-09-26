@@ -29,7 +29,7 @@ const exact = (_k, v) =>
 
 const called = [];
 const call = (name, f) => {
-  called.push(name);
+  if (!called.includes(name)) called.push(name);
   try {
     return { ok: f() };
   } catch (e) {
@@ -282,6 +282,23 @@ const out = {
   import_train: call("import_train", () =>
     JSON.parse(w.import_train(w.export_train(JSON.stringify(trainDoc)))),
   ),
+  // **A carrier cycle refused where it enters**: the default train with
+  // its first two axes each carried by the body on the other, read back
+  // from its own file and solved — each answer the key naming the field.
+  carrier_cycle: (() => {
+    const train = structuredClone(defaults.train);
+    const on = (axis) => train.shape.bodies.find((b) => b.axis === axis).body;
+    train.shape.axes[0].carried_by = on(1);
+    train.shape.axes[1].carried_by = on(0);
+    return {
+      import_train: call("import_train", () =>
+        JSON.parse(w.import_train(w.export_train(JSON.stringify({ name: "cycle", train })))),
+      ),
+      solve_train: call("solve_train", () =>
+        JSON.parse(w.solve_train(JSON.stringify({ train, materials: library }))).failure,
+      ),
+    };
+  })(),
   export_materials: call("export_materials", () => w.export_materials(JSON.stringify(library))),
   import_materials: call("import_materials", () =>
     JSON.parse(w.import_materials(w.export_materials(JSON.stringify(library)))),

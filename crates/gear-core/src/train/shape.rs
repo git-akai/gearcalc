@@ -3684,7 +3684,7 @@ pub fn rate(
     // ---- notes.
     let mut notes = Vec::new();
     let mut distances = Vec::new();
-    for d in 0..shape.distances.len() {
+    for (d, &stagger) in staggers.iter().enumerate() {
         let meshes = shape.meshes_on(d);
         let nominal: Vec<f64> = meshes.iter().map(|&k| built.meshes[k].nominal()).collect();
         let Some(&first) = meshes.first() else {
@@ -3712,7 +3712,7 @@ pub fn rate(
             running,
             clearance,
             sized_by: chosen.bound_by.get(d).copied().flatten(),
-            stagger: staggers[d],
+            stagger,
         });
     }
     notes.extend(chosen.how.note());
