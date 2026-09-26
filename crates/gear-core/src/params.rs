@@ -220,9 +220,9 @@ impl Clamps {
 /// Named and gathered so they are auditable in one place rather than scattered
 /// as bare literals through the geometry.
 ///
-/// **Two kinds live here and they answer different questions.** The last three
-/// — the fillet fraction, the fillet floor and the tip-above-base fraction — are
-/// tolerances on *degeneracy*, at the scale of the quantity they separate, and
+/// **Two kinds live here and they answer different questions.** The last two
+/// — the fillet fraction and the fillet floor — are tolerances on
+/// *degeneracy*, at the scale of the quantity they separate, and
 /// no design is near them. The first five are **conventions**: each sits inside
 /// the limit where the shape stops existing, and each could be widened without
 /// admitting anything impossible.
@@ -262,10 +262,6 @@ pub(crate) mod guard {
     /// Floor on the cutter tip radius, in modules. A truly sharp corner is a
     /// removable singularity in the trochoid; this keeps it finite.
     pub const MIN_FILLET_MODULES: f64 = 1e-9;
-
-    /// How far above the base circle the tip radius is forced to sit, as a
-    /// fraction of the base radius. Below the base circle there is no involute.
-    pub const TIP_ABOVE_BASE_FRACTION: f64 = 1e-9;
 }
 
 /// How nearly two gears must agree before they are taken to be the same rack.

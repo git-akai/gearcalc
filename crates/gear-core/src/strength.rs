@@ -512,7 +512,9 @@ impl ToothOutline for Tooth {
         self.alpha_n
     }
     fn is_usable(&self) -> bool {
-        !self.severed && self.u_j.is_finite()
+        // A tooth with no flank — severed, or ended at its tip on the fillet —
+        // has nowhere to take a load.
+        !self.severed && self.u_j < self.u_tip
     }
     fn tangent_angle_deg(&self) -> f64 {
         TANGENT_ANGLE_DEG

@@ -39,30 +39,11 @@ use crate::note::{key, Note};
 use crate::params::{compat, guard, Clamps, GearParams};
 use crate::solve::{brent, newton_bracketed, Tol};
 
-/// Bracket-expansion settings for the undercut junction search.
+/// How a half-profile's points are shared among its sections.
 ///
-/// Search heuristics, not geometry: they only decide how the bracket is grown
-/// before a guaranteed bracketed solve takes over. Any values that find a
-/// bracket give the same root.
+/// Sampling choices, not geometry: they decide where points fall on curves that
+/// are already fixed.
 mod search {
-    /// Growth factor when walking outward to find where the fillet crosses the
-    /// base circle.
-    pub const BASE_CROSS_GROWTH: f64 = 1.6;
-    /// Growth factor when walking outward to find the flank/fillet crossing.
-    pub const CROSSING_GROWTH: f64 = 1.4;
-    /// Additive nudge so the walk escapes `s = 0`, **in modules**.
-    ///
-    /// `s` is a rack travel and so a length: a bare `1e-6` here was the only
-    /// dimensioned constant in a block whose neighbours are all dimensionless
-    /// growth factors, and it therefore meant something different at every
-    /// module. Harmless as it stood — it only widens a bracket, and the root a
-    /// bracketed solve converges on does not depend on where the bracket
-    /// started, which the module-homogeneity law in `tests/geometry_laws.rs`
-    /// confirms. Scaled anyway, because the next constant to be read out of
-    /// this block may not be so forgiving.
-    pub const CROSSING_NUDGE_MODULES: f64 = 1e-6;
-    /// Maximum expansion steps before declaring no bracket exists.
-    pub const MAX_STEPS: u32 = 200;
     /// Samples per section when estimating arc length for point allocation.
     pub const LENGTH_SAMPLES: usize = 60;
     /// Minimum share of the total point budget any one section receives.
@@ -128,6 +109,15 @@ pub struct Settled {
     /// The largest tip round that fits both flanks and the tip line; zero where
     /// there is no tip flat.
     pub rho_fit: f64,
+}
+
+/// Where a tooth's flank hands over to its fillet.
+#[derive(Clone, Copy, Debug)]
+enum Junction {
+    /// The involute at roll `u` meets the fillet at rack travel `s`.
+    Crossing { u: f64, s: f64 },
+    /// No crossing below the tip: the fillet runs to the tip, at travel `s`.
+    AtTip { s: f64 },
 }
 
 /// A generated gear cross-section.
@@ -199,7 +189,9 @@ pub struct Tooth {
     /// degeneracy kind, not a design one: nothing a designer can type sits a
     /// thousand-millionth of a module from the edge.
     pub undercut: bool,
-    /// Roll parameter at the flank/fillet junction. NaN if severed.
+    /// Roll parameter at the flank/fillet junction. NaN if severed; equal to
+    /// [`Self::u_tip`] when the tooth ends at its tip on the fillet, which
+    /// leaves no flank.
     pub u_j: f64,
     /// Rack travel parameter at the flank/fillet junction.
     pub s_j: f64,
@@ -495,7 +487,9 @@ impl Tooth {
                 clamps.push(Note::new(key::CLAMP_TIP_CAPPED_POINTED).number("radius", ra, 4));
             }
         }
-        let ra = ra.max(rb * (1.0 + guard::TIP_ABOVE_BASE_FRACTION));
+        // A tip below the root is a tooth of no height: held at the root, where
+        // the junction below reports it as a tooth that ends at its tip.
+        let ra = ra.max(rf);
         // A pointed tip is a point: the flanks meet on the centreline, at the
         // roll that was solved for, rather than at a tip land a rounding wide
         // and of either sign.
@@ -548,14 +542,30 @@ impl Tooth {
             severed: false,
         };
 
-        let (u_j, s_j) = g.solve_junction();
-        g.u_j = u_j;
-        g.s_j = s_j;
+        match g.solve_junction() {
+            Junction::Crossing { u, s } => {
+                g.u_j = u;
+                g.s_j = s;
+                g.r_j = rb * f64::hypot(1.0, u);
+            }
+            Junction::AtTip { s } => {
+                // No crossing below the tip: the fillet has consumed the flank
+                // (or the tip is under the form circle, or under the base
+                // circle, where there is no involute at all). The tooth is its
+                // fillets up to the tip, and its land is the fillet's there.
+                g.s_j = s;
+                g.u_j = g.u_tip;
+                g.r_j = g.ra;
+                g.theta_a = g.trochoid_at(s).1;
+                g.clamps
+                    .push(Note::new(key::CLAMP_TIP_BELOW_FORM).number("radius", g.ra, 4));
+            }
+        }
         if clamp_flank_at_base {
             g.u_j = l.max(0.0) / rb;
             g.s_j = -bc / alpha_t.tan();
+            g.r_j = rb * f64::hypot(1.0, g.u_j);
         }
-        g.r_j = rb * f64::hypot(1.0, g.u_j);
         g.check_severed();
         g
     }
@@ -607,7 +617,24 @@ impl Tooth {
 
     // ---------------------------------------------------------------- //
 
-    /// Where the involute flank meets the trochoid fillet.
+    /// The fillet's rack travel at a radius at or above the root.
+    ///
+    /// `r(s) ≥ |s|` and `r(0) = r_f`, and the radius falls monotonically as `s`
+    /// rises to zero (for a corner below the rolling line, `b_c > 0`), so
+    /// `[−radius, 0]` brackets the one root. At the root itself the two ends
+    /// agree to rounding and the answer is the root, `s = 0`.
+    fn fillet_travel_at(&self, radius: f64) -> f64 {
+        brent(
+            |s| self.trochoid_at(s).0 - radius,
+            -radius,
+            0.0,
+            Tol::default(),
+        )
+        .unwrap_or(0.0)
+    }
+
+    /// Where the involute flank meets the trochoid fillet, or that it does not
+    /// below the tip.
     ///
     /// **Not undercut** (`l >= 0`): the rack's straight flank ends exactly where
     /// its tip round begins, so the curves meet tangentially at a point available
@@ -616,59 +643,48 @@ impl Tooth {
     /// **Undercut** (`l < 0`): the round has eaten past the flank's limit and the
     /// two curves genuinely *cross*. Solved for, not assumed — clamping here is
     /// what used to leave a step in the profile. The crossing is a real corner:
-    /// that is the undercut notch, and it is correct geometry.
-    fn solve_junction(&self) -> (f64, f64) {
+    /// that is the undercut notch, and it is correct geometry. Every bracket is
+    /// closed: the fillet at the base circle and at the tip, from
+    /// [`Self::fillet_travel_at`], and the crossing between them.
+    ///
+    /// **Neither below the tip**: the crossing is above it, or the tip is under
+    /// the base circle where there is no involute. Then the tooth ends at the
+    /// tip on its fillet — one rule for the undercut band on the shift axis, a
+    /// stub addendum on a tooth that is not undercut, and a tip below the base
+    /// circle.
+    fn solve_junction(&self) -> Junction {
         let s_tan = -self.bc / self.alpha_t.tan();
-        if !self.undercut {
-            return (self.l / self.rb, s_tan);
-        }
-
-        let r_of = |s: f64| self.trochoid_at(s).0;
-
-        // Walk outward until the fillet has climbed past the base circle.
-        let mut s_lo = s_tan.min(-f64::MIN_POSITIVE);
-        let mut found = false;
-        for _ in 0..search::MAX_STEPS {
-            if r_of(s_lo) > self.rb {
-                found = true;
-                break;
-            }
-            s_lo *= search::BASE_CROSS_GROWTH;
-        }
-        if !found {
-            return (0.0, s_tan); // fillet never reaches the base circle
-        }
-        let Some(s_b) = brent(|s| r_of(s) - self.rb, s_lo, 0.0, Tol::default()) else {
-            return (0.0, s_tan);
+        let at_tip = || Junction::AtTip {
+            s: self.fillet_travel_at(self.ra),
         };
+        if !self.undercut {
+            let u = self.l / self.rb;
+            return if self.rb * f64::hypot(1.0, u) <= self.ra {
+                Junction::Crossing { u, s: s_tan }
+            } else {
+                at_tip()
+            };
+        }
+        if self.ra <= self.rb {
+            return at_tip();
+        }
 
-        // Angular gap between fillet and the extended involute at the same radius.
+        // Angular gap between fillet and the involute at the same radius:
+        // negative at the base circle, where the fillet is inside the flank.
         let gap = |s: f64| {
             let (r, th) = self.trochoid_at(s);
-            let u = crate::involute::roll_at_radius(r, self.rb);
-            th - (self.psi_b - inv_from_roll(u))
+            th - (self.psi_b - inv_from_roll(crate::involute::roll_at_radius(r, self.rb)))
         };
-
-        // gap < 0 at the base circle; march out for a sign change.
-        let mut s_far = s_b;
-        let mut crossed = false;
-        for _ in 0..search::MAX_STEPS {
-            s_far = s_far * search::CROSSING_GROWTH
-                - search::CROSSING_NUDGE_MODULES * self.params.module;
-            if gap(s_far) > 0.0 {
-                crossed = true;
-                break;
-            }
+        let s_base = self.fillet_travel_at(self.rb);
+        let s_tip = self.fillet_travel_at(self.ra);
+        if gap(s_tip) <= 0.0 {
+            return at_tip();
         }
-        if !crossed {
-            return (0.0, s_b);
+        let s = brent(gap, s_tip, s_base, Tol::default()).unwrap_or(s_base);
+        Junction::Crossing {
+            u: crate::involute::roll_at_radius(self.trochoid_at(s).0, self.rb),
+            s,
         }
-
-        let Some(s_j) = brent(gap, s_far, s_b, Tol::default()) else {
-            return (0.0, s_b);
-        };
-        let r_j = self.trochoid_at(s_j).0;
-        (crate::involute::roll_at_radius(r_j, self.rb), s_j)
     }
 
     /// Detect a tooth cut away entirely by undercut.

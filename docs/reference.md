@@ -122,6 +122,15 @@ Two properties that must not be "simplified" away: the flank continues **below
 the base circle** to its true intersection with the trochoid, and the fillet cap
 is the expression above rather than the plausible `w_tip/(2 cos α_t)`.
 
+**A tooth that ends at its tip.** Where the fillet and the involute cross
+above the tip — deep in the undercut band, on a stub addendum, or with the tip
+under the base circle where there is no involute — the tooth is its fillets up
+to the tip. The junction is the fillet at `r_a`, `u_j = u_tip` (an empty
+flank), the tip land is the fillet's angle there, and `clamp.tip_below_form`
+says so. A tooth with no flank takes no bending rating. The fillet's travel at
+a radius is bracketed on `[−r, 0]`, since `r(s) ≥ |s|` and `r(0) = r_f`; the
+crossing is bracketed between the fillet at the base circle and at the tip.
+
 **Severed teeth.** Where the fillet reaches the centreline the cutter has removed
 the whole tooth. The profile is truncated there so it stays a simple closed
 curve, `severed` is set, and `u_j` and `u_tip` become NaN — any code touching the
@@ -158,7 +167,7 @@ guards begin to clamp.
 | Helix angle | `\|β\| < 90°` | `m_t → ∞` at the limit |
 | Thickness mod. | `0 < k < 2` | a rack whose tooth or space has no width at the datum line is not a rack; below it the tooth narrows, and the dedendum's bound says where it closes |
 | Profile shift | computed, below | |
-| Addendum | `h_a > max(−h_f, (r_b − r)/m − x)` | tooth must have height; tip must clear the base circle |
+| Addendum | `h_a > −h_f` | tooth must have height; a tip under the form or base circle leaves a tooth of fillets alone, cut as asked and reported (`clamp.tip_below_form`) |
 | Dedendum | `−h_a < h_f < min(x + 0.9 r/m, π/(4 tan α_n) − x_s)` | positive height; root circle off the axis; no deeper than the rack's tooth reaches before it comes to a point (at a sharp corner; the smallest round moves it by ~1e-9 m) |
 | Root radius | `ρ ≤ 0.95 · min(b_d, ρ_max)/m_t` | the round must fit both the depth and the space |
 | Angular shift | see below | one tool must reach every tooth |

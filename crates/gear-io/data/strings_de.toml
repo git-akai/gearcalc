@@ -26,6 +26,7 @@ tooth_thickness_raised = "Zahndicke erhöht: Profilverschiebung oder Dickenände
 tooth_thickness_capped = "Zahndicke begrenzt: Profilverschiebung oder Dickenänderung zu positiv"
 fillet_capped = "Fußrundung auf {radius} mm begrenzt: die Zahnlücke fasst keine größere"
 tip_capped_pointed = "Kopf bei {radius} mm begrenzt: dort läuft der Zahn spitz zu"
+tip_below_form = "Kopfkreis bei Radius {radius} mm liegt unterhalb des Flankenbeginns: der Zahn besteht nur aus seinen Fußrundungen, ohne Evolventenflanke"
 tooth_severed = "Zahn durch Unterschnitt abgetrennt"
 tooth_undercut = "Unterschnitt: das Werkzeug hat einen Teil der Flanke am Fuß abgetragen"
 cutter_no_tip_corner = "keine Fußrundung: das Werkzeug hat keine nutzbare Kopfecke"

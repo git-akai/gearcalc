@@ -1121,3 +1121,188 @@ fn the_depth_stops_where_the_racks_tooth_closes() {
     }
     assert!(reached > 0, "no case reached the cap");
 }
+
+/// **A tooth ends at its tip.** Below its own undercut threshold a flank is
+/// eaten by the fillet from below, and past a point the crossing of fillet and
+/// involute is above the tip — or there is no involute at all, the tip being
+/// under the base circle, or a negative addendum puts it under the form
+/// circle. Then the tooth is its fillets up to the tip, with no flank, and
+/// says so (`clamp.tip_below_form`). Before, the flank was drawn from a
+/// junction above the tip down to it, so the outline stood proud of the tip
+/// circle: 0.146 mm on the standard z17 at x −1.5, 1.06 mm on a fuzz gear, and
+/// the tip land was read off the wrong curve, 35 % narrow.
+///
+/// Swept to the admissible shift floor, over pressure angles from 10° and
+/// addenda down to −1, which is where the grids stopped short.
+#[test]
+fn the_tooth_ends_at_its_tip() {
+    use gear_core::auto::admissible_profile_shift;
+    use gear_core::note::key;
+    let mut ended = 0;
+    for mut p in Grid::new()
+        .teeth(AWKWARD_TEETH)
+        .shifts(&[-0.5, 0.0, 0.6, f64::NAN])
+        .pressure_angle(&[10.0, 14.5, 20.0, 25.0, 30.0])
+        .addendum(&[-1.0, -0.5, 0.0, 1.0])
+        .root_radius(&[0.0, 0.38])
+        .helix_angle(&[0.0, 30.0])
+        .build()
+    {
+        // `NaN` marks the row taken at the floor itself.
+        if p.profile_shift.is_nan() {
+            p.profile_shift = admissible_profile_shift(&p, 2.0).bound.min.unwrap();
+        }
+        let g = Tooth::new(p);
+        let gear = Gear::new(p);
+        let tag = format!(
+            "z={} x={} a={} ha={} rho={} b={}",
+            p.teeth, p.profile_shift, p.pressure_angle, p.addendum, p.root_radius, p.helix_angle
+        );
+        let limit = g.ra * (1.0 + 1e-12);
+        let (r, _) = g.half_profile(400);
+        let profile = gear.profile(80);
+        let outline = common::flatten(&gear.outline(1e-3), 8);
+        for (name, worst) in [
+            ("half-profile", r.iter().copied().fold(0.0, f64::max)),
+            (
+                "profile",
+                profile.iter().map(|q| q[0].hypot(q[1])).fold(0.0, f64::max),
+            ),
+            (
+                "outline",
+                outline.iter().map(|q| q[0].hypot(q[1])).fold(0.0, f64::max),
+            ),
+        ] {
+            assert!(
+                worst <= limit,
+                "the {name} reaches {:.3e} mm past the tip at {tag}",
+                worst - g.ra
+            );
+        }
+        for w in r.windows(2) {
+            assert!(
+                w[1] <= w[0] + 1e-9,
+                "radius rises along the profile at {tag}"
+            );
+        }
+        if g.severed {
+            continue;
+        }
+        assert!(
+            g.u_j <= g.u_tip,
+            "junction {} above the tip {} at {tag}",
+            g.u_j,
+            g.u_tip
+        );
+        if g.clamps.fired(key::CLAMP_TIP_BELOW_FORM) {
+            ended += 1;
+            // The tip is on the fillet: the fillet's point at the junction's
+            // travel is at the tip radius, and its angle is the tip land. The
+            // radius is what is asserted to a tolerance, since near the root's
+            // bottom the fillet runs across the radius and the travel at a
+            // given radius is ill-conditioned while the point is not.
+            let (r_end, th_end) = g.trochoid_at(g.s_j);
+            assert!(
+                (r_end - g.ra).abs() < 1e-9 * p.module && g.theta_a == th_end,
+                "the tip ({}, {}) is not the fillet's end ({r_end}, {th_end}) at {tag}",
+                g.ra,
+                g.theta_a
+            );
+        }
+    }
+    assert!(
+        ended > 100,
+        "only {ended} teeth reached the tip-below-form band"
+    );
+}
+
+/// The standard gear the finding was made on, its tip land, and a stub tooth
+/// whose tip is below the form circle without any undercut.
+#[test]
+fn the_tip_below_form_cases_are_where_they_were_found() {
+    use gear_core::note::key;
+    let g = Tooth::new(GearParams {
+        profile_shift: -1.5,
+        ..Default::default()
+    });
+    assert!(g.clamps.fired(key::CLAMP_TIP_BELOW_FORM));
+    assert!(
+        (g.theta_a - 0.034_800).abs() < 5e-7,
+        "tip land {} at z17 x−1.5",
+        g.theta_a
+    );
+    let stub = Tooth::new(GearParams {
+        teeth: 40,
+        addendum: -1.0,
+        ..Default::default()
+    });
+    assert!(stub.clamps.fired(key::CLAMP_TIP_BELOW_FORM), "z40 h_a −1");
+}
+
+/// **The switch is continuous.** Where the crossing reaches the tip, the tooth
+/// with a flank and the tooth without one are the same tooth, so the profile
+/// does not jump across the shift at which the note starts to fire.
+#[test]
+fn the_tooth_is_continuous_where_its_flank_runs_out() {
+    use gear_core::note::key;
+    let at = |x: f64| {
+        Tooth::new(GearParams {
+            profile_shift: x,
+            ..Default::default()
+        })
+    };
+    // Bracketed on the note itself: fired at −1.5, not at −1.0.
+    let (mut lo, mut hi) = (-1.5, -1.0);
+    for _ in 0..60 {
+        let mid = 0.5 * (lo + hi);
+        if at(mid).clamps.fired(key::CLAMP_TIP_BELOW_FORM) {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
+    }
+    let (a, b) = (at(lo), at(hi));
+    assert!(
+        a.clamps.fired(key::CLAMP_TIP_BELOW_FORM) && !b.clamps.fired(key::CLAMP_TIP_BELOW_FORM)
+    );
+    let step = hi - lo;
+    assert!(
+        (a.theta_a - b.theta_a).abs() < 1e-6,
+        "tip land jumps {} over a shift step of {step:e}",
+        a.theta_a - b.theta_a
+    );
+    assert!(
+        (a.r_j - b.r_j).abs() < 1e-6,
+        "junction jumps {} mm",
+        a.r_j - b.r_j
+    );
+    // Each side's points measured to the other's curve, drawn densely enough
+    // that its chords are far inside the tolerance.
+    let xy = |t: &Tooth, n: usize| {
+        let (r, th) = t.half_profile(n);
+        r.iter()
+            .zip(&th)
+            .map(|(r, t)| [r * t.sin(), r * t.cos()])
+            .collect::<Vec<_>>()
+    };
+    let to_curve = |p: [f64; 2], c: &[[f64; 2]]| {
+        c.windows(2)
+            .map(|w| {
+                let (e, q) = (
+                    [w[1][0] - w[0][0], w[1][1] - w[0][1]],
+                    [p[0] - w[0][0], p[1] - w[0][1]],
+                );
+                let t = ((q[0] * e[0] + q[1] * e[1])
+                    / (e[0] * e[0] + e[1] * e[1]).max(f64::MIN_POSITIVE))
+                .clamp(0.0, 1.0);
+                f64::hypot(q[0] - t * e[0], q[1] - t * e[1])
+            })
+            .fold(f64::INFINITY, f64::min)
+    };
+    let dense = xy(&b, 20_000);
+    let far = xy(&a, 200)
+        .into_iter()
+        .map(|p| to_curve(p, &dense))
+        .fold(0.0, f64::max);
+    assert!(far < 1e-6, "the profile moves {far} mm across the switch");
+}

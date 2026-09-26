@@ -525,8 +525,8 @@ fn tighter(a: Bound, b: Bound) -> Bound {
 ///
 /// - **Addendum**, lower: the tip must be outside the root, `r_a > r_f`, which
 ///   reduces to the pleasingly simple `h_a > −h_f` — the tooth must have
-///   positive height. Also `r_a > r_b`, which binds only at extreme negative
-///   addendum.
+///   positive height. A tip under the form circle, or the base circle, is not
+///   a bound: the tooth is its fillets alone, cut as asked and reported.
 /// - **Dedendum**, lower: the same condition read the other way, `h_f > −h_a`.
 ///   Upper: the root circle must stay off the axis, `m(h_f − x) < 0.9 r`, and
 ///   the rack's tooth must not come to a point before it reaches the depth,
@@ -663,12 +663,12 @@ fn ranges_at_shift(p: &GearParams, working_depth: f64) -> Ranges {
     let alpha_t = crate::plane::transverse_pressure_angle(an, beta);
     let mt = p.module / beta.cos();
     let r = mt * f64::from(p.teeth) / 2.0;
-    let rb = r * alpha_t.cos();
     let x = p.profile_shift;
 
-    // Addendum: tip outside the root, and outside the base circle.
+    // Addendum: tip outside the root. Below the form circle — or the base
+    // circle — the tooth is its fillets alone, which is cut exactly as asked and
+    // reported (`clamp.tip_below_form`), not a bound.
     let above_root = -p.dedendum;
-    let above_base = (rb * (1.0 + guard::TIP_ABOVE_BASE_FRACTION) - r) / p.module - x;
 
     // Dedendum: positive height, a root circle that does not reach the axis, and
     // no deeper than the rack's tooth reaches before it comes to a point.
@@ -698,7 +698,7 @@ fn ranges_at_shift(p: &GearParams, working_depth: f64) -> Ranges {
         thickness_mod: Bound::strictly(0.0, 2.0),
 
         profile_shift: admissible_profile_shift(p, working_depth),
-        addendum: Bound::between(Some(above_root.max(above_base)), None),
+        addendum: Bound::between(Some(above_root), None),
         dedendum: Bound::between(Some(-p.addendum), Some(root_positive.min(tool_closes))),
         root_radius: Bound::between(Some(0.0), Some((rho_max / mt).max(0.0))),
         angular_shift: admissible_angular_shift(p),

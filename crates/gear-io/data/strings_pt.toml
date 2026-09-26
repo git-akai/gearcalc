@@ -27,6 +27,7 @@ tooth_thickness_raised = "espessura do dente aumentada: correção do perfil ou 
 tooth_thickness_capped = "espessura do dente limitada: correção do perfil ou correção de espessura demasiado positiva"
 fillet_capped = "concordância de raiz limitada a {radius} mm: o vão entre dentes não comporta raio maior"
 tip_capped_pointed = "topo limitado a {radius} mm: aí o dente termina em ponta"
+tip_below_form = "a cabeça no raio {radius} mm fica abaixo do início do flanco: o dente é só os seus arredondamentos de pé, sem flanco evolvente"
 tooth_severed = "dente seccionado pelo adelgaçamento"
 tooth_undercut = "adelgaçamento: a ferramenta removeu parte do flanco junto à raiz"
 cutter_no_tip_corner = "sem concordância de raiz: a ferramenta não tem canto de topo utilizável"

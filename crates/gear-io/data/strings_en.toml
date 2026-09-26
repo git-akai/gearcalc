@@ -81,6 +81,7 @@ tooth_thickness_raised = "tooth thickness increased: shift or thickness modifica
 tooth_thickness_capped = "tooth thickness capped: shift or thickness modification too positive"
 fillet_capped = "fillet capped to {radius} mm: tooth space holds no larger round"
 tip_capped_pointed = "tip capped at {radius} mm: tooth comes to a point there"
+tip_below_form = "tip at radius {radius} mm is below where the flank begins: the tooth is its fillets alone, with no involute flank"
 tooth_severed = "tooth severed by undercut"
 tooth_undercut = "undercut: cutter has removed part of the flank near the root"
 cutter_no_tip_corner = "no fillet: cutter has no usable tip corner"

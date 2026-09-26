@@ -102,6 +102,69 @@ fn pointed_rack_rows() -> Vec<GearParams> {
     .concat()
 }
 
+/// Rows past the undercut band, where the fillet eats the flank from below
+/// until the crossing is above the tip.
+fn deep_undercut_rows() -> Vec<GearParams> {
+    [
+        Grid::new()
+            .teeth(&[9, 12, 17, 31])
+            .shifts(&[-0.9, -1.2])
+            .pressure_angle(&[14.5, 20.0])
+            .root_radius(&[0.0, 0.38])
+            .build(),
+        vec![
+            GearParams {
+                teeth: 12,
+                profile_shift: -1.0,
+                pressure_angle: 14.5,
+                ..Default::default()
+            },
+            GearParams {
+                profile_shift: -1.5,
+                ..Default::default()
+            },
+            // The fuzz case the finding was made on.
+            GearParams {
+                module: 3.440_788,
+                pressure_angle: 14.580_153,
+                teeth: 9,
+                profile_shift: -0.685_214,
+                helix_angle: 6.845_211,
+                addendum: 0.540_009,
+                dedendum: 1.477_107,
+                root_radius: 0.372_547,
+                thickness_mod: 1.198_174,
+                ..Default::default()
+            },
+        ],
+    ]
+    .concat()
+}
+
+/// **The gate holds past the undercut band.** Before the tooth ended at its
+/// tip, a flank drawn from above the tip stood in the cutter's path: 5.1e-2 mm
+/// of penetration at z12 x−1.0 α14.5, 0.729 mm on the fuzz gear.
+#[test]
+fn profile_is_bounded_by_the_cutter_past_the_undercut_band() {
+    for p in deep_undercut_rows() {
+        let rep = check_cut(&Tooth::new(p), 150);
+        let tag = format!(
+            "z={} x={} a={} rho={} m={}",
+            p.teeth, p.profile_shift, p.pressure_angle, p.root_radius, p.module
+        );
+        assert!(
+            rep.penetration <= PENETRATION_LIMIT,
+            "penetration {:.3e} mm at {tag}",
+            rep.penetration
+        );
+        assert!(
+            rep.deviation < DEVIATION_LIMIT,
+            "deviation {:.3e} mm at {tag}",
+            rep.deviation
+        );
+    }
+}
+
 /// **The gate holds where the rack comes to a point.** Its cutter is built
 /// from the inputs and the tool, so a tooth whose depth was driven past the
 /// rack's closing point shows as a root the rack never reached — 4e-2 to

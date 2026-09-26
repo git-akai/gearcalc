@@ -211,13 +211,19 @@ impl Tooth {
             };
             subdivide(&f_minus, 1.0, 0.0, tol, 0, out);
 
-            // 3. flank, minus side: u from the junction out to the tip
+            // 3. flank, minus side: u from the junction out to the tip. A tooth
+            //    that ends at its tip on the fillet has no flank, and an empty
+            //    section adds no vertex: the involute's point at the tip is not
+            //    the fillet's.
             let flank = |t: f64| self.involute_at(self.u_j + t * (self.u_tip - self.u_j));
+            let has_flank = self.u_j < self.u_tip;
             let l_minus = |t: f64| {
                 let (r, th) = flank(t);
                 pt(r, -th)
             };
-            subdivide(&l_minus, 0.0, 1.0, tol, 0, out);
+            if has_flank {
+                subdivide(&l_minus, 0.0, 1.0, tol, 0, out);
+            }
 
             // 4. tip arc, across the tooth. Exact.
             if let Some(last) = out.last_mut() {
@@ -231,7 +237,9 @@ impl Tooth {
                 let (r, th) = flank(t);
                 pt(r, th)
             };
-            subdivide(&l_plus, 1.0, 0.0, tol, 0, out);
+            if has_flank {
+                subdivide(&l_plus, 1.0, 0.0, tol, 0, out);
+            }
 
             // 6. fillet, plus side, down to the root circle
             let f_plus = |t: f64| {
