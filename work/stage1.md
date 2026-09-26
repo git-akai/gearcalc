@@ -16,3 +16,10 @@ checked adversarially before it is integrated. Adjustments from the working plan
 | P2 test grids | T16.3 → T16.4, T16.5; T16.6 → T16.7; T16.21 | after P8 |
 
 Order: P3 ∥ P8, then P4 ∥ P6, P5 ∥ P7, P1 ∥ P9, then P2.
+
+Carried into P1 from the s0-tools check (minor):
+- `identity` edits only presets asked alone; add multi-part trains (join, split, insert).
+- `identity` labels edit cases by offer index; label them by the edit instead.
+- `check_all.sh` neither runs nor flags a `uses:` step.
+- `check_golden`'s `.golden.old.$$` is outside the cleanup trap.
+- The homogeneity allowance's κ is a heuristic; its comment should say so.
