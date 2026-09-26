@@ -62,20 +62,36 @@ esac
 # instrument written to catch it. A command added to the table was invisible
 # until something else forced a rebuild, and `--write` then *deleted* its golden
 # file. Cargo is incremental, so an up-to-date tree pays nothing for this.
-bin="$root/target/release/gear-cli"
-profile=(--release)
-if $fast && [[ ! -x "$bin" && -x "$root/target/debug/gear-cli" ]]; then
-  bin="$root/target/debug/gear-cli"
-  profile=()
+# `GEAR_CLI=<path>` runs that binary instead and builds nothing.
+if [[ -n "${GEAR_CLI:-}" ]]; then
+  bin="$GEAR_CLI"
+else
+  target="$("$root/tools/cargo_target_dir.sh")"
+  bin="$target/release/gear-cli"
+  profile=(--release)
+  if $fast && [[ ! -x "$bin" && -x "$target/debug/gear-cli" ]]; then
+    bin="$target/debug/gear-cli"
+    profile=()
+  fi
+  cargo build "${profile[@]}" --manifest-path "$root/Cargo.toml" --bin gear-cli >/dev/null
 fi
-cargo build "${profile[@]}" --manifest-path "$root/Cargo.toml" --bin gear-cli >/dev/null
 
 slug() { echo "$1" | tr ' /' '__'; }
 
 scratch="$(mktemp -d)"
 trap 'rm -rf "$scratch"' EXIT
 
-# `speed \t keep \t invocation \t why`, from the harness itself.
+# `speed \t keep \t invocation \t why`, from the harness itself. Captured
+# first so `set -e` sees the binary fail, and refused when empty: a list that
+# reads as nothing would compare nothing and report every file unchanged.
+list="$("$bin" --golden-cases)" || {
+  echo "check_golden: $bin --golden-cases exited $?" >&2
+  exit 1
+}
+if [[ -z "$list" ]]; then
+  echo "check_golden: $bin --golden-cases listed no cases" >&2
+  exit 1
+fi
 cases=()
 skipped=()
 elsewhere=()
@@ -89,16 +105,28 @@ while IFS=$'\t' read -r speed keep case why; do
     continue
   fi
   cases+=("$keep|$case")
-done < <("$bin" --golden-cases)
+done <<<"$list"
+if (( ${#cases[@]} == 0 )); then
+  echo "check_golden: no case left to run" >&2
+  exit 1
+fi
 
+status=0
 for entry in "${cases[@]}"; do
   keep="${entry%%|*}"
   case="${entry#*|}"
   out="$scratch/$(slug "$case").txt"
   # 2>&1 deliberately: a command that starts printing to stderr has changed what
-  # it says, and that is exactly what this exists to notice.
+  # it says, and that is exactly what this exists to notice. A non-zero exit is
+  # recorded in the output, so a change in it is a diff like any other, and the
+  # case is named on stderr.
   # shellcheck disable=SC2086
-  "$bin" $case >"$out" 2>&1
+  "$bin" $case >"$out" 2>&1 || {
+    s=$?
+    echo "exit $s" >>"$out"
+    echo "check_golden: gear-cli $case exited $s" >&2
+    status=1
+  }
   if [[ "$keep" == digest ]]; then
     # The shape as well as the hash, so a diff says *how* it moved rather than
     # only that it did — a bare hash tells you nothing you can act on.
@@ -116,12 +144,27 @@ if [[ "$mode" == write ]]; then
     echo "refusing to --write a partial corpus; drop --fast" >&2
     exit 2
   fi
-  mkdir -p "$store"
-  # Removed rather than overwritten, so a command dropped from the table takes
-  # its golden file with it instead of leaving one nothing regenerates.
-  rm -f "$store"/*.txt
-  cp "$scratch"/*.txt "$store/"
-  echo "tools/golden: $(ls "$store"/*.txt | wc -l) files written"
+  if (( status != 0 )); then
+    echo "refusing to --write: a case exited non-zero (named above)" >&2
+    exit 1
+  fi
+  # Built whole beside the store, then swapped in, so a failure at any step
+  # leaves the old corpus as it was. The store is replaced rather than merged,
+  # so a command dropped from the table takes its golden file with it.
+  fresh="$(mktemp -d "$root/tools/.golden.XXXXXX")"
+  cp "$scratch"/*.txt "$fresh/"
+  count="$(find "$fresh" -name '*.txt' | wc -l)"
+  if (( count != ${#cases[@]} )); then
+    rm -rf "$fresh"
+    echo "refusing to --write: $count files for ${#cases[@]} cases" >&2
+    exit 1
+  fi
+  old="$root/tools/.golden.old.$$"
+  [[ -d "$store" ]] && mv "$store" "$old"
+  mv "$fresh" "$store"
+  chmod 755 "$store"
+  rm -rf "$old"
+  echo "tools/golden: $count files written"
   exit 0
 fi
 
@@ -131,7 +174,6 @@ if [[ ! -d "$store" ]]; then
   exit 1
 fi
 
-status=0
 if $fast; then
   # Compare only what was run. Named individually rather than by a directory
   # diff, so a skipped case cannot read as a passing one.
@@ -159,7 +201,7 @@ if [[ $status -ne 0 ]]; then
   exit 1
 fi
 
-echo "tools/golden: $(ls "$store"/*.txt | wc -l) recorded outputs, all unchanged"
+echo "tools/golden: ${#cases[@]} outputs compared, all unchanged"
 # What is deliberately not here, said out loud. A coverage claim that omits its
 # own exceptions is how a partial check comes to read as a complete one.
 for e in "${elsewhere[@]}"; do

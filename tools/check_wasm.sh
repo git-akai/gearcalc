@@ -33,7 +33,7 @@ set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # **Not in `tools/golden/`**, though it is the same idiom. That directory is
 # `check_golden.sh`'s corpus, asked from the CLI binary and rewritten wholesale
-# — its `--write` does `rm -f golden/*.txt` first, so a record kept there that
+# — its `--write` replaces the directory whole, so a record kept there that
 # the CLI does not produce is one a routine `--write` silently deletes. Found by
 # putting it there: `check_golden.sh` reported the extra file as a diff.
 record="$root/tools/wasm_boundary.json"
@@ -72,8 +72,10 @@ node "$root/tools/wasm_probe.mjs" "$scratch/gear_wasm.js" > "$scratch/after.json
 # left off. `build_wasm.sh` always applies it — it is the shipped artifact's
 # recipe — so the module before it is recovered by running `wasm-bindgen`
 # alone, which is what that script does first.
-wasm-bindgen --target nodejs --out-dir "$scratch" \
-  "$root/target/wasm32-unknown-unknown/wasm/gear_wasm.wasm"
+# The same module `build_wasm.sh` read: `BUILD_WASM_MODULE` if given, else
+# cargo's own target directory.
+module="${BUILD_WASM_MODULE:-$("$root/tools/cargo_target_dir.sh")/wasm32-unknown-unknown/wasm/gear_wasm.wasm}"
+wasm-bindgen --target nodejs --out-dir "$scratch" "$module"
 cp "$scratch/gear_wasm_bg.wasm" "$scratch/unoptimised.wasm"
 node "$root/tools/wasm_probe.mjs" "$scratch/gear_wasm.js" > "$scratch/before.json"
 

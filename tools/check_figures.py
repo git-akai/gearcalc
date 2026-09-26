@@ -89,6 +89,7 @@ is the measurement of how much of the documents this reaches.
 Dependency-free, like its siblings here.
 """
 
+import os
 import re
 import subprocess
 import sys
@@ -111,15 +112,29 @@ def _bin():
     met in the second of the two instruments written to catch drift -- the first
     was `check_golden.sh`, and the fix is the same one. Cargo is incremental, so
     an up-to-date tree pays nothing.
+
+    `GEAR_CLI=<path>` runs that binary instead and builds nothing. Otherwise
+    the directory is cargo's own (`tools/cargo_target_dir.sh`), so
+    `CARGO_TARGET_DIR` is honoured.
     """
-    profile = "debug" if (ROOT / "target" / "debug" / "gear-cli").exists() and not (
-        ROOT / "target" / "release" / "gear-cli"
+    if os.environ.get("GEAR_CLI"):
+        return Path(os.environ["GEAR_CLI"])
+    target = Path(
+        subprocess.run(
+            [ROOT / "tools" / "cargo_target_dir.sh"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+    )
+    profile = "debug" if (target / "debug" / "gear-cli").exists() and not (
+        target / "release" / "gear-cli"
     ).exists() else "release"
     argv = ["cargo", "build", "--bin", "gear-cli"]
     if profile == "release":
         argv.append("--release")
     subprocess.run(argv, cwd=ROOT, check=True, stdout=subprocess.DEVNULL)
-    return ROOT / "target" / profile / "gear-cli"
+    return target / profile / "gear-cli"
 
 
 BIN = _bin()

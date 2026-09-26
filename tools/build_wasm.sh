@@ -47,7 +47,7 @@ if [[ "${BUILD_WASM_SKIP_CARGO:-}" != 1 ]]; then
     --manifest-path "$root/Cargo.toml" --package gear-wasm >&2
 fi
 
-module="${BUILD_WASM_MODULE:-$root/target/wasm32-unknown-unknown/wasm/gear_wasm.wasm}"
+module="${BUILD_WASM_MODULE:-$("$root/tools/cargo_target_dir.sh")/wasm32-unknown-unknown/wasm/gear_wasm.wasm}"
 
 mkdir -p "$out"
 wasm-bindgen --target "$target" --out-dir "$out" "$module"
