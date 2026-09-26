@@ -185,7 +185,16 @@ pub enum Refused {
     /// The known torques contradict the rows in every assignment of
     /// directions: a load nothing holds, which turns the train.
     Inconsistent,
+    /// **More meshes than the direction mask has bits**: the `2^M`
+    /// assignments are counted in a `u32`, which holds [`MOST_MESHES`]
+    /// meshes' worth. Refused rather than wrapped.
+    TooManyMeshes { meshes: usize },
 }
+
+/// **The most meshes one flow enumerates**: the bits of the `u32` its
+/// assignments are counted in, less the one `2^M` itself needs. A limit of
+/// the representation, not a choice.
+pub const MOST_MESHES: usize = u32::BITS as usize - 1;
 
 /// **The power flow**, given every body's speed.
 ///
@@ -198,7 +207,8 @@ pub enum Refused {
 ///
 /// # Errors
 ///
-/// [`Refused`] says which of the three.
+/// [`Refused`] says which of the three, or that there are more meshes
+/// than the enumeration can count.
 pub fn solve(
     bodies: usize,
     meshes: &[MeshFlow],
@@ -219,8 +229,14 @@ pub fn solve(
     let mut why = Refused::Inconsistent;
     let known = |s: Body| -> Option<f64> { asked.known_at(s) };
     let m = meshes.len();
+    let Some(assignments) = u32::try_from(m)
+        .ok()
+        .and_then(|bits| 1_u32.checked_shl(bits))
+    else {
+        return Err(Refused::TooManyMeshes { meshes: m });
+    };
     let mut best: Option<Flow> = None;
-    for assignment in 0..(1u32 << m) {
+    for assignment in 0..assignments {
         let directions: Vec<Drive> = (0..m)
             .map(|k| {
                 if assignment & (1 << k) == 0 {
@@ -599,5 +615,63 @@ mod tests {
             .err(),
             Some(Refused::Undetermined)
         );
+    }
+
+    /// **A flow wider than its direction mask is refused by name**, never
+    /// wrapped: a series chain of `m` pairs, `η = 0.98` both ways and driven
+    /// from its first body, solves to `0.98^m` while every assignment of
+    /// its directions fits the mask, and past [`MOST_MESHES`] is
+    /// [`Refused::TooManyMeshes`] — at 32, where a `u32` shift used to wrap
+    /// to one assignment, and beyond.
+    #[test]
+    fn a_flow_past_its_mask_is_refused_by_name() {
+        let chain = |m: usize| -> Result<Flow, Refused> {
+            let meshes: Vec<MeshFlow> = (1..=m)
+                .map(|a| MeshFlow {
+                    a,
+                    b: a + 1,
+                    frame: GROUND,
+                    za: 17.0,
+                    zb: 19.0,
+                    efficiency: Directional {
+                        forward: 0.98,
+                        backward: 0.98,
+                    },
+                    paths: 1.0,
+                })
+                .collect();
+            let speed: Vec<f64> = (0..=m + 1)
+                .map(|s| {
+                    if s == GROUND {
+                        0.0
+                    } else {
+                        (-17.0_f64 / 19.0).powi(i32::try_from(s - 1).unwrap())
+                    }
+                })
+                .collect();
+            solve(
+                m + 2,
+                &meshes,
+                &speed,
+                &Asked::through(m + 2, 1, 1.0, m + 1, &[]),
+            )
+        };
+        for m in [1, 4, 8] {
+            let f = chain(m).unwrap();
+            let expected = 0.98_f64.powi(i32::try_from(m).unwrap());
+            assert!(
+                (f.efficiency - expected).abs() < 1e-12,
+                "{m}: {}",
+                f.efficiency
+            );
+        }
+        assert_eq!(MOST_MESHES, 31, "a u32 mask holds 2^31 assignments");
+        for m in [32, 33, 40] {
+            assert_eq!(
+                chain(m).err(),
+                Some(Refused::TooManyMeshes { meshes: m }),
+                "{m} meshes"
+            );
+        }
     }
 }

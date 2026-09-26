@@ -80,6 +80,7 @@ case_no_load = "nenhuma carga em nenhum eixo: marque um ou mais eixos como carga
 case_underdetermined = "movimento indefinido: falta(m) {short} velocidade(s), ou deixe um eixo a menos livre"
 case_nothing_drives = "nenhum binário dado realiza trabalho — cada carga é nula ou está num eixo parado: nada aciona este caso"
 load_shared = "suportado em ambas as extremidades: como a carga se divide é uma questão de rigidez que este modelo não define — suporte apenas uma extremidade, ou deixe um engrenamento autobloqueante suportá-la"
+flow_too_many_meshes = "o fluxo de potência atravessa {meshes} engrenamentos e só consegue seguir no máximo {most} de uma vez"
 
 [preview]
 nothing = "não altera nada"

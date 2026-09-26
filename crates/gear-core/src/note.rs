@@ -165,6 +165,8 @@ pub mod key {
     pub const TRAIN_CASE_NOTHING_DRIVES: &str = "train.case_nothing_drives";
     /// `train.load_shared`
     pub const TRAIN_LOAD_SHARED: &str = "train.load_shared";
+    /// `train.flow_too_many_meshes`
+    pub const TRAIN_FLOW_TOO_MANY_MESHES: &str = "train.flow_too_many_meshes";
 
     // ---- a preview ------------------------------------------------ //
     //
@@ -317,6 +319,7 @@ pub mod key {
         TRAIN_CASE_NOTHING_DRIVES,
         TRAIN_LOAD_SHARED,
         TRAIN_LOAD_NOT_REACTED,
+        TRAIN_FLOW_TOO_MANY_MESHES,
         ERROR_MESH_INCOMPATIBLE,
         ERROR_MESH_RING_TOO_SMALL,
         ERROR_MESH_OUTSIDE_INVOLUTE_DOMAIN,

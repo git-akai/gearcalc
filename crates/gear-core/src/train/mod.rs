@@ -4537,6 +4537,17 @@ fn solve_parts(
                 nothing(notes, &mut cases, &mut per_part);
                 continue;
             }
+            // More meshes than the enumeration can count: said as that,
+            // never as a load the train cannot react.
+            Err(flow::Refused::TooManyMeshes { meshes }) => {
+                notes.push(
+                    Note::new(key::TRAIN_FLOW_TOO_MANY_MESHES)
+                        .count("meshes", u32::try_from(meshes).unwrap_or(u32::MAX))
+                        .count("most", u32::try_from(flow::MOST_MESHES).unwrap_or(u32::MAX)),
+                );
+                nothing(notes, &mut cases, &mut per_part);
+                continue;
+            }
         };
         // ---- how many times each body comes round over a fatigue duty.
         let turns: Option<Vec<f64>> = case.counted().map(|duty| match *duty {
@@ -11231,6 +11242,33 @@ mod tests {
             for g in &spur(&r.by_part[0]).members {
                 assert_eq!(g.face_width, 7.0);
             }
+        }
+    }
+
+    /// **A train whose flow is wider than the mask says so on its case**:
+    /// 32 pairs in a chain, each case refused by the flow's own key, never
+    /// as a load nothing holds or a load held at both ends.
+    #[test]
+    fn a_flow_past_its_mask_is_said_on_the_case() {
+        let stages: Vec<Shape> = (0..32)
+            .map(|k| arr::pair(if k % 2 == 0 { [17, 19] } else { [19, 17] }))
+            .collect();
+        let t = Train::chained(stages, |t| {
+            vec![
+                LoadCase::ultimate(t.port(0, 1), t.port(31, 2), 2.0, 3000.0),
+                LoadCase::back_driving(t.port(0, 1), t.port(31, 2), 2.0),
+            ]
+        });
+        let r = solve_train(&t, &test_library()).unwrap();
+        for c in &r.cases {
+            assert!(!c.solved, "case {}", c.case);
+            let keys: Vec<&str> = c.notes.iter().map(|n| n.key.as_str()).collect();
+            assert_eq!(
+                keys,
+                vec![key::TRAIN_FLOW_TOO_MANY_MESHES],
+                "case {}",
+                c.case
+            );
         }
     }
 }

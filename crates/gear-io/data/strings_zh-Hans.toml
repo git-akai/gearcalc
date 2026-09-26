@@ -75,6 +75,7 @@ case_no_load = "没有任何轴口带载荷：请把一个或多个轴口标为�
 case_underdetermined = "运动未定：还需给定 {short} 个转速，或少留一个自由轴口"
 case_nothing_drives = "没有给定转矩做功——每个载荷或为零或位于静止轴口：没有构件驱动此工况"
 load_shared = "两端均受支承：载荷如何分配取决于刚度，本模型不作此判断——请只支承一端，或由自锁啮合承受"
+flow_too_many_meshes = "功率流经过 {meshes} 个啮合，一次最多只能追踪 {most} 个"
 
 [preview]
 nothing = "不作任何改变"

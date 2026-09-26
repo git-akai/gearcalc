@@ -153,6 +153,7 @@ case_no_load = "no load on any port: mark one or more ports as loads"
 case_underdetermined = "motion undecided: {short} more speed(s) to give, or one fewer port to leave free"
 case_nothing_drives = "no given torque does any work — every load is nought or on a still port: nothing drives this case"
 load_shared = "held at both ends: how the load divides is a matter of stiffness this model does not state — hold one end only, or let a self-locking mesh hold it"
+flow_too_many_meshes = "the power flow crosses {meshes} meshes, and it can follow at most {most} at once"
 
 [preview]
 nothing = "changes nothing"

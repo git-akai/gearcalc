@@ -1410,6 +1410,22 @@ mod tests {
                 }
                 err(TrainError::Malformed(Invariant::NumberGap(3)).note());
             }
+            // **A flow wider than its direction mask**: 32 pairs in a chain,
+            // its case said as the flow's limit.
+            {
+                use gear_core::train::{LoadCase, Train};
+                let t = Train::chained(
+                    (0..32)
+                        .map(|k| arr::pair(if k % 2 == 0 { [17, 19] } else { [19, 17] }))
+                        .collect(),
+                    |t| vec![LoadCase::ultimate(t.port(0, 1), t.port(31, 2), 2.0, 3000.0)],
+                );
+                if let Ok(r) = gear_core::train::solve_train(&t, &lib) {
+                    for n in r.every_note() {
+                        err(n);
+                    }
+                }
+            }
             err(TrainError::NoRootSection.note());
             if let Err(e) = gear_core::train::solve_train(
                 &Train::chained(Vec::new(), |_| {
