@@ -118,6 +118,7 @@ train_overdetermined = "zwei Bedingungen können an Körper {body} nicht beide g
 train_no_such_body = "eine Randbedingung oder ein Lastfall nennt einen Körper, den der Strang nicht hat: Körper {body}"
 train_overflow = "die Zähnezahlen entlang des Wellenstrangs multiplizieren sich über das hinaus, was ein exaktes Verhältnis fassen kann"
 train_tips_unclearable = "Eingriff {mesh}: kein Achsabstand bringt die Zähne frei"
+train_size_over_constrained = "Eingriffe {first} und {second}: ihre vorgegebenen Achsabstände verlangen bei festgelegten Profilverschiebungen zwei verschiedene Größen ihrer Räder — eine Verschiebung, einen Abstand oder die Größe freigeben"
 train_axes_cannot_be_placed = "Achsabstand {distance}: die beiden Achsen, die er auf einem Träger verbindet, können bei ihren Abständen zur Trägerachse nicht so weit auseinander stehen"
 train_malformed = "der Graph des Getriebes ist nicht wohlgeformt"
 train_malformed_carried_by = "Achse {axis}: ihr carried_by nennt keinen Körper auf einer anderen Achse"

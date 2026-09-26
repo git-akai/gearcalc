@@ -800,6 +800,16 @@ impl Shape {
     /// they share — the opposite hand across an external mesh, the same
     /// across an internal one — else straight teeth.
     pub(crate) fn helix_angles(&self) -> Vec<f64> {
+        self.resolved_helices().0
+    }
+
+    /// [`Self::helix_angles`], and **the two meshes that ask one group two
+    /// sizes**, where two given distances with both shifts pinned each
+    /// decide the size of one mesh group and decide it differently: the
+    /// first mesh that sized the group, and the later one that asked
+    /// another. The first stands in the helices; the solve refuses the
+    /// shape by name ([`TrainError::SizeOverConstrained`]).
+    pub(crate) fn resolved_helices(&self) -> (Vec<f64>, Option<[usize; 2]>) {
         let readings = self.readings();
         // The last reading given is the one relief leaves standing, and the
         // one the solve honours.
@@ -816,14 +826,43 @@ impl Shape {
             })
         };
         let mut out: Vec<Option<f64>> = (0..self.members.len()).map(stated).collect();
+        // Through the meshes until nothing moves: `β_b = Σ − sign · β_a`,
+        // the opposite hand across an external mesh, the same hand across
+        // an internal one, and on crossed shafts the shaft angle shared
+        // between the two.
+        let propagate = |out: &mut Vec<Option<f64>>| loop {
+            let mut moved = false;
+            for (k, m) in self.meshes.iter().enumerate() {
+                let sign = self.kind_of(k).map_or(1.0, MeshKind::sign);
+                let angle = self.shaft_angle_of(k);
+                match (out[m.a], out[m.b]) {
+                    (Some(a), None) => {
+                        out[m.b] = Some(angle - sign * a);
+                        moved = true;
+                    }
+                    (None, Some(b)) => {
+                        out[m.a] = Some(angle - sign * b);
+                        moved = true;
+                    }
+                    _ => {}
+                }
+            }
+            if !moved {
+                break;
+            }
+        };
+        propagate(&mut out);
+        // The mesh that sized each member's group, where one did.
+        let mut sized_by: Vec<Option<usize>> = vec![None; self.members.len()];
+        let mut conflict: Option<[usize; 2]> = None;
         // **A given distance with both shifts pinned decides the size.** With
         // nothing else free to reach it, the helix of a mesh's first member
         // is solved so the zero-backlash distance opened by the clearance is
-        // the one given — the pair's rule, on every parallel mesh.
+        // the one given — the pair's rule, on every parallel mesh — once
+        // per mesh group: a group some reading or earlier mesh has sized is
+        // not sized again, and a later mesh asking it another size is the
+        // conflict.
         for (k, m) in self.meshes.iter().enumerate() {
-            if out[m.a].is_some() || out[m.b].is_some() {
-                continue;
-            }
             let Some(d) = self.distance_of(k) else {
                 continue;
             };
@@ -850,9 +889,8 @@ impl Shape {
                 let shifts: Vec<f64> = self.asked(&helix).iter().map(|a| a.settled).collect();
                 self.nominal_of(k, &shifts, &helix).unwrap_or(f64::NAN)
             };
-            let sized = match target {
-                None => None,
-                Some(target) if angle == 0.0 => {
+            let size = |target: f64| -> Option<f64> {
+                if angle == 0.0 {
                     // Straight teeth are the floor; the distance grows with
                     // the helix without bound below ninety degrees.
                     (at(0.0) <= target)
@@ -865,43 +903,51 @@ impl Shape {
                             )
                         })
                         .flatten()
+                } else {
+                    self.size_reaching(k, target, &at)
                 }
-                Some(target) => self.size_reaching(k, target, &at),
             };
+            if let Some(stood) = out[m.a] {
+                // Two sizings of one root agree to what Brent's stopping
+                // rule leaves each: within `2·tol1 = 4ε|β| + x_tol` of the
+                // root, so twice that apart. Anything wider is a second
+                // size asked of the group.
+                let first = sized_by[m.a];
+                if let (Some(first), Some(asked)) = (first, target.and_then(size)) {
+                    let within = |beta: f64| {
+                        4.0 * f64::EPSILON * beta.abs() + crate::solve::Tol::default().x_tol
+                    };
+                    let agree = within(asked) + within(stood);
+                    if conflict.is_none() && (asked - stood).abs() > agree {
+                        conflict = Some([first, k]);
+                    }
+                }
+                continue;
+            }
+            let sized = target.and_then(size);
             // A crossed mesh with nothing stating its size shares the body
             // angle evenly, which at a right angle is a 45°/45° crossed pair;
             // a parallel one has straight teeth.
             if let Some(beta) = sized.or_else(|| (angle != 0.0).then_some(angle / 2.0)) {
                 out[m.a] = Some(beta);
                 out[m.b] = Some(angle - sign * beta);
-            }
-        }
-        // Propagate through the meshes until nothing moves.
-        loop {
-            let mut moved = false;
-            for (k, m) in self.meshes.iter().enumerate() {
-                let sign = self.kind_of(k).map_or(1.0, MeshKind::sign);
-                let angle = self.shaft_angle_of(k);
-                // `β_b = Σ − sign · β_a`: the opposite hand across an
-                // external mesh, the same hand across an internal one, and
-                // on crossed shafts the shaft angle shared between the two.
-                match (out[m.a], out[m.b]) {
-                    (Some(a), None) => {
-                        out[m.b] = Some(angle - sign * a);
-                        moved = true;
+                let before: Vec<bool> = out.iter().map(Option::is_some).collect();
+                propagate(&mut out);
+                // The mesh is the group's sizer where it asked a size; a
+                // crossed mesh sharing its angle evenly asked none.
+                if sized.is_some() {
+                    for (i, h) in out.iter().enumerate() {
+                        if h.is_some() && (!before[i] || i == m.a || i == m.b) {
+                            sized_by[i] = Some(k);
+                        }
                     }
-                    (None, Some(b)) => {
-                        out[m.a] = Some(angle - sign * b);
-                        moved = true;
-                    }
-                    _ => {}
                 }
             }
-            if !moved {
-                break;
-            }
         }
-        out.into_iter().map(|h| h.unwrap_or(0.0)).collect()
+        (
+            out.into_iter().map(|h| h.unwrap_or(0.0)).collect(),
+            conflict,
+        )
     }
 
     /// **The first member's helix that puts a crossed mesh at `target`**,
@@ -3164,7 +3210,10 @@ pub fn cut(shape: &Shape, lib: &MaterialLibrary) -> Result<Cut, TrainError> {
     // anything reads one — a member that follows reads what it follows.
     let shape = shape.shared();
     let n = shape.members.len();
-    let helix = shape.helix_angles();
+    let (helix, conflict) = shape.resolved_helices();
+    if let Some(meshes) = conflict {
+        return Err(TrainError::SizeOverConstrained { meshes });
+    }
 
     // ---- the wiring describes a mechanism before anything is built at it:
     // a member with no teeth is refused by name here, and not as a tooth
@@ -4139,6 +4188,17 @@ impl Shape {
     /// A shift gives instead, which is what the set's own kind did.
     pub fn freedoms(&self) -> Vec<FreedomGroup> {
         let mut groups = Vec::new();
+        // **One size entry per mesh group**: in the relation of the first
+        // distance its group's first mesh comes first on, and for a group
+        // that is first on no distance, a relation of its own — its size,
+        // stated at most one way.
+        let mesh_groups = self.mesh_groups();
+        let group_of = |k: usize| {
+            mesh_groups
+                .iter()
+                .position(|g| g.contains(&self.meshes[k].a))
+        };
+        let mut sized = vec![false; mesh_groups.len()];
         for d in 0..self.distances.len() {
             let meshes = self.meshes_on(d);
             if meshes.is_empty() {
@@ -4152,13 +4212,17 @@ impl Shape {
                     order.push(vec![Freedom::Member(m.a, MemberFreedom::Shift)]);
                     order.push(vec![Freedom::Member(m.b, MemberFreedom::Shift)]);
                     order.push(vec![Freedom::Clearance(d)]);
-                    order.push(super::entry(&self.readings_for(k)));
+                    if let Some(g) = group_of(k).filter(|&g| !sized[g]) {
+                        sized[g] = true;
+                        order.push(super::entry(&self.readings_for(k)));
+                    }
                 } else {
                     // A later mesh gives on a member that can absorb for
                     // it — the plan's own list — and on nothing else: not
-                    // a member with no leverage, and not the clearance or
-                    // the size, which move every mesh on the distance
-                    // together and close no difference between two.
+                    // a member with no leverage, and not the clearance,
+                    // which moves every mesh on the distance together and
+                    // closes no difference between two. Its size is its
+                    // group's, counted once where the group first comes.
                     order.extend(
                         self.absorbers(meshes[0], k, &meshes[..n])
                             .into_iter()
@@ -4176,6 +4240,15 @@ impl Shape {
                 });
             }
             groups.push(super::distance_and_clearance(d));
+        }
+        for (g, meshes) in self.group_meshes().iter().enumerate() {
+            if let (false, Some(&k)) = (sized[g], meshes.first()) {
+                groups.push(FreedomGroup {
+                    given_at_most: 1,
+                    automatic_at_most: 1,
+                    order: vec![super::entry(&self.readings_for(k))],
+                });
+            }
         }
         // **A mesh's two thickness coefficients are one number said twice**
         // — the second is the first's mate by the mesh's rule — so at most
@@ -6510,5 +6583,138 @@ mod one_module_per_group {
         assert_eq!(shared.members[3].normal_module(), 1.0 / 0.998);
         assert_eq!(shared.members[0].normal_module(), 1.0);
         assert_eq!(shared.members[1].normal_module(), 1.0);
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod one_size_per_group {
+    //! **A mesh group's size is one number, said once**: its helix, a
+    //! member's pitch diameter or the overlap, and relief keeps at most one
+    //! standing on every group — not only on the group whose mesh comes
+    //! first on a distance.
+
+    use super::super::arrangements::{self as arr, Preset};
+    use super::super::{test_library, Freedom, MemberFreedom, TrainError};
+    use super::*;
+
+    fn solve(shape: &Shape) -> Result<crate::train::Alone, TrainError> {
+        crate::train::solve_alone(
+            &crate::train::Train::alone(shape, 2.0, 3000.0),
+            &test_library(),
+        )
+    }
+
+    /// Member `i` given `f` at `value`, then relieved as a designer's
+    /// typing it is.
+    fn typed(shape: &Shape, i: usize, f: MemberFreedom, value: f64) -> Shape {
+        let mut s = shape.clone();
+        *s.input_mut(Freedom::Member(i, f)).unwrap() = Auto::fixed(value);
+        s.relieved(Some(Freedom::Member(i, f)))
+    }
+
+    /// The pitch diameter member `i` has at a helix, degrees.
+    fn diameter_at(shape: &Shape, i: usize, beta: f64) -> f64 {
+        let m = &shape.members[i];
+        f64::from(m.gear.teeth) * m.normal_module() / beta.to_radians().cos()
+    }
+
+    /// **Every reading given, relieved: one stands per group.** Every
+    /// member's helix and pitch diameter typed on every preset, a line of
+    /// four and a Ravigneaux, and relief leaves at most one of a group's
+    /// readings given.
+    #[test]
+    fn relief_leaves_one_size_per_group() {
+        let mut shapes: Vec<(String, Shape)> = Preset::ALL
+            .iter()
+            .map(|p| (format!("{p:?}"), p.build()))
+            .collect();
+        shapes.push(("line".into(), arr::line(&[20, 30, 25, 35])));
+        shapes.push((
+            "ravigneaux".into(),
+            arr::ravigneaux([24, 30], [18, 18], 66, 3),
+        ));
+        for (name, shape) in shapes {
+            let mut s = shape.clone();
+            for i in 0..s.members.len() {
+                let d = diameter_at(&s, i, 12.0);
+                s.members[i].pitch_diameter = Auto::fixed(d);
+                s.members[i].gear.helix_angle = Auto::fixed(12.0);
+            }
+            let s = s.relieved(None);
+            for group in s.mesh_groups() {
+                let given = group
+                    .iter()
+                    .flat_map(|&i| {
+                        [
+                            !s.members[i].gear.helix_angle.auto,
+                            !s.members[i].pitch_diameter.auto,
+                        ]
+                    })
+                    .filter(|&g| g)
+                    .count();
+                assert!(given <= 1, "{name}: group {group:?} keeps {given} sizes");
+            }
+        }
+    }
+
+    /// **The last size typed is the one the solve honours**, on a group
+    /// whose mesh is not the first on its distance: a layshaft's second
+    /// pair and a compound's second step. A pitch diameter at 15° then a
+    /// helix of 10° solves at 10°; a helix then the mate's pitch diameter
+    /// solves at the diameter's.
+    #[test]
+    fn the_last_size_typed_is_honoured_on_every_group() {
+        for (name, shape, i, mate) in [
+            ("layshaft", Preset::Layshaft.build(), 2, 3),
+            ("compound", Preset::Compound.build(), 2, 4),
+        ] {
+            let s = typed(
+                &shape,
+                i,
+                MemberFreedom::PitchDiameter,
+                diameter_at(&shape, i, 15.0),
+            );
+            let s = typed(&s, i, MemberFreedom::Helix, 10.0);
+            let got = solve(&s).unwrap().part.members[i].helix_angle;
+            assert!((got.abs() - 10.0).abs() < 1e-9, "{name}: {got}");
+            let s = typed(&shape, i, MemberFreedom::Helix, 10.0);
+            let s = typed(
+                &s,
+                mate,
+                MemberFreedom::PitchDiameter,
+                diameter_at(&shape, mate, 15.0),
+            );
+            let got = solve(&s)
+                .unwrap_or_else(|e| panic!("{name}: {e}"))
+                .part
+                .members[mate]
+                .helix_angle;
+            assert!((got.abs() - 15.0).abs() < 1e-9, "{name}: {got}");
+        }
+    }
+
+    /// **Two given distances that ask two sizes of one group are refused by
+    /// name**: a line of four with every shift pinned, its first and last
+    /// distances given at sizes no one helix reaches.
+    #[test]
+    fn two_distances_asking_two_sizes_are_refused_by_name() {
+        let mut s = arr::line(&[20, 30, 25, 35]).size_free();
+        for m in &mut s.members {
+            m.gear.profile_shift = Auto::fixed(0.0);
+        }
+        s.distances[0].distance = Auto::fixed(25.8);
+        s.distances[2].distance = Auto::fixed(31.5);
+        let out = solve(&s);
+        assert!(
+            matches!(out, Err(TrainError::SizeOverConstrained { .. })),
+            "{:?}",
+            out.map(|a| a
+                .part
+                .members
+                .iter()
+                .map(|m| m.helix_angle)
+                .collect::<Vec<_>>())
+        );
     }
 }

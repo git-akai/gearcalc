@@ -1423,6 +1423,23 @@ mod tests {
                     other => panic!("the axes cannot be placed: {:?}", other.err()),
                 }
             }
+            // **Two given distances asking one group two sizes**: a line of
+            // four, every shift pinned, its first and last distances given.
+            {
+                let mut shape = arr::line(&[20, 30, 25, 35]).size_free();
+                for m in &mut shape.members {
+                    m.gear.profile_shift = gear_core::params::Auto::fixed(0.0);
+                }
+                shape.distances[0].distance = gear_core::params::Auto::fixed(25.8);
+                shape.distances[2].distance = gear_core::params::Auto::fixed(31.5);
+                match gear_core::train::solve_alone(
+                    &gear_core::train::Train::alone(&shape, 2.0, 3000.0),
+                    &lib,
+                ) {
+                    Err(e @ TrainError::SizeOverConstrained { .. }) => err(e.note()),
+                    other => panic!("two sizes asked of one group: {:?}", other.err()),
+                }
+            }
             // **A flow wider than its direction mask**: 32 pairs in a chain,
             // its case said as the flow's limit.
             {

@@ -1643,6 +1643,12 @@ pub enum TrainError {
     /// difference ([`shape::Shape::staggers`]). Zero-based, as the
     /// distances are indexed; the front end numbers from 1.
     AxesCannotBePlaced { distance: usize },
+    /// **Two given distances ask one mesh group two sizes**: each with both
+    /// its mesh's shifts pinned decides the group's helix, and they decide
+    /// it differently ([`shape::Shape::resolved_helices`]). The mesh that
+    /// sized the group first and the one that asked another, zero-based;
+    /// the front end numbers from 1.
+    SizeOverConstrained { meshes: [usize; 2] },
     /// **The graph is not well formed**, at the invariant named: input
     /// that describes no train, refused where it enters
     /// ([`Train::validate`]) before anything reads it.
@@ -1723,6 +1729,11 @@ impl crate::note::Explain for TrainError {
             Self::Overflow => Note::new(key::ERROR_TRAIN_OVERFLOW),
             Self::LoadPort { case } => {
                 Note::new(key::ERROR_TRAIN_LOAD_PORT).text("case", (case + 1).to_string())
+            }
+            Self::SizeOverConstrained { meshes: [a, b] } => {
+                Note::new(key::ERROR_TRAIN_SIZE_OVER_CONSTRAINED)
+                    .count("first", u32::try_from(*a + 1).unwrap_or(u32::MAX))
+                    .count("second", u32::try_from(*b + 1).unwrap_or(u32::MAX))
             }
             Self::AxesCannotBePlaced { distance } => {
                 Note::new(key::ERROR_TRAIN_AXES_CANNOT_BE_PLACED)
@@ -1824,6 +1835,13 @@ impl std::fmt::Display for TrainError {
             Self::Overflow => write!(
                 f,
                 "the tooth counts along the shaft line multiply past what an exact ratio holds"
+            ),
+            Self::SizeOverConstrained { meshes: [a, b] } => write!(
+                f,
+                "meshes {} and {}: their given distances, with every shift pinned, ask \
+                 their gears two different sizes",
+                a + 1,
+                b + 1
             ),
             Self::AxesCannotBePlaced { distance } => write!(
                 f,
