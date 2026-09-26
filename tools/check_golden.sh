@@ -79,7 +79,8 @@ fi
 slug() { echo "$1" | tr ' /' '__'; }
 
 scratch="$(mktemp -d)"
-trap 'rm -rf "$scratch"' EXIT
+fresh=""
+trap 'rm -rf "$scratch" ${fresh:+"$fresh"}' EXIT
 
 # `speed \t keep \t invocation \t why`, from the harness itself. Captured
 # first so `set -e` sees the binary fail, and refused when empty: a list that
@@ -96,6 +97,12 @@ cases=()
 skipped=()
 elsewhere=()
 while IFS=$'\t' read -r speed keep case why; do
+  # A line that does not parse would run `gear-cli` with no arguments and
+  # record whatever that prints; refused instead.
+  if [[ ! "$speed" =~ ^(fast|slow)$ || ! "$keep" =~ ^(full|digest|none)$ || -z "$case" ]]; then
+    echo "check_golden: malformed --golden-cases line: speed=${speed@Q} keep=${keep@Q} case=${case@Q}" >&2
+    exit 1
+  fi
   if [[ "$keep" == none ]]; then
     elsewhere+=("$case — $why")
     continue

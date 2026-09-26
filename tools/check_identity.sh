@@ -36,7 +36,11 @@ CARGO_TARGET_DIR="$target/identity-base" \
 cargo build --release --quiet --manifest-path "$root/Cargo.toml" --bin gear-cli
 
 run() { # binary, output
-  if ! "$1" --golden-cases | grep -q $'\tidentity\t'; then
+  # Captured whole before it is searched: `grep -q` in a pipe can close it
+  # early and fail the producer under `pipefail`.
+  local cases
+  cases="$("$1" --golden-cases)"
+  if [[ "$cases" != *$'\tidentity\t'* ]]; then
     echo "check_identity: $1 has no \`identity\` subcommand" >&2
     exit 2
   fi
