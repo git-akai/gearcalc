@@ -63,7 +63,7 @@ The fix:
 - In `member_is_buildable`, keep only `x ≥ floor − compat::SAME_SHIFT`.
 - Pass `working_depth.resolve(dedendum)` at shape.rs:2233 and in the `Absorbed` arm.
 - Floor every member at `x_min`.
-- If non-negativity is wanted, make it an explicit per-member option with its own note.
+- There is no non-negativity rule and no option for one: negative shifts are admitted by default. The only floor is x_min, and it applies only where "no undercut" is asked.
 
 The recorded justification (the hula walks to −1.79 and loses efficiency) comes from the round alternation. Fix it with T12.1's "keep the best round". Rewrite the eight tests that encode the floor's refusals as geometry (added#46 lists two).
 **Proof.** Chosen shift ≥ floor(h_w) for every member, paired or not, at h_w ∈ {0.8, 1.0, h_f, 1.5}; this fails today at 1.5. At z = 7..20 a pinion exactly at its floor with a non-interfering mate is admissible. Member-order symmetry at every given distance. Searched η at floor x_min ≥ at max(x_min, 0), checked against a brute force; the hula drive η must not fall (today it falls [19,18,17,18] 0.3089→0.2832 without T12.1).

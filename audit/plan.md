@@ -9,7 +9,7 @@ The core mathematics is right. Involute and trochoid generation, ring geometry, 
 - the flow and the search cost grow exponentially with the train;
 - too many gates cannot fail, because they share the assumption they check.
 
-The plan makes the gates able to fail first, then fixes the 27 high-severity wrong answers. After that it gives every input and refusal one owner, makes cost linear, and replaces split or copied models with one signed model per phenomenon. Documentation and features come last. The 21 workstream files in [`workstreams/`](workstreams/) (T01–T21) hold each task's change and its proof; [`findings.md`](findings.md) lists every finding and [`ledger.json`](ledger.json) holds its evidence.
+The plan makes the gates able to fail first, then fixes the 27 high-severity wrong answers. After that it gives every input and refusal one owner, makes cost linear, and replaces split or copied models with one signed model per phenomenon. Documentation and features come last. Every design decision the plan needed is settled; the tasks carry them. The one parked task, T09.12, waits for the ISO 1328-2 text. The 21 workstream files in [`workstreams/`](workstreams/) (T01–T21) hold each task's change and its proof; [`findings.md`](findings.md) lists every finding and [`ledger.json`](ledger.json) holds its evidence.
 
 ## What was done
 
@@ -210,13 +210,6 @@ Then T11.14 and, last, T11.13.
 - Larger scopes: T21.16, T07.20, T21.17.
 
 **Exit.** Each feature has its law or published-example gate (for example c′ ≈ 14 and c_γ ≈ 20 N/(mm·µm) for T21.13), and is off or neutral by default.
-
-## Open decisions
-
-1. **Efficiency model (T06.8).** Weight the loss by load per unit contact-line length, holding the total at the transmitted force at every instant. It is closed form, equals Ohlendorf's H_V at ε_β = 0 and today's value at integer ε_β, and has no spur/helical branch. It lowers spur loss by about 14 % (canary 98.741 → 98.919 %, Wolfrom ≈ 45.4 → 49.4 %). The alternative is to keep today's model and record its bias in state.md: +12–19 % spur loss.
-2. **Allowables (T08.4, T08.6).** Each fatigue value states its load ratio, and the 0.7 reversed fraction applies only to R = 0 data. Contact gets its own allowable, which for the steels is higher than the bending figure it borrows today. Contact sizing stays off by default, and a note is raised whenever σ_H exceeds the allowable. The open question is how the contact allowable is sourced: estimated from hardness with a visible quality grade, taken from a datasheet, or bounded by mechanics alone (subsurface yield, shakedown).
-3. **Shift floor (T12.6).** The search floors every member at max(x_min, 0): a non-negativity rule rides inside "no undercut". The open question is whether to drop that hidden floor and leave the single floor the option names, x_min.
-4. **Worm locking (T07.13).** A back-driven worm whose static friction exceeds its locking threshold reports 0 % efficiency, although it runs at a positive efficiency once moving. The open question is whether the running figure is reported beside the self-locking note.
 
 ## What not to touch
 

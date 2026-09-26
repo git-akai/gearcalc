@@ -275,7 +275,7 @@ Name the idle threshold (`1e-9` absolute today) and make it relative to the case
 - `checks.web = self.packages.web`.
 - A crane test derivation for `check_bindings`, and a `buildNpmPackage` check for `npm run check`.
 
-Whether the by-hand scripts run in CI is a separate policy decision; once T16.2 makes them fail on a crate defect, they cost about 20 s. Then update CLAUDE.md's "`nix flake check` is **not** all of them" and README ([lens-docs-accuracy-1#6], [added2#56]).
+The by-hand scripts join CI once T16.2 makes them fail on a crate defect (about 20 s). Then update CLAUDE.md's "`nix flake check` is **not** all of them" and README ([lens-docs-accuracy-1#6], [added2#56]).
 **Proof.** `nix flake check` fails on each mutation named in T16.1, T16.14, T16.17 and T16.18. CI saves the release gear-cli build and the check_bindings compile.
 
 ### T16.31 Kill the surviving mutants

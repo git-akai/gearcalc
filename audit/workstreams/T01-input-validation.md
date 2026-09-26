@@ -82,7 +82,7 @@ Export `MeshRanges` beside the member ranges, so that `TrainPanel.svelte:673-674
 - module 0 gets four different keys across ten presets.
 
 `every_add_on_every_preset_solves` must stay green.
-**Notes.** Face width 0 now solves to nulls and needs a decision before it is gated [lens-errors-policy#13]. Planetary at friction 20 has both meshes at η 0 and a path efficiency of 1/7; a mesh at η 0 holds, so T11.4's oracle law must decide whether that figure is right. The panel's integer sanitation is [web#5, lens-errors-policy#16].
+**Notes.** Face width 0 describes no contact, so it is refused under the face-width key (rule 5); today it solves to nulls [lens-errors-policy#13]. Planetary at friction 20 has both meshes at η 0 and a path efficiency of 1/7; a mesh at η 0 holds, and T11.4's oracle law settles whether 1/7 is the right figure. The panel's integer sanitation is [web#5, lens-errors-policy#16].
 
 ### T01.9 Material validation in gear-core
 **Change.** Add `MaterialLibrary::check()` / `Material::refusal()` in `gear-core/material.rs`, refusing `Implausible { material, field }`. The bounds are all finite, density > 0, E > 0, −1 < ν < 0.5 and 0 < fatigue ≤ ultimate. Call it from `gear_io::materials::from_toml`, from the gear-wasm entry points that take a library, and on the resolved material after member overrides (`material.rs:353`), which never pass through `from_toml`. `every_material_carries_physically_sane_values` becomes a call to the same predicate. Its 0.2 floor on ν is a sanity band, not a physical limit, and does not belong at runtime.

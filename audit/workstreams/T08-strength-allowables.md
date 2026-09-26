@@ -100,10 +100,11 @@ The library's fatigue figures are fully reversed endurances (R = −1): POM's D6
 
 **Change.**
 - Add `contact_fatigue_allowable: Option<Value>` to `Material`, the TOML and `Overrides`. Key the lookup by rating and kind: `allowable(material, Rating::{Bending, Contact}, kind)`.
-- Steels: estimate from hardness with ISO 6336-5 Table 1, through-hardened alloy steel: ML 1.313HV+188, MQ 1.313HV+373, ME 2.213HV+260. The quality grade is an explicit, user-visible option. The note says that 46 HRC lies past the table's 360/390 HV cap.
-- Polymers: `None` unless a VDI 2736 figure can be quoted. The rating is then Unavailable, with a note.
+- Source the value like every other library value, with a `basis` and a note: a datasheet or test figure where one is published (`Datasheet`), otherwise an estimate from hardness (`Estimated`) using ISO 6336-5 Table 1, through-hardened alloy steel: ML 1.313HV+188, MQ 1.313HV+373, ME 2.213HV+260. The quality grade is an explicit, user-visible option, and the value's note names the source and grade. The note also says that 46 HRC lies past the table's 360/390 HV cap. Where both sources exist, the library carries both and the datasheet figure is the default.
+- Polymers: `None` unless a VDI 2736 or datasheet figure can be quoted. The rating is then Unavailable, with a note.
+- The panel shows the contact allowable's basis the same way it shows the other values' (T19's basis badge).
 - Ultimate contact: replace Hertz against tensile yield with first subsurface yield, p_Y = C(κ)·σ_y. C is 1.79 for line contact and 1.60 for circular contact (von Mises, ν = 0.3), and C(κ) comes in closed form from the Hertz field using hertz's κ. It applies only where `ultimate_measure = Yield`, which gives that field a reader.
-- Keep contact sizing off by default, and emit a note whenever σ_H exceeds the flank allowable at the chosen width. Record whichever default remains in state.md with its size.
+- Keep contact sizing off by default, and emit a note whenever σ_H exceeds the flank allowable at the chosen width. Record the default-off choice in state.md with its size.
 - Fix rationale.md:1265-1275 and train/mod.rs:2489-2505. Record in Known-approximate the ~12 % offset between the tool's single-pair σ_H and the ISO σ_H that σ_Hlim is calibrated against (from T08.3).
 - Add labels to the 5 catalogues. The default-off wording in reference.md is T18.7 [added2#75].
 
