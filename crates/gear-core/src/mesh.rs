@@ -1371,7 +1371,7 @@ mod tests {
     fn the_backlash_law_is_the_geometry_on_both_kinds_and_a_clearance_opens_both() {
         use crate::ring::{Cutter, Ring};
         let arc = |g: &Tooth, r: f64| {
-            let u = (((r / g.rb).powi(2) - 1.0).max(0.0)).sqrt();
+            let u = crate::involute::roll_at_radius(r, g.rb);
             2.0 * r * (g.psi_b - crate::involute::inv_from_roll(u))
         };
         let mut worst = 0.0_f64;

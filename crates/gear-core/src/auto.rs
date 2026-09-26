@@ -357,10 +357,7 @@ pub fn admissible_profile_shift(p: &GearParams, working_depth: f64) -> ShiftRang
         let st = p.module * (PI / 2.0 + 2.0 * (x + xs) * ta) / beta.cos();
         let psi_b = st / (2.0 * r) + inv(alpha_t);
         let ra = r + p.module * (p.addendum + x);
-        if ra <= rb {
-            return psi_b;
-        }
-        psi_b - inv_from_roll(((ra / rb).powi(2) - 1.0).sqrt())
+        psi_b - inv_from_roll(crate::involute::roll_at_radius(ra, rb))
     };
     let pointed = if half_tip_angle(min) * half_tip_angle(max) < 0.0 {
         brent(half_tip_angle, min, max, Tol::default())
@@ -676,12 +673,7 @@ fn ranges_at_shift(p: &GearParams, working_depth: f64) -> Ranges {
     // Root radius: the tip round must fit the cutter depth and the tooth space.
     let bd = p.module * (p.dedendum - x);
     let st = p.module * (PI / 2.0 + 2.0 * (x + p.thickness_shift()) * an.tan()) / beta.cos();
-    let w_tip = (PI * mt - st) - 2.0 * bd * alpha_t.tan();
-    let rho_fit = if w_tip > 0.0 {
-        w_tip * alpha_t.cos() / (2.0 * (1.0 - alpha_t.sin()))
-    } else {
-        0.0
-    };
+    let rho_fit = Rack::settle(st, bd, alpha_t, mt).rho_fit;
     let rho_max = guard::FILLET_FRACTION_OF_MAX * bd.min(rho_fit);
 
     Ranges {

@@ -1,5 +1,6 @@
-//! Measurements you can actually take on a finished gear: span over teeth,
-//! measurement over pins or balls, and the cutter tip width.
+//! Measurements you can actually take on a finished gear: span over teeth and
+//! measurement over pins or balls — and, beside them, the width of the tool's
+//! tip, which is a property of the cutter rather than a measurement of the gear.
 //!
 //! These are what go on a drawing, so the emphasis is on reporting *whether a
 //! measurement is takeable* as much as on the number itself. A span that
@@ -14,17 +15,6 @@
 
 use crate::involute::{inv, inv_inverse};
 use crate::tooth::Tooth;
-
-/// This gear's base helix angle, radians — [`crate::plane::base_helix_angle`]
-/// read off a [`Tooth`].
-///
-/// The identity lives in [`crate::plane`]; what this adds is which two of a
-/// gear's angles go into it, which is the part a call site would otherwise have
-/// to remember.
-#[must_use]
-pub fn base_helix_angle(g: &Tooth) -> f64 {
-    crate::plane::base_helix_angle(g.beta, g.alpha_n)
-}
 
 /// Why a measurement cannot be taken.
 ///
@@ -85,7 +75,7 @@ impl Space {
         Self {
             half_space: std::f64::consts::PI / f64::from(g.params.teeth) - g.psi_b,
             rb: g.rb,
-            beta_b: base_helix_angle(g),
+            beta_b: g.base_helix_angle(),
             sign: 1.0,
             tip: g.ra,
             form: g.r_j,
@@ -149,7 +139,7 @@ fn space_at(gear: &crate::gear::Gear, i: usize) -> Space {
     Space {
         half_space: gear.space_half_angle(i),
         rb: mean.rb,
-        beta_b: base_helix_angle(mean),
+        beta_b: mean.base_helix_angle(),
         sign: 1.0,
         tip: t.ra,
         form: t.r_j,
@@ -245,25 +235,34 @@ pub struct Span {
 /// checks it does. Writing it in the general form means profile shift and
 /// thickness modification are handled without a special case, since both are
 /// already inside `s_t`.
+///
+/// `None` where there is no such measurement, by [`span_over_teeth_at`]'s rule:
+/// no teeth spanned, a severed tooth, or faces that touch off the usable flank,
+/// between the junction and the tip. On a tooth, where every flank is the same,
+/// the symmetric placement is on the flank exactly when any placement is.
 #[must_use]
-pub fn span_over_teeth(g: &Tooth, k: u32) -> Span {
+pub fn span_over_teeth(g: &Tooth, k: u32) -> Option<Span> {
+    if k == 0 || g.severed {
+        return None;
+    }
     let z = f64::from(g.params.teeth);
-    let bb = base_helix_angle(g);
+    let bb = g.base_helix_angle();
     let nominal = bb.cos()
         * g.rb
-        * (2.0 * std::f64::consts::PI * f64::from(k.saturating_sub(1)) / z
-            + g.st / g.r
-            + 2.0 * inv(g.alpha_t));
+        * (2.0 * std::f64::consts::PI * f64::from(k - 1) / z + g.st / g.r + 2.0 * inv(g.alpha_t));
     // The configuration is symmetric about the radius through the middle of the
     // spanned group, so each measuring face touches half a span from the base
     // tangent point.
     let half = nominal / (2.0 * bb.cos());
-    Span {
-        teeth_spanned: k,
-        nominal,
-        contact_radius: f64::hypot(g.rb, half),
-        limits: None,
-    }
+    let contact_radius = f64::hypot(g.rb, half);
+    (nominal.is_finite() && nominal > 0.0 && (g.r_j..=g.ra).contains(&contact_radius)).then_some(
+        Span {
+            teeth_spanned: k,
+            nominal,
+            contact_radius,
+            limits: None,
+        },
+    )
 }
 
 /// The span a metrologist would actually use: the one whose contact lands
@@ -279,23 +278,14 @@ pub fn span_over_teeth(g: &Tooth, k: u32) -> Span {
 ///
 /// [`MeasurementError::NoValidSpan`] when no `k` contacts the usable flank.
 pub fn best_span(g: &Tooth) -> Result<Span, MeasurementError> {
-    if g.severed {
-        return Err(MeasurementError::NoValidSpan);
-    }
-    let mut best: Option<Span> = None;
-    for k in 1..=g.params.teeth {
-        let s = span_over_teeth(g, k);
-        if s.contact_radius < g.r_j || s.contact_radius > g.ra {
-            continue;
-        }
-        let better = best
-            .as_ref()
-            .is_none_or(|b| (s.contact_radius - g.r).abs() < (b.contact_radius - g.r).abs());
-        if better {
-            best = Some(s);
-        }
-    }
-    best.ok_or(MeasurementError::NoValidSpan)
+    (1..=g.params.teeth)
+        .filter_map(|k| span_over_teeth(g, k))
+        .min_by(|a, b| {
+            (a.contact_radius - g.r)
+                .abs()
+                .total_cmp(&(b.contact_radius - g.r).abs())
+        })
+        .ok_or(MeasurementError::NoValidSpan)
 }
 
 /// Span over `k` teeth starting at tooth `j`, on a gear whose teeth may differ.
@@ -341,7 +331,7 @@ pub fn span_over_teeth_at(gear: &crate::gear::Gear, j: usize, k: u32) -> Option<
     let z = gear.teeth();
     let last = (j + k as usize - 1) % z;
     let mean = gear.mean();
-    let bb = base_helix_angle(mean);
+    let bb = mean.base_helix_angle();
 
     // **Grouped so the cancellation happens first.** Taking the difference of two
     // *accumulated* seats — `flank_seat(last) − flank_seat(j)` — is arithmetically
@@ -365,7 +355,7 @@ pub fn span_over_teeth_at(gear: &crate::gear::Gear, j: usize, k: u32) -> Option<
     // its own. So the placements that keep a contact on usable flank are an
     // interval in that length, and both must hold at once.
     let total = sweep;
-    let roll_at = |radius: f64| ((radius / mean.rb).powi(2) - 1.0).max(0.0).sqrt();
+    let roll_at = |radius: f64| crate::involute::roll_at_radius(radius, mean.rb);
     let usable = |t: &Tooth| (roll_at(t.r_j), roll_at(t.ra));
     let (a_lo, a_hi) = usable(gear.tooth(j).0);
     let (b_lo, b_hi) = usable(gear.tooth(last).0);
@@ -433,7 +423,7 @@ pub fn pin_geometry(g: &Tooth, pin_diameter: f64) -> Result<(f64, f64), Measurem
     pin_seat(
         std::f64::consts::PI / f64::from(g.params.teeth) - g.psi_b,
         g.rb,
-        base_helix_angle(g),
+        g.base_helix_angle(),
         pin_diameter,
         1.0,
     )
@@ -720,15 +710,14 @@ pub fn over_pins_at(
 
 /// The cutter's tip width in the **normal** plane, mm.
 ///
-/// This is the sharp rack tip width, ignoring the tip round. Reported in the
-/// normal plane so it is independent of helix angle, which is what a
-/// normal-module tool definition implies.
+/// The sharp rack tip width, ignoring the tip round, of the tool that cut this
+/// tooth: [`crate::tooth::Rack::settle`] read at the tooth's own thickness and
+/// depth, so a clamped depth reports the tool that cut rather than the one asked
+/// for. Reported in the normal plane so it is independent of helix angle, which
+/// is what a normal-module tool definition implies.
 #[must_use]
 pub fn cutter_tip_width(g: &Tooth) -> f64 {
-    let p = &g.params;
-    std::f64::consts::PI * p.module
-        - g.st * g.beta.cos()
-        - 2.0 * p.module * (p.dedendum - p.profile_shift) * g.alpha_n.tan()
+    crate::tooth::Rack::settle(g.st, g.bd, g.alpha_t, g.mt).w_tip * g.beta.cos()
 }
 
 impl crate::note::Explain for MeasurementError {

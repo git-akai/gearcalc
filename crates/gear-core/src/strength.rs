@@ -38,7 +38,6 @@
 use crate::contact::{ContactPath, LoadSharing};
 use crate::hertz::peak_pressure;
 use crate::mesh::Mesh;
-use crate::metrology::base_helix_angle;
 use crate::solve::{brent, Tol};
 use crate::tooth::Tooth;
 
@@ -553,7 +552,7 @@ impl ToothOutline for Tooth {
         self.alpha_t
     }
     fn base_helix_angle(&self) -> f64 {
-        crate::metrology::base_helix_angle(self)
+        Tooth::base_helix_angle(self)
     }
     fn tip_at_high_roll(&self) -> bool {
         // An external tooth's flank runs from its fillet junction out to its
@@ -1288,7 +1287,7 @@ impl Load {
     /// its projection.
     #[must_use]
     pub fn normal_to_flank(&self, g: &Tooth) -> f64 {
-        self.transverse_line_of_action(g) / base_helix_angle(g).cos()
+        self.transverse_line_of_action(g) / g.base_helix_angle().cos()
     }
 
     /// The same mesh load, re-quoted against the mating gear.
@@ -1836,7 +1835,7 @@ pub fn contact_stress(
     // carries the whole of it at a point; the line carries the same force spread
     // along its length.
     let f_bn = load.normal_to_flank(g1);
-    let cos_bb = base_helix_angle(g1).cos();
+    let cos_bb = g1.base_helix_angle().cos();
 
     let at = |xi: f64| -> Option<(f64, f64)> {
         let inv_rho_t = mesh.relative_curvature(xi)?;
@@ -2025,7 +2024,7 @@ mod tests {
                     // moves the tooth's figure either way. That second regime is the
                     // one the ramp was never calibrated for, and the stage says
                     // so rather than letting the number pass as a rating.
-                    let eps_n = eps / crate::metrology::base_helix_angle(&g).cos().powi(2);
+                    let eps_n = eps / g.base_helix_angle().cos().powi(2);
                     if eps_n < 2.0 {
                         assert!(
                             now >= 0.97 * was,
@@ -2618,7 +2617,7 @@ mod tests {
             assert!((f_bt - load.tangential(&g) / g.alpha_t.cos()).abs() < 1e-9);
             // F_bn = F_bt / cos β_b, and for a spur gear the two coincide.
             let f_bn = load.normal_to_flank(&g);
-            let cos_bb = base_helix_angle(&g).cos();
+            let cos_bb = g.base_helix_angle().cos();
             assert!((f_bn - f_bt / cos_bb).abs() < 1e-9);
             if beta == 0.0 {
                 assert!(
@@ -2857,7 +2856,7 @@ mod tests {
                 let rb2 = mesh.a_w * f64::from(mesh.z2) / sum_z * mesh.alpha_w.cos();
                 let rho1 = path.base_radius_1 * mesh.alpha_w.tan() + cs.worst_position;
                 let rho2 = rb2 * mesh.alpha_w.tan() - cs.worst_position;
-                let inv_rho_n = base_helix_angle(&g1).cos() * (1.0 / rho1 + 1.0 / rho2);
+                let inv_rho_n = g1.base_helix_angle().cos() * (1.0 / rho1 + 1.0 / rho2);
                 let f_prime = load.transverse_line_of_action(&g1) / load.face_width;
                 let line = (f_prime * inv_rho_n * e_star / std::f64::consts::PI).sqrt();
                 assert_eq!(
@@ -3033,7 +3032,7 @@ mod tests {
             });
             let v = g.virtual_spur();
             let eps = 1.55;
-            let cos_bb = base_helix_angle(&g).cos();
+            let cos_bb = g.base_helix_angle().cos();
             let pbn = crate::plane::base_pitch(v.mt, v.alpha_t);
 
             let want =
@@ -3104,7 +3103,7 @@ mod tests {
             // The transverse geometry itself changes with beta (m_t grows), so
             // compare against the same mesh computed without the plane change
             // rather than against the spur mesh directly.
-            let cos_bb = base_helix_angle(&g1).cos();
+            let cos_bb = g1.base_helix_angle().cos();
             let f_bt = load.transverse_line_of_action(&g1);
             // relative_radius is reported in the normal plane, ρ_n = ρ_t/cos β_b.
             let rho_t = cs.relative_radius * cos_bb;

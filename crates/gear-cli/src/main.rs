@@ -2201,7 +2201,6 @@ fn strength_report(
     use gear_core::contact::{efficiency, ContactPath, Drive};
     use gear_core::material::contact_modulus;
     use gear_core::mesh::{Mesh, MeshKind};
-    use gear_core::metrology::base_helix_angle;
     use gear_core::strength::{
         bending_section, bending_stress, contact_stress, min_face_width_bending,
         min_face_width_contact, Load, RimSupport, RootStressModel, PARALLEL_AXES,
@@ -2250,7 +2249,7 @@ fn strength_report(
     if helix != 0.0 {
         println!(
             "helix  beta {helix} deg  base helix beta_b {:.3} deg  virtual teeth {:.2}/{:.2}",
-            base_helix_angle(&g1).to_degrees(),
+            g1.base_helix_angle().to_degrees(),
             g1.virtual_spur().z,
             g2.virtual_spur().z
         );

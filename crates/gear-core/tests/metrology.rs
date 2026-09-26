@@ -60,7 +60,10 @@ fn span_reduces_to_the_textbook_formula() {
         let an = p.pressure_angle.to_radians();
         let x_thick = p.profile_shift + p.thickness_shift();
         for k in 2..=5u32 {
-            let got = span_over_teeth(&g, k).nominal;
+            // A span whose faces miss the flank is not a measurement.
+            let Some(got) = span_over_teeth(&g, k).map(|s| s.nominal) else {
+                continue;
+            };
             // The textbook form is stated for spur gears; the helical case is
             // covered by `consecutive_spans_differ_by_one_base_pitch` instead.
             if p.helix_angle != 0.0 {
@@ -95,7 +98,10 @@ fn consecutive_spans_differ_by_one_base_pitch() {
         let g = Tooth::new(p);
         let pbn = std::f64::consts::PI * p.module * p.pressure_angle.to_radians().cos();
         for k in 2..=6u32 {
-            let d = span_over_teeth(&g, k + 1).nominal - span_over_teeth(&g, k).nominal;
+            let (Some(a), Some(b)) = (span_over_teeth(&g, k), span_over_teeth(&g, k + 1)) else {
+                continue;
+            };
+            let d = b.nominal - a.nominal;
             assert!(
                 (d - pbn).abs() < 1e-12,
                 "z={} k={k}: step {d}, base pitch {pbn}",
@@ -405,6 +411,44 @@ fn backlash_matches_a_direct_tooth_thickness_computation() {
 }
 
 // --------------------------------------------------------------------- //
+
+/// **The tip width reported is the tool that cut.** Read off what the tooth
+/// became — its thickness and the depth its root sits at — rather than off the
+/// inputs, so a clamped depth reports the tool the hob was actually set to. The
+/// raw dedendum reported the tool asked for: at z30 x1.5 the root is raised and
+/// the width was 0.661 mm against the 0.443 mm that cut.
+#[test]
+fn the_cutter_tip_width_is_the_tool_that_cut() {
+    let mut clamped = 0;
+    for p in Grid::new()
+        .teeth(&[9, 17, 30, 60])
+        .shifts(&[-0.5, 0.0, 0.8, 1.3, 1.5])
+        .helix_angle(&[0.0, 25.0])
+        .dedendum(&[1.25, 2.0])
+        .build()
+    {
+        let g = Tooth::new(p);
+        let depth = g.r - g.rf;
+        let want = std::f64::consts::PI * g.mt - g.st - 2.0 * depth * g.alpha_t.tan();
+        let got = cutter_tip_width(&g) / g.beta.cos();
+        clamped += usize::from(g.clamps.any());
+        assert!(
+            (got - want).abs() < 1e-12 * p.module,
+            "z={} x={} b={} hf={}: {got} against {want} from the tooth",
+            p.teeth,
+            p.profile_shift,
+            p.helix_angle,
+            p.dedendum
+        );
+    }
+    assert!(clamped > 0, "the law must reach clamped gears");
+}
+
+/// No teeth spanned is no span.
+#[test]
+fn a_span_over_no_teeth_is_none() {
+    assert!(span_over_teeth(&Tooth::new(GearParams::default()), 0).is_none());
+}
 
 /// The cutter tip width is a normal-plane quantity, so it must not move when
 /// only the helix angle changes. That is the property the spec calls out.
@@ -718,12 +762,21 @@ fn the_general_span_is_the_published_one_on_an_evenly_cut_gear() {
         let t = Tooth::new(p);
         let gear = Gear::new(p);
         for k in 2..=5u32 {
-            let want = span_over_teeth(&t, k).nominal;
+            let want = span_over_teeth(&t, k);
             // ...and from every starting tooth, since an evenly cut gear has no
             // preferred one. A general form that only worked at tooth 0 would
-            // pass a single-position check.
+            // pass a single-position check. The two agree on whether there is a
+            // span at all, as well as on its value.
             for j in [0usize, 1, 3, p.teeth as usize - 1] {
-                let Some(got) = span_over_teeth_at(&gear, j, k) else {
+                let got = span_over_teeth_at(&gear, j, k);
+                assert_eq!(
+                    got.is_some(),
+                    want.is_some(),
+                    "z={} x={} k={k} j={j}: one route measures and the other refuses",
+                    p.teeth,
+                    p.profile_shift
+                );
+                let (Some(got), Some(want)) = (got, want.map(|s| s.nominal)) else {
                     continue;
                 };
                 let rel = (got.nominal - want).abs() / want.abs();

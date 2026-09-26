@@ -119,6 +119,17 @@ pub struct Rack {
     pub tip_round: f64,
 }
 
+/// What a rack leaves at its tip, from [`Rack::settle`]. Millimetres, transverse.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Settled {
+    /// Width of the sharp rack tooth's tip flat, before any round. Negative
+    /// where the flanks meet above the tip line.
+    pub w_tip: f64,
+    /// The largest tip round that fits both flanks and the tip line; zero where
+    /// there is no tip flat.
+    pub rho_fit: f64,
+}
+
 /// A generated gear cross-section.
 ///
 /// Every field is in millimetres or radians. Construction never fails: degenerate
@@ -301,6 +312,14 @@ impl Tooth {
         Self::build(params, false)
     }
 
+    /// This tooth's base helix angle, radians: [`crate::plane::base_helix_angle`]
+    /// at its own helix and normal pressure angle. [`crate::ring::Ring`] has the
+    /// same method.
+    #[must_use]
+    pub fn base_helix_angle(&self) -> f64 {
+        crate::plane::base_helix_angle(self.beta, self.alpha_n)
+    }
+
     /// Reproduces the pre-fix behaviour: the flank clamped at the base circle,
     /// leaving a step where the fillet should meet it.
     ///
@@ -475,7 +494,7 @@ impl Tooth {
             }
         }
         let ra = ra.max(rb * (1.0 + guard::TIP_ABOVE_BASE_FRACTION));
-        let u_tip = (((ra / rb).powi(2) - 1.0).max(0.0)).sqrt();
+        let u_tip = crate::involute::roll_at_radius(ra, rb);
 
         // ---- flank / fillet junction ------------------------------------
         //
@@ -615,7 +634,7 @@ impl Tooth {
         // Angular gap between fillet and the extended involute at the same radius.
         let gap = |s: f64| {
             let (r, th) = self.trochoid_at(s);
-            let u = (((r / self.rb).powi(2) - 1.0).max(0.0)).sqrt();
+            let u = crate::involute::roll_at_radius(r, self.rb);
             th - (self.psi_b - inv_from_roll(u))
         };
 
@@ -638,7 +657,7 @@ impl Tooth {
             return (0.0, s_b);
         };
         let r_j = self.trochoid_at(s_j).0;
-        ((((r_j / self.rb).powi(2) - 1.0).max(0.0)).sqrt(), s_j)
+        (crate::involute::roll_at_radius(r_j, self.rb), s_j)
     }
 
     /// Detect a tooth cut away entirely by undercut.
@@ -879,6 +898,27 @@ impl Rack {
         (self.depth - (rho + sa * (r * sa - rho))) / module
     }
 
+    /// What a rack leaves at its tip when it cuts a space for a tooth `st`
+    /// thick at the pitch circle (transverse) to `bd` below the rolling line.
+    ///
+    /// One function for the tool's settling, the ranges that predict it and the
+    /// width metrology reports, so the three read the same tool. Callers pass
+    /// the values in force: clamped ones for a tool that was cut, raw ones for a
+    /// range that asks where clamping begins.
+    ///
+    /// The round's fit is `w_tip cos α_t / (2(1 − sin α_t))`: the largest circle
+    /// tangent to both flanks and the tip line. The plausible `w_tip/(2 cos α_t)`
+    /// is smaller by `(1 − sin α_t)/cos² α_t`, 0.745 at 20°, on every gear, and
+    /// would cap the default 0.38 round.
+    #[must_use]
+    pub fn settle(st: f64, bd: f64, alpha_t: f64, mt: f64) -> Settled {
+        let w_tip = (std::f64::consts::PI * mt - st) - 2.0 * bd * alpha_t.tan();
+        Settled {
+            w_tip,
+            rho_fit: w_tip.max(0.0) * alpha_t.cos() / (2.0 * (1.0 - alpha_t.sin())),
+        }
+    }
+
     /// The tool a single tooth asks for, and the clamps that asking raised.
     ///
     /// This is the settling [`Tooth::new`] used to do inline. It is a free
@@ -895,10 +935,8 @@ impl Rack {
         beta: f64,
         r: f64,
     ) -> (Self, Vec<Note>) {
-        use std::f64::consts::PI;
         let mut notes = Vec::new();
         let x = params.profile_shift;
-        let (ca, sa) = (alpha_t.cos(), alpha_t.sin());
         let mt = m / beta.cos();
 
         // Depth below the tip of the tooth being cut, then the clamps that keep
@@ -914,14 +952,7 @@ impl Rack {
         }
 
         // The round has to fit both the depth and the space the tooth leaves.
-        // NOT `w_tip / (2 cos α)`: that form is wrong and silently shrinks the
-        // fillet on every profile-shifted gear.
-        let w_tip = (PI * mt - st) - 2.0 * bd * alpha_t.tan();
-        let rho_fit = if w_tip > 0.0 {
-            w_tip * ca / (2.0 * (1.0 - sa))
-        } else {
-            0.0
-        };
+        let Settled { rho_fit, .. } = Self::settle(st, bd, alpha_t, mt);
         let mut rho = params.root_radius * mt;
         let rho_cap =
             (guard::FILLET_FRACTION_OF_MAX * bd).min(guard::FILLET_FRACTION_OF_MAX * rho_fit);

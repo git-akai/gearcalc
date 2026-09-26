@@ -21,6 +21,18 @@ pub fn inv_from_roll(u: f64) -> f64 {
     u - u.atan()
 }
 
+/// The involute's roll parameter `u = tan α` at radius `r` on base radius `r_b`,
+/// `√(r² − r_b²)/r_b`, and zero at or below the base circle, where there is no
+/// involute to roll along.
+///
+/// Written as `√((r − r_b)(r + r_b))` so the difference is taken before it is
+/// squared: `(r/r_b)² − 1` loses the digits that matter just above the base
+/// circle.
+#[must_use]
+pub fn roll_at_radius(r: f64, rb: f64) -> f64 {
+    ((r - rb) * (r + rb)).max(0.0).sqrt() / rb
+}
+
 /// The largest angle the inverse will search.
 ///
 /// `inv` rises without bound as `α → π/2`, so the bracket has to stop somewhere.

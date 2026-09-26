@@ -425,7 +425,7 @@ pub fn efficiency(path: &ContactPath, mesh: &Mesh, g1: &Tooth, friction: f64, dr
     // `1/z₁ + 1/z₂` with gear 2 signed, so a ring's reciprocal subtracts without
     // a case of its own — see `MeshKind::sign`.
     let z = 1.0 / f64::from(mesh.z1) + 1.0 / mesh.signed_z2();
-    let cos_bb = crate::metrology::base_helix_angle(g1).cos();
+    let cos_bb = g1.base_helix_angle().cos();
     // `∫|s| ds` over the path, in base pitches. Written with the sign carried
     // rather than squared away: for the familiar mesh, where the path straddles
     // the pitch point and both coordinates are positive, `ε|ε|` **is** `ε²` and
@@ -647,7 +647,7 @@ pub fn sliding_at(path: &ContactPath, mesh: &Mesh, g1: &Tooth, xi: f64, speed_1:
     // which, so the reversal is arithmetic rather than a case.
     let speed_2 = -speed_1 * f64::from(mesh.z1) / mesh.signed_z2();
 
-    let beta_b = crate::metrology::base_helix_angle(g1);
+    let beta_b = g1.base_helix_angle();
     let contact_line = [
         beta_b.sin() * along_action[0],
         beta_b.sin() * along_action[1],
@@ -1460,7 +1460,7 @@ mod tests {
                 let (rb1, rb2) = m.base_radii();
 
                 let mean_abs_xi = mean_over_path(&path, f64::abs);
-                let cos_bb = crate::metrology::base_helix_angle(&a).cos();
+                let cos_bb = a.base_helix_angle().cos();
                 let numeric = 1.0 - mu * mean_abs_xi * (1.0 / rb1 + 1.0 / rb2) / cos_bb;
 
                 let closed = efficiency(&path, &m, &a, mu, Drive::Forward);
@@ -1618,7 +1618,7 @@ mod tests {
                 // Fractional loss is mu |v_s| / (v_b cos beta_b): friction acts
                 // on F_bn while the useful power crosses as F_bt.
                 let v_b = omega_1 * a.rb;
-                let cos_bb = crate::metrology::base_helix_angle(&a).cos();
+                let cos_bb = a.base_helix_angle().cos();
 
                 let mean_slide = mean_over_path(&path, |xi| {
                     sliding_at(&path, &m, &a, xi, omega_1).magnitude()
@@ -1729,7 +1729,7 @@ mod tests {
                 // contact sweeps the path at constant speed, so average it
                 // uniformly in xi.
                 let mean_abs_xi = mean_over_path(&path, f64::abs);
-                let cos_bb = crate::metrology::base_helix_angle(&a).cos();
+                let cos_bb = a.base_helix_angle().cos();
                 let numeric = 1.0 - mu * mean_abs_xi * (1.0 / a.rb + 1.0 / b.rb) / cos_bb;
 
                 let closed = efficiency(&path, &m, &a, mu, Drive::Forward);
@@ -1747,7 +1747,7 @@ mod tests {
     fn the_helical_efficiency_formula_reduces_exactly_at_zero_helix() {
         let (a, b, m) = pair(17, 43);
         let path = ContactPath::new(&a, b.ra, &m).unwrap();
-        assert!((crate::metrology::base_helix_angle(&a).cos() - 1.0).abs() < f64::EPSILON);
+        assert!((a.base_helix_angle().cos() - 1.0).abs() < f64::EPSILON);
 
         // The loss carries the 1/cos(beta_b), so at a fixed transverse geometry
         // more helix means more loss. That the CLI shows helical meshes as
@@ -1760,7 +1760,7 @@ mod tests {
                 helix_angle: beta,
                 ..Default::default()
             });
-            let cos_bb = crate::metrology::base_helix_angle(&g).cos();
+            let cos_bb = g.base_helix_angle().cos();
             let loss = (1.0 - efficiency(&path, &m, &g, 0.06, Drive::Forward)) * 1.0;
             assert!(
                 loss > previous,

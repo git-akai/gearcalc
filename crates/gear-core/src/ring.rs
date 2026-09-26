@@ -303,7 +303,7 @@ impl Ring {
             ra = ra_min;
         }
 
-        let roll_at = |radius: f64| (((radius / rb).powi(2) - 1.0).max(0.0)).sqrt();
+        let roll_at = |radius: f64| crate::involute::roll_at_radius(radius, rb);
 
         // ---- where the cutter sits.
         //
@@ -527,7 +527,7 @@ impl Ring {
     /// the trochoid's radius is monotone either side of the deepest cut.
     fn solve_junction(&self) -> Option<(f64, f64)> {
         let r_bc = self.cut.cutter_radius * self.alpha_t.cos();
-        let t_g = (((self.cut.corner_radius / r_bc).powi(2) - 1.0).max(0.0)).sqrt();
+        let t_g = crate::involute::roll_at_radius(self.cut.corner_radius, r_bc);
         let t_tan = t_g + self.cut.tip_round / r_bc;
 
         let along = self.cut.centre_distance * self.cut.alpha_w.sin() + r_bc * t_tan;
@@ -619,7 +619,7 @@ impl Ring {
 
     /// The involute's roll parameter at a radius. Closed form.
     fn roll_at(&self, radius: f64) -> f64 {
-        (((radius / self.rb).powi(2) - 1.0).max(0.0)).sqrt()
+        crate::involute::roll_at_radius(radius, self.rb)
     }
 
     /// The fillet at cutter travel `s`, as `(radius, angle)`.
@@ -661,7 +661,7 @@ impl Ring {
 
     /// Base helix angle, radians — `sin β_b = sin β cos α_n`.
     ///
-    /// The same relation [`crate::metrology::base_helix_angle`] gives an external
+    /// The same relation [`crate::tooth::Tooth::base_helix_angle`] gives an external
     /// gear; it is a property of the reference rack, not of which side the
     /// material is on.
     #[must_use]
@@ -746,7 +746,7 @@ impl Ring {
     /// Tooth thickness, as an arc length, at a radius on the flank.
     #[must_use]
     pub fn tooth_thickness_at(&self, radius: f64) -> f64 {
-        let u = (((radius / self.rb).powi(2) - 1.0).max(0.0)).sqrt();
+        let u = crate::involute::roll_at_radius(radius, self.rb);
         2.0 * radius * (self.psi_b + inv_from_roll(u))
     }
 
@@ -2119,7 +2119,7 @@ mod tests {
             let rr = m.centre_distance * f64::from(zr) / sz;
             assert!((rr - rp - m.centre_distance).abs() < 1e-12);
 
-            let u = (((rp / p.rb).powi(2) - 1.0).max(0.0)).sqrt();
+            let u = crate::involute::roll_at_radius(rp, p.rb);
             let tooth = 2.0 * rp * (p.psi_b - inv_from_roll(u));
             let space = g.space_width_at(rr);
             assert!(
@@ -2394,7 +2394,7 @@ mod tests {
 
         // The external gear, measured the same way, goes the other way.
         let ext_thickness = |radius: f64| {
-            let u = (((radius / external.rb).powi(2) - 1.0).max(0.0)).sqrt();
+            let u = crate::involute::roll_at_radius(radius, external.rb);
             2.0 * radius * (external.psi_b - inv_from_roll(u))
         };
         assert!(
