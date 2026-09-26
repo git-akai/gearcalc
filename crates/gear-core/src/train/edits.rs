@@ -145,9 +145,10 @@ pub enum EditRefused {
     Geared,
     /// Two bodies an axis distance apart made one: a shaft is straight.
     Apart,
-    /// A body a case loads or reacts at left held or in no part — joined
-    /// to a held body, or its coupling taken: the load would be grounded
-    /// or cut off, and a load is never moved to a guessed body.
+    /// A body a case loads or reacts at held, left in no part, or joined
+    /// to a held body or to another the same case names: the load would
+    /// be grounded, cut off or dropped, and a load is never moved to a
+    /// guessed body or dropped.
     Loaded,
     /// **A gear meshing in two frames** — a gear on a fixed axis meshing a
     /// sun or a ring whose other mates ride a carrier — which the wiring
@@ -192,7 +193,7 @@ impl std::fmt::Display for EditRefused {
             Self::NoDistance => "no axis distance joins those axes",
             Self::Geared => "those bodies are geared to each other",
             Self::Apart => "those bodies are an axis distance apart",
-            Self::Loaded => "a case loads or reacts at a body this would hold or cut off",
+            Self::Loaded => "a case loads or reacts at a body this would hold, cut off or join to another it names",
             Self::TwoFrames => "that gear would mesh in two frames",
         })
     }

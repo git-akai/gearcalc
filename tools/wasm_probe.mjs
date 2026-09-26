@@ -122,7 +122,8 @@ const out = {
   // every index the graph's — a part's body read off the part's own list
   // by slot, and its member by its own index. A set inserted at the
   // default pair's output, joined to it by its sun, its cases carried to
-  // the new end, the carrier; the carrier held and released again; the
+  // the new end, the carrier; the ring released and held again (the
+  // carrier, which the cases react at, is refused a hold); the
   // pair's second gear moved off the sun's shaft and its shaft joined to
   // the set's ring instead, then back; and a case of each kind added
   // between the ends, their duties switched.
@@ -136,10 +137,10 @@ const out = {
     const graph = (e) => (t = edit(t, { graph: e }));
     graph({ insert: { shape: preset("planetary"), at: null } });
     const out = [["insert", structuredClone(t)]];
-    graph({ hold: body(1, 2) });
-    out.push(["hold", structuredClone(t)]);
-    graph({ release: body(1, 2) });
+    graph({ release: body(1, 3) });
     out.push(["release", structuredClone(t)]);
+    graph({ hold: body(1, 3) });
+    out.push(["hold", structuredClone(t)]);
     graph({ move: { member: member(0, 1), to: null } });
     graph({ join: { a: body(0, 2), b: body(1, 3) } });
     out.push(["move_join", structuredClone(t)]);

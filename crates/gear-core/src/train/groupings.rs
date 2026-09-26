@@ -142,9 +142,9 @@ impl Train {
     /// **Each case's flow** — see [the module](self) — in the train's case
     /// order: from the case's first load, down every mesh that carries
     /// power, most first, a mesh that carries none an idle branch; and then
-    /// from every body no walk has reached, so every body and every mesh appears once. A
-    /// case the train did not rate has no shares to read, and its flow is
-    /// the graph's walk with every mesh carrying.
+    /// from every body no walk has reached, so every body and every mesh
+    /// appears once. A case the train did not rate has no shares to read,
+    /// and its flow is the graph's walk with every mesh carrying.
     #[must_use]
     pub fn flows(&self, result: &TrainResult) -> Vec<Vec<FlowRow>> {
         (0..self.load_cases.len())

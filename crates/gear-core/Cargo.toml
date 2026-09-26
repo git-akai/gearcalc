@@ -31,5 +31,7 @@ workspace = true
 
 [dev-dependencies]
 # The edit walk's round trip of a train through JSON, as the boundary
-# carries it; read only with the `serde` feature on.
+# carries it: the crate's own tests always build with `serde` on, so the
+# round trip runs under a plain `cargo nextest run`.
+gear-core = { path = ".", features = ["serde"] }
 serde_json = "1"

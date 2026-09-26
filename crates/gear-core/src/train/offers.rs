@@ -240,7 +240,9 @@ mod tests {
     //! hold, removal, ratio, step, coupling and stage at every index — is
     //! offered at the piece it names.
 
-    use super::super::{solve_train, test_library, CaseKind, LoadCase, Shape, TrainError};
+    use super::super::{
+        solve_train, test_library, CaseKind, LoadCase, LoadRole, Shape, TrainError,
+    };
     use super::*;
     use std::panic::{catch_unwind, AssertUnwindSafe};
 
@@ -582,13 +584,10 @@ mod tests {
             Ok(r) => super::super::groupings::says_everything_once(t, r)?,
             Err(_) => {}
         }
-        #[cfg(feature = "serde")]
-        {
-            let json = serde_json::to_string(t).unwrap();
-            let back: Train = serde_json::from_str(&json).map_err(|e| format!("json: {e}"))?;
-            if serde_json::to_string(&back).unwrap() != json {
-                return Err("json: a round trip changed the train".into());
-            }
+        let json = serde_json::to_string(t).unwrap();
+        let back: Train = serde_json::from_str(&json).map_err(|e| format!("json: {e}"))?;
+        if serde_json::to_string(&back).unwrap() != json {
+            return Err("json: a round trip changed the train".into());
         }
         Ok(r.is_ok())
     }
@@ -611,6 +610,13 @@ mod tests {
             let mut t = start.clone();
             let mut steps: Vec<String> = Vec::new();
             let mut solved = solve_train(&t, &test_library()).is_ok();
+            // Every load and reaction a case states, case by case.
+            let stated = |t: &Train| -> Vec<usize> {
+                t.load_cases
+                    .iter()
+                    .map(|c| c.loads.iter().filter(|l| l.role != LoadRole::Free).count())
+                    .collect()
+            };
             for _ in 0..DEPTH {
                 let made = catch_unwind(AssertUnwindSafe(|| {
                     let u = step(&t, &mut rng, &mut steps)?;
@@ -619,7 +625,19 @@ mod tests {
                 match made {
                     Ok(None) => {}
                     Ok(Some((held, u))) => match held {
-                        Ok(s) => (t, solved) = (u, s),
+                        Ok(s) => {
+                            // A load or a reaction goes only with a
+                            // removal.
+                            let (was, now) = (stated(&t), stated(&u));
+                            let removal = steps.last().is_some_and(|x| x.starts_with("Remove"));
+                            if !removal && was.iter().zip(&now).any(|(a, b)| b < a) {
+                                failures.push(format!(
+                                    "walk {walk}, {name}: {steps:?}: an entry dropped: {was:?} -> {now:?}"
+                                ));
+                                break;
+                            }
+                            (t, solved) = (u, s);
+                        }
                         Err(e) => {
                             failures.push(format!("walk {walk}, {name}: {steps:?}: {e}"));
                             break;
@@ -724,8 +742,7 @@ mod tests {
         assert!(whole >= Preset::ALL.len(), "only {whole} emptied whole");
     }
 
-    /// **A hold leaves no case anything to say of the body.** A pair's
-    /// output held takes its reaction and its sweep with it. A set's
+    /// **A hold leaves no case anything to say of the body.** A set's
     /// fatigue sweep measured at its ring, the ring then held: the sweep
     /// moves to the case's reaction and the set counts cycles, where it
     /// counted none, saying nothing. A join that would hold a body a case
@@ -747,17 +764,6 @@ mod tests {
             let cycles = m.cases[1].cycles.unwrap();
             assert!(cycles.bending > 0.0, "{cycles:?}");
         }
-        // A hold at a pair's reacted output is made, and the case keeps
-        // nothing there: its sweep goes to what is left, the load.
-        let mut t = cased(vec![Preset::Spur.build()]);
-        t.edit(Edit::Hold(2)).unwrap();
-        for c in &t.load_cases {
-            assert!(c.loads.iter().all(|l| l.at == 1), "{c:?}");
-            assert!(matches!(
-                c.duty,
-                super::super::Duty::Intermittent { at: 1, .. }
-            ));
-        }
         // A pair chained on a pair at its input, its far end held, then
         // that end joined to the first pair's reacted output.
         let mut t = cased(vec![Preset::Spur.build()]);
@@ -773,5 +779,41 @@ mod tests {
             Err(super::super::EditRefused::Loaded)
         );
         assert_eq!(format!("{t:?}"), before, "refused whole");
+    }
+
+    /// **A load is never dropped by a join or a hold**: a hold at a body a
+    /// case loads or reacts at, and a join that would put two entries of
+    /// one case on one body, are refused under one key, the train
+    /// unchanged — and offered as refused.
+    #[test]
+    fn a_load_is_never_dropped_by_a_join_or_a_hold() {
+        let loaded = Some(Note::new(super::super::EditRefused::Loaded.key()));
+        let refused = |t: &Train, at: Target, edit: Edit| {
+            let mut u = t.clone();
+            assert_eq!(
+                u.edit(edit.clone()),
+                Err(super::super::EditRefused::Loaded),
+                "{edit:?}"
+            );
+            assert_eq!(
+                format!("{u:?}"),
+                format!("{t:?}"),
+                "{edit:?}: refused whole"
+            );
+            let offer = t
+                .offers(at)
+                .into_iter()
+                .find(|o| format!("{:?}", o.edit) == format!("{edit:?}"))
+                .unwrap();
+            assert_eq!(offer.refused, loaded, "{edit:?}");
+        };
+        // Two pairs chained, loaded at 1 and reacted at 3: one body would
+        // carry both.
+        let t = cased(vec![Preset::Spur.build(), Preset::Spur.build()]);
+        refused(&t, Target::Body(1), Edit::Join { a: 1, b: 3 });
+        // A pair: its input and its output each carry an entry.
+        let t = cased(vec![Preset::Spur.build()]);
+        refused(&t, Target::Body(1), Edit::Hold(1));
+        refused(&t, Target::Body(2), Edit::Hold(2));
     }
 }

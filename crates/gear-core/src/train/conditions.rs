@@ -875,25 +875,27 @@ impl Train {
         if !named(a) || !named(b) {
             return Err(super::EditRefused::NoSuchIndex);
         }
-        // A body held made one with a body a case loads or reacts at would
-        // ground the load: the case would say two things of one body.
-        let held = |x: usize| self.held.contains(&x);
-        let said = |x: usize| {
-            self.load_cases.iter().any(|c| {
-                c.loads
-                    .iter()
-                    .any(|l| l.at == x && l.role != super::LoadRole::Free)
-            })
-        };
-        if (held(a) && said(b)) || (held(b) && said(a)) {
-            return Err(super::EditRefused::Loaded);
-        }
         // A part with both would have one body at two of its slots, which
         // is a mesh or a carrier turning against itself: not a body.
         let both = |p: &Part| p.shape.slot_if_any(a).is_some() && p.shape.slot_if_any(b).is_some();
         if self.parts().iter().any(both) {
             return Err(super::EditRefused::Geared);
         }
+        // A load is never grounded or dropped: a body held joined to a body
+        // a case loads or reacts at would ground it, and two bodies one
+        // case says something of made one would leave it two things to say
+        // of one body.
+        let held = |x: usize| self.held.contains(&x);
+        let said = |c: &super::LoadCase, x: usize| {
+            c.loads
+                .iter()
+                .any(|l| l.at == x && l.role != super::LoadRole::Free)
+        };
+        let loaded = |x: usize| self.load_cases.iter().any(|c| said(c, x));
+        if (held(a) && loaded(b)) || (held(b) && loaded(a)) {
+            return Err(super::EditRefused::Loaded);
+        }
+        let twice = self.load_cases.iter().any(|c| said(c, a) && said(c, b));
         let axis = |body: usize| {
             self.shape
                 .bodies
@@ -918,6 +920,9 @@ impl Train {
             if x != y && self.shape.distances.iter().any(apart) {
                 return Err(super::EditRefused::Apart);
             }
+        }
+        if twice {
+            return Err(super::EditRefused::Loaded);
         }
         // The lower number survives, which is the order a chain names in.
         let (a, b) = if b < a { (b, a) } else { (a, b) };
@@ -1066,15 +1071,18 @@ impl Train {
         fresh
     }
 
-    /// **A body held to ground**, in so many words. Every case entry at it
-    /// goes with it: a held body is fixed, and no case can say anything of
-    /// it.
+    /// **A body held to ground**, in so many words. A held body is fixed,
+    /// and no case can say anything of it: [`super::Edit::Hold`] refuses a
+    /// body a case loads or reacts at ([`super::EditRefused::Loaded`]), and
+    /// what is left to drop here is a free entry.
     pub fn hold(&mut self, body: usize) {
         self.settle_held(body);
     }
 
     /// **The one way a hold is written**: the body held, every case entry
-    /// at it dropped, and a sweep measured there moved to the case's
+    /// at it dropped — a free one, since every edit that holds a body
+    /// refuses where a case loads or reacts there — and a sweep measured
+    /// there moved to the case's
     /// reaction by [`sweep_body`]'s rule — a case with no entry left keeps
     /// its sweep where it was, having nothing to rate. Every edit that
     /// leaves a body held ends here.
@@ -1382,6 +1390,15 @@ impl Train {
             Edit::Hold(body) => {
                 if body == GROUND || !self.shape.bodies.iter().any(|b| b.body == body) {
                     return Err(super::EditRefused::NoSuchIndex);
+                }
+                // A load is never dropped by a hold: moved first, or refused.
+                let loaded = self.load_cases.iter().any(|c| {
+                    c.loads
+                        .iter()
+                        .any(|l| l.at == body && l.role != super::LoadRole::Free)
+                });
+                if loaded {
+                    return Err(super::EditRefused::Loaded);
                 }
                 self.hold(body);
                 Ok(())
