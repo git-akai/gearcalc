@@ -53,6 +53,8 @@ mod edits;
 pub mod flow;
 pub mod graph;
 mod groupings;
+#[cfg(test)]
+mod homogeneity;
 mod offers;
 mod pair;
 mod planetary;
