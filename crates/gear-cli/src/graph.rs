@@ -67,7 +67,7 @@ fn chain(presets: &[Preset]) -> Train {
     train
 }
 
-fn fixtures() -> Vec<(String, Train)> {
+pub(crate) fn fixtures() -> Vec<(String, Train)> {
     let name = |p: &Preset| format!("{p:?}").to_lowercase();
     let mut out: Vec<(String, Train)> = Preset::ALL
         .iter()

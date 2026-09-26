@@ -175,13 +175,14 @@ Thirteen checks in six different ways. `nix flake check` is **not** all of them.
 | `tools/check_wasm.sh` | **the payload, executed** — everything else checks the boundary's shape or `gear-core`'s values, and nothing ran the `.wasm` the browser downloads. Asserts a law (optimising it changes no answer), records what it answers, and fails if an entry point has no probe | yes |
 | `python3 tools/validate_dxf.py` | an export read back by a parser that shares no code with the writer | yes |
 | `tools/worm_flank_curvature.py` · `crossed_path.py` · `hula_kinematics.py` · `train_kinematics.py` · `breakaway.py` · `iso_6336_3_stack.py` | the crate against derivations that share no code with it | no — by hand |
+| `tools/check_identity.sh <base-rev>` | **any float that moved by a bit** since `<base-rev>`, across every preset, arrangement and a gear grid (`gear-cli identity`) — for a refactor meant to move nothing | no — by hand |
 
-**Before pushing, run everything the table marks "yes"** — not a chosen
-subset. It was "run five" here, and the five omitted `check_units.py`: a
-field named `sigma` for a mesh kind's sign went out green on every one of the
-five and red on CI, the second red build this paragraph has cost by naming
-fewer checks than CI runs. The one-liner is the table; the cheap ones take
-seconds.
+**Before pushing, run `tools/check_all.sh`** — it reads every step of CI's
+`tests` job from `ci.yml` and runs it, cheap ones first, so it cannot run
+fewer checks than CI does (`--fast` skips the two nix builds and says so).
+Naming a subset here instead cost two red builds: the five named omitted
+`check_units.py`, and a field named `sigma` for a mesh kind's sign went out
+green on the five and red on CI.
 
 The corpus is on that list because of a measurement, not for symmetry.
 Perturbing five of the rating model's cited constants — `K_f`'s `H` and `L`,

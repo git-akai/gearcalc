@@ -14,6 +14,7 @@
 
 mod diagram;
 mod graph;
+mod identity;
 mod kinematics;
 mod matrix;
 
@@ -614,6 +615,14 @@ const COMMANDS: &[Command] = &[
         run: |a| verify(arg(a, 1, usize::MAX)),
         record: Record::Cases(&["verify 100"]),
         slow: true
+    },
+    Command {
+        name: "identity",
+        args: "",
+        summary: "every preset, arrangement and a gear grid solved, every float at full precision — what tools/check_identity.sh compares between two builds",
+        run: |_| identity::run(),
+        record: Record::Elsewhere("megabytes of bits read only by `tools/check_identity.sh`, which compares two builds"),
+        slow: false
     },
 ];
 

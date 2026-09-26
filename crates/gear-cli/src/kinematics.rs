@@ -132,7 +132,7 @@ fn unclosed() -> Shape {
 ///
 /// A table rather than a `match`, for the reason `COMMANDS` is one: a fixture
 /// added with no row is a fixture the corpus cannot record.
-fn fixtures() -> Vec<(String, Train)> {
+pub(crate) fn fixtures() -> Vec<(String, Train)> {
     // A chain of these stages, loaded between its two ends.
     let train = |stages: Vec<Shape>| {
         let mut t = Train::chained(stages, |_| Vec::new());
