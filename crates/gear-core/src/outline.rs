@@ -380,11 +380,11 @@ mod tests {
     /// The ring's outline against its own profile sampler: two routes to the
     /// same curve, one adaptive with exact arcs and one uniform in parameter.
     ///
-    /// Every outline vertex must sit on the profile to within the tolerance
-    /// asked for, and the outline must close. That is what makes it exportable
-    /// rather than merely plottable.
+    /// The profile must lie within the tolerance asked for of the outline,
+    /// spans and arcs included, and the outline inside the ring's annulus.
+    /// That is what makes it exportable rather than merely plottable.
     #[test]
-    fn a_rings_outline_tracks_its_profile_and_closes() {
+    fn a_rings_outline_tracks_its_profile() {
         use crate::ring::{Cutter, Ring};
         for teeth in [43u32, 60, 90] {
             let g = Ring::cut_by(
@@ -424,29 +424,18 @@ mod tests {
                 .map(|(r, th)| (r * th.cos(), r * th.sin()))
                 .collect();
 
-            // Only the first tooth: the rest are rotations of it.
-            let mut worst: f64 = 0.0;
-            for vert in v.iter().take(v.len() / teeth as usize) {
-                let near = cartesian
-                    .iter()
-                    .map(|&(x, y)| f64::hypot(x - vert.x, y - vert.y))
-                    .fold(f64::INFINITY, f64::min);
-                worst = worst.max(near);
-            }
+            // Every reference point within the tolerance of the outline, each
+            // arc read as the arc its chord and bulge define — the law the
+            // external gear is held to. Measuring the outline's vertices
+            // against the profile instead cannot see a span between them.
+            let cartesian: Vec<[f64; 2]> = cartesian.iter().map(|&(x, y)| [x, y]).collect();
+            let worst = deviation(&v, &cartesian);
             assert!(
-                worst < tol,
-                "z={teeth}: an outline vertex is {worst} mm from the profile"
+                worst <= tol,
+                "z={teeth}: the outline strays {worst} mm from the profile"
             );
 
-            // Closes, and stays inside its own annulus.
-            let first = v[0];
-            let last = *v.last().unwrap();
-            let gap = f64::hypot(first.x - last.x, first.y - last.y);
-            let pitch_arc = 2.0 * g.rf * g.half_pitch;
-            assert!(
-                gap < 2.0 * pitch_arc,
-                "z={teeth}: the loop's ends are {gap} mm apart"
-            );
+            // ...and stays inside its own annulus.
             for vert in &v {
                 let r = f64::hypot(vert.x, vert.y);
                 assert!(r >= g.ra - 1e-9 && r <= g.rf + 1e-9, "z={teeth}: r={r}");
@@ -490,9 +479,8 @@ mod tests {
     /// The reference is [`Gear::profile`], sampled far denser than any outline —
     /// the same curve in the same frame, uniform in parameter where the outline
     /// is adaptive with exact arcs, so the two share the geometry and share none
-    /// of the subdivision under test. It is the check
-    /// `a_rings_outline_tracks_its_profile_and_closes` already makes of a ring,
-    /// which an external gear had no counterpart to.
+    /// of the subdivision under test. A ring is held to the same law in
+    /// `a_rings_outline_tracks_its_profile`.
     fn worst_deviation(g: &Tooth, tol: f64) -> f64 {
         // **One tooth of reference points is every tooth**, the gear being
         // periodic — and the whole outline to match them against, so a point is
@@ -510,9 +498,20 @@ mod tests {
         let all = gear.profile(per_tooth);
         let truth = &all[..per_tooth.min(all.len())];
 
-        // The outline covers the whole gear and the reference one half-tooth, so
-        // each reference point is matched to the nearest chord rather than the
-        // two being walked in step. Distance from a point to a segment.
+        deviation(&v, truth)
+    }
+
+    /// How far the furthest reference point lies from a closed outline, each
+    /// point measured to its nearest span. The outline covers the whole gear
+    /// and the reference may cover one tooth, so each point is matched to the
+    /// nearest span rather than the two being walked in step.
+    ///
+    /// **A bulged span is the arc its chord and bulge define**, as CAD reads
+    /// it: the distance is to that circle within the arc's angular extent, and
+    /// to the nearer end outside it. Reading every arc as concentric with the
+    /// axis, as this once did, cannot see an arc bulged onto the wrong chord —
+    /// it passed one centred 22 mm off the axis.
+    fn deviation(v: &[Vertex], truth: &[[f64; 2]]) -> f64 {
         let to_segment = |p: [f64; 2], a: [f64; 2], b: [f64; 2]| {
             let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
             let len2 = dx * dx + dy * dy;
@@ -523,22 +522,42 @@ mod tests {
             };
             f64::hypot(p[0] - (a[0] + t * dx), p[1] - (a[1] + t * dy))
         };
+        let to_arc = |p: [f64; 2], a: [f64; 2], b: [f64; 2], bulge: f64| {
+            let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
+            let chord = dx.hypot(dy);
+            // Centre to the left of travel by `c/2 · (1 − b²)/(2b)`; the arc
+            // sweeps `4 atan b` from `a`, counter-clockwise when positive.
+            let h = chord / 2.0 * (1.0 - bulge * bulge) / (2.0 * bulge);
+            let c = [
+                (a[0] + b[0]) / 2.0 - dy / chord * h,
+                (a[1] + b[1]) / 2.0 + dx / chord * h,
+            ];
+            let radius = (a[0] - c[0]).hypot(a[1] - c[1]);
+            let sweep = 4.0 * bulge.atan();
+            let angle = |q: [f64; 2]| (q[1] - c[1]).atan2(q[0] - c[0]);
+            // Where `p` sits along the sweep, from 0 at `a`.
+            let along = (angle(p) - angle(a) + std::f64::consts::PI)
+                .rem_euclid(std::f64::consts::TAU)
+                - std::f64::consts::PI;
+            if (along / sweep) >= 0.0 && (along / sweep) <= 1.0 {
+                ((p[0] - c[0]).hypot(p[1] - c[1]) - radius).abs()
+            } else {
+                (p[0] - a[0])
+                    .hypot(p[1] - a[1])
+                    .min((p[0] - b[0]).hypot(p[1] - b[1]))
+            }
+        };
 
         let mut worst = 0.0_f64;
-        for p in truth {
+        for &p in truth {
             let mut nearest = f64::INFINITY;
             for i in 0..v.len() {
                 let (a, b) = (v[i], v[(i + 1) % v.len()]);
-                nearest = nearest.min(if a.bulge.abs() > 1e-12 {
-                    // **A bulged span is an arc, and the only arcs here are the
-                    // tip and root**, concentric with the axis — so the distance
-                    // to one is the difference of two radii, exactly. Skipping
-                    // them instead leaves every reference point that lies on one
-                    // matched to a remote chord, which reads as a third of a
-                    // millimetre of stray that no tolerance ever shrinks.
-                    (f64::hypot(p[0], p[1]) - f64::hypot(a.x, a.y)).abs()
+                let (pa, pb) = ([a.x, a.y], [b.x, b.y]);
+                nearest = nearest.min(if a.bulge == 0.0 {
+                    to_segment(p, pa, pb)
                 } else {
-                    to_segment(*p, [a.x, a.y], [b.x, b.y])
+                    to_arc(p, pa, pb, a.bulge)
                 });
             }
             worst = worst.max(nearest);
@@ -546,18 +565,16 @@ mod tests {
         worst
     }
 
-    /// **The outline meets the tolerance it was given, and converges on it.**
+    /// **The outline meets the tolerance it was given.**
     ///
     /// An absolute claim, so it sees a tolerance that moved — where the two
-    /// relative tests it replaces could not.
+    /// relative tests it replaced could not — and the bound is the tolerance
+    /// itself rather than a multiple chosen above what was measured.
     ///
-    /// # What it is, measured
+    /// # What it was, and why
     ///
-    /// Subdivision stops when a span's **midpoint sagitta** is inside tolerance,
-    /// and a curved flank's true worst deviation is larger than its midpoint
-    /// sagitta — most so on an undercut tooth, whose profile is legitimately
-    /// re-entrant. Across nine gears, deviation as a multiple of the tolerance
-    /// asked for:
+    /// It used to allow three times the tolerance, and 1.4 at a
+    /// ten-thousandth, having measured this across nine gears:
     ///
     /// ```text
     ///                    1e-2   1e-3   1e-4
@@ -566,10 +583,14 @@ mod tests {
     ///   z43              0.63   0.93   0.99
     /// ```
     ///
-    /// So it **converges on the tolerance** as the spans shorten and the curve
-    /// becomes locally a parabola, which is the second claim here and the more
-    /// informative one: it says the number is a tolerance rather than a knob
-    /// that happens to correlate.
+    /// and put it down to the midpoint sagitta under-reading a re-entrant
+    /// undercut flank. It was the root arc bulged onto the wrong chord
+    /// (T04.1): the fillet's first span was drawn as part of a circle through
+    /// its far end, and the measure — which read every arc as concentric with
+    /// the axis — reported that as a deviation that shrank with the tolerance
+    /// only because the fillet's first span did. With every arc measured as the
+    /// arc it is, and every arc ending where it should, no gear here strays
+    /// past the tolerance.
     ///
     /// # The reference has to be denser than the thing it judges
     ///
@@ -590,21 +611,14 @@ mod tests {
                     ..Default::default()
                 };
                 let g = Tooth::new(p);
-                let tolerances = [1e-2_f64, 1e-3, 1e-4];
-                let ratio = tolerances.map(|t| worst_deviation(&g, t) / t);
-                for (t, r) in tolerances.iter().zip(ratio) {
+                for t in [1e-2_f64, 1e-3, 1e-4] {
+                    let r = worst_deviation(&g, t) / t;
                     assert!(
-                        r <= 3.0,
+                        r <= 1.0,
                         "z{teeth} x{shift}: asked for {t} mm and the outline \
                          strays {r} times it"
                     );
                 }
-                assert!(
-                    ratio[2] <= 1.4,
-                    "z{teeth} x{shift}: at a ten-thousandth the deviation is \
-                     still {} times the tolerance, so it is not converging on it",
-                    ratio[2]
-                );
             }
         }
     }
