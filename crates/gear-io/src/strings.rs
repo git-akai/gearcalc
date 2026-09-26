@@ -1410,6 +1410,19 @@ mod tests {
                 }
                 err(TrainError::Malformed(Invariant::NumberGap(3)).note());
             }
+            // **Two planet axes that cannot stand where their distances put
+            // them**: a meshed-planet set one ring tooth past collinear.
+            {
+                let shape = arr::meshed_planets(24, [18, 18], 97, 3);
+                let out = gear_core::train::solve_alone(
+                    &gear_core::train::Train::alone(&shape, 2.0, 3000.0),
+                    &lib,
+                );
+                match out {
+                    Err(e @ TrainError::AxesCannotBePlaced { .. }) => err(e.note()),
+                    other => panic!("the axes cannot be placed: {:?}", other.err()),
+                }
+            }
             // **A flow wider than its direction mask**: 32 pairs in a chain,
             // its case said as the flow's limit.
             {

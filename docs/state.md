@@ -633,7 +633,7 @@ been. They are not a backlog.
 | A planetary **set's** drawing | The viewport draws single gears; a set needs the carrier and N planets placed. **Not planned** — nothing depends on it, and the set's numbers are all reported without it |
 | A ring's own bounds for a train's member | The gear card shows a rack's buildable range, which is not a ring's, so it shows nothing there and says so |
 | A coupled glass POM grade | Can be added if one is wanted; it must be *coupled*, not filled |
-| **Two carried axes placed round the carrier** | A meshed-planet or Ravigneaux set has three distances — centre to each planet axis and between them — and each closes on its own shifts; nothing checks the three form a triangle, and the planet-clearance layout places one axis's planets without the other's. A preset carries it, the figures it reports are the meshes', and a layout that does not close is a fault this tool does not yet name |
+| **A planet against a central member it does not mesh** | Two axes on one carrier are placed by the triangle of their three running distances, refused where there is none (`error.train_axes_cannot_be_placed`), and every planet's tip gap to the planets of the other axis is in its layout's clearance. A planet against a sun or ring it does not mesh is not checked: the graph has no axial positions, and on a Ravigneaux the long planet and the large sun share a plane where the short planet and the small sun do not |
 | **A part's order when two parts share two bodies** | A join keeps every part's own order of bodies (`Train::keep_orders`); two parts that share two bodies in opposite orders cannot both keep theirs, and the earlier-listed part's stands. Nothing the panel offers builds it |
 | **A stepped planet's assembly, timed** | The assembly rule (`Shape::assembly`) takes every planet identical: two gears on one planet's body at one relative phase. Planets timed individually at manufacture assemble equally spaced at any count, which the rule then under-reports as *no*; the rule's answer is the cheaper build, not the only one |
 
@@ -1191,8 +1191,8 @@ Not a queue with a head; this is what a next session would pick from.
   still want that the shape has not got is a planet meshing a planet on a
   *given* spacing, a second planet axis added by an edit (the
   meshed-planets preset supplies its two), and the two verifications in
-  *Not built* above: the triangle of two carried axes, and a stepped
-  planet's timing.
+  *Not built* above: a planet against a central member it does not mesh,
+  and a stepped planet's timing.
 - **The transverse rack round at a steep helix**, in the ledger above. The
   honest transverse tool is a normal round's elliptical section, which neither
   circle is; until then a worm's fillet is the cap's and its interference

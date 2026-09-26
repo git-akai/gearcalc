@@ -15,6 +15,9 @@ axis: number, count: number,
  */
 equal_spacing: boolean | null, simultaneous_meshing: boolean | null, 
 /**
- * Tip-to-tip gap between neighbouring instances, mm.
+ * The least tip-to-tip gap, mm, between one instance and another
+ * planet it does not mesh: its neighbours on this axis, and the
+ * instances of any axis it meshes on the same carrier, bar its own
+ * mate — placed at their stagger ([`DistanceReport::stagger`]).
  */
 clearance: number, clearance_ok: boolean, };

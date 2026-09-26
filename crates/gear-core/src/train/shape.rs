@@ -2982,6 +2982,11 @@ pub struct DistanceReport {
     /// ([`Distance::tip_clearance`]); `None` where the shifts' own distance
     /// stood, or the distance was given.
     pub sized_by: Option<usize>,
+    /// **The stagger angle**, degrees, where the distance joins two axes
+    /// one carrier carries and each stands at a distance from the
+    /// carrier's own axis: the angle about that axis between the two, from
+    /// the triangle the three running distances make. `None` elsewhere.
+    pub stagger: Option<f64>,
 }
 
 /// What the layout of one replicated axis came to.
@@ -3001,7 +3006,10 @@ pub struct LayoutReport {
     /// meshing two central members.
     pub equal_spacing: Option<bool>,
     pub simultaneous_meshing: Option<bool>,
-    /// Tip-to-tip gap between neighbouring instances, mm.
+    /// The least tip-to-tip gap, mm, between one instance and another
+    /// planet it does not mesh: its neighbours on this axis, and the
+    /// instances of any axis it meshes on the same carrier, bar its own
+    /// mate — placed at their stagger ([`DistanceReport::stagger`]).
     pub clearance: f64,
     pub clearance_ok: bool,
 }
@@ -3057,6 +3065,8 @@ pub struct Cut {
     at_rest: Vec<Directional<f64>>,
     /// Per member, a bending section in each line mesh it is in.
     bendings: Vec<Vec<(usize, Option<super::Bending>)>>,
+    /// Per distance, its stagger angle ([`DistanceReport::stagger`]).
+    staggers: Vec<Option<f64>>,
 }
 
 impl Cut {
@@ -3095,6 +3105,53 @@ impl Cut {
     }
 }
 
+impl Shape {
+    /// **Where two axes on one carrier stand**: for each distance joining
+    /// two axes one carrier carries, each at a running distance from the
+    /// carrier's own axis, the angle about that axis between them, degrees
+    /// — the law of cosines on the three running distances. `None` for a
+    /// distance that is not such a triangle's third side.
+    ///
+    /// # Errors
+    ///
+    /// [`TrainError::AxesCannotBePlaced`] where the three distances make no
+    /// triangle: the planet–planet distance longer than the two radii
+    /// together, or shorter than their difference. No placement of the axes
+    /// gives it, so the shape describes nothing that can be assembled.
+    pub(crate) fn staggers(&self, running: &[Option<f64>]) -> Result<Vec<Option<f64>>, TrainError> {
+        let between = |a: usize, b: usize| {
+            self.distances
+                .iter()
+                .position(|d| d.axes == [a, b] || d.axes == [b, a])
+                .and_then(|d| running.get(d).copied().flatten())
+        };
+        let mut out = vec![None; self.distances.len()];
+        for (d, x) in self.distances.iter().enumerate() {
+            let [a, b] = x.axes;
+            let carrier = self.axes[a].carried_by;
+            if carrier == GROUND || carrier != self.axes[b].carried_by {
+                continue;
+            }
+            let Some(central) = self.axis_of_slot(self.slot(carrier)) else {
+                continue;
+            };
+            let (Some(r1), Some(r2), Some(d12)) = (
+                between(central, a),
+                between(central, b),
+                running.get(d).copied().flatten(),
+            ) else {
+                continue;
+            };
+            if d12 > r1 + r2 || d12 < (r1 - r2).abs() {
+                return Err(TrainError::AxesCannotBePlaced { distance: d });
+            }
+            let cos = ((r1 * r1 + r2 * r2 - d12 * d12) / (2.0 * r1 * r2)).clamp(-1.0, 1.0);
+            out[d] = Some(cos.acos().to_degrees());
+        }
+        Ok(out)
+    }
+}
+
 /// **A shape cut** ([`Cut`]).
 ///
 /// # Errors
@@ -3118,6 +3175,7 @@ pub fn cut(shape: &Shape, lib: &MaterialLibrary) -> Result<Cut, TrainError> {
     // ---- the shifts, and every member and mesh built at them.
     let chosen = shape.chosen_at(&crate::auto::Search::SHIPPED, &helix)?;
     let built = shape.build(&chosen.shifts, &helix, &chosen.held)?;
+    let staggers = shape.staggers(&built.running)?;
 
     // ---- materials.
     let materials: Vec<Material> = shape
@@ -3184,6 +3242,7 @@ pub fn cut(shape: &Shape, lib: &MaterialLibrary) -> Result<Cut, TrainError> {
         sliding: Vec::new(),
         at_rest: Vec::new(),
         bendings: Vec::new(),
+        staggers,
     };
 
     // ---- each mesh's own efficiency, sliding and at rest.
@@ -3264,6 +3323,7 @@ pub fn rate(
         sliding,
         at_rest,
         bendings,
+        staggers,
     } = cut;
     let n = shape.members.len();
     let x = &chosen.shifts;
@@ -3586,6 +3646,7 @@ pub fn rate(
             running,
             clearance,
             sized_by: chosen.bound_by.get(d).copied().flatten(),
+            stagger: staggers[d],
         });
     }
     notes.extend(chosen.how.note());
@@ -3628,7 +3689,49 @@ pub fn rate(
                 .iter()
                 .map(|&i| 2.0 * built.members[i].tip_radius())
                 .fold(0.0_f64, f64::max);
-            let clearance = 2.0 * running * (std::f64::consts::PI / f64::from(count)).sin() - tip;
+            let own = 2.0 * running * (std::f64::consts::PI / f64::from(count)).sin() - tip;
+            // ...and every instance of an axis it meshes on the same carrier,
+            // bar the one it meshes: placed at the stagger the distance
+            // between the two axes gives ([`Shape::staggers`]), the far
+            // axis's instances stand at `φ + 2πk/N` about the carrier's axis.
+            // A mirror placement, at `−φ`, gives the same gaps.
+            let across = (0..shape.distances.len())
+                .filter_map(|e| {
+                    let phi = staggers[e]?.to_radians();
+                    let [p, q] = shape.distances[e].axes;
+                    let other = if p == axis {
+                        q
+                    } else if q == axis {
+                        p
+                    } else {
+                        return None;
+                    };
+                    if shape.axes[other].count != count {
+                        return None;
+                    }
+                    let far = shape
+                        .distances
+                        .iter()
+                        .position(|x| x.axes == [central, other] || x.axes == [other, central])?;
+                    let r_other = built.running[far]?;
+                    let tip_other = (0..n)
+                        .filter(|&i| shape.axis_of_slot(shape.slot_of_member(i)) == Some(other))
+                        .map(|i| built.members[i].tip_radius())
+                        .fold(0.0_f64, f64::max);
+                    (1..count)
+                        .map(|k| {
+                            let angle =
+                                phi + 2.0 * std::f64::consts::PI * f64::from(k) / f64::from(count);
+                            (running * running + r_other * r_other
+                                - 2.0 * running * r_other * angle.cos())
+                            .sqrt()
+                                - tip / 2.0
+                                - tip_other
+                        })
+                        .reduce(f64::min)
+                })
+                .reduce(f64::min);
+            let clearance = across.map_or(own, |g| own.min(g));
             let assembly = shape.assembly(axis);
             let equal_spacing = assembly.map(|a| a.0);
             let simultaneous_meshing = assembly.map(|a| a.1);
@@ -4390,6 +4493,164 @@ mod tests {
                 .abs()
                 < 1e-12
         );
+    }
+
+    /// Each distance joining two axes on one carrier, with the distances
+    /// from the carrier's own axis to each: `(d12, d1, d2)`.
+    fn triangles(shape: &Shape) -> Vec<(usize, usize, usize)> {
+        let between = |a: usize, b: usize| {
+            shape
+                .distances
+                .iter()
+                .position(|d| d.axes == [a, b] || d.axes == [b, a])
+        };
+        let mut out = Vec::new();
+        for (d, x) in shape.distances.iter().enumerate() {
+            let [a, b] = x.axes;
+            let carrier = shape.axes[a].carried_by;
+            if carrier == GROUND || carrier != shape.axes[b].carried_by {
+                continue;
+            }
+            let Some(central) = shape.axis_of_slot(shape.slot(carrier)) else {
+                continue;
+            };
+            if let (Some(d1), Some(d2)) = (between(central, a), between(central, b)) {
+                out.push((d, d1, d2));
+            }
+        }
+        out
+    }
+
+    /// **Two axes on one carrier stand where their distances put them, or
+    /// the shape is refused**: over a grid of meshed-planet and Ravigneaux
+    /// sun and ring counts, every set that solves has each planet–planet
+    /// distance within the triangle its two radii make, and the stagger it
+    /// reports places the axes at that distance again; the two sets the
+    /// audit found, one tooth past where the axes meet, are refused by
+    /// name; and the shipped meshed-planet set stands at φ = 2.94°.
+    #[test]
+    fn carried_axes_stand_where_their_distances_put_them() {
+        let mut shapes: Vec<Shape> = Vec::new();
+        for sun in [18, 20, 22, 24, 26] {
+            for ring in 88..=104 {
+                shapes.push(arr::meshed_planets(sun, [18, 18], ring, 3));
+            }
+        }
+        for ring in 56..=68 {
+            shapes.push(arr::ravigneaux([18, 64], [22, 18], ring, 3));
+            shapes.push(arr::ravigneaux([24, 30], [18, 18], ring, 3));
+        }
+        let (mut placed, mut refused) = (0, 0);
+        for shape in &shapes {
+            let alone = crate::train::solve_alone(
+                &crate::train::Train::alone(shape, 2.0, 3000.0),
+                &test_library(),
+            );
+            let Ok(alone) = alone else {
+                if let Err(crate::train::TrainError::AxesCannotBePlaced { .. }) = alone {
+                    refused += 1;
+                }
+                continue;
+            };
+            let r = &alone.part.distances;
+            for (d, d1, d2) in triangles(shape) {
+                let (a, b, c) = (r[d1].running, r[d2].running, r[d].running);
+                assert!(
+                    (a - b).abs() <= c && c <= a + b,
+                    "{:?}: distance {d} at {c} between radii {a} and {b}",
+                    shape.gears()
+                );
+                let phi = r[d].stagger.unwrap().to_radians();
+                let again = (a * a + b * b - 2.0 * a * b * phi.cos()).sqrt();
+                assert!((again - c).abs() < 1e-9, "{again} against {c}");
+                placed += 1;
+                // **Every planet placed**, each axis's instances at 2πj/N and
+                // the other's at φ + 2πj/N: the least tip gap between two
+                // that do not mesh is the least the layouts report.
+                let [pa, pb] = shape.distances[d].axes;
+                let count = shape.axes[pa].count;
+                let tip = |axis: usize| {
+                    (0..shape.members.len())
+                        .filter(|&i| shape.axis_of_slot(shape.slot_of_member(i)) == Some(axis))
+                        .map(|i| crate::tooth::Tooth::new(alone.part.members[i].params).ra)
+                        .fold(0.0_f64, f64::max)
+                };
+                let (ra, rb) = (
+                    r[if shape.distances[d1].axes.contains(&pa) {
+                        d1
+                    } else {
+                        d2
+                    }]
+                    .running,
+                    r[if shape.distances[d1].axes.contains(&pa) {
+                        d2
+                    } else {
+                        d1
+                    }]
+                    .running,
+                );
+                let at = |radius: f64, angle: f64| (radius * angle.cos(), radius * angle.sin());
+                let step = 2.0 * std::f64::consts::PI / f64::from(count);
+                let mut planets = Vec::new();
+                for j in 0..count {
+                    let t = step * f64::from(j);
+                    planets.push((pa, j, at(ra, t), tip(pa)));
+                    planets.push((pb, j, at(rb, t + phi), tip(pb)));
+                }
+                let mut least = f64::INFINITY;
+                for (x, p) in planets.iter().enumerate() {
+                    for q in &planets[x + 1..] {
+                        if p.0 != q.0 && p.1 == q.1 {
+                            continue; // the pair that meshes
+                        }
+                        let gap = ((p.2 .0 - q.2 .0).powi(2) + (p.2 .1 - q.2 .1).powi(2)).sqrt()
+                            - p.3
+                            - q.3;
+                        least = least.min(gap);
+                    }
+                }
+                let reported = alone
+                    .part
+                    .layouts
+                    .iter()
+                    .map(|l| l.clearance)
+                    .fold(f64::INFINITY, f64::min);
+                assert!(
+                    (least - reported).abs() < 1e-9,
+                    "{:?}: {least} placed against {reported} reported",
+                    shape.gears().iter().map(|g| g.teeth).collect::<Vec<_>>()
+                );
+            }
+        }
+        assert!(
+            placed > 0 && refused > 0,
+            "{placed} placed, {refused} refused"
+        );
+        for shape in [
+            arr::meshed_planets(24, [18, 18], 97, 3),
+            arr::ravigneaux([18, 64], [22, 18], 62, 3),
+        ] {
+            let out = crate::train::solve_alone(
+                &crate::train::Train::alone(&shape, 2.0, 3000.0),
+                &test_library(),
+            );
+            assert!(
+                matches!(
+                    out,
+                    Err(crate::train::TrainError::AxesCannotBePlaced { .. })
+                ),
+                "{:?}",
+                out.map(|a| a.part.distances)
+            );
+        }
+        let shipped = crate::train::solve_alone(
+            &crate::train::Train::alone(&arr::meshed_planets(24, [18, 18], 96, 3), 2.0, 3000.0),
+            &test_library(),
+        )
+        .unwrap();
+        let (d, _, _) = triangles(&arr::meshed_planets(24, [18, 18], 96, 3))[0];
+        let phi = shipped.part.distances[d].stagger.unwrap();
+        assert!((phi - 2.94).abs() < 0.005, "{phi}");
     }
 
     #[test]
@@ -6136,10 +6397,12 @@ mod the_pieces_own {
 
     /// **A planet axis keeps its own gap.** Meshed planets run two carried
     /// axes; a minimum no gap meets on one is reported against that axis
-    /// alone.
+    /// alone. (A 72-tooth ring stood here, whose planet axes no placement
+    /// puts 13 mm apart: 29.5 and 15.5 mm out differ by 14. It is refused
+    /// now, and 68 teeth stand them at a stagger.)
     #[test]
     fn a_planet_axis_keeps_its_own_gap() {
-        let mut s = arr::meshed_planets(18, [13, 13], 72, 3);
+        let mut s = arr::meshed_planets(18, [13, 13], 68, 3);
         let before = conventionally(&s);
         assert!(before.layouts.len() == 2 && before.layouts.iter().all(|l| l.clearance_ok));
         let first = before.layouts[0].axis;

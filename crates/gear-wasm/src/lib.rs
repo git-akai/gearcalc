@@ -2821,6 +2821,9 @@ mod tests {
         // A distance the shifts left where it was, or one the designer gave,
         // was sized by no mesh's tips.
         "sized_by",
+        // A distance that is not the third side of two axes on one carrier
+        // has no stagger.
+        "stagger",
         "simultaneous_meshing",
         // A crossed gear pair is not a worm and has no published proportions,
         // and no parallel-axis member has any either.

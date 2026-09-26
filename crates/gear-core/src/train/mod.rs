@@ -1637,6 +1637,12 @@ pub enum TrainError {
     /// ([`shape::Distance::tip_clearance`]). Zero-based, as the meshes are
     /// indexed; the front end numbers from 1.
     TipsUnclearable { mesh: usize },
+    /// **Two axes on one carrier cannot stand where their distances put
+    /// them**: the distance between them is longer than their two
+    /// distances from the carrier's axis together, or shorter than their
+    /// difference ([`shape::Shape::staggers`]). Zero-based, as the
+    /// distances are indexed; the front end numbers from 1.
+    AxesCannotBePlaced { distance: usize },
     /// **The graph is not well formed**, at the invariant named: input
     /// that describes no train, refused where it enters
     /// ([`Train::validate`]) before anything reads it.
@@ -1717,6 +1723,10 @@ impl crate::note::Explain for TrainError {
             Self::Overflow => Note::new(key::ERROR_TRAIN_OVERFLOW),
             Self::LoadPort { case } => {
                 Note::new(key::ERROR_TRAIN_LOAD_PORT).text("case", (case + 1).to_string())
+            }
+            Self::AxesCannotBePlaced { distance } => {
+                Note::new(key::ERROR_TRAIN_AXES_CANNOT_BE_PLACED)
+                    .count("distance", u32::try_from(*distance + 1).unwrap_or(u32::MAX))
             }
             // Each field a refusal can name has its own key; the axis is
             // numbered from one, as the panel numbers axes.
@@ -1814,6 +1824,12 @@ impl std::fmt::Display for TrainError {
             Self::Overflow => write!(
                 f,
                 "the tooth counts along the shaft line multiply past what an exact ratio holds"
+            ),
+            Self::AxesCannotBePlaced { distance } => write!(
+                f,
+                "distance {}: the two axes it joins on one carrier cannot stand that \
+                 far apart at their distances from the carrier's axis",
+                distance + 1
             ),
             Self::Malformed(Invariant::CarriedByNothing(axis)) => write!(
                 f,

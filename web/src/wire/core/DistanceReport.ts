@@ -22,4 +22,11 @@ clearance: number,
  * ([`Distance::tip_clearance`]); `None` where the shifts' own distance
  * stood, or the distance was given.
  */
-sized_by: number | null, };
+sized_by: number | null, 
+/**
+ * **The stagger angle**, degrees, where the distance joins two axes
+ * one carrier carries and each stands at a distance from the
+ * carrier's own axis: the angle about that axis between the two, from
+ * the triangle the three running distances make. `None` elsewhere.
+ */
+stagger: number | null, };
