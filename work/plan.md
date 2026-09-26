@@ -1,0 +1,161 @@
+# gearcalc — working plan (implementation of the audit, and what it missed)
+
+This plan builds on the audit (`audit/`, which stays unedited). It does not repeat the audit's
+tasks. It records what changed after a second review, in what order the work lands, how each change
+is checked, and what the owner still has to decide. Task ids `Tnn.m` are the audit's.
+`PC-`, `U`, `H` and `S` ids refer to the four review reports in [`review/`](review/).
+
+Baseline: `audit-ablation` @ 03f9823. The code is unchanged since the audit (a2f2234). 679 tests
+pass in 36 s.
+
+## 1. What the second review found
+
+Four reviewers ran after the audit: a critic of the plan, a unification review, a bug hunt in the
+least-audited files, and a skeptic of the audit's own claims. The main results:
+
+**The audit's plan contradicts itself in places.**
+- Some tasks are undone by later ones, e.g. T08.2 → `Option` then T17.7 → `f64`, and T07.2 then
+  T07.4.
+- The tip-at-or-below-base-circle rule has four incompatible policies (PC-13).
+- About 20 edits land twice.
+- Ten tasks still offer "A or B" (PC-35).
+- The register gate, T18.28, passes if someone just bumps a commit hash (PC-36).
+- The plan says 144 surviving mutants; the figure is 181.
+
+**Its "What not to touch" list is partly false (S).**
+- Malformed TOML *does* trap (graph-ops#1).
+- Some output wire types are hand-written (tools-ci#10).
+- The epicyclic search does not converge on Planocentric (added2#94).
+- Module homogeneity holds in the core but not in the presets: millimetre defaults break it. The
+  Worm preset refuses at m = 10 and Planocentric at m = 0.1.
+
+**New defects:**
+- **H2 (medium):** an offered edit builds a gear that meshes in two frames. The whole train then
+  fails as a `Wiring` "preset defect", about 5,900 hits in a two-step sweep. This refutes
+  shape-a#8's "refused cleanly".
+- **H1 (low–medium):** a case's flow grouping drops meshes, and sometimes a whole planetary part, on
+  edited trains.
+- **U1 (medium):** ring members silently ignore `no_sharp_tip`/`min_tip_width`, get no undercut
+  floor, and use a different search bound. This is a live breach of rule 4.
+- **U8 (medium):** planet clearance assumes equal spacing and never checks planets on the other axes
+  of the same carrier.
+- **PC-11/PC-32:** the guard conventions in `params.rs` (0.05, 0.9, 0.02, 0.95, 0.95,
+  `MAX_TOOTH_THICKNESS_FRACTION_OF_PITCH`) are hidden rules of thumb that no task owns.
+- **Smaller items:**
+  - About 15 silent `teeth.max(1)` clamps (PC-30).
+  - Zero used as "absent" at hertz.rs:300, strength.rs:597, and screw.rs:935 and :1005 (PC-31).
+  - A dead zero branch in flow.rs and an absolute ε that can void a crossed average (U9–U12).
+  - An SVG backslash (H3).
+  - Stale comments in auto.rs and gear-cli main.rs:1542 (S).
+
+**Where the audit patches instances, one structural change removes the whole class.** The
+redesigns below replace roughly 45 audit tasks and delete more code than they add.
+
+| Redesign | What it is | Replaces |
+|---|---|---|
+| **G — one generator** (PC R1, U) | Two independent parameters: workpiece side σ = ±1 and tool pitch curvature κ (the rack is κ = 0, a continuous parameter rather than a special case). One rolling corner in normal-angle form. One domain rule, κ_c + σκ_w > 0, replaces three separate refusals. | T03.13–15, T05.2/9/14/15/17, T14.8 (member half), T04.1's walker, U1, U7. Deletes about 600 lines of mirrored ring machinery, `BuiltMember` and the `auto::Cut` dispatch. |
+| **F — flow by blocks** (U2, PC R2) | Block-triangular decomposition of the torque system (matching plus strongly connected components). A 1×1 block's direction is forced; enumeration survives only inside the irreducible blocks, which are the loops where power circulates. Exact, with no seed and no fallback. Prototype: matches 2^M on 2,998 random trains. | T11.1's global cap (becomes per block), T11.4 steps 2–4, T11.15, T11.8, T15.12 (conditioning). T11.4's two-algorithm design is dropped. |
+| **C — closure decomposition** (U3, PC R3) | One structural decomposition of shifts against running distances. It gives: relief admissibility, plan roles independent of list order, closed-form absorbers, and the search's free directions and components. | T10.5, T10.6, T10.9, T12.2, T12.3, T14.7, part of T12.10. The search heuristics T12.7/8/12 are replaced by per-component exact division. |
+| **R — one signed clearance record per mesh** (PC R4) | Tip crossing, far gap, bottom clearance and interference depth for each mesh, read at both ends of the band. Sizing, the search filter and the report all read it. | T03.5, T05.1, T05.3, T05.12, T06.2, T10.10, T10.16. Deletes `RingMesh`. |
+| **L — one load field** (U4) | Share per pair and contact-line length per instant. It feeds bending share, efficiency and contact stress for line and point contact alike. | T06.5, T06.8, T07.19, added#28. Fixes strength#6 (Z_ε omitted). |
+| **K — thickness as a per-member allowance** (PC R6) | Backlash comes from per-member thickness deviations. The absolute 0.02 ± 0.02 mm band stops being the only source of backlash. | T10.4's odd-cycle special case, T15.3, T21.3. Cures lens-standards#6 and the module-homogeneity break (S). |
+| **X — crossed face as one interval model** (PC R7) | The face as one interval on the contact's axial coordinate. | T07.2/4/5/15, T08.12; removes the Phase-1/Phase-4 reversal. |
+| **V — one validator table** (PC R5) | One validator for every kind of input, each refusal keyed by its field. | T01.2, T13.1, T14.6, T01.6/8/9, T05.8, T13.5, parts of T02.6/7. |
+| **N — one train tolerance module** (PC R8) | Relative, power-normalised zero tests with their derivation stated. | T11.10 b4, T15.7, T15.12, T16.28. |
+
+**Reviewed and not worth doing** (U):
+- One geometry for line and point contact. The interface is unified instead, through a core `Path`
+  trait.
+- A general contact-analysis engine.
+- A linear or complementarity programme (LP/LCP) for the flow.
+- Trait objects for the contact enum.
+- Merging the exact-rational numerics with the floating-point ones.
+
+## 2. Decisions this plan makes, by the owner's stated principles
+
+These settle the open choices the audit left (PC-13, PC-35). Each is applied once, everywhere.
+
+1. **Tip at or below the base circle:** clamp with a note, for both kinds (rule 5, continuous).
+   `TIP_ABOVE_BASE_FRACTION` goes. T02.6, T05.13, T05.15, T15.11 and T16.23 are rewritten to match.
+2. **Absence is typed:** `bending_factor` returns `Option`. T17.7's first bullet is dropped.
+3. **Rules of thumb become visible options:**
+   - The `params.rs` guard conventions, the best-k rule, the 1.75 mm pin, μ = 0.08 and the
+     locking/efficiency thresholds all become named, user-visible settings with their source stated.
+   - The model underneath each one stays continuous.
+4. **No cap without a derivation:**
+   - T05.4's minimum α_w and T11.1's global M cap are dropped.
+   - A cap survives only where the cost or the domain derives it, e.g. inside an irreducible flow
+     block.
+5. **Unpublished formulas are not shipped as the model.** T08.11's interpolation becomes an option
+   labelled as an estimate, or it is dropped. T08.6's "closed form C(κ)" claim is corrected.
+6. **A load is never moved to a guessed body.** Where T13.4 would do that, the edit is refused under
+   a named key.
+7. **The register gate names a command.** CI re-runs it when the files it covers change (PC-36).
+8. **Priority follows the verifier's severity, not the auditor's.**
+9. **`handoff_inbound/` stays**: it is the source of the seven regression fixtures.
+   `geartrain-refactor-*.md` are deleted, as they promise; this is T18.
+
+## 3. Order of work
+
+Each stage ends with every check green (§4). A stage is pushed to `origin/audit-ablation` when it
+closes. Nothing is merged to `main`.
+
+**Stage 0 — The instrument** (small, first):
+- `tools/check_all.sh` runs every check CI runs (T16.14/T20.1).
+- A bit-identity harness: every preset × case, solved and hashed, so a refactor that should not move
+  numbers can prove it.
+- The seeded edit walk (T13.1) with H1's flow law and H2's frame law added.
+- A module-scaling law over the presets (S).
+- The fixes to the "What not to touch" register.
+
+**Stage 1 — Gates that can fail, and the high-severity wrong answers.** The audit's Phase 1, with
+these changes:
+- Items that the redesigns replace get only a small interim fix plus a failing law, so the law
+  carries over. T11.1 is an example: refuse above M = 31 until F lands.
+- H2 is added: refuse the edit under a named key now, then apply the per-mesh frame cure.
+- U1 is added, as an interim: the ring honours the tip-width and undercut floors.
+
+**Stage 2 — Boundaries and errors.** The audit's Phase 2, built as redesign **V**, and the typed
+absences of PC-31. Also PC-30's silent `teeth.max(1)` clamps, which become refusals.
+
+**Stage 3 — Structure.** The redesigns, in order: **F** → **C** → **N**, then **G**, **R**, **L**,
+**K** and **X** as parallel tracks where the files do not overlap.
+- F runs first because it also serves as Phase 3's performance work.
+- Each redesign lands in behaviour-neutral steps under the identity harness, then with its intended
+  number changes recorded in the corpus.
+- T14.5's split of `train/mod.rs` runs before C.
+
+**Stage 4 — The audit's remaining Phase 4 tasks** that no redesign replaced: rating, metrology, edits,
+numerics, dead code, the CLI harness and the UI. Afterwards: re-run mutation testing (target ≥ 92 %
+caught, test workspace included) and the 130-constant perturbation.
+
+**Stage 5 — Documentation**, rewritten for any reader.
+- Present tense, one home per fact.
+- History stays in `corrections.md` and out of the working text.
+- Comments say what the code does and why, without argument or narrative.
+- `CLAUDE.md` is kept current at each stage.
+
+**Stage 6 — Features** (the audit's Phase 6), each off or neutral by default.
+
+## 4. How work is done and checked
+
+- **Orchestrator:** this session. It holds the plan, splits work into packages of related tasks,
+  and integrates commits onto `audit-ablation`, in a linear history with no merge commits.
+- **Workers:** at most two at once, each in its own worktree under `~/.cache/gearcalc-work/wt/`.
+  Builds go through the two-slot `gc` helper.
+- **Watchdog:** checks every 0.3 s. It kills any process over 5 GB, and the largest process that is
+  not critical when the machine has under 3 GB available. Every kill is logged and reported.
+- **Worker commits:** each proof law is written first and seen failing at the base commit, then the
+  change lands, one commit per task or tight group.
+- **Adversarial checker:** one agent per package. It:
+  - re-runs the proof at the base and at the head;
+  - runs `check_all.sh`;
+  - diffs the golden corpus and asks why every moved number moved;
+  - challenges the change against the principles in §2.
+  A package is integrated only after the checker passes it.
+- **Re-audit:** after each stage, a short re-review asks whether any new finding changes this plan.
+  This file is updated, and the change is logged in §5.
+
+## 5. Change log
+
+- 2026-09-26 — plan written after the four-way review.
