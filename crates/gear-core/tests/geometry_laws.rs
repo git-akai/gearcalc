@@ -1053,7 +1053,9 @@ fn the_outline_is_a_simple_closed_curve() {
         );
         let profile = gear.profile(120);
         let n = common::crossings(&profile[..profile.len() - 1]);
-        assert_eq!(n, 0, "{n} crossings at {tag}");
+        assert_eq!(n, 0, "{n} crossings in the profile at {tag}");
+        let n = common::crossings(&common::flatten(&outline, 8));
+        assert_eq!(n, 0, "{n} crossings in the outline at {tag}");
     }
 }
 

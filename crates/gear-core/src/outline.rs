@@ -129,12 +129,17 @@ impl Tooth {
         };
         if displace.is_none() {
             if side < 0.0 {
+                // One bulged vertex and the arc's own end: the fillet's walk
+                // never emits its start, so without the end the bulge would
+                // land on the chord to the first fillet sample.
                 let s = pt(self.rf, -self.half_pitch);
                 out.push(Vertex {
                     x: s.0,
                     y: s.1,
                     bulge: bulge_for(self.half_pitch - self.theta0),
                 });
+                let e = pt(self.rf, -self.theta0);
+                out.push(Vertex::line(e.0, e.1));
             } else if let Some(last) = out.last_mut() {
                 last.bulge = bulge_for(self.half_pitch - self.theta0);
             }
@@ -146,9 +151,9 @@ impl Tooth {
             let th = side * (self.theta0 + t * (self.half_pitch - self.theta0));
             pt(self.rf, th)
         };
+        // Mid-space is the previous tooth's last vertex, so the walk in starts
+        // after it.
         if side < 0.0 {
-            let s = curve(1.0);
-            out.push(Vertex::line(s.0, s.1));
             subdivide(&curve, 1.0, 0.0, tol, 0, out);
         } else {
             subdivide(&curve, 0.0, 1.0, tol, 0, out);
@@ -178,10 +183,6 @@ impl Tooth {
             if self.severed {
                 // No flank and no tip arc: fillet and root arc only.
                 self.emit_root(base, -1.0, displace, tol, out);
-                out.push(Vertex::line(
-                    pt(self.rf, -self.theta0).0,
-                    pt(self.rf, -self.theta0).1,
-                ));
                 let fillet_up = |t: f64| {
                     let (r, th) = self.trochoid_at(self.s_j + t * (0.0 - self.s_j));
                     pt(r, -th)
@@ -225,12 +226,15 @@ impl Tooth {
                 subdivide(&l_minus, 0.0, 1.0, tol, 0, out);
             }
 
-            // 4. tip arc, across the tooth. Exact.
-            if let Some(last) = out.last_mut() {
-                last.bulge = bulge_for(2.0 * self.theta_a);
+            // 4. tip arc, across the tooth. Exact. A pointed tip has none: the
+            //    flanks meet on the centreline, where the walk already is.
+            if self.theta_a > 0.0 {
+                if let Some(last) = out.last_mut() {
+                    last.bulge = bulge_for(2.0 * self.theta_a);
+                }
+                let tip = pt(self.ra, self.theta_a);
+                out.push(Vertex::line(tip.0, tip.1));
             }
-            let tip = pt(self.ra, self.theta_a);
-            out.push(Vertex::line(tip.0, tip.1));
 
             // 5. flank, plus side: back down from the tip to the junction
             let l_plus = |t: f64| {
@@ -294,13 +298,19 @@ impl crate::ring::Ring {
                 (r * a.cos(), r * a.sin())
             };
 
-            // 1. root arc, from mid tooth-space round to where the fillet starts
+            // 1. root arc, from mid tooth-space round to where the fillet
+            //    starts: one bulged vertex and the arc's own end. A fully
+            //    filleted root has no arc, and an empty section adds no vertex.
             let start = pt(self.rf, -self.half_pitch);
             out.push(Vertex {
                 x: start.0,
                 y: start.1,
                 bulge: bulge_for(root_arc),
             });
+            if root_arc > 0.0 {
+                let end = pt(self.rf, -theta_root);
+                out.push(Vertex::line(end.0, end.1));
+            }
 
             // 2. fillet, minus side, climbing inward from the root. Absent when
             //    the cut generated none: the flank then starts at the root
@@ -661,19 +671,133 @@ mod tests {
         }
     }
 
-    /// The arcs must be where the geometry is actually circular, and nowhere
-    /// else — otherwise a bulge would be silently faking a curve.
+    /// Outlines of every kind the walkers draw, with the tip and root radii
+    /// each may carry an arc at: external, helical, undercut, severed, pointed,
+    /// ended at its tip on the fillet, eccentric, and rings.
+    fn every_kind_of_outline() -> Vec<(String, Vec<Vertex>, Vec<f64>)> {
+        use crate::ring::{Cutter, Ring};
+        let external = |p: GearParams| {
+            let gear = crate::gear::Gear::new(p);
+            let radii = gear.distinct().flat_map(|t| [t.ra, t.rf]).collect();
+            (format!("{p:?}"), gear.outline(1e-3), radii)
+        };
+        let with = |f: fn(&mut GearParams)| {
+            let mut p = GearParams::default();
+            f(&mut p);
+            p
+        };
+        let mut cases = vec![
+            external(GearParams::default()),
+            external(with(|p| p.helix_angle = 25.0)),
+            external(with(|p| {
+                p.teeth = 9;
+                p.profile_shift = -0.3;
+            })),
+            // severed
+            external(with(|p| {
+                p.teeth = 5;
+                p.profile_shift = -0.5;
+                p.pressure_angle = 14.5;
+            })),
+            // pointed
+            external(with(|p| {
+                p.teeth = 9;
+                p.profile_shift = 0.9;
+            })),
+            // ended at its tip on the fillet
+            external(with(|p| p.profile_shift = -1.5)),
+            // eccentric
+            external(with(|p| {
+                p.teeth = 24;
+                p.angular_shift = 0.25;
+            })),
+            external(with(|p| {
+                p.teeth = 9;
+                p.profile_shift = -0.3;
+                p.angular_shift = 1.0;
+            })),
+        ];
+        for teeth in [43u32, 90] {
+            let ring = Ring::cut_by(
+                &GearParams {
+                    teeth,
+                    ..Default::default()
+                },
+                &Cutter::default(),
+            );
+            cases.push((
+                format!("ring z{teeth}"),
+                ring.outline(1e-3),
+                vec![ring.ra, ring.rf],
+            ));
+        }
+        cases
+    }
+
+    /// **Every arc is a tip or root arc about the axis.** Each bulged span is
+    /// read back from its chord and bulge alone, as CAD reads it: its ends and
+    /// its midpoint lie on one circle about the axis, that circle is a tip or a
+    /// root, and the bulge is `tan(Δθ/4)` of the angle its ends subtend there.
+    ///
+    /// Three points rather than a centre because a span a fraction of a micron
+    /// long has a centre its rounding cannot place, and a midpoint it can. The
+    /// check this replaces read the start vertex only, and passed an arc bulged
+    /// onto the chord to the first fillet sample: centred 22.4 mm off the axis
+    /// on z17, 47.6 mm on a z43 ring.
     #[test]
-    fn only_the_tip_and_root_arcs_carry_a_bulge() {
-        let g = Tooth::new(GearParams::default());
-        for v in crate::gear::Gear::new(g.params).outline(1e-3) {
-            if v.bulge.abs() > 1e-12 {
-                let r = f64::hypot(v.x, v.y);
+    fn every_arc_is_a_tip_or_root_arc_about_the_axis() {
+        for (name, v, radii) in every_kind_of_outline() {
+            let size = radii.iter().copied().fold(0.0, f64::max);
+            let tol = 1e-9 * size;
+            for i in 0..v.len() {
+                let (a, b) = (v[i], v[(i + 1) % v.len()]);
+                if a.bulge == 0.0 {
+                    continue;
+                }
+                let (ra, rb) = (a.x.hypot(a.y), b.x.hypot(b.y));
+                let (dx, dy) = (b.x - a.x, b.y - a.y);
+                let sagitta = a.bulge * dx.hypot(dy) / 2.0;
+                let len = dx.hypot(dy);
+                // The arc's midpoint: off the chord's middle, to the right of
+                // travel for a counter-clockwise (positive) bulge.
+                let mid = [
+                    (a.x + b.x) / 2.0 + dy / len * sagitta,
+                    (a.y + b.y) / 2.0 - dx / len * sagitta,
+                ];
+                let rm = mid[0].hypot(mid[1]);
                 assert!(
-                    (r - g.ra).abs() < 1e-9 || (r - g.rf).abs() < 1e-9,
-                    "a bulge at r={r} is neither the tip ({}) nor the root ({})",
-                    g.ra,
-                    g.rf
+                    (ra - rb).abs() < tol && (ra - rm).abs() < tol,
+                    "{name}: span {i} is not one circle about the axis: ends at {ra}, {rb}, middle at {rm}"
+                );
+                assert!(
+                    radii.iter().any(|r| (r - ra).abs() < tol),
+                    "{name}: span {i} is an arc at r={ra}, neither a tip nor a root"
+                );
+                let subtends = (a.x * b.y - a.y * b.x).atan2(a.x * b.x + a.y * b.y);
+                assert!(
+                    (a.bulge - (subtends / 4.0).tan()).abs() < 1e-9,
+                    "{name}: span {i} bulges {} for {subtends} rad",
+                    a.bulge
+                );
+            }
+        }
+    }
+
+    /// **No vertex is repeated.** Every section ends on its own vertex and
+    /// starts on the one before, so two consecutive vertices at one point mean
+    /// a section was emitted twice or an empty one was emitted at all: a
+    /// zero-length segment in the export.
+    #[test]
+    fn no_two_consecutive_vertices_coincide() {
+        for (name, v, radii) in every_kind_of_outline() {
+            let size = radii.iter().copied().fold(0.0, f64::max);
+            for i in 0..v.len() {
+                let (a, b) = (v[i], v[(i + 1) % v.len()]);
+                let gap = (b.x - a.x).hypot(b.y - a.y);
+                assert!(
+                    gap > 1e-12 * size,
+                    "{name}: vertices {i} and {} are {gap:e} mm apart",
+                    (i + 1) % v.len()
                 );
             }
         }
