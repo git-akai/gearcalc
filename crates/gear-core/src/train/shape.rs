@@ -1918,7 +1918,10 @@ impl Shape {
         // hula's own solver ran. Three at most; the second usually moves nothing
         // and the third never has.
 
-        let mut found: Option<Vec<f64>> = None;
+        // What a round found, with the plan it was scored in: a later
+        // round's re-sizing replaces the plan, and a point is admissible
+        // only at a plan it was closed and scored at.
+        let mut found: Option<(Vec<f64>, Plan, Vec<Option<usize>>)> = None;
         for _ in 0..3 {
             let objective = |v: &[f64], only: Option<&[usize]>| -> Option<f64> {
                 let x = self.closed(&plan, &place(v), helix)?;
@@ -1951,7 +1954,7 @@ impl Shape {
                 break;
             };
             let chosen = place(&v);
-            found = Some(v);
+            found = Some((v, plan.clone(), bound_by.clone()));
             if !bound_by.iter().any(Option::is_some) {
                 break;
             }
@@ -1966,17 +1969,30 @@ impl Shape {
             plan = self.plan_held(helix, held);
             bound_by = again;
         }
-        match found {
-            None => fallback(&plan, &bound_by, super::Searched::FoundNothing),
-            Some(v) => Ok(Chosen {
-                shifts: self
-                    .closed(&plan, &place(&v), helix)
-                    .unwrap_or_else(|| settled.clone()),
-                how: super::Searched::Chose,
-                held: plan.held.clone(),
-                bound_by,
-            }),
-        }
+        let Some((v, scored_in, scored_bound)) = found else {
+            return fallback(&plan, &bound_by, super::Searched::FoundNothing);
+        };
+        // **The point at the latest plan where it is admissible there**, and
+        // otherwise at the plan the round scored it in — never the one
+        // round's shifts closed at the next round's plan unchecked.
+        let at = |plan: &Plan| -> Option<Vec<f64>> {
+            let x = self.closed(plan, &place(&v), helix)?;
+            self.trial_efficiency(plan, &x, helix, Some(&cache), None)
+                .map(|_| x)
+        };
+        let (shifts, plan, bound_by) = match at(&plan) {
+            Some(x) => (x, plan, bound_by),
+            None => match at(&scored_in) {
+                Some(x) => (x, scored_in, scored_bound),
+                None => return fallback(&scored_in, &scored_bound, super::Searched::FoundNothing),
+            },
+        };
+        Ok(Chosen {
+            shifts,
+            how: super::Searched::Chose,
+            held: plan.held.clone(),
+            bound_by,
+        })
     }
 
     /// **Every member cut at its mesh group's module and pressure angle** —
@@ -2341,6 +2357,7 @@ struct Constraint {
     absorber: Option<usize>,
 }
 
+#[derive(Clone)]
 struct Plan {
     asked: Vec<super::pair::ShiftAsked>,
     role: Vec<Role>,
@@ -4566,6 +4583,74 @@ mod tests {
                 .abs()
                 < 1e-12
         );
+    }
+
+    /// **Searching never loses a solve and never loses efficiency**: on
+    /// every preset, every arrangement of a set, a Ravigneaux and the hula,
+    /// with the search asked of every mesh and of each mesh alone, the
+    /// train solves wherever it solves unsearched, and the product of its
+    /// meshes' efficiencies is no lower.
+    #[test]
+    fn searching_never_loses_a_solve_or_efficiency() {
+        use crate::planetary::{Arrangement, PlanetaryShaft};
+        use crate::train::{solve_alone, Preset, Train};
+        let mut trains: Vec<(String, Train)> = Preset::ALL
+            .iter()
+            .map(|p| (format!("{p:?}"), Train::alone(&p.build(), 2.0, 3000.0)))
+            .collect();
+        let set = arr::planetary(12, 30, 72, 3);
+        for input in PlanetaryShaft::ALL {
+            for fixed in PlanetaryShaft::ALL {
+                if input != fixed {
+                    let arrangement = Arrangement { input, fixed };
+                    trains.push((
+                        format!("{arrangement:?}"),
+                        Train::alone(&set, 2.0, 3000.0).arranged_as(arrangement),
+                    ));
+                }
+            }
+        }
+        for (name, shape) in [
+            ("ravigneaux", arr::ravigneaux([24, 30], [18, 18], 66, 3)),
+            ("hula", arr::hula([65, 61, 57, 61], [1.0, 1.0])),
+        ] {
+            trains.push((name.into(), Train::alone(&shape, 2.0, 3000.0)));
+        }
+        let product = |t: &Train| -> Option<f64> {
+            solve_alone(t, &test_library())
+                .ok()
+                .map(|a| a.part.meshes.iter().map(|m| m.efficiency.forward).product())
+        };
+        let mut searched = 0;
+        for (name, t) in trains {
+            let mut off = t.clone();
+            for m in &mut off.shape.meshes {
+                m.search = false;
+            }
+            let Some(unsearched) = product(&off) else {
+                continue;
+            };
+            let asks: Vec<Vec<usize>> = std::iter::once((0..t.shape.meshes.len()).collect())
+                .chain((0..t.shape.meshes.len()).map(|k| vec![k]))
+                .collect();
+            for ask in asks {
+                let mut on = off.clone();
+                for &k in &ask {
+                    on.shape.meshes[k].search = true;
+                }
+                let got = product(&on)
+                    .unwrap_or_else(|| panic!("{name}: searching {ask:?} loses the solve"));
+                // No lower beyond rounding: a few units in the last place a
+                // mesh, where the search lands where nothing was searched.
+                let rounding = 4.0 * f64::EPSILON * t.shape.meshes.len() as f64;
+                assert!(
+                    got >= unsearched * (1.0 - rounding),
+                    "{name}: searching {ask:?} comes to {got} under {unsearched}"
+                );
+                searched += 1;
+            }
+        }
+        assert!(searched > 0);
     }
 
     /// Each distance joining two axes on one carrier, with the distances
