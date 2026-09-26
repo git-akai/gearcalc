@@ -2799,8 +2799,11 @@ exceed one another freely; nothing is clamped against anything.
 train at once** ([the graph](#the-graph) says how a flow is found): the given torques
 known, the derived loads, the reacted ends, the fixed bodies and ground
 unknown, and the direction of the flow read off the case's speeds — a load
-held still takes its direction from the sign of its torque, so a stall case
-rates as one turning the way it pushes. Each mesh's driver is whichever side
+held still takes its direction from its impending motion, signed so the given
+torques do positive work on it, and a mesh the speeds leave exactly still
+relative to its frame takes its direction from that motion alone. So a stall
+case rates as one turning the way it is pushed, a derived torque's seed has no
+say, and scaling every given speed moves no torque. Each mesh's driver is whichever side
 the flow puts power across it from, its driven side under that direction's
 `η`, so a self-locking worm **holds** a load from its wheel where it stands —
 its driver pressing the flanks, nothing beyond it seeing any — and a load put

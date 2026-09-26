@@ -2967,7 +2967,8 @@ pub struct Load {
     pub torque: Auto<f64>,
     /// rpm, given or derived from the other loads through the motion. A
     /// given nought is a load held still; the flow then takes its direction
-    /// from the torque's sign.
+    /// from its impending motion, signed so the given torques do positive
+    /// work on it.
     pub speed: Auto<f64>,
 }
 
@@ -4504,38 +4505,50 @@ fn solve_parts(
         }
         // ---- the motion: each given speed drives its port at one turn with
         // every other given port still, and the case's speeds are those
-        // solutions scaled and summed. The flow's direction comes from the
-        // same sum, a load held still weighing in by its torque's sign.
-        let given_speeds: Vec<(Body, f64, f64)> = loads
+        // solutions scaled and summed. **A port held still has an impending
+        // motion** — its own turn, the other given ports still — signed so
+        // the given torques do positive work on it, and nought where they
+        // do none; a derived torque, whose box holds only a seed, has no
+        // say. The flow reads it only to break a tie the speeds leave.
+        let given_speeds: Vec<(Body, f64)> = loads
             .iter()
             .filter(|(_, l)| !l.speed.auto)
-            .map(|(g, l)| {
-                let s = l.speed.manual;
-                let weight = if s != 0.0 {
-                    s
-                } else if l.torque.manual < 0.0 {
-                    -1.0
-                } else {
-                    1.0
-                };
-                (*g, s, weight)
-            })
+            .map(|(g, l)| (*g, l.speed.manual))
             .collect();
+        let given_torque = |b: Body| -> f64 {
+            loads
+                .iter()
+                .filter(|(g, l)| *g == b && !l.torque.auto)
+                .map(|(_, l)| l.torque.manual)
+                .sum()
+        };
         let mut speeds = vec![0.0; shafts];
-        let mut unit = vec![0.0; shafts];
+        let mut still = vec![0.0; shafts];
         let mut determined = true;
-        for &(driver, s, weight) in &given_speeds {
+        for &(driver, s) in &given_speeds {
             let mut c = conditions.clone();
-            for &(other, _, _) in &given_speeds {
+            for &(other, _) in &given_speeds {
                 c[other] = Condition::Ground;
             }
             c[driver] = Condition::Drive(crate::ratio::Ratio::ONE);
             match system.motion_in(&c, &[driver]) {
                 Ok(sol) if sol.is_unique() => {
-                    for (i, v) in sol.values.iter().enumerate() {
-                        let v = v.to_f64();
+                    let v: Vec<f64> = sol.values.iter().map(|r| r.to_f64()).collect();
+                    for (i, v) in v.iter().enumerate() {
                         speeds[i] += s * v;
-                        unit[i] += weight * v;
+                    }
+                    if s == 0.0 {
+                        let work: f64 = (0..shafts).map(|b| given_torque(b) * v[b]).sum();
+                        let sign = if work > 0.0 {
+                            1.0
+                        } else if work < 0.0 {
+                            -1.0
+                        } else {
+                            0.0
+                        };
+                        for (i, v) in v.iter().enumerate() {
+                            still[i] += sign * v;
+                        }
                     }
                 }
                 _ => determined = false,
@@ -4546,7 +4559,7 @@ fn solve_parts(
         // the count.
         let short = {
             let mut c = conditions.clone();
-            for &(g, _, _) in &given_speeds {
+            for &(g, _) in &given_speeds {
                 c[g] = Condition::Drive(crate::ratio::Ratio::ONE);
             }
             system
@@ -4584,7 +4597,7 @@ fn solve_parts(
             }
         }
         let asked = flow::Asked { known, unknown };
-        let flow = match flow::solve(shafts, &meshes, &unit, &asked) {
+        let flow = match flow::solve_tied(shafts, &meshes, &speeds, &still, &asked) {
             Ok(flow) => flow,
             Err(flow::Refused::NothingDrives) => {
                 notes.push(Note::new(key::TRAIN_CASE_NOTHING_DRIVES));
@@ -4632,11 +4645,11 @@ fn solve_parts(
                 let port = sweep_at;
                 // **A sweep is a magnitude**, stated at a port; every body's
                 // share of it is the ratio of the two speeds, which the
-                // unit motion has where a held load's speed does not. The
+                // impending motion has where a held load's speed does not. The
                 // turns are **signed** here, so a member's turns against
                 // its carrier are a difference of two, taken as a magnitude
                 // where they are counted.
-                let per = if speeds[port] != 0.0 { &speeds } else { &unit };
+                let per = if speeds[port] != 0.0 { &speeds } else { &still };
                 (0..shafts)
                     .map(|s| {
                         if per[port] == 0.0 {
@@ -11481,6 +11494,163 @@ mod tests {
             for v in [b.nominal, b.minimum, b.maximum] {
                 assert!((v - 0.041_724).abs() < 5e-7, "planetary at ±{tol}: {b:?}");
             }
+        }
+    }
+
+    /// Every preset alone with three cases along its conventional ends:
+    /// its own, one stalled — the input's torque given and its speed
+    /// derived, the output held still with its torque derived — and one
+    /// back-driven from the output held still.
+    fn still_cases() -> Vec<(String, Train)> {
+        Preset::ALL
+            .iter()
+            .map(|p| {
+                let mut t = Train::alone(&p.build(), 2.0, 3000.0);
+                let (input, output) = (t.load_cases[0].loads[0].at, t.load_cases[0].loads[1].at);
+                t.load_cases.push(LoadCase {
+                    loads: vec![
+                        Load {
+                            speed: Auto::automatic(0.0),
+                            ..Load::given(input, 2.0, 0.0)
+                        },
+                        Load {
+                            torque: Auto::automatic(0.0),
+                            ..Load::given(output, 0.0, 0.0)
+                        },
+                    ],
+                    ..LoadCase::ultimate(input, output, 2.0, 0.0)
+                });
+                t.load_cases
+                    .push(LoadCase::back_driving(input, output, 2.0));
+                (format!("{p:?}"), t)
+            })
+            .collect()
+    }
+
+    /// What a train's cases come to, every figure to the bit.
+    fn cases_of(t: &Train) -> String {
+        match solve_train(t, &test_library()) {
+            Ok(r) => format!("{:?}", r.cases),
+            Err(e) => format!("{e:?}"),
+        }
+    }
+
+    /// **A case is a function of what it gives**: every automatic figure's
+    /// seed — the number a derived box shows until it is solved — set to
+    /// ±1e-9, ±1 and ±1e3 changes nothing a case comes to, on every preset
+    /// alone, stalled and back-driven.
+    #[test]
+    fn a_case_does_not_read_its_seeds() {
+        for (name, t) in still_cases() {
+            let want = cases_of(&t);
+            for seed in [1e-9, -1e-9, 1.0, -1.0, 1e3, -1e3] {
+                let mut u = t.clone();
+                for c in &mut u.load_cases {
+                    for l in &mut c.loads {
+                        if l.torque.auto {
+                            l.torque.manual = seed;
+                        }
+                        if l.speed.auto {
+                            l.speed.manual = seed;
+                        }
+                    }
+                }
+                assert_eq!(cases_of(&u), want, "{name}: seeds at {seed}");
+            }
+        }
+    }
+
+    /// **Relief's seeding is idempotent**: a case relieved — its derived
+    /// figures seeded from what it came to — comes to what it came to.
+    #[test]
+    fn relief_seeds_nothing_a_case_reads() {
+        for (name, t) in still_cases() {
+            let want = cases_of(&t);
+            for c in 0..t.load_cases.len() {
+                let mut u = t.clone();
+                u.relieve_case(c, None, &test_library()).unwrap();
+                assert_eq!(cases_of(&u), want, "{name}: case {c} relieved");
+            }
+        }
+    }
+
+    /// **A case is the same at any speed**: every given speed scaled by
+    /// 1e-6 up to 1e3 moves no torque — on every preset's
+    /// cases, and on a planetary set with its ring released, driven at the
+    /// sun with the ring held still by a derived torque.
+    #[test]
+    fn a_case_is_the_same_at_any_speed() {
+        let mut trains = still_cases();
+        let mut set = Train::alone(&Preset::Planetary.build(), 2.0, 3000.0);
+        let (sun, carrier) = (set.load_cases[0].loads[0].at, set.load_cases[0].loads[1].at);
+        let ring = set.held[0];
+        set.release(ring);
+        set.load_cases = vec![LoadCase {
+            loads: vec![
+                Load::given(sun, 2.0, 3000.0),
+                Load {
+                    torque: Auto::automatic(0.0),
+                    ..Load::given(ring, 0.0, 0.0)
+                },
+                Load::declared(carrier, LoadRole::Reacted),
+            ],
+            ..LoadCase::ultimate(sun, carrier, 2.0, 3000.0)
+        }];
+        trains.push(("planetary, ring still".into(), set));
+        let torques = |t: &Train| -> Vec<Vec<(usize, u64)>> {
+            solve_train(t, &test_library())
+                .unwrap()
+                .cases
+                .iter()
+                .map(|c| {
+                    c.bodies
+                        .iter()
+                        .map(|b| (b.at, ((b.torque * 1e9).round() as i64) as u64))
+                        .collect()
+                })
+                .collect()
+        };
+        for (name, t) in trains {
+            let want = torques(&t);
+            for scale in [1e-6, 1e-4, 1e-3, 1e3] {
+                let mut u = t.clone();
+                for c in &mut u.load_cases {
+                    for l in &mut c.loads {
+                        if !l.speed.auto {
+                            l.speed.manual *= scale;
+                        }
+                    }
+                }
+                assert_eq!(torques(&u), want, "{name}: speeds scaled by {scale}");
+            }
+        }
+    }
+
+    /// **A stall comes to its closed form**: the input's torque given, the
+    /// output held still, the output carries `T_in · |i| · η_forward` — the
+    /// mesh driven forward, as the given torque drives it — on a pair and
+    /// on a worm, whatever the held output's derived torque was seeded at.
+    #[test]
+    fn a_stall_comes_to_its_closed_form() {
+        for ((name, t), seed) in still_cases()
+            .into_iter()
+            .filter(|(n, _)| n == "Spur" || n == "Worm")
+            .flat_map(|x| [(x.clone(), 1.0), (x, -1.0)])
+        {
+            let mut t = t;
+            t.load_cases[1].loads[1].torque.manual = seed;
+            let r = solve_train(&t, &test_library()).unwrap();
+            let stall = &r.cases[1];
+            assert!(stall.solved, "{name}: {:?}", stall.notes);
+            let output = t.load_cases[1].loads[1].at;
+            let eta = r.meshes[0].efficiency.forward;
+            let ratio = r.paths[0].ratio.abs();
+            let want = 2.0 * ratio * eta;
+            let got = stall.shaft(output).unwrap().torque.abs();
+            assert!(
+                (got - want).abs() < 1e-9 * want,
+                "{name} seeded {seed}: {got} against {want}"
+            );
         }
     }
 

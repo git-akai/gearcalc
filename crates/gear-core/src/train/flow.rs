@@ -215,14 +215,42 @@ pub fn solve(
     speed: &[f64],
     asked: &Asked,
 ) -> Result<Flow, Refused> {
+    solve_tied(bodies, meshes, speed, speed, asked)
+}
+
+/// **The power flow**, given every body's speed and a motion to break a
+/// tie with: [`solve`] read at `speed + ε·tie` as `ε → 0`. A power the
+/// speeds make exactly nought — a mesh whose members stand still relative
+/// to its frame, or a case whose every given speed is nought — takes its
+/// sign from `tie` instead; where every speed is nought the flow is the
+/// tie's, whose scale cancels in every ratio it gives. The tie is a port
+/// held still's impending motion, so it never enters as a speed.
+///
+/// # Errors
+///
+/// As [`solve`].
+pub fn solve_tied(
+    bodies: usize,
+    meshes: &[MeshFlow],
+    speed: &[f64],
+    tie: &[f64],
+    asked: &Asked,
+) -> Result<Flow, Refused> {
     // The work the known torques do, either way: the scale a power is
     // nought against. A known torque that works *against* its body is a
     // load absorbing, and who drives it is one of the unknowns — a derived
     // load, or a reacted port — so a known driver is not required; a case
     // with no work known at all has nothing to follow.
-    let input_power: f64 = (0..bodies)
-        .filter_map(|s| asked.known_at(s).map(|t| (t * speed[s]).abs()))
-        .sum();
+    let work = |motion: &[f64]| -> f64 {
+        (0..bodies)
+            .filter_map(|s| asked.known_at(s).map(|t| (t * motion[s]).abs()))
+            .sum()
+    };
+    let (speed, input_power) = match work(speed) {
+        p if p > 0.0 => (speed, p),
+        _ => (tie, work(tie)),
+    };
+    let tie_power = work(tie);
     if input_power <= 0.0 || !input_power.is_finite() {
         return Err(Refused::NothingDrives);
     }
@@ -299,20 +327,26 @@ pub fn solve(
         let shaft_torques: Vec<f64> = (0..bodies)
             .map(|s| (0..m).map(|k| per_unit(k, s) * c[k]).sum())
             .collect();
-        // The power the assumed driver puts into each mesh: its torque
-        // times its speed relative to the frame.
-        let driving_power = |k: usize| -> f64 {
+        // The power the assumed driver puts into each mesh under a motion:
+        // its torque times its speed relative to the frame.
+        let driving_power_in = |k: usize, motion: &[f64]| -> f64 {
             let mesh = &meshes[k];
             match directions[k] {
-                Drive::Forward => c[k] * mesh.za * (speed[mesh.a] - speed[mesh.frame]),
-                Drive::Backward => c[k] * mesh.zb * (speed[mesh.b] - speed[mesh.frame]),
+                Drive::Forward => c[k] * mesh.za * (motion[mesh.a] - motion[mesh.frame]),
+                Drive::Backward => c[k] * mesh.zb * (motion[mesh.b] - motion[mesh.frame]),
             }
         };
+        let driving_power = |k: usize| driving_power_in(k, speed);
         // Each mesh's assumed direction must be the one the solution puts
         // power across it: the driver's torque works with its speed relative
-        // to the frame.
+        // to the frame — or, where the speeds leave that exactly nought,
+        // with its impending motion.
         let consistent = (0..m).all(|k| {
             let p = driving_power(k);
+            if p == 0.0 {
+                let q = driving_power_in(k, tie);
+                return q.abs() <= ZERO * tie_power || q > 0.0;
+            }
             p.abs() <= ZERO * input_power || p > 0.0
         });
         if !consistent {
