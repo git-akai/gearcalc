@@ -299,14 +299,11 @@ fn fixtures() -> Vec<(String, Train)> {
         t.load_cases = loads(t.port(0, 1), t.port(1, 3));
         t
     }));
-    // **A train that does not close, recorded as it currently answers.** A
-    // ratio needs tooth counts and topology; neither of these fixtures has
-    // anything wrong with its kinematics. The first says what a set with no
-    // admissible planet shift reports, and the second says what it costs the
-    // stage beside it — a pair that closes perfectly well and loses its ratio
-    // to a neighbour that does not. Both are the fault
-    // `geartrain-refactor-plan.md` opens with, and they are here so that fixing
-    // it is a diff in this file rather than an assertion about one.
+    // **A train with a part that does not close.** Neither fixture has a
+    // kinematic fault. The first is a set with no admissible planet shift. The
+    // second shows that such a part costs the whole train its answer: the pair
+    // beside it closes, yet loses its ratio too. The golden output records
+    // this, so a fix shows up as a diff here.
     out.push(("unclosed".to_string(), train(vec![unclosed()])));
     out.push((
         "chain-unclosed".to_string(),

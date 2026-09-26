@@ -22,11 +22,9 @@
 //! kinematics (a *slot*, ground 0); a body two parts list is where they meet,
 //! and nothing but the body says so. "Input" and "output" are not names here: they are *readings* of
 //! a load case — a loaded body is where power comes in, and which body
-//! power leaves by is a result. That is the handoff's point about mobility
-//! above one taken seriously: two drives and one load, and one drive with two
-//! loads, are the same kinematic object, and asking the designer to declare
-//! which is which as structure would be asking them to tell the model what it
-//! is about to work out.
+//! power leaves by is a result. With mobility above one, two drives and one
+//! load, and one drive with two loads, are the same kinematic object, so the
+//! designer is never asked to declare which is which as structure.
 //!
 //! # The chain is a constructor, not a rule
 //!

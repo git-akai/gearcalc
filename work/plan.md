@@ -63,7 +63,22 @@ redesigns below replace roughly 45 audit tasks and delete more code than they ad
 | **V — one validator table** (PC R5) | One validator for every kind of input, each refusal keyed by its field. | T01.2, T13.1, T14.6, T01.6/8/9, T05.8, T13.5, parts of T02.6/7. |
 | **N — one train tolerance module** (PC R8) | Relative, power-normalised zero tests with their derivation stated. | T11.10 b4, T15.7, T15.12, T16.28. |
 
-**Reviewed and not worth doing** (U):
+**Reviewed and not taken as proposed** (U; owner's rulings 2026-09-26):
+- **One efficiency model — taken after all.** The parallel closed form becomes the exact value of
+  the same path integral the crossed mesh uses. A law holds the two to agree, so there is one model
+  with a fast closed-form route. This lands inside redesign **L**.
+- **One contact geometry — still wanted in principle; investigate alternatives (spike S-C).** A
+  general numerical tooth-contact analysis is rejected: parallel gearing is not a uniform Σ → 0 limit
+  of crossed (second-order distance law, 1-D vs 2-D contact, a face-bounded boundary layer). The
+  spike looks for a model that holds both, need not be a published standard, and is accepted if its
+  reasoning is sound and its results agree with both closed forms where they apply. Candidates:
+  - a face-sliced contact field, with each slice a signed-curvature Hertz contact;
+  - the parallel mesh written as the crossed model with its face bound carried explicitly;
+  - a line contact taken as the elliptical limit along the instantaneous contact lines.
+  Until a candidate passes, the core `Path` interface unifies the two, and the differences between
+  them are recorded with size and sign.
+
+Rejected, as recommended:
 - One geometry for line and point contact. The interface is unified instead, through a core `Path`
   trait.
 - A general contact-analysis engine.
@@ -92,7 +107,28 @@ These settle the open choices the audit left (PC-13, PC-35). Each is applied onc
    a named key.
 7. **The register gate names a command.** CI re-runs it when the files it covers change (PC-36).
 8. **Priority follows the verifier's severity, not the auditor's.**
-9. **`handoff_inbound/` stays**: it is the source of the seven regression fixtures.
+9. **The train graph is a known structure, handled by known methods**, even where they are more
+   than today's trains need.
+   - Representation: the kinematic graph of gear-train theory (Buchsbaum–Freudenstein / Tsai).
+     Links are vertices; gear pairs and turning pairs are edges labelled by axis. Fundamental
+     circuits and transfer vertices come from this representation.
+   - Algorithms: standard graph algorithms, named in the code — union–find, Tarjan's strongly
+     connected components, Hopcroft–Karp matching, Dulmage–Mendelsohn decomposition.
+   - Each algorithm is written once, in `structure.rs`, with its reference. Nothing is ad hoc.
+10. **Gears are stand-alone entities; a mesh is the link between two of them.**
+    - A gear's form, options and checks belong to the gear, and it never reads its mate.
+    - Whatever needs both gears (distance, play, clearance, contact) lives on the mesh.
+    - Where a gear depends on its mate today, a small rewrite is preferred over a small dependency.
+      Redesigns **K** (thickness is the member's) and **R** (clearance is the mesh's) follow this.
+11. **Units are checked for intent before they change.** Some millimetre figures are deliberate:
+    axis distance, for one.
+    - No value moves between mm and module without confirming, from its history, docs and use, that
+      mm was not chosen on purpose.
+    - Candidates: the 0.02 ± 0.02 mm clearance band, the worm's 0.04 mm axial clearance, the
+      1.75 mm pin, the 7 mm worm.
+    - The module-scaling law scales the mm fields too. It tests the model's homogeneity, not what the
+      defaults should be.
+12. **`handoff_inbound/` stays**: it is the source of the seven regression fixtures.
    `geartrain-refactor-*.md` are deleted, as they promise; this is T18.
 
 ## 3. Order of work
@@ -124,6 +160,10 @@ absences of PC-31. Also PC-30's silent `teeth.max(1)` clamps, which become refus
 - Each redesign lands in behaviour-neutral steps under the identity harness, then with its intended
   number changes recorded in the corpus.
 - T14.5's split of `train/mod.rs` runs before C.
+- Spike **S-C** (unified contact geometry) runs as a research track beside G/R/L. It uses Python
+  prototypes against both closed forms and produces a report before any code lands. If it succeeds,
+  it replaces the `Path` interface's two implementations.
+- Before C, `structure.rs` puts the train into the kinematic-graph representation (principle 9).
 
 **Stage 4 — The audit's remaining Phase 4 tasks** that no redesign replaced: rating, metrology, edits,
 numerics, dead code, the CLI harness and the UI. Afterwards: re-run mutation testing (target ≥ 92 %
@@ -159,3 +199,10 @@ caught, test workspace included) and the 130-constant perturbation.
 ## 5. Change log
 
 - 2026-09-26 — plan written after the four-way review.
+- 2026-09-26 — owner's rulings:
+  - Redesigns first.
+  - Docs and comments rewritten concisely, overriding `CLAUDE.md`'s prose-ratio note.
+  - Rules of thumb exposed as options in the core and the UI.
+  - `geartrain-refactor-*.md` deleted; `handoff_inbound/` kept.
+  - One efficiency model taken; contact-geometry spike S-C added.
+  - Principles 9–11 (graph, gears as entities, units) added.
