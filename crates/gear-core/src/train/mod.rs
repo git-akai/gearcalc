@@ -66,7 +66,7 @@ pub use conditions::{
 
 use crate::kinematics::{Body, Condition, GROUND};
 pub use arrangements::{Preset, PresetFamily};
-pub use edits::{Edit, EditRefused, Piece, Place};
+pub use edits::{Edit, EditRefused, Invariant, Piece, Place};
 pub use groupings::{AxisBody, AxisGroup, Centre, FlowRow, Groupings};
 pub use offers::{Offer, Target};
 pub(crate) use pair::ShiftAsked;

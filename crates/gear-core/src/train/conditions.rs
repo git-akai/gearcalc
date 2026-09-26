@@ -299,7 +299,7 @@ impl Train {
     /// **The bodies numbered densely**, in order, every number nothing
     /// names given up — what every remove ends with, so a body's number is
     /// its place in the list as a gear's is.
-    fn prune(&mut self) {
+    fn prune(&mut self) -> Vec<Option<usize>> {
         let max = self.max_body();
         let named: Vec<bool> = (0..=max)
             .map(|b| {
@@ -326,9 +326,10 @@ impl Train {
             })
             .collect();
         if map.iter().enumerate().all(|(b, m)| *m == Some(b)) {
-            return;
+            return map;
         }
         self.renumber(|b| map.get(b).copied().flatten());
+        map
     }
 
     /// **What a case or a hold names that the graph has not**, dropped: a
@@ -344,9 +345,10 @@ impl Train {
         }
         for case in &mut self.load_cases {
             case.loads.retain(|l| listed(l.at));
+            let reaction = sweep_body(&case.loads);
             if let super::Duty::Intermittent { at, .. } = &mut case.duty {
                 if !listed(*at) {
-                    *at = GROUND;
+                    *at = reaction.unwrap_or(*at);
                 }
             }
         }
@@ -873,6 +875,19 @@ impl Train {
         if !named(a) || !named(b) {
             return Err(super::EditRefused::NoSuchIndex);
         }
+        // A body held made one with a body a case loads or reacts at would
+        // ground the load: the case would say two things of one body.
+        let held = |x: usize| self.held.contains(&x);
+        let said = |x: usize| {
+            self.load_cases.iter().any(|c| {
+                c.loads
+                    .iter()
+                    .any(|l| l.at == x && l.role != super::LoadRole::Free)
+            })
+        };
+        if (held(a) && said(b)) || (held(b) && said(a)) {
+            return Err(super::EditRefused::Loaded);
+        }
         // A part with both would have one body at two of its slots, which
         // is a mesh or a carrier turning against itself: not a body.
         let both = |p: &Part| p.shape.slot_if_any(a).is_some() && p.shape.slot_if_any(b).is_some();
@@ -910,7 +925,7 @@ impl Train {
             case.loads
                 .retain(|l| !((l.at == a || l.at == b) && l.role == super::LoadRole::Free));
         }
-        self.merge(a, b);
+        let _ = self.merge(a, b);
         Ok(())
     }
 
@@ -922,7 +937,7 @@ impl Train {
     /// and distance on the later moved to the earlier, whose reading stands
     /// ([`Shape::merge_axes`]) — and the body is listed once, where it was
     /// first listed, so each part keeps the order it numbers its bodies in.
-    fn merge(&mut self, a: usize, b: usize) {
+    fn merge(&mut self, a: usize, b: usize) -> impl Fn(usize) -> usize {
         self.keep_orders(a, b);
         let axis =
             |s: &Shape, body: usize| s.bodies.iter().find(|x| x.body == body).map(|x| x.axis);
@@ -951,7 +966,14 @@ impl Train {
         }
         self.held.sort_unstable();
         self.held.dedup();
-        self.prune();
+        if self.held.contains(&a) {
+            self.settle_held(a);
+        }
+        let map = self.prune();
+        move |x: usize| {
+            let x = if x == b { a } else { x };
+            map.get(x).copied().flatten().unwrap_or(x)
+        }
     }
 
     /// **Every part keeps the order it numbers its bodies in** through a
@@ -1048,6 +1070,15 @@ impl Train {
     /// goes with it: a held body is fixed, and no case can say anything of
     /// it.
     pub fn hold(&mut self, body: usize) {
+        self.settle_held(body);
+    }
+
+    /// **The one way a hold is written**: the body held, every case entry
+    /// at it dropped, and a sweep measured there moved to the case's
+    /// reaction by [`sweep_body`]'s rule — a case with no entry left keeps
+    /// its sweep where it was, having nothing to rate. Every edit that
+    /// leaves a body held ends here.
+    fn settle_held(&mut self, body: usize) {
         if body == GROUND {
             return;
         }
@@ -1056,6 +1087,12 @@ impl Train {
         }
         for case in &mut self.load_cases {
             case.loads.retain(|l| l.at != body);
+            let reaction = sweep_body(&case.loads);
+            if let super::Duty::Intermittent { at, .. } = &mut case.duty {
+                if *at == body {
+                    *at = reaction.unwrap_or(*at);
+                }
+            }
         }
     }
 
@@ -1081,7 +1118,8 @@ impl Train {
     }
 
     /// **A fresh case of this kind along the headline case's path** — or,
-    /// on a train with no case, between the chain's two ends: a torque at
+    /// on a train with no case, between the chain's two ends, or its first
+    /// and last open ports where it has no chain's ends: a torque at
     /// the first, driven at a speed, reacted at the second, the duty's sweep
     /// measured at the second — the case a panel's button adds, **switched
     /// off**, so a case added at its default figures moves no rating until
@@ -1090,7 +1128,15 @@ impl Train {
     /// to take up or the designer to move.
     #[must_use]
     pub fn fresh_case(&self, kind: super::CaseKind, torque: f64, speed: f64) -> super::LoadCase {
-        let ends = self.headline().or_else(|| self.chain_ends());
+        let open: Vec<usize> = self.open_ports().iter().map(|p| p.body).collect();
+        let first_and_last = match open.as_slice() {
+            [a, .., b] => Some((*a, *b)),
+            _ => None,
+        };
+        let ends = self
+            .headline()
+            .or_else(|| self.chain_ends())
+            .or(first_and_last);
         let (input, output) = ends.unwrap_or_else(|| {
             let parked = self.parked();
             match parked.as_slice() {
@@ -1104,6 +1150,17 @@ impl Train {
             super::CaseKind::Fatigue => super::LoadCase::fatigue(input, output, torque, speed),
         };
         case.enabled = false;
+        // On a train with gears, a case names its open ports and nothing
+        // else: with fewer than two, it has fewer entries.
+        if !self.shape.members.is_empty() {
+            case.loads.retain(|l| open.contains(&l.at));
+            let reaction = sweep_body(&case.loads);
+            if let super::Duty::Intermittent { at, .. } = &mut case.duty {
+                if !open.contains(at) {
+                    *at = reaction.unwrap_or(GROUND);
+                }
+            }
+        }
         case
     }
 
@@ -1142,17 +1199,13 @@ impl Train {
     /// **A case's duty switched**, to intermittent or continuous, seeded from
     /// the same numbers a fresh case starts with: a thousand sweeps of 25°,
     /// measured at the case's reaction — its first reacted entry, else its
-    /// first entry of any kind, else ground — or a thousand hours.
+    /// first entry of any kind, else ground — or a thousand hours. A body
+    /// only the old sweep named is given up, and the numbers close up.
     pub fn set_duty(&mut self, case: usize, intermittent: bool) {
         let Some(c) = self.load_cases.get_mut(case) else {
             return;
         };
-        let at = c
-            .loads
-            .iter()
-            .find(|l| l.role == super::LoadRole::Reacted)
-            .or_else(|| c.loads.first())
-            .map_or(GROUND, |l| l.at);
+        let at = sweep_body(&c.loads).unwrap_or(GROUND);
         c.duty = if intermittent {
             super::Duty::intermittent(at)
         } else {
@@ -1160,6 +1213,7 @@ impl Train {
                 runtime_hours: 1000.0,
             }
         };
+        let _ = self.prune();
     }
 
     /// **A shape appended to the train and joined onward** — a preset's,
@@ -1193,20 +1247,20 @@ impl Train {
             }
         });
         let (input, output) = self.lay(shape);
-        let body = |train: &Self, entry: usize| train.shape.bodies[entry].body;
         if k == 0 {
             // Taken up as they were: a reaction parked at the output is a
             // reaction at the shape's, not a body two parts share. Each
-            // merge closes the numbers up, so the second is read afresh.
+            // merge closes the numbers up, so the output is followed
+            // through the first and the parked list read afresh.
+            let mut output = output;
             if let Some(&a) = self.parked().first() {
-                self.merge(body(self, input), a);
+                output = self.merge(input, a)(output);
             }
             if let Some(&b) = self.parked().first() {
-                self.merge(body(self, output), b);
+                let _ = self.merge(output, b);
             }
             return;
         }
-        let (input, output) = (body(self, input), body(self, output));
         if let Some(from) = onward {
             for case in &mut self.load_cases {
                 for l in &mut case.loads {
@@ -1228,9 +1282,8 @@ impl Train {
     /// numbered after every body the train has, in its own slot order —
     /// slot `i` body `next + i - 1` — and what it holds by convention
     /// written as the train's holds, so from here on the train holds it
-    /// because it says so. Where its conventional input and output landed
-    /// in the graph's list of bodies, which no merge with a body nothing
-    /// lists reorders.
+    /// because it says so ([`Self::settle_held`]). The body numbers its
+    /// conventional input and output were given.
     fn lay(&mut self, mut shape: Shape) -> (usize, usize) {
         let next = self.max_body() + 1;
         let slots: Vec<usize> = shape.bodies.iter().map(|b| b.body).collect();
@@ -1238,14 +1291,11 @@ impl Train {
         let ports = shape.ports();
         let (input, output) = (ports.input(), ports.output());
         let held: Vec<usize> = ports.held.iter().map(|&slot| shape.body_at(slot)).collect();
-        let at = self.shape.bodies.len();
         self.shape.append(shape);
         for body in held {
-            if !self.held.contains(&body) {
-                self.held.push(body);
-            }
+            self.settle_held(body);
         }
-        (at + input - 1, at + output - 1)
+        (next + input - 1, next + output - 1)
     }
 
     /// **A shape laid in at a body** ([`super::Edit::Insert`]): its
@@ -1262,7 +1312,6 @@ impl Train {
         }
         let mut t = self.clone();
         let (input, _) = t.lay(shape);
-        let input = t.shape.bodies[input].body;
         t.try_join(at, input)?;
         *self = t;
         Ok(())
@@ -1284,6 +1333,49 @@ impl Train {
     ///
     /// [`super::EditRefused`], the train unchanged.
     pub fn edit(&mut self, edit: super::Edit) -> Result<(), super::EditRefused> {
+        // An edit keeps a well-formed train well formed ([`Self::check`]).
+        let asked = (cfg!(debug_assertions) && self.check().is_ok()).then(|| edit.clone());
+        let before = self.clone();
+        let made = self.make(edit).and_then(|()| self.keeps_its_loads());
+        if made.is_err() {
+            *self = before;
+        }
+        debug_assert!(
+            asked.is_none() || self.check().is_ok(),
+            "{asked:?} broke {:?}",
+            self.check()
+        );
+        made
+    }
+
+    /// **No case's load or reaction left where no load can enter**: an
+    /// edit that leaves a body a case loads or reacts at listed but no
+    /// open port — held, or in no part — is refused, since the load would
+    /// be grounded or cut off and a load is never moved to a guessed body.
+    /// A free entry there is dropped: it says what saying nothing says.
+    fn keeps_its_loads(&mut self) -> Result<(), super::EditRefused> {
+        if self.shape.members.is_empty() {
+            return Ok(());
+        }
+        let open: Vec<usize> = self.open_ports().iter().map(|p| p.body).collect();
+        let listed = |b: usize| self.shape.bodies.iter().any(|x| x.body == b);
+        let stranded = |l: &super::Load| listed(l.at) && !open.contains(&l.at);
+        let said = |l: &super::Load| l.role != super::LoadRole::Free;
+        if self
+            .load_cases
+            .iter()
+            .any(|c| c.loads.iter().any(|l| stranded(l) && said(l)))
+        {
+            return Err(super::EditRefused::Loaded);
+        }
+        for case in &mut self.load_cases {
+            case.loads.retain(|l| !stranded(l));
+        }
+        Ok(())
+    }
+
+    /// [`Self::edit`], unchecked: each edit's own rule.
+    fn make(&mut self, edit: super::Edit) -> Result<(), super::EditRefused> {
         use super::Edit;
         match edit {
             Edit::Join { a, b } => self.try_join(a, b),
@@ -1302,6 +1394,11 @@ impl Train {
             edit => {
                 let next = self.max_body() + 1;
                 self.shape.apply(&edit, next)?;
+                // An empty graph lists nothing: its cases wait by number
+                // for the next preset laid in ([`Self::chain_on`]).
+                if self.shape.members.is_empty() {
+                    self.shape = Shape::default();
+                }
                 self.drop_bare();
                 self.drop_orphans();
                 self.prune();
@@ -1309,4 +1406,14 @@ impl Train {
             }
         }
     }
+}
+
+/// **Where a case's sweep is measured by default**: its first reacted
+/// entry, else its first entry — `None` for a case with none.
+fn sweep_body(loads: &[super::Load]) -> Option<usize> {
+    loads
+        .iter()
+        .find(|l| l.role == super::LoadRole::Reacted)
+        .or_else(|| loads.first())
+        .map(|l| l.at)
 }

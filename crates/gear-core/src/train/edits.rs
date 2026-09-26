@@ -145,6 +145,15 @@ pub enum EditRefused {
     Geared,
     /// Two bodies an axis distance apart made one: a shaft is straight.
     Apart,
+    /// A body a case loads or reacts at left held or in no part — joined
+    /// to a held body, or its coupling taken: the load would be grounded
+    /// or cut off, and a load is never moved to a guessed body.
+    Loaded,
+    /// **A gear meshing in two frames** — a gear on a fixed axis meshing a
+    /// sun or a ring whose other mates ride a carrier — which the wiring
+    /// cannot hold: it gives each member one frame. A frame per mesh would
+    /// let it stand.
+    TwoFrames,
 }
 
 impl EditRefused {
@@ -164,6 +173,8 @@ impl EditRefused {
             Self::NoDistance => "ui.train_edit_refused_no_distance",
             Self::Geared => "ui.train_edit_refused_geared",
             Self::Apart => "ui.train_edit_refused_apart",
+            Self::Loaded => "ui.train_edit_refused_loaded",
+            Self::TwoFrames => "ui.train_edit_refused_two_frames",
         }
     }
 }
@@ -181,6 +192,8 @@ impl std::fmt::Display for EditRefused {
             Self::NoDistance => "no axis distance joins those axes",
             Self::Geared => "those bodies are geared to each other",
             Self::Apart => "those bodies are an axis distance apart",
+            Self::Loaded => "a case loads or reacts at a body this would hold or cut off",
+            Self::TwoFrames => "that gear would mesh in two frames",
         })
     }
 }
@@ -210,7 +223,8 @@ impl Shape {
     /// **An edit made whole or not at all**: on a copy, kept where it
     /// refuses nothing and leaves every planet that ran at a radius still
     /// running at one — a carried axis a gear is on meeting a gear on its
-    /// carrier's axis, the mesh its radius is read from.
+    /// carrier's axis, the mesh its radius is read from — and every mesh
+    /// that had a kind and a frame still having them ([`Self::meshes_whole`]).
     fn transact(
         &mut self,
         edit: impl FnOnce(&mut Self) -> Result<(), EditRefused>,
@@ -220,7 +234,26 @@ impl Shape {
         if self.planets_at_a_radius() && !s.planets_at_a_radius() {
             return Err(EditRefused::LastOnItsStep);
         }
+        if self.meshes_whole().is_ok() {
+            s.meshes_whole()?;
+        }
         *self = s;
+        Ok(())
+    }
+
+    /// **Every mesh has a kind and a frame**: a ring on crossed shafts has
+    /// no kind the screw model holds ([`Self::kind_of`]), and a member
+    /// meshing in two frames none the wiring holds ([`super::Wiring::frame`]).
+    fn meshes_whole(&self) -> Result<(), EditRefused> {
+        let wiring = self.wiring();
+        for k in 0..self.meshes.len() {
+            if self.kind_of(k).is_none() {
+                return Err(EditRefused::WrongFamily);
+            }
+            if wiring.frame(k).is_err() {
+                return Err(EditRefused::TwoFrames);
+            }
+        }
         Ok(())
     }
 
@@ -825,64 +858,174 @@ impl Shape {
     }
 }
 
-/// **What every edit leaves**: nothing hanging — every gear on a body
-/// on an axis and in a mesh, every mesh across a distance between two
-/// axes, one distance per pair of axes and each carrying a mesh, no
-/// axis with nothing on it, every carried axis carried by a body on
-/// another, and every hold at a body the graph has.
-#[cfg(test)]
-pub(super) fn well_formed(t: &super::Train) -> Result<(), String> {
-    let s = &t.shape;
-    let axis_of = |body: usize| s.bodies.iter().find(|b| b.body == body).map(|b| b.axis);
-    for b in &s.bodies {
-        if b.axis >= s.axes.len() {
-            return Err(format!("body {} on no axis", b.body));
+/// **An invariant of a well-formed train, broken**, naming what breaks
+/// it — what [`super::Train::check`] finds.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Invariant {
+    /// A body listed on an axis the graph has not.
+    BodyOnNoAxis(usize),
+    /// A body listed twice.
+    BodyListedTwice(usize),
+    /// A member on a body the graph does not list.
+    MemberOnNoBody(usize),
+    /// A member in no mesh.
+    MemberInNoMesh(usize),
+    /// A mesh whose two members are on one axis.
+    MeshOnOneAxis(usize),
+    /// A mesh across no axis distance.
+    MeshAcrossNoDistance(usize),
+    /// An axis distance with no mesh across it.
+    DistanceWithNoMesh(usize),
+    /// An axis distance stated twice.
+    DistanceTwice(usize),
+    /// An axis with no body and no distance.
+    AxisWithNothing(usize),
+    /// A carried axis whose carrier is on no other axis.
+    CarriedByNothing(usize),
+    /// An axis carried round, through its carriers, by itself.
+    CarriedInACycle(usize),
+    /// A planet gear meeting nothing on its carrier's axis.
+    PlanetMeetsNothing,
+    /// A graph with no member that still lists a body: an empty train
+    /// lists nothing, and its cases wait by number.
+    ListedWhileEmpty(usize),
+    /// A hold at a body the graph does not list.
+    HoldUnlisted(usize),
+    /// A case entry at a body that is not an open port of a train with
+    /// members.
+    EntryNotOpen { case: usize, body: usize },
+    /// Two entries of one case at one body.
+    EntryTwice { case: usize, body: usize },
+    /// A case with entries whose sweep is measured at a body that is not
+    /// an open port.
+    SweepNotOpen { case: usize, body: usize },
+    /// A number below the largest that nothing names.
+    NumberGap(usize),
+}
+
+impl super::Train {
+    /// **Whether the train is well formed** — what every edit keeps.
+    ///
+    /// The graph has nothing hanging: every gear on a listed body on an
+    /// axis and in a mesh, every mesh across a distance between two axes,
+    /// one distance per pair of axes and each carrying a mesh, no axis with
+    /// nothing on it, every carried axis carried by a body on another and
+    /// no carrier carried by what it carries, every planet meeting its
+    /// carrier's axis; and a graph with no member lists nothing.
+    ///
+    /// What hangs off it names it rightly: every hold at a listed body;
+    /// on a train with members, every case entry and every sweep of a case
+    /// with entries at an open port, and no case with two entries at one
+    /// body; and the body numbers dense, every one from 1 to the largest
+    /// named by the graph, a hold or a case.
+    ///
+    /// # Errors
+    ///
+    /// The first [`Invariant`] broken.
+    pub fn check(&self) -> Result<(), Invariant> {
+        let s = &self.shape;
+        let axis_of = |body: usize| s.bodies.iter().find(|b| b.body == body).map(|b| b.axis);
+        for (i, b) in s.bodies.iter().enumerate() {
+            if b.axis >= s.axes.len() {
+                return Err(Invariant::BodyOnNoAxis(b.body));
+            }
+            if s.bodies[..i].iter().any(|x| x.body == b.body) {
+                return Err(Invariant::BodyListedTwice(b.body));
+            }
         }
+        for (i, m) in s.members.iter().enumerate() {
+            if axis_of(m.body).is_none() {
+                return Err(Invariant::MemberOnNoBody(i));
+            }
+            if !s.meshes.iter().any(|x| x.a == i || x.b == i) {
+                return Err(Invariant::MemberInNoMesh(i));
+            }
+        }
+        for (k, m) in s.meshes.iter().enumerate() {
+            if axis_of(s.members[m.a].body) == axis_of(s.members[m.b].body) {
+                return Err(Invariant::MeshOnOneAxis(k));
+            }
+            if s.distance_of(k).is_none() {
+                return Err(Invariant::MeshAcrossNoDistance(k));
+            }
+        }
+        for (d, x) in s.distances.iter().enumerate() {
+            if s.meshes_on(d).is_empty() {
+                return Err(Invariant::DistanceWithNoMesh(d));
+            }
+            let same =
+                |y: &super::shape::Distance| y.axes == x.axes || y.axes == [x.axes[1], x.axes[0]];
+            if s.distances.iter().filter(|y| same(y)).count() > 1 {
+                return Err(Invariant::DistanceTwice(d));
+            }
+        }
+        for (a, x) in s.axes.iter().enumerate() {
+            if !s.bodies.iter().any(|b| b.axis == a)
+                && !s.distances.iter().any(|d| d.axes.contains(&a))
+            {
+                return Err(Invariant::AxisWithNothing(a));
+            }
+            if x.carried_by != GROUND && axis_of(x.carried_by).is_none_or(|c| c == a) {
+                return Err(Invariant::CarriedByNothing(a));
+            }
+            // Down the carriers: ground within as many steps as there are
+            // axes, or round a cycle.
+            let mut at = a;
+            for _ in 0..=s.axes.len() {
+                match s.axes.get(at).map(|x| x.carried_by) {
+                    Some(GROUND) | None => break,
+                    Some(c) => at = axis_of(c).unwrap_or(usize::MAX),
+                }
+            }
+            if s.axes.get(at).is_some_and(|x| x.carried_by != GROUND) {
+                return Err(Invariant::CarriedInACycle(a));
+            }
+        }
+        if !s.planets_at_a_radius() {
+            return Err(Invariant::PlanetMeetsNothing);
+        }
+        if s.members.is_empty() {
+            if let Some(b) = s.bodies.first() {
+                return Err(Invariant::ListedWhileEmpty(b.body));
+            }
+        }
+        for &h in &self.held {
+            if axis_of(h).is_none() {
+                return Err(Invariant::HoldUnlisted(h));
+            }
+        }
+        if !s.members.is_empty() {
+            let open: Vec<usize> = self.open_ports().iter().map(|p| p.body).collect();
+            for (c, case) in self.load_cases.iter().enumerate() {
+                for (i, l) in case.loads.iter().enumerate() {
+                    let body = l.at;
+                    if !open.contains(&body) {
+                        return Err(Invariant::EntryNotOpen { case: c, body });
+                    }
+                    if case.loads[..i].iter().any(|x| x.at == body) {
+                        return Err(Invariant::EntryTwice { case: c, body });
+                    }
+                }
+                if let super::Duty::Intermittent { at, .. } = case.duty {
+                    if !case.loads.is_empty() && !open.contains(&at) {
+                        return Err(Invariant::SweepNotOpen { case: c, body: at });
+                    }
+                }
+            }
+        }
+        let named = |b: usize| {
+            axis_of(b).is_some()
+                || self.held.contains(&b)
+                || self.load_cases.iter().any(|c| {
+                    c.loads.iter().any(|l| l.at == b)
+                        || matches!(c.duty, super::Duty::Intermittent { at, .. } if at == b)
+                })
+        };
+        if let Some(b) = (1..=self.max_body()).find(|&b| !named(b)) {
+            return Err(Invariant::NumberGap(b));
+        }
+        Ok(())
     }
-    for (i, m) in s.members.iter().enumerate() {
-        if axis_of(m.body).is_none() {
-            return Err(format!("member {i} on no body"));
-        }
-        if !s.meshes.iter().any(|x| x.a == i || x.b == i) {
-            return Err(format!("member {i} in no mesh"));
-        }
-    }
-    for (k, m) in s.meshes.iter().enumerate() {
-        if axis_of(s.members[m.a].body) == axis_of(s.members[m.b].body) {
-            return Err(format!("mesh {k} on one axis"));
-        }
-        if s.distance_of(k).is_none() {
-            return Err(format!("mesh {k} across no distance"));
-        }
-    }
-    for (d, x) in s.distances.iter().enumerate() {
-        if s.meshes_on(d).is_empty() {
-            return Err(format!("distance {d} with no mesh"));
-        }
-        let same =
-            |y: &super::shape::Distance| y.axes == x.axes || y.axes == [x.axes[1], x.axes[0]];
-        if s.distances.iter().filter(|y| same(y)).count() > 1 {
-            return Err(format!("distance {d} stated twice"));
-        }
-    }
-    for (a, x) in s.axes.iter().enumerate() {
-        if !s.bodies.iter().any(|b| b.axis == a) && !s.distances.iter().any(|d| d.axes.contains(&a))
-        {
-            return Err(format!("axis {a} with nothing on it"));
-        }
-        if x.carried_by != GROUND && axis_of(x.carried_by).is_none_or(|c| c == a) {
-            return Err(format!("axis {a} carried by no body on another axis"));
-        }
-    }
-    for &h in &t.held {
-        if axis_of(h).is_none() {
-            return Err(format!("a hold at {h}, which the graph has not"));
-        }
-    }
-    if !s.planets_at_a_radius() {
-        return Err("a planet meeting nothing on its carrier's axis".into());
-    }
-    Ok(())
 }
 
 #[cfg(test)]
@@ -1614,7 +1757,8 @@ mod tests {
                             continue;
                         }
                         made += 1;
-                        well_formed(&u).unwrap_or_else(|e| panic!("{name}: {edit:?}: {e}"));
+                        u.check()
+                            .unwrap_or_else(|e| panic!("{name}: {edit:?}: {e:?}"));
                         // It solves, or says why — a lock by construction, a
                         // distance two groups cannot share — as a train does.
                         let _ = solve_train(&u, &lib);
@@ -1709,7 +1853,8 @@ mod tests {
                 }
                 made += 1;
                 assert_ne!(debug(&u), debug(&t), "{name}: {piece:?} took nothing");
-                well_formed(&u).unwrap_or_else(|e| panic!("{name}: {piece:?}: {e}"));
+                u.check()
+                    .unwrap_or_else(|e| panic!("{name}: {piece:?}: {e:?}"));
                 let _ = solve_train(&u, &lib);
             }
         }
@@ -1735,7 +1880,7 @@ mod tests {
         assert_eq!((t.parts().len(), t.shape.axes.len()), (2, 4));
         let mut u = t.clone();
         u.edit(Edit::Join { a: 2, b: 3 }).unwrap();
-        well_formed(&u).unwrap();
+        u.check().unwrap();
         assert_eq!(
             (u.parts().len(), u.shape.axes.len(), u.shape.bodies.len()),
             (2, 3, 3)
@@ -1772,7 +1917,7 @@ mod tests {
             at: Some(1),
         })
         .unwrap();
-        well_formed(&t).unwrap();
+        t.check().unwrap();
         assert_eq!(t.parts().len(), 2);
         assert_eq!(t.ends_of(1).len(), 2, "the input shaft carries both");
         solve_train(&t, &library()).unwrap();
@@ -1862,7 +2007,8 @@ mod tests {
                 shared,
             })
             .unwrap();
-            well_formed(&u).unwrap_or_else(|e| panic!("sharing {shared}: {e}"));
+            u.check()
+                .unwrap_or_else(|e| panic!("sharing {shared}: {e:?}"));
             let n = u.shape.members.len();
             assert_eq!(u.shape.members[n - 2].body, shared, "on the body asked");
         }

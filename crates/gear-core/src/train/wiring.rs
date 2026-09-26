@@ -30,12 +30,14 @@
 //! — they share an axis — and naming the carrier is what leaves the intersection
 //! with a planet's frame a single body.
 //!
-//! **The one thing this cannot express** is a member central to *two different
-//! carriers*, which would need a set of frames rather than one. No arrangement
-//! in scope has it: a Ravigneaux has one carrier with two planet sets, and a
-//! Simpson is two sets coupled body to body. If one arrives, the field
-//! becomes a list and the frame becomes the intersection — the same derivation,
-//! one type wider.
+//! **The one thing this cannot express** is a member meshing in *two frames*
+//! — central to two carriers, or a sun or a ring that also meshes a gear on a
+//! fixed axis — which needs a frame per mesh rather than one per member. No
+//! preset has it (a Ravigneaux has one carrier with two planet sets, and a
+//! Simpson is two sets coupled body to body), but the graph's edits can reach
+//! it, so an edit that would build one is refused
+//! ([`super::EditRefused::TwoFrames`]). A frame per mesh — the intersection of
+//! the frames its two members' axes stand still in — would let it stand.
 //!
 //! # The sign is the mesh kind's
 //!

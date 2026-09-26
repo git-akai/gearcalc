@@ -142,7 +142,7 @@ impl Train {
     /// **Each case's flow** — see [the module](self) — in the train's case
     /// order: from the case's first load, down every mesh that carries
     /// power, most first, a mesh that carries none an idle branch; and then
-    /// from every body no walk has reached, so every body appears once. A
+    /// from every body no walk has reached, so every body and every mesh appears once. A
     /// case the train did not rate has no shares to read, and its flow is
     /// the graph's walk with every mesh carrying.
     #[must_use]
@@ -241,9 +241,15 @@ impl Train {
         };
         let idle = |p: Option<f64>| p.is_some_and(|p| p < 1e-9);
 
+        // **Filtered by the pieces said, not the bodies seen**: a step is
+        // taken once whatever its far end, so a mesh or a junction whose
+        // every far end is said already — held, orbiting, reached another
+        // way — is still said.
         let mut rows = Vec::new();
         let mut seen: Vec<usize> = Vec::new();
         let mut junctions: Vec<usize> = Vec::new();
+        let mut said_meshes: Vec<usize> = Vec::new();
+        let mut said_couplings: Vec<usize> = Vec::new();
         let start = self.load_cases.get(case).and_then(|c| {
             c.loads
                 .iter()
@@ -267,9 +273,10 @@ impl Train {
                 rows.push(FlowRow::Body { body: b });
                 let mut steps: Vec<(Step, usize, Option<f64>)> = steps_from(b)
                     .into_iter()
-                    .filter(|(step, to, _)| {
-                        !seen.contains(to)
-                            && !matches!(step, Step::Junction(p) if junctions.contains(p))
+                    .filter(|(step, _, _)| match *step {
+                        Step::Mesh(k) => !said_meshes.contains(&k),
+                        Step::Junction(p) => !junctions.contains(&p),
+                        Step::Coupling(c) => !said_couplings.contains(&c),
                     })
                     .collect();
                 steps.sort_by(|x, y| {
@@ -280,10 +287,12 @@ impl Train {
                 for (step, to, power) in &steps {
                     match *step {
                         Step::Mesh(k) if idle(*power) => {
+                            said_meshes.push(k);
                             rows.push(FlowRow::Idle { mesh: k, to: *to });
                             branches.push(*to);
                         }
                         Step::Mesh(k) => {
+                            said_meshes.push(k);
                             rows.push(FlowRow::Mesh { mesh: k, to: *to });
                             onward.push(*to);
                         }
@@ -327,6 +336,7 @@ impl Train {
                             }
                         }
                         Step::Coupling(c) => {
+                            said_couplings.push(c);
                             rows.push(FlowRow::Coupling {
                                 coupling: c,
                                 to: *to,
@@ -340,8 +350,95 @@ impl Train {
                 }
             }
         }
+        // A junction no body leads into — every body it joins orbits — is
+        // said last, so every mesh is said.
+        for p in 0..parts.len() {
+            let meshes: Vec<usize> = (0..s.meshes.len())
+                .filter(|&k| junction_of[k] == Some(p))
+                .collect();
+            if !meshes.is_empty() && !junctions.contains(&p) {
+                rows.push(FlowRow::Junction {
+                    part: p,
+                    meshes,
+                    terminals: terminals(p),
+                });
+            }
+        }
         rows
     }
+}
+
+/// **A case's flow says every body once and every mesh once**, and
+/// starts where the case's load goes in: a body in a row of its own, or
+/// said at the end of a step or inside the junction it orbits in or ends
+/// at; a mesh as a step, an idle branch or inside its junction.
+#[cfg(test)]
+pub(super) fn says_everything_once(t: &Train, r: &TrainResult) -> Result<(), String> {
+    let parts = t.parts();
+    let mut all: Vec<usize> = t.shape.bodies.iter().map(|b| b.body).collect();
+    all.sort_unstable();
+    for (c, rows) in t.flows(r).iter().enumerate() {
+        let mut bodies: Vec<usize> = rows
+            .iter()
+            .filter_map(|row| match row {
+                FlowRow::Body { body } => Some(*body),
+                _ => None,
+            })
+            .collect();
+        let load = t.load_cases[c]
+            .loads
+            .iter()
+            .find(|l| l.is_load())
+            .map(|l| l.at)
+            .filter(|b| all.contains(b));
+        if load.is_some() && bodies.first().copied() != load {
+            return Err(format!("case {c} does not start at its load: {rows:?}"));
+        }
+        bodies.sort_unstable();
+        let before = bodies.len();
+        bodies.dedup();
+        if bodies.len() != before {
+            return Err(format!("case {c}: a body twice: {rows:?}"));
+        }
+        let mut said: Vec<usize> = rows
+            .iter()
+            .flat_map(|row| match row {
+                FlowRow::Body { body } => vec![*body],
+                FlowRow::Idle { to, .. }
+                | FlowRow::Coupling { to, .. }
+                | FlowRow::Mesh { to, .. } => {
+                    vec![*to]
+                }
+                FlowRow::Junction {
+                    part, terminals, ..
+                } => terminals
+                    .iter()
+                    .copied()
+                    .chain(parts[*part].shape.bodies.iter().map(|b| b.body))
+                    .collect(),
+            })
+            .collect();
+        said.sort_unstable();
+        said.dedup();
+        if said != all {
+            return Err(format!(
+                "case {c}: bodies said {said:?} of {all:?}: {rows:?}"
+            ));
+        }
+        let mut meshes: Vec<usize> = rows
+            .iter()
+            .flat_map(|row| match row {
+                FlowRow::Mesh { mesh, .. } | FlowRow::Idle { mesh, .. } => vec![*mesh],
+                FlowRow::Junction { meshes, .. } => meshes.clone(),
+                FlowRow::Body { .. } | FlowRow::Coupling { .. } => Vec::new(),
+            })
+            .collect();
+        meshes.sort_unstable();
+        if meshes != (0..t.shape.meshes.len()).collect::<Vec<_>>() {
+            return Err(format!("case {c}: meshes said {meshes:?}: {rows:?}"));
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -422,9 +519,8 @@ mod tests {
         assert!(matches!(rows[0], FlowRow::Body { body } if body == t.port(0, 1)));
     }
 
-    /// **A case's flow says every body once and every mesh once**, and
-    /// starts where the case's load goes in: a body in a row of its own,
-    /// or said inside the junction it orbits in or ends at.
+    /// **A case's flow says every body once and every mesh once**
+    /// ([`says_everything_once`]) on every preset alone and chained on.
     #[test]
     fn a_flow_says_every_body_and_every_mesh_once() {
         let lib = test_library();
@@ -432,64 +528,31 @@ mod tests {
             let Ok(r) = solve_train(&t, &lib) else {
                 continue;
             };
-            for (c, rows) in t.flows(&r).iter().enumerate() {
-                let mut bodies: Vec<usize> = rows
-                    .iter()
-                    .filter_map(|row| match row {
-                        FlowRow::Body { body } => Some(*body),
-                        _ => None,
-                    })
-                    .collect();
-                let first = bodies.first().copied();
-                let load = t.load_cases[c]
-                    .loads
-                    .iter()
-                    .find(|l| l.is_load())
-                    .unwrap()
-                    .at;
-                assert_eq!(first, Some(load), "{name}: case {c} starts at its load");
-                bodies.sort_unstable();
-                let before = bodies.len();
-                bodies.dedup();
-                assert_eq!(bodies.len(), before, "{name}: a body twice");
-                // ...and no body left unsaid: each in a row of its own, at
-                // the end of an idle branch, or inside a junction.
-                let parts = t.parts();
-                let mut said: Vec<usize> = rows
-                    .iter()
-                    .flat_map(|row| match row {
-                        FlowRow::Body { body } => vec![*body],
-                        FlowRow::Idle { to, .. } | FlowRow::Coupling { to, .. } => vec![*to],
-                        FlowRow::Junction {
-                            part, terminals, ..
-                        } => terminals
-                            .iter()
-                            .copied()
-                            .chain(parts[*part].shape.bodies.iter().map(|b| b.body))
-                            .collect(),
-                        FlowRow::Mesh { to, .. } => vec![*to],
-                    })
-                    .collect();
-                said.sort_unstable();
-                said.dedup();
-                let mut all: Vec<usize> = t.shape.bodies.iter().map(|b| b.body).collect();
-                all.sort_unstable();
-                assert_eq!(said, all, "{name}: case {c}: {rows:?}");
-                let mut meshes: Vec<usize> = rows
-                    .iter()
-                    .flat_map(|row| match row {
-                        FlowRow::Mesh { mesh, .. } | FlowRow::Idle { mesh, .. } => vec![*mesh],
-                        FlowRow::Junction { meshes, .. } => meshes.clone(),
-                        _ => Vec::new(),
-                    })
-                    .collect();
-                meshes.sort_unstable();
-                assert_eq!(
-                    meshes,
-                    (0..t.shape.meshes.len()).collect::<Vec<_>>(),
-                    "{name}: case {c}: {rows:?}"
-                );
-            }
+            says_everything_once(&t, &r).unwrap_or_else(|e| panic!("{name}: {e}"));
         }
+    }
+
+    /// **A part whose ends are all held is still said** — the hunter's
+    /// repro: a Wolfrom laid in at a Wolfrom's held ring, then one of its
+    /// meshes taken out. Both cases solve, and the flow once dropped the
+    /// second part's remaining mesh, since every body it reaches is held
+    /// or orbits.
+    #[test]
+    fn a_part_with_every_end_held_is_said() {
+        let lib = test_library();
+        let mut t = Train::chained(vec![Preset::Wolfrom.build()], |t| {
+            let (a, b) = t.chain_ends().unwrap();
+            vec![LoadCase::ultimate(a, b, 1.0, 1000.0)]
+        });
+        t.edit(super::super::Edit::Insert {
+            shape: Preset::Wolfrom.build(),
+            at: Some(2),
+        })
+        .unwrap();
+        t.edit(super::super::Edit::Remove(super::super::Piece::Mesh(3)))
+            .unwrap();
+        let r = solve_train(&t, &lib).unwrap();
+        assert!(r.cases.iter().all(|c| c.solved));
+        says_everything_once(&t, &r).unwrap();
     }
 }

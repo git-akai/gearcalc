@@ -28,3 +28,8 @@ typescript = ["dep:ts-rs", "serde"]
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+# The edit walk's round trip of a train through JSON, as the boundary
+# carries it; read only with the `serde` feature on.
+serde_json = "1"

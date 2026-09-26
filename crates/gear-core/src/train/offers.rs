@@ -240,23 +240,49 @@ mod tests {
     //! hold, removal, ratio, step, coupling and stage at every index — is
     //! offered at the piece it names.
 
-    use super::super::edits::well_formed;
-    use super::super::Shape;
+    use super::super::{solve_train, test_library, CaseKind, LoadCase, Shape, TrainError};
     use super::*;
+    use std::panic::{catch_unwind, AssertUnwindSafe};
 
+    /// The figures of the panel's fresh case: a load small enough that
+    /// every preset's teeth carry it, at a speed that counts cycles.
+    const TORQUE: f64 = 0.1;
+    const SPEED: f64 = 30_000.0;
+
+    /// **A train as the panel starts it**: its presets chained, an
+    /// ultimate and a fatigue case between the chain's two ends.
+    fn cased(stages: Vec<Shape>) -> Train {
+        Train::chained(stages, |t| {
+            t.chain_ends()
+                .map(|(a, b)| {
+                    vec![
+                        LoadCase::ultimate(a, b, TORQUE, SPEED),
+                        LoadCase::fatigue(a, b, TORQUE, SPEED),
+                    ]
+                })
+                .unwrap_or_default()
+        })
+    }
+
+    /// Every preset alone and after a pair, spur and with its first gear's
+    /// helix given, each with its conventional cases.
     fn trains() -> Vec<(String, Train)> {
         let mut out = Vec::new();
         for p in Preset::ALL {
             for before in [None, Some(Preset::Spur)] {
-                let stages: Vec<Shape> = before
-                    .into_iter()
-                    .chain(std::iter::once(p))
-                    .map(Preset::build)
-                    .collect();
-                out.push((
-                    format!("{p:?} after {before:?}"),
-                    Train::chained(stages, |_| Vec::new()),
-                ));
+                for helix in [None, Some(20.0)] {
+                    let last = p.build();
+                    let last = helix.map_or(last.clone(), |b| last.with_first_helix(b));
+                    let stages: Vec<Shape> = before
+                        .map(Preset::build)
+                        .into_iter()
+                        .chain(std::iter::once(last))
+                        .collect();
+                    out.push((
+                        format!("{p:?} after {before:?}, helix {helix:?}"),
+                        cased(stages),
+                    ));
+                }
             }
         }
         out
@@ -291,7 +317,7 @@ mod tests {
                     );
                     if offer.refused.is_none() {
                         assert!(!unchanged(&t, &u), "{context}: changes nothing");
-                        well_formed(&u).unwrap_or_else(|e| panic!("{context}: {e}"));
+                        u.check().unwrap_or_else(|e| panic!("{context}: {e:?}"));
                     }
                     offered += 1;
                 }
@@ -418,5 +444,334 @@ mod tests {
             }
         }
         assert!(made > 1000, "only {made} edits made");
+    }
+
+    /// **No offered gear meshes in two frames.** A gear on the input shaft
+    /// meshing a set's sun — which meshes its planets in the carrier's
+    /// frame — was offered and made, and the train then failed as a whole
+    /// with a wiring fault said to be a preset's. It is refused now, with
+    /// its own reason; the frame per mesh that would let it stand is the
+    /// graph's redesign.
+    #[test]
+    fn a_gear_meshing_in_two_frames_is_refused() {
+        let t = cased(vec![Preset::Spur.build(), Preset::Planetary.build()]);
+        let sun = t.member(1, 0);
+        let edit = Edit::AddGear {
+            mate: sun,
+            on: Place::Body(1),
+            ring: false,
+        };
+        let offer = t
+            .offers(Target::Member(sun))
+            .into_iter()
+            .find(|o| format!("{:?}", o.edit) == format!("{edit:?}"))
+            .unwrap();
+        assert_eq!(
+            offer.refused,
+            Some(Note::new("ui.train_edit_refused_two_frames"))
+        );
+    }
+
+    /// **A ring on crossed shafts is no mesh**, and is refused: the screw
+    /// model has no internal kind.
+    #[test]
+    fn a_ring_across_crossed_shafts_is_refused() {
+        let t = cased(vec![Preset::Worm.build()]);
+        let mut u = t.clone();
+        assert_eq!(
+            u.edit(Edit::AddGear {
+                mate: 0,
+                on: Place::Body(2),
+                ring: true,
+            }),
+            Err(super::super::EditRefused::WrongFamily)
+        );
+    }
+
+    /// A fixed linear congruential generator (Knuth's MMIX constants): the
+    /// walk's one source of choice, so a failure replays from its seed.
+    struct Lcg(u64);
+
+    impl Lcg {
+        fn pick(&mut self, n: usize) -> usize {
+            self.0 = self
+                .0
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            usize::try_from(self.0 >> 33).unwrap() % n.max(1)
+        }
+    }
+
+    /// Whether a solve failed as a wiring that describes no mechanism —
+    /// which an edit the graph offers must never make.
+    fn wiring(e: &TrainError) -> bool {
+        match e {
+            TrainError::Wiring(_) => true,
+            TrainError::InPart { cause, .. } => wiring(cause),
+            _ => false,
+        }
+    }
+
+    /// One step of a walk: a case added or its duty switched, a hold, a
+    /// release or a join at a body, or any offer the graph makes at any
+    /// piece — each as the panel asks it. `None` where the choice made
+    /// has nothing to offer.
+    fn step(t: &Train, rng: &mut Lcg, log: &mut Vec<String>) -> Option<Train> {
+        let mut u = t.clone();
+        match rng.pick(8) {
+            0 => {
+                let kind = [CaseKind::Ultimate, CaseKind::Fatigue][rng.pick(2)];
+                log.push(format!("fresh_case({kind:?})"));
+                let case = u.fresh_case(kind, TORQUE, SPEED);
+                u.load_cases.push(case);
+                Some(u)
+            }
+            1 if !u.load_cases.is_empty() => {
+                let (case, intermittent) = (rng.pick(u.load_cases.len()), rng.pick(2) == 0);
+                log.push(format!("set_duty({case}, {intermittent})"));
+                u.set_duty(case, intermittent);
+                Some(u)
+            }
+            2 | 3 if !u.shape.bodies.is_empty() => {
+                let b = u.shape.bodies[rng.pick(u.shape.bodies.len())].body;
+                let open: Vec<Edit> = t
+                    .offers(Target::Body(b))
+                    .into_iter()
+                    .filter(|o| o.refused.is_none())
+                    .map(|o| o.edit)
+                    .filter(|e| matches!(e, Edit::Hold(_) | Edit::Release(_) | Edit::Join { .. }))
+                    .collect();
+                let edit = open.get(rng.pick(open.len()))?.clone();
+                log.push(format!("{edit:?}"));
+                u.edit(edit).unwrap();
+                Some(u)
+            }
+            _ => {
+                let at = targets(t);
+                let at = at[rng.pick(at.len())];
+                let open: Vec<Offer> = t
+                    .offers(at)
+                    .into_iter()
+                    .filter(|o| o.refused.is_none())
+                    .collect();
+                let offer = open.get(rng.pick(open.len()))?;
+                let named = match &offer.edit {
+                    Edit::Insert { at, .. } => format!("Insert {:?} at {at:?}", offer.preset),
+                    e => format!("{e:?}"),
+                };
+                log.push(format!("{named} @ {at:?}"));
+                u.edit(offer.edit.clone()).unwrap();
+                Some(u)
+            }
+        }
+    }
+
+    /// What a walk asserts of the train after every step, `solved` saying
+    /// whether the train before it solved: the train well formed; offers
+    /// at the train and a solve that do not panic; a train that solved
+    /// kept solving or refused by a named reason other than a wiring that
+    /// describes no mechanism; every flow saying each body and mesh once;
+    /// and the train the same after a trip through JSON.
+    fn laws(t: &Train, solved: bool) -> Result<bool, String> {
+        let lib = test_library();
+        t.check().map_err(|e| format!("check: {e:?}"))?;
+        let _ = t.offers(Target::Train);
+        let r = solve_train(t, &lib);
+        match &r {
+            Err(e) if solved && wiring(e) => return Err(format!("solved, then {e:?}")),
+            Ok(r) => super::super::groupings::says_everything_once(t, r)?,
+            Err(_) => {}
+        }
+        #[cfg(feature = "serde")]
+        {
+            let json = serde_json::to_string(t).unwrap();
+            let back: Train = serde_json::from_str(&json).map_err(|e| format!("json: {e}"))?;
+            if serde_json::to_string(&back).unwrap() != json {
+                return Err("json: a round trip changed the train".into());
+            }
+        }
+        Ok(r.is_ok())
+    }
+
+    /// **A seeded walk over cased trains** — every start in [`trains`],
+    /// [`WALKS`] walks of [`DEPTH`] steps each ([`step`]) — the train
+    /// held to [`laws`] after every step, and the steps that led to any
+    /// failure printed. A walk crosses what one edit on a fresh preset
+    /// never reaches: an emptied train given a preset, a hold on a body a
+    /// case names, a join onto a held body.
+    #[test]
+    fn a_walk_of_offered_edits_keeps_the_train_whole() {
+        const WALKS: usize = 200;
+        const DEPTH: usize = 4;
+        let starts = trains();
+        let mut failures: Vec<String> = Vec::new();
+        for walk in 0..WALKS {
+            let (name, start) = &starts[walk % starts.len()];
+            let mut rng = Lcg(walk as u64);
+            let mut t = start.clone();
+            let mut steps: Vec<String> = Vec::new();
+            let mut solved = solve_train(&t, &test_library()).is_ok();
+            for _ in 0..DEPTH {
+                let made = catch_unwind(AssertUnwindSafe(|| {
+                    let u = step(&t, &mut rng, &mut steps)?;
+                    Some((laws(&u, solved), u))
+                }));
+                match made {
+                    Ok(None) => {}
+                    Ok(Some((held, u))) => match held {
+                        Ok(s) => (t, solved) = (u, s),
+                        Err(e) => {
+                            failures.push(format!("walk {walk}, {name}: {steps:?}: {e}"));
+                            break;
+                        }
+                    },
+                    Err(panic) => {
+                        let what = panic
+                            .downcast_ref::<String>()
+                            .cloned()
+                            .or_else(|| panic.downcast_ref::<&str>().map(ToString::to_string));
+                        failures.push(format!(
+                            "walk {walk}, {name}: {steps:?} then panicked: {what:?}"
+                        ));
+                        break;
+                    }
+                }
+            }
+        }
+        assert!(
+            failures.is_empty(),
+            "{} of {WALKS} walks failed:\n{}",
+            failures.len(),
+            failures.join("\n")
+        );
+    }
+
+    /// The train emptied by offered removals, each time the first (or the
+    /// last) one offered anywhere, until no gear is left.
+    fn emptied(mut t: Train, last: bool) -> Train {
+        while !t.shape.members.is_empty() {
+            let removals: Vec<Edit> = targets(&t)
+                .into_iter()
+                .flat_map(|at| t.offers(at))
+                .filter(|o| o.refused.is_none() && matches!(o.edit, Edit::Remove(_)))
+                .map(|o| o.edit)
+                .collect();
+            let edit = if last {
+                removals.last()
+            } else {
+                removals.first()
+            };
+            t.edit(edit.unwrap().clone()).unwrap();
+        }
+        t
+    }
+
+    /// What a case says, entry by entry, and where its sweep is measured.
+    fn said(t: &Train) -> Vec<String> {
+        t.load_cases
+            .iter()
+            .map(|c| {
+                let entries: Vec<_> = c.loads.iter().map(|l| (l.at, l.role)).collect();
+                format!("{entries:?}, {:?}", c.duty)
+            })
+            .collect()
+    }
+
+    /// **An emptied train lists nothing, and the next preset takes its
+    /// cases up as a fresh train of it would have them.** Every preset,
+    /// emptied by the removals it offers in two orders: the train offers
+    /// its presets without panicking, and every preset laid in holds what
+    /// it holds alone, reads its cases load in and reaction out, and
+    /// solves them as it does alone — wherever the removals kept both of
+    /// a case's entries. A removal that takes the body an entry is at
+    /// drops the entry, which is a rule of its own (audit T13.4); there
+    /// the preset laid in is only held well formed.
+    #[test]
+    fn an_emptied_train_takes_the_next_preset_as_it_would_come() {
+        let lib = test_library();
+        let mut whole = 0;
+        for p in Preset::ALL {
+            for last in [false, true] {
+                let t = emptied(cased(vec![p.build()]), last);
+                assert!(t.shape.bodies.is_empty(), "{p:?}: {:?}", t.shape.bodies);
+                assert!(!t.offers(Target::Train).is_empty());
+                let kept = t.load_cases.iter().all(|c| c.loads.len() == 2);
+                whole += usize::from(kept);
+                for q in Preset::ALL {
+                    let mut u = t.clone();
+                    u.edit(Edit::Insert {
+                        shape: q.build(),
+                        at: None,
+                    })
+                    .unwrap();
+                    u.check().unwrap();
+                    if !kept {
+                        continue;
+                    }
+                    let fresh = cased(vec![q.build()]);
+                    let context = format!("{p:?} emptied (last {last}), then {q:?}");
+                    assert_eq!(u.held, fresh.held, "{context}");
+                    assert_eq!(said(&u), said(&fresh), "{context}");
+                    assert_eq!(u.headline(), fresh.headline(), "{context}");
+                    let solved = |t: &Train| {
+                        solve_train(t, &lib)
+                            .map(|r| r.cases.iter().map(|c| c.solved).collect::<Vec<_>>())
+                    };
+                    assert_eq!(solved(&u), solved(&fresh), "{context}");
+                }
+            }
+        }
+        assert!(whole >= Preset::ALL.len(), "only {whole} emptied whole");
+    }
+
+    /// **A hold leaves no case anything to say of the body.** A pair's
+    /// output held takes its reaction and its sweep with it. A set's
+    /// fatigue sweep measured at its ring, the ring then held: the sweep
+    /// moves to the case's reaction and the set counts cycles, where it
+    /// counted none, saying nothing. A join that would hold a body a case
+    /// reacts at is refused — it once left the reaction on ground.
+    #[test]
+    fn a_hold_moves_the_sweep_and_a_join_does_not_ground_a_reaction() {
+        let lib = test_library();
+        let mut t = cased(vec![Preset::Planetary.build()]);
+        let ring = t.port(0, 3);
+        let reaction = t.load_cases[1].loads[1].at;
+        t.edit(Edit::Release(ring)).unwrap();
+        t.load_cases[1].duty = super::super::Duty::intermittent(ring);
+        t.edit(Edit::Hold(ring)).unwrap();
+        assert!(
+            matches!(t.load_cases[1].duty, super::super::Duty::Intermittent { at, .. } if at == reaction)
+        );
+        let r = solve_train(&t, &lib).unwrap();
+        for m in &r.members {
+            let cycles = m.cases[1].cycles.unwrap();
+            assert!(cycles.bending > 0.0, "{cycles:?}");
+        }
+        // A hold at a pair's reacted output is made, and the case keeps
+        // nothing there: its sweep goes to what is left, the load.
+        let mut t = cased(vec![Preset::Spur.build()]);
+        t.edit(Edit::Hold(2)).unwrap();
+        for c in &t.load_cases {
+            assert!(c.loads.iter().all(|l| l.at == 1), "{c:?}");
+            assert!(matches!(
+                c.duty,
+                super::super::Duty::Intermittent { at: 1, .. }
+            ));
+        }
+        // A pair chained on a pair at its input, its far end held, then
+        // that end joined to the first pair's reacted output.
+        let mut t = cased(vec![Preset::Spur.build()]);
+        t.edit(Edit::Insert {
+            shape: Preset::Spur.build(),
+            at: Some(1),
+        })
+        .unwrap();
+        t.edit(Edit::Hold(3)).unwrap();
+        let before = format!("{t:?}");
+        assert_eq!(
+            t.edit(Edit::Join { a: 2, b: 3 }),
+            Err(super::super::EditRefused::Loaded)
+        );
+        assert_eq!(format!("{t:?}"), before, "refused whole");
     }
 }

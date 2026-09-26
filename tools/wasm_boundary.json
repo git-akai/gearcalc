@@ -3445,23 +3445,23 @@
    "ok": [
     [
      "en",
-     524
+     526
     ],
     [
      "de",
-     524
+     526
     ],
     [
      "pt",
-     524
+     526
     ],
     [
      "zh-Hans",
-     524
+     526
     ],
     [
      "zh-Hant",
-     524
+     526
     ]
    ]
   },
@@ -11414,7 +11414,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 3,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -11440,7 +11440,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 3,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -11466,7 +11466,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 3,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -11955,7 +11955,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 3,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -11981,7 +11981,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 3,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -12007,7 +12007,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 3,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -12495,7 +12495,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 3,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -12521,7 +12521,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 3,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -12547,7 +12547,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 3,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -13035,7 +13035,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 3,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -13061,7 +13061,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 3,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -13087,7 +13087,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 3,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -13575,7 +13575,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 3,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -13601,7 +13601,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 3,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -13627,7 +13627,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 3,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -14191,7 +14191,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 3,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -14217,7 +14217,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 3,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -14804,7 +14804,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 3,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -14830,7 +14830,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 3,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -15560,7 +15560,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 7,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -15586,7 +15586,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 7,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -16882,7 +16882,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 7,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -16908,7 +16908,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 7,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -18098,7 +18098,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 0,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -18124,7 +18124,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 0,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -18176,7 +18176,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 0,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -19470,7 +19470,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 0,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -19496,7 +19496,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 0,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -19548,7 +19548,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 0,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -20851,7 +20851,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 0,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -20877,7 +20877,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 0,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -20929,7 +20929,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 0,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -22338,7 +22338,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 0,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -22364,7 +22364,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 0,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -22416,7 +22416,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 0,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -23719,7 +23719,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 0,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -23745,7 +23745,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 0,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -23797,7 +23797,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 0,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -25245,7 +25245,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 0,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -25271,7 +25271,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 0,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -25323,7 +25323,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 0,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
