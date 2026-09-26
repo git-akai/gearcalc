@@ -83,6 +83,53 @@ fn profile_is_bounded_from_both_sides_by_the_cutter() {
     );
 }
 
+/// The gate's rack is rebuilt from the inputs and the settled tool, never from
+/// the tooth, so a tooth that is wrong in a way its own derived quantities agree
+/// with is still a tooth that rack did not cut.
+///
+/// Each fault is planted by cutting the tooth for other inputs and letting it
+/// claim the originals: every derived quantity then moves together, which is
+/// the error a gate built from those quantities cannot see.
+#[test]
+fn the_gate_sees_a_tooth_its_rack_did_not_cut() {
+    let p = GearParams::default();
+    let asked = Tooth::new(p);
+    let claiming = |mut g: Tooth| {
+        g.params = p;
+        g.tool = asked.tool;
+        check_cut(&g, 150)
+    };
+
+    // Thicker by `δ` at the pitch circle: `s = m (π k/2 + 2 x tan α)`.
+    let delta = 1e-3;
+    let thick = claiming(Tooth::new(GearParams {
+        thickness_mod: 1.0 + 2.0 * delta / std::f64::consts::PI,
+        ..p
+    }));
+    // Each flank stands `δ/2` proud across the pitch line, `δ/2 · cos α` along
+    // its normal.
+    let proud = delta / 2.0 * asked.alpha_t.cos();
+    assert!(
+        (thick.penetration - proud).abs() < 0.1 * proud,
+        "a flank {proud:.3e} mm proud reads as penetration {:.3e}",
+        thick.penetration
+    );
+
+    // Deeper by `δ`: the root the rack never reached is the deviation. Planted
+    // well above the gate's own limit, so what is asserted is that it measures
+    // the fault rather than where its threshold sits.
+    let delta = 10.0 * DEVIATION_LIMIT;
+    let deep = claiming(Tooth::new(GearParams {
+        dedendum: p.dedendum + delta / p.module,
+        ..p
+    }));
+    assert!(
+        deep.penetration <= PENETRATION_LIMIT && (deep.deviation - delta).abs() < DEVIATION_LIMIT,
+        "a root {delta:.3e} mm too deep reads as deviation {:.3e}",
+        deep.deviation
+    );
+}
+
 /// Independent of the envelope derivation entirely: every fillet point must lie
 /// exactly `rho` from the path traced by the cutter's tip-round centre.
 ///

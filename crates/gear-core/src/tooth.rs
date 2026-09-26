@@ -141,6 +141,12 @@ pub struct Tooth {
     /// Base radius.
     pub rb: f64,
 
+    /// The tool this tooth was cut by, as it was handed in or settled.
+    ///
+    /// Kept as given so a check can rebuild the cutter from it and the basic
+    /// rack alone, without reading anything this tooth derived from it
+    /// ([`crate::verify::BasicRack`]).
+    pub tool: Rack,
     /// Cutter tip depth below the rolling line.
     pub bd: f64,
     /// Root (minor) radius.
@@ -489,6 +495,7 @@ impl Tooth {
             mt,
             r,
             rb,
+            tool,
             bd,
             rf,
             st,

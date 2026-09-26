@@ -26,44 +26,110 @@
 //! deletes the containment test, which was the least trustworthy step in the
 //! suite.
 
-use crate::tooth::Tooth;
+use crate::params::{guard, GearParams};
+use crate::tooth::{Rack, Tooth};
 
-/// Exact signed distance from a point to one cutter tooth. Negative is inside.
+/// The generating rack, rebuilt from the basic-rack inputs and the settled tool
+/// alone.
 ///
-/// The tooth is convex: a wedge of three faces — two flanks and the tip flat —
-/// with its two bottom corners rounded by `ρ`. That is exactly *the wedge eroded
-/// by ρ, then Minkowski-summed with a disc of radius ρ*, and the eroded wedge's
-/// corners are precisely the tip-round centres. So the distance is
-/// `dist(p, wedge) − ρ`, needing three features instead of a discretised arc.
+/// Nothing here reads what the tooth derived: not its thickness, its root
+/// radius or its corner's place. The rack's tooth is `(π m_n/2)(2 − k)/cos β`
+/// wide on the datum line `r + x m`, its tip is `Rack::depth` below the
+/// reference circle, its round is `Rack::tip_round`, and its flanks lean at the
+/// transverse pressure angle. A tooth whose thickness or depth is wrong in a way
+/// its own derived quantities agree with is then a tooth this cutter did not
+/// cut, and the gate sees it.
 ///
-/// Coordinates are the rack frame: `y` measured from the gear centre, `x` along
-/// the rack's travel.
-#[must_use]
-pub fn cutter_sdf(g: &Tooth, px: f64, py: f64, shift: f64) -> f64 {
-    let (ca, sa) = (g.alpha_t.cos(), g.alpha_t.sin());
-    let pitch = std::f64::consts::PI * g.mt;
-    let yb = g.rf + g.rho; // the eroded wedge's base = the tip-round centre line
-    let x1 = g.ac + shift;
-    let x2 = pitch - g.ac + shift;
-    let dy = py - yb;
+/// A rack whose flanks meet above the round's centre line is kept as the tool
+/// it is: a vee with a round that stops short of the depth. The gate then reports
+/// the root that tool could not reach as deviation, rather than refusing.
+#[derive(Clone, Copy, Debug)]
+pub struct BasicRack {
+    alpha_t: f64,
+    /// Circular pitch, transverse.
+    pitch: f64,
+    /// Height of the eroded wedge's base above the gear centre: the line of the
+    /// round centres, or the vee's apex where the flanks meet above it.
+    base: f64,
+    /// Half the distance between the two round centres, never negative.
+    half: f64,
+    rho: f64,
+}
 
-    let e1 = (px - x1) * ca + dy * sa; // left flank, inward positive
-    let e2 = (x2 - px) * ca + dy * sa; // right flank
-    let e3 = dy; // tip flat
-
-    if e1 >= 0.0 && e2 >= 0.0 && e3 >= 0.0 {
-        return -(g.rho + e1.min(e2).min(e3));
+impl BasicRack {
+    /// The rack a tooth's inputs and its settled tool describe.
+    #[must_use]
+    pub fn of(g: &Tooth) -> Self {
+        Self::new(&g.params, g.tool)
     }
 
-    // left ray from (x1, yb) heading up-left; right ray from (x2, yb) up-right
-    let t1 = ((px - x1) * -sa + dy * ca).max(0.0);
-    let d1 = f64::hypot(px - (x1 - sa * t1), py - (yb + ca * t1));
-    let t2 = ((px - x2) * sa + dy * ca).max(0.0);
-    let d2 = f64::hypot(px - (x2 + sa * t2), py - (yb + ca * t2));
-    let tb = ((px - x1) / (x2 - x1)).clamp(0.0, 1.0);
-    let db = f64::hypot(px - (x1 + tb * (x2 - x1)), dy);
+    /// The rack for these inputs and this tool.
+    #[must_use]
+    pub fn new(p: &GearParams, tool: Rack) -> Self {
+        use std::f64::consts::PI;
+        let m = p.module;
+        let an = p
+            .pressure_angle
+            .to_radians()
+            .max(guard::MIN_PRESSURE_ANGLE_DEG.to_radians());
+        let beta = p.helix_angle.to_radians();
+        let alpha_t = crate::plane::transverse_pressure_angle(an, beta);
+        let mt = m / beta.cos();
+        let r = mt * f64::from(p.teeth) / 2.0;
+        let pitch = PI * mt;
 
-    d1.min(d2).min(db) - g.rho
+        let datum = r + m * p.profile_shift;
+        let width = pitch * (2.0 - p.thickness_mod) / 2.0;
+        let centres = datum - tool.depth + tool.tip_round;
+        // The flank offset inward by the round, measured across at the centre
+        // line. Negative when the flanks meet above it.
+        let eroded =
+            width / 2.0 - (datum - centres) * alpha_t.tan() - tool.tip_round / alpha_t.cos();
+        Self {
+            alpha_t,
+            pitch,
+            base: centres + (-eroded).max(0.0) / alpha_t.tan(),
+            half: eroded.max(0.0),
+            rho: tool.tip_round,
+        }
+    }
+
+    /// Exact signed distance from a point to one cutter tooth. Negative is
+    /// inside.
+    ///
+    /// The tooth is convex: two flanks and the tip flat, with the bottom
+    /// corners rounded by `ρ`. That is the wedge eroded by `ρ`, then
+    /// Minkowski-summed with a disc of radius `ρ`, and the eroded wedge's corners
+    /// are the round centres. So the distance is `dist(p, wedge) − ρ`, from
+    /// three features instead of a discretised arc.
+    ///
+    /// Coordinates are the rack frame: `y` measured from the gear centre, `x`
+    /// along the rack's travel; `shift` moves the tooth along it. At zero shift
+    /// the tooth sits in the space centred half a pitch from the gear's tooth.
+    #[must_use]
+    pub fn distance(&self, px: f64, py: f64, shift: f64) -> f64 {
+        let (ca, sa) = (self.alpha_t.cos(), self.alpha_t.sin());
+        let x1 = shift + self.pitch / 2.0 - self.half;
+        let x2 = shift + self.pitch / 2.0 + self.half;
+        let dy = py - self.base;
+
+        let e1 = (px - x1) * ca + dy * sa; // left flank, inward positive
+        let e2 = (x2 - px) * ca + dy * sa; // right flank
+        let e3 = dy; // tip flat
+
+        if e1 >= 0.0 && e2 >= 0.0 && e3 >= 0.0 {
+            return -(self.rho + e1.min(e2).min(e3));
+        }
+
+        // left ray from (x1, base) heading up-left; right ray from (x2, base) up-right
+        let t1 = ((px - x1) * -sa + dy * ca).max(0.0);
+        let d1 = f64::hypot(px - (x1 - sa * t1), py - (self.base + ca * t1));
+        let t2 = ((px - x2) * sa + dy * ca).max(0.0);
+        let d2 = f64::hypot(px - (x2 + sa * t2), py - (self.base + ca * t2));
+        let db = f64::hypot(px - px.clamp(x1, x2), dy);
+
+        d1.min(d2).min(db) - self.rho
+    }
 }
 
 /// Rack displacements over which tooth 0 is actually generated.
@@ -142,6 +208,7 @@ pub fn check_cut(g: &Tooth, profile_points: usize) -> CutReport {
     let copy_lo = (lo / pitch).floor() as i32 - COPY_MARGIN;
     let copy_hi = (hi / pitch).ceil() as i32 + COPY_MARGIN;
 
+    let rack = BasicRack::of(g);
     let n = px.len();
     let mut dist = vec![f64::INFINITY; (nphase + 1) * n];
     let mut penetration: f64 = 0.0;
@@ -162,7 +229,7 @@ pub fn check_cut(g: &Tooth, profile_points: usize) -> CutReport {
                 if fx < sh - pitch || fx > sh + 2.0 * pitch {
                     continue;
                 }
-                let d = cutter_sdf(g, fx, fy, sh);
+                let d = rack.distance(fx, fy, sh);
                 if d < best {
                     best = d;
                 }
@@ -310,6 +377,7 @@ pub fn sdf_matches_polyline(g: &Tooth, arc_points: usize, samples: usize) -> f64
     v.push((pitch - g.st / 2.0 + (top - g.r) * g.alpha_t.tan(), top));
     let _ = (ca, sa);
 
+    let rack = BasicRack::of(g);
     // Deterministic lattice rather than a random cloud, so the check is
     // reproducible without carrying a PRNG.
     let pad = 0.4 * g.params.module;
@@ -325,7 +393,7 @@ pub fn sdf_matches_polyline(g: &Tooth, arc_points: usize, samples: usize) -> f64
         for ix in 0..side {
             let qx = x_lo + (x_hi - x_lo) * (ix as f64) / ((side - 1) as f64);
             let qy = y_lo + (y_hi - y_lo) * (iy as f64) / ((side - 1) as f64);
-            let a = cutter_sdf(g, qx, qy, 0.0).abs();
+            let a = rack.distance(qx, qy, 0.0).abs();
             if a >= 0.5 * g.params.module {
                 continue; // near field only, where the comparison is meaningful
             }
