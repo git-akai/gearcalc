@@ -23,3 +23,7 @@ Carried into P1 from the s0-tools check (minor):
 - `check_all.sh` neither runs nor flags a `uses:` step.
 - `check_golden`'s `.golden.old.$$` is outside the cleanup trap.
 - The homogeneity allowance's κ is a heuristic; its comment should say so.
+
+Carried into Stage 2 from the P8 check:
+- Path efficiency shows 0.00 when a flow is refused. It is now reachable through Worm AddGear edits 18 and 23 (0-for-none, P1 pattern).
+- Genuine flow ties (zero relative speed, zero tie) are settled by efficiency and then enumeration order. Redesign F should settle these.
