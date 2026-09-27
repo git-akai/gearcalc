@@ -705,7 +705,7 @@ fn gear_profile_impl(input: &str, points_per_tooth: usize) -> Result<Vec<f64>, S
 
 fn export_dxf_impl(input: &str) -> Result<String, String> {
     let req = parse(input)?;
-    let g = Tooth::new(resolved_params(&req)?);
+    let g = gear_core::gear::Gear::new(resolved_params(&req)?);
     Ok(gear_io::gear_to_dxf(
         &g,
         &gear_io::DxfOptions {

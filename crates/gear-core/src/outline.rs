@@ -93,6 +93,46 @@ where
     }
 }
 
+/// A closed parametric curve, `t ∈ [0, 1]` with `f(1) = f(0)`, as a polyline
+/// within `tolerance` of it. Split into quarters first, so the whole loop's
+/// chord — of zero length — is never the one measured.
+pub(crate) fn closed_curve<F>(f: &F, tolerance: f64) -> Vec<Vertex>
+where
+    F: Fn(f64) -> (f64, f64),
+{
+    let mut out = Vec::new();
+    for q in 0..4 {
+        let (t0, t1) = (f64::from(q) / 4.0, f64::from(q + 1) / 4.0);
+        subdivide(f, t0, t1, tolerance, 0, &mut out);
+    }
+    // Each piece emits its end and never its start, so the loop's start is
+    // its last vertex, once.
+    out
+}
+
+/// A reference curve drawn beside an outline: a circle where the curve is one,
+/// and a closed polyline where it is not.
+///
+/// It is what a drawing needs of a gear's tip and root without knowing what a
+/// gear is: an eccentric gear's tip is no circle, and a writer handed four
+/// radii can only draw a concentric one.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Envelope {
+    Circle { centre: [f64; 2], radius: f64 },
+    Closed(Vec<Vertex>),
+}
+
+impl Envelope {
+    /// A circle about the axis.
+    #[must_use]
+    pub fn circle(radius: f64) -> Self {
+        Self::Circle {
+            centre: [0.0, 0.0],
+            radius,
+        }
+    }
+}
+
 /// Bulge of a circular arc of included angle `theta`, swept counter-clockwise.
 fn bulge_for(theta: f64) -> f64 {
     (theta / 4.0).tan()

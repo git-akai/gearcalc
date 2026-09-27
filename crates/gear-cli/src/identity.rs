@@ -331,7 +331,7 @@ fn gear(p: &GearParams, opened_by: f64, dxf: Option<&gear_io::DxfOptions>) {
         println!("admissible {:#?}", auto::admissible_ranges(p, p.dedendum));
         measured(&g);
         if let Some(o) = dxf {
-            println!("dxf\n{}", gear_io::gear_to_dxf(g.mean(), o));
+            println!("dxf\n{}", gear_io::gear_to_dxf(&g, o));
         }
         let other = Gear::new(GearParams {
             teeth: MATE,

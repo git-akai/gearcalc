@@ -2627,7 +2627,7 @@ fn verify(limit: usize) {
 
 /// Write a DXF to stdout, for inspecting or importing into CAD.
 fn dxf(teeth: u32, x: f64, tol: f64) {
-    let g = Tooth::new(GearParams {
+    let g = gear_core::gear::Gear::new(GearParams {
         teeth,
         profile_shift: x,
         ..Default::default()

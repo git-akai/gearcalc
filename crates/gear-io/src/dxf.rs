@@ -32,10 +32,12 @@
 //!
 //! Only the involute flank and the trochoid fillet are polygonal, and those are
 //! the two curves with no exact arc representation. Their accuracy is set by the
-//! chord tolerance passed to [`gear_core::Tooth::outline`].
+//! chord tolerance passed to [`gear_core::gear::Gear::outline`].
 
+use gear_core::gear::Gear;
+use gear_core::outline::Envelope;
 use gear_core::ring::Ring;
-use gear_core::{Tooth, Vertex};
+use gear_core::Vertex;
 
 /// Layer names. Geometry and construction aids are separated so the reference
 /// circles can be switched off in CAD without touching the profile.
@@ -114,15 +116,21 @@ impl Writer {
 /// Render a gear as a DXF drawing.
 ///
 /// Millimetres, with the first tooth centred on +X and the gear axis at the
-/// origin, matching the on-screen view.
+/// origin, matching the on-screen view. The outline, the pitch and base circles
+/// and the tip and root envelopes all come from the one [`Gear`] handed in —
+/// the tooth the panel quotes is its mean — so nothing drawn is a second gear
+/// the writer built for itself.
 #[must_use]
-pub fn gear_to_dxf(gear: &Tooth, opts: &DxfOptions) -> String {
+pub fn gear_to_dxf(gear: &Gear, opts: &DxfOptions) -> String {
+    let mean = gear.mean();
     outline_to_dxf(
-        // Through the assembly: drawing a whole gear is `Gear`'s job, and this
-        // is the export path an eccentric gear once slipped through as a
-        // concentric one (`docs/corrections.md`).
-        &gear_core::gear::Gear::new(gear.params).outline(opts.chord_tolerance),
-        &[gear.r, gear.rb, gear.ra, gear.rf],
+        &gear.outline(opts.chord_tolerance),
+        &[
+            Envelope::circle(mean.r),
+            Envelope::circle(mean.rb),
+            gear.tip_envelope(opts.chord_tolerance),
+            gear.root_envelope(opts.chord_tolerance),
+        ],
         opts,
     )
 }
@@ -141,17 +149,17 @@ pub fn ring_to_dxf(ring: &Ring, opts: &DxfOptions) -> String {
     // boundary nobody chose.
     outline_to_dxf(
         &ring.outline(opts.chord_tolerance),
-        &[ring.r, ring.rb, ring.ra, ring.rf, ring.rim_radius()],
+        &[ring.r, ring.rb, ring.ra, ring.rf, ring.rim_radius()].map(Envelope::circle),
         opts,
     )
 }
 
-/// Write any closed outline, with its reference circles.
+/// Write any closed outline, with its reference curves.
 ///
 /// Both gear kinds come through here. The writer has no reason to know which it
-/// is holding — a polyline is a polyline — and keeping it that way is what stops
-/// a second export path growing its own quirks.
-fn outline_to_dxf(outline: &[Vertex], circles: &[f64], opts: &DxfOptions) -> String {
+/// is holding — a polyline is a polyline and a circle a circle — and keeping it
+/// that way is what stops a second export path growing its own quirks.
+fn outline_to_dxf(outline: &[Vertex], references: &[Envelope], opts: &DxfOptions) -> String {
     let mut w = Writer::new();
     header(&mut w);
     classes(&mut w);
@@ -160,10 +168,13 @@ fn outline_to_dxf(outline: &[Vertex], circles: &[f64], opts: &DxfOptions) -> Str
 
     w.tag(0, "SECTION");
     w.tag(2, "ENTITIES");
-    polyline(&mut w, outline);
+    polyline(&mut w, outline, LAYER_PROFILE);
     if opts.reference_circles {
-        for &r in circles {
-            circle(&mut w, r);
+        for reference in references {
+            match reference {
+                Envelope::Circle { centre, radius } => circle(&mut w, *centre, *radius),
+                Envelope::Closed(vertices) => polyline(&mut w, vertices, LAYER_REFERENCE),
+            }
         }
     }
     w.tag(0, "ENDSEC");
@@ -463,11 +474,11 @@ fn entity(w: &mut Writer, kind: &str, layer: &str) {
     w.tag(8, layer);
 }
 
-fn polyline(w: &mut Writer, vertices: &[Vertex]) {
+fn polyline(w: &mut Writer, vertices: &[Vertex], layer: &str) {
     if vertices.is_empty() {
         return;
     }
-    entity(w, "LWPOLYLINE", LAYER_PROFILE);
+    entity(w, "LWPOLYLINE", layer);
     w.tag(100, "AcDbPolyline");
     w.int(90, i32::try_from(vertices.len()).unwrap_or(i32::MAX));
     w.int(70, 1); // closed
@@ -481,11 +492,11 @@ fn polyline(w: &mut Writer, vertices: &[Vertex]) {
     }
 }
 
-fn circle(w: &mut Writer, radius: f64) {
+fn circle(w: &mut Writer, centre: [f64; 2], radius: f64) {
     entity(w, "CIRCLE", LAYER_REFERENCE);
     w.tag(100, "AcDbCircle");
-    w.real(10, 0.0);
-    w.real(20, 0.0);
+    w.real(10, centre[0]);
+    w.real(20, centre[1]);
     w.real(30, 0.0);
     w.real(40, radius);
 }
@@ -495,6 +506,17 @@ fn circle(w: &mut Writer, radius: f64) {
 mod tests {
     use super::*;
     use gear_core::GearParams;
+
+    /// A gear's DXF with its reference entities, at a chord tolerance.
+    fn export(p: GearParams, chord_tolerance: f64) -> String {
+        gear_to_dxf(
+            &Gear::new(p),
+            &DxfOptions {
+                chord_tolerance,
+                reference_circles: true,
+            },
+        )
+    }
 
     fn tags(dxf: &str) -> Vec<(i32, String)> {
         let lines: Vec<&str> = dxf.lines().collect();
@@ -515,7 +537,7 @@ mod tests {
 
     #[test]
     fn structure_is_well_formed() {
-        let g = Tooth::new(GearParams::default());
+        let g = Gear::new(GearParams::default());
         let dxf = gear_to_dxf(&g, &DxfOptions::default());
         let t = tags(&dxf);
 
@@ -627,9 +649,9 @@ mod tests {
     #[test]
     fn the_file_meets_the_r2000_minimum() {
         for dxf in [
-            gear_to_dxf(&Tooth::new(GearParams::default()), &DxfOptions::default()),
+            gear_to_dxf(&Gear::new(GearParams::default()), &DxfOptions::default()),
             gear_to_dxf(
-                &Tooth::new(GearParams::default()),
+                &Gear::new(GearParams::default()),
                 &DxfOptions {
                     reference_circles: false,
                     ..DxfOptions::default()
@@ -744,7 +766,7 @@ mod tests {
     /// may hand out, so it has to be above every handle written here.
     #[test]
     fn the_handle_graph_closes() {
-        let dxf = gear_to_dxf(&Tooth::new(GearParams::default()), &DxfOptions::default());
+        let dxf = gear_to_dxf(&Gear::new(GearParams::default()), &DxfOptions::default());
         let t = tags(&dxf);
 
         let seed_at = t
@@ -806,11 +828,11 @@ mod tests {
 
     #[test]
     fn polyline_is_closed_and_carries_every_vertex() {
-        let g = Tooth::new(GearParams {
+        let g = Gear::new(GearParams {
             teeth: 9,
             ..Default::default()
         });
-        let want = gear_core::gear::Gear::new(g.params).outline(1e-3);
+        let want = g.outline(1e-3);
         let dxf = gear_to_dxf(
             &g,
             &DxfOptions {
@@ -852,7 +874,7 @@ mod tests {
 
     #[test]
     fn reference_circles_are_optional_and_on_their_own_layer() {
-        let g = Tooth::new(GearParams::default());
+        let g = Gear::new(GearParams::default());
         let with = gear_to_dxf(
             &g,
             &DxfOptions {
@@ -941,11 +963,11 @@ mod tests {
 
     #[test]
     fn bulges_are_written_only_where_the_geometry_is_circular() {
-        let g = Tooth::new(GearParams {
+        let g = Gear::new(GearParams {
             teeth: 12,
             ..Default::default()
         });
-        let outline = gear_core::gear::Gear::new(g.params).outline(1e-3);
+        let outline = g.outline(1e-3);
         let dxf = gear_to_dxf(
             &g,
             &DxfOptions {
@@ -965,5 +987,185 @@ mod tests {
         // a point are geometrically identical to one, and keeping each tooth
         // self-contained is worth more than merging them would save.
         assert_eq!(n_bulge_expected, 3 * 12);
+    }
+
+    /// What a DXF draws, read back: the profile's vertices and every reference
+    /// entity, each as its radius about the axis at an angle.
+    struct Drawn {
+        profile: Vec<[f64; 2]>,
+        references: Vec<Vec<[f64; 2]>>,
+        circles: Vec<f64>,
+    }
+
+    fn drawn(dxf: &str) -> Drawn {
+        let ents = entities(&tags(dxf));
+        let mut out = Drawn {
+            profile: Vec::new(),
+            references: Vec::new(),
+            circles: Vec::new(),
+        };
+        let mut i = 0;
+        while i < ents.len() {
+            let (code, value) = &ents[i];
+            if *code == 0 && (value == "LWPOLYLINE" || value == "CIRCLE") {
+                let end = ents[i + 1..]
+                    .iter()
+                    .position(|(c, _)| *c == 0)
+                    .map_or(ents.len(), |k| k + i + 1);
+                let body = &ents[i + 1..end];
+                let layer = body
+                    .iter()
+                    .find(|(c, _)| *c == 8)
+                    .map(|(_, v)| v.clone())
+                    .unwrap();
+                let reals = |want: i32| {
+                    body.iter()
+                        .filter(|(c, _)| *c == want)
+                        .map(|(_, v)| v.trim().parse::<f64>().unwrap())
+                        .collect::<Vec<_>>()
+                };
+                if value == "CIRCLE" {
+                    out.circles.push(reals(40)[0]);
+                } else {
+                    let pts: Vec<[f64; 2]> = reals(10)
+                        .into_iter()
+                        .zip(reals(20))
+                        .map(|(x, y)| [x, y])
+                        .collect();
+                    if layer == LAYER_PROFILE {
+                        out.profile = pts;
+                    } else {
+                        out.references.push(pts);
+                    }
+                }
+                i = end;
+            } else {
+                i += 1;
+            }
+        }
+        out
+    }
+
+    /// A drawn closed curve's radius at an angle: where the ray from the axis
+    /// crosses it, between the two vertices either side.
+    fn radius_at(curve: &[[f64; 2]], angle: f64) -> f64 {
+        let (d0, d1) = (angle.cos(), angle.sin());
+        for k in 0..curve.len() {
+            let (a, b) = (curve[k], curve[(k + 1) % curve.len()]);
+            let (ea, eb) = (a[0] * d1 - a[1] * d0, b[0] * d1 - b[1] * d0);
+            if ea * eb <= 0.0 && (a[0] * d0 + a[1] * d1) > 0.0 && ea != eb {
+                let t = ea / (ea - eb);
+                return f64::hypot(a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1]));
+            }
+        }
+        f64::NAN
+    }
+
+    /// **The DXF draws the envelopes the gear has.** Pitch and base are circles
+    /// at the gear's own radii; the tip and root are the curves the teeth's
+    /// tips and root actually follow round an eccentric gear, `r_a + e cos θ`
+    /// and `r_f + e cos θ` with `e = m Δx`, and a concentric gear's circles.
+    /// So no vertex of the profile lies outside the drawn tip or inside the
+    /// drawn root, and both are touched.
+    ///
+    /// Before, the writer rebuilt a gear of its own and drew four circles at
+    /// that one tooth's radii: at z30 Δx0.3 the teeth crossed the drawn tip by
+    /// 0.30 mm, and at z6 x0.5 Δx0.8 the drawn root was the 2.25 mm the tooth
+    /// asked for rather than the 2.15 mm the shared tool cut.
+    #[test]
+    fn the_drawn_envelopes_are_the_gears() {
+        use gear_core::gear::Gear;
+        let tol = 1e-3;
+        for (teeth, profile_shift, angular_shift) in [
+            (30, 0.0, 0.0),
+            (30, 0.0, 0.1),
+            (30, 0.0, 0.3),
+            (17, 0.2, 0.0),
+            (17, 0.2, 0.3),
+            (6, 0.5, 0.8),
+        ] {
+            let p = GearParams {
+                teeth,
+                profile_shift,
+                angular_shift,
+                ..GearParams::default()
+            };
+            let gear = Gear::new(p);
+            let mean = gear.mean();
+            let d = drawn(&export(p, tol));
+            let tag = format!("z{teeth} x{profile_shift} dx{angular_shift}");
+
+            for want in [mean.r, mean.rb] {
+                assert!(
+                    d.circles.iter().any(|r| (r - want).abs() < 1e-9),
+                    "{tag}: no circle at {want}: {:?}",
+                    d.circles
+                );
+            }
+            // The tip and root, as curves: a circle is its own radius at every
+            // angle.
+            let mut curves: Vec<Box<dyn Fn(f64) -> f64>> = Vec::new();
+            for &c in d
+                .circles
+                .iter()
+                .filter(|&&c| (c - mean.r).abs() > 1e-9 && (c - mean.rb).abs() > 1e-9)
+            {
+                curves.push(Box::new(move |_| c));
+            }
+            for poly in &d.references {
+                let poly = poly.clone();
+                curves.push(Box::new(move |a| radius_at(&poly, a)));
+            }
+            assert_eq!(
+                curves.len(),
+                2,
+                "{tag}: a tip and a root besides pitch and base"
+            );
+            let (first, second) = (&curves[0], &curves[1]);
+            let (tip, root) = if first(0.0) > second(0.0) {
+                (first, second)
+            } else {
+                (second, first)
+            };
+
+            // The root: the profile never inside it, and on it at mid-space.
+            let mut above_root = f64::INFINITY;
+            let mut outermost = 0.0_f64;
+            for v in &d.profile {
+                let (r, a) = (v[0].hypot(v[1]), v[1].atan2(v[0]));
+                above_root = above_root.min(r - root(a));
+                outermost = outermost.max(r);
+            }
+            assert!(
+                above_root.abs() < tol,
+                "{tag}: the profile is {above_root:.4} mm from the drawn root at its nearest"
+            );
+            // The tip: through each tooth's tip at its centreline, and nothing
+            // outside its highest point. A tip is an arc at its own tooth's
+            // radius, so across its width it leaves the envelope by
+            // `e sin θ · θ_a` either way; at the centre it is on it. A tooth
+            // that comes to a point first stops short of it.
+            for k in 0..gear.teeth() {
+                let (t, seat) = gear.tooth(k);
+                if t.clamps
+                    .fired(gear_core::note::key::CLAMP_TIP_CAPPED_POINTED)
+                {
+                    continue;
+                }
+                assert!(
+                    (tip(seat) - t.ra).abs() < tol,
+                    "{tag}: tooth {k}'s tip is {} and the drawn tip there {}",
+                    t.ra,
+                    tip(seat)
+                );
+            }
+            let highest = (0..3600)
+                .map(|i| tip(std::f64::consts::TAU * f64::from(i) / 3600.0))
+                .fold(0.0, f64::max);
+            assert!(
+                outermost <= highest + tol,
+                "{tag}: the profile reaches {outermost} past the drawn tip's {highest}"
+            );
+        }
     }
 }

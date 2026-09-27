@@ -306,6 +306,58 @@ impl Gear {
         self.mean.rf + p.module * (p.angular_shift * angle.cos())
     }
 
+    /// The curve the teeth's tips follow round the axis, for drawing, within
+    /// `chord_tolerance`: at each angle, the tip of the tooth cut there — at
+    /// that angle's shift, by the gear's one tool. That is the limaçon
+    /// `r_a + e cos θ`, `e = m Δx`, wherever no tooth comes to a point, and
+    /// follows the pointed tip where one does. A concentric gear's is its tip
+    /// circle.
+    #[must_use]
+    pub fn tip_envelope(&self, chord_tolerance: f64) -> crate::outline::Envelope {
+        let p = self.mean.params;
+        let tool = self.mean.tool;
+        self.envelope(self.mean.ra, chord_tolerance, |angle| {
+            Tooth::cut_by(
+                GearParams {
+                    profile_shift: p.profile_shift + p.angular_shift * angle.cos(),
+                    ..p
+                },
+                tool,
+            )
+            .ra
+        })
+    }
+
+    /// The curve the root follows round the axis — the one the drawn root is
+    /// built on (`root_at`) — as [`Self::tip_envelope`] draws the tip.
+    #[must_use]
+    pub fn root_envelope(&self, chord_tolerance: f64) -> crate::outline::Envelope {
+        self.envelope(self.mean.rf, chord_tolerance, |angle| self.root_at(angle))
+    }
+
+    /// A radius about the axis as a closed curve; a circle at `concentric`
+    /// when the gear does not vary, drawn as the exact entity it is rather
+    /// than a polyline that approximates it.
+    fn envelope(
+        &self,
+        concentric: f64,
+        chord_tolerance: f64,
+        radius_at: impl Fn(f64) -> f64,
+    ) -> crate::outline::Envelope {
+        if self.mean.params.angular_shift == 0.0 {
+            return crate::outline::Envelope::circle(concentric);
+        }
+        let point = |t: f64| {
+            let angle = std::f64::consts::TAU * t;
+            let r = radius_at(angle);
+            (r * angle.cos(), r * angle.sin())
+        };
+        crate::outline::Envelope::Closed(crate::outline::closed_curve(
+            &point,
+            self.chord_tolerance(chord_tolerance),
+        ))
+    }
+
     /// How far a point of tooth `k` is displaced radially by the tool's motion,
     /// mm — `tt` is its angle from the tooth's own centreline.
     ///
@@ -609,11 +661,7 @@ impl Gear {
     /// `Δx = 0`.
     #[must_use]
     pub fn outline(&self, chord_tolerance: f64) -> Vec<crate::outline::Vertex> {
-        let chord_tolerance = if chord_tolerance.is_finite() && chord_tolerance > 0.0 {
-            chord_tolerance.max(crate::outline::MIN_RELATIVE_TOLERANCE * self.mean.ra)
-        } else {
-            crate::outline::DEFAULT_CHORD_TOLERANCE
-        };
+        let chord_tolerance = self.chord_tolerance(chord_tolerance);
         // A constant root is a circle and stays an exact arc in the export; a
         // varying one is not a circle, so it is subdivided like a flank. The
         // rule for *where* it runs is `root_radius`, shared with the screen
@@ -627,6 +675,18 @@ impl Gear {
             self.teeth[i].tooth_outline(chord_tolerance, self.seat[k], displace, &mut out);
         }
         out
+    }
+}
+
+impl Gear {
+    /// A chord tolerance as asked, floored at what double precision resolves
+    /// on this gear, and the default where the ask is not a length.
+    fn chord_tolerance(&self, asked: f64) -> f64 {
+        if asked.is_finite() && asked > 0.0 {
+            asked.max(crate::outline::MIN_RELATIVE_TOLERANCE * self.mean.ra)
+        } else {
+            crate::outline::DEFAULT_CHORD_TOLERANCE
+        }
     }
 }
 
