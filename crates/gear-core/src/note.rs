@@ -249,8 +249,10 @@ pub mod key {
     pub const ERROR_TRAIN_LOAD_PORT: &str = "error.train_load_port";
     /// `error.train_size_over_constrained`
     pub const ERROR_TRAIN_SIZE_OVER_CONSTRAINED: &str = "error.train_size_over_constrained";
-    /// `error.train_axes_cannot_be_placed`
-    pub const ERROR_TRAIN_AXES_CANNOT_BE_PLACED: &str = "error.train_axes_cannot_be_placed";
+    /// `error.train_axes_too_close`
+    pub const ERROR_TRAIN_AXES_TOO_CLOSE: &str = "error.train_axes_too_close";
+    /// `error.train_axes_too_far`
+    pub const ERROR_TRAIN_AXES_TOO_FAR: &str = "error.train_axes_too_far";
     /// `error.train_malformed`
     pub const ERROR_TRAIN_MALFORMED: &str = "error.train_malformed";
     /// `error.train_malformed_carried_by`
@@ -347,7 +349,8 @@ pub mod key {
         ERROR_TRAIN_LOAD_PORT,
         ERROR_TRAIN_TIPS_UNCLEARABLE,
         ERROR_TRAIN_SIZE_OVER_CONSTRAINED,
-        ERROR_TRAIN_AXES_CANNOT_BE_PLACED,
+        ERROR_TRAIN_AXES_TOO_CLOSE,
+        ERROR_TRAIN_AXES_TOO_FAR,
         ERROR_TRAIN_MALFORMED,
         ERROR_TRAIN_MALFORMED_CARRIED_BY,
         ERROR_TRAIN_MALFORMED_CARRIED_BY_CYCLE,

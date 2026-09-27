@@ -1411,9 +1411,13 @@ mod tests {
                 err(TrainError::Malformed(Invariant::NumberGap(3)).note());
             }
             // **Two planet axes that cannot stand where their distances put
-            // them**: a meshed-planet set one ring tooth past collinear.
-            {
-                let shape = arr::meshed_planets(24, [18, 18], 97, 3);
+            // them**: a meshed-planet set one ring tooth past collinear, its
+            // planet axes too close; and one whose large planet reaches past
+            // a small ring, too far apart.
+            for shape in [
+                arr::meshed_planets(24, [18, 18], 97, 3),
+                arr::meshed_planets(12, [18, 40], 60, 1),
+            ] {
                 let out = gear_core::train::solve_alone(
                     &gear_core::train::Train::alone(&shape, 2.0, 3000.0),
                     &lib,

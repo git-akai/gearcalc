@@ -3205,8 +3205,19 @@ impl Shape {
             ) else {
                 continue;
             };
-            if d12 > r1 + r2 || d12 < (r1 - r2).abs() {
-                return Err(TrainError::AxesCannotBePlaced { distance: d });
+            // **Rounding is admitted, and only rounding.** Each running
+            // distance is a closed sum — radii, then a clearance — so each
+            // carries at most 2 ulp of its own size, and forming `r1 ± r2`
+            // rounds once more: a collinear set (`d12 = r1 + r2` or
+            // `|r1 − r2|` exactly, in reals) can come out apart by at most
+            // `2ε(r1 + r2 + d12) + ε(r1 + r2) ≤ 4ε(r1 + r2 + d12)`. Within
+            // that the axes stand in line, and `cos φ` is clamped to ±1.
+            let rounding = 4.0 * f64::EPSILON * (r1 + r2 + d12);
+            if d12 > r1 + r2 + rounding || d12 < (r1 - r2).abs() - rounding {
+                return Err(TrainError::AxesCannotBePlaced {
+                    distance: d,
+                    too_close: d12 < (r1 - r2).abs(),
+                });
             }
             let cos = ((r1 * r1 + r2 * r2 - d12 * d12) / (2.0 * r1 * r2)).clamp(-1.0, 1.0);
             out[d] = Some(cos.acos().to_degrees());
@@ -4585,6 +4596,28 @@ mod tests {
         );
     }
 
+    /// **Axes exactly in line stand, at φ = 0**: the shipped meshed-planet
+    /// counts with every clearance nought close the three distances exactly
+    /// collinear in reals (24 + 36 + 36 = 96), so only rounding separates
+    /// them — which is admitted, never refused (rule 5).
+    #[test]
+    fn axes_exactly_in_line_stand_at_no_stagger() {
+        for (sun, ring) in [(24, 96), (18, 90), (30, 102)] {
+            let mut shape = arr::meshed_planets(sun, [18, 18], ring, 3);
+            for d in &mut shape.distances {
+                d.clearance = Auto::fixed(0.0);
+            }
+            let alone = crate::train::solve_alone(
+                &crate::train::Train::alone(&shape, 2.0, 3000.0),
+                &test_library(),
+            )
+            .unwrap_or_else(|e| panic!("{sun}/{ring}: {e}"));
+            let (d, _, _) = triangles(&shape)[0];
+            let phi = alone.part.distances[d].stagger.unwrap();
+            assert!(phi.abs() < 1e-5, "{sun}/{ring}: {phi}");
+        }
+    }
+
     /// **Searching never loses a solve and never loses efficiency**: on
     /// every preset, every arrangement of a set, a Ravigneaux and the hula,
     /// with the search asked of every mesh and of each mesh alone, the
@@ -4630,8 +4663,10 @@ mod tests {
             let Some(unsearched) = product(&off) else {
                 continue;
             };
-            let asks: Vec<Vec<usize>> = std::iter::once((0..t.shape.meshes.len()).collect())
-                .chain((0..t.shape.meshes.len()).map(|k| vec![k]))
+            // Every mesh, then each alone where that is a different ask.
+            let n = t.shape.meshes.len();
+            let asks: Vec<Vec<usize>> = std::iter::once((0..n).collect())
+                .chain((0..n).filter(|_| n > 1).map(|k| vec![k]))
                 .collect();
             for ask in asks {
                 let mut on = off.clone();
@@ -4795,7 +4830,10 @@ mod tests {
             assert!(
                 matches!(
                     out,
-                    Err(crate::train::TrainError::AxesCannotBePlaced { .. })
+                    Err(crate::train::TrainError::AxesCannotBePlaced {
+                        too_close: true,
+                        ..
+                    })
                 ),
                 "{:?}",
                 out.map(|a| a.part.distances)

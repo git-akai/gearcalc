@@ -144,6 +144,8 @@ const CLASSES: &[(&str, Class)] = &[
     ("params/teeth", Class::Power(0)),
     ("ranges/teeth/min", Class::Power(0)),
     ("distances/sized_by", Class::Power(0)),
+    // The angle between two carried axes, from a triangle of lengths.
+    ("distances/stagger", Class::Power(0)),
     // A note's values.
     ("values/*", Class::NoteValue),
 ];

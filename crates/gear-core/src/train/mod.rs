@@ -1640,9 +1640,10 @@ pub enum TrainError {
     /// **Two axes on one carrier cannot stand where their distances put
     /// them**: the distance between them is longer than their two
     /// distances from the carrier's axis together, or shorter than their
-    /// difference ([`shape::Shape::staggers`]). Zero-based, as the
-    /// distances are indexed; the front end numbers from 1.
-    AxesCannotBePlaced { distance: usize },
+    /// difference ([`shape::Shape::staggers`]) — `too_close` says which.
+    /// Zero-based, as the distances are indexed; the front end numbers
+    /// from 1.
+    AxesCannotBePlaced { distance: usize, too_close: bool },
     /// **Two given distances ask one mesh group two sizes**: each with both
     /// its mesh's shifts pinned decides the group's helix, and they decide
     /// it differently ([`shape::Shape::resolved_helices`]). The mesh that
@@ -1735,10 +1736,15 @@ impl crate::note::Explain for TrainError {
                     .count("first", u32::try_from(*a + 1).unwrap_or(u32::MAX))
                     .count("second", u32::try_from(*b + 1).unwrap_or(u32::MAX))
             }
-            Self::AxesCannotBePlaced { distance } => {
-                Note::new(key::ERROR_TRAIN_AXES_CANNOT_BE_PLACED)
-                    .count("distance", u32::try_from(*distance + 1).unwrap_or(u32::MAX))
-            }
+            Self::AxesCannotBePlaced {
+                distance,
+                too_close,
+            } => Note::new(if *too_close {
+                key::ERROR_TRAIN_AXES_TOO_CLOSE
+            } else {
+                key::ERROR_TRAIN_AXES_TOO_FAR
+            })
+            .count("distance", u32::try_from(*distance + 1).unwrap_or(u32::MAX)),
             // Each field a refusal can name has its own key; the axis is
             // numbered from one, as the panel numbers axes.
             Self::Malformed(Invariant::CarriedByNothing(axis)) => {
@@ -1843,11 +1849,15 @@ impl std::fmt::Display for TrainError {
                 a + 1,
                 b + 1
             ),
-            Self::AxesCannotBePlaced { distance } => write!(
+            Self::AxesCannotBePlaced {
+                distance,
+                too_close,
+            } => write!(
                 f,
-                "distance {}: the two axes it joins on one carrier cannot stand that \
-                 far apart at their distances from the carrier's axis",
-                distance + 1
+                "distance {}: the two axes it joins on one carrier are too {} to stand \
+                 at their distances from the carrier's axis",
+                distance + 1,
+                if *too_close { "close" } else { "far apart" }
             ),
             Self::Malformed(Invariant::CarriedByNothing(axis)) => write!(
                 f,
@@ -11630,6 +11640,8 @@ mod tests {
     /// output held still, the output carries `T_in · |i| · η_forward` — the
     /// mesh driven forward, as the given torque drives it — on a pair and
     /// on a worm, whatever the held output's derived torque was seeded at.
+    /// A regression guard, not a proof: it passes at the base too, where
+    /// the seed's sign happened to agree with the push on both fixtures.
     #[test]
     fn a_stall_comes_to_its_closed_form() {
         for ((name, t), seed) in still_cases()
