@@ -104,16 +104,24 @@ jobs:
       - name: The payload runs, and optimising it changes no answer
         run: nix develop --command tools/check_wasm.sh
 
-      # Read an exported DXF back with ezdxf. The Rust tests can only show the
-      # writer agrees with itself; this shows an unrelated parser gets the same
-      # gear out.
+      # Read exported DXFs back with ezdxf and check each arc from its chord
+      # and bulge against the gear derived from its inputs. The Rust tests can
+      # only show the writer agrees with itself; this shows an unrelated parser
+      # gets the same gear out -- a shifted gear, an undercut one, an eccentric
+      # one and a ring.
       - name: Validate DXF export against an independent parser
         run: |
           nix develop --command bash -c '
             set -euo pipefail
-            cargo run -q --release --bin gear-cli -- dxf 17 0.2 0.001 > /tmp/gear17.dxf
-            python3 tools/validate_dxf.py /tmp/gear17.dxf \
-              --root 7.45 --tip 9.7 --base 7.987387276680222 --pitch 8.5 --teeth 17
+            cli="cargo run -q --release --bin gear-cli --"
+            $cli dxf 17 0.2 0.001 > /tmp/gear17.dxf
+            python3 tools/validate_dxf.py /tmp/gear17.dxf --teeth 17 --shift 0.2
+            $cli dxf 9 -0.3 0.001 > /tmp/gear9.dxf
+            python3 tools/validate_dxf.py /tmp/gear9.dxf --teeth 9 --shift -0.3
+            $cli dxf 24 0 0.001 0.25 > /tmp/gear24e.dxf
+            python3 tools/validate_dxf.py /tmp/gear24e.dxf --teeth 24 --angular-shift 0.25
+            $cli dxf ring 43 0 0.001 > /tmp/ring43.dxf
+            python3 tools/validate_dxf.py /tmp/ring43.dxf --ring --teeth 43
           '
 
       # ---- and, on `main` only, hand the site to the deploy job -------------

@@ -502,10 +502,16 @@ const COMMANDS: &[Command] = &[
     },
     Command {
         name: "dxf",
-        args: "[z] [x] [chord tolerance]",
-        summary: "a gear exported to DXF, on stdout (17, 0, 1e-3)",
-        run: |a| dxf(arg(a, 1, 17), arg(a, 2, 0.0), arg(a, 3, 1e-3)),
-        record: Record::Cases(&["dxf 17 0.2 0.001"]),
+        args: "[z] [x] [chord tolerance] [angular shift] | ring [z] [x] [chord tolerance]",
+        summary: "a gear, an eccentric gear or a ring (cut by the default shaper) exported to DXF, on stdout (17, 0, 1e-3, 0)",
+        run: |a| {
+            if a.get(1).is_some_and(|s| s == "ring") {
+                dxf_ring(arg(a, 2, 43), arg(a, 3, 0.0), arg(a, 4, 1e-3));
+            } else {
+                dxf(arg(a, 1, 17), arg(a, 2, 0.0), arg(a, 3, 1e-3), arg(a, 4, 0.0));
+            }
+        },
+        record: Record::Cases(&["dxf 17 0.2 0.001", "dxf 24 0 0.001 0.25", "dxf ring 43 0 0.001"]),
         slow: false
     },
     Command {
@@ -2626,16 +2632,39 @@ fn verify(limit: usize) {
 }
 
 /// Write a DXF to stdout, for inspecting or importing into CAD.
-fn dxf(teeth: u32, x: f64, tol: f64) {
+fn dxf(teeth: u32, x: f64, tol: f64, angular_shift: f64) {
     let g = gear_core::gear::Gear::new(GearParams {
         teeth,
         profile_shift: x,
+        angular_shift,
         ..Default::default()
     });
     print!(
         "{}",
         gear_io::gear_to_dxf(
             &g,
+            &gear_io::DxfOptions {
+                chord_tolerance: tol,
+                reference_circles: true,
+            }
+        )
+    );
+}
+
+/// A ring's bore, cut by the default shaper, as a DXF on stdout.
+fn dxf_ring(teeth: u32, x: f64, tol: f64) {
+    let ring = gear_core::ring::Ring::cut_by(
+        &GearParams {
+            teeth,
+            profile_shift: x,
+            ..Default::default()
+        },
+        &gear_core::ring::Cutter::default(),
+    );
+    print!(
+        "{}",
+        gear_io::ring_to_dxf(
+            &ring,
             &gear_io::DxfOptions {
                 chord_tolerance: tol,
                 reference_circles: true,
