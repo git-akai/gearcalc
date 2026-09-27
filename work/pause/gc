@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# gc <dir> <command...> — run <command> in the gearcalc nix dev shell from <dir>,
+# holding one of two build slots; test threads capped so two slots fit in RAM.
+D=/home/user/.cache/gearcalc-work
+export NEXTEST_TEST_THREADS=3 RUST_TEST_THREADS=3 CARGO_BUILD_JOBS=8
+dir="$1"; shift
+for i in 0 1; do
+  exec 9>"$D/slot.$i"
+  if flock -n 9; then cd "$dir" && exec nix develop /home/user/gearcalc -c "$@"; fi
+done
+exec 9>"$D/slot.$((RANDOM % 2))"; flock 9
+cd "$dir" && exec nix develop /home/user/gearcalc -c "$@"
