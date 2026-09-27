@@ -646,6 +646,15 @@ is a description of an error, never an excuse for one
 ([rationale](rationale.md#a-conservative-answer-is-not-a-free-one)) — an entry
 whose size is unmeasured is a debt still owed, and is marked as one.
 
+- **All stresses are nominal.** The torque entered must already be the
+  design torque: the rating applies the load case's `K_A` (1 unless stated)
+  and no `K_v`, `K_Fβ`/`K_Hβ` or `K_Fα`/`K_Hα`. Each of those is `≥ 1`, so
+  `σ_F` is **low** by their product and `σ_H` by its square root —
+  unconservative, by a size the tool cannot know since it depends on speed,
+  accuracy and mounting. Each rated case says so (`train.stresses_nominal`).
+  The allowables are not ISO's `σ_Flim` or `σ_Hlim` either, so this entry
+  states the stress's bias, not the whole margin's
+  ([rationale](rationale.md#no-isoagma-correction-factors)).
 - **Helical bending is conservative against ISO 6336-3:2019 by 26–36 %** at
   full axial overlap, and **below it by up to 22 %** at an overlap ratio under
   0.3 with a helix over 20° — the one regime where this model runs under the

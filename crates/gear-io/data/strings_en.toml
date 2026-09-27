@@ -156,6 +156,8 @@ case_underdetermined = "motion undecided: {short} more speed(s) to give, or one 
 case_nothing_drives = "no given torque does any work — every load is nought or on a still port: nothing drives this case"
 load_shared = "held at both ends: how the load divides is a matter of stiffness this model does not state — hold one end only, or let a self-locking mesh hold it"
 flow_too_many_meshes = "the power flow crosses {meshes} meshes, and it can follow at most {most} at once"
+stresses_nominal = "stresses are nominal: rated under the torque entered times K_A = {factor}, with no dynamic, face or transverse load factor — enter the design torque"
+application_factor_held = "application factor {given} held at 1: K_A is at least 1 by definition"
 
 [preview]
 nothing = "changes nothing"
@@ -370,6 +372,7 @@ sidebar_collapse = "Fold the tab lists away"
 sidebar_expand = "Show the tab lists"
 train_actuation = "Actuation"
 train_actuation_count = "Actuation count"
+train_application_factor = "Application factor K_A"
 train_actuation_range = "Actuation range"
 train_actuation_range_at = "Range measured at"
 train_add_fatigue_case = "+ Add fatigue load case"

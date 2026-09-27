@@ -3424,10 +3424,15 @@ pub fn rate(
     // which is what the flow's mesh torque is, whichever member drives.
     let pressing_torque_at_a =
         |k: usize, c: &super::CaseLoad| -> f64 { (c.mesh_torques[k] / paths(k)).abs() };
-    // Each mesh's worst pressing torque over the cases, and every case as a
+    // ...and the torque it is **rated** under: that times the case's
+    // application factor, which moves every stress and no torque.
+    let rated_torque_at_a = |k: usize, c: &super::CaseLoad| -> f64 {
+        pressing_torque_at_a(k, c) * c.application_factor
+    };
+    // Each mesh's worst rated torque over the cases, and every case as a
     // scale of it — one evaluation per mesh, every case a multiplication.
     let scaled: Vec<(f64, Vec<f64>)> = (0..shape.meshes.len())
-        .map(|k| super::scaled(cases, |c| pressing_torque_at_a(k, c)))
+        .map(|k| super::scaled(cases, |c| rated_torque_at_a(k, c)))
         .collect();
 
     // ---- contact stress per mesh at the probe width.
@@ -3477,7 +3482,7 @@ pub fn rate(
             cases
                 .iter()
                 .map(|c| {
-                    let at_a = pressing_torque_at_a(k, c);
+                    let at_a = rated_torque_at_a(k, c);
                     let (torque, on, drive) = match c.directions[k] {
                         Drive::Forward => (at_a, MeshSide::First, Drive::Forward),
                         Drive::Backward => (

@@ -47,4 +47,14 @@ loads: Array<Load>,
  * while the case is ultimate for the reason [`Auto::manual`] is kept while
  * automatic: switching the kind back finds it where it was.
  */
-duty: Duty, };
+duty: Duty, 
+/**
+ * **`K_A`, the application factor**: what the driving and driven
+ * machines add to the torque entered, by the designer's judgement of
+ * them. Every stress is rated under the entered torque times it, so
+ * bending scales by `K_A` and a line contact by `√K_A`; the torques and
+ * the flow are reported as entered. 1 where nothing is said, which is
+ * every file written before it existed. Below 1, or not a number, it is
+ * held at 1 and the case says so: `K_A ≥ 1` by definition.
+ */
+application_factor: number, };

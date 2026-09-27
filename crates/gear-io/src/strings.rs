@@ -1175,6 +1175,11 @@ mod tests {
                         ],
                         ..LoadCase::ultimate(start, end, 2.0, 3000.0)
                     },
+                    // An application factor below the 1 it cannot be less than.
+                    LoadCase {
+                        application_factor: 0.5,
+                        ..LoadCase::ultimate(start, end, 2.0, 3000.0)
+                    },
                 ];
                 if let Ok(r) = gear_core::train::solve_train(&t, &lib) {
                     record(&r.every_note());

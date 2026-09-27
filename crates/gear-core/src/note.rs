@@ -171,6 +171,10 @@ pub mod key {
     pub const TRAIN_LOAD_SHARED: &str = "train.load_shared";
     /// `train.flow_too_many_meshes`
     pub const TRAIN_FLOW_TOO_MANY_MESHES: &str = "train.flow_too_many_meshes";
+    /// `train.stresses_nominal`
+    pub const TRAIN_STRESSES_NOMINAL: &str = "train.stresses_nominal";
+    /// `train.application_factor_held`
+    pub const TRAIN_APPLICATION_FACTOR_HELD: &str = "train.application_factor_held";
 
     // ---- a preview ------------------------------------------------ //
     //
@@ -332,6 +336,8 @@ pub mod key {
         TRAIN_LOAD_SHARED,
         TRAIN_LOAD_NOT_REACTED,
         TRAIN_FLOW_TOO_MANY_MESHES,
+        TRAIN_STRESSES_NOMINAL,
+        TRAIN_APPLICATION_FACTOR_HELD,
         ERROR_MESH_INCOMPATIBLE,
         ERROR_MESH_RING_TOO_SMALL,
         ERROR_MESH_OUTSIDE_INVOLUTE_DOMAIN,

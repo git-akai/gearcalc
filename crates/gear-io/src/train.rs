@@ -251,6 +251,10 @@
 //!   written as stages and writes the one graph ([`convert`]), and the
 //!   converted train is the train a chain of the same stages builds now,
 //!   figure for figure.
+//! - **A load case carries `application_factor`**, `K_A`, which a
+//!   pre-existing file will not have. Like `load_sharing` it **defaults
+//!   rather than refusing**: 1 is the default and what every file written
+//!   before it meant — the torque entered rated as it stands.
 //!
 //! No compatibility shim, deliberately. Accepting both shapes means carrying two
 //! readers for one format and testing both forever, and the thing that would go

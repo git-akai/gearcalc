@@ -4,14 +4,17 @@
   path b2 -> b1  ratio -0.395349  efficiency 98.344976 / 98.344976 %  backlash 0.098522 / 0.038950 deg
     power through the teeth 1.000000 / 1.000000   one more tooth: -0.418605 -0.386364
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -6.975099
     b1   load     speed      3000.0000  torque 2.000000
     b2   reacted  speed     -1186.0465  torque 4.975099
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.833283
     b1   reacted  speed         0.0000  torque 0.233283
     b2   load     speed         0.0000  torque 0.600000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -6.975099
     b1   load     speed      2400.0000  torque 2.000000
     b2   reacted  speed      -948.8372  torque 4.975099
@@ -33,16 +36,19 @@
   path b2 -> b1  ratio 0.395349  efficiency 96.796847 / 96.796847 %  backlash 0.197040 / 0.077899 deg
     power through the teeth 1.986873 / 1.980844   one more tooth: 0.418605 0.395349 0.386364
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 2.896782
     b1   load     speed      3000.0000  torque 2.000000
     b2   reacted  speed      1186.0465  torque -4.896782
     b3   free     speed     -2040.0000  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.370389
     b1   reacted  speed         0.0000  torque -0.229611
     b2   load     speed         0.0000  torque 0.600000
     b3   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 2.896782
     b1   load     speed      2400.0000  torque 2.000000
     b2   reacted  speed       948.8372  torque -4.896782
@@ -73,18 +79,21 @@
   path b2 -> b1  ratio 0.422614  efficiency 96.998856 / 96.998856 %  backlash 0.235181 / 0.099391 deg
     power through the teeth 1.986312 / 1.983450   one more tooth: 0.447474 0.413009 0.422614 0.422614 0.408527 0.436247
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 2.590420
     b1   load     speed      3000.0000  torque 2.000000
     b2   reacted  speed      1267.8428  torque -4.590420
     b3   free     speed     -1186.0465  torque 0.000000
     b4   free     speed       549.6313  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.354041
     b1   reacted  speed         0.0000  torque -0.245959
     b2   load     speed         0.0000  torque 0.600000
     b3   free     speed         0.0000  torque 0.000000
     b4   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 2.590420
     b1   load     speed      2400.0000  torque 2.000000
     b2   reacted  speed      1014.2743  torque -4.590420
@@ -128,14 +137,17 @@
   path b2 -> b1  ratio -0.025000  efficiency 0.000000 / 61.804609 %  backlash 6.204966 / 0.155124 deg
     power through the teeth 1.000000 / 1.000000   one more tooth: -0.050000 -0.024390
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -51.443687
     b1   load     speed      3000.0000  torque 2.000000
     b2   reacted  speed       -75.0000  torque 49.443687
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.600000
     b1   reacted  speed         0.0000  torque 0.000000
     b2   load     speed         0.0000  torque 0.600000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -51.443687
     b1   load     speed      2400.0000  torque 2.000000
     b2   reacted  speed       -60.0000  torque 49.443687
@@ -158,14 +170,17 @@
   path b2 -> b1  ratio -0.395349  efficiency 84.253594 / 84.255298 %  backlash 0.098136 / 0.038798 deg
     power through the teeth 1.000000 / 1.000000   one more tooth: -0.418605 -0.386364
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -6.262327
     b1   load     speed      3000.0000  torque 2.000000
     b2   reacted  speed     -1186.0465  torque 4.262327
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.799857
     b1   reacted  speed         0.0000  torque 0.199857
     b2   load     speed         0.0000  torque 0.600000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -6.262327
     b1   load     speed      2400.0000  torque 2.000000
     b2   reacted  speed      -948.8372  torque 4.262327
@@ -187,18 +202,21 @@
   path b2 -> b1  ratio 0.142857  efficiency 97.672819 / 97.681810 %  backlash 0.292068 / 0.041724 deg
     power through the teeth 1.716159 / 1.695758   one more tooth: 0.152941 0.142857 0.141176
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      3000.0000  torque 2.000000
     b2   reacted  speed       428.5714  torque -13.675453
     b3   fixed    speed              -  torque 11.675453
     b4   free     speed      -600.0000  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   reacted  speed         0.0000  torque -0.083720
     b2   load     speed         0.0000  torque 0.600000
     b3   fixed    speed              -  torque -0.516280
     b4   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      2400.0000  torque 2.000000
     b2   reacted  speed       342.8571  torque -13.675453
@@ -229,18 +247,21 @@
   path b3 -> b1  ratio 0.016393  efficiency 0.000000 / 45.356184 %  backlash 2.985130 / 0.048937 deg
     power through the teeth 99.120284 / 54.142533   one more tooth: 0.016393 - 0.032258
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      3000.0000  torque 2.000000
     b2   fixed    speed              -  torque 53.334545
     b3   reacted  speed        49.1803  torque -55.334545
     b4   free     speed     -7000.0000  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   reacted  speed         0.0000  torque 0.002257
     b2   fixed    speed              -  torque -0.602257
     b3   load     speed         0.0000  torque 0.600000
     b4   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      2400.0000  torque 2.000000
     b2   fixed    speed              -  torque 53.334545
@@ -273,6 +294,7 @@
   path b3 -> b1  ratio 0.011299  efficiency 0.000000 / 65.548466 %  backlash 5.022252 / 0.056749 deg
     power through the teeth 50.046629 / 33.083841   one more tooth: 0.011632 0.006647 0.015873 0.025742 -0.004843
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      3000.0000  torque 2.000000
     b2   fixed    speed              -  torque 114.020785
@@ -280,6 +302,7 @@
     b4   free     speed       857.1429  torque 0.000000
     b5   free     speed     -2000.0000  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   reacted  speed         0.0000  torque -0.003289
     b2   fixed    speed              -  torque -0.596711
@@ -287,6 +310,7 @@
     b4   free     speed         0.0000  torque 0.000000
     b5   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      2400.0000  torque 2.000000
     b2   fixed    speed              -  torque 114.020785
@@ -331,18 +355,21 @@
   path b3 -> b1  ratio -0.100000  efficiency 97.080449 / 97.155934 %  backlash 0.957619 / 0.095762 deg
     power through the teeth 11.000000 / 10.715593   one more tooth: -0.064516 -0.133333
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      3000.0000  torque 2.000000
     b2   fixed    speed              -  torque -21.431187
     b3   reacted  speed      -300.0000  torque 19.431187
     b4   free     speed      -300.0000  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   reacted  speed         0.0000  torque 0.058248
     b2   fixed    speed              -  torque -0.658248
     b3   load     speed         0.0000  torque 0.600000
     b4   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      2400.0000  torque 2.000000
     b2   fixed    speed              -  torque -21.431187
@@ -366,6 +393,7 @@
   path b2 -> b1  ratio -0.333333  efficiency 93.466662 / 93.358179 %  backlash 0.208944 / 0.069648 deg
     power through the teeth 3.879367 / 3.922025   one more tooth: -0.352113 -0.333333 -0.333333 -0.328767
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      3000.0000  torque 2.000000
     b2   reacted  speed     -1000.0000  torque 5.601491
@@ -373,6 +401,7 @@
     b4   free     speed     -6333.3333  torque 0.000000
     b5   free     speed      4333.3333  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   reacted  speed         0.0000  torque 0.186933
     b2   load     speed         0.0000  torque 0.600000
@@ -380,6 +409,7 @@
     b4   free     speed         0.0000  torque 0.000000
     b5   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      2400.0000  torque 2.000000
     b2   reacted  speed      -800.0000  torque 5.601491
@@ -420,16 +450,19 @@
   path b3 -> b1  ratio 0.156301  efficiency 96.717344 / 96.717344 %  backlash 0.347723 / 0.054349 deg
     power through the teeth 1.983450 / 1.983450   one more tooth: 0.165495 0.152748 0.165495 0.152748
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 10.375804
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed     -1186.0465  torque 0.000000
     b3   reacted  speed       468.9021  torque -12.375804
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.509298
     b1   reacted  speed         0.0000  torque -0.090702
     b2   free     speed         0.0000  torque 0.000000
     b3   load     speed         0.0000  torque 0.600000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 10.375804
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed      -948.8372  torque 0.000000
@@ -463,18 +496,21 @@
   path b3 -> b1  ratio -0.156301  efficiency 95.194836 / 95.194836 %  backlash 0.596916 / 0.093298 deg
     power through the teeth 2.954841 / 2.948061   one more tooth: -0.165495 -0.152748 -0.165495 -0.156301 -0.152748
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -14.180986
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed     -1186.0465  torque 0.000000
     b3   reacted  speed      -468.9021  torque 12.180986
     b4   free     speed       806.5116  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.689274
     b1   reacted  speed         0.0000  torque 0.089274
     b2   free     speed         0.0000  torque 0.000000
     b3   load     speed         0.0000  torque 0.600000
     b4   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -14.180986
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed      -948.8372  torque 0.000000
@@ -517,6 +553,7 @@
   path b3 -> b1  ratio -0.167080  efficiency 95.393502 / 95.393502 %  backlash 0.693390 / 0.115852 deg
     power through the teeth 2.956301 / 2.950623   one more tooth: -0.176908 -0.163283 -0.176908 -0.163283 -0.167080 -0.167080 -0.161511 -0.172470
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -13.418897
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed     -1186.0465  torque 0.000000
@@ -524,6 +561,7 @@
     b4   free     speed       468.9021  torque 0.000000
     b5   free     speed      -217.2961  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.695630
     b1   reacted  speed         0.0000  torque 0.095630
     b2   free     speed         0.0000  torque 0.000000
@@ -531,6 +569,7 @@
     b4   free     speed         0.0000  torque 0.000000
     b5   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -13.418897
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed      -948.8372  torque 0.000000
@@ -586,16 +625,19 @@
   path b3 -> b1  ratio 0.009884  efficiency 0.000000 / 60.781728 %  backlash 15.793435 / 0.156098 deg
     power through the teeth 1.000000 / 1.983450   one more tooth: 0.010465 0.009659 0.019767 0.009643
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 120.993614
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed     -1186.0465  torque 0.000000
     b3   reacted  speed        29.6512  torque -122.993614
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.600000
     b1   reacted  speed         0.0000  torque 0.000000
     b2   free     speed         0.0000  torque 0.000000
     b3   load     speed         0.0000  torque 0.600000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 120.993614
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed      -948.8372  torque 0.000000
@@ -630,16 +672,19 @@
   path b3 -> b1  ratio 0.156301  efficiency 82.859177 / 82.860853 %  backlash 0.346749 / 0.054197 deg
     power through the teeth 1.842536 / 1.983450   one more tooth: 0.165495 0.152748 0.165495 0.152748
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 8.602749
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed     -1186.0465  torque 0.000000
     b3   reacted  speed       468.9021  torque -10.602749
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.522294
     b1   reacted  speed         0.0000  torque -0.077706
     b2   free     speed         0.0000  torque 0.000000
     b3   load     speed         0.0000  torque 0.600000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 8.602749
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed      -948.8372  torque 0.000000
@@ -673,6 +718,7 @@
   path b3 -> b1  ratio -0.056478  efficiency 96.056311 / 96.065153 %  backlash 0.837281 / 0.047288 deg
     power through the teeth 2.692887 / 2.667693   one more tooth: -0.059801 -0.055195 -0.060465 -0.056478 -0.055814
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -6.975099
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed     -1186.0465  torque 0.000000
@@ -680,6 +726,7 @@
     b4   fixed    speed              -  torque -29.043267
     b5   free     speed       237.2093  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.116270
     b1   reacted  speed         0.0000  torque 0.032551
     b2   free     speed         0.0000  torque 0.000000
@@ -687,6 +734,7 @@
     b4   fixed    speed              -  torque -0.516280
     b5   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -6.975099
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed      -948.8372  torque 0.000000
@@ -729,6 +777,7 @@
   path b4 -> b1  ratio -0.006481  efficiency 0.000000 / 44.605529 %  backlash 7.649145 / 0.049575 deg
     power through the teeth 98.999121 / 54.246461   one more tooth: -0.006862 -0.006334 -0.006481 - -0.012753
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -6.975099
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed     -1186.0465  torque 0.000000
@@ -736,6 +785,7 @@
     b4   reacted  speed       -19.4434  torque 137.647414
     b5   free     speed      2767.4419  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.003164
     b1   reacted  speed         0.0000  torque -0.000907
     b2   free     speed         0.0000  torque 0.000000
@@ -743,6 +793,7 @@
     b4   load     speed         0.0000  torque 0.600000
     b5   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -6.975099
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed      -948.8372  torque 0.000000
@@ -787,6 +838,7 @@
   path b4 -> b1  ratio -0.004467  efficiency 0.000000 / 64.463623 %  backlash 12.801866 / 0.057189 deg
     power through the teeth 50.531769 / 33.536296   one more tooth: -0.004730 -0.004366 -0.004599 -0.002628 -0.006275 -0.010177 0.001915
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -6.975099
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed     -1186.0465  torque 0.000000
@@ -795,6 +847,7 @@
     b5   free     speed      -338.8704  torque 0.000000
     b6   free     speed       790.6977  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.004568
     b1   reacted  speed         0.0000  torque 0.001279
     b2   free     speed         0.0000  torque 0.000000
@@ -803,6 +856,7 @@
     b5   free     speed         0.0000  torque 0.000000
     b6   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -6.975099
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed      -948.8372  torque 0.000000
@@ -859,6 +913,7 @@
   path b4 -> b1  ratio 0.039535  efficiency 95.473744 / 95.547980 %  backlash 2.520735 / 0.099657 deg
     power through the teeth 11.970804 / 11.538248   one more tooth: 0.041860 0.038636 0.025506 0.052713
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -6.975099
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed     -1186.0465  torque 0.000000
@@ -866,6 +921,7 @@
     b4   reacted  speed       118.6047  torque -48.336037
     b5   free     speed       118.6047  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.080896
     b1   reacted  speed         0.0000  torque -0.022647
     b2   free     speed         0.0000  torque 0.000000
@@ -873,6 +929,7 @@
     b4   load     speed         0.0000  torque 0.600000
     b5   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -6.975099
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed      -948.8372  torque 0.000000
@@ -908,6 +965,7 @@
   path b3 -> b1  ratio 0.131783  efficiency 91.919767 / 91.813079 %  backlash 0.627028 / 0.082632 deg
     power through the teeth 4.814034 / 4.857114   one more tooth: 0.139535 0.128788 0.139207 0.131783 0.131783 0.129978
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -6.975099
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed     -1186.0465  torque 0.000000
@@ -916,6 +974,7 @@
     b5   free     speed      2503.8760  torque 0.000000
     b6   free     speed     -1713.1783  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.259614
     b1   reacted  speed         0.0000  torque -0.072681
     b2   free     speed         0.0000  torque 0.000000
@@ -924,6 +983,7 @@
     b5   free     speed         0.0000  torque 0.000000
     b6   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -6.975099
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed      -948.8372  torque 0.000000
@@ -976,18 +1036,21 @@
   path b4 -> b1  ratio -0.156301  efficiency 95.194836 / 95.194836 %  backlash 0.446241 / 0.069748 deg
     power through the teeth 2.953990 / 2.948813   one more tooth: -0.165495 -0.156301 -0.152748 -0.165495 -0.152748
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -14.180986
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed      1186.0465  torque 0.000000
     b3   free     speed     -2040.0000  torque 0.000000
     b4   reacted  speed      -468.9021  torque 12.180986
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.689274
     b1   reacted  speed         0.0000  torque 0.089274
     b2   free     speed         0.0000  torque 0.000000
     b3   free     speed         0.0000  torque 0.000000
     b4   load     speed         0.0000  torque 0.600000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -14.180986
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed       948.8372  torque 0.000000
@@ -1030,6 +1093,7 @@
   path b4 -> b1  ratio 0.156301  efficiency 93.696296 / 93.696296 %  backlash 0.695434 / 0.108697 deg
     power through the teeth 3.910103 / 3.898239   one more tooth: 0.165495 0.156301 0.152748 0.165495 0.156301 0.152748
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 9.989235
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed      1186.0465  torque 0.000000
@@ -1037,6 +1101,7 @@
     b4   reacted  speed       468.9021  torque -11.989235
     b5   free     speed      -806.5116  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.512131
     b1   reacted  speed         0.0000  torque -0.087869
     b2   free     speed         0.0000  torque 0.000000
@@ -1044,6 +1109,7 @@
     b4   load     speed         0.0000  torque 0.600000
     b5   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 9.989235
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed       948.8372  torque 0.000000
@@ -1095,6 +1161,7 @@
   path b4 -> b1  ratio 0.167080  efficiency 93.891835 / 93.891835 %  backlash 0.791908 / 0.132312 deg
     power through the teeth 3.913556 / 3.900761   one more tooth: 0.176908 0.167080 0.163283 0.176908 0.163283 0.167080 0.167080 0.161511 0.172470
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 9.239143
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed      1186.0465  torque 0.000000
@@ -1103,6 +1170,7 @@
     b5   free     speed      -468.9021  torque 0.000000
     b6   free     speed       217.2961  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.505875
     b1   reacted  speed         0.0000  torque -0.094125
     b2   free     speed         0.0000  torque 0.000000
@@ -1111,6 +1179,7 @@
     b5   free     speed         0.0000  torque 0.000000
     b6   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 9.239143
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed       948.8372  torque 0.000000
@@ -1175,18 +1244,21 @@
   path b4 -> b1  ratio -0.009884  efficiency 0.000000 / 59.824913 %  backlash 15.891953 / 0.157072 deg
     power through the teeth 1.000000 / 2.948813   one more tooth: -0.010465 -0.009884 -0.009659 -0.019767 -0.009643
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -123.057470
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed      1186.0465  torque 0.000000
     b3   free     speed     -2040.0000  torque 0.000000
     b4   reacted  speed       -29.6512  torque 121.057470
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.600000
     b1   reacted  speed         0.0000  torque 0.000000
     b2   free     speed         0.0000  torque 0.000000
     b3   free     speed         0.0000  torque 0.000000
     b4   load     speed         0.0000  torque 0.600000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -123.057470
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed       948.8372  torque 0.000000
@@ -1230,18 +1302,21 @@
   path b4 -> b1  ratio -0.156301  efficiency 81.554822 / 81.556472 %  backlash 0.445267 / 0.069595 deg
     power through the teeth 2.674012 / 2.948813   one more tooth: -0.165495 -0.156301 -0.152748 -0.165495 -0.152748
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -12.435842
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed      1186.0465  torque 0.000000
     b3   free     speed     -2040.0000  torque 0.000000
     b4   reacted  speed      -468.9021  torque 10.435842
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.676482
     b1   reacted  speed         0.0000  torque 0.076482
     b2   free     speed         0.0000  torque 0.000000
     b3   free     speed         0.0000  torque 0.000000
     b4   load     speed         0.0000  torque 0.600000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -12.435842
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed       948.8372  torque 0.000000
@@ -1284,6 +1359,7 @@
   path b4 -> b1  ratio 0.056478  efficiency 94.544209 / 94.552913 %  backlash 0.935799 / 0.052852 deg
     power through the teeth 3.656794 / 3.622285   one more tooth: 0.059801 0.056478 0.055195 0.060465 0.056478 0.055814
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 2.896782
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed      1186.0465  torque 0.000000
@@ -1292,6 +1368,7 @@
     b5   fixed    speed              -  torque 28.586073
     b6   free     speed      -237.2093  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.051681
     b1   reacted  speed         0.0000  torque -0.032038
     b2   free     speed         0.0000  torque 0.000000
@@ -1300,6 +1377,7 @@
     b5   fixed    speed              -  torque -0.516280
     b6   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 2.896782
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed       948.8372  torque 0.000000
@@ -1351,6 +1429,7 @@
   path b5 -> b1  ratio 0.006481  efficiency 0.000000 / 43.903357 %  backlash 7.747663 / 0.050214 deg
     power through the teeth 98.891457 / 54.389109   one more tooth: 0.006862 0.006481 0.006334 0.006481 - 0.012753
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 2.896782
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed      1186.0465  torque 0.000000
@@ -1359,6 +1438,7 @@
     b5   reacted  speed        19.4434  torque -135.480593
     b6   free     speed     -2767.4419  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.001335
     b1   reacted  speed         0.0000  torque 0.000922
     b2   free     speed         0.0000  torque 0.000000
@@ -1367,6 +1447,7 @@
     b5   load     speed         0.0000  torque 0.600000
     b6   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 2.896782
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed       948.8372  torque 0.000000
@@ -1420,6 +1501,7 @@
   path b5 -> b1  ratio 0.004467  efficiency 0.000000 / 63.448849 %  backlash 12.900384 / 0.057629 deg
     power through the teeth 51.010540 / 34.004959   one more tooth: 0.004730 0.004467 0.004366 0.004599 0.002628 0.006275 0.010177 -0.001915
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 2.896782
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed      1186.0465  torque 0.000000
@@ -1429,6 +1511,7 @@
     b6   free     speed       338.8704  torque 0.000000
     b7   free     speed      -790.6977  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.002030
     b1   reacted  speed         0.0000  torque -0.001259
     b2   free     speed         0.0000  torque 0.000000
@@ -1438,6 +1521,7 @@
     b6   free     speed         0.0000  torque 0.000000
     b7   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 2.896782
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed       948.8372  torque 0.000000
@@ -1503,6 +1587,7 @@
   path b5 -> b1  ratio -0.039535  efficiency 93.970814 / 94.043881 %  backlash 2.619253 / 0.103552 deg
     power through the teeth 12.928865 / 12.353201   one more tooth: -0.041860 -0.039535 -0.038636 -0.025506 -0.052713
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 2.896782
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed      1186.0465  torque 0.000000
@@ -1511,6 +1596,7 @@
     b5   reacted  speed      -118.6047  torque 47.575140
     b6   free     speed      -118.6047  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.035958
     b1   reacted  speed         0.0000  torque 0.022291
     b2   free     speed         0.0000  torque 0.000000
@@ -1519,6 +1605,7 @@
     b5   load     speed         0.0000  torque 0.600000
     b6   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 2.896782
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed       948.8372  torque 0.000000
@@ -1563,6 +1650,7 @@
   path b4 -> b1  ratio -0.131783  efficiency 90.472782 / 90.367774 %  backlash 0.725546 / 0.095615 deg
     power through the teeth 5.736431 / 5.777241   one more tooth: -0.139535 -0.131783 -0.128788 -0.139207 -0.131783 -0.131783 -0.129978
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 2.896782
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed      1186.0465  torque 0.000000
@@ -1572,6 +1660,7 @@
     b6   free     speed     -2503.8760  torque 0.000000
     b7   free     speed      1713.1783  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.115397
     b1   reacted  speed         0.0000  torque 0.071537
     b2   free     speed         0.0000  torque 0.000000
@@ -1581,6 +1670,7 @@
     b6   free     speed         0.0000  torque 0.000000
     b7   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 2.896782
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed       948.8372  torque 0.000000
@@ -1642,6 +1732,7 @@
   path b5 -> b1  ratio -0.167080  efficiency 95.393502 / 95.393502 %  backlash 0.468305 / 0.078244 deg
     power through the teeth 2.953438 / 2.953438   one more tooth: -0.176908 -0.163283 -0.167080 -0.167080 -0.161511 -0.172470 -0.176908 -0.163283
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -13.418897
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed      1267.8428  torque 0.000000
@@ -1649,6 +1740,7 @@
     b4   free     speed       549.6313  torque 0.000000
     b5   reacted  speed      -501.2402  torque 11.418897
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.695630
     b1   reacted  speed         0.0000  torque 0.095630
     b2   free     speed         0.0000  torque 0.000000
@@ -1656,6 +1748,7 @@
     b4   free     speed         0.0000  torque 0.000000
     b5   load     speed         0.0000  torque 0.600000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -13.418897
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed      1014.2743  torque 0.000000
@@ -1711,6 +1804,7 @@
   path b5 -> b1  ratio 0.167080  efficiency 93.891835 / 93.891835 %  backlash 0.701420 / 0.117193 deg
     power through the teeth 3.909560 / 3.904846   one more tooth: 0.176908 0.163283 0.167080 0.167080 0.161511 0.172470 0.176908 0.167080 0.163283
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 9.239143
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed      1267.8428  torque 0.000000
@@ -1719,6 +1813,7 @@
     b5   reacted  speed       501.2402  torque -11.239143
     b6   free     speed      -862.1331  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.505875
     b1   reacted  speed         0.0000  torque -0.094125
     b2   free     speed         0.0000  torque 0.000000
@@ -1727,6 +1822,7 @@
     b5   load     speed         0.0000  torque 0.600000
     b6   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 9.239143
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed      1014.2743  torque 0.000000
@@ -1791,6 +1887,7 @@
   path b5 -> b1  ratio 0.178603  efficiency 94.087782 / 94.087782 %  backlash 0.791670 / 0.141395 deg
     power through the teeth 3.913012 / 3.907373   one more tooth: 0.189109 0.174544 0.178603 0.178603 0.172649 0.184364 0.189109 0.174544 0.178603 0.178603 0.172649 0.184364
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 8.535979
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed      1267.8428  torque 0.000000
@@ -1800,6 +1897,7 @@
     b6   free     speed      -501.2402  torque 0.000000
     b7   free     speed       232.2820  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.499174
     b1   reacted  speed         0.0000  torque -0.100826
     b2   free     speed         0.0000  torque 0.000000
@@ -1809,6 +1907,7 @@
     b6   free     speed         0.0000  torque 0.000000
     b7   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 8.535979
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed      1014.2743  torque 0.000000
@@ -1886,6 +1985,7 @@
   path b5 -> b1  ratio -0.010565  efficiency 0.000000 / 59.949764 %  backlash 14.917519 / 0.157609 deg
     power through the teeth 1.000000 / 2.953438   one more tooth: -0.011187 -0.010325 -0.010565 -0.010565 -0.010213 -0.010906 -0.021131 -0.010308
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -115.483651
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed      1267.8428  torque 0.000000
@@ -1893,6 +1993,7 @@
     b4   free     speed       549.6313  torque 0.000000
     b5   reacted  speed       -31.6961  torque 113.483651
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.600000
     b1   reacted  speed         0.0000  torque 0.000000
     b2   free     speed         0.0000  torque 0.000000
@@ -1900,6 +2001,7 @@
     b4   free     speed         0.0000  torque 0.000000
     b5   load     speed         0.0000  torque 0.600000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -115.483651
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed      1014.2743  torque 0.000000
@@ -1956,6 +2058,7 @@
   path b5 -> b1  ratio -0.167080  efficiency 81.725022 / 81.726676 %  backlash 0.467393 / 0.078092 deg
     power through the teeth 2.673539 / 2.953438   one more tooth: -0.176908 -0.163283 -0.167080 -0.167080 -0.161511 -0.172470 -0.176908 -0.163283
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -11.782936
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed      1267.8428  torque 0.000000
@@ -1963,6 +2066,7 @@
     b4   free     speed       549.6313  torque 0.000000
     b5   reacted  speed      -501.2402  torque 9.782936
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.681928
     b1   reacted  speed         0.0000  torque 0.081928
     b2   free     speed         0.0000  torque 0.000000
@@ -1970,6 +2074,7 @@
     b4   free     speed         0.0000  torque 0.000000
     b5   load     speed         0.0000  torque 0.600000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -11.782936
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed      1014.2743  torque 0.000000
@@ -2025,6 +2130,7 @@
   path b5 -> b1  ratio 0.060373  efficiency 94.741518 / 94.750239 %  backlash 0.926278 / 0.055923 deg
     power through the teeth 3.656246 / 3.628316   one more tooth: 0.063925 0.059001 0.060373 0.060373 0.058361 0.062321 0.064635 0.060373 0.059663
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 2.590420
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed      1267.8428  torque 0.000000
@@ -2034,6 +2140,7 @@
     b6   fixed    speed              -  torque 26.797619
     b7   free     speed      -253.5686  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.049400
     b1   reacted  speed         0.0000  torque -0.034319
     b2   free     speed         0.0000  torque 0.000000
@@ -2043,6 +2150,7 @@
     b6   fixed    speed              -  torque -0.516280
     b7   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 2.590420
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed      1014.2743  torque 0.000000
@@ -2107,6 +2215,7 @@
   path b6 -> b1  ratio 0.006928  efficiency 0.000000 / 43.994980 %  backlash 7.298667 / 0.050566 deg
     power through the teeth 98.930646 / 54.501087   one more tooth: 0.007336 0.006771 0.006928 0.006928 0.006697 0.007152 0.006928 - 0.013633
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 2.590420
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed      1267.8428  torque 0.000000
@@ -2116,6 +2225,7 @@
     b6   reacted  speed        20.7843  torque -127.004409
     b7   free     speed     -2958.2999  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.001274
     b1   reacted  speed         0.0000  torque 0.000983
     b2   free     speed         0.0000  torque 0.000000
@@ -2125,6 +2235,7 @@
     b6   load     speed         0.0000  torque 0.600000
     b7   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 2.590420
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed      1014.2743  torque 0.000000
@@ -2191,6 +2302,7 @@
   path b6 -> b1  ratio 0.004775  efficiency 0.000000 / 63.581263 %  backlash 12.118954 / 0.057872 deg
     power through the teeth 51.010268 / 34.074397   one more tooth: 0.005056 0.004667 0.004775 0.004775 0.004616 0.004929 0.004916 0.002809 0.006708 0.010879 -0.002047
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 2.590420
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed      1267.8428  torque 0.000000
@@ -2201,6 +2313,7 @@
     b7   free     speed       362.2408  torque 0.000000
     b8   free     speed      -845.2285  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.001941
     b1   reacted  speed         0.0000  torque -0.001348
     b2   free     speed         0.0000  torque 0.000000
@@ -2211,6 +2324,7 @@
     b7   free     speed         0.0000  torque 0.000000
     b8   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 2.590420
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed      1014.2743  torque 0.000000
@@ -2289,6 +2403,7 @@
   path b6 -> b1  ratio -0.042261  efficiency 94.166925 / 94.240145 %  backlash 2.501122 / 0.105701 deg
     power through the teeth 12.928321 / 12.377453   one more tooth: -0.044747 -0.041301 -0.042261 -0.042261 -0.040853 -0.043625 -0.027265 -0.056349
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 2.590420
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed      1267.8428  torque 0.000000
@@ -2298,6 +2413,7 @@
     b6   reacted  speed      -126.7843  torque 44.598657
     b7   free     speed      -126.7843  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.034370
     b1   reacted  speed         0.0000  torque 0.023878
     b2   free     speed         0.0000  torque 0.000000
@@ -2307,6 +2423,7 @@
     b6   load     speed         0.0000  torque 0.600000
     b7   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 2.590420
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed      1014.2743  torque 0.000000
@@ -2364,6 +2481,7 @@
   path b5 -> b1  ratio -0.140871  efficiency 90.661593 / 90.556366 %  backlash 0.729589 / 0.102778 deg
     power through the teeth 5.735907 / 5.787769   one more tooth: -0.149158 -0.137670 -0.140871 -0.140871 -0.136176 -0.145416 -0.148808 -0.140871 -0.140871 -0.138942
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 2.590420
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed      1267.8428  torque 0.000000
@@ -2374,6 +2492,7 @@
     b7   free     speed     -2676.5571  torque 0.000000
     b8   free     speed      1831.3285  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.110304
     b1   reacted  speed         0.0000  torque 0.076630
     b2   free     speed         0.0000  torque 0.000000
@@ -2384,6 +2503,7 @@
     b7   free     speed         0.0000  torque 0.000000
     b8   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 2.590420
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed      1014.2743  torque 0.000000
@@ -2458,16 +2578,19 @@
   path b3 -> b1  ratio 0.009884  efficiency 0.000000 / 60.781728 %  backlash 10.145829 / 0.100279 deg
     power through the teeth 1.983450 / 1.618046   one more tooth: 0.019767 0.009643 0.010465 0.009659
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 120.993614
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed       -75.0000  torque 0.000000
     b3   reacted  speed        29.6512  torque -122.993614
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.600000
     b1   reacted  speed         0.0000  torque 0.000000
     b2   free     speed         0.0000  torque 0.000000
     b3   load     speed         0.0000  torque 0.600000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 120.993614
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed       -60.0000  torque 0.000000
@@ -2502,18 +2625,21 @@
   path b3 -> b1  ratio -0.009884  efficiency 0.000000 / 59.824913 %  backlash 14.086551 / 0.139228 deg
     power through the teeth 2.954841 / 2.224253   one more tooth: -0.019767 -0.009643 -0.010465 -0.009884 -0.009659
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -123.057470
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed       -75.0000  torque 0.000000
     b3   reacted  speed       -29.6512  torque 121.057470
     b4   free     speed        51.0000  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.600000
     b1   reacted  speed         0.0000  torque 0.000000
     b2   free     speed         0.0000  torque 0.000000
     b3   load     speed         0.0000  torque 0.600000
     b4   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -123.057470
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed       -60.0000  torque 0.000000
@@ -2557,6 +2683,7 @@
   path b3 -> b1  ratio -0.010565  efficiency 0.000000 / 59.949764 %  backlash 15.612188 / 0.164948 deg
     power through the teeth 2.956301 / 2.225863   one more tooth: -0.021131 -0.010308 -0.011187 -0.010325 -0.010565 -0.010565 -0.010213 -0.010906
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -115.483651
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed       -75.0000  torque 0.000000
@@ -2564,6 +2691,7 @@
     b4   free     speed        29.6512  torque 0.000000
     b5   free     speed       -13.7408  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.600000
     b1   reacted  speed         0.0000  torque 0.000000
     b2   free     speed         0.0000  torque 0.000000
@@ -2571,6 +2699,7 @@
     b4   free     speed         0.0000  torque 0.000000
     b5   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -115.483651
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed       -60.0000  torque 0.000000
@@ -2627,16 +2756,19 @@
   path b3 -> b1  ratio 0.000625  efficiency 0.000000 / 38.198096 %  backlash 254.403600 / 0.159002 deg
     power through the teeth 1.000000 / 1.618046   one more tooth: 0.001250 0.000610 0.001250 0.000610
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 1220.339085
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed       -75.0000  torque 0.000000
     b3   reacted  speed         1.8750  torque -1222.339085
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.600000
     b1   reacted  speed         0.0000  torque 0.000000
     b2   free     speed         0.0000  torque 0.000000
     b3   load     speed         0.0000  torque 0.600000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 1220.339085
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed       -60.0000  torque 0.000000
@@ -2672,16 +2804,19 @@
   path b3 -> b1  ratio 0.009884  efficiency 0.000000 / 52.073657 %  backlash 10.130417 / 0.100126 deg
     power through the teeth 1.842536 / 1.618046   one more tooth: 0.019767 0.009643 0.010465 0.009659
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 103.372577
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed       -75.0000  torque 0.000000
     b3   reacted  speed        29.6512  torque -105.372577
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.600000
     b1   reacted  speed         0.0000  torque 0.000000
     b2   free     speed         0.0000  torque 0.000000
     b3   load     speed         0.0000  torque 0.600000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 103.372577
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed       -60.0000  torque 0.000000
@@ -2716,6 +2851,7 @@
   path b3 -> b1  ratio -0.003571  efficiency 0.000000 / 60.371861 %  backlash 17.887672 / 0.063885 deg
     power through the teeth 2.692887 / 2.048057   one more tooth: -0.007143 -0.003484 -0.003824 -0.003571 -0.003529
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -51.443687
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed       -75.0000  torque 0.000000
@@ -2723,6 +2859,7 @@
     b4   fixed    speed              -  torque -288.638733
     b5   free     speed        15.0000  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.083720
     b1   reacted  speed         0.0000  torque 0.000000
     b2   free     speed         0.0000  torque 0.000000
@@ -2730,6 +2867,7 @@
     b4   fixed    speed              -  torque -0.516280
     b5   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -51.443687
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed       -60.0000  torque 0.000000
@@ -2773,6 +2911,7 @@
   path b4 -> b1  ratio -0.000410  efficiency 0.000000 / 28.032212 %  backlash 125.610177 / 0.051480 deg
     power through the teeth 89.140771 / 34.462580   one more tooth: -0.000820 -0.000400 -0.000410 - -0.000806
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -51.443687
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed       -75.0000  torque 0.000000
@@ -2780,6 +2919,7 @@
     b4   reacted  speed        -1.2295  torque 1367.971960
     b5   free     speed       175.0000  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.002348
     b1   reacted  speed         0.0000  torque -0.000091
     b2   free     speed         0.0000  torque 0.000000
@@ -2787,6 +2927,7 @@
     b4   load     speed         0.0000  torque 0.600000
     b5   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -51.443687
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed       -60.0000  torque 0.000000
@@ -2832,6 +2973,7 @@
   path b4 -> b1  ratio -0.000282  efficiency 0.000000 / 40.511973 %  backlash 207.095059 / 0.058501 deg
     power through the teeth 50.531769 / 21.447339   one more tooth: -0.000565 -0.000276 -0.000291 -0.000166 -0.000397 -0.000644 0.000121
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -51.443687
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed       -75.0000  torque 0.000000
@@ -2840,6 +2982,7 @@
     b5   free     speed       -21.4286  torque 0.000000
     b6   free     speed        50.0000  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.003289
     b1   reacted  speed         0.0000  torque 0.000000
     b2   free     speed         0.0000  torque 0.000000
@@ -2848,6 +2991,7 @@
     b5   free     speed         0.0000  torque 0.000000
     b6   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -51.443687
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed       -60.0000  torque 0.000000
@@ -2905,6 +3049,7 @@
   path b4 -> b1  ratio 0.002500  efficiency 0.000000 / 60.046845 %  backlash 44.509735 / 0.111274 deg
     power through the teeth 11.970804 / 7.622731   one more tooth: 0.005000 0.002439 0.001613 0.003333
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -51.443687
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed       -75.0000  torque 0.000000
@@ -2912,6 +3057,7 @@
     b4   reacted  speed         7.5000  torque -480.374759
     b5   free     speed         7.5000  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.058248
     b1   reacted  speed         0.0000  torque 0.000000
     b2   free     speed         0.0000  torque 0.000000
@@ -2919,6 +3065,7 @@
     b4   load     speed         0.0000  torque 0.600000
     b5   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -51.443687
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed       -60.0000  torque 0.000000
@@ -2955,6 +3102,7 @@
   path b3 -> b1  ratio 0.008333  efficiency 0.000000 / 57.699657 %  backlash 14.562735 / 0.121356 deg
     power through the teeth 4.814034 / 3.423992   one more tooth: 0.016667 0.008130 0.008803 0.008333 0.008333 0.008219
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -51.443687
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed       -75.0000  torque 0.000000
@@ -2963,6 +3111,7 @@
     b5   free     speed       158.3333  torque 0.000000
     b6   free     speed      -108.3333  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.186933
     b1   reacted  speed         0.0000  torque 0.000000
     b2   free     speed         0.0000  torque 0.000000
@@ -2971,6 +3120,7 @@
     b5   free     speed         0.0000  torque 0.000000
     b6   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -51.443687
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed       -60.0000  torque 0.000000
@@ -3024,16 +3174,19 @@
   path b3 -> b1  ratio 0.156301  efficiency 82.859177 / 82.860853 %  backlash 0.347338 / 0.054289 deg
     power through the teeth 1.983450 / 1.842553   one more tooth: 0.165495 0.152748 0.165495 0.152748
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 8.602749
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed     -1186.0465  torque 0.000000
     b3   reacted  speed       468.9021  torque -10.602749
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.522294
     b1   reacted  speed         0.0000  torque -0.077706
     b2   free     speed         0.0000  torque 0.000000
     b3   load     speed         0.0000  torque 0.600000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 8.602749
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed      -948.8372  torque 0.000000
@@ -3067,18 +3220,21 @@
   path b3 -> b1  ratio -0.156301  efficiency 81.554822 / 81.556472 %  backlash 0.596531 / 0.093238 deg
     power through the teeth 2.954841 / 2.668966   one more tooth: -0.165495 -0.152748 -0.165495 -0.156301 -0.152748
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -12.435842
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed     -1186.0465  torque 0.000000
     b3   reacted  speed      -468.9021  torque 10.435842
     b4   free     speed       806.5116  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.676482
     b1   reacted  speed         0.0000  torque 0.076482
     b2   free     speed         0.0000  torque 0.000000
     b3   load     speed         0.0000  torque 0.600000
     b4   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -12.435842
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed      -948.8372  torque 0.000000
@@ -3121,6 +3277,7 @@
   path b3 -> b1  ratio -0.167080  efficiency 81.725022 / 81.726676 %  backlash 0.693005 / 0.115787 deg
     power through the teeth 2.956301 / 2.671162   one more tooth: -0.176908 -0.163283 -0.176908 -0.163283 -0.167080 -0.167080 -0.161511 -0.172470
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -11.782936
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed     -1186.0465  torque 0.000000
@@ -3128,6 +3285,7 @@
     b4   free     speed       468.9021  torque 0.000000
     b5   free     speed      -217.2961  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.681928
     b1   reacted  speed         0.0000  torque 0.081928
     b2   free     speed         0.0000  torque 0.000000
@@ -3135,6 +3293,7 @@
     b4   free     speed         0.0000  torque 0.000000
     b5   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -11.782936
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed      -948.8372  torque 0.000000
@@ -3190,16 +3349,19 @@
   path b3 -> b1  ratio 0.009884  efficiency 0.000000 / 52.073657 %  backlash 15.793050 / 0.156094 deg
     power through the teeth 1.000000 / 1.842553   one more tooth: 0.010465 0.009659 0.019767 0.009643
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 103.372577
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed     -1186.0465  torque 0.000000
     b3   reacted  speed        29.6512  torque -105.372577
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.600000
     b1   reacted  speed         0.0000  torque 0.000000
     b2   free     speed         0.0000  torque 0.000000
     b3   load     speed         0.0000  torque 0.600000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 103.372577
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed      -948.8372  torque 0.000000
@@ -3234,16 +3396,19 @@
   path b3 -> b1  ratio 0.156301  efficiency 70.986680 / 70.989553 %  backlash 0.346363 / 0.054137 deg
     power through the teeth 1.842536 / 1.842553   one more tooth: 0.165495 0.152748 0.165495 0.152748
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 7.083715
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed     -1186.0465  torque 0.000000
     b3   reacted  speed       468.9021  torque -9.083715
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.533428
     b1   reacted  speed         0.0000  torque -0.066572
     b2   free     speed         0.0000  torque 0.000000
     b3   load     speed         0.0000  torque 0.600000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 7.083715
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed      -948.8372  torque 0.000000
@@ -3277,6 +3442,7 @@
   path b3 -> b1  ratio -0.056478  efficiency 82.292860 / 82.302101 %  backlash 0.836896 / 0.047267 deg
     power through the teeth 2.692887 / 2.428766   one more tooth: -0.059801 -0.055195 -0.060465 -0.056478 -0.055814
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -6.262327
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed     -1186.0465  torque 0.000000
@@ -3284,6 +3450,7 @@
     b4   fixed    speed              -  torque -24.882299
     b5   free     speed       237.2093  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.111606
     b1   reacted  speed         0.0000  torque 0.027887
     b2   free     speed         0.0000  torque 0.000000
@@ -3291,6 +3458,7 @@
     b4   fixed    speed              -  torque -0.516280
     b5   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -6.262327
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed      -948.8372  torque 0.000000
@@ -3333,6 +3501,7 @@
   path b4 -> b1  ratio -0.006481  efficiency 0.000000 / 38.214989 %  backlash 7.648760 / 0.049573 deg
     power through the teeth 95.993910 / 46.617952   one more tooth: -0.006862 -0.006334 -0.006481 - -0.012753
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -6.262327
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed     -1186.0465  torque 0.000000
@@ -3340,6 +3509,7 @@
     b4   reacted  speed       -19.4434  torque 117.926959
     b5   free     speed      2767.4419  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.003316
     b1   reacted  speed         0.0000  torque -0.001059
     b2   free     speed         0.0000  torque 0.000000
@@ -3347,6 +3517,7 @@
     b4   load     speed         0.0000  torque 0.600000
     b5   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -6.262327
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed      -948.8372  torque 0.000000
@@ -3391,6 +3562,7 @@
   path b4 -> b1  ratio -0.004467  efficiency 0.000000 / 55.228056 %  backlash 12.801480 / 0.057187 deg
     power through the teeth 50.531769 / 28.874889   one more tooth: -0.004730 -0.004366 -0.004599 -0.002628 -0.006275 -0.010177 0.001915
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -6.262327
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed     -1186.0465  torque 0.000000
@@ -3399,6 +3571,7 @@
     b5   free     speed      -338.8704  torque 0.000000
     b6   free     speed       790.6977  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.004385
     b1   reacted  speed         0.0000  torque 0.001096
     b2   free     speed         0.0000  torque 0.000000
@@ -3407,6 +3580,7 @@
     b5   free     speed         0.0000  torque 0.000000
     b6   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -6.262327
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed      -948.8372  torque 0.000000
@@ -3463,6 +3637,7 @@
   path b4 -> b1  ratio 0.039535  efficiency 81.793767 / 81.859022 %  backlash 2.520350 / 0.099642 deg
     power through the teeth 11.970804 / 10.028455   one more tooth: 0.041860 0.038636 0.025506 0.052713
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -6.262327
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed     -1186.0465  torque 0.000000
@@ -3470,6 +3645,7 @@
     b4   reacted  speed       118.6047  torque -41.411035
     b5   free     speed       118.6047  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.077651
     b1   reacted  speed         0.0000  torque -0.019402
     b2   free     speed         0.0000  torque 0.000000
@@ -3477,6 +3653,7 @@
     b4   load     speed         0.0000  torque 0.600000
     b5   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -6.262327
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed      -948.8372  torque 0.000000
@@ -3512,6 +3689,7 @@
   path b3 -> b1  ratio 0.131783  efficiency 78.749022 / 78.659212 %  backlash 0.626642 / 0.082581 deg
     power through the teeth 4.814034 / 4.304514   one more tooth: 0.139535 0.128788 0.139207 0.131783 0.131783 0.129978
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -6.262327
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed     -1186.0465  torque 0.000000
@@ -3520,6 +3698,7 @@
     b5   free     speed      2503.8760  torque 0.000000
     b6   free     speed     -1713.1783  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.249200
     b1   reacted  speed         0.0000  torque -0.062267
     b2   free     speed         0.0000  torque 0.000000
@@ -3528,6 +3707,7 @@
     b5   free     speed         0.0000  torque 0.000000
     b6   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -6.262327
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed      -948.8372  torque 0.000000
@@ -3580,6 +3760,7 @@
   path b5 -> b1  ratio -0.056478  efficiency 96.056311 / 96.065153 %  backlash 0.981719 / 0.055446 deg
     power through the teeth 2.687756 / 2.672576   one more tooth: -0.060465 -0.056478 -0.055814 -0.059801 -0.055195
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -47.693820
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed       428.5714  torque 0.000000
@@ -3587,6 +3768,7 @@
     b4   free     speed      -600.0000  torque 0.000000
     b5   reacted  speed      -169.4352  torque 34.018366
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.833283
     b1   reacted  speed         0.0000  torque 0.032551
     b2   free     speed         0.0000  torque 0.000000
@@ -3594,6 +3776,7 @@
     b4   free     speed         0.0000  torque 0.000000
     b5   load     speed         0.0000  torque 0.600000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -47.693820
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed       342.8571  torque 0.000000
@@ -3636,6 +3819,7 @@
   path b5 -> b1  ratio 0.056478  efficiency 94.544209 / 94.552913 %  backlash 1.671345 / 0.094395 deg
     power through the teeth 3.648061 / 3.630683   one more tooth: 0.060465 0.056478 0.055814 0.059801 0.056478 0.055195
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 19.807402
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed       428.5714  torque 0.000000
@@ -3644,6 +3828,7 @@
     b5   reacted  speed       169.4352  torque -33.482855
     b6   free     speed      -291.4286  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.370389
     b1   reacted  speed         0.0000  torque -0.032038
     b2   free     speed         0.0000  torque 0.000000
@@ -3652,6 +3837,7 @@
     b5   load     speed         0.0000  torque 0.600000
     b6   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 19.807402
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed       342.8571  torque 0.000000
@@ -3703,6 +3889,7 @@
   path b5 -> b1  ratio 0.060373  efficiency 94.741518 / 94.750239 %  backlash 1.938332 / 0.117024 deg
     power through the teeth 3.650967 / 3.633228   one more tooth: 0.064635 0.060373 0.059663 0.063925 0.059001 0.060373 0.060373 0.058361 0.062321
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 17.712586
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed       428.5714  torque 0.000000
@@ -3712,6 +3899,7 @@
     b6   free     speed      -169.4352  torque 0.000000
     b7   free     speed        78.5188  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.354041
     b1   reacted  speed         0.0000  torque -0.034319
     b2   free     speed         0.0000  torque 0.000000
@@ -3721,6 +3909,7 @@
     b6   free     speed         0.0000  torque 0.000000
     b7   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 17.712586
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed       342.8571  torque 0.000000
@@ -3785,6 +3974,7 @@
   path b5 -> b1  ratio -0.003571  efficiency 0.000000 / 60.371861 %  backlash 43.726829 / 0.156167 deg
     power through the teeth 1.000000 / 2.672576   one more tooth: -0.003824 -0.003571 -0.003529 -0.007143 -0.003484
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -351.757873
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed       428.5714  torque 0.000000
@@ -3792,6 +3982,7 @@
     b4   free     speed      -600.0000  torque 0.000000
     b5   reacted  speed       -10.7143  torque 338.082419
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.600000
     b1   reacted  speed         0.0000  torque 0.000000
     b2   free     speed         0.0000  torque 0.000000
@@ -3799,6 +3990,7 @@
     b4   free     speed         0.0000  torque 0.000000
     b5   load     speed         0.0000  torque 0.600000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -351.757873
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed       342.8571  torque 0.000000
@@ -3842,6 +4034,7 @@
   path b5 -> b1  ratio -0.056478  efficiency 82.292860 / 82.302101 %  backlash 0.979022 / 0.055294 deg
     power through the teeth 2.445926 / 2.672576   one more tooth: -0.060465 -0.056478 -0.055814 -0.059801 -0.055195
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -42.820080
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed       428.5714  torque 0.000000
@@ -3849,6 +4042,7 @@
     b4   free     speed      -600.0000  torque 0.000000
     b5   reacted  speed      -169.4352  torque 29.144626
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.799857
     b1   reacted  speed         0.0000  torque 0.027887
     b2   free     speed         0.0000  torque 0.000000
@@ -3856,6 +4050,7 @@
     b4   free     speed         0.0000  torque 0.000000
     b5   load     speed         0.0000  torque 0.600000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -42.820080
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed       342.8571  torque 0.000000
@@ -3898,6 +4093,7 @@
   path b5 -> b1  ratio 0.020408  efficiency 95.399796 / 95.417361 %  backlash 2.336541 / 0.047685 deg
     power through the teeth 3.392380 / 3.352206   one more tooth: 0.021849 0.020408 0.020168 0.021849 0.020408 0.020168
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed       428.5714  torque 0.000000
@@ -3907,6 +4103,7 @@
     b6   fixed    speed              -  torque 79.833560
     b7   free     speed       -85.7143  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   reacted  speed         0.0000  torque -0.011682
     b2   free     speed         0.0000  torque 0.000000
@@ -3916,6 +4113,7 @@
     b6   fixed    speed              -  torque -0.516280
     b7   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed       342.8571  torque 0.000000
@@ -3967,6 +4165,7 @@
   path b6 -> b1  ratio 0.002342  efficiency 0.000000 / 44.304742 %  backlash 21.187980 / 0.049621 deg
     power through the teeth 99.005764 / 54.583164   one more tooth: 0.002507 0.002342 0.002314 0.002342 - 0.004608
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed       428.5714  torque 0.000000
@@ -3976,6 +4175,7 @@
     b6   reacted  speed         7.0258  torque -378.362498
     b7   free     speed     -1000.0000  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   reacted  speed         0.0000  torque 0.000330
     b2   free     speed         0.0000  torque 0.000000
@@ -3985,6 +4185,7 @@
     b6   load     speed         0.0000  torque 0.600000
     b7   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed       342.8571  torque 0.000000
@@ -4038,6 +4239,7 @@
   path b6 -> b1  ratio 0.001614  efficiency 0.000000 / 64.028928 %  backlash 35.447834 / 0.057220 deg
     power through the teeth 50.879206 / 34.012653   one more tooth: 0.001728 0.001614 0.001595 0.001662 0.000950 0.002268 0.003677 -0.000692
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed       428.5714  torque 0.000000
@@ -4048,6 +4250,7 @@
     b7   free     speed       122.4490  torque 0.000000
     b8   free     speed      -285.7143  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   reacted  speed         0.0000  torque -0.000459
     b2   free     speed         0.0000  torque 0.000000
@@ -4058,6 +4261,7 @@
     b7   free     speed         0.0000  torque 0.000000
     b8   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed       342.8571  torque 0.000000
@@ -4123,6 +4327,7 @@
   path b6 -> b1  ratio -0.014286  efficiency 94.821211 / 94.903675 %  backlash 6.995402 / 0.099934 deg
     power through the teeth 12.666055 / 12.162944   one more tooth: -0.015294 -0.014286 -0.014118 -0.009217 -0.019048
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed       428.5714  torque 0.000000
@@ -4132,6 +4337,7 @@
     b6   reacted  speed       -42.8571  torque 132.865146
     b7   free     speed       -42.8571  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   reacted  speed         0.0000  torque 0.008128
     b2   free     speed         0.0000  torque 0.000000
@@ -4141,6 +4347,7 @@
     b6   load     speed         0.0000  torque 0.600000
     b7   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed       342.8571  torque 0.000000
@@ -4185,6 +4392,7 @@
   path b5 -> b1  ratio -0.047619  efficiency 91.291524 / 91.193959 %  backlash 1.754677 / 0.083556 deg
     power through the teeth 5.483404 / 5.526863   one more tooth: -0.050980 -0.047619 -0.047059 -0.050302 -0.047619 -0.047619 -0.046967
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed       428.5714  torque 0.000000
@@ -4195,6 +4403,7 @@
     b7   free     speed      -904.7619  torque 0.000000
     b8   free     speed       619.0476  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   reacted  speed         0.0000  torque 0.026083
     b2   free     speed         0.0000  torque 0.000000
@@ -4205,6 +4414,7 @@
     b7   free     speed         0.0000  torque 0.000000
     b8   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed       342.8571  torque 0.000000
@@ -4266,6 +4476,7 @@
   path b5 -> b1  ratio -0.006481  efficiency 0.000000 / 44.605529 %  backlash 8.994947 / 0.058297 deg
     power through the teeth 98.597737 / 54.596095   one more tooth: -0.006481 - -0.012753 -0.006862 -0.006334
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -192.981960
     b1   load     speed      3000.0000  torque 2.000000
     b2   fixed    speed              -  torque 53.334545
@@ -4273,6 +4484,7 @@
     b4   free     speed     -7000.0000  torque 0.000000
     b5   reacted  speed       -19.4434  torque 137.647414
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.833283
     b1   reacted  speed         0.0000  torque -0.000878
     b2   fixed    speed              -  torque 0.234161
@@ -4280,6 +4492,7 @@
     b4   free     speed         0.0000  torque 0.000000
     b5   load     speed         0.0000  torque 0.600000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -192.981960
     b1   load     speed      2400.0000  torque 2.000000
     b2   fixed    speed              -  torque 53.334545
@@ -4324,6 +4537,7 @@
   path b5 -> b1  ratio 0.006481  efficiency 0.000000 / 43.903357 %  backlash 15.004548 / 0.097246 deg
     power through the teeth 98.148110 / 55.040968   one more tooth: 0.006481 - 0.012753 0.006862 0.006481 0.006334
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 80.146048
     b1   load     speed      3000.0000  torque 2.000000
     b2   fixed    speed              -  torque 53.334545
@@ -4332,6 +4546,7 @@
     b5   reacted  speed        19.4434  torque -135.480593
     b6   free     speed       -33.4426  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.370389
     b1   reacted  speed         0.0000  torque 0.000864
     b2   fixed    speed              -  torque -0.230475
@@ -4340,6 +4555,7 @@
     b5   load     speed         0.0000  torque 0.600000
     b6   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 80.146048
     b1   load     speed      2400.0000  torque 2.000000
     b2   fixed    speed              -  torque 53.334545
@@ -4393,6 +4609,7 @@
   path b5 -> b1  ratio 0.006928  efficiency 0.000000 / 43.994980 %  backlash 17.331144 / 0.120072 deg
     power through the teeth 98.311800 / 55.042150   one more tooth: 0.006928 - 0.013633 0.007336 0.006771 0.006928 0.006928 0.006697 0.007152
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 71.669864
     b1   load     speed      3000.0000  torque 2.000000
     b2   fixed    speed              -  torque 53.334545
@@ -4402,6 +4619,7 @@
     b6   free     speed       -19.4434  torque 0.000000
     b7   free     speed         9.0103  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.354041
     b1   reacted  speed         0.0000  torque 0.000925
     b2   fixed    speed              -  torque -0.246884
@@ -4411,6 +4629,7 @@
     b6   free     speed         0.0000  torque 0.000000
     b7   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 71.669864
     b1   load     speed      2400.0000  torque 2.000000
     b2   fixed    speed              -  torque 53.334545
@@ -4477,6 +4696,7 @@
   path b5 -> b1  ratio -0.000410  efficiency 0.000000 / 28.032212 %  backlash 381.488048 / 0.156348 deg
     power through the teeth 1.000000 / 54.596095   one more tooth: -0.000410 - -0.000806 -0.000820 -0.000400
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -1423.306505
     b1   load     speed      3000.0000  torque 2.000000
     b2   fixed    speed              -  torque 53.334545
@@ -4484,6 +4704,7 @@
     b4   free     speed     -7000.0000  torque 0.000000
     b5   reacted  speed        -1.2295  torque 1367.971960
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.600000
     b1   reacted  speed         0.0000  torque 0.000000
     b2   fixed    speed              -  torque 0.000000
@@ -4491,6 +4712,7 @@
     b4   free     speed         0.0000  torque 0.000000
     b5   load     speed         0.0000  torque 0.600000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -1423.306505
     b1   load     speed      2400.0000  torque 2.000000
     b2   fixed    speed              -  torque 53.334545
@@ -4536,6 +4758,7 @@
   path b5 -> b1  ratio -0.006481  efficiency 0.000000 / 38.214989 %  backlash 8.971443 / 0.058145 deg
     power through the teeth 86.878972 / 54.596095   one more tooth: -0.006481 - -0.012753 -0.006862 -0.006334
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -173.261504
     b1   load     speed      3000.0000  torque 2.000000
     b2   fixed    speed              -  torque 53.334545
@@ -4543,6 +4766,7 @@
     b4   free     speed     -7000.0000  torque 0.000000
     b5   reacted  speed       -19.4434  torque 117.926959
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.799857
     b1   reacted  speed         0.0000  torque -0.000752
     b2   fixed    speed              -  torque 0.200609
@@ -4550,6 +4774,7 @@
     b4   free     speed         0.0000  torque 0.000000
     b5   load     speed         0.0000  torque 0.600000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -173.261504
     b1   load     speed      2400.0000  torque 2.000000
     b2   fixed    speed              -  torque 53.334545
@@ -4594,6 +4819,7 @@
   path b5 -> b1  ratio 0.002342  efficiency 0.000000 / 44.304742 %  backlash 20.801258 / 0.048715 deg
     power through the teeth 98.637855 / 54.911664   one more tooth: 0.002342 - 0.004608 0.002507 0.002342 0.002314
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      3000.0000  torque 2.000000
     b2   fixed    speed              -  torque 53.334545
@@ -4603,6 +4829,7 @@
     b6   fixed    speed              -  torque 323.027953
     b7   free     speed        -9.8361  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   reacted  speed         0.0000  torque 0.000315
     b2   fixed    speed              -  torque -0.084034
@@ -4612,6 +4839,7 @@
     b6   fixed    speed              -  torque -0.516280
     b7   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      2400.0000  torque 2.000000
     b2   fixed    speed              -  torque 53.334545
@@ -4665,6 +4893,7 @@
   path b6 -> b1  ratio 0.000269  efficiency 0.000000 / 20.571835 %  backlash 185.078077 / 0.049739 deg
     power through the teeth 99.113373 / 78.699520   one more tooth: 0.000269 - 0.000529 0.000269 - 0.000529
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      3000.0000  torque 2.000000
     b2   fixed    speed              -  torque 53.334545
@@ -4674,6 +4903,7 @@
     b6   reacted  speed         0.8062  torque -1530.955940
     b7   free     speed      -114.7541  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   reacted  speed         0.0000  torque 0.000082
     b2   fixed    speed              -  torque 0.002175
@@ -4683,6 +4913,7 @@
     b6   load     speed         0.0000  torque 0.600000
     b7   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      2400.0000  torque 2.000000
     b2   fixed    speed              -  torque 53.334545
@@ -4738,6 +4969,7 @@
   path b6 -> b1  ratio 0.000185  efficiency 0.000000 / 29.730283 %  backlash 309.342523 / 0.057302 deg
     power through the teeth 98.232634 / 69.148101   one more tooth: 0.000185 - 0.000364 0.000191 0.000109 0.000260 0.000422 -0.000079
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      3000.0000  torque 2.000000
     b2   fixed    speed              -  torque 53.334545
@@ -4748,6 +4980,7 @@
     b7   free     speed        14.0515  torque 0.000000
     b8   free     speed       -32.7869  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   reacted  speed         0.0000  torque 0.000012
     b2   fixed    speed              -  torque -0.003301
@@ -4758,6 +4991,7 @@
     b7   free     speed         0.0000  torque 0.000000
     b8   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      2400.0000  torque 2.000000
     b2   fixed    speed              -  torque 53.334545
@@ -4825,6 +5059,7 @@
   path b6 -> b1  ratio -0.001639  efficiency 0.000000 / 44.066225 %  backlash 61.399903 / 0.100656 deg
     power through the teeth 105.749664 / 59.002717   one more tooth: -0.001639 - -0.003226 -0.001058 -0.002186
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      3000.0000  torque 2.000000
     b2   fixed    speed              -  torque 53.334545
@@ -4834,6 +5069,7 @@
     b6   reacted  speed        -4.9180  torque 537.607942
     b7   free     speed        -4.9180  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   reacted  speed         0.0000  torque -0.000219
     b2   fixed    speed              -  torque 0.058467
@@ -4843,6 +5079,7 @@
     b6   load     speed         0.0000  torque 0.600000
     b7   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      2400.0000  torque 2.000000
     b2   fixed    speed              -  torque 53.334545
@@ -4889,6 +5126,7 @@
   path b5 -> b1  ratio -0.005464  efficiency 0.000000 / 42.343708 %  backlash 15.730728 / 0.085960 deg
     power through the teeth 96.982312 / 55.921413   one more tooth: -0.005464 - -0.010753 -0.005772 -0.005464 -0.005464 -0.005390
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      3000.0000  torque 2.000000
     b2   fixed    speed              -  torque 53.334545
@@ -4899,6 +5137,7 @@
     b7   free     speed      -103.8251  torque 0.000000
     b8   free     speed        71.0383  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   reacted  speed         0.0000  torque -0.000703
     b2   fixed    speed              -  torque 0.187636
@@ -4909,6 +5148,7 @@
     b7   free     speed         0.0000  torque 0.000000
     b8   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      2400.0000  torque 2.000000
     b2   fixed    speed              -  torque 53.334545
@@ -4972,6 +5212,7 @@
   path b6 -> b1  ratio -0.004467  efficiency 0.000000 / 64.463623 %  backlash 13.741412 / 0.061386 deg
     power through the teeth 50.218346 / 33.739326   one more tooth: -0.004599 -0.002628 -0.006275 -0.010177 0.001915 -0.004730 -0.004366
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -404.628219
     b1   load     speed      3000.0000  torque 2.000000
     b2   fixed    speed              -  torque 114.020785
@@ -4980,6 +5221,7 @@
     b5   free     speed     -2000.0000  torque 0.000000
     b6   reacted  speed       -13.4017  torque 288.607434
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.833283
     b1   reacted  speed         0.0000  torque 0.001279
     b2   fixed    speed              -  torque 0.232005
@@ -4988,6 +5230,7 @@
     b5   free     speed         0.0000  torque 0.000000
     b6   load     speed         0.0000  torque 0.600000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -404.628219
     b1   load     speed      2400.0000  torque 2.000000
     b2   fixed    speed              -  torque 114.020785
@@ -5044,6 +5287,7 @@
   path b6 -> b1  ratio 0.004467  efficiency 0.000000 / 63.448849 %  backlash 22.460260 / 0.100335 deg
     power through the teeth 50.430432 / 34.382254   one more tooth: 0.004599 0.002628 0.006275 0.010177 -0.001915 0.004730 0.004467 0.004366
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 168.043442
     b1   load     speed      3000.0000  torque 2.000000
     b2   fixed    speed              -  torque 114.020785
@@ -5053,6 +5297,7 @@
     b6   reacted  speed        13.4017  torque -284.064227
     b7   free     speed       -23.0508  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.370389
     b1   reacted  speed         0.0000  torque -0.001259
     b2   fixed    speed              -  torque -0.228352
@@ -5062,6 +5307,7 @@
     b6   load     speed         0.0000  torque 0.600000
     b7   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 168.043442
     b1   load     speed      2400.0000  torque 2.000000
     b2   fixed    speed              -  torque 114.020785
@@ -5127,6 +5373,7 @@
   path b6 -> b1  ratio 0.004775  efficiency 0.000000 / 63.581263 %  backlash 25.835731 / 0.123373 deg
     power through the teeth 50.530970 / 34.383962   one more tooth: 0.004916 0.002809 0.006708 0.010879 -0.002047 0.005056 0.004667 0.004775 0.004775 0.004616 0.004929
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 150.271296
     b1   load     speed      3000.0000  torque 2.000000
     b2   fixed    speed              -  torque 114.020785
@@ -5137,6 +5384,7 @@
     b7   free     speed       -13.4017  torque 0.000000
     b8   free     speed         6.2105  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.354041
     b1   reacted  speed         0.0000  torque -0.001348
     b2   fixed    speed              -  torque -0.244610
@@ -5147,6 +5395,7 @@
     b7   free     speed         0.0000  torque 0.000000
     b8   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 150.271296
     b1   load     speed      2400.0000  torque 2.000000
     b2   fixed    speed              -  torque 114.020785
@@ -5225,6 +5474,7 @@
   path b6 -> b1  ratio -0.000282  efficiency 0.000000 / 40.511973 %  backlash 554.161731 / 0.156543 deg
     power through the teeth 1.000000 / 33.739326   one more tooth: -0.000291 -0.000166 -0.000397 -0.000644 0.000121 -0.000565 -0.000276
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -2984.268465
     b1   load     speed      3000.0000  torque 2.000000
     b2   fixed    speed              -  torque 114.020785
@@ -5233,6 +5483,7 @@
     b5   free     speed     -2000.0000  torque 0.000000
     b6   reacted  speed        -0.8475  torque 2868.247680
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.600000
     b1   reacted  speed         0.0000  torque 0.000000
     b2   fixed    speed              -  torque 0.000000
@@ -5241,6 +5492,7 @@
     b5   free     speed         0.0000  torque 0.000000
     b6   load     speed         0.0000  torque 0.600000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -2984.268465
     b1   load     speed      2400.0000  torque 2.000000
     b2   fixed    speed              -  torque 114.020785
@@ -5298,6 +5550,7 @@
   path b6 -> b1  ratio -0.004467  efficiency 0.000000 / 55.228056 %  backlash 13.707313 / 0.061234 deg
     power through the teeth 43.166084 / 33.739326   one more tooth: -0.004599 -0.002628 -0.006275 -0.010177 0.001915 -0.004730 -0.004366
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -363.280039
     b1   load     speed      3000.0000  torque 2.000000
     b2   fixed    speed              -  torque 114.020785
@@ -5306,6 +5559,7 @@
     b5   free     speed     -2000.0000  torque 0.000000
     b6   reacted  speed       -13.4017  torque 247.259254
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.799857
     b1   reacted  speed         0.0000  torque 0.001096
     b2   fixed    speed              -  torque 0.198762
@@ -5314,6 +5568,7 @@
     b5   free     speed         0.0000  torque 0.000000
     b6   load     speed         0.0000  torque 0.600000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -363.280039
     b1   load     speed      2400.0000  torque 2.000000
     b2   fixed    speed              -  torque 114.020785
@@ -5370,6 +5625,7 @@
   path b6 -> b1  ratio 0.001614  efficiency 0.000000 / 64.028928 %  backlash 30.870240 / 0.049831 deg
     power through the teeth 50.598113 / 34.195385   one more tooth: 0.001662 0.000950 0.002268 0.003677 -0.000692 0.001728 0.001614 0.001595
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      3000.0000  torque 2.000000
     b2   fixed    speed              -  torque 114.020785
@@ -5380,6 +5636,7 @@
     b7   fixed    speed              -  torque 677.297638
     b8   free     speed        -6.7797  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   reacted  speed         0.0000  torque -0.000459
     b2   fixed    speed              -  torque -0.083261
@@ -5390,6 +5647,7 @@
     b7   fixed    speed              -  torque -0.516280
     b8   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      2400.0000  torque 2.000000
     b2   fixed    speed              -  torque 114.020785
@@ -5455,6 +5713,7 @@
   path b7 -> b1  ratio 0.000185  efficiency 0.000000 / 29.730283 %  backlash 269.206281 / 0.049867 deg
     power through the teeth 98.844238 / 68.573441   one more tooth: 0.000191 0.000109 0.000260 0.000422 -0.000079 0.000185 - 0.000364
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      3000.0000  torque 2.000000
     b2   fixed    speed              -  torque 114.020785
@@ -5465,6 +5724,7 @@
     b7   reacted  speed         0.5557  torque -3209.978678
     b8   free     speed       -79.0960  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   reacted  speed         0.0000  torque 0.000039
     b2   fixed    speed              -  torque 0.002218
@@ -5475,6 +5735,7 @@
     b7   load     speed         0.0000  torque 0.600000
     b8   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      2400.0000  torque 2.000000
     b2   fixed    speed              -  torque 114.020785
@@ -5542,6 +5803,7 @@
   path b7 -> b1  ratio 0.000128  efficiency 0.000000 / 42.966014 %  backlash 449.491584 / 0.057390 deg
     power through the teeth 74.326240 / 54.769792   one more tooth: 0.000131 0.000075 0.000179 0.000291 -0.000055 0.000131 0.000075 0.000179 0.000291 -0.000055
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      3000.0000  torque 2.000000
     b2   fixed    speed              -  torque 114.020785
@@ -5553,6 +5815,7 @@
     b8   free     speed         9.6852  torque 0.000000
     b9   free     speed       -22.5989  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   reacted  speed         0.0000  torque -0.000018
     b2   fixed    speed              -  torque -0.003271
@@ -5564,6 +5827,7 @@
     b8   free     speed         0.0000  torque 0.000000
     b9   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      2400.0000  torque 2.000000
     b2   fixed    speed              -  torque 114.020785
@@ -5643,6 +5907,7 @@
   path b7 -> b1  ratio -0.001130  efficiency 0.000000 / 63.684225 %  backlash 89.771553 / 0.101437 deg
     power through the teeth 59.585492 / 40.107748   one more tooth: -0.001163 -0.000665 -0.001587 -0.002574 0.000484 -0.000729 -0.001507
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      3000.0000  torque 2.000000
     b2   fixed    speed              -  torque 114.020785
@@ -5653,6 +5918,7 @@
     b7   reacted  speed        -3.3898  torque 1127.210775
     b8   free     speed        -3.3898  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   reacted  speed         0.0000  torque 0.000319
     b2   fixed    speed              -  torque 0.057929
@@ -5663,6 +5929,7 @@
     b7   load     speed         0.0000  torque 0.600000
     b8   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      2400.0000  torque 2.000000
     b2   fixed    speed              -  torque 114.020785
@@ -5721,6 +5988,7 @@
   path b6 -> b1  ratio -0.003766  efficiency 0.000000 / 61.194854 %  backlash 23.513816 / 0.088564 deg
     power through the teeth 50.656281 / 35.654668   one more tooth: -0.003877 -0.002216 -0.005291 -0.008581 0.001614 -0.003979 -0.003766 -0.003766 -0.003715
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      3000.0000  torque 2.000000
     b2   fixed    speed              -  torque 114.020785
@@ -5732,6 +6000,7 @@
     b8   free     speed       -71.5631  torque 0.000000
     b9   free     speed        48.9642  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   reacted  speed         0.0000  torque 0.001025
     b2   fixed    speed              -  torque 0.185909
@@ -5743,6 +6012,7 @@
     b8   free     speed         0.0000  torque 0.000000
     b9   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      2400.0000  torque 2.000000
     b2   fixed    speed              -  torque 114.020785
@@ -5818,6 +6088,7 @@
   path b5 -> b1  ratio 0.039535  efficiency 95.473744 / 95.547980 %  backlash 1.942835 / 0.076810 deg
     power through the teeth 11.817947 / 11.687153   one more tooth: 0.025506 0.052713 0.041860 0.038636
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 67.767224
     b1   load     speed      3000.0000  torque 2.000000
     b2   fixed    speed              -  torque -21.431187
@@ -5825,6 +6096,7 @@
     b4   free     speed      -300.0000  torque 0.000000
     b5   reacted  speed       118.6047  torque -48.336037
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.833283
     b1   reacted  speed         0.0000  torque -0.022647
     b2   fixed    speed              -  torque 0.255931
@@ -5832,6 +6104,7 @@
     b4   free     speed         0.0000  torque 0.000000
     b5   load     speed         0.0000  torque 0.600000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 67.767224
     b1   load     speed      2400.0000  torque 2.000000
     b2   fixed    speed              -  torque -21.431187
@@ -5867,6 +6140,7 @@
   path b5 -> b1  ratio -0.039535  efficiency 93.970814 / 94.043881 %  backlash 2.928016 / 0.115759 deg
     power through the teeth 12.634526 / 12.640101   one more tooth: -0.025506 -0.052713 -0.041860 -0.039535 -0.038636
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -28.143953
     b1   load     speed      3000.0000  torque 2.000000
     b2   fixed    speed              -  torque -21.431187
@@ -5875,6 +6149,7 @@
     b5   reacted  speed      -118.6047  torque 47.575140
     b6   free     speed       204.0000  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.370389
     b1   reacted  speed         0.0000  torque 0.022291
     b2   fixed    speed              -  torque -0.251902
@@ -5883,6 +6158,7 @@
     b5   load     speed         0.0000  torque 0.600000
     b6   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -28.143953
     b1   load     speed      2400.0000  torque 2.000000
     b2   fixed    speed              -  torque -21.431187
@@ -5927,6 +6203,7 @@
   path b5 -> b1  ratio -0.042261  efficiency 94.166925 / 94.240145 %  backlash 3.309425 / 0.139861 deg
     power through the teeth 12.656186 / 12.642633   one more tooth: -0.027265 -0.056349 -0.044747 -0.041301 -0.042261 -0.042261 -0.040853 -0.043625
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -25.167470
     b1   load     speed      3000.0000  torque 2.000000
     b2   fixed    speed              -  torque -21.431187
@@ -5936,6 +6213,7 @@
     b6   free     speed       118.6047  torque 0.000000
     b7   free     speed       -54.9631  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.354041
     b1   reacted  speed         0.0000  torque 0.023878
     b2   fixed    speed              -  torque -0.269836
@@ -5945,6 +6223,7 @@
     b6   free     speed         0.0000  torque 0.000000
     b7   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -25.167470
     b1   load     speed      2400.0000  torque 2.000000
     b2   fixed    speed              -  torque -21.431187
@@ -6002,6 +6281,7 @@
   path b5 -> b1  ratio 0.002500  efficiency 0.000000 / 60.046845 %  backlash 63.007278 / 0.157518 deg
     power through the teeth 1.000000 / 11.687153   one more tooth: 0.001613 0.003333 0.005000 0.002439
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 499.805946
     b1   load     speed      3000.0000  torque 2.000000
     b2   fixed    speed              -  torque -21.431187
@@ -6009,6 +6289,7 @@
     b4   free     speed      -300.0000  torque 0.000000
     b5   reacted  speed         7.5000  torque -480.374759
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.600000
     b1   reacted  speed         0.0000  torque 0.000000
     b2   fixed    speed              -  torque 0.000000
@@ -6016,6 +6297,7 @@
     b4   free     speed         0.0000  torque 0.000000
     b5   load     speed         0.0000  torque 0.600000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 499.805946
     b1   load     speed      2400.0000  torque 2.000000
     b2   fixed    speed              -  torque -21.431187
@@ -6052,6 +6334,7 @@
   path b5 -> b1  ratio 0.039535  efficiency 81.793767 / 81.859022 %  backlash 1.938982 / 0.076657 deg
     power through the teeth 10.267895 / 11.687153   one more tooth: 0.025506 0.052713 0.041860 0.038636
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 60.842222
     b1   load     speed      3000.0000  torque 2.000000
     b2   fixed    speed              -  torque -21.431187
@@ -6059,6 +6342,7 @@
     b4   free     speed      -300.0000  torque 0.000000
     b5   reacted  speed       118.6047  torque -41.411035
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.799857
     b1   reacted  speed         0.0000  torque -0.019402
     b2   fixed    speed              -  torque 0.219260
@@ -6066,6 +6350,7 @@
     b4   free     speed         0.0000  torque 0.000000
     b5   load     speed         0.0000  torque 0.600000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 60.842222
     b1   load     speed      2400.0000  torque 2.000000
     b2   fixed    speed              -  torque -21.431187
@@ -6101,6 +6386,7 @@
   path b5 -> b1  ratio -0.014286  efficiency 94.821211 / 94.903675 %  backlash 3.878296 / 0.055404 deg
     power through the teeth 12.460169 / 12.363123   one more tooth: -0.009217 -0.019048 -0.015294 -0.014286 -0.014118
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      3000.0000  torque 2.000000
     b2   fixed    speed              -  torque -21.431187
@@ -6110,6 +6396,7 @@
     b6   fixed    speed              -  torque -113.433959
     b7   free     speed        60.0000  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   reacted  speed         0.0000  torque 0.008128
     b2   fixed    speed              -  torque -0.091847
@@ -6119,6 +6406,7 @@
     b6   fixed    speed              -  torque -0.516280
     b7   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      2400.0000  torque 2.000000
     b2   fixed    speed              -  torque -21.431187
@@ -6163,6 +6451,7 @@
   path b6 -> b1  ratio -0.001639  efficiency 0.000000 / 44.066225 %  backlash 30.808922 / 0.050506 deg
     power through the teeth 100.628943 / 63.318277   one more tooth: -0.001058 -0.002186 -0.001639 - -0.003226
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      3000.0000  torque 2.000000
     b2   fixed    speed              -  torque -21.431187
@@ -6172,6 +6461,7 @@
     b6   reacted  speed        -4.9180  torque 537.607942
     b7   free     speed       700.0000  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   reacted  speed         0.0000  torque -0.000232
     b2   fixed    speed              -  torque 0.002489
@@ -6181,6 +6471,7 @@
     b6   load     speed         0.0000  torque 0.600000
     b7   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      2400.0000  torque 2.000000
     b2   fixed    speed              -  torque -21.431187
@@ -6227,6 +6518,7 @@
   path b6 -> b1  ratio -0.001130  efficiency 0.000000 / 63.684225 %  backlash 51.180143 / 0.057831 deg
     power through the teeth 55.383167 / 42.858508   one more tooth: -0.000729 -0.001507 -0.001163 -0.000665 -0.001587 -0.002574 0.000484
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      3000.0000  torque 2.000000
     b2   fixed    speed              -  torque -21.431187
@@ -6237,6 +6529,7 @@
     b7   free     speed       -85.7143  torque 0.000000
     b8   free     speed       200.0000  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   reacted  speed         0.0000  torque 0.000319
     b2   fixed    speed              -  torque -0.003608
@@ -6247,6 +6540,7 @@
     b7   free     speed         0.0000  torque 0.000000
     b8   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      2400.0000  torque 2.000000
     b2   fixed    speed              -  torque -21.431187
@@ -6305,6 +6599,7 @@
   path b6 -> b1  ratio 0.010000  efficiency 94.246135 / 94.392755 %  backlash 10.533811 / 0.105338 deg
     power through the teeth 21.678849 / 21.126428   one more tooth: 0.006452 0.013333 0.006452 0.013333
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      3000.0000  torque 2.000000
     b2   fixed    speed              -  torque -21.431187
@@ -6314,6 +6609,7 @@
     b6   reacted  speed        30.0000  torque -188.785511
     b7   free     speed        30.0000  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   reacted  speed         0.0000  torque -0.005655
     b2   fixed    speed              -  torque 0.063903
@@ -6323,6 +6619,7 @@
     b6   load     speed         0.0000  torque 0.600000
     b7   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      2400.0000  torque 2.000000
     b2   fixed    speed              -  torque -21.431187
@@ -6360,6 +6657,7 @@
   path b5 -> b1  ratio 0.033333  efficiency 90.737855 / 90.703011 %  backlash 3.047061 / 0.101569 deg
     power through the teeth 14.160700 / 14.526073   one more tooth: 0.021505 0.044444 0.035211 0.033333 0.033333 0.032877
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      3000.0000  torque 2.000000
     b2   fixed    speed              -  torque -21.431187
@@ -6370,6 +6668,7 @@
     b7   free     speed       633.3333  torque 0.000000
     b8   free     speed      -433.3333  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   reacted  speed         0.0000  torque -0.018148
     b2   fixed    speed              -  torque 0.205081
@@ -6380,6 +6679,7 @@
     b7   free     speed         0.0000  torque 0.000000
     b8   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      2400.0000  torque 2.000000
     b2   fixed    speed              -  torque -21.431187
@@ -6434,6 +6734,7 @@
   path b6 -> b1  ratio 0.131783  efficiency 91.919767 / 91.813079 %  backlash 0.504509 / 0.066486 deg
     power through the teeth 4.815163 / 4.855607   one more tooth: 0.139207 0.131783 0.131783 0.129978 0.139535 0.128788
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 19.535476
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed     -1000.0000  torque 0.000000
@@ -6442,6 +6743,7 @@
     b5   free     speed      4333.3333  torque 0.000000
     b6   reacted  speed       395.3488  torque -13.933985
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.833283
     b1   reacted  speed         0.0000  torque -0.072681
     b2   free     speed         0.0000  torque 0.000000
@@ -6450,6 +6752,7 @@
     b5   free     speed         0.0000  torque 0.000000
     b6   load     speed         0.0000  torque 0.600000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 19.535476
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed      -800.0000  torque 0.000000
@@ -6502,6 +6805,7 @@
   path b6 -> b1  ratio -0.131783  efficiency 90.472782 / 90.367774 %  backlash 0.800063 / 0.105435 deg
     power through the teeth 5.741978 / 5.771305   one more tooth: -0.139207 -0.131783 -0.131783 -0.129978 -0.139535 -0.131783 -0.128788
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -8.113148
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed     -1000.0000  torque 0.000000
@@ -6511,6 +6815,7 @@
     b6   reacted  speed      -395.3488  torque 13.714639
     b7   free     speed       680.0000  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.370389
     b1   reacted  speed         0.0000  torque 0.071537
     b2   free     speed         0.0000  torque 0.000000
@@ -6520,6 +6825,7 @@
     b6   load     speed         0.0000  torque 0.600000
     b7   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -8.113148
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed      -800.0000  torque 0.000000
@@ -6581,6 +6887,7 @@
   path b6 -> b1  ratio -0.140871  efficiency 90.661593 / 90.556366 %  backlash 0.914486 / 0.128825 deg
     power through the teeth 5.749254 / 5.773737   one more tooth: -0.148808 -0.140871 -0.140871 -0.138942 -0.149158 -0.137670 -0.140871 -0.140871 -0.136176 -0.145416
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -7.255108
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed     -1000.0000  torque 0.000000
@@ -6591,6 +6898,7 @@
     b7   free     speed       395.3488  torque 0.000000
     b8   free     speed      -183.2104  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.354041
     b1   reacted  speed         0.0000  torque 0.076630
     b2   free     speed         0.0000  torque 0.000000
@@ -6601,6 +6909,7 @@
     b7   free     speed         0.0000  torque 0.000000
     b8   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -7.255108
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed      -800.0000  torque 0.000000
@@ -6675,6 +6984,7 @@
   path b6 -> b1  ratio 0.008333  efficiency 0.000000 / 57.699657 %  backlash 18.823842 / 0.156865 deg
     power through the teeth 1.000000 / 4.855607   one more tooth: 0.008803 0.008333 0.008333 0.008219 0.016667 0.008130
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 144.080668
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed     -1000.0000  torque 0.000000
@@ -6683,6 +6993,7 @@
     b5   free     speed      4333.3333  torque 0.000000
     b6   reacted  speed        25.0000  torque -138.479177
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.600000
     b1   reacted  speed         0.0000  torque 0.000000
     b2   free     speed         0.0000  torque 0.000000
@@ -6691,6 +7002,7 @@
     b5   free     speed         0.0000  torque 0.000000
     b6   load     speed         0.0000  torque 0.600000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 144.080668
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed      -800.0000  torque 0.000000
@@ -6744,6 +7056,7 @@
   path b6 -> b1  ratio 0.131783  efficiency 78.749022 / 78.659212 %  backlash 0.503353 / 0.066333 deg
     power through the teeth 4.268507 / 4.855607   one more tooth: 0.139207 0.131783 0.131783 0.129978 0.139535 0.128788
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 17.539183
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed     -1000.0000  torque 0.000000
@@ -6752,6 +7065,7 @@
     b5   free     speed      4333.3333  torque 0.000000
     b6   reacted  speed       395.3488  torque -11.937692
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.799857
     b1   reacted  speed         0.0000  torque -0.062267
     b2   free     speed         0.0000  torque 0.000000
@@ -6760,6 +7074,7 @@
     b5   free     speed         0.0000  torque 0.000000
     b6   load     speed         0.0000  torque 0.600000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 17.539183
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed      -800.0000  torque 0.000000
@@ -6812,6 +7127,7 @@
   path b6 -> b1  ratio -0.047619  efficiency 91.291524 / 91.193959 %  backlash 1.085147 / 0.051674 deg
     power through the teeth 5.505247 / 5.505154   one more tooth: -0.050302 -0.047619 -0.047619 -0.046967 -0.050980 -0.047619 -0.047059
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed     -1000.0000  torque 0.000000
@@ -6822,6 +7138,7 @@
     b7   fixed    speed              -  torque -32.699972
     b8   free     speed       200.0000  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   reacted  speed         0.0000  torque 0.026083
     b2   free     speed         0.0000  torque 0.000000
@@ -6832,6 +7149,7 @@
     b7   fixed    speed              -  torque -0.516280
     b8   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed      -800.0000  torque 0.000000
@@ -6893,6 +7211,7 @@
   path b7 -> b1  ratio -0.005464  efficiency 0.000000 / 42.343708 %  backlash 9.164335 / 0.050078 deg
     power through the teeth 98.595218 / 54.468507   one more tooth: -0.005772 -0.005464 -0.005464 -0.005390 -0.005464 - -0.010753
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed     -1000.0000  torque 0.000000
@@ -6903,6 +7222,7 @@
     b7   reacted  speed       -16.3934  torque 154.977971
     b8   free     speed      2333.3333  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   reacted  speed         0.0000  torque -0.000806
     b2   free     speed         0.0000  torque 0.000000
@@ -6913,6 +7233,7 @@
     b7   load     speed         0.0000  torque 0.600000
     b8   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed      -800.0000  torque 0.000000
@@ -6976,6 +7297,7 @@
   path b7 -> b1  ratio -0.003766  efficiency 0.000000 / 61.194854 %  backlash 15.275701 / 0.057536 deg
     power through the teeth 51.928665 / 34.808496   one more tooth: -0.003979 -0.003766 -0.003766 -0.003715 -0.003877 -0.002216 -0.005291 -0.008581 0.001614
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed     -1000.0000  torque 0.000000
@@ -6987,6 +7309,7 @@
     b8   free     speed      -285.7143  torque 0.000000
     b9   free     speed       666.6667  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   reacted  speed         0.0000  torque 0.001025
     b2   free     speed         0.0000  torque 0.000000
@@ -6998,6 +7321,7 @@
     b8   free     speed         0.0000  torque 0.000000
     b9   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed      -800.0000  torque 0.000000
@@ -7073,6 +7397,7 @@
   path b7 -> b1  ratio 0.033333  efficiency 90.737855 / 90.703011 %  backlash 3.081802 / 0.102727 deg
     power through the teeth 14.766107 / 13.925908   one more tooth: 0.035211 0.033333 0.033333 0.032877 0.021505 0.044444
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed     -1000.0000  torque 0.000000
@@ -7083,6 +7408,7 @@
     b7   reacted  speed       100.0000  torque -54.421806
     b8   free     speed       100.0000  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   reacted  speed         0.0000  torque -0.018148
     b2   free     speed         0.0000  torque 0.000000
@@ -7093,6 +7419,7 @@
     b7   load     speed         0.0000  torque 0.600000
     b8   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed      -800.0000  torque 0.000000
@@ -7147,6 +7474,7 @@
   path b6 -> b1  ratio 0.111111  efficiency 87.360169 / 87.157496 %  backlash 0.835777 / 0.092864 deg
     power through the teeth 7.505283 / 7.583556   one more tooth: 0.117371 0.111111 0.111111 0.109589 0.117371 0.111111 0.111111 0.109589
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed     -1000.0000  torque 0.000000
@@ -7158,6 +7486,7 @@
     b8   free     speed      2111.1111  torque 0.000000
     b9   free     speed     -1444.4444  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   reacted  speed         0.0000  torque -0.058240
     b2   free     speed         0.0000  torque 0.000000
@@ -7169,6 +7498,7 @@
     b8   free     speed         0.0000  torque 0.000000
     b9   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque 0.000000
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed      -800.0000  torque 0.000000
@@ -7240,6 +7570,7 @@
   path b7 -> b1  ratio -0.001888  efficiency 0.000000 / 62.528978 %  backlash 30.752347 / 0.058058 deg
     power through the teeth 51.480848 / 34.510458   one more tooth: -0.001999 -0.001845 -0.001999 -0.001845 -0.001888 -0.001888 -0.001825 -0.001949 -0.001943 -0.001111 -0.002652 -0.004301 0.000809
   case 1
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -13.418897
     b1   load     speed      3000.0000  torque 2.000000
     b2   free     speed     -1186.0465  torque 0.000000
@@ -7251,6 +7582,7 @@
     b8   free     speed      -143.2115  torque 0.000000
     b9   free     speed       334.1601  torque 0.000000
   case 2
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -0.003813
     b1   reacted  speed         0.0000  torque 0.000524
     b2   free     speed         0.0000  torque 0.000000
@@ -7262,6 +7594,7 @@
     b8   free     speed         0.0000  torque 0.000000
     b9   free     speed         0.0000  torque 0.000000
   case 3
+    ! train.stresses_nominal
     b0   fixed    speed              -  torque -13.418897
     b1   load     speed      2400.0000  torque 2.000000
     b2   free     speed      -948.8372  torque 0.000000

@@ -82,6 +82,8 @@ case_underdetermined = "Bewegung unbestimmt: {short} Drehzahl(en) fehlen, oder e
 case_nothing_drives = "kein vorgegebenes Drehmoment verrichtet Arbeit — jede Last ist null oder liegt an einer stehenden Welle: nichts treibt diesen Lastfall"
 load_shared = "an beiden Enden abgestützt: wie sich die Last aufteilt, ist eine Frage der Steifigkeit, die dieses Modell nicht beantwortet — nur ein Ende abstützen, oder eine selbsthemmende Verzahnung halten lassen"
 flow_too_many_meshes = "der Leistungsfluss läuft über {meshes} Eingriffe, und er kann höchstens {most} zugleich verfolgen"
+stresses_nominal = "Spannungen sind nominell: bewertet unter dem eingegebenen Drehmoment mal K_A = {factor}, ohne Dynamik-, Breiten- oder Stirnlastfaktor — das Auslegungsdrehmoment eingeben"
+application_factor_held = "Anwendungsfaktor {given} auf 1 gehalten: K_A ist per Definition mindestens 1"
 
 [preview]
 nothing = "ändert nichts"
@@ -282,6 +284,7 @@ sidebar_collapse = "Die Tab-Listen einklappen"
 sidebar_expand = "Die Tab-Listen zeigen"
 train_actuation = "Betätigung"
 train_actuation_count = "Anzahl der Betätigungen"
+train_application_factor = "Anwendungsfaktor K_A"
 train_actuation_range = "Betätigungsbereich"
 train_actuation_range_at = "Bereich gemessen am"
 train_add_fatigue_case = "+ Dauerlastfall hinzufügen"

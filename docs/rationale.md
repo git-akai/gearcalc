@@ -580,9 +580,24 @@ choice](#no-isoagma-correction-factors).
 
 ### No ISO/AGMA correction factors
 
-`Y_β`, `f_ε`, `Y_DT`, `K_A`, `K_v`, `K_Fβ`/`K_Hβ`, `K_Fα`/`K_Hα`, `Z_ε`, `Z_β`
+`Y_β`, `f_ε`, `Y_DT`, `K_v`, `K_Fβ`/`K_Hβ`, `K_Fα`/`K_Hα`, `Z_ε`, `Z_β`
 and their relatives are not used, and will not be added on request without
 revisiting this.
+
+**What leaving them out costs, with its sign.** `K_v`, `K_Fβ` and `K_Fα` are
+`≥ 1` by definition: each raises the load a tooth sees above the nominal one.
+Without them every stress is **nominal** — `σ_F` low by their product, `σ_H` by
+its square root — which is the unconservative direction, and
+[`state.md`](state.md#known-approximate-documented-at-the-call-site) records it.
+Every rated case says so beside its figures (`train.stresses_nominal`).
+
+**`K_A` is not on the list.** It is not calibrated against a population of
+test gears: it is the designer's statement of what the driving and driven
+machines add to the torque, which only they can make. So it is an input on
+each load case, 1 unless stated, and it multiplies the force every stress is
+rated under — `σ_F` by `K_A`, a line contact by `√K_A` — and no torque the train
+reports. On the canary pair a light `K_A = 1.25` takes the fatigue contact
+width from 8.48 to 10.60 mm, past its 10 mm face.
 
 **Three reasons, in order of weight.**
 

@@ -83,6 +83,8 @@ case_underdetermined = "movimento indefinido: falta(m) {short} velocidade(s), ou
 case_nothing_drives = "nenhum binário dado realiza trabalho — cada carga é nula ou está num eixo parado: nada aciona este caso"
 load_shared = "suportado em ambas as extremidades: como a carga se divide é uma questão de rigidez que este modelo não define — suporte apenas uma extremidade, ou deixe um engrenamento autobloqueante suportá-la"
 flow_too_many_meshes = "o fluxo de potência atravessa {meshes} engrenamentos e só consegue seguir no máximo {most} de uma vez"
+stresses_nominal = "as tensões são nominais: avaliadas sob o torque informado vezes K_A = {factor}, sem fator dinâmico, de face ou transversal — informe o torque de projeto"
+application_factor_held = "fator de aplicação {given} mantido em 1: K_A é pelo menos 1 por definição"
 
 [preview]
 nothing = "não altera nada"
@@ -283,6 +285,7 @@ sidebar_collapse = "Recolher as listas de separadores"
 sidebar_expand = "Mostrar as listas de separadores"
 train_actuation = "Acionamento"
 train_actuation_count = "Número de acionamentos"
+train_application_factor = "Fator de aplicação K_A"
 train_actuation_range = "Curso por acionamento"
 train_actuation_range_at = "Curso medido no"
 train_add_fatigue_case = "+ Adicionar caso de carga de fadiga"

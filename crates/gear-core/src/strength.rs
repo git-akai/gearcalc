@@ -856,14 +856,17 @@ fn finish<T: ToothOutline + ?Sized>(
 ///
 /// # Why this survives the no-correction-factors policy
 ///
-/// docs/reference.md#contact-stress excludes the ISO correction factors —
-/// `K_A`, `K_v`, `K_Fβ`, `K_Fα`, `Z_ε`, `Z_β`. `Y_S` is kept, and the
-/// difference is not special pleading:
+/// docs/rationale.md#no-isoagma-correction-factors declines ISO's load factors
+/// `K_v`, `K_Fβ` and `K_Fα`, and the contact factors `Z_ε` and `Z_β`; `K_A` is
+/// the load case's own input, 1 unless a designer states it. The load factors
+/// are `≥ 1` by definition, so leaving them out makes every stress **nominal**:
+/// `σ_F` low by their product and `σ_H` by its square root — the
+/// unconservative direction, recorded in `docs/state.md`. `Y_S` is kept, and
+/// the difference is not special pleading:
 ///
-/// - **It points the other way.** Those factors are mostly `≤ 1` for bending, so
-///   omitting them is conservative. `Y_S ≥ 1` — typically 1.6 to 2.1. Dropping
-///   it would report a nominal section stress well *below* the real peak, which
-///   is the unconservative direction.
+/// - **Dropping it would be the same error, larger.** `Y_S ≥ 1` — typically
+///   1.6 to 2.1. Without it a nominal section stress sits well *below* the real
+///   peak.
 /// - **It is local, not population-calibrated.** It converts nominal stress at a
 ///   section into peak stress at a notch. Its inputs `s_Fn`, `h_Fe` and `ρ_F`
 ///   are measured off this gear's own generated profile, not looked up against a
@@ -1362,10 +1365,12 @@ impl Load {
 /// which carries the measurement, and `docs/state.md`, which carries every
 /// declined formula so the decision can be revisited without the standard.
 ///
-/// **The `K` and `Z` families are not applied either**, and that is the same
-/// policy (docs/reference.md#contact-stress). `Y_S` and `Y_B` are the two
-/// exceptions and neither is half of anything; see [`RootStressModel`] and
-/// [`RimSupport`].
+/// **The `K` factors are not applied here**: the stress is nominal under the
+/// force it is given, and a train's rating passes the force times its load
+/// case's `K_A`. `K_v`, `K_Fβ` and `K_Fα` are declined
+/// (docs/rationale.md#no-isoagma-correction-factors); each is `≥ 1`, so the
+/// stress is low by their product. `Y_S` and `Y_B` are the two exceptions and
+/// neither is half of anything; see [`RootStressModel`] and [`RimSupport`].
 ///
 /// Returns `None` when the stress correction is undefined for this section —
 /// see [`RootSection::stress_correction`]. That is not a failure to compute; it

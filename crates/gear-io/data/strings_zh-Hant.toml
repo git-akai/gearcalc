@@ -78,6 +78,8 @@ case_underdetermined = "運動未定：還需給定 {short} 個轉速，或少�
 case_nothing_drives = "沒有給定轉矩作功——每個載荷或為零或位於靜止軸口：沒有構件驅動此工況"
 load_shared = "兩端均受支承：負荷如何分配取決於剛度，本模型不作此判斷——請只支承一端，或由自鎖嚙合承受"
 flow_too_many_meshes = "功率流經過 {meshes} 個嚙合，一次最多只能追蹤 {most} 個"
+stresses_nominal = "應力為名義值：按輸入扭矩乘以 K_A = {factor} 評定，未計動載、齒向或端面負荷係數——請輸入設計扭矩"
+application_factor_held = "使用係數 {given} 取為 1：按定義 K_A 至少為 1"
 
 [preview]
 nothing = "不作任何改變"
@@ -278,6 +280,7 @@ sidebar_collapse = "收起分頁清單"
 sidebar_expand = "展開分頁清單"
 train_actuation = "動作方式"
 train_actuation_count = "動作次數"
+train_application_factor = "使用係數 K_A"
 train_actuation_range = "單次動作行程"
 train_actuation_range_at = "行程測量於"
 train_add_fatigue_case = "+ 新增疲勞負荷工況"

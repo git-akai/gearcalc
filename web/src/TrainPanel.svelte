@@ -870,6 +870,9 @@
 {#snippet caseEditor(c: LoadCase, i: number)}
   {@const cres = forCase(solved?.cases, i)}
     <div class="grid shared">
+      <!-- K_A: the designer's factor on the torque every stress is rated
+           under. The core holds it at 1 below 1 and says so. -->
+      {@render numberField("ui.train_application_factor", () => c.application_factor, (v) => (c.application_factor = v), 0.05)}
       {#if c.kind === "fatigue"}
         <!-- **What is the case's, before what is each load's.** A
              fatigue case alone has a duty: an ultimate load is survived

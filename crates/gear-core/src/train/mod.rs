@@ -59,6 +59,8 @@ mod offers;
 mod pair;
 mod planetary;
 mod preview;
+#[cfg(test)]
+mod rating_laws;
 pub mod shape;
 mod wiring;
 
@@ -2930,6 +2932,21 @@ pub struct LoadCase {
     /// while the case is ultimate for the reason [`Auto::manual`] is kept while
     /// automatic: switching the kind back finds it where it was.
     pub duty: Duty,
+    /// **`K_A`, the application factor**: what the driving and driven
+    /// machines add to the torque entered, by the designer's judgement of
+    /// them. Every stress is rated under the entered torque times it, so
+    /// bending scales by `K_A` and a line contact by `√K_A`; the torques and
+    /// the flow are reported as entered. 1 where nothing is said, which is
+    /// every file written before it existed. Below 1, or not a number, it is
+    /// held at 1 and the case says so: `K_A ≥ 1` by definition.
+    #[cfg_attr(feature = "serde", serde(default = "unit_factor"))]
+    pub application_factor: f64,
+}
+
+/// `K_A = 1`: the torque entered is the design torque.
+#[must_use]
+pub const fn unit_factor() -> f64 {
+    1.0
 }
 
 /// **What a case says a port is.** A port the case does not mention has a
@@ -3039,6 +3056,7 @@ impl LoadCase {
                 Load::declared(output, LoadRole::Reacted),
             ],
             duty: Duty::intermittent(output),
+            application_factor: unit_factor(),
         }
     }
 
@@ -3068,6 +3086,18 @@ impl LoadCase {
                 Load::declared(input, LoadRole::Reacted),
             ],
             duty: Duty::intermittent(output),
+            application_factor: unit_factor(),
+        }
+    }
+
+    /// **`K_A` as the rating applies it**: the factor given, or 1 where
+    /// the factor given is below 1 or not a number.
+    #[must_use]
+    pub fn applied_factor(&self) -> f64 {
+        if self.application_factor >= 1.0 && self.application_factor.is_finite() {
+            self.application_factor
+        } else {
+            unit_factor()
         }
     }
 
@@ -3164,6 +3194,9 @@ pub struct CaseLoad {
     pub turns: Option<Vec<f64>>,
     /// The actuations a reversing duty counts, where it reverses.
     pub reversing_actuations: Option<f64>,
+    /// `K_A` as applied ([`LoadCase::applied_factor`]): what every mesh's
+    /// torque is multiplied by for rating, and for nothing else.
+    pub application_factor: f64,
 }
 
 impl CaseLoad {
@@ -3188,6 +3221,7 @@ impl CaseLoad {
             on_members: vec![0.0; wiring.mounts.len()],
             turns: None,
             reversing_actuations: None,
+            application_factor: unit_factor(),
         }
     }
 }
@@ -4684,6 +4718,22 @@ fn solve_parts(
             } => Some(f64::from(actuations)),
             _ => None,
         });
+        // ---- what the rating of this case leaves out, said where it is
+        // rated: the stresses are nominal, under `K_A` and no other factor.
+        if case.enabled {
+            if case.applied_factor() != case.application_factor {
+                notes.push(Note::new(key::TRAIN_APPLICATION_FACTOR_HELD).number(
+                    "given",
+                    case.application_factor,
+                    2,
+                ));
+            }
+            notes.push(Note::new(key::TRAIN_STRESSES_NOMINAL).number(
+                "factor",
+                case.applied_factor(),
+                2,
+            ));
+        }
         // ---- what each part's meshes put on each of its bodies.
         for (k, w) in wirings.iter().enumerate().filter(|_| case.enabled) {
             let mine = &mesh_of_part[k];
@@ -4716,6 +4766,7 @@ fn solve_parts(
                     .as_ref()
                     .map(|t| (0..w.slots.len()).map(|l| t[port(k, l)]).collect()),
                 reversing_actuations,
+                application_factor: case.applied_factor(),
             });
         }
         cases.push(TrainCase {
@@ -11076,7 +11127,11 @@ mod tests {
         let mut held = t.clone();
         held.load_cases[BACK] = LoadCase::back_driving(start_of(&t), end_of(&t), 5.0);
         let h = solve_train(&held, &lib).unwrap();
-        assert!(h.cases[BACK].notes.is_empty());
+        // Nothing to say of it but what every rated case says.
+        assert!(h.cases[BACK]
+            .notes
+            .iter()
+            .all(|n| n.is(key::TRAIN_STRESSES_NOMINAL)));
         let mut at = 5.0;
         for s in h.by_part.iter().rev() {
             let p = spur(s);
@@ -11138,7 +11193,13 @@ mod tests {
         }
 
         // ...and the case solved, nothing reaching the free start.
-        assert!(r.cases[BACK].solved && r.cases[BACK].notes.is_empty());
+        assert!(
+            r.cases[BACK].solved
+                && r.cases[BACK]
+                    .notes
+                    .iter()
+                    .all(|n| n.is(key::TRAIN_STRESSES_NOMINAL))
+        );
         assert_eq!(at_port(&r, &t, BACK, start_of(&t)).torque, 0.0);
 
         // **The two torques are two facts.** Put the locking stage first, so
