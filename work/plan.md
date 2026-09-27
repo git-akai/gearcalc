@@ -208,6 +208,22 @@ caught, test workspace included) and the 130-constant perturbation.
 ## 5. Change log
 
 - 2026-09-26 — plan written after the four-way review.
+- 2026-09-26 — owner's ruling on contact: the unified contact model (S-C) is the preferred path, for
+  every mesh, straight teeth included. There is no split case: if the speed is acceptable for helical
+  gears, it is acceptable for spur gears. Today's line-contact and point-contact models, and ISO's
+  closed forms, become its validation cases. If it turns out right but too slow for practical use, it
+  ships as the validation instrument for the existing models instead.
+  - Adopted by default (owner may override): tip-edge contact counts, with a "tips relieved" option;
+    friction enters the normal force; ratings are read at the field maximum, with ISO's points
+    reported beside them.
+  - Next step is a phase-exact prototype:
+    - load along a line integrated exactly;
+    - the shared approach solved exactly per piece;
+    - means and maxima over phase from breakpoints;
+    - the Hertz aspect ratio as the one bracketed inverse;
+    - a closed-form limit at Σ → 0;
+    - tooth stiffness in series, derived from the generated tooth and gated against ISO 6336-1's c′
+      and c_γ.
 - 2026-09-26 — owner's rulings:
   - Redesigns first.
   - Docs and comments rewritten concisely, overriding `CLAUDE.md`'s prose-ratio note.
