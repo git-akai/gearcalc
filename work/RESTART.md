@@ -37,6 +37,10 @@ Branches live in worktrees under `~/.cache/gearcalc-work/wt/`. Status notes are 
   results are in `work/contact-model.md` (IN PROGRESS). Scripts are in
   `~/.cache/gearcalc-work/contact-proto/`, and the oracle is in `~/.cache/gearcalc-work/spike-verify/`.
 
+## Ask the owner when contact work resumes
+- Worm types as variants: ZN (preferred for low-cost manufacture), ZA, ZK. See the last section of
+  `contact-model.md`: the flank as a parameter, and the conjugate-wheel question.
+
 ## Next, in order
 1. Finish P3's check and P6, then integrate both.
 2. P4 (ring) after P3; P5 (mesh and crossed; T07.2–T07.4 dropped) together with P7 (metrology,
