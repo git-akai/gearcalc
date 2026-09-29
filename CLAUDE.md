@@ -157,7 +157,7 @@ string catalogues is what five languages costs.
 
 ## Which check catches what
 
-Thirteen checks in six different ways. `nix flake check` is **not** all of them.
+The checks, by what each catches. `nix flake check` is **not** all of them.
 
 | Run | Catches | In CI |
 |---|---|---|
