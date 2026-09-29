@@ -27,3 +27,10 @@ Carried into P1 from the s0-tools check (minor):
 Carried into Stage 2 from the P8 check:
 - Path efficiency shows 0.00 when a flow is refused. It is now reachable through Worm AddGear edits 18 and 23 (0-for-none, P1 pattern).
 - Genuine flow ties (zero relative speed, zero tie) are settled by efficiency and then enumeration order. Redesign F should settle these.
+
+Carried from the P3 check:
+- Stage 2 (typed absence): `edge_of_undercut` reads a Brent failure as "no edge"; u_tip and u_j are
+  NaN on severed teeth.
+- P4 (ring): `ring.rs:218` does not guard α.
+- P1: validate_dxf models only the unclamped cut. Eccentric z40 x1 Δx0.5 fails, on the safe side,
+  and no CI case reaches it.
