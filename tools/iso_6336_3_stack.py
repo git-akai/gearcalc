@@ -268,14 +268,13 @@ def rate(z1, z2, alpha_deg, beta_deg=0.0, face=10.0):
     # material test on the swept rack for a spur gear, and the pair skipped
     # on a helical one.
     def form_roll(i, z):
-        g = r["gear"][i]
-        lift = (g["h_fP"] - g["rho_fP"] * (1 - math.sin(alpha_n))) * m_n
+        lift = (h_fP - rho_fP * (1 - math.sin(alpha_n))) * m_n
         roll = d[i] / 2 * math.sin(alpha_t) - lift / math.sin(alpha_t)
         if roll >= 0:
             return roll
         if beta_deg:
             return None
-        return undercut_form_roll(z, m_n, alpha_n, g["h_fP"], g["rho_fP"])
+        return undercut_form_roll(z, m_n, alpha_n, h_fP, rho_fP)
 
     rolls = [form_roll(i, z) for i, z in enumerate((z1, z2))]
     if None in rolls:
