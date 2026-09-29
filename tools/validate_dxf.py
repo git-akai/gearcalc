@@ -49,6 +49,11 @@ ADDENDUM = 1.0
 DEDENDUM = 1.25
 TIP_ROUND = 0.38
 
+# The least depth a tool reaches below the rolling line of any tooth it cuts,
+# in modules: zero depth is no tooth at all (the harness's
+# `params::guard::MIN_CUTTER_DEPTH_MODULES`, a stated convention).
+MIN_DEPTH = 0.05
+
 # The shaper cutter the harness cuts a ring with: its tooth count and addendum
 # (modules), unshifted.
 CUTTER_TEETH = 20
@@ -81,13 +86,25 @@ def arc_of(a, b, bulge):
 
 class External:
     """An external gear cut by the ISO rack, from its inputs alone: spur, at
-    shift x + dx cos(theta) for the tooth at theta."""
+    shift x + dx cos(theta) for the tooth at theta.
+
+    **One rack at one setting cuts every tooth**, as a hob does: its depth
+    below the reference line is what the most demanding tooth asks, the
+    dedendum, or `MIN_DEPTH` below a tooth's own rolling line where its shift
+    passes the dedendum -- so on an eccentric gear whose highest tooth is
+    shifted past `h_f - MIN_DEPTH`, every tooth is cut deeper than its
+    dedendum. Not modelled: the rack's tip round capped to fit that shallow
+    cut (the root arc check is a concentric gear's), the depth cap near the
+    axis, and a space that closes before the depth; a case reaching those is
+    outside what this derives, and fails rather than passes."""
 
     def __init__(self, z, m, x, alpha_deg, dx):
         self.z, self.m, self.x, self.dx = z, m, x, dx
         self.alpha = math.radians(alpha_deg)
         self.r = m * z / 2.0
         self.rb = self.r * math.cos(self.alpha)
+        # The tool's depth below the reference line, in modules.
+        self.depth = max(DEDENDUM, MIN_DEPTH + x + abs(dx))
 
     def shift(self, k):
         return self.x + self.dx * math.cos(2.0 * math.pi * k / self.z)
@@ -102,7 +119,7 @@ class External:
         return psi_b - inv(math.acos(self.rb / self.tip(x)))
 
     def root(self, x):
-        return self.r - self.m * (DEDENDUM - x)
+        return self.r - self.m * (self.depth - x)
 
     def root_arc_half_angle(self, x):
         """Half the root arc's angle: the flat the rack's tooth has at its tip,
@@ -117,7 +134,7 @@ class External:
         """
         s = self.m * (math.pi / 2.0 + 2.0 * x * math.tan(self.alpha))
         rho = TIP_ROUND * self.m
-        w = math.pi * self.m - s - 2.0 * self.m * (DEDENDUM - x) * math.tan(self.alpha)
+        w = math.pi * self.m - s - 2.0 * self.m * (self.depth - x) * math.tan(self.alpha)
         inset = rho * (1.0 - math.sin(self.alpha)) / math.cos(self.alpha)
         return (w / 2.0 - inset) / self.r
 

@@ -150,7 +150,8 @@ jobs:
       # and bulge against the gear derived from its inputs. The Rust tests can
       # only show the writer agrees with itself; this shows an unrelated parser
       # gets the same gear out -- a shifted gear, an undercut one, an eccentric
-      # one and a ring.
+      # one, an eccentric one whose highest tooth sets the shared tool deeper
+      # than the dedendum, and a ring.
       - name: Validate DXF export against an independent parser
         run: |
           nix develop --command bash -c '
@@ -164,6 +165,8 @@ jobs:
             python3 tools/validate_dxf.py $out/gear9.dxf --teeth 9 --shift -0.3
             $cli dxf 24 0 0.001 0.25 > $out/gear24e.dxf
             python3 tools/validate_dxf.py $out/gear24e.dxf --teeth 24 --angular-shift 0.25
+            $cli dxf 40 1 0.001 0.5 > $out/gear40e.dxf
+            python3 tools/validate_dxf.py $out/gear40e.dxf --teeth 40 --shift 1 --angular-shift 0.5
             $cli dxf ring 43 0 0.001 > $out/ring43.dxf
             python3 tools/validate_dxf.py $out/ring43.dxf --ring --teeth 43
           '
