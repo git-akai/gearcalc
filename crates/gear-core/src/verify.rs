@@ -188,11 +188,7 @@ pub struct CutReport {
 
 /// Two-sided verification of a profile against its generating rack.
 #[must_use]
-#[allow(
-    clippy::cast_possible_truncation,
-    clippy::cast_sign_loss,
-    clippy::cast_precision_loss
-)]
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 pub fn check_cut(g: &Tooth, profile_points: usize) -> CutReport {
     let (r, th) = g.half_profile(profile_points);
     // +theta side only; the other is its mirror
@@ -301,7 +297,6 @@ const COPY_MARGIN: i32 = 3;
 /// path, so point-sampling spacing would otherwise dominate the very quantity
 /// being measured.
 #[must_use]
-#[allow(clippy::cast_precision_loss)]
 pub fn fillet_envelope_error(g: &Tooth, fillet_points: usize, path_points: usize) -> f64 {
     let mut pts = Vec::with_capacity(fillet_points);
     for i in 0..fillet_points {
@@ -352,7 +347,6 @@ pub fn fillet_envelope_error(g: &Tooth, fillet_points: usize, path_points: usize
 /// The polyline is kept purely as this cross-check — it is no longer on the path
 /// used by [`check_cut`].
 #[must_use]
-#[allow(clippy::cast_precision_loss)]
 pub fn sdf_matches_polyline(g: &Tooth, arc_points: usize, samples: usize) -> f64 {
     let (ca, sa) = (g.alpha_t.cos(), g.alpha_t.sin());
     let pitch = std::f64::consts::PI * g.mt;
@@ -506,7 +500,6 @@ pub fn ring_cut_envelope_spans(
     const FLANK: usize = 600;
     let r_low = r_bc * 1.000_001;
     for i in 0..=FLANK {
-        #[allow(clippy::cast_precision_loss)]
         let t = i as f64 / FLANK as f64;
         let radius = r_low + (r_tan - r_low) * t;
         boundary.push(polar(radius, half_angle_at(radius)));
@@ -517,7 +510,6 @@ pub fn ring_cut_envelope_spans(
     let end = (0.0 - cx).atan2(r_tip - cy);
     const ROUND: usize = 300;
     for i in 0..=ROUND {
-        #[allow(clippy::cast_precision_loss)]
         let t = i as f64 / ROUND as f64;
         let a = start + (end - start) * t;
         boundary.push((cx + rho * a.sin(), cy + rho * a.cos()));
@@ -525,7 +517,6 @@ pub fn ring_cut_envelope_spans(
     const TIP: usize = 120;
     let tip_angle = (cx + rho * end.sin()).atan2(cy + rho * end.cos());
     for i in 0..=TIP {
-        #[allow(clippy::cast_precision_loss)]
         let t = i as f64 / TIP as f64;
         boundary.push(polar(r_tip, tip_angle * (1.0 - t)));
     }
@@ -534,7 +525,6 @@ pub fn ring_cut_envelope_spans(
     let span = spans * PI * ring.mt;
     let mut envelope = vec![f64::INFINITY; radii];
     for j in 0..=phases {
-        #[allow(clippy::cast_precision_loss)]
         let s = -span + 2.0 * span * (j as f64 / phases as f64);
         // Rolling is on the operating circles, which are the reference ones only
         // when the cut sits at reference centres.
@@ -579,7 +569,6 @@ pub fn ring_cut_envelope_spans(
         .enumerate()
         .filter(|(_, a)| a.is_finite())
         .map(|(bin, &a)| {
-            #[allow(clippy::cast_precision_loss)]
             let radius = ring.ra + (ring.rf - ring.ra) * (bin as f64 + 0.5) / radii as f64;
             (radius, a)
         })
@@ -611,7 +600,6 @@ pub fn check_ring_cut(ring: &crate::ring::Ring, radii: usize, phases: usize) -> 
     const DENSE: usize = 3000;
     let mut reference: Vec<(f64, f64)> = Vec::with_capacity(2 * DENSE);
     for i in 0..=DENSE {
-        #[allow(clippy::cast_precision_loss)]
         let t = i as f64 / DENSE as f64;
         reference.extend(
             [
@@ -779,7 +767,6 @@ pub fn contact_phase_from_outlines(
     // everywhere; the free band is the play, and it is what this is measuring.
     let pitch = std::f64::consts::TAU / f64::from(g2.params.teeth);
     const SCAN: usize = 400;
-    #[allow(clippy::cast_precision_loss)]
     let free_seed = (0..=SCAN)
         .map(|i| pitch * (i as f64 / SCAN as f64) - pitch / 2.0)
         .find(|phi| !touches(*phi))?;

@@ -196,6 +196,10 @@ impl Catalogue {
     /// Never in a shipped build: the file is `include_str!`d and parsed by the
     /// test suite, so a malformed one fails CI rather than a user's session.
     #[must_use]
+    #[expect(
+        clippy::expect_used,
+        reason = "the compiled-in catalogue is parsed by the test suite"
+    )]
     pub fn english() -> Self {
         Self::parse(EN).expect("the compiled-in English catalogue must parse")
     }
@@ -216,6 +220,10 @@ impl Catalogue {
     /// Never in a shipped build, for the reason [`Self::english`] gives: every
     /// file is parsed by the test suite.
     #[must_use]
+    #[expect(
+        clippy::expect_used,
+        reason = "every compiled-in catalogue is parsed by the test suite"
+    )]
     pub fn for_language(tag: &str) -> Self {
         let mut base = Self::english();
         let lang = Language::resolve(tag);

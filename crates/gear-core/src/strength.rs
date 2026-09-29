@@ -1590,7 +1590,6 @@ fn worst_over_cycle<T: ToothOutline + ?Sized>(
     // The candidates the sweep must not miss, then the sweep itself.
     let mut samples = vec![0.0, eps_n, highest_single_pair(eps_n), eps_n.min(1.0)];
     for i in 0..=samples_wanted {
-        #[allow(clippy::cast_precision_loss)]
         let t = i as f64 / samples_wanted as f64;
         samples.push(t * eps_n);
     }
@@ -3279,7 +3278,6 @@ mod tests {
         let want = mesh.a_w * mesh.alpha_w.sin();
 
         for i in 0..=20 {
-            #[allow(clippy::cast_precision_loss)]
             let t = i as f64 / 20.0;
             let xi = -path.approach + t * (path.approach + path.recess);
             let rho1 = path.base_radius_1 * mesh.alpha_w.tan() + xi;

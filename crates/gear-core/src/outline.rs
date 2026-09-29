@@ -454,7 +454,6 @@ mod tests {
             const DENSE: usize = 4000;
             let mut dense: Vec<(f64, f64)> = Vec::new();
             for i in 0..=DENSE {
-                #[allow(clippy::cast_precision_loss)]
                 let t = i as f64 / DENSE as f64;
                 dense.push((g.ra, -g.involute_at(g.u_tip).1 * (1.0 - 2.0 * t)));
                 dense.push(g.involute_at(g.u_tip + (g.u_j - g.u_tip) * t));
@@ -955,7 +954,6 @@ mod tests {
         let g = Tooth::new(GearParams::default());
         let n = crate::gear::Gear::new(g.params).outline(1e-18).len();
         let expected = SPANS * f64::from(1u32 << DEPTH);
-        #[allow(clippy::cast_precision_loss)]
         let ratio = n as f64 / expected;
         assert!(
             (std::f64::consts::FRAC_1_SQRT_2..std::f64::consts::SQRT_2).contains(&ratio),

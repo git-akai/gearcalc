@@ -540,7 +540,6 @@ impl Gear {
         let z = self.seat.len();
         let (a, b) = (self.tooth(k).0.psi_b, self.tooth(k + 1).0.psi_b);
         let lam = self.mean.params.index_offset;
-        #[allow(clippy::cast_precision_loss)]
         let pitch = std::f64::consts::TAU / z as f64;
         (pitch + lam * (a - b) - a - b) / 2.0
     }
@@ -558,7 +557,6 @@ impl Gear {
         let z = self.seat.len();
         let psi = |k: usize| self.tooth(k).0.psi_b;
         let lam = self.mean.params.index_offset;
-        #[allow(clippy::cast_precision_loss)]
         let pitch = std::f64::consts::TAU * (b as f64 - a as f64) / z as f64;
         let spread = lam * ((psi(a) + psi(a + 1)) - (psi(b) + psi(b + 1))) + (psi(a) - psi(a + 1))
             - (psi(b) - psi(b + 1));
@@ -769,7 +767,6 @@ impl Gear {
         // mm of pitch error — a rounding residual dressed as a measurement.
         let departure = |k: usize, side: f64| {
             let (g, seat) = self.tooth(k);
-            #[allow(clippy::cast_precision_loss)]
             let ideal = std::f64::consts::TAU * k as f64 / z as f64;
             (seat - ideal) + side * g.psi_b
         };
@@ -1011,10 +1008,8 @@ fn centre_profile_of(
             .collect::<Result<Vec<f64>, MeshError>>()?;
 
         let n = commanded.len();
-        #[allow(clippy::cast_precision_loss)]
         let count = n as f64;
         let angle = |k: usize| {
-            #[allow(clippy::cast_precision_loss)]
             let kf = k as f64;
             std::f64::consts::TAU * kf / count
         };
@@ -1672,7 +1667,6 @@ mod tests {
                 ..Default::default()
             })
             .variation();
-            #[allow(clippy::cast_precision_loss)]
             let reached =
                 1.0 - (std::f64::consts::TAU * (teeth / 2) as f64 / f64::from(teeth)).cos();
             let want = shift * reached;

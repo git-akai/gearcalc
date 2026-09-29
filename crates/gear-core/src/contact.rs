@@ -1149,11 +1149,9 @@ mod tests {
         let span = path.approach + path.recess;
         let mut sum = 0.0;
         for i in 0..N {
-            #[allow(clippy::cast_precision_loss)]
             let t = (i as f64 + 0.5) / N as f64;
             sum += f(-path.approach + span * t);
         }
-        #[allow(clippy::cast_precision_loss)]
         {
             sum / N as f64
         }
@@ -1508,7 +1506,6 @@ mod tests {
                 let (a, _, m, path) = internal_pair(zp, zr, beta);
                 let pitch_line = 100.0 * path.operating_radius_1;
                 for k in 0..11 {
-                    #[allow(clippy::cast_precision_loss)]
                     let t = k as f64 / 10.0;
                     let xi = -path.approach + (path.approach + path.recess) * t;
                     let s = sliding_at(&path, &m, &a, xi, 100.0);
@@ -1592,7 +1589,6 @@ mod tests {
                 let (a, b, m) = helical_pair(z1, z2, beta);
                 let path = ContactPath::new(&a, b.flank_ends(), &m).unwrap();
                 for step in 0..=10 {
-                    #[allow(clippy::cast_precision_loss)]
                     let t = step as f64 / 10.0;
                     let xi = -path.approach + t * (path.approach + path.recess);
                     let s = sliding_at(&path, &m, &a, xi, 100.0);
@@ -1623,7 +1619,6 @@ mod tests {
                 let omega_1 = 100.0;
                 let omega_2 = omega_1 * f64::from(z1) / f64::from(z2);
                 for step in 0..=8 {
-                    #[allow(clippy::cast_precision_loss)]
                     let t = step as f64 / 8.0;
                     let xi = -path.approach + t * (path.approach + path.recess);
                     let expected = xi.abs() * (omega_1 + omega_2);
@@ -2047,7 +2042,6 @@ mod tests {
         let (a, b, m) = pair(19, 31);
         let path = ContactPath::new(&a, b.flank_ends(), &m).unwrap();
         for i in 0..=200 {
-            #[allow(clippy::cast_precision_loss)]
             let t = i as f64 / 200.0;
             let xi = -path.approach + t * (path.approach + path.recess);
             let shared = path.load_fraction(xi, LoadSharing::LinearRamp);

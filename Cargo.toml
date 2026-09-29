@@ -9,7 +9,7 @@ license = "MIT"
 repository = "https://github.com/schlarpc/gears"
 
 [workspace.lints.rust]
-unsafe_code = "warn"
+unsafe_code = "forbid"
 missing_docs = "allow"
 
 [workspace.lints.clippy]
@@ -25,6 +25,12 @@ ptr_as_ptr = "warn"
 redundant_closure_for_method_calls = "warn"
 # A calculation engine must not panic. Allowed per-module in tests.
 unwrap_used = "warn"
+# Every other way to panic is named where it is kept (`#[expect(…, reason)]`),
+# so a new one is a warning rather than a crash nobody chose. Tests may
+# (`clippy.toml`).
+expect_used = "warn"
+panic = "warn"
+unreachable = "warn"
 
 [profile.dev]
 opt-level = 0

@@ -1,0 +1,5 @@
+# Tests assert by panicking: `unwrap`, `expect` and `panic!` are how a test
+# fails, so the lints that name a panic in production leave tests alone.
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true

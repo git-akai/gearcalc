@@ -1899,20 +1899,17 @@ impl Shape {
         // The search's point as one value per member, the free ones set.
         let place = |v: &[f64]| -> Vec<f64> {
             let mut out = settled.clone();
-            let mut k = 0;
-            while k < axes.len() {
-                match axes[k] {
-                    Coordinate::Own(j) => {
-                        out[free[j]] = v[k];
-                        k += 1;
+            // A division follows its sum, so the pair is placed when its
+            // division is read, from the sum read just before.
+            let mut sum = 0.0;
+            for (c, &x) in axes.iter().zip(v) {
+                match *c {
+                    Coordinate::Own(j) => out[free[j]] = x,
+                    Coordinate::Sum(..) => sum = x,
+                    Coordinate::Division(pa, pb, sign) => {
+                        out[free[pa]] = (sum + x) / 2.0;
+                        out[free[pb]] = (sum - x) / (2.0 * sign);
                     }
-                    Coordinate::Sum(pa, pb, sign) => {
-                        let (s, d) = (v[k], v[k + 1]);
-                        out[free[pa]] = (s + d) / 2.0;
-                        out[free[pb]] = (s - d) / (2.0 * sign);
-                        k += 2;
-                    }
-                    Coordinate::Division(..) => unreachable!("a division follows its sum"),
                 }
             }
             out

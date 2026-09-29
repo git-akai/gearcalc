@@ -12,6 +12,13 @@
 //! the commands it lists". It had fallen out of step by eight of twenty-one.
 //! Proximity is not a mechanism; a table that *is* the dispatch is.
 
+// The harness's `.expect()`s are on fixtures it builds itself, and a
+// development tool stopping loudly on its own broken fixture is the point.
+#![allow(
+    clippy::expect_used,
+    reason = "a harness fixture that does not build is the harness's defect, and says so by stopping"
+)]
+
 mod diagram;
 mod graph;
 mod identity;
@@ -3122,7 +3129,6 @@ fn matrix_report() {
             member.tangent_angle()
         );
         let d = matrix::parting(member, &pop);
-        #[allow(clippy::cast_precision_loss)]
         let pct = |k: usize| 100.0 * k as f64 / d.n as f64;
         println!("  designs rated by both        {}", d.n);
         println!(
@@ -3885,7 +3891,6 @@ fn crossed_report(z1: u32, z2: u32, shaft_angle: f64) {
     );
     let mut any = false;
     for i in 0..=10 {
-        #[allow(clippy::cast_precision_loss)]
         let beta1 = shaft_angle * (i as f64 / 10.0);
         let stage = base.clone().with_first_helix(beta1);
         let Ok(g) = stage.screw(0) else {

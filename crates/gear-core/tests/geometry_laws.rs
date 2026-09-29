@@ -574,7 +574,6 @@ fn a_rings_drawn_profile_is_dense_and_lies_on_its_base_circles_involute() {
             // 1. Density. The closing point makes it one more than a whole
             //    number of teeth; a tenth either way is generous, and the
             //    failure this exists for was a factor of forty.
-            #[allow(clippy::cast_precision_loss)]
             let per_tooth = (pts.len() - 1) as f64 / f64::from(teeth);
             assert!(
                 (0.9 * PER_TOOTH as f64..=1.1 * PER_TOOTH as f64).contains(&per_tooth),
@@ -825,7 +824,6 @@ fn a_tooth_called_unsevered_is_not_severed_at_a_finer_scan() {
                 // The interval the crate scans, sampled a hundred times finer.
                 let mut min_th = f64::INFINITY;
                 for i in 0..DENSE {
-                    #[allow(clippy::cast_precision_loss)]
                     let t = i as f64 / (DENSE - 1) as f64;
                     let th = g.trochoid_at(g.s_j + t * (0.0 - g.s_j)).1;
                     min_th = min_th.min(th);
@@ -1006,7 +1004,6 @@ fn only_an_undercut_tooth_can_be_severed() {
                 let n = 2000usize;
                 let mut min_th = f64::INFINITY;
                 for i in 0..n {
-                    #[allow(clippy::cast_precision_loss)]
                     let f = i as f64 / (n - 1) as f64;
                     min_th = min_th.min(t.trochoid_at(t.s_j + f * (0.0 - t.s_j)).1);
                 }

@@ -2156,6 +2156,148 @@ mod tests {
         assert!(classes.iter().any(|c| c["scale"] == "standard"));
     }
 
+    /// **The panics [`degenerate_input_cannot_panic`] finds, by site**: the
+    /// start of the message and the task that removes it — T01.6's
+    /// `GearParams::check` at every boundary, and a profile that never
+    /// indexes an empty flank.
+    const KNOWN_PANICS: &[(&str, &str)] = &[
+        // tooth.rs, `debug_assert!` on the junction the flank solve found.
+        ("unsolved flank junction", "T01.6"),
+        // gear.rs and ring.rs, `&r[1..]` on a flank that came out empty.
+        ("range start index 1 out of range", "T01.6"),
+    ];
+
+    /// **Degenerate input cannot panic, through any entry point.** Every
+    /// entry that takes a gear is sent one with no teeth, a module at or
+    /// below nought, and a right angle for each angle — what JSON can
+    /// carry of `gear-core`'s own degenerate set (`tests/degenerate.rs`),
+    /// which has the not-a-numbers — and every entry that takes a train
+    /// is sent the default train with its first gear so; each returns,
+    /// refused or not. A panic is allowed only at a listed site, and every
+    /// listed site must still be reached, so the list only shrinks.
+    #[test]
+    fn degenerate_input_cannot_panic() {
+        use serde_json::{json, Value};
+        use std::panic::{catch_unwind, AssertUnwindSafe};
+        let gear: Value = serde_json::from_str(REQ).unwrap();
+        let defaults: Value = serde_json::from_str(&defaults_impl().unwrap()).unwrap();
+        let library: Value = serde_json::from_str(&default_materials_impl().unwrap()).unwrap();
+        let degenerate: [(&str, &str, Value); 5] = [
+            ("teeth 0", "teeth", json!(0)),
+            ("module 0", "module", json!(0.0)),
+            ("module -1", "module", json!(-1.0)),
+            ("pressure angle 90", "pressure_angle", json!(90.0)),
+            ("helix 90", "helix_angle", json!(90.0)),
+        ];
+        // An entry point, answering whether it accepted what it was sent.
+        type Asks = fn(&str) -> bool;
+        type Call = Box<dyn Fn() -> bool>;
+        let mut calls: Vec<(String, Call)> = Vec::new();
+        for (name, field, value) in degenerate {
+            let mut g = gear.clone();
+            g["params"][field] = value.clone();
+            let g = g.to_string();
+            let entries: [(&str, Asks); 6] = [
+                ("solve_gear", |i| solve_gear_impl(i).is_ok()),
+                ("gear_profile", |i| gear_profile_impl(i, 64).is_ok()),
+                ("export_dxf", |i| export_dxf_impl(i).is_ok()),
+                ("solve_ring", |i| solve_ring_impl(i).is_ok()),
+                ("ring_profile", |i| ring_profile_impl(i, 64).is_ok()),
+                ("export_ring_dxf", |i| export_ring_dxf_impl(i).is_ok()),
+            ];
+            for (entry, f) in entries {
+                let g = g.clone();
+                calls.push((format!("{entry} at {name}"), Box::new(move || f(&g))));
+            }
+            // The train's first gear so: its teeth on the gear, the rest on
+            // the member, where a train states them.
+            let mut train = defaults["train"].clone();
+            let member = &mut train["shape"]["members"][0];
+            match field {
+                "teeth" => member["gear"]["teeth"] = value.clone(),
+                "helix_angle" => {
+                    member["gear"]["helix_angle"] = json!({"auto": false, "manual": value})
+                }
+                _ => member[field] = json!({"auto": false, "manual": value}),
+            }
+            let requests: [(&str, Asks, Value); 8] = [
+                (
+                    "solve_train",
+                    |i| solve_train_impl(i).is_ok(),
+                    json!({"train": train}),
+                ),
+                (
+                    "adopt_member",
+                    |i| adopt_member_impl(i).is_ok(),
+                    json!({"train": train, "member": 0}),
+                ),
+                (
+                    "relieve",
+                    |i| relieve_impl(i).is_ok(),
+                    json!({"shape": train["shape"], "just": null, "figures": []}),
+                ),
+                (
+                    "relieve_case",
+                    |i| relieve_case_impl(i).is_ok(),
+                    json!({"train": train, "library": library, "case": 0, "just": null}),
+                ),
+                (
+                    "edit_train",
+                    |i| edit_train_impl(i).is_ok(),
+                    json!({"train": train, "edit": {"add_case": "ultimate"}}),
+                ),
+                (
+                    "preview_edit",
+                    |i| preview_edit_impl(i).is_ok(),
+                    json!({"train": train, "edit": {"graph": {"release": 1}}}),
+                ),
+                (
+                    "offers",
+                    |i| offers_impl(i).is_ok(),
+                    json!({"train": train, "at": "train"}),
+                ),
+                (
+                    "export_train",
+                    |i| export_train_impl(i).is_ok(),
+                    json!({"name": "degenerate", "train": train}),
+                ),
+            ];
+            for (entry, f, request) in requests {
+                let r = request.to_string();
+                calls.push((format!("{entry} at {name}"), Box::new(move || f(&r))));
+            }
+        }
+        std::panic::set_hook(Box::new(|_| {}));
+        let mut panics: Vec<(String, String)> = Vec::new();
+        let mut answered = 0;
+        for (name, call) in &calls {
+            match catch_unwind(AssertUnwindSafe(call)) {
+                Ok(accepted) => answered += usize::from(accepted),
+                Err(e) => panics.push((
+                    name.clone(),
+                    e.downcast_ref::<String>()
+                        .cloned()
+                        .or_else(|| e.downcast_ref::<&str>().map(ToString::to_string))
+                        .unwrap_or_default(),
+                )),
+            }
+        }
+        let _ = std::panic::take_hook();
+        let site = |m: &str| KNOWN_PANICS.iter().position(|(s, _)| m.starts_with(s));
+        let new: Vec<_> = panics.iter().filter(|(_, m)| site(m).is_none()).collect();
+        let reached: Vec<usize> = panics.iter().filter_map(|(_, m)| site(m)).collect();
+        let cured: Vec<_> = (0..KNOWN_PANICS.len())
+            .filter(|k| !reached.contains(k))
+            .map(|k| KNOWN_PANICS[k])
+            .collect();
+        assert!(
+            new.is_empty() && cured.is_empty(),
+            "of {} calls ({answered} answered), panicking at no listed site: {new:?}; listed and never reached: {cured:?}",
+            calls.len()
+        );
+        assert_eq!(calls.len(), 5 * 14);
+    }
+
     #[test]
     fn rejects_malformed_input_instead_of_panicking() {
         assert!(solve_gear_impl("{ not json").is_err());

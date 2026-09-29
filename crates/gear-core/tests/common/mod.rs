@@ -229,7 +229,6 @@ pub fn flatten(outline: &[gear_core::Vertex], per_arc: usize) -> Vec<[f64; 2]> {
         if let Some((c, radius, theta)) = arc_of(a, b, v.bulge) {
             let start = (a[1] - c[1]).atan2(a[0] - c[0]);
             for k in 1..per_arc {
-                #[allow(clippy::cast_precision_loss)]
                 let t = start + theta * k as f64 / per_arc as f64;
                 out.push([c[0] + radius * t.cos(), c[1] + radius * t.sin()]);
             }

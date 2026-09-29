@@ -214,6 +214,10 @@ pub fn epicyclic(
     // Every central body first, in the order listed; the carrier's number
     // is what the carried axes are hung from.
     let shafts: Vec<Body> = centrals.iter().map(|_| b.body(centre)).collect();
+    #[expect(
+        clippy::expect_used,
+        reason = "every caller in this module lists a carrier; a list without one is a defect in the list, not an input"
+    )]
     let carrier = centrals
         .iter()
         .position(|c| *c == Central::Carrier)

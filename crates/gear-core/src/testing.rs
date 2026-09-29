@@ -19,11 +19,9 @@
 /// the fourth-order one it claims to be.
 pub fn simpson_unit_interval<F: Fn(f64) -> f64>(f: F) -> f64 {
     const N: usize = 200_000;
-    #[allow(clippy::cast_precision_loss)]
     let h = 1.0 / N as f64;
     let mut sum = f(0.0) + f(1.0);
     for i in 1..N {
-        #[allow(clippy::cast_precision_loss)]
         let x = i as f64 * h;
         sum += if i % 2 == 0 { 2.0 } else { 4.0 } * f(x);
     }

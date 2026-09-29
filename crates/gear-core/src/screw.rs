@@ -1233,11 +1233,9 @@ impl CrossedPath {
         samples: usize,
     ) -> Option<f64> {
         let steps = samples.max(2);
-        #[allow(clippy::cast_precision_loss)]
         let width = (self.zone[1] - self.zone[0]) / steps as f64;
         let mut loss = 0.0;
         for k in 0..=steps {
-            #[allow(clippy::cast_precision_loss)]
             let s = self.zone[0] + width * k as f64;
             let eta = self.contact_at(screw, s).efficiency(friction, drive)?;
             // Trapezium: the ends are half-weighted because they are the ends,
@@ -1245,7 +1243,6 @@ impl CrossedPath {
             let weight = if k == 0 || k == steps { 0.5 } else { 1.0 };
             loss += weight * (1.0 - eta);
         }
-        #[allow(clippy::cast_precision_loss)]
         Some(1.0 - loss / steps as f64)
     }
 

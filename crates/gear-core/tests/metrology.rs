@@ -348,7 +348,6 @@ fn distance_to_flank(g: &Tooth, px: f64, py: f64) -> f64 {
     let (lo, hi) = (0.0_f64, g.u_tip.max(0.1));
     let mut best = f64::INFINITY;
     for i in 0..=n {
-        #[allow(clippy::cast_precision_loss)]
         let u = lo + (hi - lo) * (i as f64 / n as f64);
         let (r, th) = g.involute_at(u);
         let d = f64::hypot(px - r * th.sin(), py - r * th.cos());

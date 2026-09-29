@@ -805,7 +805,6 @@ impl Ring {
 
     fn sample_section(&self, section: Section, n: usize) -> Vec<(f64, f64)> {
         let n = n.max(2);
-        #[allow(clippy::cast_precision_loss)]
         let lerp = |a: f64, b: f64, i: usize| a + (b - a) * (i as f64 / (n - 1) as f64);
         (0..n)
             .map(|i| match section {
@@ -1494,7 +1493,6 @@ mod tests {
         let mut radius = g.ra;
         let mut angle = 0.0_f64;
         for i in 0..=40 {
-            #[allow(clippy::cast_precision_loss)]
             let t = i as f64 / 40.0;
             let (r, a) = g.involute_at(g.u_tip + (g.u_j - g.u_tip) * t);
             assert!(
@@ -1506,7 +1504,6 @@ mod tests {
             angle = a;
         }
         for i in 0..=40 {
-            #[allow(clippy::cast_precision_loss)]
             let t = i as f64 / 40.0;
             let (r, a) = g.trochoid_at(f.phi_j + (f.phi_root - f.phi_j) * t);
             assert!(
@@ -2512,7 +2509,6 @@ mod tests {
         for teeth in [31u32, 43, 60] {
             let g = ring(teeth);
             for i in 0..=10 {
-                #[allow(clippy::cast_precision_loss)]
                 let t = i as f64 / 10.0;
                 let radius = g.ra + (g.rf - g.ra) * t;
                 let pitch = 2.0 * radius * g.half_pitch;

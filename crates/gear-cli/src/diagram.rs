@@ -52,7 +52,6 @@ fn path_of(pts: &[[f64; 2]]) -> String {
 ///
 /// The view is placed in tooth coordinates and flipped in `y`, since SVG counts
 /// downward and a gear tooth is read pointing up.
-#[allow(clippy::too_many_lines)]
 pub fn tooth_diagram(p: GearParams, width: f64) -> String {
     let g = Tooth::new(p);
     let outline = tooth_outline(&g, 900);
@@ -184,7 +183,6 @@ pub fn tooth_diagram(p: GearParams, width: f64) -> String {
             let mut d = String::new();
             let steps = 90;
             for i in 0..=steps {
-                #[allow(clippy::cast_precision_loss)]
                 let t = -1.0 + 2.0 * (i as f64) / f64::from(steps);
                 let xx = t * x_end;
                 let yy = vertex - xx * xx / (4.0 * pp);

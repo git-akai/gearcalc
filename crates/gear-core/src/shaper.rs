@@ -741,7 +741,6 @@ mod tests {
                 let phi_j = cut.junction_normal(g.alpha_t);
                 let mut worst: f64 = 0.0;
                 for i in 0..=20 {
-                    #[allow(clippy::cast_precision_loss)]
                     let t = i as f64 / 20.0;
                     let phi = phi_j * (1.0 - t);
                     let (r_rack, a_rack) = g.trochoid_at(cut.travel_at(phi));
@@ -818,7 +817,6 @@ mod tests {
             let phi_j = cut.junction_normal(g.alpha_t);
             let mut worst: f64 = 0.0;
             for i in 0..=20 {
-                #[allow(clippy::cast_precision_loss)]
                 let t = i as f64 / 20.0;
                 let phi = phi_j * (1.0 - t);
                 let rack = g.trochoid_at(cut.travel_at(phi)).0;
@@ -852,7 +850,6 @@ mod tests {
 
                 let phi_j = cut.junction_normal(g.alpha_t);
                 for i in 0..=10 {
-                    #[allow(clippy::cast_precision_loss)]
                     let t = i as f64 / 10.0;
                     let phi0 = phi_j * (1.0 - t) * 0.9;
                     let s0 = cut.travel_at(phi0);
@@ -875,7 +872,6 @@ mod tests {
                     // the point moves with it.
                     let span = std::f64::consts::PI * g.mt;
                     for j in -40..=40 {
-                        #[allow(clippy::cast_precision_loss)]
                         let s = s0 + span * f64::from(j) / 40.0;
                         let turned = (s - s0) / g.r;
                         let (px, py) = (

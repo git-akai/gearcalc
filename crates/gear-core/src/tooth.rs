@@ -409,7 +409,7 @@ impl Tooth {
         Self::build_with_z(params, false, z, Some(tool))
     }
 
-    #[allow(clippy::too_many_lines, clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments)]
     fn build_with_z(
         params: GearParams,
         clamp_flank_at_base: bool,
@@ -826,7 +826,6 @@ impl Tooth {
 
     fn sample_section(&self, section: Section, n: usize) -> Vec<(f64, f64)> {
         let n = n.max(2);
-        #[allow(clippy::cast_precision_loss)]
         let lerp = |a: f64, b: f64, i: usize| a + (b - a) * (i as f64 / (n - 1) as f64);
         (0..n)
             .map(|i| match section {

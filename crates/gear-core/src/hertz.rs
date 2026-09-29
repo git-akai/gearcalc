@@ -545,16 +545,13 @@ fn axis_stress(kappa: f64, nu: f64, z: f64) -> [f64; 3] {
 /// Gauss–Legendre nodes and weights on `[-1, 1]`, by Newton on `P_n`.
 fn gauss_legendre<const N: usize>() -> [(f64, f64); N] {
     let mut out = [(0.0, 0.0); N];
-    #[allow(clippy::cast_precision_loss)]
     let n = N as f64;
     for (i, slot) in out.iter_mut().enumerate() {
-        #[allow(clippy::cast_precision_loss)]
         let mut x = (PI * (i as f64 + 0.75) / (n + 0.5)).cos();
         let mut dp = 1.0;
         for _ in 0..100 {
             let (mut p0, mut p1) = (1.0, x);
             for k in 2..=N {
-                #[allow(clippy::cast_precision_loss)]
                 let k = k as f64;
                 let p2 = ((2.0 * k - 1.0) * x * p1 - (k - 1.0) * p0) / k;
                 p0 = p1;

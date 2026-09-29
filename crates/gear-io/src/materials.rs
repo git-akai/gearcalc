@@ -76,6 +76,10 @@ pub fn to_toml(lib: &MaterialLibrary) -> Result<String, MaterialError> {
 /// If `data/materials_default.toml` does not parse — a build-time defect, not a
 /// runtime condition.
 #[must_use]
+#[expect(
+    clippy::expect_used,
+    reason = "the compiled-in document is parsed by this module's tests"
+)]
 pub fn default_library() -> MaterialLibrary {
     from_toml(DEFAULT_TOML).expect("compiled-in default material library must parse")
 }

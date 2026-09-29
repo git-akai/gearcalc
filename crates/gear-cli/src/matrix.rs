@@ -221,7 +221,6 @@ pub fn continuity_in_profile_shift(model: Model, on: Member, teeth: u32) -> f64 
     let mut previous: Option<f64> = None;
     let steps = 4000;
     for i in 0..=steps {
-        #[allow(clippy::cast_precision_loss)]
         let x = -0.4 + 1.2 * (i as f64) / f64::from(steps);
         let Some(v) = model.evaluate(
             on,
@@ -262,7 +261,6 @@ pub fn rank_correlation(a: Model, b: Model, on: Member, pop: &[GearParams]) -> (
         });
         let mut r = vec![0.0; n];
         for (place, &i) in idx.iter().enumerate() {
-            #[allow(clippy::cast_precision_loss)]
             {
                 r[i] = place as f64;
             }
@@ -271,7 +269,6 @@ pub fn rank_correlation(a: Model, b: Model, on: Member, pop: &[GearParams]) -> (
     };
     let ra = rank(&|p| p.0);
     let rb = rank(&|p| p.1);
-    #[allow(clippy::cast_precision_loss)]
     let nf = n as f64;
     let mean = (nf - 1.0) / 2.0;
     let (mut num, mut da, mut db) = (0.0, 0.0, 0.0);
@@ -337,7 +334,6 @@ pub fn gradient_agreement(
                 agree += 1;
             }
         }
-        #[allow(clippy::cast_precision_loss)]
         {
             out[k] = if total == 0 {
                 f64::NAN
@@ -433,7 +429,6 @@ pub fn parting(on: Member, pop: &[GearParams]) -> Parting {
         out.notch_out[1] += usize::from(!tan.notch_parameter_in_range());
     }
     if out.n > 0 {
-        #[allow(clippy::cast_precision_loss)]
         let n = out.n as f64;
         out.form[2] /= n;
         out.factor[2] /= n;
@@ -457,7 +452,6 @@ pub fn ring_flank_thickness(p: GearParams, samples: usize) -> Vec<(f64, f64)> {
     let (lo, hi) = ToothOutline::flank_bracket(&r);
     (0..=samples)
         .map(|i| {
-            #[allow(clippy::cast_precision_loss)]
             let u = lo + (hi - lo) * (i as f64) / (samples as f64);
             let (q, _) = ToothOutline::flank_at(&r, u);
             (f64::hypot(q[0], q[1]), 2.0 * q[0].abs())
@@ -486,7 +480,6 @@ pub fn fillet_radius_readings(
         let at_junction = g.fillet_curvature(g.fillet_junction());
         let mut best = (f64::INFINITY, 0.0);
         for i in 0..=samples {
-            #[allow(clippy::cast_precision_loss)]
             let t = i as f64 / samples as f64;
             let s = lo + (hi - lo) * t;
             let r = g.fillet_curvature(s);
@@ -533,7 +526,6 @@ mod tests {
             ring.on_flank, ring.n,
             "a ring's parabola lands on the flank every time"
         );
-        #[allow(clippy::cast_precision_loss)]
         let ext_flank = ext.on_flank as f64 / ext.n as f64;
         assert!(
             (0.10..0.16).contains(&ext_flank),
@@ -575,7 +567,6 @@ mod tests {
             ring.notch[0],
             ring.notch[1]
         );
-        #[allow(clippy::cast_precision_loss)]
         let ring_out = ring.notch_out[0] as f64 / ring.n as f64;
         assert!(
             ring_out > 0.6,

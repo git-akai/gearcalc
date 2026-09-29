@@ -1776,7 +1776,6 @@ impl Search {
             scan: Self::SHIPPED.scan * i32::try_from(k).unwrap_or(i32::MAX),
             budget: Self::SHIPPED.budget * k * k,
             starts: Self::SHIPPED.starts * k,
-            #[allow(clippy::cast_precision_loss)]
             resolution: Self::SHIPPED.resolution / k as f64,
             ..Self::SHIPPED
         }
@@ -1797,7 +1796,6 @@ impl Search {
 
     /// As [`maximise`], at this effort.
     #[must_use]
-    #[allow(clippy::too_many_lines)]
     pub fn maximise(
         &self,
         box_: &[(f64, f64)],
