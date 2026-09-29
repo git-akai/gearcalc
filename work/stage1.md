@@ -50,3 +50,11 @@ Carried from P1 (into Stage 3 redesign C / R3, the search):
 - With search on, Layshaft evaluates 46,251 candidates and cuts 98,966 teeth, about 1.4 s per solve.
 - Breakaway cannot see a "minimum among positive efficiencies" tie-break, because the recorded
   presets have only one positive branch. Add a fixture with two.
+
+Carried from the ring-tip package (into Stage 3, the search redesign):
+- Holding tips re-cuts each held gear once per search candidate. Recorded counts:
+  - pair: teeth 1,822 → 4,912;
+  - planetary set: evaluations 3,846 → 2,710, teeth 4,930 → 7,525, rings 961 → 3,983;
+  - hula: teeth 1,361 → 2,135.
+  The redesigned search should resolve the tip bound once per shift plan, not once per candidate.
+- A test comment's "4,120 set evaluations at doubled starts" predates the holds. Re-measure it.
