@@ -37,11 +37,12 @@ list, a paragraph -- or to the closing fence of a code block. Numbers match
 output of 98.7412, and one saying 98.741 is not.
 
 **A table row is matched as a row.** Its numbers, in order, must be an ordered
-subsequence of the numbers **one** of the block's commands prints, so two rows'
-figures swapped, or two figures within a row, fail. A command a row quotes as
-its label (`` `gear-cli strength 17 43 2.0` ``) is the label, not output. Prose
-and lists are matched as a bag against everything the block's commands print,
-since a sentence orders its figures for the reader.
+subsequence of **one line** a block's command prints, so two rows' figures
+swapped, two figures within a row swapped, or a figure taken from another line,
+fail. A row's labels are not figures: a command it quotes
+(`` `gear-cli strength 17 43 2.0` ``) and a code span holding a letter
+(`` `N+1/N/N−1/N` ``). Prose and lists are matched as a bag against everything
+the block's commands print, since a sentence orders its figures for the reader.
 
 The second verb is for a document that *is* generated output:
 
@@ -78,11 +79,12 @@ The fifth names a test that already gates the block:
     <!-- figures-by-test: the_documented_tables_are_the_ones_this_code_prints -->
 
 which is not an exemption -- it is a *different gate*, and saying so is the
-information a reader wants. The name must be a `#[test]` fn, and every number
-in the block must be a literal in that test's body (comments and strings
-aside), within half a unit of the document's last digit: a test that holds a
-table's figures holds them as numbers, and a figure the test does not hold is
-one nothing gates.
+information a reader wants. The name must be a `#[test]` fn. A table row must
+read, in order, as one of the test's literal tuples -- a parenthesised group of
+numeric literals, the row the test holds -- at the document's precision; a line
+of prose must find each of its numbers among the body's literals (comments and
+strings aside). A figure the test does not hold as that row is one nothing
+gates.
 
 # What this is and is not
 
@@ -200,8 +202,8 @@ class _Tests:
     def __init__(self, text=None):
         self.text = text
 
-    def literals(self, name):
-        """The numeric literals in `#[test] fn name`'s body, or None."""
+    def body(self, name):
+        """`#[test] fn name`'s body, strings and comments blanked, or None."""
         if self.text is None:
             self.text = "".join(
                 p.read_text() for p in sorted((ROOT / "crates").rglob("*.rs"))
@@ -215,8 +217,34 @@ class _Tests:
             i += 1
         body = self.text[m.end() : i - 1]
         body = re.sub(r'"(?:\\.|[^"\\])*"', " ", body, flags=re.S)
-        body = re.sub(r"//[^\n]*", " ", body)
-        return [float(x.replace("_", "")) for x in LITERAL.findall(body)]
+        return re.sub(r"//[^\n]*", " ", body)
+
+    def literals(self, name):
+        """The numeric literals in the test's body, in order, or None."""
+        body = self.body(name)
+        return None if body is None else [float(x.replace("_", "")) for x in LITERAL.findall(body)]
+
+    def tuples(self, name):
+        """The test's literal tuples: each parenthesised group made of numeric
+        literals, `true`/`false`, blanked strings and nested `[...]`/`(...)`
+        alone -- a row of the table the test holds -- as its literals in order.
+        Or None where there is no such test."""
+        body = self.body(name)
+        if body is None:
+            return None
+        out = []
+        for open_at in (i for i, c in enumerate(body) if c == "("):
+            depth, j = 0, open_at
+            while j < len(body):
+                depth += (body[j] == "(") - (body[j] == ")")
+                if depth == 0:
+                    break
+                j += 1
+            inner = body[open_at + 1 : j]
+            rest = re.sub(r"\b(?:true|false)\b", " ", LITERAL.sub(" ", inner))
+            if set(rest) <= set(" \t\n,[]()-") and LITERAL.search(inner):
+                out.append([float(x.replace("_", "")) for x in LITERAL.findall(inner)])
+        return out
 
 
 TESTS = _Tests()
@@ -419,13 +447,31 @@ def same(value, decimals, other):
     return at(other, decimals) == at(value, decimals)
 
 
-def in_order(want, have):
+def within(value, decimals, literal):
+    """A test's literal reads as the document's figure: the same magnitude to
+    half a unit of the document's last digit (a test writes `93.25` for a
+    figure a document rounds either way, and `−323` is a typographic minus,
+    which is no sign to this reader)."""
+    return abs(abs(literal) - abs(value)) <= 0.5 * 10**-decimals * (1 + 1e-9)
+
+
+def in_order(want, have, match=None):
     """`want`'s numbers are an ordered subsequence of `have`'s."""
+    match = match or (lambda v, d, h: same(v, d, h))
     j = 0
-    for v, _, _ in have:
-        if j < len(want) and same(want[j][0], want[j][1], v):
+    for h, _, _ in have:
+        if j < len(want) and match(want[j][0], want[j][1], h):
             j += 1
     return j == len(want)
+
+
+def row_numbers(line, claimed):
+    """A table row's numbers, less its labels: a `gear-cli` command it quotes,
+    and a code span holding a letter (`N+1/N/N−1/N`, `h_a`) -- a name, where a
+    code span of digits alone is a figure."""
+    line = LABEL.sub(" ", line)
+    line = re.sub(r"`[^`]*[A-Za-z][^`]*`", " ", line)
+    return numbers(claimed(line))
 
 
 def check_block(verb, commands, text, output_of, tests=TESTS):
@@ -435,22 +481,38 @@ def check_block(verb, commands, text, output_of, tests=TESTS):
     Both are parameters so `--self-test` can hand in fakes."""
     named = " + ".join(f"`{c}`" for c in commands)
     if verb == "-by-test":
-        literals = tests.literals(commands[0])
-        if literals is None:
+        # A row is one of the test's literal tuples, in order; a line of prose
+        # is literals of the test's body, as a bag.
+        tuples = tests.tuples(commands[0])
+        if tuples is None:
             return [f"no #[test] fn named `{commands[0]}` -- this block claims a gate that does not exist"], 0, 0
-        # Within half a unit of the document's last digit, either sign: a
-        # test writes `−323` as an operator on `323.0`.
-        missing = [
-            raw
-            for v, d, raw in numbers(text)
-            if not any(abs(abs(l) - abs(v)) <= 0.5 * 10**-d * (1 + 1e-9) for l in literals)
-        ]
-        if missing:
-            return [f"`{commands[0]}` holds no literal for: " + ", ".join(missing[:8])], 0, 0
-        return [], 0, 0
+        literals = [(l, 0, "") for l in tests.literals(commands[0])]
+        failures = []
+        for line in text.splitlines():
+            if RULE.match(line):
+                continue
+            if ROW.match(line):
+                row = row_numbers(line, lambda f: f)
+                have = [[(l, 0, "") for l in t] for t in tuples]
+                if row and not any(in_order(row, t, within) for t in have):
+                    failures.append(
+                        f"`{commands[0]}` holds no tuple reading, in order: "
+                        + ", ".join(raw for _, _, raw in row[:10])
+                    )
+            else:
+                missing = [
+                    raw for v, d, raw in numbers(line)
+                    if not any(within(v, d, l) for l, _, _ in literals)
+                ]
+                if missing:
+                    failures.append(f"`{commands[0]}` holds no literal for: " + ", ".join(missing[:8]))
+        return failures, 0, 0
 
     outputs = [numbers(output_of(c)) for c in commands]
     union = [n for o in outputs for n in o]
+    # A row is matched against one printed line: two rows' figures, or a
+    # figure from a later line, do not make a row.
+    printed_lines = [numbers(l) for c in commands for l in output_of(c).splitlines()]
     failures, strong, weak = [], 0, 0
 
     def claimed(fragment):
@@ -463,10 +525,10 @@ def check_block(verb, commands, text, output_of, tests=TESTS):
             continue
         if RULE.match(line):
             continue
-        row = numbers(claimed(LABEL.sub(" ", line)))
+        row = row_numbers(line, claimed)
         strong += sum(d >= STRONG_DECIMALS for _, d, _ in row)
         weak += sum(d < STRONG_DECIMALS for _, d, _ in row)
-        if row and not any(in_order(row, o) for o in outputs):
+        if row and not any(in_order(row, o) for o in printed_lines):
             failures.append(
                 f"{named} prints no row reading, in order: "
                 + ", ".join(raw for _, _, raw in row[:10])
@@ -585,6 +647,11 @@ _FIXTURE_OUTPUT = {
         "least shift   0.0057  0.0000  0.0057  1.5993  98.345 %\n"
         "least loss    0.6100  0.6466  1.2566  1.4626  98.488 %\n"
     ),
+    "gear-cli hulaband 18": (
+        "  d  z  module  backlash\n"
+        "  1  18  1.000  0.37141\n"
+        "  9  162  0.111  0.01429\n"
+    ),
     "gear-cli strength 17 43 2.0": (
         "sigma_F  66.80  56.00 MPa\nsigma_H 692.70 MPa\nrho 1.7231 mm\neta 98.7412 %\n"
     ),
@@ -593,7 +660,7 @@ _FIXTURE_OUTPUT = {
 _FIXTURE_TEST = """
     #[test]
     fn the_fixture_table_is_the_one_this_code_prints() {
-        for (reduction, meshes, keeps) in [(144.0, 98.85, 37.9), (324.0, 99.18, 27.4)] {
+        for (reduction, meshes, keeps) in [(144.0, 98.85, 37.9), (324.0, 99.18, 27.4), (-323.0, 99.18, 27.2)] {
             // 12.34 in a comment is not a literal
             assert!(check(reduction, meshes, keeps), "not 56.78 either");
         }
@@ -602,28 +669,36 @@ _FIXTURE_TEST = """
 
 _FIXTURE_BLOCKS = [
     ("", ["gear-cli shifts 9 37", "gear-cli shifts 17 43"],
-     "| pair | least shift | least loss |\n|---|---|---|\n"
-     "| 9/37 | `Σx = 0.4736`, ε 1.3280, 97.561 % | `Σx = 1.4078`, ε 1.2929, **97.678 %** |\n"
-     "| 17/43 | `Σx = 0.0057`, ε 1.5993, 98.345 % | `Σx = 1.2566`, ε 1.4626, **98.488 %** |"),
+     "| | Σx | ε | η |\n|---|---|---|---|\n"
+     "| `z 9/37`, least shift | 0.4736 | 1.3280 | 97.561 % |\n"
+     "| `z 9/37`, least loss | 1.4078 | 1.2929 | **97.678 %** |\n"
+     "| `z 17/43`, least shift | 0.0057 | 1.5993 | 98.345 % |\n"
+     "| `z 17/43`, least loss | 1.2566 | 1.4626 | **98.488 %** |"),
     ("", ["gear-cli strength 17 43 2.0"],
      "| | |\n|---|---|\n"
-     "| `gear-cli strength 17 43 2.0` | σ_F 66.8 / 56.0 MPa · σ_H 692.7 MPa · ρ 1.723 mm · η 98.741 % |"),
+     "| `σ_F` | 66.8 / 56.0 MPa |"),
     ("", ["gear-cli strength 17 43 2.0"], "Contact is 692.7 MPa and the loss 98.741 %."),
     ("-by-test", ["the_fixture_table_is_the_one_this_code_prints"],
      "| reduction | meshes | the stage |\n|---|---|---|\n"
-     "| 144 | 98.85 % | 37.9 % |\n| 324 | 99.18 % | 27.4 % |"),
+     "| 144 | 98.85 % | 37.9 % |\n| 324 | 99.18 % | 27.4 % |\n| −323 | 99.18 % | 27.2 % |"),
+    ("", ["gear-cli hulaband 18"],
+     "| d | z | module | backlash out |\n|---|---|---|---|\n"
+     "| 1 | 18 | 1.000 | 0.371° |\n| 9 | 162 | 0.111 | 0.014° |"),
 ]
 
 # Each planted fault: (name, block index, text replaced, replacement).
 _FIXTURE_FAULTS = [
-    ("F1 a figure that drifted", 1, "1.723", "1.724"),
-    ("F2 a figure swapped between rows", 0, "97.561 %", "98.345 %"),
-    ("F2 ...and back", 0, "ε 1.5993, 98.345 %", "ε 1.5993, 97.561 %"),
+    ("F1 a figure that drifted", 1, "66.8 /", "66.9 /"),
+    ("F2 a figure swapped between rows", 0, "| 1.3280 | 97.561 % |", "| 1.3280 | 98.345 % |"),
+    ("F2 ...and back", 0, "| 1.5993 | 98.345 % |", "| 1.5993 | 97.561 % |"),
     ("F3 a figure the test does not hold", 3, "37.9 %", "39.9 %"),
     ("F4 two figures swapped within a row", 1, "66.8 / 56.0", "56.0 / 66.8"),
     ("F5 a prose figure that drifted", 2, "692.7", "692.9"),
     ("F6 a test that does not exist", 3, None, None),
     ("F7 a literal only in a comment", 3, "27.4 %", "12.34 %"),
+    ("F8 a row's figure taken from a later printed line", 4, "| 1.000 | 0.371° |", "| 1.000 | 0.014° |"),
+    ("F9 a figure from another row of the test", 3, "| 144 | 98.85 % | 37.9 % |", "| 144 | 98.85 % | 27.4 % |"),
+    ("F10 a figure from another tuple of the test", 3, "| 324 | 99.18 % | 27.4 % |", "| 324 | 99.18 % | 27.2 % |"),
 ]
 
 

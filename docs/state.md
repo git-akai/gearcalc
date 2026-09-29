@@ -187,8 +187,13 @@ caught more in their areas than the suite has.
 <!-- figures: gear-cli wormstage 1 40 7 2 -->
 | | |
 |---|---|
-| `gear-cli strength 17 43 2.0` | `σ_F` 66.8 / 56.0 MPa · `σ_H` 692.7 MPa · ρ 1.723 mm · η 98.741 % |
-| `gear-cli wormstage 1 40 7 2` | η 61.805 % forward, 0.000 % backward (self-locking) · backlash 0.15512° at the wheel (min 0.11342, max 0.19683), 6.20497° at the worm |
+| `gear-cli strength 17 43 2.0`, gear 1 | `Y_F` 1.7200, `σ_F` 66.8 MPa |
+| `gear-cli strength 17 43 2.0`, gear 2 | `Y_F` 1.3955, `σ_F` 56.0 MPa |
+| `gear-cli strength 17 43 2.0`, `σ_H` | 692.7 MPa |
+| `gear-cli strength 17 43 2.0`, `ρ` | 1.723 mm |
+| `gear-cli strength 17 43 2.0`, `η` | 98.741 % |
+| `gear-cli wormstage 1 40 7 2`, `η` | 61.805 % forward, 0.000 % backward (self-locking) |
+| `gear-cli wormstage 1 40 7 2`, backlash | 0.15512° at the wheel (min 0.11342, max 0.19683), 6.20497° at the worm |
 
 **The strength canary has moved twice, both deliberately, and both are the same
 model arriving in two commits.**

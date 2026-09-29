@@ -1619,14 +1619,26 @@ mod hula {
         // | d | least loss (Σx, x_ring, x_pinion) | least shift |  — the shift
         // columns of the same table, to the two decimals it prints. The
         // first wobble gear is member 0, the grounded ring it runs in 2.
-        for (d, on_shifts, off_shifts) in [
-            (2u32, [-0.19_f64, 0.37, 0.18], [-0.20_f64, 0.20, 0.00]),
-            (3, [-0.09, 0.51, 0.42], [-0.11, 0.11, 0.00]),
-            (4, [-0.03, 0.37, 0.34], [-0.05, 0.05, 0.00]),
-            (5, [0.00, 0.00, 0.00], [0.00, 0.00, 0.00]),
+        for (d, on_shifts, off_shifts, best, least) in [
+            (
+                2u32,
+                [-0.19_f64, 0.37, 0.18],
+                [-0.20_f64, 0.20, 0.00],
+                58.39,
+                54.81,
+            ),
+            (3, [-0.09, 0.51, 0.42], [-0.11, 0.11, 0.00], 90.57, 79.52),
+            (4, [-0.03, 0.37, 0.34], [-0.05, 0.05, 0.00], 93.25, 91.72),
+            (5, [0.00, 0.00, 0.00], [0.00, 0.00, 0.00], 94.25, 94.25),
         ] {
-            for (optimise, want) in [(true, on_shifts), (false, off_shifts)] {
+            for (optimise, want, stage) in [(true, on_shifts, best), (false, off_shifts, least)] {
                 let r = at_d(d, optimise);
+                let got = r.efficiency.unwrap().forward * 100.0;
+                assert!(
+                    (got - stage).abs() < 0.005,
+                    "d {d} optimise={optimise}: the table says the stage keeps {stage} %, this \
+                     gives {got:.2} %"
+                );
                 let (ring, pin) = (r.members[2].profile_shift, r.members[0].profile_shift);
                 let got = [pin - ring, ring, pin];
                 for (g, w) in got.iter().zip(want) {

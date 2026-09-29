@@ -6449,6 +6449,9 @@ mod tests {
     #[test]
     fn the_two_contacts_report_one_patch_at_the_limit() {
         let lib = library();
+        // The table's figures: the pitch point at no friction (relative), and
+        // at μ = 0.08 and the peak, in percent.
+        let (pitch_free, pitch_friction_percent, peak_percent) = (1e-5, 1.5, 5.0);
         let stage = |sigma: f64, mu: f64| {
             let mut s = arr::crossed([17, 43], sigma);
             s.meshes[0].sliding_friction = mu;
@@ -6481,14 +6484,14 @@ mod tests {
             "pressure at the pitch point, μ = 0",
             l.at_pitch_point,
             p.at_pitch_point,
-            1e-5,
+            pitch_free,
         );
         // The worst point is a different point — see above — and is not one:
         // 5 %, to the whole percent the table quotes. The seam is real, and this
         // test would be asserting agreement it does not have if it closed.
         let seam = 100.0 * (l.max_pressure - p.max_pressure) / l.max_pressure;
         assert!(
-            (seam - 5.0).abs() <= 0.5,
+            (seam - peak_percent).abs() <= 0.5,
             "the single-pair seam is {seam:.2} %: {} against {}",
             l.max_pressure,
             p.max_pressure
@@ -6524,7 +6527,7 @@ mod tests {
         let gap = (line.cases[0].contact.at_pitch_point - point.cases[0].contact.at_pitch_point)
             / line.cases[0].contact.at_pitch_point;
         assert!(
-            (100.0 * gap - 1.5).abs() <= 0.05,
+            (100.0 * gap - pitch_friction_percent).abs() <= 0.05,
             "the friction seam at the pitch point is {:.3} %, and it is the flank load \
              convention — the table's 1.5 %",
             100.0 * gap

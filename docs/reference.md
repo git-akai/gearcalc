@@ -656,10 +656,12 @@ toward unity, and the loss falls with it.
 <!-- figures: gear-cli shifts 9 37 -->
 <!-- figures: gear-cli shifts 17 43 -->
 
-| pair | least shift that clears undercut | least loss |
-|---|---|---|
-| 9/37 | `Σx = 0.4736`, ε 1.3280: 97.561 % | `Σx = 1.4078`, ε 1.2929: **97.678 %** |
-| 17/43 | `Σx = 0.0057`, ε 1.5993: 98.345 % | `Σx = 1.2566`, ε 1.4626: **98.488 %** |
+| pair, shifts | `Σx` | `ε` | `η` |
+|---|---|---|---|
+| `z 9/37`, least that clears undercut | 0.4736 | 1.3280 | 97.561 % |
+| `z 9/37`, least loss | 1.4078 | 1.2929 | **97.678 %** |
+| `z 17/43`, least that clears undercut | 0.0057 | 1.5993 | 98.345 % |
+| `z 17/43`, least loss | 1.2566 | 1.4626 | **98.488 %** |
 
 **Where the optimum sits is the pair's own answer, not a rule.** On 17/43 it is
 *interior* — every neighbouring shift, in either member or both, is worse and
@@ -2201,11 +2203,13 @@ the *other* mesh's angle out by rather more than the first one gained. At
 `z = 18`, one tooth of difference, `h_a = 0.8` and 0.3 mm of gap:
 
 <!-- figures-by-test: the_documented_tables_are_the_ones_this_code_prints -->
-| m₁/m₂ | 0.80 | 0.90 | **1.00** | 1.10 | 1.30 |
-|---|---|---|---|---|---|
-| offset, mm | 0.813 | 0.813 | **0.813** | 0.884 | 1.028 |
-| α_w, first mesh | 61.7° | 57.8° | **53.6°** | 53.3° | 52.7° |
-| α_w, second mesh | 53.6° | 53.6° | **53.6°** | 57.1° | 62.2° |
+| m₁/m₂ | offset, mm | α_w, first mesh | α_w, second mesh |
+|---|---|---|---|
+| 0.80 | 0.813 | 61.7° | 53.6° |
+| 0.90 | 0.813 | 57.8° | 53.6° |
+| **1.00** | **0.813** | **53.6°** | **53.6°** |
+| 1.10 | 0.884 | 53.3° | 57.1° |
+| 1.30 | 1.028 | 52.7° | 62.2° |
 
 Equal modules is a corner where both bounds are active at once, and the stage
 efficiency falls away either side of it — 27.4 % at equality against 23.7 % at
