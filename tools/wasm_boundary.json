@@ -3957,7 +3957,7 @@
       "scale": "fine",
       "grade": 0
      },
-     "tooth_to_tooth": "6.2999999999999998",
+     "tooth_to_tooth": 6,
      "total": 18
     }
    }
