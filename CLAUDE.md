@@ -177,6 +177,7 @@ The checks, by what each catches. `nix flake check` is **not** all of them.
 | `tools/check_strings.py` | every `ui.` message is used and every use has a message | yes |
 | `tools/check_golden.sh` | **any number the harness prints that moved.** A change detector, not a correctness gate: a diff is a question | yes |
 | `tools/check_figures.py` | every figure the documents print is one the code still prints | yes |
+| `tools/check_figures.py --self-test` | a rule of `check_figures.py` that stopped failing: a fixture passes and each planted fault (rows swapped, a drifted figure, a figure no test holds) fails | yes |
 | `tools/check_units.py` | **an angle that does not say its unit, or a name that means both.** The crate is degrees where a designer states a number and radians in the mathematics; a name meaning one in one module and the other in the next is how that becomes a bug, and it did | yes |
 | `tools/check_wasm.sh` | **the payload, executed** — everything else checks the boundary's shape or `gear-core`'s values, and nothing ran the `.wasm` the browser downloads. Asserts a law (optimising it changes no answer), records what it answers, and fails if an entry point has no probe | yes |
 | `python3 tools/validate_dxf.py` | an export read back by a parser that shares no code with the writer | yes |

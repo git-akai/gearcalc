@@ -32,10 +32,16 @@ can be named instead of `gear-cli`, and is handed the same binary through
     <!-- figures: tools/iso_6336_3_stack.py -->
 
 The block runs from the marker to the next blank line -- a Markdown table, a
-list, a paragraph -- or to the closing fence of a code block. Every number in it
-must appear in what the command prints, **at the document's own precision**: a
-document saying 98.74 is satisfied by an output of 98.7412, and one saying
-98.741 is not.
+list, a paragraph -- or to the closing fence of a code block. Numbers match
+**at the document's own precision**: a document saying 98.74 is satisfied by an
+output of 98.7412, and one saying 98.741 is not.
+
+**A table row is matched as a row.** Its numbers, in order, must be an ordered
+subsequence of the numbers **one** of the block's commands prints, so two rows'
+figures swapped, or two figures within a row, fail. A command a row quotes as
+its label (`` `gear-cli strength 17 43 2.0` ``) is the label, not output. Prose
+and lists are matched as a bag against everything the block's commands print,
+since a sentence orders its figures for the reader.
 
 The second verb is for a document that *is* generated output:
 
@@ -72,8 +78,11 @@ The fifth names a test that already gates the block:
     <!-- figures-by-test: the_documented_tables_are_the_ones_this_code_prints -->
 
 which is not an exemption -- it is a *different gate*, and saying so is the
-information a reader wants. The test's name is checked to exist, because a
-pointer that no longer resolves is the exact rot this file exists to prevent.
+information a reader wants. The name must be a `#[test]` fn, and every number
+in the block must be a literal in that test's body (comments and strings
+aside), within half a unit of the document's last digit: a test that holds a
+table's figures holds them as numbers, and a figure the test does not hold is
+one nothing gates.
 
 # What this is and is not
 
@@ -89,8 +98,9 @@ find something. The report separates the two so the coverage claim is honest,
 and `--list` names every table carrying figures that nothing generates -- which
 is the measurement of how much of the documents this reaches.
 
-    tools/check_figures.py           # exits non-zero and names what drifted
-    tools/check_figures.py --list    # what is tagged, what is not, and by what
+    tools/check_figures.py              # exits non-zero and names what drifted
+    tools/check_figures.py --list       # what is tagged, what is not, and by what
+    tools/check_figures.py --self-test  # the rules, on a fixture and planted faults
 
 Dependency-free, like its siblings here.
 """
@@ -143,7 +153,14 @@ def _bin():
     return target / profile / "gear-cli"
 
 
-BIN = _bin()
+_BIN = []
+
+
+def binary():
+    """The harness, built once and only when a command is run."""
+    if not _BIN:
+        _BIN.append(_bin())
+    return _BIN[0]
 
 FILES = (
     sorted((ROOT / "docs").glob("*.md"))
@@ -170,18 +187,36 @@ NUMBER = re.compile(r"-?\d[\d,]*(?:\.\d+)?(?:[eE][-+]?\d+)?")
 STRONG_DECIMALS = 2
 
 
+# A Rust numeric literal: `1.777_921_669_562`, `12_u32`, `45.0f64`.
+LITERAL = re.compile(
+    r"(?<![\w.])(\d[\d_]*(?:\.\d[\d_]*)?(?:[eE][-+]?\d+)?)"
+    r"(?:_?(?:f64|f32|u8|u16|u32|u64|usize|i8|i16|i32|i64|isize))?(?!\w)"
+)
+
+
 class _Tests:
-    """Every `fn name(` in the crates, so a `figures-by-test` pointer resolves."""
+    """The crates' Rust, so a `figures-by-test` pointer is read as a test."""
 
-    def __init__(self):
-        self.text = None
+    def __init__(self, text=None):
+        self.text = text
 
-    def search(self, needle):
+    def literals(self, name):
+        """The numeric literals in `#[test] fn name`'s body, or None."""
         if self.text is None:
             self.text = "".join(
                 p.read_text() for p in sorted((ROOT / "crates").rglob("*.rs"))
             )
-        return needle in self.text
+        m = re.search(r"#\[test\]\s*\n\s*fn " + re.escape(name) + r"\(\)[^{]*\{", self.text)
+        if not m:
+            return None
+        i, depth = m.end(), 1
+        while depth and i < len(self.text):
+            depth += (self.text[i] == "{") - (self.text[i] == "}")
+            i += 1
+        body = self.text[m.end() : i - 1]
+        body = re.sub(r'"(?:\\.|[^"\\])*"', " ", body, flags=re.S)
+        body = re.sub(r"//[^\n]*", " ", body)
+        return [float(x.replace("_", "")) for x in LITERAL.findall(body)]
 
 
 TESTS = _Tests()
@@ -287,19 +322,19 @@ def run(command, cache):
     argv = command.split()
     env = dict(os.environ)
     if argv[0] == "gear-cli":
-        argv = [str(BIN)] + argv[1:]
+        argv = [str(binary())] + argv[1:]
     elif re.fullmatch(r"tools/[a-z0-9_]+\.py", argv[0]) and (ROOT / argv[0]).exists():
         # A script that compares the harness with a derivation of its own,
         # handed the same binary.
         argv = [sys.executable, str(ROOT / argv[0])] + argv[1:]
-        env["GEAR_CLI"] = str(BIN)
+        env["GEAR_CLI"] = str(binary())
     else:
         raise SystemExit(
             f"only `gear-cli ...` or `tools/<script>.py` commands can be tagged: {command}"
         )
-    if not BIN.exists():
+    if not binary().exists():
         raise SystemExit(
-            f"{BIN} is not built. `cargo build --release --bin gear-cli` first."
+            f"{binary()} is not built. `cargo build --release --bin gear-cli` first."
         )
     result = subprocess.run(argv, capture_output=True, text=True, env=env)
     cache[command] = result.stdout + result.stderr
@@ -372,7 +407,86 @@ def untagged(path, tagged_spans):
     return loose
 
 
+# A table row, and the rule under its header.
+ROW = re.compile(r"^\s*\|")
+RULE = re.compile(r"^\s*\|[\s|:-]+\|\s*$")
+# A command a row quotes as its label.
+LABEL = re.compile(r"`gear-cli [^`]*`")
+
+
+def same(value, decimals, other):
+    """`other` printed at the document's precision reads as `value` does."""
+    return at(other, decimals) == at(value, decimals)
+
+
+def in_order(want, have):
+    """`want`'s numbers are an ordered subsequence of `have`'s."""
+    j = 0
+    for v, _, _ in have:
+        if j < len(want) and same(want[j][0], want[j][1], v):
+            j += 1
+    return j == len(want)
+
+
+def check_block(verb, commands, text, output_of, tests=TESTS):
+    """(failures, strong, weak) for one tagged block.
+
+    `output_of(command)` is what a command prints; `tests` reads test bodies.
+    Both are parameters so `--self-test` can hand in fakes."""
+    named = " + ".join(f"`{c}`" for c in commands)
+    if verb == "-by-test":
+        literals = tests.literals(commands[0])
+        if literals is None:
+            return [f"no #[test] fn named `{commands[0]}` -- this block claims a gate that does not exist"], 0, 0
+        # Within half a unit of the document's last digit, either sign: a
+        # test writes `−323` as an operator on `323.0`.
+        missing = [
+            raw
+            for v, d, raw in numbers(text)
+            if not any(abs(abs(l) - abs(v)) <= 0.5 * 10**-d * (1 + 1e-9) for l in literals)
+        ]
+        if missing:
+            return [f"`{commands[0]}` holds no literal for: " + ", ".join(missing[:8])], 0, 0
+        return [], 0, 0
+
+    outputs = [numbers(output_of(c)) for c in commands]
+    union = [n for o in outputs for n in o]
+    failures, strong, weak = [], 0, 0
+
+    def claimed(fragment):
+        return "\n".join(BOLD.findall(fragment)) if verb == "-bold" else fragment
+
+    prose = []
+    for line in text.splitlines():
+        if not ROW.match(line):
+            prose.append(line)
+            continue
+        if RULE.match(line):
+            continue
+        row = numbers(claimed(LABEL.sub(" ", line)))
+        strong += sum(d >= STRONG_DECIMALS for _, d, _ in row)
+        weak += sum(d < STRONG_DECIMALS for _, d, _ in row)
+        if row and not any(in_order(row, o) for o in outputs):
+            failures.append(
+                f"{named} prints no row reading, in order: "
+                + ", ".join(raw for _, _, raw in row[:10])
+            )
+    bag = numbers(claimed("\n".join(prose)))
+    strong += sum(d >= STRONG_DECIMALS for _, d, _ in bag)
+    weak += sum(d < STRONG_DECIMALS for _, d, _ in bag)
+    missing = [raw for v, d, raw in bag if not any(same(v, d, h) for h, _, _ in union)]
+    if missing:
+        failures.append(
+            f"{named} no longer prints: "
+            + ", ".join(missing[:8])
+            + (f" (+{len(missing) - 8} more)" if len(missing) > 8 else "")
+        )
+    return failures, strong, weak
+
+
 def main():
+    if "--self-test" in sys.argv:
+        return self_test()
     listing = "--list" in sys.argv
     cache = {}
     failures = []
@@ -385,77 +499,45 @@ def main():
         spans = []
         for verb, commands, line, text in blocks(path):
             spans.append((line, line + text.count("\n") + 1))
-            if verb == "-by-test":
-                name = commands[0]
-                if not TESTS.search(f"fn {name}("):
-                    failures.append(
-                        f"{rel}:{line}: no test named `{name}` -- "
-                        "this block claims a gate that does not exist"
-                    )
-                else:
-                    by_test += 1
-                if listing:
-                    coverage.append(f"  {rel}:{line}  by test  <- {name}")
-                continue
             if verb == "-exempt":
                 exempt += 1
                 if listing:
                     coverage.append(f"  {rel}:{line}  exempt    -- {commands[0]}")
                 continue
-            tagged_blocks += 1
-            output = "\n".join(run(c, cache) for c in commands)
             named = " + ".join(f"`{c}`" for c in commands)
-            claimed = "\n".join(BOLD.findall(text)) if verb == "-bold" else text
-            if verb == "-bold" and not claimed.strip():
-                failures.append(
-                    f"{rel}:{line}: {named} is tagged `figures-bold` and the block "
-                    "has no bold figures -- nothing would be checked"
-                )
-                continue
-
             if verb == "-verbatim":
-                if text.strip() and text.strip() in output:
-                    # The document quotes the command; the useful direction is
-                    # the other one -- everything the command prints is here.
-                    pass
+                tagged_blocks += 1
+                output = "\n".join(run(c, cache) for c in commands)
                 if output.strip() not in path.read_text():
-                    failures.append(
-                        f"{rel}:{line}: {named} no longer prints what this file contains"
-                    )
+                    failures.append(f"{rel}:{line}: {named} no longer prints what this file contains")
                 else:
                     checked += 1
                 if listing:
                     coverage.append(f"  {rel}:{line}  verbatim  <- {' + '.join(commands)}")
                 continue
-
-            have = numbers(output)
-            missing = []
-            for value, decimals, raw in numbers(claimed):
-                checked += 1
-                if decimals >= STRONG_DECIMALS:
-                    tagged_strong += 1
-                else:
-                    tagged_weak += 1
-                want = at(value, decimals)
-                if not any(at(v, decimals) == want for v, _, _ in have):
-                    missing.append(raw)
-            if missing:
+            if verb == "-bold" and not BOLD.findall(text):
                 failures.append(
-                    f"{rel}:{line}: {named} no longer prints: "
-                    + ", ".join(missing[:8])
-                    + (f" (+{len(missing) - 8} more)" if len(missing) > 8 else "")
+                    f"{rel}:{line}: {named} is tagged `figures-bold` and the block "
+                    "has no bold figures -- nothing would be checked"
                 )
-            if listing:
-                strong = sum(1 for _, d, _ in numbers(claimed) if d >= STRONG_DECIMALS)
-                coverage.append(
-                    f"  {rel}:{line}  {strong} strong figures  <- {' + '.join(commands)}"
-                )
+                continue
+            if verb == "-by-test":
+                by_test += 1
+                if listing:
+                    coverage.append(f"  {rel}:{line}  by test  <- {commands[0]}")
+            else:
+                tagged_blocks += 1
+            found, strong, weak = check_block(verb, commands, text, lambda c: run(c, cache))
+            failures += [f"{rel}:{line}: {f}" for f in found]
+            checked += strong + weak
+            tagged_strong += strong
+            tagged_weak += weak
+            if listing and verb != "-by-test":
+                coverage.append(f"  {rel}:{line}  {strong} strong figures  <- {' + '.join(commands)}")
 
         if listing:
             for line, strong, kind in untagged(path, spans):
-                coverage.append(
-                    f"  {rel}:{line}  {strong} strong figures  <- NOTHING ({kind})"
-                )
+                coverage.append(f"  {rel}:{line}  {strong} strong figures  <- NOTHING ({kind})")
 
     if listing:
         print("Tagged blocks, and blocks carrying figures that nothing generates:\n")
@@ -487,6 +569,94 @@ def main():
         f"({tagged_strong} at {STRONG_DECIMALS}+ decimals, {tagged_weak} weaker); "
         f"{by_test} blocks gated by a named test, {exempt} sections exempt"
     )
+    return 0
+
+
+# --- the rules, on a fixture ----------------------------------------------
+
+_FIXTURE_OUTPUT = {
+    "gear-cli shifts 9 37": (
+        "pair z 9/37\n"
+        "least shift   0.4736  0.0000  0.4736  1.3280  97.561 %\n"
+        "least loss    0.6746  0.7332  1.4078  1.2929  97.678 %\n"
+    ),
+    "gear-cli shifts 17 43": (
+        "pair z 17/43\n"
+        "least shift   0.0057  0.0000  0.0057  1.5993  98.345 %\n"
+        "least loss    0.6100  0.6466  1.2566  1.4626  98.488 %\n"
+    ),
+    "gear-cli strength 17 43 2.0": (
+        "sigma_F  66.80  56.00 MPa\nsigma_H 692.70 MPa\nrho 1.7231 mm\neta 98.7412 %\n"
+    ),
+}
+
+_FIXTURE_TEST = """
+    #[test]
+    fn the_fixture_table_is_the_one_this_code_prints() {
+        for (reduction, meshes, keeps) in [(144.0, 98.85, 37.9), (324.0, 99.18, 27.4)] {
+            // 12.34 in a comment is not a literal
+            assert!(check(reduction, meshes, keeps), "not 56.78 either");
+        }
+    }
+"""
+
+_FIXTURE_BLOCKS = [
+    ("", ["gear-cli shifts 9 37", "gear-cli shifts 17 43"],
+     "| pair | least shift | least loss |\n|---|---|---|\n"
+     "| 9/37 | `Σx = 0.4736`, ε 1.3280, 97.561 % | `Σx = 1.4078`, ε 1.2929, **97.678 %** |\n"
+     "| 17/43 | `Σx = 0.0057`, ε 1.5993, 98.345 % | `Σx = 1.2566`, ε 1.4626, **98.488 %** |"),
+    ("", ["gear-cli strength 17 43 2.0"],
+     "| | |\n|---|---|\n"
+     "| `gear-cli strength 17 43 2.0` | σ_F 66.8 / 56.0 MPa · σ_H 692.7 MPa · ρ 1.723 mm · η 98.741 % |"),
+    ("", ["gear-cli strength 17 43 2.0"], "Contact is 692.7 MPa and the loss 98.741 %."),
+    ("-by-test", ["the_fixture_table_is_the_one_this_code_prints"],
+     "| reduction | meshes | the stage |\n|---|---|---|\n"
+     "| 144 | 98.85 % | 37.9 % |\n| 324 | 99.18 % | 27.4 % |"),
+]
+
+# Each planted fault: (name, block index, text replaced, replacement).
+_FIXTURE_FAULTS = [
+    ("F1 a figure that drifted", 1, "1.723", "1.724"),
+    ("F2 a figure swapped between rows", 0, "97.561 %", "98.345 %"),
+    ("F2 ...and back", 0, "ε 1.5993, 98.345 %", "ε 1.5993, 97.561 %"),
+    ("F3 a figure the test does not hold", 3, "37.9 %", "39.9 %"),
+    ("F4 two figures swapped within a row", 1, "66.8 / 56.0", "56.0 / 66.8"),
+    ("F5 a prose figure that drifted", 2, "692.7", "692.9"),
+    ("F6 a test that does not exist", 3, None, None),
+    ("F7 a literal only in a comment", 3, "27.4 %", "12.34 %"),
+]
+
+
+def self_test():
+    """The fixture passes, and every planted fault fails it."""
+    tests = _Tests(_FIXTURE_TEST)
+    output_of = _FIXTURE_OUTPUT.__getitem__
+    bad = []
+    for i, (verb, commands, text) in enumerate(_FIXTURE_BLOCKS):
+        found, _, _ = check_block(verb, commands, text, output_of, tests)
+        if found:
+            bad.append(f"the fixture's block {i} fails: {found}")
+    faults = list(_FIXTURE_FAULTS)
+    # F2's second half is the same edit completed: both rows swapped.
+    swap = next(f for f in faults if f[0] == "F2 ...and back")
+    faults.remove(swap)
+    for name, i, old, new in faults:
+        verb, commands, text = _FIXTURE_BLOCKS[i]
+        if name.startswith("F6"):
+            commands = ["no_such_test"]
+        else:
+            assert old in text, (name, old)
+            text = text.replace(old, new, 1)
+            if name.startswith("F2"):
+                text = text.replace(swap[2], swap[3], 1)
+        found, _, _ = check_block(verb, commands, text, output_of, tests)
+        print(f"{'caught' if found else 'MISSED'}  {name}")
+        if not found:
+            bad.append(f"{name} passes")
+    if bad:
+        print("\n".join(bad), file=sys.stderr)
+        return 1
+    print(f"the fixture passes and all {len(faults)} planted faults fail")
     return 0
 
 

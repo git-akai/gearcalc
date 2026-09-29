@@ -656,10 +656,10 @@ toward unity, and the loss falls with it.
 <!-- figures: gear-cli shifts 9 37 -->
 <!-- figures: gear-cli shifts 17 43 -->
 
-| pair | least loss | least shift that clears undercut |
+| pair | least shift that clears undercut | least loss |
 |---|---|---|
-| 9/37 | **97.678 %** at `Σx = 1.4078`, ε 1.2929 | 97.561 % at `Σx = 0.4736`, ε 1.3280 |
-| 17/43 | **98.488 %** at `Σx = 1.2566`, ε 1.4626 | 98.345 % at `Σx = 0.0057`, ε 1.5993 |
+| 9/37 | `Σx = 0.4736`, ε 1.3280: 97.561 % | `Σx = 1.4078`, ε 1.2929: **97.678 %** |
+| 17/43 | `Σx = 0.0057`, ε 1.5993: 98.345 % | `Σx = 1.2566`, ε 1.4626: **98.488 %** |
 
 **Where the optimum sits is the pair's own answer, not a rule.** On 17/43 it is
 *interior* — every neighbouring shift, in either member or both, is worse and
@@ -1199,7 +1199,7 @@ enough that the line governs:
 <!-- figures-by-test: the_two_contacts_report_one_patch_at_the_limit -->
 | field | meets by | why not exactly |
 |---|---|---|
-| pressure at the pitch point, `μ = 0` | a part in 10⁵ | — |
+| pressure at the pitch point, `μ = 0` | to 1e-5 | — |
 | pressure at the pitch point, `μ = 0.08` | 1.5 % | the flank load: the crossed balance presses with `μ F_n` along a sliding direction that stays finite as the speed vanishes; the line rating uses the transverse projection alone, as ISO does |
 | peak pressure | 5 % | *one pair carries everything* is a different point: a transverse base pitch in from the path's ends on a line, a normal base pitch in along the line of action on a point, `cos² β_b` apart |
 | curvature across, patch width | a tenth | they travel with that point |
@@ -2111,7 +2111,7 @@ addendum, the shaper and each mesh's shift division free (`gear-cli hulaband`):
 | 2 | 36 | 0.500 | 99.784 % | **58.9 %** | 35.2° | 0.154° |
 | 3 | 54 | 0.333 | 99.956 % | **87.6 %** | 25.4° | 0.077° |
 | 4 | 72 | 0.250 | 99.980 % | **94.0 %** | 19.4° | 0.046° |
-| 6 | 108 | 0.167 | 99.982 % | **94.6 %** | 17.3° | 0.027° |
+| 6 | 108 | 0.167 | 99.982 % | **94.6 %** | 17.25° | 0.027° |
 | 9 | 162 | 0.111 | 99.915 % | **78.5 %** | 13.6° | 0.014° |
 
 *(The operating angle is the **running** mesh's, 0.02 mm inside the
@@ -2204,8 +2204,8 @@ the *other* mesh's angle out by rather more than the first one gained. At
 | m₁/m₂ | 0.80 | 0.90 | **1.00** | 1.10 | 1.30 |
 |---|---|---|---|---|---|
 | offset, mm | 0.813 | 0.813 | **0.813** | 0.884 | 1.028 |
-| α_w, mesh 1 | 61.7° | 57.8° | **53.6°** | 53.3° | 52.7° |
-| α_w, mesh 2 | 53.6° | 53.6° | **53.6°** | 57.1° | 62.2° |
+| α_w, first mesh | 61.7° | 57.8° | **53.6°** | 53.3° | 52.7° |
+| α_w, second mesh | 53.6° | 53.6° | **53.6°** | 57.1° | 62.2° |
 
 Equal modules is a corner where both bounds are active at once, and the stage
 efficiency falls away either side of it — 27.4 % at equality against 23.7 % at

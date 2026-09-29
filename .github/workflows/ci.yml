@@ -62,6 +62,12 @@ jobs:
       - name: Angular units are unambiguous
         run: nix develop --command tools/check_units.py
 
+      # The figure checker's own rules, on a fixture: the fixture passes and
+      # every planted fault (a drifted figure, rows swapped, a figure a test
+      # does not hold, ...) fails. A gate is seen failing before it is trusted.
+      - name: The figure checker fails on planted faults
+        run: nix develop --command tools/check_figures.py --self-test
+
       # Everything CI needs to check: build, clippy --deny warnings, fmt, tests.
       - run: nix flake check -L
 

@@ -168,9 +168,12 @@ construction in lines and angles.
 
 <!-- figures-by-test: the_construction_reproduces_the_surfaces_derivation -->
 On a 17/23 pair at 45°/45° with shafts at 90°, tips at `r + m_n`, they give
-ε = 1.777921670 and 1.777921669562 — at the nominal centre, which is what the
-script builds; the harness's `crossed` command runs the pair 0.02 mm open and
-prints 1.758113579.
+ε = 1.777921670 and 1.777921669562, at the nominal centre, which is what the
+script builds.
+
+<!-- figures: gear-cli crossed 17 23 90 -->
+The harness's `crossed` command runs the pair open by the default clearance
+and prints 1.758113579.
 
 ---
 

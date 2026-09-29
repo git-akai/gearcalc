@@ -1499,12 +1499,22 @@ mod hula {
         // | arrangement | `D` | ratio | meshes | the stage |    — at N = 18.
         // Each is solved under the hula's own arrangement whatever its
         // counts make the rings, which is what the explicit boundary is for.
-        for (name, counts, ratio, meshes, keeps) in [
-            ("N+1/N/N−1/N", [19u32, 18, 17, 18], 324.0_f64, 99.18, 27.4),
-            ("N/N+1/N/N−1", [18, 19, 18, 17], -323.0, 99.18, 27.2),
-            ("N+1/N/N/N−1", [19, 18, 18, 17], -8.5, 99.18, 92.7),
-            ("N/N+1/N/N+1", [18, 19, 18, 19], 9.8, 99.20, 93.5),
+        for (name, counts, d, ratio, meshes, keeps) in [
+            (
+                "N+1/N/N−1/N",
+                [19u32, 18, 17, 18],
+                1_i64,
+                324.0_f64,
+                99.18,
+                27.4,
+            ),
+            ("N/N+1/N/N−1", [18, 19, 18, 17], -1, -323.0, 99.18, 27.2),
+            ("N+1/N/N/N−1", [19, 18, 18, 17], -36, -8.5, 99.18, 92.7),
+            ("N/N+1/N/N+1", [18, 19, 18, 19], 37, 9.8, 99.20, 93.5),
         ] {
+            // `D = z₂z₄ − z₁z₃`, the table's second column.
+            let [z1, z2, z3, z4] = counts.map(i64::from);
+            assert_eq!(z2 * z4 - z1 * z3, d, "{name}: D");
             let r = Fixture::tables()
                 .teeth(counts)
                 .solve(1000.0)

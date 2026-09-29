@@ -6428,7 +6428,7 @@ mod tests {
     /// contact slides along the bodies by `Δa / sin Σ`) and the face wide
     /// enough that the line governs:
     ///
-    /// - **the pitch point meets exactly** at no friction — a part in 10⁵ —
+    /// - **the pitch point meets exactly** at no friction — to 1e-5 —
     ///   and by 1.5 % at `μ = 0.08`, which is the flank load: the crossed
     ///   balance presses the flank with `μ F_n` along a sliding direction that
     ///   stays finite as the sliding speed vanishes, and the line rating
@@ -6481,14 +6481,15 @@ mod tests {
             "pressure at the pitch point, μ = 0",
             l.at_pitch_point,
             p.at_pitch_point,
-            1e-4,
+            1e-5,
         );
-        // The worst point is a different point — see above — and is not one.
-        close("peak pressure", l.max_pressure, p.max_pressure, 6e-2);
+        // The worst point is a different point — see above — and is not one:
+        // 5 %, to the whole percent the table quotes. The seam is real, and this
+        // test would be asserting agreement it does not have if it closed.
+        let seam = 100.0 * (l.max_pressure - p.max_pressure) / l.max_pressure;
         assert!(
-            (l.max_pressure - p.max_pressure) / l.max_pressure > 3e-2,
-            "the single-pair seam is real, and this test would be asserting agreement it does \
-             not have if it closed: {} against {}",
+            (seam - 5.0).abs() <= 0.5,
+            "the single-pair seam is {seam:.2} %: {} against {}",
             l.max_pressure,
             p.max_pressure
         );
@@ -6523,9 +6524,10 @@ mod tests {
         let gap = (line.cases[0].contact.at_pitch_point - point.cases[0].contact.at_pitch_point)
             / line.cases[0].contact.at_pitch_point;
         assert!(
-            (0.005..0.03).contains(&gap),
-            "the friction seam at the pitch point is {gap}, and it is the flank load \
-             convention — not nothing, and not more than that"
+            (100.0 * gap - 1.5).abs() <= 0.05,
+            "the friction seam at the pitch point is {:.3} %, and it is the flank load \
+             convention — the table's 1.5 %",
+            100.0 * gap
         );
         close(
             "efficiency",

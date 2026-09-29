@@ -30,6 +30,7 @@ CHEAP=(
   "Documentation pointers resolve"
   "The string catalogue is complete"
   "Angular units are unambiguous"
+  "The figure checker fails on planted faults"
 )
 NIX=(
   "nix flake check -L"
