@@ -38,7 +38,20 @@ from pathlib import Path
 # `f64` or `f32`, an `Auto`/`Option`, a `Vec`, an array or a tuple. The pattern
 # once matched `pub` fields of bare `f64` alone, so every automatic angle, every
 # `pub(crate)` or private one and every list of angles went unchecked.
-FIELD = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?([a-z_0-9]+): ([^,]*\bf(?:64|32)\b[^,]*),\s*(?://.*)?$")
+FIELD = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?([a-z_0-9]+):\s*(.+?)\s*(?://.*)?$")
+FLOAT = re.compile(r"\bf(?:64|32)\b")
+
+
+def field_type(rest: str):
+    """A field's type: the text up to the comma that ends it at bracket depth
+    zero, so `(f64, f64)` and `HashMap<String, f64>` are one type, not cut at
+    their first comma. None where the line does not end the field."""
+    depth = 0
+    for i, c in enumerate(rest):
+        depth += (c in "<([") - (c in ">)]")
+        if c == "," and depth == 0:
+            return rest[:i] if not rest[i + 1 :].strip() else None
+    return None
 # The opening line of a struct with named fields, where FIELD is read; a
 # function's parameters look the same and carry no doc to read.
 STRUCT = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?struct \w+[^;(]*\{\s*$")
@@ -98,7 +111,9 @@ def fields(lines: list[str]):
         depth += line.count("{") - line.count("}")
         m = FIELD.match(line)
         if m and depth == 1:
-            yield i, m.group(1)
+            ty = field_type(m.group(2))
+            if ty is not None and FLOAT.search(ty):
+                yield i, m.group(1)
         if depth <= 0:
             depth = None
 
