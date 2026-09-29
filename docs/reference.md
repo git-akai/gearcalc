@@ -1095,6 +1095,19 @@ a crossed gear pair stands at its box and says so
 (`gear.face_width_as_entered`), because the alternative — a face that grows
 with every helix the designer tries — was a width nobody had asked for.
 
+**What the faces can carry.** The contact point runs `sin β_b` along each
+member's axis per unit of path, so a face `b` wide holds at most
+`b / sin β_b` of it, wherever the contact sits. A crossed pair's contact ratio
+never exceeds that on either member (`CrossedPath::face_capacity`). Where the
+faces leave the ideal contact line no length at all — its contact slid along
+the shafts by a clearance or a shift, which near parallel is far — the teeth
+meet at a face edge instead, which this model does not compute: the mesh says
+so (`mesh.contact_off_face`) and reports that bound as its contact ratio, not
+the tips' zone; its efficiency and pressure are read along the tips' zone,
+which understates an edge contact's pressure
+([state](state.md#known-approximate-documented-at-the-call-site)). A spur member's contact does not travel along its axis, so it
+holds the whole line or none: its fixed axial position is on the face or not.
+
 ### Worm proportions
 
 Shipped as recommendations with their sources named, in the **axial** module:

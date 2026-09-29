@@ -22,5 +22,7 @@ face_width_for_continuity: [number, number] | null,
 /**
  * How far the contact point runs along each member's own axis, mm — what a
  * face has to cover, and what a line contact does not have at all.
+ * `None` where the ideal contact runs off the faces
+ * (`mesh.contact_off_face`): no zone on them has a travel.
  */
-axial_travel: [number, number], };
+axial_travel: [number, number] | null, };

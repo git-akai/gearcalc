@@ -924,8 +924,15 @@ impl CrossedPath {
     /// the alignment the geometry is drawn at, and an offset one is a smaller
     /// zone than this reports rather than a different construction.
     ///
-    /// Returns `None` when the bounded zone closes entirely — a face so narrow
-    /// that the teeth never meet on it.
+    /// Returns `None` when the bounded zone closes entirely: the ideal contact
+    /// line has no length on both faces. That is not teeth that never meet —
+    /// centred faces overlap wherever the tips reach across the common
+    /// perpendicular — but contact at a face edge, which this model does not
+    /// compute; the caller says so rather than read the tips' zone instead.
+    ///
+    /// A member whose contact does not travel along its axis (a spur member,
+    /// `sin β_b = 0`) holds the whole line or none of it: the line is on its
+    /// face when its fixed axial position is.
     #[must_use]
     pub fn limited_by_face(&self, screw: &Screw, face: [f64; 2]) -> Option<(Self, ZoneLimit)> {
         let mut lo = self.zone[0];
@@ -933,6 +940,9 @@ impl CrossedPath {
         let mut limit = ZoneLimit::Tips;
         for (i, b) in face.iter().enumerate() {
             let Some(half) = Self::half_span(screw, i, *b) else {
+                if self.axial_offset(screw, i).abs() > 0.5 * b {
+                    return None;
+                }
                 continue;
             };
             // The face is centred on its own gear, which is `axial_centre` and
@@ -1060,7 +1070,48 @@ impl CrossedPath {
     /// counterpart: there the line of action turns instead (docs/reference.md#axis-distance-and-backlash).
     #[must_use]
     pub fn axial_centre(&self, screw: &Screw, i: usize) -> Option<f64> {
-        let axis = if i == 0 {
+        let rate = dot(self.normal, Self::axis(screw, i));
+        (rate.abs() > f64::EPSILON).then(|| -self.axial_offset(screw, i) / rate)
+    }
+
+    /// **The most contact the faces can carry**, as a contact ratio: the
+    /// tips' zone, or less where a face is narrower than the zone's travel
+    /// along that member's axis. The contact point runs `|n·a_i|` along
+    /// member `i`'s axis per unit of path, so a face `b_i` wide holds at most
+    /// `b_i / |n·a_i|` of it wherever the contact sits; a member whose contact
+    /// does not travel along it bounds nothing.
+    ///
+    /// It is what a pair whose ideal contact runs off its faces reports
+    /// ([`Self::limited_by_face`] is `None`): the teeth meet at a face edge
+    /// there, which this model does not compute, and the tips' zone alone
+    /// would count contact the faces cannot hold.
+    #[must_use]
+    pub fn face_capacity(&self, screw: &Screw, face: [f64; 2]) -> f64 {
+        let held = (0..2).fold(self.length_from_tips(), |held, i| {
+            let rate = dot(self.normal, Self::axis(screw, i)).abs();
+            let b = face[i];
+            // `b / 0` is an unbounded hold, which is the reading wanted.
+            held.min(b / rate)
+        });
+        held / screw.normal_base_pitch()
+    }
+
+    /// Where the path's reference point sits along member `i`'s axis, mm from
+    /// its mid-plane — the whole of where the contact is on that member when
+    /// the contact does not travel along it.
+    fn axial_offset(&self, screw: &Screw, i: usize) -> f64 {
+        let origin = if i == 0 {
+            [0.0; 3]
+        } else {
+            [self.centre_distance, 0.0, 0.0]
+        };
+        dot(sub(self.through, origin), Self::axis(screw, i))
+    }
+
+    /// Member `i`'s axis direction: the first along `z`, the second turned
+    /// by the shaft angle about the common perpendicular.
+    fn axis(screw: &Screw, i: usize) -> [f64; 3] {
+        if i == 0 {
             [0.0, 0.0, 1.0]
         } else {
             [
@@ -1068,14 +1119,7 @@ impl CrossedPath {
                 screw.shaft_angle_rad.sin(),
                 screw.shaft_angle_rad.cos(),
             ]
-        };
-        let origin = if i == 0 {
-            [0.0; 3]
-        } else {
-            [self.centre_distance, 0.0, 0.0]
-        };
-        let rate = dot(self.normal, axis);
-        (rate.abs() > f64::EPSILON).then(|| -dot(sub(self.through, origin), axis) / rate)
+        }
     }
 
     /// **The radius on one member that the other's tip touches**, or `None`

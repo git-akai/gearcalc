@@ -147,6 +147,8 @@ pub mod key {
     pub const MESH_LOAD_SHARING_OUT_OF_BAND: &str = "mesh.load_sharing_out_of_band";
     /// `mesh.flank_interference`
     pub const MESH_FLANK_INTERFERENCE: &str = "mesh.flank_interference";
+    /// `mesh.contact_off_face`
+    pub const MESH_CONTACT_OFF_FACE: &str = "mesh.contact_off_face";
 
     // ---- the part --------------------------------------------------- //
     //
@@ -346,6 +348,7 @@ pub mod key {
         MESH_SELF_LOCKING,
         MESH_LOAD_SHARING_OUT_OF_BAND,
         MESH_FLANK_INTERFERENCE,
+        MESH_CONTACT_OFF_FACE,
         PART_DISTANCE_NOT_REACHED,
         PART_CLEARANCE_NEGATIVE,
         PART_OPTIMISER_FOUND_NOTHING,

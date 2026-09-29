@@ -3595,23 +3595,23 @@
    "ok": [
     [
      "en",
-     556
+     560
     ],
     [
      "de",
-     556
+     560
     ],
     [
      "pt",
-     556
+     560
     ],
     [
      "zh-Hans",
-     556
+     560
     ],
     [
      "zh-Hant",
-     556
+     560
     ]
    ]
   },
@@ -30101,8 +30101,8 @@
           "step_up": false
          },
          "efficiency": {
-          "forward": "0.96065153358380007",
-          "backward": "0.96056310757421903"
+          "forward": "0.96101099326631578",
+          "backward": "0.96092533893808152"
          },
          "backlash": {
           "forward": {
@@ -30118,7 +30118,7 @@
          },
          "circulation": {
           "forward": "2.6676931020525156",
-          "backward": "2.6928872256775085"
+          "backward": "2.6935256187656740"
          }
         },
         {
@@ -30129,8 +30129,8 @@
           "step_up": true
          },
          "efficiency": {
-          "forward": "0.96056310757421903",
-          "backward": "0.96065153358380007"
+          "forward": "0.96092533893808152",
+          "backward": "0.96101099326631578"
          },
          "backlash": {
           "forward": {
@@ -30145,7 +30145,7 @@
           }
          },
          "circulation": {
-          "forward": "2.6928872256775085",
+          "forward": "2.6935256187656740",
           "backward": "2.6676931020525156"
          }
         }
@@ -30176,13 +30176,13 @@
            "at": 3,
            "role": "reacted",
            "speed": "-1694.3521594684387",
-           "torque": "1.7009183035807283"
+           "torque": "1.7015547586656532"
           },
           {
            "at": 4,
            "role": "fixed",
            "speed": null,
-           "torque": "-1.4521633634828268"
+           "torque": "-1.4527998185677518"
           },
           {
            "at": 5,
@@ -30208,13 +30208,13 @@
            "at": 0,
            "role": "fixed",
            "speed": null,
-           "torque": "-0.58135101346394558"
+           "torque": "-0.58157024275646085"
           },
           {
            "at": 1,
            "role": "reacted",
            "speed": 0,
-           "torque": "0.16275321756240921"
+           "torque": "0.16281459231176798"
           },
           {
            "at": 2,
@@ -30232,7 +30232,7 @@
            "at": 4,
            "role": "fixed",
            "speed": null,
-           "torque": "-2.5814022040984641"
+           "torque": "-2.5812443495553077"
           },
           {
            "at": 5,
@@ -30276,13 +30276,13 @@
            "at": 3,
            "role": "reacted",
            "speed": "-1694.3521594684387",
-           "torque": "0.34018366071614559"
+           "torque": "0.34031095173313053"
           },
           {
            "at": 4,
            "role": "fixed",
            "speed": null,
-           "torque": "-0.29043267269656531"
+           "torque": "-0.29055996371355031"
           },
           {
            "at": 5,
@@ -30319,7 +30319,7 @@
          },
          "profile_shift": "0.0056565377194108812",
          "addendum": 1,
-         "face_width": "0.040704893618717354",
+         "face_width": "0.040720243561907073",
          "recommended_face_width": null,
          "pitch_diameter": 17,
          "helix_angle": 0,
@@ -30333,25 +30333,25 @@
            "speed": 30000,
            "speed_against_carrier": 30000,
            "cycles": null,
-           "bending_stress": "824.81252711509046",
-           "contact_stress": "2421.0155296522544",
+           "bending_stress": "824.50160497106822",
+           "contact_stress": "2420.5591724396090",
            "min_face_width": {
-            "bending": "0.024596268257586214",
-            "contact": "0.040370131893468622"
+            "bending": "0.024596268257586217",
+            "contact": "0.040370131893468650"
            }
           },
           {
            "case": 1,
-           "torque": "0.16549215186804925",
-           "on_body": "0.16275321756240921",
+           "torque": "0.16555455947813444",
+           "on_body": "0.16281459231176795",
            "speed": 0,
            "speed_against_carrier": 0,
            "cycles": null,
-           "bending_stress": "1365.0000000000002",
-           "contact_stress": "3114.4852381402857",
+           "bending_stress": 1365,
+           "contact_stress": "3114.4852381402861",
            "min_face_width": {
-            "bending": "0.040704893618717361",
-            "contact": "0.066809399982470874"
+            "bending": "0.040720243561907073",
+            "contact": "0.066834594016973878"
            }
           },
           {
@@ -30364,11 +30364,11 @@
             "bending": 1230,
             "contact": 1230
            },
-           "bending_stress": "164.96250542301803",
-           "contact_stress": "1082.7110597770195",
+           "bending_stress": "164.90032099421359",
+           "contact_stress": "1082.5069706271202",
            "min_face_width": {
-            "bending": "0.0089530416457613768",
-            "contact": "0.066720555052960109"
+            "bending": "0.0089530416457613803",
+            "contact": "0.066720555052960179"
            }
           }
          ],
@@ -30513,7 +30513,7 @@
          },
          "profile_shift": 0,
          "addendum": 1,
-         "face_width": "0.040704893618717354",
+         "face_width": "0.040720243561907073",
          "recommended_face_width": null,
          "pitch_diameter": 43,
          "helix_angle": 0,
@@ -30527,25 +30527,25 @@
            "speed": "-11860.465116279069",
            "speed_against_carrier": "-11860.465116279069",
            "cycles": null,
-           "bending_stress": "698.29366680088981",
-           "contact_stress": "2199.7167682531458",
+           "bending_stress": "698.03043733128141",
+           "contact_stress": "2199.3021254717696",
            "min_face_width": {
-            "bending": "0.020823420821798010",
-            "contact": "0.033327178581922016"
+            "bending": "0.020823420821798014",
+            "contact": "0.033327178581922037"
            }
           },
           {
            "case": 1,
-           "torque": "0.41859779590153634",
-           "on_body": "0.41859779590153634",
+           "torque": "0.41875565044469298",
+           "on_body": "0.41875565044469298",
            "speed": 0,
            "speed_against_carrier": 0,
            "cycles": null,
            "bending_stress": "1155.6212155470980",
            "contact_stress": "2829.7982061263888",
            "min_face_width": {
-            "bending": "0.034461127210532939",
-            "contact": "0.055153864992130368"
+            "bending": "0.034474122609805820",
+            "contact": "0.055174663687792190"
            }
           },
           {
@@ -30558,11 +30558,11 @@
             "bending": 487,
             "contact": 487
            },
-           "bending_stress": "139.65873336017791",
-           "contact_stress": "983.74324501203682",
+           "bending_stress": "139.60608746625624",
+           "contact_stress": "983.55781112292959",
            "min_face_width": {
-            "bending": "0.0075797251791344718",
-            "contact": "0.055080519905230031"
+            "bending": "0.0075797251791344753",
+            "contact": "0.055080519905230073"
            }
           }
          ],
@@ -30707,7 +30707,7 @@
          },
          "profile_shift": "0.29810098382068817",
          "addendum": 1,
-         "face_width": "0.053046288244698217",
+         "face_width": "0.053066292166551135",
          "recommended_face_width": null,
          "pitch_diameter": 12,
          "helix_angle": 0,
@@ -30721,25 +30721,25 @@
            "speed": "-11860.465116279069",
            "speed_against_carrier": "-10166.112956810630",
            "cycles": null,
-           "bending_stress": "682.82020335601715",
-           "contact_stress": "2643.8814990780147",
+           "bending_stress": "682.56280677845598",
+           "contact_stress": "2643.3831320181152",
            "min_face_width": {
-            "bending": "0.026535587785001275",
-            "contact": "0.062741856662562323"
+            "bending": "0.026535587785001268",
+            "contact": "0.062741856662562337"
            }
           },
           {
            "case": 1,
-           "torque": "0.14261527231240592",
-           "on_body": "-0.41859779590153634",
+           "torque": "0.14266905297938134",
+           "on_body": "-0.41875565044469287",
            "speed": 0,
            "speed_against_carrier": 0,
            "cycles": null,
            "bending_stress": "1174.4159437039334",
            "contact_stress": "3467.3666984990218",
            "min_face_width": {
-            "bending": "0.045639858365485807",
-            "contact": "0.10791279525699865"
+            "bending": "0.045657069299376414",
+            "contact": "0.10795348951091691"
            }
           },
           {
@@ -30752,11 +30752,11 @@
             "bending": 1250,
             "contact": 1250
            },
-           "bending_stress": "136.56404067120340",
-           "contact_stress": "1182.3797512784975",
+           "bending_stress": "136.51256135569119",
+           "contact_stress": "1182.1568747537613",
            "min_face_width": {
-            "bending": "0.0096589539537404612",
-            "contact": "0.10369476900957783"
+            "bending": "0.0096589539537404630",
+            "contact": "0.10369476900957790"
            }
           }
          ],
@@ -30901,7 +30901,7 @@
          },
          "profile_shift": "-0.17005856545961162",
          "addendum": 1,
-         "face_width": "0.053046288244698217",
+         "face_width": "0.053066292166551135",
          "recommended_face_width": null,
          "pitch_diameter": 30,
          "helix_angle": 0,
@@ -30915,25 +30915,25 @@
            "speed": "2372.0930232558139",
            "speed_against_carrier": "4066.4451827242528",
            "cycles": null,
-           "bending_stress": "793.62817115835253",
-           "contact_stress": "2429.8377577660131",
+           "bending_stress": "793.32900429992014",
+           "contact_stress": "2429.3797375787271",
            "min_face_width": {
             "bending": "0.030841779286724293",
-            "contact": "0.052994152033505965"
+            "contact": "0.052994152033505985"
            }
           },
           {
            "case": 1,
-           "torque": "0.35852808390256447",
-           "on_body": 0,
+           "torque": "0.35850615966045946",
+           "on_body": "6.6613381477509392e-16",
            "speed": 0,
            "speed_against_carrier": 0,
            "cycles": null,
            "bending_stress": 1365,
-           "contact_stress": "3186.6551231480898",
+           "contact_stress": "3186.6551231480908",
            "min_face_width": {
-            "bending": "0.053046288244698217",
-            "contact": "0.091147240174394295"
+            "bending": "0.053066292166551135",
+            "contact": "0.091181612084850094"
            }
           },
           {
@@ -30946,11 +30946,11 @@
             "bending": 167,
             "contact": 167
            },
-           "bending_stress": "158.72563423167045",
-           "contact_stress": "1086.6564801320944",
+           "bending_stress": "158.66580085998399",
+           "contact_stress": "1086.4516472773269",
            "min_face_width": {
-            "bending": "0.011226407660367640",
-            "contact": "0.087584535209520101"
+            "bending": "0.011226407660367642",
+            "contact": "0.087584535209520170"
            }
           }
          ],
@@ -31095,7 +31095,7 @@
          },
          "profile_shift": 0,
          "addendum": 1,
-         "face_width": "0.053046288244698217",
+         "face_width": "0.053066292166551135",
          "recommended_face_width": null,
          "pitch_diameter": 72,
          "helix_angle": 0,
@@ -31105,46 +31105,46 @@
           {
            "case": 0,
            "torque": "0.48675604866264260",
-           "on_body": "-1.4521633634828268",
+           "on_body": "-1.4527998185677518",
            "speed": 0,
            "speed_against_carrier": "1694.3521594684387",
            "cycles": null,
-           "bending_stress": "446.18608562521109",
-           "contact_stress": "1147.1666053243539",
+           "bending_stress": "446.01789087814467",
+           "contact_stress": "1090.9403953890285",
            "min_face_width": {
             "bending": "0.017339571947874395",
-            "contact": "0.011812080185782177"
+            "contact": "0.010686590889632488"
            }
           },
           {
            "case": 1,
-           "torque": "0.86046740136615474",
-           "on_body": "-2.5814022040984641",
+           "torque": "0.86041478318510267",
+           "on_body": "-2.5812443495553081",
            "speed": 0,
            "speed_against_carrier": 0,
            "cycles": null,
-           "bending_stress": "788.74948278198474",
-           "contact_stress": "1525.2394453796037",
+           "bending_stress": "788.40394060017013",
+           "contact_stress": "1450.4383577738831",
            "min_face_width": {
-            "bending": "0.030652184920519996",
-            "contact": "0.020880911434205854"
+            "bending": "0.030650310518057770",
+            "contact": "0.018890162348375397"
            }
           },
           {
            "case": 2,
            "torque": "0.097351209732528504",
-           "on_body": "-0.29043267269656531",
+           "on_body": "-0.29055996371355025",
            "speed": 0,
            "speed_against_carrier": "1694.3521594684387",
            "cycles": {
             "bending": 209,
             "contact": 209
            },
-           "bending_stress": "89.237217125042193",
-           "contact_stress": "513.02850220458538",
+           "bending_stress": "89.203578175628905",
+           "contact_stress": "487.88337669807322",
            "min_face_width": {
             "bending": "0.0063116041890262774",
-            "contact": "0.019522070138516558"
+            "contact": "0.017661950613927609"
            }
           }
          ],
@@ -31285,7 +31285,7 @@
           },
           {
            "case": 1,
-           "power_through": "0.97672819043691816",
+           "power_through": "0.97709651770428374",
            "sliding_velocity": 0
           },
           {
@@ -31341,7 +31341,7 @@
           },
           {
            "case": 1,
-           "power_through": "0.85569163387443536",
+           "power_through": "0.85601431787628801",
            "sliding_velocity": 0
           },
           {
@@ -31380,10 +31380,10 @@
         },
         {
          "coprime": false,
-         "contact_ratio": "1.9726210851406283",
+         "contact_ratio": "1.8614618788535788",
          "efficiency": {
-          "forward": "0.99444979846518677",
-          "backward": "0.99444979846518677"
+          "forward": "0.99488564655697287",
+          "backward": "0.99488564655697287"
          },
          "locking_friction": {
           "forward": -1,
@@ -31397,7 +31397,7 @@
           },
           {
            "case": 1,
-           "power_through": "0.86046740136615474",
+           "power_through": "0.86041478318510256",
            "sliding_velocity": 0
           },
           {
@@ -31426,13 +31426,21 @@
           "tip_interference": false,
           "far_gap": "40.315337340751441"
          },
-         "notes": [],
+         "notes": [
+          {
+           "key": "mesh.flank_interference",
+           "values": {
+            "depth": "0.328",
+            "member": "1"
+           }
+          }
+         ],
          "line": {
           "operating_pressure_angle": "21.054925260088243",
           "contact_ratios": {
-           "transverse": "1.9726210851406283",
+           "transverse": "1.8614618788535788",
            "overlap": 0,
-           "total": "1.9726210851406283"
+           "total": "1.8614618788535788"
           }
          },
          "point": null
@@ -31589,7 +31597,7 @@
           "face_width"
          ]
         },
-        "value": "0.040704893618717354"
+        "value": "0.040720243561907073"
        },
        {
         "freedom": {
@@ -31652,7 +31660,7 @@
           "face_width"
          ]
         },
-        "value": "0.040704893618717354"
+        "value": "0.040720243561907073"
        },
        {
         "freedom": {
@@ -31715,7 +31723,7 @@
           "face_width"
          ]
         },
-        "value": "0.053046288244698217"
+        "value": "0.053066292166551135"
        },
        {
         "freedom": {
@@ -31778,7 +31786,7 @@
           "face_width"
          ]
         },
-        "value": "0.053046288244698217"
+        "value": "0.053066292166551135"
        },
        {
         "freedom": {
@@ -31841,7 +31849,7 @@
           "face_width"
          ]
         },
-        "value": "0.053046288244698217"
+        "value": "0.053066292166551135"
        },
        {
         "freedom": {

@@ -2331,7 +2331,7 @@ impl Shape {
                 BuiltContact::Point(p) => crate::auto::CrossedTrial {
                     members,
                     screw: &p.screw,
-                    path: p.path.as_ref(),
+                    path: Some(&p.path),
                     centre: bm.running,
                     min_contact_ratio,
                     friction: m.sliding_friction,
@@ -2532,8 +2532,9 @@ pub(crate) struct LineBuilt {
 pub(crate) struct PointBuilt {
     pub(crate) screw: Screw,
     /// The zone the teeth leave at the running distance, before any face
-    /// limits it; `None` where the teeth never meet.
-    pub(crate) path: Option<CrossedPath>,
+    /// limits it. A pair whose teeth never meet is refused (`NoContact`), as
+    /// a line contact is.
+    pub(crate) path: CrossedPath,
 }
 
 impl BuiltMesh {
@@ -2565,7 +2566,7 @@ impl BuiltMesh {
             BuiltContact::Point(p) => {
                 let zone = p.zone(face);
                 Directional::of(|d| {
-                    zone.and_then(|z| z.efficiency(&p.screw, mu, d, PATH_SAMPLES))
+                    zone.efficiency(&p.screw, mu, d, PATH_SAMPLES)
                         .unwrap_or_else(|| p.screw.efficiency(mu, d))
                 })
             }
@@ -2574,12 +2575,16 @@ impl BuiltMesh {
 }
 
 impl PointBuilt {
-    /// The zone as the faces in use actually leave it.
-    pub(crate) fn zone(&self, face: [f64; 2]) -> Option<CrossedPath> {
-        self.path.as_ref().map(|path| {
-            path.limited_by_face(&self.screw, face)
-                .map_or(*path, |(z, _)| z)
-        })
+    /// The zone the efficiency, locking and rating are read along: as the
+    /// faces in use leave it, or the tips' where they leave the ideal
+    /// contact line no length. The pair still meets there, at a face edge
+    /// this model does not compute; the tips' zone is the nearer stand-in
+    /// (the pitch point alone reads a near-parallel pair as lossless), and
+    /// the mesh says its figures are approximate (`mesh.contact_off_face`).
+    pub(crate) fn zone(&self, face: [f64; 2]) -> CrossedPath {
+        self.path
+            .limited_by_face(&self.screw, face)
+            .map_or(self.path, |(z, _)| z)
     }
 
     /// **The friction at which each direction locks**, quoted beside the
@@ -2590,14 +2595,8 @@ impl PointBuilt {
     /// direction.
     fn locking_friction(&self, face: [f64; 2]) -> Directional<f64> {
         let pitch_point = self.screw.locking_friction();
-        let along = self
-            .zone(face)
-            .map(|z| z.locking_friction(&self.screw, PATH_SAMPLES));
-        Directional::of(|d| {
-            along
-                .and_then(|t| *t.get(d))
-                .unwrap_or_else(|| *pitch_point.get(d))
-        })
+        let along = self.zone(face).locking_friction(&self.screw, PATH_SAMPLES);
+        Directional::of(|d| along.get(d).unwrap_or_else(|| *pitch_point.get(d)))
     }
 
     /// **One contact rating**, under a torque on the driving member in the
@@ -2671,7 +2670,8 @@ impl PointBuilt {
         let mut patch = pitch_patch;
         let mut worst_position = 0.0;
         let mut curvatures = (curvature_along, curvature_across);
-        if let Some(path) = self.zone(face) {
+        {
+            let path = self.zone(face);
             for position in path.single_pair_bounds(s) {
                 let contact = path.contact_at(s, position);
                 let Some((along, across)) = path.curvatures_at(s, position) else {
@@ -2814,21 +2814,25 @@ fn point_mesh_report(
         ));
     }
     // The zone as the widths in use actually leave it — one construction,
-    // asked twice for different things. No zone at all is a contact ratio
-    // of nought, which the note says as plainly as a short one.
-    let (contact_ratio, zone) = p.path.as_ref().map_or((0.0, None), |path| {
-        let (zone, limited_by) = path
-            .limited_by_face(s, face)
-            .unwrap_or((*path, crate::screw::ZoneLimit::Face));
+    // asked twice for different things. Where the faces leave the ideal
+    // contact line no length the pair still meets, at a face edge this model
+    // does not compute: its contact ratio is then the most the faces could
+    // carry, while its efficiency and pressure were read along the tips'
+    // zone (`PointBuilt::zone`) — two zones, which the note says. A capacity
+    // below one is still contact lost between teeth, and says that too.
+    let path = &p.path;
+    let on_faces = path.limited_by_face(s, face);
+    let (contact_ratio, limited_by, axial_travel) = on_faces.map_or(
         (
-            zone.contact_ratio,
-            Some((
-                limited_by,
-                path.face_widths_for(s, 1.0),
-                zone.axial_travel(s),
-            )),
-        )
-    });
+            path.face_capacity(s, face),
+            crate::screw::ZoneLimit::Face,
+            None,
+        ),
+        |(zone, limited_by)| (zone.contact_ratio, limited_by, Some(zone.axial_travel(s))),
+    );
+    if on_faces.is_none() {
+        notes.push(Note::new(key::MESH_CONTACT_OFF_FACE));
+    }
     if contact_ratio < 1.0 {
         notes.push(Note::new(key::MESH_CONTACT_RATIO_BELOW_ONE).number("ratio", contact_ratio, 3));
     }
@@ -2864,9 +2868,9 @@ fn point_mesh_report(
         tips: None,
         line: None,
         point: Some(super::PointContact {
-            limited_by: zone.map_or(crate::screw::ZoneLimit::Face, |z| z.0),
-            face_width_for_continuity: zone.and_then(|z| z.1),
-            axial_travel: zone.map_or([0.0; 2], |z| z.2),
+            limited_by,
+            face_width_for_continuity: path.face_widths_for(s, 1.0),
+            axial_travel,
         }),
     }
 }
@@ -3007,15 +3011,18 @@ impl Shape {
                     // The tips are the teeth's own: this is the one place a
                     // crossed pair's tooth form reaches an answer, which is
                     // why it is specified at all (docs/reference.md#crossed-axes).
-                    // No zone at all — the teeth never meet — is not a
-                    // refusal here: it is a contact ratio of nought, said
-                    // by the mesh, and a flank inside a base cylinder is
-                    // fouling rather than idle.
-                    let path = screw.path_of_contact_at(
-                        members[m.a].tip_radius(),
-                        members[m.b].tip_radius(),
-                        at,
-                    );
+                    // No zone at all is teeth that never meet, refused as a
+                    // line contact's is. With faces centred on the common
+                    // perpendicular, a pair whose tips reach across it has
+                    // faces that overlap there, so this is the one case in
+                    // which the faces hold no contact.
+                    let path = screw
+                        .path_of_contact_at(
+                            members[m.a].tip_radius(),
+                            members[m.b].tip_radius(),
+                            at,
+                        )
+                        .ok_or(TrainError::NoContact)?;
                     BuiltContact::Point(PointBuilt { screw, path })
                 }
             };
@@ -4105,9 +4112,9 @@ pub fn rate(
                         case_power,
                         backlash,
                         row_play,
-                        flank_interference: p.path.as_ref().map_or([true, true], |path| {
-                            path.flank_interference(&p.screw, [a.flank_ends(), b.flank_ends()])
-                        }),
+                        flank_interference: p
+                            .path
+                            .flank_interference(&p.screw, [a.flank_ends(), b.flank_ends()]),
                         first_reference_radius: f64::from(shape.members[m.a].gear.teeth)
                             * shape.members[m.a].normal_module()
                             / helix[m.a].to_radians().cos()

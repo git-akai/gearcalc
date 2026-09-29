@@ -144,6 +144,7 @@ overlap_below_one = "axial contact ratio below 1; helical in form but loaded lik
 contact_ratio_below_one = "contact ratio {ratio}: below 1, the pair loses contact between teeth"
 load_sharing_out_of_band = "virtual contact ratio {ratio}: two pairs are always engaged, so there is no single-pair zone — unshared, bending is taken where the tooth never carries the whole load; shared, the ramp extrapolates (measured as a 25–32 % relief on high-contact-ratio spur pairs, a direction the model does not fix)"
 flank_interference = "member {member}'s flank is reached {depth} mm past its usable end along the line of action: contact ratio, efficiency and ratings count only the usable flanks"
+contact_off_face = "the ideal contact runs off the faces: the teeth meet at a face edge, which this crossed-axis model does not compute; the contact ratio is the most the faces can carry, while efficiency and pressure are read along the tips' zone and understate an edge contact's pressure"
 self_locking = "self-locking: static μ {friction} against a threshold of {threshold}, so the second member cannot drive the first"
 near_self_locking = "close to self-locking: static μ {friction} near threshold of {threshold}, so back-driving changes on an estimated coefficient"
 forward_locking = "cannot be driven forward: static μ {friction} against a threshold of {threshold}, so the first member cannot drive the second"

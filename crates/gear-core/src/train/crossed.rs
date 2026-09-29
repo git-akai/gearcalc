@@ -2008,4 +2008,98 @@ mod tests {
         }
         assert!(solved > 40, "only {solved} pairs solved");
     }
+
+    /// **A crossed pair's contact ratio never exceeds what its faces can
+    /// carry** (crossed-worm#0), the law a model that computes the contact at
+    /// the faces keeps too. The contact point runs `sin β_b` along each
+    /// member's axis per unit of path, so a face `b` wide holds at most
+    /// `b / sin β_b` of it wherever it sits: the bound here is computed from
+    /// the members' helices, not from the path's normal the model uses.
+    ///
+    /// Where the faces leave the ideal contact line no length, the pair
+    /// still meets — at a face edge, which this model does not compute — so
+    /// that is said (`mesh.contact_off_face`), and a capacity below one says
+    /// "loses contact" beside it, as any contact ratio below one does.
+    /// The base read the tips' zone there instead: 17/43 at 20°,
+    /// `Σ = 0.5°`, 0.02 mm, reported 1.644 on 16 mm faces, 0.860 on 12 mm,
+    /// and 1.644 again on every face from 10 mm to 0.5 mm, which holds 0.53.
+    #[test]
+    fn a_crossed_pairs_contact_never_exceeds_what_its_faces_carry() {
+        let lib = library();
+        let faces = [
+            60.0, 30.0, 16.0, 12.0, 10.0, 8.0, 6.0, 4.7, 4.0, 2.0, 1.0, 0.5,
+        ];
+        let (mut off_face, mut bound_by_face) = (0, 0);
+        for shaft_angle in [0.5_f64, 5.0, 20.0, 45.0, 90.0] {
+            // A helical pair, and one whose second member is spur.
+            for (teeth, first_helix) in [([17_u32, 43_u32], 20.0), ([17, 23], shaft_angle)] {
+                for clearance in [0.0_f64, 0.02, 0.3, 0.5] {
+                    for shifts in [[0.0_f64, 0.0], [1.0, -0.4]] {
+                        for narrowed in [0_usize, 1] {
+                            for b in faces {
+                                let mut s =
+                                    arr::crossed(teeth, shaft_angle).with_first_helix(first_helix);
+                                s.distances[0].clearance = Auto::fixed(clearance);
+                                for (m, x) in s.members.iter_mut().zip(shifts) {
+                                    m.gear.profile_shift = Auto::fixed(x);
+                                    m.gear.face_width = Auto::fixed(60.0);
+                                }
+                                s.members[narrowed].gear.face_width = Auto::fixed(b);
+                                let Ok(r) = super::super::solve_preset(&s, 2.0, 1000.0, &lib)
+                                else {
+                                    continue;
+                                };
+                                let m = point(&r);
+                                let screw = s.screw(0).unwrap();
+                                let held =
+                                    [screw.worm_helix_angle_rad, screw.wheel_helix_angle_rad]
+                                        .into_iter()
+                                        .zip([r.members[0].face_width, r.members[1].face_width])
+                                        .map(|(beta, face)| {
+                                            let rate = crate::plane::base_helix_angle(
+                                                beta,
+                                                screw.normal_pressure_angle_rad,
+                                            )
+                                            .sin()
+                                            .abs();
+                                            face / (rate * screw.normal_base_pitch())
+                                        })
+                                        .fold(f64::INFINITY, f64::min);
+                                let at = format!(
+                                    "Σ {shaft_angle} z {teeth:?} c {clearance} x {shifts:?} \
+                                     face {narrowed} {b} mm"
+                                );
+                                assert!(
+                                    m.contact_ratio <= held * (1.0 + 1e-9),
+                                    "{at}: ε {} where the faces hold {held}",
+                                    m.contact_ratio
+                                );
+                                if m.contact_ratio >= held * (1.0 - 1e-9) {
+                                    bound_by_face += 1;
+                                }
+                                let said = |k: &str| m.notes.iter().any(|n| n.is(k));
+                                // Lost contact between teeth is said on the
+                                // faces' figure, off them or on them.
+                                assert_eq!(
+                                    said(key::MESH_CONTACT_RATIO_BELOW_ONE),
+                                    m.contact_ratio < 1.0,
+                                    "{at}: ε {}",
+                                    m.contact_ratio
+                                );
+                                if said(key::MESH_CONTACT_OFF_FACE) {
+                                    off_face += 1;
+                                    assert!(m.point.unwrap().axial_travel.is_none(), "{at}");
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        assert!(
+            off_face > 0 && bound_by_face > 0,
+            "the sweep never ran a contact off its faces ({off_face}) or to their bound \
+             ({bound_by_face})"
+        );
+    }
 }

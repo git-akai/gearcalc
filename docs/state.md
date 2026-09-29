@@ -798,13 +798,24 @@ whose size is unmeasured is a debt still owed, and is marked as one.
   transverse one. Each is the standard convention of its own model; the
   parallel figure is the higher on both. At `μ = 0` the pitch point meets to a
   part in 10⁵.
-- **A crossed pair's axis-distance error slides its contact along the shafts
-  by `Δa / sin Σ`**, which is the model's own degeneracy toward parallel: at a
-  hundredth of a degree the default 0.02 mm of clearance moves the contact
-  95 mm, off any face. The reported zone then says *face* and a contact ratio
-  under one; the rating falls back to the tip-limited zone rather than to an
-  empty one. Neither is a number a designer should read at that angle, and the
-  parallel solve is one shaft-angle keystroke away.
+- **A crossed pair's axis-distance error slides its ideal contact along the
+  shafts by `Δa / sin Σ`**, and a shift slides it too: at a hundredth of a
+  degree the default 0.02 mm of clearance moves it 95 mm, off any face. The
+  real pair still meets there, at a face edge — the contact-geometry spike
+  measured a rigid pair binding inside the face — which this point-contact
+  model does not compute. It says so (`mesh.contact_off_face`) and its
+  figures then come from **two different zones**: the contact ratio is the
+  most the faces can carry, `b / sin β_b` of path on the narrower face (and
+  below one it says the pair loses contact, as any ratio does), while the
+  efficiency, locking and pressure are read along the tips' zone, the nearer
+  stand-in (the pitch point alone reads a near-parallel pair as lossless).
+  **The pressure is unconservative**: an edge contact is a truncated patch
+  carrying the load at a face's corner, above the pressure of the smooth
+  patch the tips' zone rates; the size is not measured here, and the unified
+  contact model is what computes it. The efficiency's error has no sign
+  established. The search still judges a crossed pair on the tips' zone, so
+  it can choose shifts whose contact the given faces do not hold, and the
+  note is then its answer's.
 - **A ring's flank below its generation limit is not a generated involute** —
   about 0.08 mm on ordinary designs. Flagged per part.
 - **The cut simulation cannot see below the generation limit**: its simulated

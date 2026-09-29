@@ -77,6 +77,7 @@ overlap_below_one = "razão de recobrimento abaixo de 1; helicoidal na forma mas
 contact_ratio_below_one = "razão de contacto {ratio}: abaixo de 1, o par perde o contacto entre dentes"
 load_sharing_out_of_band = "razão de contacto virtual {ratio}: há sempre dois pares engrenados, pelo que não existe zona de um só par — sem partilha, a flexão é tomada onde o dente nunca leva a carga toda; com partilha, a rampa extrapola (medido como um alívio de 25–32 % em pares de alta razão de contacto, sentido que o modelo não fixa)"
 flank_interference = "o flanco do elemento {member} é alcançado {depth} mm além da sua extensão útil ao longo da linha de ação: razão de contacto, rendimento e tensões contam só os flancos úteis"
+contact_off_face = "o contacto ideal sai das larguras de face: os dentes tocam-se numa aresta da face, que este modelo de eixos cruzados não calcula; a razão de contacto é o máximo que as faces suportam, enquanto rendimento e pressão são lidos ao longo da zona das cabeças e subestimam a pressão de um contacto de aresta"
 self_locking = "autobloqueante: μ estático {friction} contra um limiar de {threshold}, pelo que o segundo membro não consegue accionar o primeiro"
 near_self_locking = "próximo do autobloqueio: μ estático {friction} perto do limiar {threshold}, portanto o retroacionamento depende de um coeficiente estimado"
 forward_locking = "não pode ser acionado no sentido direto: μ estático {friction} contra um limiar de {threshold}, portanto o primeiro membro não consegue acionar o segundo"

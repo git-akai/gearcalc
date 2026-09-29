@@ -72,6 +72,7 @@ overlap_below_one = "纵向重合度小于 1；外形是斜齿而受力如同直
 contact_ratio_below_one = "重合度 {ratio}：低于 1，齿对在齿与齿之间失去接触"
 load_sharing_out_of_band = "虚拟重合度 {ratio}：始终有两对齿啮合，不存在单齿啮合区——不做载荷分配时，弯曲取在轮齿从未承担全部载荷之处；做载荷分配时，斜坡模型属于外推（在高重合度直齿轮副上实测为降低 25–32 %，模型并不保证其方向）"
 flank_interference = "构件 {member} 的齿面沿啮合线在可用范围之外 {depth} mm 处被接触：重合度、效率和强度只计可用齿面"
+contact_off_face = "理想接触偏离齿宽：轮齿在齿宽边缘接触，本交错轴模型不计算该接触；重合度取齿宽所能承载的最大值，而效率和接触压力沿齿顶限定的区段读取，会低估边缘接触的压力"
 self_locking = "自锁：静摩擦系数 μ {friction} 对比阈值 {threshold}，因此第二个构件无法驱动第一个"
 near_self_locking = "接近自锁：静摩擦系数 μ {friction} 接近阈值 {threshold}，反驱能力因而取决于一个估算的系数"
 forward_locking = "无法正向驱动：静摩擦系数 μ {friction}，阈值为 {threshold}，因此第一构件无法驱动第二构件"

@@ -72,6 +72,7 @@ overlap_below_one = "縱向接觸比小於 1；外形是斜齒而受力如同直
 contact_ratio_below_one = "重合度 {ratio}：低於 1，齒對在齒與齒之間失去接觸"
 load_sharing_out_of_band = "虛擬接觸比 {ratio}：始終有兩對齒嚙合，不存在單齒嚙合區——不做負載分配時，彎曲取在輪齒從未承擔全部負載之處；做負載分配時，斜坡模型屬於外推（在高接觸比正齒輪副上實測為降低 25–32 %，模型並不保證其方向）"
 flank_interference = "構件 {member} 的齒面沿嚙合線在可用範圍之外 {depth} mm 處被接觸：重合度、效率和強度只計可用齒面"
+contact_off_face = "理想接觸偏離齒寬：輪齒在齒寬邊緣接觸，本交錯軸模型不計算該接觸；重合度取齒寬所能承載的最大值，而效率和接觸壓力沿齒頂限定的區段讀取，會低估邊緣接觸的壓力"
 self_locking = "自鎖：靜摩擦係數 μ {friction} 對比閾值 {threshold}，因此第二個構件無法驅動第一個"
 near_self_locking = "接近自鎖：靜摩擦係數 μ {friction} 接近閾值 {threshold}，反驅能力因而取決於一個估算的係數"
 forward_locking = "無法正向驅動：靜摩擦係數 μ {friction}，閾值為 {threshold}，因此第一構件無法驅動第二構件"

@@ -1734,7 +1734,13 @@ pub fn bending_section_shared_with<T: ToothOutline>(
     samples: usize,
 ) -> Option<(RootSection, f64)> {
     let v = g.virtual_spur();
-    let (at, eps_n) = load_point(g, &v, transverse_contact_ratio, 0.0, CriticalSection::default())?;
+    let (at, eps_n) = load_point(
+        g,
+        &v,
+        transverse_contact_ratio,
+        0.0,
+        CriticalSection::default(),
+    )?;
     worst_over_cycle(&at, eps_n, model, samples, false)
 }
 
@@ -1750,7 +1756,13 @@ pub fn bending_section_searched_afresh<T: ToothOutline>(
     samples: usize,
 ) -> Option<(RootSection, f64)> {
     let v = g.virtual_spur();
-    let (at, eps_n) = load_point(g, &v, transverse_contact_ratio, 0.0, CriticalSection::default())?;
+    let (at, eps_n) = load_point(
+        g,
+        &v,
+        transverse_contact_ratio,
+        0.0,
+        CriticalSection::default(),
+    )?;
     worst_over_cycle(&at, eps_n, model, samples, true)
 }
 

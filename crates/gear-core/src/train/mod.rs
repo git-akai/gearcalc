@@ -394,7 +394,9 @@ pub struct PointContact {
     pub face_width_for_continuity: Option<[f64; 2]>,
     /// How far the contact point runs along each member's own axis, mm — what a
     /// face has to cover, and what a line contact does not have at all.
-    pub axial_travel: [f64; 2],
+    /// `None` where the ideal contact runs off the faces
+    /// (`mesh.contact_off_face`): no zone on them has a travel.
+    pub axial_travel: Option<[f64; 2]>,
 }
 
 /// **The Hertzian contact a mesh presses** — one answer for an ellipse and a

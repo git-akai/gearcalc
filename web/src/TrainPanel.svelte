@@ -1256,7 +1256,7 @@
   {#if m?.point}
     <dt>{t("ui.train_contact_travel")}</dt>
     <dd>
-      {num(m.point.axial_travel[0], 3)} · {num(m.point.axial_travel[1], 3)} mm
+      {num(m.point.axial_travel?.[0], 3)} · {num(m.point.axial_travel?.[1], 3)} mm
       <small>{t("ui.train_along_each_member_s_own_axis")}</small>
     </dd>
     <dt>{t("ui.train_bending_stress")}</dt>
