@@ -4034,7 +4034,7 @@ pub fn rate(
                         },
                         notes: super::single_pair_band(
                             l.path.contact_ratio,
-                            crate::metrology::base_helix_angle(a.as_gear()),
+                            a.as_gear().base_helix_angle(),
                         )
                         .into_iter()
                         .collect(),
