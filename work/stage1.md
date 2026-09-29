@@ -39,3 +39,9 @@ Carried from the P6 re-check:
 - The Lewis section, held at the highest point of single-pair contact under load sharing, reads up to
   21 % low (unconservative) against a fresh search. Revisit when the unified contact model sets the
   load positions: a continuous section search that survives the pointed limit.
+
+Carried from the P5 check (after P4 lands):
+- The shipped Planetary, Wolfrom, Compound and MeshedPlanets presets' full-depth rings reach
+  0.33–0.38 mm along the line of action past the planet's form circle, so they warn of flank
+  interference by default. Size the ring tip automatically to the mate's form circle, a computed
+  value rather than a fixed addendum.
