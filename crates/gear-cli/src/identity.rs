@@ -14,9 +14,12 @@
 //!   load cases, the motion report, the groupings and each case's flow, and
 //!   each case relieved to the train's mobility;
 //! - each preset and one-part fixture asked alone (`solve_alone`);
-//! - **the graph's edits**: every offer at every piece of every preset, and
-//!   every offer made, previewed and solved (whole for a fixed pseudo-random
-//!   sample, as a digest for the rest);
+//! - **the graph's edits**: every offer at every piece of every preset and of
+//!   a few multi-part trains (`EDITED_CHAINS`), where the join, the insert and
+//!   the hold act across parts, and there every split of a body two parts
+//!   share; each made, previewed and solved (whole for a sample fixed by each
+//!   edit's own digest, as a digest for the rest), and each labelled by the
+//!   edit, so an offer added or removed moves only its own lines;
 //! - a grid of gears over module, tooth count, shift, helix, pressure angle,
 //!   addendum and root radius: each gear and its outline, its mesh with a
 //!   fixed mate, its span and over-pins measurements, its admissible ranges,
@@ -42,9 +45,21 @@ use gear_core::{auto, Gear, GearParams, MaterialLibrary};
 const TORQUE_NM: f64 = 2.0;
 const SPEED_RPM: f64 = 3000.0;
 
-/// Edited trains per preset whose solve is printed whole rather than as a
+/// Edited trains per train whose solve is printed whole rather than as a
 /// digest: a sample, since each is some thousands of lines.
 const SOLVED_WHOLE_PER_PRESET: usize = 8;
+
+/// The multi-part trains whose edits are recorded as well as each preset's
+/// alone, by their `gear-cli graph` names: a fixed-axis part either side of
+/// an epicyclic one, a crossed part ahead of a compound set, a layshaft ahead
+/// of a Wolfrom, and the chain of three.
+const EDITED_CHAINS: [&str; 5] = [
+    "spur then planetary",
+    "planetary then spur",
+    "worm then compound",
+    "layshaft then wolfrom",
+    "spur then layshaft then compound",
+];
 
 /// A panic is recorded as its message and the run goes on, so one broken
 /// case does not hide the rest of the comparison.
@@ -56,21 +71,6 @@ fn guarded(what: &str, f: impl FnOnce() + std::panic::UnwindSafe) {
             .or_else(|| e.downcast_ref::<String>().cloned())
             .unwrap_or_default();
         println!("PANIC in {what}: {msg}");
-    }
-}
-
-/// A fixed linear congruential sequence (Knuth's MMIX constants), so the
-/// sample of offers is the same on every run and every build.
-struct Lcg(u64);
-
-impl Lcg {
-    fn below(&mut self, n: usize) -> usize {
-        self.0 = self
-            .0
-            .wrapping_mul(6_364_136_223_846_793_005)
-            .wrapping_add(1_442_695_040_888_963_407);
-        // The high half: the low bits of an LCG modulo 2^64 cycle short.
-        usize::try_from(self.0 >> 32).unwrap_or(0) % n.max(1)
     }
 }
 
@@ -165,13 +165,14 @@ fn fnv1a(text: &str) -> u64 {
 fn edits(lib: &MaterialLibrary) {
     let fixtures: Vec<_> = crate::graph::fixtures()
         .into_iter()
-        .take(Preset::ALL.len())
+        .enumerate()
+        .filter(|(k, (name, _))| *k < Preset::ALL.len() || EDITED_CHAINS.contains(&name.as_str()))
+        .map(|(_, f)| f)
         .collect();
     let texts: Vec<String> = std::thread::scope(|scope| {
         let running: Vec<_> = fixtures
             .iter()
-            .enumerate()
-            .map(|(k, (name, train))| scope.spawn(move || edits_of(k as u64, name, train, lib)))
+            .map(|(name, train)| scope.spawn(move || edits_of(name, train, lib)))
             .collect();
         running
             .into_iter()
@@ -186,38 +187,87 @@ fn edits(lib: &MaterialLibrary) {
     }
 }
 
-/// [`edits`] for one preset, its sample drawn from a sequence seeded by its
-/// place in the list.
-fn edits_of(seed: u64, name: &str, train: &Train, lib: &MaterialLibrary) -> String {
+/// One change [`edits_of`] makes to a train: an offered edit, or a part's
+/// end of a shared body split off, which is the train's and no piece offers.
+enum Change {
+    Offered(gear_core::train::Edit),
+    Split { part: usize, body: usize },
+}
+
+/// What a change is called in the record: the edit itself, an insert by the
+/// preset it lays in rather than the whole shape it carries.
+fn label(offer: &gear_core::train::Offer) -> String {
+    match (&offer.edit, offer.preset) {
+        (gear_core::train::Edit::Insert { at, .. }, Some(p)) => {
+            format!("Insert {{ {p:?} at {at:?} }}")
+        }
+        (edit, _) => format!("{edit:?}"),
+    }
+}
+
+/// [`edits`] for one train. Each change is labelled by what it does, listed
+/// once however many pieces offer it, and printed whole where its label's
+/// digest is among the smallest — a sample no other change's arrival moves.
+fn edits_of(name: &str, train: &Train, lib: &MaterialLibrary) -> String {
     use std::fmt::Write;
     let mut out = String::new();
-    let mut lcg = Lcg(seed);
     let caught = |f: &mut dyn FnMut() -> String| {
         std::panic::catch_unwind(std::panic::AssertUnwindSafe(f))
             .unwrap_or_else(|_| "PANIC\n".to_string())
     };
     let _ = writeln!(out, "== offers {name}");
-    let mut offered = Vec::new();
+    let mut changes: Vec<(String, Change)> = Vec::new();
     for at in targets(train) {
         match std::panic::catch_unwind(|| train.offers(at)) {
             Ok(offers) => {
                 let _ = writeln!(out, "at {at:?}: {offers:#?}");
-                offered.extend(offers.into_iter().filter(|o| o.refused.is_none()));
+                for o in offers.into_iter().filter(|o| o.refused.is_none()) {
+                    let l = label(&o);
+                    if !changes.iter().any(|(k, _)| *k == l) {
+                        changes.push((l, Change::Offered(o.edit)));
+                    }
+                }
             }
             Err(_) => {
                 let _ = writeln!(out, "PANIC in offers at {at:?}");
             }
         }
     }
-    let whole: Vec<usize> = (0..SOLVED_WHOLE_PER_PRESET.min(offered.len()))
-        .map(|_| lcg.below(offered.len()))
-        .collect();
-    for (i, offer) in offered.iter().enumerate() {
-        let _ = writeln!(out, "== edit {name} {i}: {:?}", offer.edit);
+    // Every end of a body two parts share, split off from each part.
+    let parts = train.parts();
+    for (p, part) in parts.iter().enumerate() {
+        for b in part.shape.bodies.iter().map(|b| b.body) {
+            let shared = parts
+                .iter()
+                .filter(|q| q.shape.bodies.iter().any(|x| x.body == b))
+                .count();
+            if b != gear_core::kinematics::GROUND && shared > 1 {
+                changes.push((
+                    format!("split part {p} body {b}"),
+                    Change::Split { part: p, body: b },
+                ));
+            }
+        }
+    }
+    let mut digests: Vec<u64> = changes.iter().map(|(l, _)| fnv1a(l)).collect();
+    digests.sort_unstable();
+    let cut = digests
+        .get(SOLVED_WHOLE_PER_PRESET.min(digests.len()).saturating_sub(1))
+        .copied()
+        .unwrap_or(0);
+    for (l, change) in &changes {
+        let _ = writeln!(out, "== edit {name}: {l}");
+        let whole = fnv1a(l) <= cut;
         out += &caught(&mut || {
             let mut text = String::new();
             let mut edited = train.clone();
-            let made = edited.edit(offer.edit.clone());
+            let made = match change {
+                Change::Offered(edit) => edited.edit(edit.clone()),
+                Change::Split { part, body } => {
+                    edited.split(*part, *body);
+                    Ok(())
+                }
+            };
             let _ = writeln!(text, "made {made:?}");
             let _ = writeln!(
                 text,
@@ -226,7 +276,7 @@ fn edits_of(seed: u64, name: &str, train: &Train, lib: &MaterialLibrary) -> Stri
             );
             if made.is_ok() {
                 let solved = format!("{:#?}", solve_train(&edited, lib));
-                if whole.contains(&i) {
+                if whole {
                     let _ = writeln!(text, "solved {solved}");
                 } else {
                     let _ = writeln!(text, "solved fnv1a {:016x}", fnv1a(&solved));
