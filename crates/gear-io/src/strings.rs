@@ -1083,6 +1083,9 @@ mod tests {
                 // Asking no undercut floor, so the shift stands where it is
                 // typed rather than rising to where the flank reaches the tip.
                 s.members[2].gear.no_undercut = false;
+                // ...and its tip as typed, rather than held off the
+                // planet's usable flank above the base circle.
+                s.members[2].gear.no_tip_past_mate_flank = false;
                 s
             };
             match gear_core::train::solve_alone(

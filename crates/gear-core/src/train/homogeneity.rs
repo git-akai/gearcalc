@@ -297,8 +297,8 @@ fn scaled(train: &Train, s: f64, keep: Option<&str>) -> Train {
 /// **How much a flank junction near its base circle magnifies a rounding**,
 /// where the path of contact is cut there.
 ///
-/// A mesh whose tip reaches past a flank's usable end has its path end at
-/// that member's junction, `ρ_j = r_b u_j` along the line of action. Near the
+/// A mesh whose tip reaches past a flank's usable end, or is held to meet
+/// it, has its path end at that member's junction, `ρ_j = r_b u_j` along the line of action. Near the
 /// base circle the involute is a cusp: its radius moves as `r_b u du`, so a
 /// junction located to a rounding `ε r_b` in position is located to
 /// `ε / u_j` in roll — a derivative, not a solver's tolerance — and every
@@ -312,7 +312,14 @@ fn cusp(train: &Train, r: &super::TrainResult) -> f64 {
     for (k, mesh) in r.meshes.iter().enumerate() {
         let m = train.shape.meshes[k];
         for (side, i) in [m.a, m.b].into_iter().enumerate() {
-            if !mesh.flank_interference[side] || train.shape.members[i].ring.is_some() {
+            // Cut there: reached past, or met exactly by a mate's tip held
+            // to it (`MemberGear::no_tip_past_mate_flank`).
+            let mate = [m.b, m.a][side];
+            let held = r.members[mate]
+                .notes
+                .iter()
+                .any(|n| n.is(crate::note::key::GEAR_ADDENDUM_HELD_TO_MATE_FLANK));
+            if !(mesh.flank_interference[side] || held) || train.shape.members[i].ring.is_some() {
                 continue;
             }
             let u = crate::Tooth::new(r.members[i].params).u_j.abs();

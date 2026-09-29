@@ -8,4 +8,4 @@
   backlash out deg            0.064023422      0.064023422   yes
 
   the converted file is the drive: every figure identical to the last bit
-  and it writes the file the tool writes of the drive now
+  BUT IT WRITES A DIFFERENT FILE from the drive built now

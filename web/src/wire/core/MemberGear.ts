@@ -79,7 +79,37 @@ no_sharp_tip: boolean,
 /**
  * Minimum transverse tooth tip width, mm.
  */
-min_tip_width: number, dedendum: number, root_radius: number, 
+min_tip_width: number, 
+/**
+ * **The tip may not reach past a mate's usable flank.**
+ *
+ * The same shape as [`Self::no_sharp_tip`]: an upper bound on the
+ * addendum, which a typed number answers to. The bound is the mesh's to
+ * compute — where this tip meets the start of its mate's usable flank
+ * along the line of action, at the distance the mesh runs at — and the
+ * mesh hands it to the gear as a number of modules, so the gear never
+ * reads its mate. A member in several meshes is held to the lowest.
+ *
+ * It is what keeps a full-depth ring off its planet's form circle
+ * (`crate::ring::mesh_with`): the bound meets it exactly, rather than a
+ * fixed shorter addendum that is right for one pair of counts.
+ *
+ * **On for a ring where one is laid in, off otherwise**
+ * ([`Shape::push_member`](shape::Shape::push_member)). The bound is one
+ * rule for either kind; the default differs because the need does. An
+ * internal pair at full depth interferes as a matter of course, so its
+ * ring is built short. An external pair interferes only where a search
+ * or a designer pushes it, and there the searches hold the shifts off
+ * the interference instead. Turned on there, the bound takes that
+ * limit away and a search tops the tips to gain efficiency: at 9/37 the
+ * least loss moves from Σx 1.41 to 1.64 and ε drops from 1.29 to 1.20.
+ * A document that does not say is read as off, so a saved train builds
+ * as it did.
+ *
+ * Off, the addendum stands as asked and a tip that reaches too far is
+ * said on the mesh (`mesh.flank_interference`).
+ */
+no_tip_past_mate_flank: boolean, dedendum: number, root_radius: number, 
 /**
  * Helix angle, degrees, signed by hand — and who decides it.
  *

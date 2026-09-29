@@ -235,13 +235,13 @@
     case 2  T 0.071701  n 0.0000  vs frame 0.0000  sF 1.449  sH 103.815  cycles -  widths 0.010613 / 0.018236
     case 3  T 1.666667  n -480.0000  vs frame -822.8571  sF 33.848  sH 501.804  cycles 4.937143e7 / 4.937143e7  widths 0.451304 / 3.520916
   member 3  z 72  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 72.000000
+    ! gear.addendum_held_to_mate_flank
     case 1  T 3.913539  n 0.0000  vs frame -428.5714  sF 19.030  sH 225.341  cycles -  widths 0.139411 / 0.085921
     case 2  T 0.172083  n 0.0000  vs frame 0.0000  sF 0.837  sH 47.252  cycles -  widths 0.006130 / 0.003778
     case 3  T 3.913539  n 0.0000  vs frame -342.8571  sF 19.030  sH 225.341  cycles 6.171429e7 / 6.171429e7  widths 0.253728 / 0.710014
   mesh 1  members 1 2  alpha_w 21.054925  eps 1.436891 / 0.000000 / 1.436891  efficiency 97.838469 / 97.838469 %  play 0.145568 / 0.058227 deg  shares a factor
     power through, by case: 0.857143 / 0.856014 / 0.857143
   mesh 2  members 2 3  alpha_w 21.054925  eps 1.861462 / 0.000000 / 1.861462  efficiency 99.488565 / 99.488565 %  play 0.058600 / 0.024417 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 0.838615 / 0.860415 / 0.838615
   distance 1  running 21.145279  clearance 0.020000
 
@@ -277,19 +277,18 @@
     case 2  T 0.060064  n 0.0000  vs frame 0.0000  sF 1.744  sH 85.966  cycles -  widths 0.012775 / 0.012505
     case 3  T 5.865037  n -5600.0000  vs frame -8000.0000  sF 170.273  sH 845.747  cycles 4.800000e8 / 4.800000e8  widths 2.270309 / 10.001584
   member 2  z 60  m 1  alpha 20  x 0.028069  b 10.000000  beta 0.000000  d 60.000000
+    ! gear.addendum_held_to_mate_flank
     case 1  T 19.378425  n 0.0000  vs frame -3000.0000  sF 121.988  sH 717.252  cycles -  widths 0.893686 / 0.870486
     case 2  T 0.200212  n 0.0000  vs frame 0.0000  sF 1.260  sH 72.905  cycles -  widths 0.009233 / 0.008994
     case 3  T 19.378425  n 0.0000  vs frame -2400.0000  sF 121.988  sH 717.252  cycles 4.320000e8 / 4.320000e8  widths 1.626508 / 7.193349
   member 3  z 61  m 1  alpha 20  x -0.429445  b 10.000000  beta 0.000000  d 61.000000
-    ! clamp.ring_flank_ungenerated
+    ! gear.addendum_held_to_mate_flank
     case 1  T 19.875958  n 49.1803  vs frame -2950.8197  sF 138.903  sH 818.296  cycles -  widths 1.017603 / 1.133025
     case 2  T 0.201772  n 0.0000  vs frame 0.0000  sF 1.410  sH 82.447  cycles -  widths 0.010330 / 0.011502
     case 3  T 19.875958  n 39.3443  vs frame -2360.6557  sF 138.903  sH 818.296  cycles 4.249180e8 / 4.249180e8  widths 1.852038 / 9.362868
   mesh 1  members 1 2  alpha_w 20.059335  eps 1.755255 / 0.000000 / 1.755255  efficiency 99.127208 / 99.127208 %  play 0.093279 / 0.027984 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 29.067637 / 57.360116 / 29.067637
   mesh 2  members 1 3  alpha_w 15.907986  eps 1.755255 / 0.000000 / 1.755255  efficiency 99.121756 / 99.121756 %  play 0.074710 / 0.022046 deg  coprime
-    ! mesh.flank_interference
     power through, by case: 29.325184 / 56.859481 / 29.325184
   distance 1  running 21.007930  clearance 0.020000
 
@@ -327,11 +326,13 @@
     case 2  T 0.001252  n 0.0000  vs frame 0.0000  sF 0.028  sH 14.395  cycles -  widths 0.000206 / 0.000351
     case 3  T 0.666667  n 2400.0000  vs frame 1714.2857  sF 14.974  sH 332.186  cycles 3.085714e8 / 3.085714e8  widths 0.199652 / 1.542942
   member 2  z 60  m 1  alpha 20  x 0.028069  b 10.000000  beta 0.000000  d 60.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 39.919687  n 0.0000  vs frame -857.1429  sF 250.797  sH 1029.659  cycles -  widths 1.837343 / 1.793930
     case 2  T 0.198772  n 0.0000  vs frame 0.0000  sF 1.249  sH 72.657  cycles -  widths 0.009149 / 0.008933
     case 3  T 39.919687  n 0.0000  vs frame -685.7143  sF 250.797  sH 1029.659  cycles 1.234286e8 / 1.234286e8  widths 3.343965 / 14.824326
   member 3  z 59  m 1  alpha 20  x 0.037256  b 10.000000  beta 0.000000  d 59.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 40.236730  n 33.8983  vs frame -823.2446  sF 258.772  sH 1080.212  cycles -  widths 1.895766 / 1.974405
     case 2  T 0.201885  n 0.0000  vs frame 0.0000  sF 1.298  sH 76.516  cycles -  widths 0.009512 / 0.009906
@@ -350,10 +351,8 @@
   mesh 1  members 1 4  alpha_w 20.104080  eps 1.548221 / 0.000000 / 1.548221  efficiency 98.107354 / 98.107354 %  play 0.069611 / 0.092815 deg  shares a factor
     power through, by case: 0.714286 / 0.395696 / 0.714286
   mesh 2  members 4 2  alpha_w 20.104080  eps 1.757409 / 0.000000 / 1.757409  efficiency 99.124183 / 99.124183 %  play 0.093476 / 0.028043 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 17.108437 / 25.130432 / 17.108437
   mesh 3  members 5 3  alpha_w 20.104080  eps 1.742869 / 0.000000 / 1.742869  efficiency 99.066170 / 99.066170 %  play 0.098975 / 0.028518 deg  coprime
-    ! mesh.flank_interference
     power through, by case: 16.562335 / 24.514639 / 16.562335
   distance 1  running 21.013928  clearance 0.020000
 
@@ -437,13 +436,13 @@
     case 2  T 0.049192  n 0.0000  vs frame 0.0000  sF 1.596  sH 113.738  cycles -  widths 0.011689 / 0.021889
     case 3  T 0.490551  n 3466.6667  vs frame 4266.6667  sF 16.074  sH 361.001  cycles 2.560000e8 / 2.560000e8  widths 0.214321 / 1.822233
   member 4  z 96  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 96.000000
+    ! gear.addendum_held_to_mate_flank
     case 1  T 2.561111  n 0.0000  vs frame 1000.0000  sF 10.523  sH 222.938  cycles -  widths 0.077093 / 0.084098
     case 2  T 0.262356  n 0.0000  vs frame 0.0000  sF 1.078  sH 71.354  cycles -  widths 0.007897 / 0.008615
     case 3  T 2.561111  n 0.0000  vs frame 800.0000  sF 10.523  sH 222.938  cycles 1.440000e8 / 1.440000e8  widths 0.140310 / 0.694954
   mesh 1  members 1 2  alpha_w 20.149246  eps 1.546097 / 0.000000 / 1.546097  efficiency 98.110213 / 98.110213 %  play 0.069762 / 0.093016 deg  shares a factor
     power through, by case: 1.333333 / 1.271143 / 1.333333
   mesh 2  members 3 4  alpha_w 19.919074  eps 1.755255 / 0.000000 / 1.755255  efficiency 98.989239 / 98.989239 %  play 0.092505 / 0.017345 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 1.280555 / 1.311780 / 1.280555
   mesh 3  members 2 3  alpha_w 20.173990  eps 1.510040 / 0.000000 / 1.510040  efficiency 97.891587 / 97.891587 %  play 0.093071 / 0.093071 deg  shares a factor
     power through, by case: 1.308136 / 1.298521 / 1.308136
@@ -782,13 +781,13 @@
     case 2  T 0.071701  n 0.0000  vs frame 0.0000  sF 1.449  sH 103.815  cycles -  widths 0.010613 / 0.018236
     case 3  T 4.145916  n 189.7674  vs frame 325.3156  sF 84.198  sH 791.443  cycles 1.951894e7 / 1.951894e7  widths 1.122641 / 8.758454
   member 5  z 72  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 72.000000
+    ! gear.addendum_held_to_mate_flank
     case 1  T 9.735121  n 0.0000  vs frame 169.4352  sF 47.337  sH 355.407  cycles -  widths 0.346791 / 0.213732
     case 2  T 0.172083  n 0.0000  vs frame 0.0000  sF 0.837  sH 47.252  cycles -  widths 0.006130 / 0.003778
     case 3  T 9.735121  n 0.0000  vs frame 135.5482  sF 47.337  sH 355.407  cycles 2.439867e7 / 2.439867e7  widths 0.631160 / 1.766195
   mesh 2  members 3 4  alpha_w 21.054925  eps 1.436891 / 0.000000 / 1.436891  efficiency 97.838469 / 97.838469 %  play 0.145568 / 0.058227 deg  shares a factor
     power through, by case: 0.842957 / 0.856014 / 0.842957
   mesh 3  members 4 5  alpha_w 21.054925  eps 1.861462 / 0.000000 / 1.861462  efficiency 99.488565 / 99.488565 %  play 0.058600 / 0.024417 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 0.824736 / 0.860415 / 0.824736
   distance 2  running 21.145279  clearance 0.020000
 
@@ -838,21 +837,20 @@
     case 2  T 0.060064  n 0.0000  vs frame 0.0000  sF 1.744  sH 85.966  cycles -  widths 0.012775 / 0.012505
     case 3  T 14.589569  n 2213.9535  vs frame 3162.7907  sF 423.563  sH 1333.909  cycles 1.897674e8 / 1.897674e8  widths 5.647506 / 24.879433
   member 4  z 60  m 1  alpha 20  x 0.028069  b 10.000000  beta 0.000000  d 60.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 48.204788  n 0.0000  vs frame 1186.0465  sF 303.451  sH 1131.247  cycles -  widths 2.223087 / 2.165376
     case 2  T 0.200212  n 0.0000  vs frame 0.0000  sF 1.260  sH 72.905  cycles -  widths 0.009233 / 0.008994
     case 3  T 48.204788  n 0.0000  vs frame 948.8372  sF 303.451  sH 1131.247  cycles 1.707907e8 / 1.707907e8  widths 4.046018 / 17.893811
   member 5  z 61  m 1  alpha 20  x -0.429445  b 10.000000  beta 0.000000  d 61.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
-    ! clamp.ring_flank_ungenerated
     case 1  T 49.442427  n -19.4434  vs frame 1166.6031  sF 345.528  sH 1290.614  cycles -  widths 2.531339 / 2.818455
     case 2  T 0.201772  n 0.0000  vs frame 0.0000  sF 1.410  sH 82.447  cycles -  widths 0.010330 / 0.011502
     case 3  T 49.442427  n -15.5547  vs frame 933.2825  sF 345.528  sH 1290.614  cycles 1.679909e8 / 1.679909e8  widths 4.607036 / 23.290597
   mesh 2  members 3 4  alpha_w 20.059335  eps 1.755255 / 0.000000 / 1.755255  efficiency 99.127208 / 99.127208 %  play 0.093279 / 0.027984 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 28.586561 / 57.301616 / 28.586561
   mesh 3  members 3 5  alpha_w 15.907986  eps 1.755255 / 0.000000 / 1.755255  efficiency 99.121756 / 99.121756 %  play 0.074710 / 0.022046 deg  coprime
-    ! mesh.flank_interference
     power through, by case: 28.839845 / 56.801492 / 28.839845
   distance 2  running 21.007930  clearance 0.020000
 
@@ -904,11 +902,13 @@
     case 2  T 0.001252  n 0.0000  vs frame 0.0000  sF 0.028  sH 14.395  cycles -  widths 0.000206 / 0.000351
     case 3  T 1.658366  n -948.8372  vs frame -677.7409  sF 37.248  sH 523.922  cycles 1.219934e8 / 1.219934e8  widths 0.496645 / 3.838145
   member 4  z 60  m 1  alpha 20  x 0.028069  b 10.000000  beta 0.000000  d 60.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 99.302194  n 0.0000  vs frame 338.8704  sF 623.871  sH 1623.975  cycles -  widths 4.570482 / 4.462489
     case 2  T 0.198772  n 0.0000  vs frame 0.0000  sF 1.249  sH 72.657  cycles -  widths 0.009149 / 0.008933
     case 3  T 99.302194  n 0.0000  vs frame 271.0963  sF 623.871  sH 1623.975  cycles 4.879734e7 / 4.879734e7  widths 8.318278 / 36.876243
   member 5  z 59  m 1  alpha 20  x 0.037256  b 10.000000  beta 0.000000  d 59.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 100.090855  n -13.4017  vs frame 325.4688  sF 643.708  sH 1703.706  cycles -  widths 4.715810 / 4.911430
     case 2  T 0.201885  n 0.0000  vs frame 0.0000  sF 1.298  sH 76.516  cycles -  widths 0.009512 / 0.009906
@@ -927,10 +927,8 @@
   mesh 2  members 3 6  alpha_w 20.104080  eps 1.548221 / 0.000000 / 1.548221  efficiency 98.107354 / 98.107354 %  play 0.069611 / 0.092815 deg  shares a factor
     power through, by case: 0.702464 / 0.395696 / 0.702464
   mesh 3  members 6 4  alpha_w 20.104080  eps 1.757409 / 0.000000 / 1.757409  efficiency 99.124183 / 99.124183 %  play 0.093476 / 0.028043 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 16.825289 / 25.130432 / 16.825289
   mesh 4  members 7 5  alpha_w 20.104080  eps 1.742869 / 0.000000 / 1.742869  efficiency 99.066170 / 99.066170 %  play 0.098975 / 0.028518 deg  coprime
-    ! mesh.flank_interference
     power through, by case: 16.288224 / 24.514639 / 16.288224
   distance 2  running 21.013928  clearance 0.020000
 
@@ -1042,13 +1040,13 @@
     case 2  T 0.049192  n 0.0000  vs frame 0.0000  sF 1.596  sH 113.738  cycles -  widths 0.011689 / 0.021889
     case 3  T 1.220270  n -1370.5426  vs frame -1686.8217  sF 39.985  sH 569.369  cycles 1.012093e8 / 1.012093e8  widths 0.533135 / 4.532895
   member 6  z 96  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 96.000000
+    ! gear.addendum_held_to_mate_flank
     case 1  T 6.370889  n 0.0000  vs frame -395.3488  sF 26.177  sH 351.617  cycles -  widths 0.191773 / 0.209198
     case 2  T 0.262356  n 0.0000  vs frame 0.0000  sF 1.078  sH 71.354  cycles -  widths 0.007897 / 0.008615
     case 3  T 6.370889  n 0.0000  vs frame -316.2791  sF 26.177  sH 351.617  cycles 5.693023e7 / 5.693023e7  widths 0.349027 / 1.728731
   mesh 2  members 3 4  alpha_w 20.149246  eps 1.546097 / 0.000000 / 1.546097  efficiency 98.110213 / 98.110213 %  play 0.069762 / 0.093016 deg  shares a factor
     power through, by case: 1.311266 / 1.271143 / 1.311266
   mesh 3  members 5 6  alpha_w 19.919074  eps 1.755255 / 0.000000 / 1.755255  efficiency 98.989239 / 98.989239 %  play 0.092505 / 0.017345 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 1.259362 / 1.311780 / 1.259362
   mesh 4  members 4 5  alpha_w 20.173990  eps 1.510040 / 0.000000 / 1.510040  efficiency 97.891587 / 97.891587 %  play 0.093071 / 0.093071 deg  shares a factor
     power through, by case: 1.286486 / 1.298521 / 1.286486
@@ -1447,13 +1445,13 @@
     case 2  T 0.071701  n 0.0000  vs frame 0.0000  sF 1.449  sH 103.815  cycles -  widths 0.010613 / 0.018236
     case 3  T 4.080651  n -189.7674  vs frame -325.3156  sF 82.873  sH 785.189  cycles 1.951894e7 / 1.951894e7  widths 1.104968 / 8.620580
   member 6  z 72  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 72.000000
+    ! gear.addendum_held_to_mate_flank
     case 1  T 9.581872  n 0.0000  vs frame -169.4352  sF 46.592  sH 352.598  cycles -  widths 0.341332 / 0.210367
     case 2  T 0.172083  n 0.0000  vs frame 0.0000  sF 0.837  sH 47.252  cycles -  widths 0.006130 / 0.003778
     case 3  T 9.581872  n 0.0000  vs frame -135.5482  sF 46.592  sH 352.598  cycles 2.439867e7 / 2.439867e7  widths 0.621225 / 1.738392
   mesh 3  members 4 5  alpha_w 21.054925  eps 1.436891 / 0.000000 / 1.436891  efficiency 97.838469 / 97.838469 %  play 0.145568 / 0.058227 deg  shares a factor
     power through, by case: 0.829687 / 0.856014 / 0.829687
   mesh 4  members 5 6  alpha_w 21.054925  eps 1.861462 / 0.000000 / 1.861462  efficiency 99.488565 / 99.488565 %  play 0.058600 / 0.024417 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 0.811753 / 0.860415 / 0.811753
   distance 3  running 21.145279  clearance 0.020000
 
@@ -1513,21 +1511,20 @@
     case 2  T 0.060064  n 0.0000  vs frame 0.0000  sF 1.744  sH 85.966  cycles -  widths 0.012775 / 0.012505
     case 3  T 14.359902  n -2213.9535  vs frame -3162.7907  sF 416.895  sH 1323.369  cycles 1.897674e8 / 1.897674e8  widths 5.558604 / 24.487786
   member 5  z 60  m 1  alpha 20  x 0.028069  b 10.000000  beta 0.000000  d 60.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 47.445957  n 0.0000  vs frame -1186.0465  sF 298.674  sH 1122.308  cycles -  widths 2.188092 / 2.131289
     case 2  T 0.200212  n 0.0000  vs frame 0.0000  sF 1.260  sH 72.905  cycles -  widths 0.009233 / 0.008994
     case 3  T 47.445957  n 0.0000  vs frame -948.8372  sF 298.674  sH 1122.308  cycles 1.707907e8 / 1.707907e8  widths 3.982327 / 17.612130
   member 6  z 61  m 1  alpha 20  x -0.429445  b 10.000000  beta 0.000000  d 61.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
-    ! clamp.ring_flank_ungenerated
     case 1  T 48.664113  n 19.4434  vs frame -1166.6031  sF 340.088  sH 1280.415  cycles -  widths 2.491491 / 2.774088
     case 2  T 0.201772  n 0.0000  vs frame 0.0000  sF 1.410  sH 82.447  cycles -  widths 0.010330 / 0.011502
     case 3  T 48.664113  n 15.5547  vs frame -933.2825  sF 340.088  sH 1280.415  cycles 1.679909e8 / 1.679909e8  widths 4.534513 / 22.923960
   mesh 3  members 4 5  alpha_w 20.059335  eps 1.755255 / 0.000000 / 1.755255  efficiency 99.127208 / 99.127208 %  play 0.093279 / 0.027984 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 28.136556 / 57.245197 / 28.136556
   mesh 4  members 4 6  alpha_w 15.907986  eps 1.755255 / 0.000000 / 1.755255  efficiency 99.121756 / 99.121756 %  play 0.074710 / 0.022046 deg  coprime
-    ! mesh.flank_interference
     power through, by case: 28.385853 / 56.745565 / 28.385853
   distance 3  running 21.007930  clearance 0.020000
 
@@ -1589,11 +1586,13 @@
     case 2  T 0.001252  n 0.0000  vs frame 0.0000  sF 0.028  sH 14.395  cycles -  widths 0.000206 / 0.000351
     case 3  T 1.632261  n 948.8372  vs frame 677.7409  sF 36.662  sH 519.782  cycles 1.219934e8 / 1.219934e8  widths 0.488827 / 3.777726
   member 5  z 60  m 1  alpha 20  x 0.028069  b 10.000000  beta 0.000000  d 60.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 97.738996  n 0.0000  vs frame -338.8704  sF 614.050  sH 1611.142  cycles -  widths 4.498534 / 4.392242
     case 2  T 0.198772  n 0.0000  vs frame 0.0000  sF 1.249  sH 72.657  cycles -  widths 0.009149 / 0.008933
     case 3  T 97.738996  n 0.0000  vs frame -271.0963  sF 614.050  sH 1611.142  cycles 4.879734e7 / 4.879734e7  widths 8.187333 / 36.295744
   member 6  z 59  m 1  alpha 20  x 0.037256  b 10.000000  beta 0.000000  d 59.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 98.515242  n 13.4017  vs frame -325.4688  sF 633.575  sH 1690.244  cycles -  widths 4.641575 / 4.834115
     case 2  T 0.201885  n 0.0000  vs frame 0.0000  sF 1.298  sH 76.516  cycles -  widths 0.009512 / 0.009906
@@ -1612,10 +1611,8 @@
   mesh 3  members 4 7  alpha_w 20.104080  eps 1.548221 / 0.000000 / 1.548221  efficiency 98.107354 / 98.107354 %  play 0.069611 / 0.092815 deg  shares a factor
     power through, by case: 0.691406 / 0.395696 / 0.691406
   mesh 4  members 7 5  alpha_w 20.104080  eps 1.757409 / 0.000000 / 1.757409  efficiency 99.124183 / 99.124183 %  play 0.093476 / 0.028043 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 16.560428 / 25.130432 / 16.560428
   mesh 5  members 8 6  alpha_w 20.104080  eps 1.742869 / 0.000000 / 1.742869  efficiency 99.066170 / 99.066170 %  play 0.098975 / 0.028518 deg  coprime
-    ! mesh.flank_interference
     power through, by case: 16.031818 / 24.514639 / 16.031818
   distance 3  running 21.013928  clearance 0.020000
 
@@ -1747,13 +1744,13 @@
     case 2  T 0.049192  n 0.0000  vs frame 0.0000  sF 1.596  sH 113.738  cycles -  widths 0.011689 / 0.021889
     case 3  T 1.201061  n 1370.5426  vs frame 1686.8217  sF 39.356  sH 564.870  cycles 1.012093e8 / 1.012093e8  widths 0.524742 / 4.461539
   member 7  z 96  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 96.000000
+    ! gear.addendum_held_to_mate_flank
     case 1  T 6.270600  n 0.0000  vs frame 395.3488  sF 25.765  sH 348.838  cycles -  widths 0.188754 / 0.205905
     case 2  T 0.262356  n 0.0000  vs frame 0.0000  sF 1.078  sH 71.354  cycles -  widths 0.007897 / 0.008615
     case 3  T 6.270600  n 0.0000  vs frame 316.2791  sF 25.765  sH 348.838  cycles 5.693023e7 / 5.693023e7  widths 0.343533 / 1.701518
   mesh 3  members 4 5  alpha_w 20.149246  eps 1.546097 / 0.000000 / 1.546097  efficiency 98.110213 / 98.110213 %  play 0.069762 / 0.093016 deg  shares a factor
     power through, by case: 1.290625 / 1.271143 / 1.290625
   mesh 4  members 6 7  alpha_w 19.919074  eps 1.755255 / 0.000000 / 1.755255  efficiency 98.989239 / 98.989239 %  play 0.092505 / 0.017345 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 1.239537 / 1.311780 / 1.239537
   mesh 5  members 5 6  alpha_w 20.173990  eps 1.510040 / 0.000000 / 1.510040  efficiency 97.891587 / 97.891587 %  play 0.093071 / 0.093071 deg  shares a factor
     power through, by case: 1.266235 / 1.298521 / 1.266235
@@ -2246,13 +2243,13 @@
     case 2  T 0.071701  n 0.0000  vs frame 0.0000  sF 1.449  sH 103.815  cycles -  widths 0.010613 / 0.018236
     case 3  T 3.825350  n -202.8549  vs frame -347.7512  sF 77.688  sH 760.230  cycles 2.086507e7 / 2.086507e7  widths 1.035837 / 8.081243
   member 9  z 72  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 72.000000
+    ! gear.addendum_held_to_mate_flank
     case 1  T 8.982394  n 0.0000  vs frame -181.1204  sF 43.677  sH 341.390  cycles -  widths 0.319977 / 0.197206
     case 2  T 0.172083  n 0.0000  vs frame 0.0000  sF 0.837  sH 47.252  cycles -  widths 0.006130 / 0.003778
     case 3  T 8.982394  n 0.0000  vs frame -144.8963  sF 43.677  sH 341.390  cycles 2.608134e7 / 2.608134e7  widths 0.582359 / 1.629631
   mesh 4  members 7 8  alpha_w 21.054925  eps 1.436891 / 0.000000 / 1.436891  efficiency 97.838469 / 97.838469 %  play 0.145568 / 0.058227 deg  shares a factor
     power through, by case: 0.831419 / 0.856014 / 0.831419
   mesh 5  members 8 9  alpha_w 21.054925  eps 1.861462 / 0.000000 / 1.861462  efficiency 99.488565 / 99.488565 %  play 0.058600 / 0.024417 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 0.813447 / 0.860415 / 0.813447
   distance 2  running 21.145279  clearance 0.020000
 
@@ -2328,21 +2325,20 @@
     case 2  T 0.060064  n 0.0000  vs frame 0.0000  sF 1.744  sH 85.966  cycles -  widths 0.012775 / 0.012505
     case 3  T 13.461492  n -2366.6399  vs frame -3380.9142  sF 390.813  sH 1281.302  cycles 2.028549e8 / 2.028549e8  widths 5.210837 / 22.955736
   member 8  z 60  m 1  alpha 20  x 0.028069  b 10.000000  beta 0.000000  d 60.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 44.477556  n 0.0000  vs frame -1267.8428  sF 279.988  sH 1086.633  cycles -  widths 2.051196 / 1.997948
     case 2  T 0.200212  n 0.0000  vs frame 0.0000  sF 1.260  sH 72.905  cycles -  widths 0.009233 / 0.008994
     case 3  T 44.477556  n 0.0000  vs frame -1014.2743  sF 279.988  sH 1086.633  cycles 1.825694e8 / 1.825694e8  widths 3.733177 / 16.510248
   member 9  z 61  m 1  alpha 20  x -0.429445  b 10.000000  beta 0.000000  d 61.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
-    ! clamp.ring_flank_ungenerated
     case 1  T 45.619500  n 20.7843  vs frame -1247.0585  sF 318.811  sH 1239.715  cycles -  widths 2.335614 / 2.600530
     case 2  T 0.201772  n 0.0000  vs frame 0.0000  sF 1.410  sH 82.447  cycles -  widths 0.010330 / 0.011502
     case 3  T 45.619500  n 16.6274  vs frame -997.6468  sF 318.811  sH 1239.715  cycles 1.795764e8 / 1.795764e8  widths 4.250817 / 21.489750
   mesh 4  members 7 8  alpha_w 20.059335  eps 1.755255 / 0.000000 / 1.755255  efficiency 99.127208 / 99.127208 %  play 0.093279 / 0.027984 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 28.195275 / 57.252655 / 28.195275
   mesh 5  members 7 9  alpha_w 15.907986  eps 1.755255 / 0.000000 / 1.755255  efficiency 99.121756 / 99.121756 %  play 0.074710 / 0.022046 deg  coprime
-    ! mesh.flank_interference
     power through, by case: 28.445093 / 56.752958 / 28.445093
   distance 2  running 21.007930  clearance 0.020000
 
@@ -2420,11 +2416,13 @@
     case 2  T 0.001252  n 0.0000  vs frame 0.0000  sF 0.028  sH 14.395  cycles -  widths 0.000206 / 0.000351
     case 3  T 1.530140  n 1014.2743  vs frame 724.4816  sF 34.368  sH 503.260  cycles 1.304067e8 / 1.304067e8  widths 0.458244 / 3.541377
   member 8  z 60  m 1  alpha 20  x 0.028069  b 10.000000  beta 0.000000  d 60.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 91.624071  n 0.0000  vs frame -362.2408  sF 575.633  sH 1559.929  cycles -  widths 4.217089 / 4.117446
     case 2  T 0.198772  n 0.0000  vs frame 0.0000  sF 1.249  sH 72.657  cycles -  widths 0.009149 / 0.008933
     case 3  T 91.624071  n 0.0000  vs frame -289.7926  sF 575.633  sH 1559.929  cycles 5.216268e7 / 5.216268e7  widths 7.675102 / 34.024943
   member 9  z 59  m 1  alpha 20  x 0.037256  b 10.000000  beta 0.000000  d 59.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 92.351751  n 14.3259  vs frame -347.9149  sF 593.936  sH 1636.516  cycles -  widths 4.351180 / 4.531674
     case 2  T 0.201885  n 0.0000  vs frame 0.0000  sF 1.298  sH 76.516  cycles -  widths 0.009512 / 0.009906
@@ -2443,10 +2441,8 @@
   mesh 4  members 7 10  alpha_w 20.104080  eps 1.548221 / 0.000000 / 1.548221  efficiency 98.107354 / 98.107354 %  play 0.069611 / 0.092815 deg  shares a factor
     power through, by case: 0.692849 / 0.395696 / 0.692849
   mesh 5  members 10 8  alpha_w 20.104080  eps 1.757409 / 0.000000 / 1.757409  efficiency 99.124183 / 99.124183 %  play 0.093476 / 0.028043 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 16.594989 / 25.130432 / 16.594989
   mesh 6  members 11 9  alpha_w 20.104080  eps 1.742869 / 0.000000 / 1.742869  efficiency 99.066170 / 99.066170 %  play 0.098975 / 0.028518 deg  coprime
-    ! mesh.flank_interference
     power through, by case: 16.065275 / 24.514639 / 16.065275
   distance 2  running 21.013928  clearance 0.020000
 
@@ -2610,13 +2606,13 @@
     case 2  T 0.049192  n 0.0000  vs frame 0.0000  sF 1.596  sH 113.738  cycles -  widths 0.011689 / 0.021889
     case 3  T 1.125918  n 1465.0628  vs frame 1803.1542  sF 36.893  sH 546.914  cycles 1.081893e8 / 1.081893e8  widths 0.491913 / 4.182408
   member 10  z 96  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 96.000000
+    ! gear.addendum_held_to_mate_flank
     case 1  T 5.878287  n 0.0000  vs frame 422.6143  sF 24.153  sH 337.750  cycles -  widths 0.176945 / 0.193023
     case 2  T 0.262356  n 0.0000  vs frame 0.0000  sF 1.078  sH 71.354  cycles -  widths 0.007897 / 0.008615
     case 3  T 5.878287  n 0.0000  vs frame 338.0914  sF 24.153  sH 337.750  cycles 6.085646e7 / 6.085646e7  widths 0.322040 / 1.595065
   mesh 4  members 7 8  alpha_w 20.149246  eps 1.546097 / 0.000000 / 1.546097  efficiency 98.110213 / 98.110213 %  play 0.069762 / 0.093016 deg  shares a factor
     power through, by case: 1.293318 / 1.271143 / 1.293318
   mesh 5  members 9 10  alpha_w 19.919074  eps 1.755255 / 0.000000 / 1.755255  efficiency 98.989239 / 98.989239 %  play 0.092505 / 0.017345 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 1.242124 / 1.311780 / 1.242124
   mesh 6  members 8 9  alpha_w 20.173990  eps 1.510040 / 0.000000 / 1.510040  efficiency 97.891587 / 97.891587 %  play 0.093071 / 0.093071 deg  shares a factor
     power through, by case: 1.268877 / 1.298521 / 1.268877
@@ -2980,6 +2976,7 @@
     case 2  T 0.071701  n 0.0000  vs frame 0.0000  sF 1.449  sH 103.815  cycles -  widths 0.010613 / 0.018236
     case 3  T 41.203072  n 12.0000  vs frame 20.5714  sF 836.780  sH 2495.022  cycles 1.234286e6 / 1.234286e6  widths 11.157065 / 87.043544
   member 5  z 72  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 72.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 96.749892  n 0.0000  vs frame 10.7143  sF 470.446  sH 1120.418  cycles -  widths 3.446494 / 2.124116
     case 2  T 0.172083  n 0.0000  vs frame 0.0000  sF 0.837  sH 47.252  cycles -  widths 0.006130 / 0.003778
@@ -2987,7 +2984,6 @@
   mesh 2  members 3 4  alpha_w 21.054925  eps 1.436891 / 0.000000 / 1.436891  efficiency 97.838469 / 97.838469 %  play 0.145568 / 0.058227 deg  shares a factor
     power through, by case: 0.529754 / 0.856014 / 0.529754
   mesh 3  members 4 5  alpha_w 21.054925  eps 1.861462 / 0.000000 / 1.861462  efficiency 99.488565 / 99.488565 %  play 0.058600 / 0.024417 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 0.518303 / 0.860415 / 0.518303
   distance 2  running 21.145279  clearance 0.020000
 
@@ -3041,21 +3037,20 @@
     case 2  T 0.060064  n 0.0000  vs frame 0.0000  sF 1.744  sH 85.966  cycles -  widths 0.012775 / 0.012505
     case 3  T 144.994520  n 140.0000  vs frame 200.0000  sF 4209.467  sH 4205.144  cycles 1.200000e7 / 1.200000e7  widths 56.126227 / 247.257583
   member 4  z 60  m 1  alpha 20  x 0.028069  b 10.000000  beta 0.000000  d 60.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 479.070378  n 0.0000  vs frame 75.0000  sF 3015.770  sH 3566.252  cycles -  widths 22.093554 / 21.520012
     case 2  T 0.200212  n 0.0000  vs frame 0.0000  sF 1.260  sH 72.905  cycles -  widths 0.009233 / 0.008994
     case 3  T 479.070378  n 0.0000  vs frame 60.0000  sF 3015.770  sH 3566.252  cycles 1.080000e7 / 1.080000e7  widths 40.210269 / 177.832852
   member 5  z 61  m 1  alpha 20  x -0.429445  b 10.000000  beta 0.000000  d 61.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
-    ! clamp.ring_flank_ungenerated
     case 1  T 491.370317  n -1.2295  vs frame 73.7705  sF 3433.935  sH 4068.656  cycles -  widths 25.157031 / 28.010462
     case 2  T 0.201772  n 0.0000  vs frame 0.0000  sF 1.410  sH 82.447  cycles -  widths 0.010330 / 0.011502
     case 3  T 491.370317  n -0.9836  vs frame 59.0164  sF 3433.935  sH 4068.656  cycles 1.062295e7 / 1.062295e7  widths 45.785796 / 231.467358
   mesh 2  members 3 4  alpha_w 20.059335  eps 1.755255 / 0.000000 / 1.755255  efficiency 99.127208 / 99.127208 %  play 0.093279 / 0.027984 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 17.965139 / 55.287341 / 17.965139
   mesh 3  members 3 5  alpha_w 15.907986  eps 1.755255 / 0.000000 / 1.755255  efficiency 99.121756 / 99.121756 %  play 0.074710 / 0.022046 deg  coprime
-    ! mesh.flank_interference
     power through, by case: 18.124315 / 54.804797 / 18.124315
   distance 2  running 21.007930  clearance 0.020000
 
@@ -3112,11 +3107,13 @@
     case 2  T 0.001252  n 0.0000  vs frame 0.0000  sF 0.028  sH 14.395  cycles -  widths 0.000206 / 0.000351
     case 3  T 16.481229  n -60.0000  vs frame -42.8571  sF 370.183  sH 1651.663  cycles 7.714286e6 / 7.714286e6  widths 4.935772 / 38.144380
   member 4  z 60  m 1  alpha 20  x 0.028069  b 10.000000  beta 0.000000  d 60.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 986.888257  n 0.0000  vs frame 21.4286  sF 6200.173  sH 5119.576  cycles -  widths 45.422513 / 44.349254
     case 2  T 0.198772  n 0.0000  vs frame 0.0000  sF 1.249  sH 72.657  cycles -  widths 0.009149 / 0.008933
     case 3  T 986.888257  n 0.0000  vs frame 17.1429  sF 6200.173  sH 5119.576  cycles 3.085715e6 / 3.085715e6  widths 82.668973 / 366.484665
   member 5  z 59  m 1  alpha 20  x 0.037256  b 10.000000  beta 0.000000  d 59.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 994.726151  n -0.8475  vs frame 20.5811  sF 6397.321  sH 5370.928  cycles -  widths 46.866818 / 48.810928
     case 2  T 0.201885  n 0.0000  vs frame 0.0000  sF 1.298  sH 76.516  cycles -  widths 0.009512 / 0.009906
@@ -3135,10 +3132,8 @@
   mesh 2  members 3 6  alpha_w 20.104080  eps 1.548221 / 0.000000 / 1.548221  efficiency 98.107354 / 98.107354 %  play 0.069611 / 0.092815 deg  shares a factor
     power through, by case: 0.441461 / 0.395696 / 0.441461
   mesh 3  members 6 4  alpha_w 20.104080  eps 1.757409 / 0.000000 / 1.757409  efficiency 99.124183 / 99.124183 %  play 0.093476 / 0.028043 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 10.573803 / 25.130432 / 10.573803
   mesh 4  members 7 5  alpha_w 20.104080  eps 1.742869 / 0.000000 / 1.742869  efficiency 99.066170 / 99.066170 %  play 0.098975 / 0.028518 deg  coprime
-    ! mesh.flank_interference
     power through, by case: 10.236286 / 24.514639 / 10.236286
   distance 2  running 21.013928  clearance 0.020000
 
@@ -3263,6 +3258,7 @@
     case 2  T 0.049192  n 0.0000  vs frame 0.0000  sF 1.596  sH 113.738  cycles -  widths 0.011689 / 0.021889
     case 3  T 12.127327  n -86.6667  vs frame -106.6667  sF 397.381  sH 1794.934  cycles 6.400000e6 / 6.400000e6  widths 5.298419 / 45.048963
   member 6  z 96  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 96.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 63.315373  n 0.0000  vs frame -25.0000  sF 260.153  sH 1108.471  cycles -  widths 1.905886 / 2.079061
     case 2  T 0.262356  n 0.0000  vs frame 0.0000  sF 1.078  sH 71.354  cycles -  widths 0.007897 / 0.008615
@@ -3270,7 +3266,6 @@
   mesh 2  members 3 4  alpha_w 20.149246  eps 1.546097 / 0.000000 / 1.546097  efficiency 98.110213 / 98.110213 %  play 0.069762 / 0.093016 deg  shares a factor
     power through, by case: 0.824061 / 1.271143 / 0.824061
   mesh 3  members 5 6  alpha_w 19.919074  eps 1.755255 / 0.000000 / 1.755255  efficiency 98.989239 / 98.989239 %  play 0.092505 / 0.017345 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 0.791442 / 1.311780 / 0.791442
   mesh 4  members 4 5  alpha_w 20.173990  eps 1.510040 / 0.000000 / 1.510040  efficiency 97.891587 / 97.891587 %  play 0.093071 / 0.093071 deg  shares a factor
     power through, by case: 0.808488 / 1.298521 / 0.808488
@@ -3619,13 +3614,13 @@
     case 2  T 0.071701  n 0.0000  vs frame 0.0000  sF 1.449  sH 103.815  cycles -  widths 0.010613 / 0.018236
     case 3  T 3.551939  n 189.7674  vs frame 325.3156  sF 72.135  sH 732.558  cycles 1.951894e7 / 1.951894e7  widths 0.961802 / 7.503648
   member 5  z 72  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 72.000000
+    ! gear.addendum_held_to_mate_flank
     case 1  T 8.340391  n 0.0000  vs frame 169.4352  sF 40.555  sH 328.964  cycles -  widths 0.297107 / 0.183111
     case 2  T 0.172083  n 0.0000  vs frame 0.0000  sF 0.837  sH 47.252  cycles -  widths 0.006130 / 0.003778
     case 3  T 8.340391  n 0.0000  vs frame 135.5482  sF 40.555  sH 328.964  cycles 2.439867e7 / 2.439867e7  widths 0.540735 / 1.513156
   mesh 2  members 3 4  alpha_w 21.054925  eps 1.436891 / 0.000000 / 1.436891  efficiency 97.838469 / 97.838469 %  play 0.145568 / 0.058227 deg  shares a factor
     power through, by case: 0.722188 / 0.856014 / 0.722188
   mesh 3  members 4 5  alpha_w 21.054925  eps 1.861462 / 0.000000 / 1.861462  efficiency 99.488565 / 99.488565 %  play 0.058600 / 0.024417 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 0.706578 / 0.860415 / 0.706578
   distance 2  running 21.145279  clearance 0.020000
 
@@ -3677,21 +3672,20 @@
     case 2  T 0.060064  n 0.0000  vs frame 0.0000  sF 1.744  sH 85.966  cycles -  widths 0.012775 / 0.012505
     case 3  T 12.499352  n 2213.9535  vs frame 3162.7907  sF 362.880  sH 1234.664  cycles 1.897674e8 / 1.897674e8  widths 4.838400 / 21.315009
   member 4  z 60  m 1  alpha 20  x 0.028069  b 10.000000  beta 0.000000  d 60.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 41.298590  n 0.0000  vs frame 1186.0465  sF 259.977  sH 1047.080  cycles -  widths 1.904590 / 1.855147
     case 2  T 0.200212  n 0.0000  vs frame 0.0000  sF 1.260  sH 72.905  cycles -  widths 0.009233 / 0.008994
     case 3  T 41.298590  n 0.0000  vs frame 948.8372  sF 259.977  sH 1047.080  cycles 1.707907e8 / 1.707907e8  widths 3.466354 / 15.330203
   member 5  z 61  m 1  alpha 20  x -0.429445  b 10.000000  beta 0.000000  d 61.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
-    ! clamp.ring_flank_ungenerated
     case 1  T 42.358914  n -19.4434  vs frame 1166.6031  sF 296.025  sH 1194.590  cycles -  widths 2.168679 / 2.414661
     case 2  T 0.201772  n 0.0000  vs frame 0.0000  sF 1.410  sH 82.447  cycles -  widths 0.010330 / 0.011502
     case 3  T 42.358914  n -15.5547  vs frame 933.2825  sF 296.025  sH 1194.590  cycles 1.679909e8 / 1.679909e8  widths 3.946996 / 19.953802
   mesh 2  members 3 4  alpha_w 20.059335  eps 1.755255 / 0.000000 / 1.755255  efficiency 99.127208 / 99.127208 %  play 0.093279 / 0.027984 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 24.491024 / 56.717150 / 24.491024
   mesh 3  members 3 5  alpha_w 15.907986  eps 1.755255 / 0.000000 / 1.755255  efficiency 99.121756 / 99.121756 %  play 0.074710 / 0.022046 deg  coprime
-    ! mesh.flank_interference
     power through, by case: 24.708021 / 56.222127 / 24.708021
   distance 2  running 21.007930  clearance 0.020000
 
@@ -3745,11 +3739,13 @@
     case 2  T 0.001252  n 0.0000  vs frame 0.0000  sF 0.028  sH 14.395  cycles -  widths 0.000206 / 0.000351
     case 3  T 1.420776  n -948.8372  vs frame -677.7409  sF 31.912  sH 484.941  cycles 1.219934e8 / 1.219934e8  widths 0.425492 / 3.288262
   member 4  z 60  m 1  alpha 20  x 0.028069  b 10.000000  beta 0.000000  d 60.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 85.075378  n 0.0000  vs frame 338.8704  sF 534.490  sH 1503.149  cycles -  widths 3.915679 / 3.823158
     case 2  T 0.198772  n 0.0000  vs frame 0.0000  sF 1.249  sH 72.657  cycles -  widths 0.009149 / 0.008933
     case 3  T 85.075378  n 0.0000  vs frame 271.0963  sF 534.490  sH 1503.149  cycles 4.879734e7 / 4.879734e7  widths 7.126535 / 31.593061
   member 5  z 59  m 1  alpha 20  x 0.037256  b 10.000000  beta 0.000000  d 59.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 85.751048  n -13.4017  vs frame 325.4688  sF 551.485  sH 1576.948  cycles -  widths 4.040186 / 4.207779
     case 2  T 0.201885  n 0.0000  vs frame 0.0000  sF 1.298  sH 76.516  cycles -  widths 0.009512 / 0.009906
@@ -3768,10 +3764,8 @@
   mesh 2  members 3 6  alpha_w 20.104080  eps 1.548221 / 0.000000 / 1.548221  efficiency 98.107354 / 98.107354 %  play 0.069611 / 0.092815 deg  shares a factor
     power through, by case: 0.601824 / 0.395696 / 0.601824
   mesh 3  members 6 4  alpha_w 20.104080  eps 1.757409 / 0.000000 / 1.757409  efficiency 99.124183 / 99.124183 %  play 0.093476 / 0.028043 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 14.414765 / 25.130432 / 14.414765
   mesh 4  members 7 5  alpha_w 20.104080  eps 1.742869 / 0.000000 / 1.742869  efficiency 99.066170 / 99.066170 %  play 0.098975 / 0.028518 deg  coprime
-    ! mesh.flank_interference
     power through, by case: 13.954644 / 24.514639 / 13.954644
   distance 2  running 21.013928  clearance 0.020000
 
@@ -3887,13 +3881,13 @@
     case 2  T 0.049192  n 0.0000  vs frame 0.0000  sF 1.596  sH 113.738  cycles -  widths 0.011689 / 0.021889
     case 3  T 1.045444  n -1370.5426  vs frame -1686.8217  sF 34.257  sH 527.007  cycles 1.012093e8 / 1.012093e8  widths 0.456754 / 3.883477
   member 6  z 96  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 96.000000
+    ! gear.addendum_held_to_mate_flank
     case 1  T 5.458145  n 0.0000  vs frame -395.3488  sF 22.427  sH 325.456  cycles -  widths 0.164298 / 0.179227
     case 2  T 0.262356  n 0.0000  vs frame 0.0000  sF 1.078  sH 71.354  cycles -  widths 0.007897 / 0.008615
     case 3  T 5.458145  n 0.0000  vs frame -316.2791  sF 22.427  sH 325.456  cycles 5.693023e7 / 5.693023e7  widths 0.299023 / 1.481060
   mesh 2  members 3 4  alpha_w 20.149246  eps 1.546097 / 0.000000 / 1.546097  efficiency 98.110213 / 98.110213 %  play 0.069762 / 0.093016 deg  shares a factor
     power through, by case: 1.123404 / 1.271143 / 1.123404
   mesh 3  members 5 6  alpha_w 19.919074  eps 1.755255 / 0.000000 / 1.755255  efficiency 98.989239 / 98.989239 %  play 0.092505 / 0.017345 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 1.078936 / 1.311780 / 1.078936
   mesh 4  members 4 5  alpha_w 20.173990  eps 1.510040 / 0.000000 / 1.510040  efficiency 97.891587 / 97.891587 %  play 0.093071 / 0.093071 deg  shares a factor
     power through, by case: 1.102174 / 1.298521 / 1.102174
@@ -3939,13 +3933,13 @@
     case 2  T 0.027878  n 0.0000  vs frame 0.0000  sF 0.563  sH 64.733  cycles -  widths 0.004126 / 0.007090
     case 3  T 1.666667  n -480.0000  vs frame -822.8571  sF 33.848  sH 501.804  cycles 4.937143e7 / 4.937143e7  widths 0.451304 / 3.520916
   member 3  z 72  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 72.000000
+    ! gear.addendum_held_to_mate_flank
     case 1  T 3.913539  n 0.0000  vs frame -428.5714  sF 19.030  sH 225.341  cycles -  widths 0.139411 / 0.085921
     case 2  T 0.066907  n 0.0000  vs frame 0.0000  sF 0.325  sH 29.464  cycles -  widths 0.002383 / 0.001469
     case 3  T 3.913539  n 0.0000  vs frame -342.8571  sF 19.030  sH 225.341  cycles 6.171429e7 / 6.171429e7  widths 0.253728 / 0.710014
   mesh 1  members 1 2  alpha_w 21.054925  eps 1.436891 / 0.000000 / 1.436891  efficiency 97.838469 / 97.838469 %  play 0.145568 / 0.058227 deg  shares a factor
     power through, by case: 0.857143 / 0.841847 / 0.857143
   mesh 2  members 2 3  alpha_w 21.054925  eps 1.861462 / 0.000000 / 1.861462  efficiency 99.488565 / 99.488565 %  play 0.058600 / 0.024417 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 0.838615 / 0.846175 / 0.838615
   distance 1  running 21.145279  clearance 0.020000
   member 4  z 17  m 1  alpha 20  x 0.005657  b 10.000000  beta 0.000000  d 17.000000
@@ -4003,13 +3997,13 @@
     case 2  T 0.027439  n 0.0000  vs frame 0.0000  sF 0.554  sH 64.221  cycles -  widths 0.004062 / 0.006979
     case 3  T 1.666667  n -480.0000  vs frame -822.8571  sF 33.848  sH 501.804  cycles 4.937143e7 / 4.937143e7  widths 0.451304 / 3.520916
   member 3  z 72  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 72.000000
+    ! gear.addendum_held_to_mate_flank
     case 1  T 3.913539  n 0.0000  vs frame -428.5714  sF 19.030  sH 225.341  cycles -  widths 0.139411 / 0.085921
     case 2  T 0.065854  n 0.0000  vs frame 0.0000  sF 0.320  sH 29.231  cycles -  widths 0.002346 / 0.001446
     case 3  T 3.913539  n 0.0000  vs frame -342.8571  sF 19.030  sH 225.341  cycles 6.171429e7 / 6.171429e7  widths 0.253728 / 0.710014
   mesh 1  members 1 2  alpha_w 21.054925  eps 1.436891 / 0.000000 / 1.436891  efficiency 97.838469 / 97.838469 %  play 0.145568 / 0.058227 deg  shares a factor
     power through, by case: 0.857143 / 0.828595 / 0.857143
   mesh 2  members 2 3  alpha_w 21.054925  eps 1.861462 / 0.000000 / 1.861462  efficiency 99.488565 / 99.488565 %  play 0.058600 / 0.024417 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 0.838615 / 0.832854 / 0.838615
   distance 1  running 21.145279  clearance 0.020000
   member 4  z 17  m 1  alpha 20  x 0.005657  b 10.000000  beta 0.000000  d 17.000000
@@ -4078,13 +4072,13 @@
     case 2  T 0.029393  n 0.0000  vs frame 0.0000  sF 0.594  sH 66.468  cycles -  widths 0.004351 / 0.007476
     case 3  T 1.666667  n -480.0000  vs frame -822.8571  sF 33.848  sH 501.804  cycles 4.937143e7 / 4.937143e7  widths 0.451304 / 3.520916
   member 3  z 72  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 72.000000
+    ! gear.addendum_held_to_mate_flank
     case 1  T 3.913539  n 0.0000  vs frame -428.5714  sF 19.030  sH 225.341  cycles -  widths 0.139411 / 0.085921
     case 2  T 0.070542  n 0.0000  vs frame 0.0000  sF 0.343  sH 30.254  cycles -  widths 0.002513 / 0.001549
     case 3  T 3.913539  n 0.0000  vs frame -342.8571  sF 19.030  sH 225.341  cycles 6.171429e7 / 6.171429e7  widths 0.253728 / 0.710014
   mesh 1  members 1 2  alpha_w 21.054925  eps 1.436891 / 0.000000 / 1.436891  efficiency 97.838469 / 97.838469 %  play 0.145568 / 0.058227 deg  shares a factor
     power through, by case: 0.857143 / 0.830324 / 0.857143
   mesh 2  members 2 3  alpha_w 21.054925  eps 1.861462 / 0.000000 / 1.861462  efficiency 99.488565 / 99.488565 %  play 0.058600 / 0.024417 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 0.838615 / 0.834593 / 0.838615
   distance 1  running 21.145279  clearance 0.020000
   member 4  z 17  m 1  alpha 20  x 0.005657  b 10.000000  beta 0.000000  d 17.000000
@@ -4161,13 +4155,13 @@
     case 2  T 0.000000  n 0.0000  vs frame 0.0000  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
     case 3  T 1.666667  n -480.0000  vs frame -822.8571  sF 33.848  sH 501.804  cycles 4.937143e7 / 4.937143e7  widths 0.451304 / 3.520916
   member 3  z 72  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 72.000000
+    ! gear.addendum_held_to_mate_flank
     case 1  T 3.913539  n 0.0000  vs frame -428.5714  sF 19.030  sH 225.341  cycles -  widths 0.139411 / 0.085921
     case 2  T 0.000000  n 0.0000  vs frame 0.0000  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
     case 3  T 3.913539  n 0.0000  vs frame -342.8571  sF 19.030  sH 225.341  cycles 6.171429e7 / 6.171429e7  widths 0.253728 / 0.710014
   mesh 1  members 1 2  alpha_w 21.054925  eps 1.436891 / 0.000000 / 1.436891  efficiency 97.838469 / 97.838469 %  play 0.145568 / 0.058227 deg  shares a factor
     power through, by case: 0.857143 / 0.000000 / 0.857143
   mesh 2  members 2 3  alpha_w 21.054925  eps 1.861462 / 0.000000 / 1.861462  efficiency 99.488565 / 99.488565 %  play 0.058600 / 0.024417 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 0.838615 / 0.000000 / 0.838615
   distance 1  running 21.145279  clearance 0.020000
   member 4  z 1  m 1  alpha 20  x 0.000000  b 13.538864  beta 81.786789  d 7.000000
@@ -4224,13 +4218,13 @@
     case 2  T 0.023883  n 0.0000  vs frame 0.0000  sF 0.483  sH 59.916  cycles -  widths 0.003535 / 0.006074
     case 3  T 1.666667  n -480.0000  vs frame -822.8571  sF 33.848  sH 501.804  cycles 4.937143e7 / 4.937143e7  widths 0.451304 / 3.520916
   member 3  z 72  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 72.000000
+    ! gear.addendum_held_to_mate_flank
     case 1  T 3.913539  n 0.0000  vs frame -428.5714  sF 19.030  sH 225.341  cycles -  widths 0.139411 / 0.085921
     case 2  T 0.057320  n 0.0000  vs frame 0.0000  sF 0.279  sH 27.271  cycles -  widths 0.002042 / 0.001258
     case 3  T 3.913539  n 0.0000  vs frame -342.8571  sF 19.030  sH 225.341  cycles 6.171429e7 / 6.171429e7  widths 0.253728 / 0.710014
   mesh 1  members 1 2  alpha_w 21.054925  eps 1.436891 / 0.000000 / 1.436891  efficiency 97.838469 / 97.838469 %  play 0.145568 / 0.058227 deg  shares a factor
     power through, by case: 0.857143 / 0.721223 / 0.857143
   mesh 2  members 2 3  alpha_w 21.054925  eps 1.861462 / 0.000000 / 1.861462  efficiency 99.488565 / 99.488565 %  play 0.058600 / 0.024417 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 0.838615 / 0.724930 / 0.838615
   distance 1  running 21.145279  clearance 0.020000
   member 4  z 17  m 1  alpha 20  x 0.000000  b 10.000000  beta 45.000000  d 24.041631
@@ -4291,13 +4285,13 @@
     case 2  T 0.010008  n 0.0000  vs frame 0.0000  sF 0.202  sH 38.786  cycles -  widths 0.001481 / 0.002546
     case 3  T 1.666667  n -480.0000  vs frame -822.8571  sF 33.848  sH 501.804  cycles 4.937143e7 / 4.937143e7  widths 0.451304 / 3.520916
   member 3  z 72  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 72.000000
+    ! gear.addendum_held_to_mate_flank
     case 1  T 3.913539  n 0.0000  vs frame -428.5714  sF 19.030  sH 225.341  cycles -  widths 0.139411 / 0.085921
     case 2  T 0.024020  n 0.0000  vs frame 0.0000  sF 0.117  sH 17.654  cycles -  widths 0.000856 / 0.000527
     case 3  T 3.913539  n 0.0000  vs frame -342.8571  sF 19.030  sH 225.341  cycles 6.171429e7 / 6.171429e7  widths 0.253728 / 0.710014
   mesh 1  members 1 2  alpha_w 21.054925  eps 1.436891 / 0.000000 / 1.436891  efficiency 97.838469 / 97.838469 %  play 0.145568 / 0.058227 deg  shares a factor
     power through, by case: 0.857143 / 0.836409 / 0.857143
   mesh 2  members 2 3  alpha_w 21.054925  eps 1.861462 / 0.000000 / 1.861462  efficiency 99.488565 / 99.488565 %  play 0.058600 / 0.024417 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 0.838615 / 0.840708 / 0.838615
   distance 1  running 21.145279  clearance 0.020000
   member 4  z 12  m 1  alpha 20  x 0.298101  b 10.000000  beta 0.000000  d 12.000000
@@ -4311,13 +4305,13 @@
     case 2  T 0.071701  n 0.0000  vs frame 0.0000  sF 1.449  sH 103.815  cycles -  widths 0.010613 / 0.018236
     case 3  T 11.400475  n -68.5714  vs frame -117.5510  sF 231.529  sH 1312.415  cycles 7.053062e6 / 7.053062e6  widths 3.087047 / 24.084073
   member 6  z 72  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 72.000000
+    ! gear.addendum_held_to_mate_flank
     case 1  T 26.769722  n 0.0000  vs frame -61.2245  sF 130.168  sH 589.355  cycles -  widths 0.953610 / 0.587722
     case 2  T 0.172083  n 0.0000  vs frame 0.0000  sF 0.837  sH 47.252  cycles -  widths 0.006130 / 0.003778
     case 3  T 26.769722  n 0.0000  vs frame -48.9796  sF 130.168  sH 589.355  cycles 8.816327e6 / 8.816327e6  widths 1.735570 / 4.856699
   mesh 3  members 4 5  alpha_w 21.054925  eps 1.436891 / 0.000000 / 1.436891  efficiency 97.838469 / 97.838469 %  play 0.145568 / 0.058227 deg  shares a factor
     power through, by case: 0.837586 / 0.856014 / 0.837586
   mesh 4  members 5 6  alpha_w 21.054925  eps 1.861462 / 0.000000 / 1.861462  efficiency 99.488565 / 99.488565 %  play 0.058600 / 0.024417 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 0.819481 / 0.860415 / 0.819481
   distance 2  running 21.145279  clearance 0.020000
 
@@ -4365,13 +4359,13 @@
     case 2  T 0.000077  n 0.0000  vs frame 0.0000  sF 0.002  sH 3.419  cycles -  widths 0.000012 / 0.000020
     case 3  T 1.666667  n -480.0000  vs frame -822.8571  sF 33.848  sH 501.804  cycles 4.937143e7 / 4.937143e7  widths 0.451304 / 3.520916
   member 3  z 72  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 72.000000
+    ! gear.addendum_held_to_mate_flank
     case 1  T 3.913539  n 0.0000  vs frame -428.5714  sF 19.030  sH 225.341  cycles -  widths 0.139411 / 0.085921
     case 2  T 0.000182  n 0.0000  vs frame 0.0000  sF 0.001  sH 1.536  cycles -  widths 0.000006 / 0.000004
     case 3  T 3.913539  n 0.0000  vs frame -342.8571  sF 19.030  sH 225.341  cycles 6.171429e7 / 6.171429e7  widths 0.253728 / 0.710014
   mesh 1  members 1 2  alpha_w 21.054925  eps 1.436891 / 0.000000 / 1.436891  efficiency 97.838469 / 97.838469 %  play 0.145568 / 0.058227 deg  shares a factor
     power through, by case: 0.857143 / 0.053137 / 0.857143
   mesh 2  members 2 3  alpha_w 21.054925  eps 1.861462 / 0.000000 / 1.861462  efficiency 99.488565 / 99.488565 %  play 0.058600 / 0.024417 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 0.838615 / 0.051989 / 0.838615
   distance 1  running 21.145279  clearance 0.020000
   member 4  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
@@ -4380,21 +4374,20 @@
     case 2  T 0.060064  n 0.0000  vs frame 0.0000  sF 1.744  sH 85.966  cycles -  widths 0.012775 / 0.012505
     case 3  T 40.118525  n -800.0000  vs frame -1142.8571  sF 1164.717  sH 2211.961  cycles 6.857143e7 / 6.857143e7  widths 15.529562 / 68.413685
   member 5  z 60  m 1  alpha 20  x 0.028069  b 10.000000  beta 0.000000  d 60.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 132.553953  n 0.0000  vs frame -428.5714  sF 834.433  sH 1875.896  cycles -  widths 6.113064 / 5.954371
     case 2  T 0.200212  n 0.0000  vs frame 0.0000  sF 1.260  sH 72.905  cycles -  widths 0.009233 / 0.008994
     case 3  T 132.553953  n 0.0000  vs frame -342.8571  sF 834.433  sH 1875.896  cycles 6.171429e7 / 6.171429e7  widths 11.125777 / 49.204561
   member 6  z 61  m 1  alpha 20  x -0.429445  b 10.000000  beta 0.000000  d 61.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
-    ! clamp.ring_flank_ungenerated
     case 1  T 135.957222  n 7.0258  vs frame -421.5457  sF 950.135  sH 2140.167  cycles -  widths 6.960697 / 7.750213
     case 2  T 0.201772  n 0.0000  vs frame 0.0000  sF 1.410  sH 82.447  cycles -  widths 0.010330 / 0.011502
     case 3  T 135.957222  n 5.6206  vs frame -337.2365  sF 950.135  sH 2140.167  cycles 6.070258e7 / 6.070258e7  widths 12.668469 / 64.044689
   mesh 3  members 4 5  alpha_w 20.059335  eps 1.755255 / 0.000000 / 1.755255  efficiency 99.127208 / 99.127208 %  play 0.093279 / 0.027984 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 28.404418 / 57.278982 / 28.404418
   mesh 4  members 4 6  alpha_w 15.907986  eps 1.755255 / 0.000000 / 1.755255  efficiency 99.121756 / 99.121756 %  play 0.074710 / 0.022046 deg  coprime
-    ! mesh.flank_interference
     power through, by case: 28.656089 / 56.779055 / 28.656089
   distance 2  running 21.007930  clearance 0.020000
 
@@ -4445,13 +4438,13 @@
     case 2  T 0.000440  n 0.0000  vs frame 0.0000  sF 0.009  sH 8.135  cycles -  widths 0.000065 / 0.000112
     case 3  T 1.666667  n -480.0000  vs frame -822.8571  sF 33.848  sH 501.804  cycles 4.937143e7 / 4.937143e7  widths 0.451304 / 3.520916
   member 3  z 72  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 72.000000
+    ! gear.addendum_held_to_mate_flank
     case 1  T 3.913539  n 0.0000  vs frame -428.5714  sF 19.030  sH 225.341  cycles -  widths 0.139411 / 0.085921
     case 2  T 0.001057  n 0.0000  vs frame 0.0000  sF 0.005  sH 3.703  cycles -  widths 0.000038 / 0.000023
     case 3  T 3.913539  n 0.0000  vs frame -342.8571  sF 19.030  sH 225.341  cycles 6.171429e7 / 6.171429e7  widths 0.253728 / 0.710014
   mesh 1  members 1 2  alpha_w 21.054925  eps 1.436891 / 0.000000 / 1.436891  efficiency 97.838469 / 97.838469 %  play 0.145568 / 0.058227 deg  shares a factor
     power through, by case: 0.857143 / 0.465235 / 0.857143
   mesh 2  members 2 3  alpha_w 21.054925  eps 1.861462 / 0.000000 / 1.861462  efficiency 99.488565 / 99.488565 %  play 0.058600 / 0.024417 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 0.838615 / 0.467626 / 0.838615
   distance 1  running 21.145279  clearance 0.020000
   member 4  z 24  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 24.000000
@@ -4460,11 +4453,13 @@
     case 2  T 0.001252  n 0.0000  vs frame 0.0000  sF 0.028  sH 14.395  cycles -  widths 0.000206 / 0.000351
     case 3  T 4.560190  n 342.8571  vs frame 244.8980  sF 102.426  sH 868.796  cycles 4.408163e7 / 4.408163e7  widths 1.365679 / 10.554166
   member 5  z 60  m 1  alpha 20  x 0.028069  b 10.000000  beta 0.000000  d 60.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 273.062049  n 0.0000  vs frame -122.4490  sF 1715.525  sH 2692.965  cycles -  widths 12.567952 / 12.270992
     case 2  T 0.198772  n 0.0000  vs frame 0.0000  sF 1.249  sH 72.657  cycles -  widths 0.009149 / 0.008933
     case 3  T 273.062049  n 0.0000  vs frame -97.9592  sF 1715.525  sH 2692.965  cycles 1.763265e7 / 1.763265e7  widths 22.873673 / 101.402619
   member 6  z 59  m 1  alpha 20  x 0.037256  b 10.000000  beta 0.000000  d 59.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 275.230716  n 4.8426  vs frame -117.6064  sF 1770.074  sH 2825.179  cycles -  widths 12.967577 / 13.505492
     case 2  T 0.201885  n 0.0000  vs frame 0.0000  sF 1.298  sH 76.516  cycles -  widths 0.009512 / 0.009906
@@ -4483,10 +4478,8 @@
   mesh 3  members 4 7  alpha_w 20.104080  eps 1.548221 / 0.000000 / 1.548221  efficiency 98.107354 / 98.107354 %  play 0.069611 / 0.092815 deg  shares a factor
     power through, by case: 0.697988 / 0.395696 / 0.697988
   mesh 4  members 7 5  alpha_w 20.104080  eps 1.757409 / 0.000000 / 1.757409  efficiency 99.124183 / 99.124183 %  play 0.093476 / 0.028043 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 16.718085 / 25.130432 / 16.718085
   mesh 5  members 8 6  alpha_w 20.104080  eps 1.742869 / 0.000000 / 1.742869  efficiency 99.066170 / 99.066170 %  play 0.098975 / 0.028518 deg  coprime
-    ! mesh.flank_interference
     power through, by case: 16.184442 / 24.514639 / 16.184442
   distance 2  running 21.013928  clearance 0.020000
 
@@ -4534,13 +4527,13 @@
     case 2  T 0.006961  n 0.0000  vs frame 0.0000  sF 0.141  sH 32.346  cycles -  widths 0.001030 / 0.001770
     case 3  T 1.666667  n -480.0000  vs frame -822.8571  sF 33.848  sH 501.804  cycles 4.937143e7 / 4.937143e7  widths 0.451304 / 3.520916
   member 3  z 72  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 72.000000
+    ! gear.addendum_held_to_mate_flank
     case 1  T 3.913539  n 0.0000  vs frame -428.5714  sF 19.030  sH 225.341  cycles -  widths 0.139411 / 0.085921
     case 2  T 0.016706  n 0.0000  vs frame 0.0000  sF 0.081  sH 14.723  cycles -  widths 0.000595 / 0.000367
     case 3  T 3.913539  n 0.0000  vs frame -342.8571  sF 19.030  sH 225.341  cycles 6.171429e7 / 6.171429e7  widths 0.253728 / 0.710014
   mesh 1  members 1 2  alpha_w 21.054925  eps 1.436891 / 0.000000 / 1.436891  efficiency 97.838469 / 97.838469 %  play 0.145568 / 0.058227 deg  shares a factor
     power through, by case: 0.857143 / 0.831023 / 0.857143
   mesh 2  members 2 3  alpha_w 21.054925  eps 1.861462 / 0.000000 / 1.861462  efficiency 99.488565 / 99.488565 %  play 0.058600 / 0.024417 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 0.838615 / 0.835295 / 0.838615
   distance 1  running 21.145279  clearance 0.020000
   member 4  z 30  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 30.000000
@@ -4604,13 +4597,13 @@
     case 2  T 0.022355  n 0.0000  vs frame 0.0000  sF 0.452  sH 57.967  cycles -  widths 0.003309 / 0.005686
     case 3  T 1.666667  n -480.0000  vs frame -822.8571  sF 33.848  sH 501.804  cycles 4.937143e7 / 4.937143e7  widths 0.451304 / 3.520916
   member 3  z 72  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 72.000000
+    ! gear.addendum_held_to_mate_flank
     case 1  T 3.913539  n 0.0000  vs frame -428.5714  sF 19.030  sH 225.341  cycles -  widths 0.139411 / 0.085921
     case 2  T 0.053652  n 0.0000  vs frame 0.0000  sF 0.261  sH 26.384  cycles -  widths 0.001911 / 0.001178
     case 3  T 3.913539  n 0.0000  vs frame -342.8571  sF 19.030  sH 225.341  cycles 6.171429e7 / 6.171429e7  widths 0.253728 / 0.710014
   mesh 1  members 1 2  alpha_w 21.054925  eps 1.436891 / 0.000000 / 1.436891  efficiency 97.838469 / 97.838469 %  play 0.145568 / 0.058227 deg  shares a factor
     power through, by case: 0.857143 / 0.800665 / 0.857143
   mesh 2  members 2 3  alpha_w 21.054925  eps 1.861462 / 0.000000 / 1.861462  efficiency 99.488565 / 99.488565 %  play 0.058600 / 0.024417 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 0.838615 / 0.804781 / 0.838615
   distance 1  running 21.145279  clearance 0.020000
   member 4  z 24  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 24.000000
@@ -4629,13 +4622,13 @@
     case 2  T 0.049192  n 0.0000  vs frame 0.0000  sF 1.596  sH 113.738  cycles -  widths 0.011689 / 0.021889
     case 3  T 3.355509  n 495.2381  vs frame 609.5238  sF 109.951  sH 944.159  cycles 3.657143e7 / 3.657143e7  widths 1.466019 / 12.464595
   member 7  z 96  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 96.000000
+    ! gear.addendum_held_to_mate_flank
     case 1  T 17.518727  n 0.0000  vs frame 142.8571  sF 71.982  sH 583.071  cycles -  widths 0.527339 / 0.575255
     case 2  T 0.262356  n 0.0000  vs frame 0.0000  sF 1.078  sH 71.354  cycles -  widths 0.007897 / 0.008615
     case 3  T 17.518727  n 0.0000  vs frame 114.2857  sF 71.982  sH 583.071  cycles 2.057143e7 / 2.057143e7  widths 0.959758 / 4.753681
   mesh 3  members 4 5  alpha_w 20.149246  eps 1.546097 / 0.000000 / 1.546097  efficiency 98.110213 / 98.110213 %  play 0.069762 / 0.093016 deg  shares a factor
     power through, by case: 1.302911 / 1.271143 / 1.302911
   mesh 4  members 6 7  alpha_w 19.919074  eps 1.755255 / 0.000000 / 1.755255  efficiency 98.989239 / 98.989239 %  play 0.092505 / 0.017345 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 1.251338 / 1.311780 / 1.251338
   mesh 5  members 5 6  alpha_w 20.173990  eps 1.510040 / 0.000000 / 1.510040  efficiency 97.891587 / 97.891587 %  play 0.093071 / 0.093071 deg  shares a factor
     power through, by case: 1.278289 / 1.298521 / 1.278289
@@ -4678,19 +4671,18 @@
     case 2  T 0.023353  n 0.0000  vs frame 0.0000  sF 0.678  sH 53.603  cycles -  widths 0.004967 / 0.004862
     case 3  T 5.865037  n -5600.0000  vs frame -8000.0000  sF 170.273  sH 845.747  cycles 4.800000e8 / 4.800000e8  widths 2.270309 / 10.001584
   member 2  z 60  m 1  alpha 20  x 0.028069  b 10.000000  beta 0.000000  d 60.000000
+    ! gear.addendum_held_to_mate_flank
     case 1  T 19.378425  n 0.0000  vs frame -3000.0000  sF 121.988  sH 717.252  cycles -  widths 0.893686 / 0.870486
     case 2  T 0.077843  n 0.0000  vs frame 0.0000  sF 0.490  sH 45.459  cycles -  widths 0.003590 / 0.003497
     case 3  T 19.378425  n 0.0000  vs frame -2400.0000  sF 121.988  sH 717.252  cycles 4.320000e8 / 4.320000e8  widths 1.626508 / 7.193349
   member 3  z 61  m 1  alpha 20  x -0.429445  b 10.000000  beta 0.000000  d 61.000000
-    ! clamp.ring_flank_ungenerated
+    ! gear.addendum_held_to_mate_flank
     case 1  T 19.875958  n 49.1803  vs frame -2950.8197  sF 138.903  sH 818.296  cycles -  widths 1.017603 / 1.133025
     case 2  T 0.078450  n 0.0000  vs frame 0.0000  sF 0.548  sH 51.409  cycles -  widths 0.004016 / 0.004472
     case 3  T 19.875958  n 39.3443  vs frame -2360.6557  sF 138.903  sH 818.296  cycles 4.249180e8 / 4.249180e8  widths 1.852038 / 9.362868
   mesh 1  members 1 2  alpha_w 20.059335  eps 1.755255 / 0.000000 / 1.755255  efficiency 99.127208 / 99.127208 %  play 0.093279 / 0.027984 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 29.067637 / 56.467487 / 29.067637
   mesh 2  members 1 3  alpha_w 15.907986  eps 1.755255 / 0.000000 / 1.755255  efficiency 99.121756 / 99.121756 %  play 0.074710 / 0.022046 deg  coprime
-    ! mesh.flank_interference
     power through, by case: 29.325184 / 55.974643 / 29.325184
   distance 1  running 21.007930  clearance 0.020000
   member 4  z 17  m 1  alpha 20  x 0.005657  b 10.000000  beta 0.000000  d 17.000000
@@ -4745,19 +4737,18 @@
     case 2  T 0.022985  n 0.0000  vs frame 0.0000  sF 0.667  sH 53.180  cycles -  widths 0.004889 / 0.004785
     case 3  T 5.865037  n -5600.0000  vs frame -8000.0000  sF 170.273  sH 845.747  cycles 4.800000e8 / 4.800000e8  widths 2.270309 / 10.001584
   member 2  z 60  m 1  alpha 20  x 0.028069  b 10.000000  beta 0.000000  d 60.000000
+    ! gear.addendum_held_to_mate_flank
     case 1  T 19.378425  n 0.0000  vs frame -3000.0000  sF 121.988  sH 717.252  cycles -  widths 0.893686 / 0.870486
     case 2  T 0.076618  n 0.0000  vs frame 0.0000  sF 0.482  sH 45.100  cycles -  widths 0.003533 / 0.003442
     case 3  T 19.378425  n 0.0000  vs frame -2400.0000  sF 121.988  sH 717.252  cycles 4.320000e8 / 4.320000e8  widths 1.626508 / 7.193349
   member 3  z 61  m 1  alpha 20  x -0.429445  b 10.000000  beta 0.000000  d 61.000000
-    ! clamp.ring_flank_ungenerated
+    ! gear.addendum_held_to_mate_flank
     case 1  T 19.875958  n 49.1803  vs frame -2950.8197  sF 138.903  sH 818.296  cycles -  widths 1.017603 / 1.133025
     case 2  T 0.077215  n 0.0000  vs frame 0.0000  sF 0.540  sH 51.003  cycles -  widths 0.003953 / 0.004402
     case 3  T 19.875958  n 39.3443  vs frame -2360.6557  sF 138.903  sH 818.296  cycles 4.249180e8 / 4.249180e8  widths 1.852038 / 9.362868
   mesh 1  members 1 2  alpha_w 20.059335  eps 1.755255 / 0.000000 / 1.755255  efficiency 99.127208 / 99.127208 %  play 0.093279 / 0.027984 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 29.067637 / 55.630885 / 29.067637
   mesh 2  members 1 3  alpha_w 15.907986  eps 1.755255 / 0.000000 / 1.755255  efficiency 99.121756 / 99.121756 %  play 0.074710 / 0.022046 deg  coprime
-    ! mesh.flank_interference
     power through, by case: 29.325184 / 55.145343 / 29.325184
   distance 1  running 21.007930  clearance 0.020000
   member 4  z 17  m 1  alpha 20  x 0.005657  b 10.000000  beta 0.000000  d 17.000000
@@ -4823,19 +4814,18 @@
     case 2  T 0.024622  n 0.0000  vs frame 0.0000  sF 0.715  sH 55.040  cycles -  widths 0.005237 / 0.005126
     case 3  T 5.865037  n -5600.0000  vs frame -8000.0000  sF 170.273  sH 845.747  cycles 4.800000e8 / 4.800000e8  widths 2.270309 / 10.001584
   member 2  z 60  m 1  alpha 20  x 0.028069  b 10.000000  beta 0.000000  d 60.000000
+    ! gear.addendum_held_to_mate_flank
     case 1  T 19.378425  n 0.0000  vs frame -3000.0000  sF 121.988  sH 717.252  cycles -  widths 0.893686 / 0.870486
     case 2  T 0.082073  n 0.0000  vs frame 0.0000  sF 0.517  sH 46.678  cycles -  widths 0.003785 / 0.003687
     case 3  T 19.378425  n 0.0000  vs frame -2400.0000  sF 121.988  sH 717.252  cycles 4.320000e8 / 4.320000e8  widths 1.626508 / 7.193349
   member 3  z 61  m 1  alpha 20  x -0.429445  b 10.000000  beta 0.000000  d 61.000000
-    ! clamp.ring_flank_ungenerated
+    ! gear.addendum_held_to_mate_flank
     case 1  T 19.875958  n 49.1803  vs frame -2950.8197  sF 138.903  sH 818.296  cycles -  widths 1.017603 / 1.133025
     case 2  T 0.082713  n 0.0000  vs frame 0.0000  sF 0.578  sH 52.788  cycles -  widths 0.004235 / 0.004715
     case 3  T 19.875958  n 39.3443  vs frame -2360.6557  sF 138.903  sH 818.296  cycles 4.249180e8 / 4.249180e8  widths 1.852038 / 9.362868
   mesh 1  members 1 2  alpha_w 20.059335  eps 1.755255 / 0.000000 / 1.755255  efficiency 99.127208 / 99.127208 %  play 0.093279 / 0.027984 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 29.067637 / 55.740139 / 29.067637
   mesh 2  members 1 3  alpha_w 15.907986  eps 1.755255 / 0.000000 / 1.755255  efficiency 99.121756 / 99.121756 %  play 0.074710 / 0.022046 deg  coprime
-    ! mesh.flank_interference
     power through, by case: 29.325184 / 55.253643 / 29.325184
   distance 1  running 21.007930  clearance 0.020000
   member 4  z 17  m 1  alpha 20  x 0.005657  b 10.000000  beta 0.000000  d 17.000000
@@ -4909,19 +4899,18 @@
     case 2  T 0.000000  n 0.0000  vs frame 0.0000  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
     case 3  T 5.865037  n -5600.0000  vs frame -8000.0000  sF 170.273  sH 845.747  cycles 4.800000e8 / 4.800000e8  widths 2.270309 / 10.001584
   member 2  z 60  m 1  alpha 20  x 0.028069  b 10.000000  beta 0.000000  d 60.000000
+    ! gear.addendum_held_to_mate_flank
     case 1  T 19.378425  n 0.0000  vs frame -3000.0000  sF 121.988  sH 717.252  cycles -  widths 0.893686 / 0.870486
     case 2  T 0.000000  n 0.0000  vs frame 0.0000  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
     case 3  T 19.378425  n 0.0000  vs frame -2400.0000  sF 121.988  sH 717.252  cycles 4.320000e8 / 4.320000e8  widths 1.626508 / 7.193349
   member 3  z 61  m 1  alpha 20  x -0.429445  b 10.000000  beta 0.000000  d 61.000000
-    ! clamp.ring_flank_ungenerated
+    ! gear.addendum_held_to_mate_flank
     case 1  T 19.875958  n 49.1803  vs frame -2950.8197  sF 138.903  sH 818.296  cycles -  widths 1.017603 / 1.133025
     case 2  T 0.000000  n 0.0000  vs frame 0.0000  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
     case 3  T 19.875958  n 39.3443  vs frame -2360.6557  sF 138.903  sH 818.296  cycles 4.249180e8 / 4.249180e8  widths 1.852038 / 9.362868
   mesh 1  members 1 2  alpha_w 20.059335  eps 1.755255 / 0.000000 / 1.755255  efficiency 99.127208 / 99.127208 %  play 0.093279 / 0.027984 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 29.067637 / 0.000000 / 29.067637
   mesh 2  members 1 3  alpha_w 15.907986  eps 1.755255 / 0.000000 / 1.755255  efficiency 99.121756 / 99.121756 %  play 0.074710 / 0.022046 deg  coprime
-    ! mesh.flank_interference
     power through, by case: 29.325184 / 0.000000 / 29.325184
   distance 1  running 21.007930  clearance 0.020000
   member 4  z 1  m 1  alpha 20  x 0.000000  b 13.538864  beta 81.786789  d 7.000000
@@ -4975,19 +4964,18 @@
     case 2  T 0.020007  n 0.0000  vs frame 0.0000  sF 0.581  sH 49.615  cycles -  widths 0.004255 / 0.004165
     case 3  T 5.865037  n -5600.0000  vs frame -8000.0000  sF 170.273  sH 845.747  cycles 4.800000e8 / 4.800000e8  widths 2.270309 / 10.001584
   member 2  z 60  m 1  alpha 20  x 0.028069  b 10.000000  beta 0.000000  d 60.000000
+    ! gear.addendum_held_to_mate_flank
     case 1  T 19.378425  n 0.0000  vs frame -3000.0000  sF 121.988  sH 717.252  cycles -  widths 0.893686 / 0.870486
     case 2  T 0.066690  n 0.0000  vs frame 0.0000  sF 0.420  sH 42.077  cycles -  widths 0.003076 / 0.002996
     case 3  T 19.378425  n 0.0000  vs frame -2400.0000  sF 121.988  sH 717.252  cycles 4.320000e8 / 4.320000e8  widths 1.626508 / 7.193349
   member 3  z 61  m 1  alpha 20  x -0.429445  b 10.000000  beta 0.000000  d 61.000000
-    ! clamp.ring_flank_ungenerated
+    ! gear.addendum_held_to_mate_flank
     case 1  T 19.875958  n 49.1803  vs frame -2950.8197  sF 138.903  sH 818.296  cycles -  widths 1.017603 / 1.133025
     case 2  T 0.067209  n 0.0000  vs frame 0.0000  sF 0.470  sH 47.584  cycles -  widths 0.003441 / 0.003831
     case 3  T 19.875958  n 39.3443  vs frame -2360.6557  sF 138.903  sH 818.296  cycles 4.249180e8 / 4.249180e8  widths 1.852038 / 9.362868
   mesh 1  members 1 2  alpha_w 20.059335  eps 1.755255 / 0.000000 / 1.755255  efficiency 99.127208 / 99.127208 %  play 0.093279 / 0.027984 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 29.067637 / 48.794065 / 29.067637
   mesh 2  members 1 3  alpha_w 15.907986  eps 1.755255 / 0.000000 / 1.755255  efficiency 99.121756 / 99.121756 %  play 0.074710 / 0.022046 deg  coprime
-    ! mesh.flank_interference
     power through, by case: 29.325184 / 48.368194 / 29.325184
   distance 1  running 21.007930  clearance 0.020000
   member 4  z 17  m 1  alpha 20  x 0.000000  b 10.000000  beta 45.000000  d 24.041631
@@ -5045,19 +5033,18 @@
     case 2  T 0.008384  n 0.0000  vs frame 0.0000  sF 0.243  sH 32.118  cycles -  widths 0.001783 / 0.001745
     case 3  T 5.865037  n -5600.0000  vs frame -8000.0000  sF 170.273  sH 845.747  cycles 4.800000e8 / 4.800000e8  widths 2.270309 / 10.001584
   member 2  z 60  m 1  alpha 20  x 0.028069  b 10.000000  beta 0.000000  d 60.000000
+    ! gear.addendum_held_to_mate_flank
     case 1  T 19.378425  n 0.0000  vs frame -3000.0000  sF 121.988  sH 717.252  cycles -  widths 0.893686 / 0.870486
     case 2  T 0.027947  n 0.0000  vs frame 0.0000  sF 0.176  sH 27.238  cycles -  widths 0.001289 / 0.001255
     case 3  T 19.378425  n 0.0000  vs frame -2400.0000  sF 121.988  sH 717.252  cycles 4.320000e8 / 4.320000e8  widths 1.626508 / 7.193349
   member 3  z 61  m 1  alpha 20  x -0.429445  b 10.000000  beta 0.000000  d 61.000000
-    ! clamp.ring_flank_ungenerated
+    ! gear.addendum_held_to_mate_flank
     case 1  T 19.875958  n 49.1803  vs frame -2950.8197  sF 138.903  sH 818.296  cycles -  widths 1.017603 / 1.133025
     case 2  T 0.028164  n 0.0000  vs frame 0.0000  sF 0.197  sH 30.803  cycles -  widths 0.001442 / 0.001606
     case 3  T 19.875958  n 39.3443  vs frame -2360.6557  sF 138.903  sH 818.296  cycles 4.249180e8 / 4.249180e8  widths 1.852038 / 9.362868
   mesh 1  members 1 2  alpha_w 20.059335  eps 1.755255 / 0.000000 / 1.755255  efficiency 99.127208 / 99.127208 %  play 0.093279 / 0.027984 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 29.067637 / 56.124351 / 29.067637
   mesh 2  members 1 3  alpha_w 15.907986  eps 1.755255 / 0.000000 / 1.755255  efficiency 99.121756 / 99.121756 %  play 0.074710 / 0.022046 deg  coprime
-    ! mesh.flank_interference
     power through, by case: 29.325184 / 55.634501 / 29.325184
   distance 1  running 21.007930  clearance 0.020000
   member 4  z 12  m 1  alpha 20  x 0.298101  b 10.000000  beta 0.000000  d 12.000000
@@ -5071,6 +5058,7 @@
     case 2  T 0.071701  n 0.0000  vs frame 0.0000  sF 1.449  sH 103.815  cycles -  widths 0.010613 / 0.018236
     case 3  T 49.689895  n -7.8689  vs frame -13.4895  sF 1009.136  sH 2739.956  cycles 8.093680e5 / 8.093680e5  widths 13.455146 / 104.972379
   member 6  z 72  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 72.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 116.677997  n 0.0000  vs frame -7.0258  sF 567.347  sH 1230.408  cycles -  widths 4.156387 / 2.561632
     case 2  T 0.172083  n 0.0000  vs frame 0.0000  sF 0.837  sH 47.252  cycles -  widths 0.006130 / 0.003778
@@ -5078,7 +5066,6 @@
   mesh 3  members 4 5  alpha_w 21.054925  eps 1.436891 / 0.000000 / 1.436891  efficiency 97.838469 / 97.838469 %  play 0.145568 / 0.058227 deg  shares a factor
     power through, by case: 0.418931 / 0.805203 / 0.418931
   mesh 4  members 5 6  alpha_w 21.054925  eps 1.861462 / 0.000000 / 1.861462  efficiency 99.488565 / 99.488565 %  play 0.058600 / 0.024417 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 0.409876 / 0.809342 / 0.409876
   distance 2  running 21.145279  clearance 0.020000
 
@@ -5123,19 +5110,18 @@
     case 2  T 0.000062  n 0.0000  vs frame 0.0000  sF 0.002  sH 2.760  cycles -  widths 0.000013 / 0.000013
     case 3  T 5.865037  n -5600.0000  vs frame -8000.0000  sF 170.273  sH 845.747  cycles 4.800000e8 / 4.800000e8  widths 2.270309 / 10.001584
   member 2  z 60  m 1  alpha 20  x 0.028069  b 10.000000  beta 0.000000  d 60.000000
+    ! gear.addendum_held_to_mate_flank
     case 1  T 19.378425  n 0.0000  vs frame -3000.0000  sF 121.988  sH 717.252  cycles -  widths 0.893686 / 0.870486
     case 2  T 0.000206  n 0.0000  vs frame 0.0000  sF 0.001  sH 2.341  cycles -  widths 0.000010 / 0.000009
     case 3  T 19.378425  n 0.0000  vs frame -2400.0000  sF 121.988  sH 717.252  cycles 4.320000e8 / 4.320000e8  widths 1.626508 / 7.193349
   member 3  z 61  m 1  alpha 20  x -0.429445  b 10.000000  beta 0.000000  d 61.000000
-    ! clamp.ring_flank_ungenerated
+    ! gear.addendum_held_to_mate_flank
     case 1  T 19.875958  n 49.1803  vs frame -2950.8197  sF 138.903  sH 818.296  cycles -  widths 1.017603 / 1.133025
     case 2  T 0.000212  n 0.0000  vs frame 0.0000  sF 0.001  sH 2.671  cycles -  widths 0.000011 / 0.000012
     case 3  T 19.875958  n 39.3443  vs frame -2360.6557  sF 138.903  sH 818.296  cycles 4.249180e8 / 4.249180e8  widths 1.852038 / 9.362868
   mesh 1  members 1 2  alpha_w 20.059335  eps 1.755255 / 0.000000 / 1.755255  efficiency 99.127208 / 99.127208 %  play 0.093279 / 0.027984 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 29.067637 / 3.392632 / 29.067637
   mesh 2  members 1 3  alpha_w 15.907986  eps 1.755255 / 0.000000 / 1.755255  efficiency 99.121756 / 99.121756 %  play 0.074710 / 0.022046 deg  coprime
-    ! mesh.flank_interference
     power through, by case: 29.325184 / 3.422691 / 29.325184
   distance 1  running 21.007930  clearance 0.020000
   member 4  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
@@ -5144,21 +5130,20 @@
     case 2  T 0.060064  n 0.0000  vs frame 0.0000  sF 1.744  sH 85.966  cycles -  widths 0.012775 / 0.012505
     case 3  T 174.859834  n -91.8033  vs frame -131.1475  sF 5076.514  sH 4617.959  cycles 7.868853e6 / 7.868853e6  widths 67.686853 / 298.186580
   member 5  z 60  m 1  alpha 20  x 0.028069  b 10.000000  beta 0.000000  d 60.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 577.747124  n 0.0000  vs frame -49.1803  sF 3636.945  sH 3916.348  cycles -  widths 26.644284 / 25.952606
     case 2  T 0.200212  n 0.0000  vs frame 0.0000  sF 1.260  sH 72.905  cycles -  widths 0.009233 / 0.008994
     case 3  T 577.747124  n 0.0000  vs frame -39.3443  sF 3636.945  sH 3916.348  cycles 7.081968e6 / 7.081968e6  widths 48.492597 / 214.462057
   member 6  z 61  m 1  alpha 20  x -0.429445  b 10.000000  beta 0.000000  d 61.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
-    ! clamp.ring_flank_ungenerated
     case 1  T 592.580549  n 0.8062  vs frame -48.3741  sF 4141.241  sH 4468.072  cycles -  widths 30.338762 / 33.779930
     case 2  T 0.201772  n 0.0000  vs frame 0.0000  sF 1.410  sH 82.447  cycles -  widths 0.010330 / 0.011502
     case 3  T 592.580549  n 0.6450  vs frame -38.6993  sF 4141.241  sH 4468.072  cycles 6.965870e6 / 6.965870e6  widths 55.216547 / 279.143956
   mesh 3  members 4 5  alpha_w 20.059335  eps 1.755255 / 0.000000 / 1.755255  efficiency 99.127208 / 99.127208 %  play 0.093279 / 0.027984 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 14.206896 / 53.937425 / 14.206896
   mesh 4  members 4 6  alpha_w 15.907986  eps 1.755255 / 0.000000 / 1.755255  efficiency 99.121756 / 99.121756 %  play 0.074710 / 0.022046 deg  coprime
-    ! mesh.flank_interference
     power through, by case: 14.332773 / 53.466663 / 14.332773
   distance 2  running 21.007930  clearance 0.020000
 
@@ -5206,19 +5191,18 @@
     case 2  T 0.000369  n 0.0000  vs frame 0.0000  sF 0.011  sH 6.737  cycles -  widths 0.000078 / 0.000077
     case 3  T 5.865037  n -5600.0000  vs frame -8000.0000  sF 170.273  sH 845.747  cycles 4.800000e8 / 4.800000e8  widths 2.270309 / 10.001584
   member 2  z 60  m 1  alpha 20  x 0.028069  b 10.000000  beta 0.000000  d 60.000000
+    ! gear.addendum_held_to_mate_flank
     case 1  T 19.378425  n 0.0000  vs frame -3000.0000  sF 121.988  sH 717.252  cycles -  widths 0.893686 / 0.870486
     case 2  T 0.001230  n 0.0000  vs frame 0.0000  sF 0.008  sH 5.713  cycles -  widths 0.000057 / 0.000055
     case 3  T 19.378425  n 0.0000  vs frame -2400.0000  sF 121.988  sH 717.252  cycles 4.320000e8 / 4.320000e8  widths 1.626508 / 7.193349
   member 3  z 61  m 1  alpha 20  x -0.429445  b 10.000000  beta 0.000000  d 61.000000
-    ! clamp.ring_flank_ungenerated
+    ! gear.addendum_held_to_mate_flank
     case 1  T 19.875958  n 49.1803  vs frame -2950.8197  sF 138.903  sH 818.296  cycles -  widths 1.017603 / 1.133025
     case 2  T 0.001239  n 0.0000  vs frame 0.0000  sF 0.009  sH 6.461  cycles -  widths 0.000063 / 0.000071
     case 3  T 19.875958  n 39.3443  vs frame -2360.6557  sF 138.903  sH 818.296  cycles 4.249180e8 / 4.249180e8  widths 1.852038 / 9.362868
   mesh 1  members 1 2  alpha_w 20.059335  eps 1.755255 / 0.000000 / 1.755255  efficiency 99.127208 / 99.127208 %  play 0.093279 / 0.027984 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 29.067637 / 32.062552 / 29.067637
   mesh 2  members 1 3  alpha_w 15.907986  eps 1.755255 / 0.000000 / 1.755255  efficiency 99.121756 / 99.121756 %  play 0.074710 / 0.022046 deg  coprime
-    ! mesh.flank_interference
     power through, by case: 29.325184 / 31.782712 / 29.325184
   distance 1  running 21.007930  clearance 0.020000
   member 4  z 24  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 24.000000
@@ -5227,11 +5211,13 @@
     case 2  T 0.001252  n 0.0000  vs frame 0.0000  sF 0.028  sH 14.395  cycles -  widths 0.000206 / 0.000351
     case 3  T 19.875958  n 39.3443  vs frame 28.1030  sF 446.432  sH 1813.805  cycles 5.058549e6 / 5.058549e6  widths 5.952420 / 46.001187
   member 5  z 60  m 1  alpha 20  x 0.028069  b 10.000000  beta 0.000000  d 60.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 1190.163029  n 0.0000  vs frame -14.0515  sF 7477.257  sH 5622.160  cycles -  widths 54.778436 / 53.484113
     case 2  T 0.198772  n 0.0000  vs frame 0.0000  sF 1.249  sH 72.657  cycles -  widths 0.009149 / 0.008933
     case 3  T 1190.163029  n 0.0000  vs frame -11.2412  sF 7477.257  sH 5622.160  cycles 2.023420e6 / 2.023420e6  widths 99.696754 / 441.971516
   member 6  z 59  m 1  alpha 20  x 0.037256  b 10.000000  beta 0.000000  d 59.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 1199.615336  n 0.5557  vs frame -13.4958  sF 7715.012  sH 5898.187  cycles -  widths 56.520233 / 58.864781
     case 2  T 0.201885  n 0.0000  vs frame 0.0000  sF 1.298  sH 76.516  cycles -  widths 0.009512 / 0.009906
@@ -5250,10 +5236,8 @@
   mesh 3  members 4 7  alpha_w 20.104080  eps 1.548221 / 0.000000 / 1.548221  efficiency 98.107354 / 98.107354 %  play 0.069611 / 0.092815 deg  shares a factor
     power through, by case: 0.349109 / 0.382278 / 0.349109
   mesh 4  members 7 5  alpha_w 20.104080  eps 1.757409 / 0.000000 / 1.757409  efficiency 99.124183 / 99.124183 %  play 0.093476 / 0.028043 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 8.361801 / 24.278265 / 8.361801
   mesh 5  members 8 6  alpha_w 20.104080  eps 1.742869 / 0.000000 / 1.742869  efficiency 99.066170 / 99.066170 %  play 0.098975 / 0.028518 deg  coprime
-    ! mesh.flank_interference
     power through, by case: 8.094892 / 23.683354 / 8.094892
   distance 2  running 21.013928  clearance 0.020000
 
@@ -5298,19 +5282,18 @@
     case 2  T 0.005831  n 0.0000  vs frame 0.0000  sF 0.169  sH 26.785  cycles -  widths 0.001240 / 0.001214
     case 3  T 5.865037  n -5600.0000  vs frame -8000.0000  sF 170.273  sH 845.747  cycles 4.800000e8 / 4.800000e8  widths 2.270309 / 10.001584
   member 2  z 60  m 1  alpha 20  x 0.028069  b 10.000000  beta 0.000000  d 60.000000
+    ! gear.addendum_held_to_mate_flank
     case 1  T 19.378425  n 0.0000  vs frame -3000.0000  sF 121.988  sH 717.252  cycles -  widths 0.893686 / 0.870486
     case 2  T 0.019437  n 0.0000  vs frame 0.0000  sF 0.122  sH 22.716  cycles -  widths 0.000896 / 0.000873
     case 3  T 19.378425  n 0.0000  vs frame -2400.0000  sF 121.988  sH 717.252  cycles 4.320000e8 / 4.320000e8  widths 1.626508 / 7.193349
   member 3  z 61  m 1  alpha 20  x -0.429445  b 10.000000  beta 0.000000  d 61.000000
-    ! clamp.ring_flank_ungenerated
+    ! gear.addendum_held_to_mate_flank
     case 1  T 19.875958  n 49.1803  vs frame -2950.8197  sF 138.903  sH 818.296  cycles -  widths 1.017603 / 1.133025
     case 2  T 0.019588  n 0.0000  vs frame 0.0000  sF 0.137  sH 25.689  cycles -  widths 0.001003 / 0.001117
     case 3  T 19.875958  n 39.3443  vs frame -2360.6557  sF 138.903  sH 818.296  cycles 4.249180e8 / 4.249180e8  widths 1.852038 / 9.362868
   mesh 1  members 1 2  alpha_w 20.059335  eps 1.755255 / 0.000000 / 1.755255  efficiency 99.127208 / 99.127208 %  play 0.093279 / 0.027984 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 29.067637 / 55.784260 / 29.067637
   mesh 2  members 1 3  alpha_w 15.907986  eps 1.755255 / 0.000000 / 1.755255  efficiency 99.121756 / 99.121756 %  play 0.074710 / 0.022046 deg  coprime
-    ! mesh.flank_interference
     power through, by case: 29.325184 / 55.297379 / 29.325184
   distance 1  running 21.007930  clearance 0.020000
   member 4  z 30  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 30.000000
@@ -5371,19 +5354,18 @@
     case 2  T 0.018727  n 0.0000  vs frame 0.0000  sF 0.544  sH 48.001  cycles -  widths 0.003983 / 0.003899
     case 3  T 5.865037  n -5600.0000  vs frame -8000.0000  sF 170.273  sH 845.747  cycles 4.800000e8 / 4.800000e8  widths 2.270309 / 10.001584
   member 2  z 60  m 1  alpha 20  x 0.028069  b 10.000000  beta 0.000000  d 60.000000
+    ! gear.addendum_held_to_mate_flank
     case 1  T 19.378425  n 0.0000  vs frame -3000.0000  sF 121.988  sH 717.252  cycles -  widths 0.893686 / 0.870486
     case 2  T 0.062422  n 0.0000  vs frame 0.0000  sF 0.393  sH 40.708  cycles -  widths 0.002879 / 0.002804
     case 3  T 19.378425  n 0.0000  vs frame -2400.0000  sF 121.988  sH 717.252  cycles 4.320000e8 / 4.320000e8  widths 1.626508 / 7.193349
   member 3  z 61  m 1  alpha 20  x -0.429445  b 10.000000  beta 0.000000  d 61.000000
-    ! clamp.ring_flank_ungenerated
+    ! gear.addendum_held_to_mate_flank
     case 1  T 19.875958  n 49.1803  vs frame -2950.8197  sF 138.903  sH 818.296  cycles -  widths 1.017603 / 1.133025
     case 2  T 0.062909  n 0.0000  vs frame 0.0000  sF 0.440  sH 46.036  cycles -  widths 0.003221 / 0.003586
     case 3  T 19.875958  n 39.3443  vs frame -2360.6557  sF 138.903  sH 818.296  cycles 4.249180e8 / 4.249180e8  widths 1.852038 / 9.362868
   mesh 1  members 1 2  alpha_w 20.059335  eps 1.755255 / 0.000000 / 1.755255  efficiency 99.127208 / 99.127208 %  play 0.093279 / 0.027984 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 29.067637 / 53.862542 / 29.067637
   mesh 2  members 1 3  alpha_w 15.907986  eps 1.755255 / 0.000000 / 1.755255  efficiency 99.121756 / 99.121756 %  play 0.074710 / 0.022046 deg  coprime
-    ! mesh.flank_interference
     power through, by case: 29.325184 / 53.392434 / 29.325184
   distance 1  running 21.007930  clearance 0.020000
   member 4  z 24  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 24.000000
@@ -5402,6 +5384,7 @@
     case 2  T 0.049192  n 0.0000  vs frame 0.0000  sF 1.596  sH 113.738  cycles -  widths 0.011689 / 0.021889
     case 3  T 14.625258  n 56.8306  vs frame 69.9454  sF 479.232  sH 1971.141  cycles 4.196722e6 / 4.196722e6  widths 6.389764 / 54.327945
   member 7  z 96  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 96.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 76.356787  n 0.0000  vs frame 16.3934  sF 313.739  sH 1217.289  cycles -  widths 2.298452 / 2.507296
     case 2  T 0.262356  n 0.0000  vs frame 0.0000  sF 1.078  sH 71.354  cycles -  widths 0.007897 / 0.008615
@@ -5409,7 +5392,6 @@
   mesh 3  members 4 5  alpha_w 20.149246  eps 1.546097 / 0.000000 / 1.546097  efficiency 98.110213 / 98.110213 %  play 0.069762 / 0.093016 deg  shares a factor
     power through, by case: 0.651671 / 1.198732 / 0.651671
   mesh 4  members 6 7  alpha_w 19.919074  eps 1.755255 / 0.000000 / 1.755255  efficiency 98.989239 / 98.989239 %  play 0.092505 / 0.017345 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 0.625875 / 1.237054 / 0.625875
   mesh 5  members 5 6  alpha_w 20.173990  eps 1.510040 / 0.000000 / 1.510040  efficiency 97.891587 / 97.891587 %  play 0.093071 / 0.093071 deg  shares a factor
     power through, by case: 0.639356 / 1.224550 / 0.639356
@@ -5454,11 +5436,13 @@
     case 2  T 0.000487  n 0.0000  vs frame 0.0000  sF 0.011  sH 8.976  cycles -  widths 0.000080 / 0.000136
     case 3  T 0.666667  n 2400.0000  vs frame 1714.2857  sF 14.974  sH 332.186  cycles 3.085714e8 / 3.085714e8  widths 0.199652 / 1.542942
   member 2  z 60  m 1  alpha 20  x 0.028069  b 10.000000  beta 0.000000  d 60.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 39.919687  n 0.0000  vs frame -857.1429  sF 250.797  sH 1029.659  cycles -  widths 1.837343 / 1.793930
     case 2  T 0.077284  n 0.0000  vs frame 0.0000  sF 0.486  sH 45.305  cycles -  widths 0.003557 / 0.003473
     case 3  T 39.919687  n 0.0000  vs frame -685.7143  sF 250.797  sH 1029.659  cycles 1.234286e8 / 1.234286e8  widths 3.343965 / 14.824326
   member 3  z 59  m 1  alpha 20  x 0.037256  b 10.000000  beta 0.000000  d 59.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 40.236730  n 33.8983  vs frame -823.2446  sF 258.772  sH 1080.212  cycles -  widths 1.895766 / 1.974405
     case 2  T 0.078494  n 0.0000  vs frame 0.0000  sF 0.505  sH 47.711  cycles -  widths 0.003698 / 0.003852
@@ -5477,10 +5461,8 @@
   mesh 1  members 1 4  alpha_w 20.104080  eps 1.548221 / 0.000000 / 1.548221  efficiency 98.107354 / 98.107354 %  play 0.069611 / 0.092815 deg  shares a factor
     power through, by case: 0.714286 / 0.389147 / 0.714286
   mesh 2  members 4 2  alpha_w 20.104080  eps 1.757409 / 0.000000 / 1.757409  efficiency 99.124183 / 99.124183 %  play 0.093476 / 0.028043 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 17.108437 / 24.714517 / 17.108437
   mesh 3  members 5 3  alpha_w 20.104080  eps 1.742869 / 0.000000 / 1.742869  efficiency 99.066170 / 99.066170 %  play 0.098975 / 0.028518 deg  coprime
-    ! mesh.flank_interference
     power through, by case: 16.562335 / 24.108916 / 16.562335
   distance 1  running 21.013928  clearance 0.020000
   member 6  z 17  m 1  alpha 20  x 0.005657  b 10.000000  beta 0.000000  d 17.000000
@@ -5537,11 +5519,13 @@
     case 2  T 0.000479  n 0.0000  vs frame 0.0000  sF 0.011  sH 8.905  cycles -  widths 0.000079 / 0.000134
     case 3  T 0.666667  n 2400.0000  vs frame 1714.2857  sF 14.974  sH 332.186  cycles 3.085714e8 / 3.085714e8  widths 0.199652 / 1.542942
   member 2  z 60  m 1  alpha 20  x 0.028069  b 10.000000  beta 0.000000  d 60.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 39.919687  n 0.0000  vs frame -857.1429  sF 250.797  sH 1029.659  cycles -  widths 1.837343 / 1.793930
     case 2  T 0.076067  n 0.0000  vs frame 0.0000  sF 0.478  sH 44.947  cycles -  widths 0.003501 / 0.003418
     case 3  T 39.919687  n 0.0000  vs frame -685.7143  sF 250.797  sH 1029.659  cycles 1.234286e8 / 1.234286e8  widths 3.343965 / 14.824326
   member 3  z 59  m 1  alpha 20  x 0.037256  b 10.000000  beta 0.000000  d 59.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 40.236730  n 33.8983  vs frame -823.2446  sF 258.772  sH 1080.212  cycles -  widths 1.895766 / 1.974405
     case 2  T 0.077259  n 0.0000  vs frame 0.0000  sF 0.497  sH 47.334  cycles -  widths 0.003640 / 0.003791
@@ -5560,10 +5544,8 @@
   mesh 1  members 1 4  alpha_w 20.104080  eps 1.548221 / 0.000000 / 1.548221  efficiency 98.107354 / 98.107354 %  play 0.069611 / 0.092815 deg  shares a factor
     power through, by case: 0.714286 / 0.383021 / 0.714286
   mesh 2  members 4 2  alpha_w 20.104080  eps 1.757409 / 0.000000 / 1.757409  efficiency 99.124183 / 99.124183 %  play 0.093476 / 0.028043 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 17.108437 / 24.325465 / 17.108437
   mesh 3  members 5 3  alpha_w 20.104080  eps 1.742869 / 0.000000 / 1.742869  efficiency 99.066170 / 99.066170 %  play 0.098975 / 0.028518 deg  coprime
-    ! mesh.flank_interference
     power through, by case: 16.562335 / 23.729398 / 16.562335
   distance 1  running 21.013928  clearance 0.020000
   member 6  z 17  m 1  alpha 20  x 0.005657  b 10.000000  beta 0.000000  d 17.000000
@@ -5631,11 +5613,13 @@
     case 2  T 0.000513  n 0.0000  vs frame 0.0000  sF 0.012  sH 9.217  cycles -  widths 0.000084 / 0.000144
     case 3  T 0.666667  n 2400.0000  vs frame 1714.2857  sF 14.974  sH 332.186  cycles 3.085714e8 / 3.085714e8  widths 0.199652 / 1.542942
   member 2  z 60  m 1  alpha 20  x 0.028069  b 10.000000  beta 0.000000  d 60.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 39.919687  n 0.0000  vs frame -857.1429  sF 250.797  sH 1029.659  cycles -  widths 1.837343 / 1.793930
     case 2  T 0.081483  n 0.0000  vs frame 0.0000  sF 0.512  sH 46.519  cycles -  widths 0.003750 / 0.003662
     case 3  T 39.919687  n 0.0000  vs frame -685.7143  sF 250.797  sH 1029.659  cycles 1.234286e8 / 1.234286e8  widths 3.343965 / 14.824326
   member 3  z 59  m 1  alpha 20  x 0.037256  b 10.000000  beta 0.000000  d 59.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 40.236730  n 33.8983  vs frame -823.2446  sF 258.772  sH 1080.212  cycles -  widths 1.895766 / 1.974405
     case 2  T 0.082759  n 0.0000  vs frame 0.0000  sF 0.532  sH 48.990  cycles -  widths 0.003899 / 0.004061
@@ -5654,10 +5638,8 @@
   mesh 1  members 1 4  alpha_w 20.104080  eps 1.548221 / 0.000000 / 1.548221  efficiency 98.107354 / 98.107354 %  play 0.069611 / 0.092815 deg  shares a factor
     power through, by case: 0.714286 / 0.383820 / 0.714286
   mesh 2  members 4 2  alpha_w 20.104080  eps 1.757409 / 0.000000 / 1.757409  efficiency 99.124183 / 99.124183 %  play 0.093476 / 0.028043 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 17.108437 / 24.376231 / 17.108437
   mesh 3  members 5 3  alpha_w 20.104080  eps 1.742869 / 0.000000 / 1.742869  efficiency 99.066170 / 99.066170 %  play 0.098975 / 0.028518 deg  coprime
-    ! mesh.flank_interference
     power through, by case: 16.562335 / 23.778920 / 16.562335
   distance 1  running 21.013928  clearance 0.020000
   member 6  z 17  m 1  alpha 20  x 0.005657  b 10.000000  beta 0.000000  d 17.000000
@@ -5733,11 +5715,13 @@
     case 2  T 0.000000  n 0.0000  vs frame 0.0000  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
     case 3  T 0.666667  n 2400.0000  vs frame 1714.2857  sF 14.974  sH 332.186  cycles 3.085714e8 / 3.085714e8  widths 0.199652 / 1.542942
   member 2  z 60  m 1  alpha 20  x 0.028069  b 10.000000  beta 0.000000  d 60.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 39.919687  n 0.0000  vs frame -857.1429  sF 250.797  sH 1029.659  cycles -  widths 1.837343 / 1.793930
     case 2  T 0.000000  n 0.0000  vs frame 0.0000  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
     case 3  T 39.919687  n 0.0000  vs frame -685.7143  sF 250.797  sH 1029.659  cycles 1.234286e8 / 1.234286e8  widths 3.343965 / 14.824326
   member 3  z 59  m 1  alpha 20  x 0.037256  b 10.000000  beta 0.000000  d 59.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 40.236730  n 33.8983  vs frame -823.2446  sF 258.772  sH 1080.212  cycles -  widths 1.895766 / 1.974405
     case 2  T 0.000000  n 0.0000  vs frame 0.0000  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
@@ -5756,10 +5740,8 @@
   mesh 1  members 1 4  alpha_w 20.104080  eps 1.548221 / 0.000000 / 1.548221  efficiency 98.107354 / 98.107354 %  play 0.069611 / 0.092815 deg  shares a factor
     power through, by case: 0.714286 / 0.000000 / 0.714286
   mesh 2  members 4 2  alpha_w 20.104080  eps 1.757409 / 0.000000 / 1.757409  efficiency 99.124183 / 99.124183 %  play 0.093476 / 0.028043 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 17.108437 / 0.000000 / 17.108437
   mesh 3  members 5 3  alpha_w 20.104080  eps 1.742869 / 0.000000 / 1.742869  efficiency 99.066170 / 99.066170 %  play 0.098975 / 0.028518 deg  coprime
-    ! mesh.flank_interference
     power through, by case: 16.562335 / 0.000000 / 16.562335
   distance 1  running 21.013928  clearance 0.020000
   member 6  z 1  m 1  alpha 20  x 0.000000  b 13.538864  beta 81.786789  d 7.000000
@@ -5815,11 +5797,13 @@
     case 2  T 0.000417  n 0.0000  vs frame 0.0000  sF 0.009  sH 8.308  cycles -  widths 0.000069 / 0.000117
     case 3  T 0.666667  n 2400.0000  vs frame 1714.2857  sF 14.974  sH 332.186  cycles 3.085714e8 / 3.085714e8  widths 0.199652 / 1.542942
   member 2  z 60  m 1  alpha 20  x 0.028069  b 10.000000  beta 0.000000  d 60.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 39.919687  n 0.0000  vs frame -857.1429  sF 250.797  sH 1029.659  cycles -  widths 1.837343 / 1.793930
     case 2  T 0.066210  n 0.0000  vs frame 0.0000  sF 0.416  sH 41.934  cycles -  widths 0.003047 / 0.002975
     case 3  T 39.919687  n 0.0000  vs frame -685.7143  sF 250.797  sH 1029.659  cycles 1.234286e8 / 1.234286e8  widths 3.343965 / 14.824326
   member 3  z 59  m 1  alpha 20  x 0.037256  b 10.000000  beta 0.000000  d 59.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 40.236730  n 33.8983  vs frame -823.2446  sF 258.772  sH 1080.212  cycles -  widths 1.895766 / 1.974405
     case 2  T 0.067247  n 0.0000  vs frame 0.0000  sF 0.432  sH 44.161  cycles -  widths 0.003168 / 0.003300
@@ -5838,10 +5822,8 @@
   mesh 1  members 1 4  alpha_w 20.104080  eps 1.548221 / 0.000000 / 1.548221  efficiency 98.107354 / 98.107354 %  play 0.069611 / 0.092815 deg  shares a factor
     power through, by case: 0.714286 / 0.333388 / 0.714286
   mesh 2  members 4 2  alpha_w 20.104080  eps 1.757409 / 0.000000 / 1.757409  efficiency 99.124183 / 99.124183 %  play 0.093476 / 0.028043 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 17.108437 / 21.173292 / 17.108437
   mesh 3  members 5 3  alpha_w 20.104080  eps 1.742869 / 0.000000 / 1.742869  efficiency 99.066170 / 99.066170 %  play 0.098975 / 0.028518 deg  coprime
-    ! mesh.flank_interference
     power through, by case: 16.562335 / 20.654465 / 16.562335
   distance 1  running 21.013928  clearance 0.020000
   member 6  z 17  m 1  alpha 20  x 0.000000  b 10.000000  beta 45.000000  d 24.041631
@@ -5901,11 +5883,13 @@
     case 2  T 0.000175  n 0.0000  vs frame 0.0000  sF 0.004  sH 5.378  cycles -  widths 0.000029 / 0.000049
     case 3  T 0.666667  n 2400.0000  vs frame 1714.2857  sF 14.974  sH 332.186  cycles 3.085714e8 / 3.085714e8  widths 0.199652 / 1.542942
   member 2  z 60  m 1  alpha 20  x 0.028069  b 10.000000  beta 0.000000  d 60.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 39.919687  n 0.0000  vs frame -857.1429  sF 250.797  sH 1029.659  cycles -  widths 1.837343 / 1.793930
     case 2  T 0.027746  n 0.0000  vs frame 0.0000  sF 0.174  sH 27.145  cycles -  widths 0.001277 / 0.001247
     case 3  T 39.919687  n 0.0000  vs frame -685.7143  sF 250.797  sH 1029.659  cycles 1.234286e8 / 1.234286e8  widths 3.343965 / 14.824326
   member 3  z 59  m 1  alpha 20  x 0.037256  b 10.000000  beta 0.000000  d 59.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 40.236730  n 33.8983  vs frame -823.2446  sF 258.772  sH 1080.212  cycles -  widths 1.895766 / 1.974405
     case 2  T 0.028180  n 0.0000  vs frame 0.0000  sF 0.181  sH 28.587  cycles -  widths 0.001328 / 0.001383
@@ -5924,10 +5908,8 @@
   mesh 1  members 1 4  alpha_w 20.104080  eps 1.548221 / 0.000000 / 1.548221  efficiency 98.107354 / 98.107354 %  play 0.069611 / 0.092815 deg  shares a factor
     power through, by case: 0.714286 / 0.386633 / 0.714286
   mesh 2  members 4 2  alpha_w 20.104080  eps 1.757409 / 0.000000 / 1.757409  efficiency 99.124183 / 99.124183 %  play 0.093476 / 0.028043 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 17.108437 / 24.554857 / 17.108437
   mesh 3  members 5 3  alpha_w 20.104080  eps 1.742869 / 0.000000 / 1.742869  efficiency 99.066170 / 99.066170 %  play 0.098975 / 0.028518 deg  coprime
-    ! mesh.flank_interference
     power through, by case: 16.562335 / 23.953169 / 16.562335
   distance 1  running 21.013928  clearance 0.020000
   member 6  z 12  m 1  alpha 20  x 0.298101  b 10.000000  beta 0.000000  d 12.000000
@@ -5941,6 +5923,7 @@
     case 2  T 0.071701  n 0.0000  vs frame 0.0000  sF 1.449  sH 103.815  cycles -  widths 0.010613 / 0.018236
     case 3  T 100.591826  n -5.4237  vs frame -9.2978  sF 2042.887  sH 3898.440  cycles 5.578700e5 / 5.578700e5  widths 27.238491 / 212.505247
   member 8  z 72  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 72.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 236.202006  n 0.0000  vs frame -4.8426  sF 1148.532  sH 1750.639  cycles -  widths 8.414157 / 5.185748
     case 2  T 0.172083  n 0.0000  vs frame 0.0000  sF 0.837  sH 47.252  cycles -  widths 0.006130 / 0.003778
@@ -5948,7 +5931,6 @@
   mesh 4  members 6 7  alpha_w 21.054925  eps 1.436891 / 0.000000 / 1.436891  efficiency 97.838469 / 97.838469 %  play 0.145568 / 0.058227 deg  shares a factor
     power through, by case: 0.584553 / 0.856014 / 0.584553
   mesh 5  members 7 8  alpha_w 21.054925  eps 1.861462 / 0.000000 / 1.861462  efficiency 99.488565 / 99.488565 %  play 0.058600 / 0.024417 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 0.571918 / 0.860415 / 0.571918
   distance 2  running 21.145279  clearance 0.020000
 
@@ -5995,11 +5977,13 @@
     case 2  T 0.000004  n 0.0000  vs frame 0.0000  sF 0.000  sH 0.762  cycles -  widths 0.000001 / 0.000001
     case 3  T 0.666667  n 2400.0000  vs frame 1714.2857  sF 14.974  sH 332.186  cycles 3.085714e8 / 3.085714e8  widths 0.199652 / 1.542942
   member 2  z 60  m 1  alpha 20  x 0.028069  b 10.000000  beta 0.000000  d 60.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 39.919687  n 0.0000  vs frame -857.1429  sF 250.797  sH 1029.659  cycles -  widths 1.837343 / 1.793930
     case 2  T 0.000210  n 0.0000  vs frame 0.0000  sF 0.001  sH 2.362  cycles -  widths 0.000010 / 0.000009
     case 3  T 39.919687  n 0.0000  vs frame -685.7143  sF 250.797  sH 1029.659  cycles 1.234286e8 / 1.234286e8  widths 3.343965 / 14.824326
   member 3  z 59  m 1  alpha 20  x 0.037256  b 10.000000  beta 0.000000  d 59.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 40.236730  n 33.8983  vs frame -823.2446  sF 258.772  sH 1080.212  cycles -  widths 1.895766 / 1.974405
     case 2  T 0.000212  n 0.0000  vs frame 0.0000  sF 0.001  sH 2.478  cycles -  widths 0.000010 / 0.000010
@@ -6018,10 +6002,8 @@
   mesh 1  members 1 4  alpha_w 20.104080  eps 1.548221 / 0.000000 / 1.548221  efficiency 98.107354 / 98.107354 %  play 0.069611 / 0.092815 deg  shares a factor
     power through, by case: 0.714286 / 0.061791 / 0.714286
   mesh 2  members 4 2  alpha_w 20.104080  eps 1.757409 / 0.000000 / 1.757409  efficiency 99.124183 / 99.124183 %  play 0.093476 / 0.028043 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 17.108437 / 1.479996 / 17.108437
   mesh 3  members 5 3  alpha_w 20.104080  eps 1.742869 / 0.000000 / 1.742869  efficiency 99.066170 / 99.066170 %  play 0.098975 / 0.028518 deg  coprime
-    ! mesh.flank_interference
     power through, by case: 16.562335 / 1.432755 / 16.562335
   distance 1  running 21.013928  clearance 0.020000
   member 6  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
@@ -6030,21 +6012,20 @@
     case 2  T 0.060064  n 0.0000  vs frame 0.0000  sF 1.744  sH 85.966  cycles -  widths 0.012775 / 0.012505
     case 3  T 353.984853  n -63.2768  vs frame -90.3955  sF 10276.854  sH 6570.485  cycles 5.423729e6 / 5.423729e6  widths 137.024724 / 603.646534
   member 7  z 60  m 1  alpha 20  x 0.028069  b 10.000000  beta 0.000000  d 60.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 1169.586670  n 0.0000  vs frame -33.8983  sF 7362.602  sH 5572.224  cycles -  widths 53.938477 / 52.538249
     case 2  T 0.200212  n 0.0000  vs frame 0.0000  sF 1.260  sH 72.905  cycles -  widths 0.009233 / 0.008994
     case 3  T 1169.586670  n 0.0000  vs frame -27.1186  sF 7362.602  sH 5572.224  cycles 4.881356e6 / 4.881356e6  widths 98.168027 / 434.155278
   member 8  z 61  m 1  alpha 20  x -0.429445  b 10.000000  beta 0.000000  d 61.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
-    ! clamp.ring_flank_ungenerated
     case 1  T 1199.615336  n 0.5557  vs frame -33.3426  sF 8383.495  sH 6357.224  cycles -  widths 61.417548 / 68.383820
     case 2  T 0.201772  n 0.0000  vs frame 0.0000  sF 1.410  sH 82.447  cycles -  widths 0.010330 / 0.011502
     case 3  T 1199.615336  n 0.4446  vs frame -26.6741  sF 8383.495  sH 6357.224  cycles 4.801334e6 / 4.801334e6  widths 111.779937 / 565.096798
   mesh 4  members 6 7  alpha_w 20.059335  eps 1.755255 / 0.000000 / 1.755255  efficiency 99.127208 / 99.127208 %  play 0.093279 / 0.027984 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 19.823503 / 55.782080 / 19.823503
   mesh 5  members 6 8  alpha_w 15.907986  eps 1.755255 / 0.000000 / 1.755255  efficiency 99.121756 / 99.121756 %  play 0.074710 / 0.022046 deg  coprime
-    ! mesh.flank_interference
     power through, by case: 19.999144 / 55.295218 / 19.999144
   distance 2  running 21.007930  clearance 0.020000
 
@@ -6094,11 +6075,13 @@
     case 2  T 0.000008  n 0.0000  vs frame 0.0000  sF 0.000  sH 1.128  cycles -  widths 0.000001 / 0.000002
     case 3  T 0.666667  n 2400.0000  vs frame 1714.2857  sF 14.974  sH 332.186  cycles 3.085714e8 / 3.085714e8  widths 0.199652 / 1.542942
   member 2  z 60  m 1  alpha 20  x 0.028069  b 10.000000  beta 0.000000  d 60.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 39.919687  n 0.0000  vs frame -857.1429  sF 250.797  sH 1029.659  cycles -  widths 1.837343 / 1.793930
     case 2  T 0.001221  n 0.0000  vs frame 0.0000  sF 0.008  sH 5.694  cycles -  widths 0.000056 / 0.000055
     case 3  T 39.919687  n 0.0000  vs frame -685.7143  sF 250.797  sH 1029.659  cycles 1.234286e8 / 1.234286e8  widths 3.343965 / 14.824326
   member 3  z 59  m 1  alpha 20  x 0.037256  b 10.000000  beta 0.000000  d 59.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 40.236730  n 33.8983  vs frame -823.2446  sF 258.772  sH 1080.212  cycles -  widths 1.895766 / 1.974405
     case 2  T 0.001240  n 0.0000  vs frame 0.0000  sF 0.008  sH 5.996  cycles -  widths 0.000058 / 0.000061
@@ -6117,10 +6100,8 @@
   mesh 1  members 1 4  alpha_w 20.104080  eps 1.548221 / 0.000000 / 1.548221  efficiency 98.107354 / 98.107354 %  play 0.069611 / 0.092815 deg  shares a factor
     power through, by case: 0.714286 / 0.215056 / 0.714286
   mesh 2  members 4 2  alpha_w 20.104080  eps 1.757409 / 0.000000 / 1.757409  efficiency 99.124183 / 99.124183 %  play 0.093476 / 0.028043 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 17.108437 / 13.658120 / 17.108437
   mesh 3  members 5 3  alpha_w 20.104080  eps 1.742869 / 0.000000 / 1.742869  efficiency 99.066170 / 99.066170 %  play 0.098975 / 0.028518 deg  coprime
-    ! mesh.flank_interference
     power through, by case: 16.562335 / 13.323444 / 16.562335
   distance 1  running 21.013928  clearance 0.020000
   member 6  z 24  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 24.000000
@@ -6129,11 +6110,13 @@
     case 2  T 0.001252  n 0.0000  vs frame 0.0000  sF 0.028  sH 14.395  cycles -  widths 0.000206 / 0.000351
     case 3  T 40.236730  n 27.1186  vs frame 19.3705  sF 903.752  sH 2580.702  cycles 3.486683e6 / 3.486683e6  widths 12.050032 / 93.124435
   member 7  z 60  m 1  alpha 20  x 0.028069  b 10.000000  beta 0.000000  d 60.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 2409.356541  n 0.0000  vs frame -9.6852  sF 15136.898  sH 7999.273  cycles -  widths 110.893029 / 108.272811
     case 2  T 0.198772  n 0.0000  vs frame 0.0000  sF 1.249  sH 72.657  cycles -  widths 0.009149 / 0.008933
     case 3  T 2409.356541  n 0.0000  vs frame -7.7482  sF 15136.898  sH 7999.273  cycles 1.394674e6 / 1.394674e6  widths 201.825313 / 894.723612
   member 8  z 59  m 1  alpha 20  x 0.037256  b 10.000000  beta 0.000000  d 59.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 2428.491717  n 0.3830  vs frame -9.3022  sF 15618.208  sH 8392.008  cycles -  widths 114.419108 / 119.165393
     case 2  T 0.201885  n 0.0000  vs frame 0.0000  sF 1.298  sH 76.516  cycles -  widths 0.009512 / 0.009906
@@ -6152,10 +6135,8 @@
   mesh 4  members 6 9  alpha_w 20.104080  eps 1.548221 / 0.000000 / 1.548221  efficiency 98.107354 / 98.107354 %  play 0.069611 / 0.092815 deg  shares a factor
     power through, by case: 0.487127 / 0.395696 / 0.487127
   mesh 5  members 9 7  alpha_w 20.104080  eps 1.757409 / 0.000000 / 1.757409  efficiency 99.124183 / 99.124183 %  play 0.093476 / 0.028043 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 11.667586 / 25.130432 / 11.667586
   mesh 6  members 10 8  alpha_w 20.104080  eps 1.742869 / 0.000000 / 1.742869  efficiency 99.066170 / 99.066170 %  play 0.098975 / 0.028518 deg  coprime
-    ! mesh.flank_interference
     power through, by case: 11.295156 / 24.514639 / 11.295156
   distance 2  running 21.013928  clearance 0.020000
 
@@ -6202,11 +6183,13 @@
     case 2  T 0.000122  n 0.0000  vs frame 0.0000  sF 0.003  sH 4.485  cycles -  widths 0.000020 / 0.000034
     case 3  T 0.666667  n 2400.0000  vs frame 1714.2857  sF 14.974  sH 332.186  cycles 3.085714e8 / 3.085714e8  widths 0.199652 / 1.542942
   member 2  z 60  m 1  alpha 20  x 0.028069  b 10.000000  beta 0.000000  d 60.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 39.919687  n 0.0000  vs frame -857.1429  sF 250.797  sH 1029.659  cycles -  widths 1.837343 / 1.793930
     case 2  T 0.019297  n 0.0000  vs frame 0.0000  sF 0.121  sH 22.638  cycles -  widths 0.000888 / 0.000867
     case 3  T 39.919687  n 0.0000  vs frame -685.7143  sF 250.797  sH 1029.659  cycles 1.234286e8 / 1.234286e8  widths 3.343965 / 14.824326
   member 3  z 59  m 1  alpha 20  x 0.037256  b 10.000000  beta 0.000000  d 59.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 40.236730  n 33.8983  vs frame -823.2446  sF 258.772  sH 1080.212  cycles -  widths 1.895766 / 1.974405
     case 2  T 0.019599  n 0.0000  vs frame 0.0000  sF 0.126  sH 23.841  cycles -  widths 0.000923 / 0.000962
@@ -6225,10 +6208,8 @@
   mesh 1  members 1 4  alpha_w 20.104080  eps 1.548221 / 0.000000 / 1.548221  efficiency 98.107354 / 98.107354 %  play 0.069611 / 0.092815 deg  shares a factor
     power through, by case: 0.714286 / 0.384143 / 0.714286
   mesh 2  members 4 2  alpha_w 20.104080  eps 1.757409 / 0.000000 / 1.757409  efficiency 99.124183 / 99.124183 %  play 0.093476 / 0.028043 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 17.108437 / 24.396736 / 17.108437
   mesh 3  members 5 3  alpha_w 20.104080  eps 1.742869 / 0.000000 / 1.742869  efficiency 99.066170 / 99.066170 %  play 0.098975 / 0.028518 deg  coprime
-    ! mesh.flank_interference
     power through, by case: 16.562335 / 23.798922 / 16.562335
   distance 1  running 21.013928  clearance 0.020000
   member 6  z 30  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 30.000000
@@ -6291,11 +6272,13 @@
     case 2  T 0.000390  n 0.0000  vs frame 0.0000  sF 0.009  sH 8.038  cycles -  widths 0.000064 / 0.000109
     case 3  T 0.666667  n 2400.0000  vs frame 1714.2857  sF 14.974  sH 332.186  cycles 3.085714e8 / 3.085714e8  widths 0.199652 / 1.542942
   member 2  z 60  m 1  alpha 20  x 0.028069  b 10.000000  beta 0.000000  d 60.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 39.919687  n 0.0000  vs frame -857.1429  sF 250.797  sH 1029.659  cycles -  widths 1.837343 / 1.793930
     case 2  T 0.061973  n 0.0000  vs frame 0.0000  sF 0.389  sH 40.570  cycles -  widths 0.002852 / 0.002785
     case 3  T 39.919687  n 0.0000  vs frame -685.7143  sF 250.797  sH 1029.659  cycles 1.234286e8 / 1.234286e8  widths 3.343965 / 14.824326
   member 3  z 59  m 1  alpha 20  x 0.037256  b 10.000000  beta 0.000000  d 59.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 40.236730  n 33.8983  vs frame -823.2446  sF 258.772  sH 1080.212  cycles -  widths 1.895766 / 1.974405
     case 2  T 0.062944  n 0.0000  vs frame 0.0000  sF 0.405  sH 42.724  cycles -  widths 0.002966 / 0.003089
@@ -6314,10 +6297,8 @@
   mesh 1  members 1 4  alpha_w 20.104080  eps 1.548221 / 0.000000 / 1.548221  efficiency 98.107354 / 98.107354 %  play 0.069611 / 0.092815 deg  shares a factor
     power through, by case: 0.714286 / 0.370110 / 0.714286
   mesh 2  members 4 2  alpha_w 20.104080  eps 1.757409 / 0.000000 / 1.757409  efficiency 99.124183 / 99.124183 %  play 0.093476 / 0.028043 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 17.108437 / 23.505522 / 17.108437
   mesh 3  members 5 3  alpha_w 20.104080  eps 1.742869 / 0.000000 / 1.742869  efficiency 99.066170 / 99.066170 %  play 0.098975 / 0.028518 deg  coprime
-    ! mesh.flank_interference
     power through, by case: 16.562335 / 22.929546 / 16.562335
   distance 1  running 21.013928  clearance 0.020000
   member 6  z 24  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 24.000000
@@ -6336,6 +6317,7 @@
     case 2  T 0.049192  n 0.0000  vs frame 0.0000  sF 1.596  sH 113.738  cycles -  widths 0.011689 / 0.021889
     case 3  T 29.607256  n 39.1714  vs frame 48.2109  sF 970.154  sH 2804.562  cycles 2.892656e6 / 2.892656e6  widths 12.935386 / 109.981058
   member 9  z 96  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 96.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 154.576070  n 0.0000  vs frame 11.2994  sF 635.130  sH 1731.972  cycles -  widths 4.652967 / 5.075750
     case 2  T 0.262356  n 0.0000  vs frame 0.0000  sF 1.078  sH 71.354  cycles -  widths 0.007897 / 0.008615
@@ -6343,7 +6325,6 @@
   mesh 4  members 6 7  alpha_w 20.149246  eps 1.546097 / 0.000000 / 1.546097  efficiency 98.110213 / 98.110213 %  play 0.069762 / 0.093016 deg  shares a factor
     power through, by case: 0.909305 / 1.271143 / 0.909305
   mesh 5  members 8 9  alpha_w 19.919074  eps 1.755255 / 0.000000 / 1.755255  efficiency 98.989239 / 98.989239 %  play 0.092505 / 0.017345 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 0.873311 / 1.311780 / 0.873311
   mesh 6  members 7 8  alpha_w 20.173990  eps 1.510040 / 0.000000 / 1.510040  efficiency 97.891587 / 97.891587 %  play 0.093071 / 0.093071 deg  shares a factor
     power through, by case: 0.892121 / 1.298521 / 0.892121
@@ -6719,13 +6700,13 @@
     case 2  T 0.071701  n 0.0000  vs frame 0.0000  sF 1.449  sH 103.815  cycles -  widths 0.010613 / 0.018236
     case 3  T 16.192656  n 48.0000  vs frame 82.2857  sF 328.851  sH 1564.115  cycles 4.937143e6 / 4.937143e6  widths 4.384685 / 34.207792
   member 5  z 72  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 72.000000
+    ! gear.addendum_held_to_mate_flank
     case 1  T 38.022351  n 0.0000  vs frame 42.8571  sF 184.884  sH 702.383  cycles -  widths 1.354459 / 0.834770
     case 2  T 0.172083  n 0.0000  vs frame 0.0000  sF 0.837  sH 47.252  cycles -  widths 0.006130 / 0.003778
     case 3  T 38.022351  n 0.0000  vs frame 34.2857  sF 184.884  sH 702.383  cycles 6.171429e6 / 6.171429e6  widths 2.465116 / 6.898208
   mesh 2  members 3 4  alpha_w 21.054925  eps 1.436891 / 0.000000 / 1.436891  efficiency 97.838469 / 97.838469 %  play 0.145568 / 0.058227 deg  shares a factor
     power through, by case: 0.832765 / 0.856014 / 0.832765
   mesh 3  members 4 5  alpha_w 21.054925  eps 1.861462 / 0.000000 / 1.861462  efficiency 99.488565 / 99.488565 %  play 0.058600 / 0.024417 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 0.814765 / 0.860415 / 0.814765
   distance 2  running 21.145279  clearance 0.020000
 
@@ -6781,21 +6762,20 @@
     case 2  T 0.060064  n 0.0000  vs frame 0.0000  sF 1.744  sH 85.966  cycles -  widths 0.012775 / 0.012505
     case 3  T 56.982312  n 560.0000  vs frame 800.0000  sF 1654.305  sH 2636.180  cycles 4.800000e7 / 4.800000e7  widths 22.057400 / 97.171320
   member 4  z 60  m 1  alpha 20  x 0.028069  b 10.000000  beta 0.000000  d 60.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 188.272894  n 0.0000  vs frame 300.0000  sF 1185.187  sH 2235.663  cycles -  widths 8.682685 / 8.457285
     case 2  T 0.200212  n 0.0000  vs frame 0.0000  sF 1.260  sH 72.905  cycles -  widths 0.009233 / 0.008994
     case 3  T 188.272894  n 0.0000  vs frame 240.0000  sF 1185.187  sH 2235.663  cycles 4.320000e7 / 4.320000e7  widths 15.802487 / 69.887656
   member 5  z 61  m 1  alpha 20  x -0.429445  b 10.000000  beta 0.000000  d 61.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
-    ! clamp.ring_flank_ungenerated
     case 1  T 193.106725  n -4.9180  vs frame 295.0820  sF 1349.524  sH 2550.617  cycles -  widths 9.886620 / 11.008008
     case 2  T 0.201772  n 0.0000  vs frame 0.0000  sF 1.410  sH 82.447  cycles -  widths 0.010330 / 0.011502
     case 3  T 193.106725  n -3.9344  vs frame 236.0656  sF 1349.524  sH 2550.617  cycles 4.249180e7 / 4.249180e7  widths 17.993649 / 90.965819
   mesh 2  members 3 4  alpha_w 20.059335  eps 1.755255 / 0.000000 / 1.755255  efficiency 99.127208 / 99.127208 %  play 0.093279 / 0.027984 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 28.240934 / 57.258433 / 28.240934
   mesh 3  members 3 5  alpha_w 15.907986  eps 1.755255 / 0.000000 / 1.755255  efficiency 99.121756 / 99.121756 %  play 0.074710 / 0.022046 deg  coprime
-    ! mesh.flank_interference
     power through, by case: 28.491156 / 56.758686 / 28.491156
   distance 2  running 21.007930  clearance 0.020000
 
@@ -6854,11 +6834,13 @@
     case 2  T 0.001252  n 0.0000  vs frame 0.0000  sF 0.028  sH 14.395  cycles -  widths 0.000206 / 0.000351
     case 3  T 6.477062  n -240.0000  vs frame -171.4286  sF 145.481  sH 1035.418  cycles 3.085714e7 / 3.085714e7  widths 1.939740 / 14.990601
   member 4  z 60  m 1  alpha 20  x 0.028069  b 10.000000  beta 0.000000  d 60.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 387.843450  n 0.0000  vs frame 85.7143  sF 2436.645  sH 3209.432  cycles -  widths 17.850880 / 17.429094
     case 2  T 0.198772  n 0.0000  vs frame 0.0000  sF 1.249  sH 72.657  cycles -  widths 0.009149 / 0.008933
     case 3  T 387.843450  n 0.0000  vs frame 68.5714  sF 2436.645  sH 3209.432  cycles 1.234286e7 / 1.234286e7  widths 32.488602 / 144.027124
   member 5  z 59  m 1  alpha 20  x 0.037256  b 10.000000  beta 0.000000  d 59.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 390.923714  n -3.3898  vs frame 82.3245  sF 2514.123  sH 3367.004  cycles -  widths 18.418487 / 19.182515
     case 2  T 0.201885  n 0.0000  vs frame 0.0000  sF 1.298  sH 76.516  cycles -  widths 0.009512 / 0.009906
@@ -6877,10 +6859,8 @@
   mesh 2  members 3 6  alpha_w 20.104080  eps 1.548221 / 0.000000 / 1.548221  efficiency 98.107354 / 98.107354 %  play 0.069611 / 0.092815 deg  shares a factor
     power through, by case: 0.693971 / 0.395696 / 0.693971
   mesh 3  members 6 4  alpha_w 20.104080  eps 1.757409 / 0.000000 / 1.757409  efficiency 99.124183 / 99.124183 %  play 0.093476 / 0.028043 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 16.621862 / 25.130432 / 16.621862
   mesh 4  members 7 5  alpha_w 20.104080  eps 1.742869 / 0.000000 / 1.742869  efficiency 99.066170 / 99.066170 %  play 0.098975 / 0.028518 deg  coprime
-    ! mesh.flank_interference
     power through, by case: 16.091291 / 24.514639 / 16.091291
   distance 2  running 21.013928  clearance 0.020000
 
@@ -7009,13 +6989,13 @@
     case 2  T 0.049192  n 0.0000  vs frame 0.0000  sF 1.596  sH 113.738  cycles -  widths 0.011689 / 0.021889
     case 3  T 4.765995  n -346.6667  vs frame -426.6667  sF 156.169  sH 1125.234  cycles 2.560000e7 / 2.560000e7  widths 2.082259 / 17.704077
   member 6  z 96  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 96.000000
+    ! gear.addendum_held_to_mate_flank
     case 1  T 24.882708  n 0.0000  vs frame -100.0000  sF 102.239  sH 694.894  cycles -  widths 0.749006 / 0.817063
     case 2  T 0.262356  n 0.0000  vs frame 0.0000  sF 1.078  sH 71.354  cycles -  widths 0.007897 / 0.008615
     case 3  T 24.882708  n 0.0000  vs frame -80.0000  sF 102.239  sH 694.894  cycles 1.440000e7 / 1.440000e7  widths 1.363191 / 6.751887
   mesh 2  members 3 4  alpha_w 20.149246  eps 1.546097 / 0.000000 / 1.546097  efficiency 98.110213 / 98.110213 %  play 0.069762 / 0.093016 deg  shares a factor
     power through, by case: 1.295412 / 1.271143 / 1.295412
   mesh 3  members 5 6  alpha_w 19.919074  eps 1.755255 / 0.000000 / 1.755255  efficiency 98.989239 / 98.989239 %  play 0.092505 / 0.017345 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 1.244135 / 1.311780 / 1.244135
   mesh 4  members 4 5  alpha_w 20.173990  eps 1.510040 / 0.000000 / 1.510040  efficiency 97.891587 / 97.891587 %  play 0.093071 / 0.093071 deg  shares a factor
     power through, by case: 1.270932 / 1.298521 / 1.270932
@@ -7068,13 +7048,13 @@
     case 2  T 0.019126  n 0.0000  vs frame 0.0000  sF 0.620  sH 70.921  cycles -  widths 0.004545 / 0.008511
     case 3  T 0.490551  n 3466.6667  vs frame 4266.6667  sF 16.074  sH 361.001  cycles 2.560000e8 / 2.560000e8  widths 0.214321 / 1.822233
   member 4  z 96  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 96.000000
+    ! gear.addendum_held_to_mate_flank
     case 1  T 2.561111  n 0.0000  vs frame 1000.0000  sF 10.523  sH 222.938  cycles -  widths 0.077093 / 0.084098
     case 2  T 0.102006  n 0.0000  vs frame 0.0000  sF 0.419  sH 44.492  cycles -  widths 0.003071 / 0.003350
     case 3  T 2.561111  n 0.0000  vs frame 800.0000  sF 10.523  sH 222.938  cycles 1.440000e8 / 1.440000e8  widths 0.140310 / 0.694954
   mesh 1  members 1 2  alpha_w 20.149246  eps 1.546097 / 0.000000 / 1.546097  efficiency 98.110213 / 98.110213 %  play 0.069762 / 0.093016 deg  shares a factor
     power through, by case: 1.333333 / 1.250105 / 1.333333
   mesh 2  members 3 4  alpha_w 19.919074  eps 1.755255 / 0.000000 / 1.755255  efficiency 98.989239 / 98.989239 %  play 0.092505 / 0.017345 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 1.280555 / 1.290070 / 1.280555
   mesh 3  members 2 3  alpha_w 20.173990  eps 1.510040 / 0.000000 / 1.510040  efficiency 97.891587 / 97.891587 %  play 0.093071 / 0.093071 deg  shares a factor
     power through, by case: 1.308136 / 1.277031 / 1.308136
@@ -7143,13 +7123,13 @@
     case 2  T 0.018825  n 0.0000  vs frame 0.0000  sF 0.611  sH 70.360  cycles -  widths 0.004473 / 0.008377
     case 3  T 0.490551  n 3466.6667  vs frame 4266.6667  sF 16.074  sH 361.001  cycles 2.560000e8 / 2.560000e8  widths 0.214321 / 1.822233
   member 4  z 96  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 96.000000
+    ! gear.addendum_held_to_mate_flank
     case 1  T 2.561111  n 0.0000  vs frame 1000.0000  sF 10.523  sH 222.938  cycles -  widths 0.077093 / 0.084098
     case 2  T 0.100400  n 0.0000  vs frame 0.0000  sF 0.413  sH 44.140  cycles -  widths 0.003022 / 0.003297
     case 3  T 2.561111  n 0.0000  vs frame 800.0000  sF 10.523  sH 222.938  cycles 1.440000e8 / 1.440000e8  widths 0.140310 / 0.694954
   mesh 1  members 1 2  alpha_w 20.149246  eps 1.546097 / 0.000000 / 1.546097  efficiency 98.110213 / 98.110213 %  play 0.069762 / 0.093016 deg  shares a factor
     power through, by case: 1.333333 / 1.230427 / 1.333333
   mesh 2  members 3 4  alpha_w 19.919074  eps 1.755255 / 0.000000 / 1.755255  efficiency 98.989239 / 98.989239 %  play 0.092505 / 0.017345 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 1.280555 / 1.269762 / 1.280555
   mesh 3  members 2 3  alpha_w 20.173990  eps 1.510040 / 0.000000 / 1.510040  efficiency 97.891587 / 97.891587 %  play 0.093071 / 0.093071 deg  shares a factor
     power through, by case: 1.308136 / 1.256928 / 1.308136
@@ -7229,13 +7209,13 @@
     case 2  T 0.020165  n 0.0000  vs frame 0.0000  sF 0.654  sH 72.822  cycles -  widths 0.004792 / 0.008973
     case 3  T 0.490551  n 3466.6667  vs frame 4266.6667  sF 16.074  sH 361.001  cycles 2.560000e8 / 2.560000e8  widths 0.214321 / 1.822233
   member 4  z 96  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 96.000000
+    ! gear.addendum_held_to_mate_flank
     case 1  T 2.561111  n 0.0000  vs frame 1000.0000  sF 10.523  sH 222.938  cycles -  widths 0.077093 / 0.084098
     case 2  T 0.107548  n 0.0000  vs frame 0.0000  sF 0.442  sH 45.685  cycles -  widths 0.003237 / 0.003532
     case 3  T 2.561111  n 0.0000  vs frame 800.0000  sF 10.523  sH 222.938  cycles 1.440000e8 / 1.440000e8  widths 0.140310 / 0.694954
   mesh 1  members 1 2  alpha_w 20.149246  eps 1.546097 / 0.000000 / 1.546097  efficiency 98.110213 / 98.110213 %  play 0.069762 / 0.093016 deg  shares a factor
     power through, by case: 1.333333 / 1.232994 / 1.333333
   mesh 2  members 3 4  alpha_w 19.919074  eps 1.755255 / 0.000000 / 1.755255  efficiency 98.989239 / 98.989239 %  play 0.092505 / 0.017345 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 1.280555 / 1.272412 / 1.280555
   mesh 3  members 2 3  alpha_w 20.173990  eps 1.510040 / 0.000000 / 1.510040  efficiency 97.891587 / 97.891587 %  play 0.093071 / 0.093071 deg  shares a factor
     power through, by case: 1.308136 / 1.259551 / 1.308136
@@ -7323,13 +7303,13 @@
     case 2  T 0.000000  n 0.0000  vs frame 0.0000  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
     case 3  T 0.490551  n 3466.6667  vs frame 4266.6667  sF 16.074  sH 361.001  cycles 2.560000e8 / 2.560000e8  widths 0.214321 / 1.822233
   member 4  z 96  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 96.000000
+    ! gear.addendum_held_to_mate_flank
     case 1  T 2.561111  n 0.0000  vs frame 1000.0000  sF 10.523  sH 222.938  cycles -  widths 0.077093 / 0.084098
     case 2  T 0.000000  n 0.0000  vs frame 0.0000  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
     case 3  T 2.561111  n 0.0000  vs frame 800.0000  sF 10.523  sH 222.938  cycles 1.440000e8 / 1.440000e8  widths 0.140310 / 0.694954
   mesh 1  members 1 2  alpha_w 20.149246  eps 1.546097 / 0.000000 / 1.546097  efficiency 98.110213 / 98.110213 %  play 0.069762 / 0.093016 deg  shares a factor
     power through, by case: 1.333333 / 0.000000 / 1.333333
   mesh 2  members 3 4  alpha_w 19.919074  eps 1.755255 / 0.000000 / 1.755255  efficiency 98.989239 / 98.989239 %  play 0.092505 / 0.017345 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 1.280555 / 0.000000 / 1.280555
   mesh 3  members 2 3  alpha_w 20.173990  eps 1.510040 / 0.000000 / 1.510040  efficiency 97.891587 / 97.891587 %  play 0.093071 / 0.093071 deg  shares a factor
     power through, by case: 1.308136 / 0.000000 / 1.308136
@@ -7397,13 +7377,13 @@
     case 2  T 0.016386  n 0.0000  vs frame 0.0000  sF 0.531  sH 65.643  cycles -  widths 0.003894 / 0.007291
     case 3  T 0.490551  n 3466.6667  vs frame 4266.6667  sF 16.074  sH 361.001  cycles 2.560000e8 / 2.560000e8  widths 0.214321 / 1.822233
   member 4  z 96  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 96.000000
+    ! gear.addendum_held_to_mate_flank
     case 1  T 2.561111  n 0.0000  vs frame 1000.0000  sF 10.523  sH 222.938  cycles -  widths 0.077093 / 0.084098
     case 2  T 0.087390  n 0.0000  vs frame 0.0000  sF 0.359  sH 41.181  cycles -  widths 0.002631 / 0.002870
     case 3  T 2.561111  n 0.0000  vs frame 800.0000  sF 10.523  sH 222.938  cycles 1.440000e8 / 1.440000e8  widths 0.140310 / 0.694954
   mesh 1  members 1 2  alpha_w 20.149246  eps 1.546097 / 0.000000 / 1.546097  efficiency 98.110213 / 98.110213 %  play 0.069762 / 0.093016 deg  shares a factor
     power through, by case: 1.333333 / 1.070984 / 1.333333
   mesh 2  members 3 4  alpha_w 19.919074  eps 1.755255 / 0.000000 / 1.755255  efficiency 98.989239 / 98.989239 %  play 0.092505 / 0.017345 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 1.280555 / 1.105222 / 1.280555
   mesh 3  members 2 3  alpha_w 20.173990  eps 1.510040 / 0.000000 / 1.510040  efficiency 97.891587 / 97.891587 %  play 0.093071 / 0.093071 deg  shares a factor
     power through, by case: 1.308136 / 1.094051 / 1.308136
@@ -7475,13 +7455,13 @@
     case 2  T 0.006866  n 0.0000  vs frame 0.0000  sF 0.223  sH 42.494  cycles -  widths 0.001632 / 0.003055
     case 3  T 0.490551  n 3466.6667  vs frame 4266.6667  sF 16.074  sH 361.001  cycles 2.560000e8 / 2.560000e8  widths 0.214321 / 1.822233
   member 4  z 96  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 96.000000
+    ! gear.addendum_held_to_mate_flank
     case 1  T 2.561111  n 0.0000  vs frame 1000.0000  sF 10.523  sH 222.938  cycles -  widths 0.077093 / 0.084098
     case 2  T 0.036621  n 0.0000  vs frame 0.0000  sF 0.150  sH 26.658  cycles -  widths 0.001102 / 0.001203
     case 3  T 2.561111  n 0.0000  vs frame 800.0000  sF 10.523  sH 222.938  cycles 1.440000e8 / 1.440000e8  widths 0.140310 / 0.694954
   mesh 1  members 1 2  alpha_w 20.149246  eps 1.546097 / 0.000000 / 1.546097  efficiency 98.110213 / 98.110213 %  play 0.069762 / 0.093016 deg  shares a factor
     power through, by case: 1.333333 / 1.242030 / 1.333333
   mesh 2  members 3 4  alpha_w 19.919074  eps 1.755255 / 0.000000 / 1.755255  efficiency 98.989239 / 98.989239 %  play 0.092505 / 0.017345 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 1.280555 / 1.281736 / 1.280555
   mesh 3  members 2 3  alpha_w 20.173990  eps 1.510040 / 0.000000 / 1.510040  efficiency 97.891587 / 97.891587 %  play 0.093071 / 0.093071 deg  shares a factor
     power through, by case: 1.308136 / 1.268781 / 1.308136
@@ -7498,13 +7478,13 @@
     case 2  T 0.071701  n 0.0000  vs frame 0.0000  sF 1.449  sH 103.815  cycles -  widths 0.010613 / 0.018236
     case 3  T 4.671393  n 160.0000  vs frame 274.2857  sF 94.870  sH 840.103  cycles 1.645714e7 / 1.645714e7  widths 1.264931 / 9.868550
   member 7  z 72  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 72.000000
+    ! gear.addendum_held_to_mate_flank
     case 1  T 10.969006  n 0.0000  vs frame 142.8571  sF 53.337  sH 377.258  cycles -  widths 0.390746 / 0.240821
     case 2  T 0.172083  n 0.0000  vs frame 0.0000  sF 0.837  sH 47.252  cycles -  widths 0.006130 / 0.003778
     case 3  T 10.969006  n 0.0000  vs frame 114.2857  sF 53.337  sH 377.258  cycles 2.057143e7 / 2.057143e7  widths 0.711157 / 1.990053
   mesh 4  members 5 6  alpha_w 21.054925  eps 1.436891 / 0.000000 / 1.436891  efficiency 97.838469 / 97.838469 %  play 0.145568 / 0.058227 deg  shares a factor
     power through, by case: 0.800810 / 0.856014 / 0.800810
   mesh 5  members 6 7  alpha_w 21.054925  eps 1.861462 / 0.000000 / 1.861462  efficiency 99.488565 / 99.488565 %  play 0.058600 / 0.024417 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 0.783500 / 0.860415 / 0.783500
   distance 4  running 21.145279  clearance 0.020000
 
@@ -7559,13 +7539,13 @@
     case 2  T 0.000056  n 0.0000  vs frame 0.0000  sF 0.002  sH 3.843  cycles -  widths 0.000013 / 0.000025
     case 3  T 0.490551  n 3466.6667  vs frame 4266.6667  sF 16.074  sH 361.001  cycles 2.560000e8 / 2.560000e8  widths 0.214321 / 1.822233
   member 4  z 96  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 96.000000
+    ! gear.addendum_held_to_mate_flank
     case 1  T 2.561111  n 0.0000  vs frame 1000.0000  sF 10.523  sH 222.938  cycles -  widths 0.077093 / 0.084098
     case 2  T 0.000290  n 0.0000  vs frame 0.0000  sF 0.001  sH 2.373  cycles -  widths 0.000009 / 0.000010
     case 3  T 2.561111  n 0.0000  vs frame 800.0000  sF 10.523  sH 222.938  cycles 1.440000e8 / 1.440000e8  widths 0.140310 / 0.694954
   mesh 1  members 1 2  alpha_w 20.149246  eps 1.546097 / 0.000000 / 1.546097  efficiency 98.110213 / 98.110213 %  play 0.069762 / 0.093016 deg  shares a factor
     power through, by case: 1.333333 / 0.086208 / 1.333333
   mesh 2  members 3 4  alpha_w 19.919074  eps 1.755255 / 0.000000 / 1.755255  efficiency 98.989239 / 98.989239 %  play 0.092505 / 0.017345 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 1.280555 / 0.082796 / 1.280555
   mesh 3  members 2 3  alpha_w 20.173990  eps 1.510040 / 0.000000 / 1.510040  efficiency 97.891587 / 97.891587 %  play 0.093071 / 0.093071 deg  shares a factor
     power through, by case: 1.308136 / 0.084579 / 1.308136
@@ -7578,21 +7558,20 @@
     case 2  T 0.060064  n 0.0000  vs frame 0.0000  sF 1.744  sH 85.966  cycles -  widths 0.012775 / 0.012505
     case 3  T 16.438734  n 1866.6667  vs frame 2666.6667  sF 477.248  sH 1415.922  cycles 1.600000e8 / 1.600000e8  widths 6.363304 / 28.032796
   member 6  z 60  m 1  alpha 20  x 0.028069  b 10.000000  beta 0.000000  d 60.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 54.314541  n 0.0000  vs frame 1000.0000  sF 341.913  sH 1200.799  cycles -  widths 2.504854 / 2.439828
     case 2  T 0.200212  n 0.0000  vs frame 0.0000  sF 1.260  sH 72.905  cycles -  widths 0.009233 / 0.008994
     case 3  T 54.314541  n 0.0000  vs frame 800.0000  sF 341.913  sH 1200.799  cycles 1.440000e8 / 1.440000e8  widths 4.558834 / 20.161776
   member 7  z 61  m 1  alpha 20  x -0.429445  b 10.000000  beta 0.000000  d 61.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
-    ! clamp.ring_flank_ungenerated
     case 1  T 55.709045  n -16.3934  vs frame 983.6066  sF 389.322  sH 1369.965  cycles -  widths 2.852175 / 3.175682
     case 2  T 0.201772  n 0.0000  vs frame 0.0000  sF 1.410  sH 82.447  cycles -  widths 0.010330 / 0.011502
     case 3  T 55.709045  n -13.1148  vs frame 786.8852  sF 389.322  sH 1369.965  cycles 1.416393e8 / 1.416393e8  widths 5.190959 / 26.242581
   mesh 4  members 5 6  alpha_w 20.059335  eps 1.755255 / 0.000000 / 1.755255  efficiency 99.127208 / 99.127208 %  play 0.093279 / 0.027984 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 27.157270 / 57.116375 / 27.157270
   mesh 5  members 5 7  alpha_w 15.907986  eps 1.755255 / 0.000000 / 1.755255  efficiency 99.121756 / 99.121756 %  play 0.074710 / 0.022046 deg  coprime
-    ! mesh.flank_interference
     power through, by case: 27.397891 / 56.617868 / 27.397891
   distance 4  running 21.007930  clearance 0.020000
 
@@ -7650,13 +7629,13 @@
     case 2  T 0.000302  n 0.0000  vs frame 0.0000  sF 0.010  sH 8.913  cycles -  widths 0.000072 / 0.000134
     case 3  T 0.490551  n 3466.6667  vs frame 4266.6667  sF 16.074  sH 361.001  cycles 2.560000e8 / 2.560000e8  widths 0.214321 / 1.822233
   member 4  z 96  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 96.000000
+    ! gear.addendum_held_to_mate_flank
     case 1  T 2.561111  n 0.0000  vs frame 1000.0000  sF 10.523  sH 222.938  cycles -  widths 0.077093 / 0.084098
     case 2  T 0.001611  n 0.0000  vs frame 0.0000  sF 0.007  sH 5.592  cycles -  widths 0.000048 / 0.000053
     case 3  T 2.561111  n 0.0000  vs frame 800.0000  sF 10.523  sH 222.938  cycles 1.440000e8 / 1.440000e8  widths 0.140310 / 0.694954
   mesh 1  members 1 2  alpha_w 20.149246  eps 1.546097 / 0.000000 / 1.546097  efficiency 98.110213 / 98.110213 %  play 0.069762 / 0.093016 deg  shares a factor
     power through, by case: 1.333333 / 0.690853 / 1.333333
   mesh 2  members 3 4  alpha_w 19.919074  eps 1.755255 / 0.000000 / 1.755255  efficiency 98.989239 / 98.989239 %  play 0.092505 / 0.017345 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 1.280555 / 0.712939 / 1.280555
   mesh 3  members 2 3  alpha_w 20.173990  eps 1.510040 / 0.000000 / 1.510040  efficiency 97.891587 / 97.891587 %  play 0.093071 / 0.093071 deg  shares a factor
     power through, by case: 1.308136 / 0.705732 / 1.308136
@@ -7668,11 +7647,13 @@
     case 2  T 0.001252  n 0.0000  vs frame 0.0000  sF 0.028  sH 14.395  cycles -  widths 0.000206 / 0.000351
     case 3  T 1.868557  n -800.0000  vs frame -571.4286  sF 41.969  sH 556.134  cycles 1.028571e8 / 1.028571e8  widths 0.559593 / 4.324614
   member 6  z 60  m 1  alpha 20  x 0.028069  b 10.000000  beta 0.000000  d 60.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 111.888325  n 0.0000  vs frame 285.7143  sF 702.944  sH 1723.822  cycles -  widths 5.149771 / 5.028091
     case 2  T 0.198772  n 0.0000  vs frame 0.0000  sF 1.249  sH 72.657  cycles -  widths 0.009149 / 0.008933
     case 3  T 111.888325  n 0.0000  vs frame 228.5714  sF 702.944  sH 1723.822  cycles 4.114286e7 / 4.114286e7  widths 9.372584 / 41.550150
   member 7  z 59  m 1  alpha 20  x 0.037256  b 10.000000  beta 0.000000  d 59.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 112.776945  n -11.2994  vs frame 274.4149  sF 725.295  sH 1808.455  cycles -  widths 5.313519 / 5.533932
     case 2  T 0.201885  n 0.0000  vs frame 0.0000  sF 1.298  sH 76.516  cycles -  widths 0.009512 / 0.009906
@@ -7691,10 +7672,8 @@
   mesh 4  members 5 8  alpha_w 20.104080  eps 1.548221 / 0.000000 / 1.548221  efficiency 98.107354 / 98.107354 %  play 0.069611 / 0.092815 deg  shares a factor
     power through, by case: 0.667342 / 0.395696 / 0.667342
   mesh 5  members 8 6  alpha_w 20.104080  eps 1.757409 / 0.000000 / 1.757409  efficiency 99.124183 / 99.124183 %  play 0.093476 / 0.028043 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 15.984046 / 25.130432 / 15.984046
   mesh 6  members 9 7  alpha_w 20.104080  eps 1.742869 / 0.000000 / 1.742869  efficiency 99.066170 / 99.066170 %  play 0.098975 / 0.028518 deg  coprime
-    ! mesh.flank_interference
     power through, by case: 15.473834 / 24.514639 / 15.473834
   distance 4  running 21.013928  clearance 0.020000
 
@@ -7749,13 +7728,13 @@
     case 2  T 0.004776  n 0.0000  vs frame 0.0000  sF 0.155  sH 35.438  cycles -  widths 0.001135 / 0.002125
     case 3  T 0.490551  n 3466.6667  vs frame 4266.6667  sF 16.074  sH 361.001  cycles 2.560000e8 / 2.560000e8  widths 0.214321 / 1.822233
   member 4  z 96  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 96.000000
+    ! gear.addendum_held_to_mate_flank
     case 1  T 2.561111  n 0.0000  vs frame 1000.0000  sF 10.523  sH 222.938  cycles -  widths 0.077093 / 0.084098
     case 2  T 0.025470  n 0.0000  vs frame 0.0000  sF 0.105  sH 22.232  cycles -  widths 0.000767 / 0.000836
     case 3  T 2.561111  n 0.0000  vs frame 800.0000  sF 10.523  sH 222.938  cycles 1.440000e8 / 1.440000e8  widths 0.140310 / 0.694954
   mesh 1  members 1 2  alpha_w 20.149246  eps 1.546097 / 0.000000 / 1.546097  efficiency 98.110213 / 98.110213 %  play 0.069762 / 0.093016 deg  shares a factor
     power through, by case: 1.333333 / 1.234031 / 1.333333
   mesh 2  members 3 4  alpha_w 19.919074  eps 1.755255 / 0.000000 / 1.755255  efficiency 98.989239 / 98.989239 %  play 0.092505 / 0.017345 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 1.280555 / 1.273482 / 1.280555
   mesh 3  members 2 3  alpha_w 20.173990  eps 1.510040 / 0.000000 / 1.510040  efficiency 97.891587 / 97.891587 %  play 0.093071 / 0.093071 deg  shares a factor
     power through, by case: 1.308136 / 1.260610 / 1.308136
@@ -7828,13 +7807,13 @@
     case 2  T 0.015337  n 0.0000  vs frame 0.0000  sF 0.497  sH 63.508  cycles -  widths 0.003645 / 0.006825
     case 3  T 0.490551  n 3466.6667  vs frame 4266.6667  sF 16.074  sH 361.001  cycles 2.560000e8 / 2.560000e8  widths 0.214321 / 1.822233
   member 4  z 96  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 96.000000
+    ! gear.addendum_held_to_mate_flank
     case 1  T 2.561111  n 0.0000  vs frame 1000.0000  sF 10.523  sH 222.938  cycles -  widths 0.077093 / 0.084098
     case 2  T 0.081797  n 0.0000  vs frame 0.0000  sF 0.336  sH 39.842  cycles -  widths 0.002462 / 0.002686
     case 3  T 2.561111  n 0.0000  vs frame 800.0000  sF 10.523  sH 222.938  cycles 1.440000e8 / 1.440000e8  widths 0.140310 / 0.694954
   mesh 1  members 1 2  alpha_w 20.149246  eps 1.546097 / 0.000000 / 1.546097  efficiency 98.110213 / 98.110213 %  play 0.069762 / 0.093016 deg  shares a factor
     power through, by case: 1.333333 / 1.188952 / 1.333333
   mesh 2  members 3 4  alpha_w 19.919074  eps 1.755255 / 0.000000 / 1.755255  efficiency 98.989239 / 98.989239 %  play 0.092505 / 0.017345 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 1.280555 / 1.226962 / 1.280555
   mesh 3  members 2 3  alpha_w 20.173990  eps 1.510040 / 0.000000 / 1.510040  efficiency 97.891587 / 97.891587 %  play 0.093071 / 0.093071 deg  shares a factor
     power through, by case: 1.308136 / 1.214560 / 1.308136
@@ -7854,13 +7833,13 @@
     case 2  T 0.049192  n 0.0000  vs frame 0.0000  sF 1.596  sH 113.738  cycles -  widths 0.011689 / 0.021889
     case 3  T 1.374934  n -1155.5556  vs frame -1422.2222  sF 45.053  sH 604.376  cycles 8.533333e7 / 8.533333e7  widths 0.600708 / 5.107420
   member 8  z 96  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 96.000000
+    ! gear.addendum_held_to_mate_flank
     case 1  T 7.178372  n 0.0000  vs frame -333.3333  sF 29.495  sH 373.235  cycles -  widths 0.216080 / 0.235713
     case 2  T 0.262356  n 0.0000  vs frame 0.0000  sF 1.078  sH 71.354  cycles -  widths 0.007897 / 0.008615
     case 3  T 7.178372  n 0.0000  vs frame -266.6667  sF 29.495  sH 373.235  cycles 4.800000e7 / 4.800000e7  widths 0.393265 / 1.947841
   mesh 4  members 5 6  alpha_w 20.149246  eps 1.546097 / 0.000000 / 1.546097  efficiency 98.110213 / 98.110213 %  play 0.069762 / 0.093016 deg  shares a factor
     power through, by case: 1.245705 / 1.271143 / 1.245705
   mesh 5  members 7 8  alpha_w 19.919074  eps 1.755255 / 0.000000 / 1.755255  efficiency 98.989239 / 98.989239 %  play 0.092505 / 0.017345 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 1.196395 / 1.311780 / 1.196395
   mesh 6  members 6 7  alpha_w 20.173990  eps 1.510040 / 0.000000 / 1.510040  efficiency 97.891587 / 97.891587 %  play 0.093071 / 0.093071 deg  shares a factor
     power through, by case: 1.222164 / 1.298521 / 1.222164
@@ -7960,11 +7939,13 @@
     case 2  T 0.001252  n 0.0000  vs frame 0.0000  sF 0.028  sH 14.395  cycles -  widths 0.000206 / 0.000351
     case 3  T 3.806299  n -400.9921  vs frame -286.4230  sF 85.493  sH 793.740  cycles 5.155613e7 / 5.155613e7  widths 1.139904 / 8.809350
   member 10  z 60  m 1  alpha 20  x 0.028069  b 10.000000  beta 0.000000  d 60.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 227.919402  n 0.0000  vs frame 143.2115  sF 1431.915  sH 2460.314  cycles -  widths 10.490217 / 10.242351
     case 2  T 0.198772  n 0.0000  vs frame 0.0000  sF 1.249  sH 72.657  cycles -  widths 0.009149 / 0.008933
     case 3  T 227.919402  n 0.0000  vs frame 114.5692  sF 1431.915  sH 2460.314  cycles 2.062245e7 / 2.062245e7  widths 19.092195 / 84.638727
   member 11  z 59  m 1  alpha 20  x 0.037256  b 10.000000  beta 0.000000  d 59.000000
+    ! gear.addendum_held_to_mate_flank
     ! gear.contact_above_allowable
     case 1  T 229.729544  n -5.6637  vs frame 137.5478  sF 1477.445  sH 2581.107  cycles -  widths 10.823776 / 11.272763
     case 2  T 0.201885  n 0.0000  vs frame 0.0000  sF 1.298  sH 76.516  cycles -  widths 0.009512 / 0.009906
@@ -7983,10 +7964,8 @@
   mesh 5  members 9 12  alpha_w 20.104080  eps 1.548221 / 0.000000 / 1.548221  efficiency 98.107354 / 98.107354 %  play 0.069611 / 0.092815 deg  shares a factor
     power through, by case: 0.681382 / 0.395696 / 0.681382
   mesh 6  members 12 10  alpha_w 20.104080  eps 1.757409 / 0.000000 / 1.757409  efficiency 99.124183 / 99.124183 %  play 0.093476 / 0.028043 deg  shares a factor
-    ! mesh.flank_interference
     power through, by case: 16.320338 / 25.130432 / 16.320338
   mesh 7  members 13 11  alpha_w 20.104080  eps 1.742869 / 0.000000 / 1.742869  efficiency 99.066170 / 99.066170 %  play 0.098975 / 0.028518 deg  coprime
-    ! mesh.flank_interference
     power through, by case: 15.799391 / 24.514639 / 15.799391
   distance 3  running 21.013928  clearance 0.020000
 

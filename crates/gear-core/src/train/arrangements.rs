@@ -395,7 +395,8 @@ impl Shape {
     /// A member at the crate's default tooth, its thickness coefficient
     /// and shift automatic, at the pressure angle the shape's members
     /// already run at — the first's, or the crate's where there is none;
-    /// a ring where a cutter is given.
+    /// a ring where a cutter is given, its tip held off its mates' usable
+    /// flanks ([`MemberGear::no_tip_past_mate_flank`]).
     pub(crate) fn push_member(
         &mut self,
         body: usize,
@@ -411,6 +412,8 @@ impl Shape {
             body,
             gear: MemberGear {
                 teeth,
+                // A ring's tip is held off its mates' usable flanks.
+                no_tip_past_mate_flank: ring.is_some(),
                 ..MemberGear::default()
             },
             module: Auto::automatic(module),
@@ -1410,6 +1413,9 @@ mod hula {
             }
             for m in &mut shape.members {
                 m.gear.addendum = self.addendum;
+                // The tables study the addendum as typed, a tip that
+                // interferes included.
+                m.gear.no_tip_past_mate_flank = false;
                 if let Some(c) = &mut m.ring {
                     c.teeth = self.cutter_teeth;
                 }

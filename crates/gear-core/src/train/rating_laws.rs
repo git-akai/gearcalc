@@ -483,3 +483,51 @@ fn the_canary_says_its_flank_is_past_its_allowable() {
         r.members[0].notes
     );
 }
+
+/// **No default design reaches a flank past its usable end.** Every preset,
+/// every arrangement of a set, a Ravigneaux, the hula and a worm beside a
+/// pair, solved alone as shipped: no mesh reports flank interference and
+/// none says so. A full-depth ring's tip reaches below its planet's form
+/// circle, so a default that interferes is a default nobody would cut.
+#[test]
+fn no_default_design_raises_flank_interference() {
+    use super::arrangements::{hula, planetary, ravigneaux, worm_and_pair};
+    use crate::planetary::{Arrangement, PlanetaryShaft};
+    let mut trains: Vec<(String, Train)> = Preset::ALL
+        .iter()
+        .map(|p| (format!("{p:?}"), Train::alone(&p.build(), 2.0, 3000.0)))
+        .collect();
+    let set = planetary(12, 30, 72, 3);
+    for input in PlanetaryShaft::ALL {
+        for fixed in PlanetaryShaft::ALL {
+            if input != fixed {
+                let arrangement = Arrangement { input, fixed };
+                trains.push((
+                    format!("{arrangement:?}"),
+                    Train::alone(&set, 2.0, 3000.0).arranged_as(arrangement),
+                ));
+            }
+        }
+    }
+    for (name, shape) in [
+        ("ravigneaux", ravigneaux([18, 30], [22, 18], 62, 3)),
+        ("hula", hula([65, 61, 57, 61], [1.0, 1.0])),
+        ("worm and pair", worm_and_pair((1, 40), (17, 43))),
+    ] {
+        trains.push((name.into(), Train::alone(&shape, 2.0, 3000.0)));
+    }
+    let mut fouled = Vec::new();
+    for (name, t) in &trains {
+        let r = solve_train(t, &test_library()).unwrap_or_else(|e| panic!("{name}: {e}"));
+        for (k, m) in r.meshes.iter().enumerate() {
+            let said = m
+                .notes
+                .iter()
+                .any(|n| n.is(crate::note::key::MESH_FLANK_INTERFERENCE));
+            if m.flank_interference.contains(&true) || said {
+                fouled.push(format!("{name} mesh {k}: {:?}", m.flank_interference));
+            }
+        }
+    }
+    assert!(fouled.is_empty(), "defaults that interfere: {fouled:#?}");
+}

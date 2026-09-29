@@ -560,6 +560,20 @@ Undercut is what the *cutter* does to one gear on its own; interference is what 
 particular *mate* does to it. A 9-tooth pinion at its undercut floor is clear of
 both; unshifted it is clear of neither.
 
+**A tip can be held to it.** The same relation read the other way gives the
+tip radius that meets the mate's junction exactly, `r_a = conjugate(r_j,mate)`,
+and a member asking `no_tip_past_mate_flank` has its addendum held to it:
+`h_a = σ((r_a − r)/m − x)`, the lowest over its meshes, beside the tip-width
+bound and never above the number typed (`gear.addendum_held_to_mate_flank`).
+The mesh finds the bound at its running geometry and hands the gear a number;
+the gear never reads its mate. It is on for a ring as the tool lays one in —
+an internal pair at full depth interferes as a matter of course — and off for
+an external gear, whose interference a search answers by shift. The path of
+contact is unchanged by holding, since it was already cut at that junction:
+only the ring's tooth is shorter. The closed form lands within a rounding of
+the junction either side, so the tip is checked on the path the report reads
+and shortened by what it still reaches past.
+
 The one condition that does not generalise is two tips fouling **away from the
 line of action**, which is `TipRoom`: an external pair's tip circles cross on the
 line of centres or not at all, so the question does not arise.
@@ -2113,12 +2127,13 @@ addendum, the shaper and each mesh's shift division free (`gear-cli hulaband`):
 | 2 | 36 | 0.500 | 99.784 % | **58.9 %** | 35.2° | 0.154° |
 | 3 | 54 | 0.333 | 99.956 % | **87.6 %** | 25.4° | 0.077° |
 | 4 | 72 | 0.250 | 99.980 % | **94.0 %** | 19.4° | 0.046° |
-| 6 | 108 | 0.167 | 99.982 % | **94.6 %** | 17.25° | 0.027° |
-| 9 | 162 | 0.111 | 99.915 % | **78.5 %** | 13.6° | 0.014° |
+| 6 | 108 | 0.167 | 99.983 % | **94.7 %** | 17.3° | 0.027° |
+| 9 | 162 | 0.111 | 99.923 % | **80.1 %** | 13.8° | 0.014° |
 
 *(The operating angle is the **running** mesh's, 0.02 mm inside the
 zero-backlash crank; the solver that generated the first version of this table
-quoted the zero-backlash angle.)*
+quoted the zero-backlash angle. The rings' tips are held off their pinions'
+usable flanks, which opened a larger shaper to the rows from `d = 6`.)*
 
 **These are optimised divisions, and they sit on a bound rather than at an
 optimum.** The *sum* of a mesh's two shifts is never free — the crank offset is
@@ -2129,7 +2144,7 @@ where they land: on these stages the mesh loses least at divisions of `+2.85`,
 three is admissible, because contact has gone discontinuous or the tips have
 fouled well before. The rows through `d = 4` sit at `ε` between 1.00 and 1.04
 with the tip margin at zero instead; from `d = 5` the winning row's contact
-ratio rises again — 1.11, then 1.32 — which is the turn-over the last rows
+ratio rises again — 1.11, then 1.33 — which is the turn-over the last rows
 show. The loss is still falling when the geometry runs out, so what a designer
 wants to know is which bound stops it — and that is what these are.
 

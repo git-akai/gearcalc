@@ -1102,16 +1102,30 @@ impl MemberRating<'_> {
 pub(crate) struct AddendumAsked {
     /// The coefficient to build with, in modules.
     pub used: f64,
-    /// Whether the bound cut it down, and so whether the tooth is the one that
-    /// was asked for.
-    pub clamped: bool,
+    /// Which bound cut it down, if one did — and so whether the tooth is the
+    /// one that was asked for.
+    pub held_by: Option<AddendumBound>,
 }
+
+/// **What an addendum can be held to**: the two ends of a tip's room.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum AddendumBound {
+    /// The tip no narrower than [`MemberGear::min_tip_width`].
+    TipWidth,
+    /// The tip reaching no further than a mate's usable flank
+    /// ([`MemberGear::no_tip_past_mate_flank`]).
+    MateFlank,
+}
+
 impl AddendumAsked {
-    /// The note a clamped addendum owes its reader, if it was clamped.
+    /// The note a held addendum owes its reader, naming what held it.
     pub(crate) fn note(&self) -> Option<crate::note::Note> {
-        self.clamped.then(|| {
-            crate::note::Note::new(crate::note::key::GEAR_ADDENDUM_HELD_TO_TIP_WIDTH)
-                .number("addendum", self.used, 4)
+        self.held_by.map(|bound| {
+            crate::note::Note::new(match bound {
+                AddendumBound::TipWidth => crate::note::key::GEAR_ADDENDUM_HELD_TO_TIP_WIDTH,
+                AddendumBound::MateFlank => crate::note::key::GEAR_ADDENDUM_HELD_TO_MATE_FLANK,
+            })
+            .number("addendum", self.used, 4)
         })
     }
 }
@@ -1224,6 +1238,35 @@ pub struct MemberGear {
     pub no_sharp_tip: bool,
     /// Minimum transverse tooth tip width, mm.
     pub min_tip_width: f64,
+    /// **The tip may not reach past a mate's usable flank.**
+    ///
+    /// The same shape as [`Self::no_sharp_tip`]: an upper bound on the
+    /// addendum, which a typed number answers to. The bound is the mesh's to
+    /// compute — where this tip meets the start of its mate's usable flank
+    /// along the line of action, at the distance the mesh runs at — and the
+    /// mesh hands it to the gear as a number of modules, so the gear never
+    /// reads its mate. A member in several meshes is held to the lowest.
+    ///
+    /// It is what keeps a full-depth ring off its planet's form circle
+    /// (`crate::ring::mesh_with`): the bound meets it exactly, rather than a
+    /// fixed shorter addendum that is right for one pair of counts.
+    ///
+    /// **On for a ring where one is laid in, off otherwise**
+    /// ([`Shape::push_member`](shape::Shape::push_member)). The bound is one
+    /// rule for either kind; the default differs because the need does. An
+    /// internal pair at full depth interferes as a matter of course, so its
+    /// ring is built short. An external pair interferes only where a search
+    /// or a designer pushes it, and there the searches hold the shifts off
+    /// the interference instead. Turned on there, the bound takes that
+    /// limit away and a search tops the tips to gain efficiency: at 9/37 the
+    /// least loss moves from Σx 1.41 to 1.64 and ε drops from 1.29 to 1.20.
+    /// A document that does not say is read as off, so a saved train builds
+    /// as it did.
+    ///
+    /// Off, the addendum stands as asked and a tip that reaches too far is
+    /// said on the mesh (`mesh.flank_interference`).
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub no_tip_past_mate_flank: bool,
     pub dedendum: f64,
     pub root_radius: f64,
     /// Helix angle, degrees, signed by hand — and who decides it.
@@ -1300,34 +1343,45 @@ impl MemberGear {
     /// `cutter` is the tool of a ring, whose tooth is thinnest at its tip
     /// because it narrows inward ([`crate::ring::addendum_for_tip_width`]):
     /// the same bound, read on the tooth that tool cuts.
+    ///
+    /// `mate` is the addendum at which this tip meets the nearest mate's
+    /// usable flank, as the meshes resolved it
+    /// ([`Self::no_tip_past_mate_flank`]); `None` where no mesh bounds it.
     pub(crate) fn addendum_asked(
         &self,
         at_shift: &crate::params::GearParams,
         cutter: Option<&crate::ring::Cutter>,
+        mate: Option<f64>,
     ) -> AddendumAsked {
         let asked = self.addendum;
-        if !self.no_sharp_tip {
-            return AddendumAsked {
-                used: asked,
-                clamped: false,
+        let tip_width = self
+            .no_sharp_tip
+            .then(|| {
+                let at = GearParams {
+                    addendum: asked,
+                    ..*at_shift
+                };
+                match cutter {
+                    None => addendum_for_tip_width(&Tooth::new(at), self.min_tip_width),
+                    Some(c) => crate::ring::addendum_for_tip_width(
+                        &crate::ring::Ring::cut_by(&at, c),
+                        self.min_tip_width,
+                    ),
+                }
+            })
+            .flatten();
+        let used = tip_width.map_or(asked, |c| asked.min(c));
+        let mut out = AddendumAsked {
+            used,
+            held_by: (used < asked - 1e-12).then_some(AddendumBound::TipWidth),
+        };
+        if let Some(c) = mate.filter(|&c| self.no_tip_past_mate_flank && c < out.used) {
+            out = AddendumAsked {
+                used: c,
+                held_by: Some(AddendumBound::MateFlank),
             };
         }
-        let at = GearParams {
-            addendum: asked,
-            ..*at_shift
-        };
-        let ceiling = match cutter {
-            None => addendum_for_tip_width(&Tooth::new(at), self.min_tip_width),
-            Some(c) => crate::ring::addendum_for_tip_width(
-                &crate::ring::Ring::cut_by(&at, c),
-                self.min_tip_width,
-            ),
-        };
-        let used = ceiling.map_or(asked, |c| asked.min(c));
-        AddendumAsked {
-            used,
-            clamped: used < asked - 1e-12,
-        }
+        out
     }
 
     /// [`ShiftAsked`], for this gear at its own working depth — or, for a
@@ -1399,6 +1453,7 @@ impl Default for MemberGear {
             addendum: 1.0,
             no_sharp_tip: true,
             min_tip_width: 0.1,
+            no_tip_past_mate_flank: false,
             dedendum: 1.25,
             root_radius: 0.38,
             helix_angle: Auto::automatic(0.0),
@@ -6109,9 +6164,19 @@ mod tests {
                 // it — 4× the budget moves `η₀` by 1.75e-7. Pinned so it can
                 // only shrink; docs/state.md#known-approximate-documented-at-the-call-site
                 // has it, and the structural search (redesign C) replaces it.
-                if (sun, planet) == (11, 17) {
+                //
+                // **And 13/18**, since its ring's tip is held off the planet's
+                // usable flank rather than refused there: the region the
+                // refusal closed is open, with a kink along the planet's form
+                // circle where the hold begins, and the walk runs its budget
+                // along it — 4× the budget moves `η₀` by 5.3e-9, and 16× and
+                // 64× agree with 4×. The same wall F50 names, met again.
+                if (sun, planet) == (11, 17) || (sun, planet) == (13, 18) {
                     let moved = generous.map_or(f64::INFINITY, |g| (g - shipped).abs());
-                    assert!(moved < 2e-7, "11/17: 4× the budget moves `η₀` by {moved}");
+                    assert!(
+                        moved < 2e-7,
+                        "{sun}/{planet}: 4× the budget moves `η₀` by {moved}"
+                    );
                     continue;
                 }
                 assert_eq!(
@@ -6678,65 +6743,76 @@ mod tests {
         assert!(seen > 0, "the walk never reached interference");
     }
 
-    /// **Which presets' default proportions reach past a usable flank**,
-    /// stated rather than assumed: on those the path is cut, and the corpus
-    /// moved with it. Every other preset's figures are the tips' path to the
-    /// bit (`contact::tests::the_path_starts_and_ends_on_usable_flank`).
+    /// **Which presets' rings are held off a usable flank**, stated rather
+    /// than assumed: the four with a full-depth ring at no shift, whose tip
+    /// would reach past its planet's usable flank. Each is held (the note on
+    /// the ring), and each asked as typed — the bound off — interferes, as
+    /// `a_full_depth_ring_interferes_as_typed_and_is_held_to_the_form_circle`
+    /// records. Every other preset is the tips' path to the bit
+    /// (`contact::tests::the_path_starts_and_ends_on_usable_flank`).
     #[test]
-    fn the_presets_that_interfere_are_the_ones_named() {
+    fn the_presets_whose_rings_are_held_are_the_ones_named() {
         let lib = library();
-        let interfering: Vec<arr::Preset> = arr::Preset::ALL
+        let as_typed = |p: arr::Preset| {
+            let mut s = p.build();
+            for m in &mut s.members {
+                m.gear.no_tip_past_mate_flank = false;
+            }
+            s
+        };
+        let held: Vec<arr::Preset> = arr::Preset::ALL
             .into_iter()
             .filter(|p| {
                 let r = solve_preset(&p.build(), 2.0, 1000.0, &lib).expect("a preset solves");
+                r.members.iter().any(|m| {
+                    m.notes
+                        .iter()
+                        .any(|n| n.is(key::GEAR_ADDENDUM_HELD_TO_MATE_FLANK))
+                })
+            })
+            .collect();
+        let interfering: Vec<arr::Preset> = arr::Preset::ALL
+            .into_iter()
+            .filter(|&p| {
+                let r = solve_preset(&as_typed(p), 2.0, 1000.0, &lib).expect("a preset solves");
                 r.meshes
                     .iter()
                     .any(|m| m.flank_interference.contains(&true))
             })
             .collect();
-        // The four with a full-depth ring at no shift: its tip reaches past
-        // the planet's usable flank, as
-        // `a_shipped_sets_full_depth_ring_interferes_and_a_shorter_tooth_clears_it`
-        // records.
-        assert_eq!(
-            interfering,
-            [
-                arr::Preset::Planetary,
-                arr::Preset::Wolfrom,
-                arr::Preset::Compound,
-                arr::Preset::MeshedPlanets,
-            ]
-        );
+        let named = [
+            arr::Preset::Planetary,
+            arr::Preset::Wolfrom,
+            arr::Preset::Compound,
+            arr::Preset::MeshedPlanets,
+        ];
+        assert_eq!(held, named);
+        assert_eq!(interfering, named);
     }
 
-    /// **A full-depth internal pair interferes, and a shipped epicyclic set is
-    /// one.**
+    /// **A full-depth internal pair interferes as typed, and held its ring's
+    /// tip meets the planet's form circle exactly.**
     ///
     /// `ring::mesh_with` has said so since it existed — the ring's tip can only
     /// touch the pinion's involute while `√(r_a2² − r_b2²) ≥ a sin α_w`, and a
-    /// standard ring misses it — but nothing ever put the question to a *set*,
-    /// whose default ring is full-depth at zero shift. So the answer here is
-    /// `true`, and it is asserted rather than fixed: it is a statement about
-    /// what the shipped proportions are, and the remedy is the ring's addendum,
-    /// which is an input.
-    ///
-    /// Both halves are pinned, because a canary that only says "it interferes"
-    /// would pass if every set interfered for a new reason. Shortening the ring
-    /// clears it, which is the same remedy `ring.rs` records and is where the
-    /// rule of thumb about internal tooth differences comes from.
+    /// standard ring misses it. Typed at full depth with the bound off, the
+    /// shipped set's ring reaches past the planet's usable flank (the
+    /// literature's involute interference, `[0]`), and the other flank and
+    /// the tips are clear. Held, nothing is reached past, and the tip sits on
+    /// the conjugate of the planet's junction: the path the cut left as
+    /// typed is the path the held tip reaches, so every figure the path
+    /// gives is the same, and only the ring's own tooth is shorter.
     #[test]
-    fn a_shipped_sets_full_depth_ring_interferes_and_a_shorter_tooth_clears_it() {
+    fn a_full_depth_ring_interferes_as_typed_and_is_held_to_the_form_circle() {
         let lib = library();
-        let solved = |addendum: f64| {
+        let solved = |held: bool| {
             let mut set = arr::planetary(12, 30, 72, 3);
-            set.members[2].gear.addendum = addendum;
+            set.members[2].gear.addendum = 1.0;
+            set.members[2].gear.no_tip_past_mate_flank = held;
             solve_preset(&set, 2.0, 0.0, &lib).expect("the shipped set solves")
         };
-        // **Read off the general flags now**, which is where the classical pair
-        // live: `[0]` is the pinion's flank reached by the ring's tip — what the
-        // literature calls involute interference — and `[1]` is the ring's flank
-        // reached by the pinion's, which it calls trochoid.
-        let full_mesh = solved(1.0).meshes[1].clone();
+        let typed = solved(false);
+        let full_mesh = typed.meshes[1].clone();
         let full = full_mesh.tips.expect("an internal mesh");
         assert!(
             full_mesh.flank_interference[0],
@@ -6748,12 +6824,85 @@ mod tests {
             "and it should be the involute one alone that bites: {:?} {full:?}",
             full_mesh.flank_interference
         );
-        let short_mesh = solved(0.75).meshes[1].clone();
+        let held = solved(true);
+        let short_mesh = held.meshes[1].clone();
         let short = short_mesh.tips.expect("an internal mesh");
         assert!(
             short.tips_clear() && short_mesh.flank_interference == [false, false],
-            "shortening the ring's tooth should clear it: {:?} {short:?}",
+            "holding the ring's tip should clear it: {:?} {short:?}",
             short_mesh.flank_interference
+        );
+        let ha = held.members[2].addendum;
+        assert!(ha < 1.0, "the ring is held shorter: {ha}");
+        let eps = |r: &Alone| r.meshes[1].line.unwrap().contact_ratios.transverse;
+        assert!(
+            (eps(&typed) - eps(&held)).abs() < 1e-9,
+            "the held tip ends the path where the cut did: {} and {}",
+            eps(&typed),
+            eps(&held)
+        );
+    }
+
+    /// **The held tip is the typed one wherever that one clears**, and the
+    /// bound where it does not: at a given shift the addendum a ring builds
+    /// at is `min(typed, bound)`, continuous in the typed number and never
+    /// above it; the note fires exactly where the two part, and no flank is
+    /// reached past on either side of the bound.
+    ///
+    /// The bound moves with the ring's shift, and past about 1.02 modules
+    /// typed the shift does move: the ring's undercut floor
+    /// ([`MemberGear::no_undercut`]) is asked at the typed tip, not the held
+    /// one, so a taller typed tooth raises it and the held tip follows,
+    /// still increasing. Where the shift is the one the full-depth ring
+    /// has, the held addendum is that ring's to the bit.
+    #[test]
+    fn a_held_ring_tip_is_the_lesser_of_typed_and_bound() {
+        let lib = library();
+        let at = |typed: f64| {
+            let mut set = arr::planetary(12, 30, 72, 3);
+            set.members[2].gear.addendum = typed;
+            let r = solve_preset(&set, 2.0, 0.0, &lib).expect("the set solves");
+            let held = r.members[2]
+                .notes
+                .iter()
+                .any(|n| n.is(key::GEAR_ADDENDUM_HELD_TO_MATE_FLANK));
+            let clear = r
+                .meshes
+                .iter()
+                .all(|m| m.flank_interference == [false, false]);
+            (
+                r.members[2].addendum,
+                r.members[2].profile_shift,
+                held,
+                clear,
+            )
+        };
+        let (bound, shift, _, _) = at(1.0);
+        assert!(bound < 1.0, "the full-depth ring is held: {bound}");
+        let mut last = f64::NEG_INFINITY;
+        let (mut below, mut above, mut moved) = (0, 0, 0);
+        for k in 0..=40 {
+            let typed = 0.8 + 0.3 * f64::from(k) / 40.0;
+            let (used, x, held, clear) = at(typed);
+            assert!(clear, "typed {typed}: a flank is reached past");
+            assert!(used <= typed, "typed {typed}: built taller, at {used}");
+            assert_eq!(held, used < typed, "typed {typed}: the note");
+            assert!(used >= last, "typed {typed}: the tip went back");
+            last = used;
+            if x.to_bits() == shift.to_bits() {
+                assert_eq!(used, typed.min(bound), "typed {typed}");
+                if typed < bound {
+                    below += 1;
+                } else {
+                    above += 1;
+                }
+            } else {
+                moved += 1;
+            }
+        }
+        assert!(
+            below > 0 && above > 0 && moved > 0,
+            "the sweep reaches all three: {below} {above} {moved}"
         );
     }
 

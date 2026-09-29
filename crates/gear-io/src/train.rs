@@ -261,6 +261,11 @@
 //!   library's figure stands, as it did. What a file meant does move in one
 //!   place — its contact fatigue is now judged against the library's flank
 //!   figure, not its root figure — and that is the correction, not a reading.
+//! - A member's gear gained `no_tip_past_mate_flank`, which **defaults
+//!   rather than refusing**, as `load_sharing` did: absent is `false`, the
+//!   tip as typed, which is what every file written before it meant. A ring
+//!   the tool lays in now writes `true`, its tip held off its mates' usable
+//!   flanks.
 //!
 //! No compatibility shim, deliberately. Accepting both shapes means carrying two
 //! readers for one format and testing both forever, and the thing that would go

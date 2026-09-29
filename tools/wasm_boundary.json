@@ -220,6 +220,7 @@
          "addendum": 1,
          "no_sharp_tip": true,
          "min_tip_width": "0.10000000000000001",
+         "no_tip_past_mate_flank": false,
          "dedendum": "1.2500000000000000",
          "root_radius": "0.38000000000000000",
          "helix_angle": {
@@ -288,6 +289,7 @@
          "addendum": 1,
          "no_sharp_tip": true,
          "min_tip_width": "0.10000000000000001",
+         "no_tip_past_mate_flank": false,
          "dedendum": "1.2500000000000000",
          "root_radius": "0.38000000000000000",
          "helix_angle": {
@@ -427,6 +429,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -495,6 +498,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -641,6 +645,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -709,6 +714,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -777,6 +783,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -955,6 +962,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -1023,6 +1031,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -1091,6 +1100,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -1159,6 +1169,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -1227,6 +1238,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -1295,6 +1307,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -1458,6 +1471,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": 0,
           "helix_angle": {
@@ -1526,6 +1540,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -1663,6 +1678,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -1731,6 +1747,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -1876,6 +1893,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -1944,6 +1962,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -2012,6 +2031,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": true,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -2174,6 +2194,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -2242,6 +2263,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": true,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -2314,6 +2336,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": true,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -2480,6 +2503,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -2548,6 +2572,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": true,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -2620,6 +2645,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": true,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -2692,6 +2718,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -2760,6 +2787,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -2931,6 +2959,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -2999,6 +3028,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": true,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -3162,6 +3192,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -3230,6 +3261,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -3298,6 +3330,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -3366,6 +3399,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": true,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -3595,23 +3629,23 @@
    "ok": [
     [
      "en",
-     560
+     563
     ],
     [
      "de",
-     560
+     563
     ],
     [
      "pt",
-     560
+     563
     ],
     [
      "zh-Hans",
-     560
+     563
     ],
     [
      "zh-Hant",
-     560
+     563
     ]
    ]
   },
@@ -7930,6 +7964,7 @@
          "addendum": 1,
          "no_sharp_tip": true,
          "min_tip_width": "0.10000000000000001",
+         "no_tip_past_mate_flank": false,
          "dedendum": "1.2500000000000000",
          "root_radius": "0.38000000000000000",
          "helix_angle": {
@@ -7998,6 +8033,7 @@
          "addendum": 1,
          "no_sharp_tip": true,
          "min_tip_width": "0.10000000000000001",
+         "no_tip_past_mate_flank": false,
          "dedendum": "1.2500000000000000",
          "root_radius": "0.38000000000000000",
          "helix_angle": {
@@ -8142,6 +8178,7 @@
          "addendum": 1,
          "no_sharp_tip": true,
          "min_tip_width": "0.10000000000000001",
+         "no_tip_past_mate_flank": false,
          "dedendum": "1.2500000000000000",
          "root_radius": "0.38000000000000000",
          "helix_angle": {
@@ -8210,6 +8247,7 @@
          "addendum": 1,
          "no_sharp_tip": true,
          "min_tip_width": "0.10000000000000001",
+         "no_tip_past_mate_flank": false,
          "dedendum": "1.2500000000000000",
          "root_radius": "0.38000000000000000",
          "helix_angle": {
@@ -8278,6 +8316,7 @@
          "addendum": 1,
          "no_sharp_tip": true,
          "min_tip_width": "0.10000000000000001",
+         "no_tip_past_mate_flank": false,
          "dedendum": "1.2500000000000000",
          "root_radius": "0.38000000000000000",
          "helix_angle": {
@@ -8454,6 +8493,7 @@
          "addendum": 1,
          "no_sharp_tip": true,
          "min_tip_width": "0.10000000000000001",
+         "no_tip_past_mate_flank": false,
          "dedendum": "1.2500000000000000",
          "root_radius": "0.38000000000000000",
          "helix_angle": {
@@ -8522,6 +8562,7 @@
          "addendum": 1,
          "no_sharp_tip": true,
          "min_tip_width": "0.10000000000000001",
+         "no_tip_past_mate_flank": false,
          "dedendum": "1.2500000000000000",
          "root_radius": "0.38000000000000000",
          "helix_angle": {
@@ -8590,6 +8631,7 @@
          "addendum": 1,
          "no_sharp_tip": true,
          "min_tip_width": "0.10000000000000001",
+         "no_tip_past_mate_flank": false,
          "dedendum": "1.2500000000000000",
          "root_radius": "0.38000000000000000",
          "helix_angle": {
@@ -8658,6 +8700,7 @@
          "addendum": 1,
          "no_sharp_tip": true,
          "min_tip_width": "0.10000000000000001",
+         "no_tip_past_mate_flank": false,
          "dedendum": "1.2500000000000000",
          "root_radius": "0.38000000000000000",
          "helix_angle": {
@@ -8726,6 +8769,7 @@
          "addendum": 1,
          "no_sharp_tip": true,
          "min_tip_width": "0.10000000000000001",
+         "no_tip_past_mate_flank": false,
          "dedendum": "1.2500000000000000",
          "root_radius": "0.38000000000000000",
          "helix_angle": {
@@ -8794,6 +8838,7 @@
          "addendum": 1,
          "no_sharp_tip": true,
          "min_tip_width": "0.10000000000000001",
+         "no_tip_past_mate_flank": false,
          "dedendum": "1.2500000000000000",
          "root_radius": "0.38000000000000000",
          "helix_angle": {
@@ -8955,6 +9000,7 @@
          "addendum": 1,
          "no_sharp_tip": true,
          "min_tip_width": "0.10000000000000001",
+         "no_tip_past_mate_flank": false,
          "dedendum": "1.2500000000000000",
          "root_radius": 0,
          "helix_angle": {
@@ -9023,6 +9069,7 @@
          "addendum": 1,
          "no_sharp_tip": true,
          "min_tip_width": "0.10000000000000001",
+         "no_tip_past_mate_flank": false,
          "dedendum": "1.2500000000000000",
          "root_radius": "0.38000000000000000",
          "helix_angle": {
@@ -9158,6 +9205,7 @@
          "addendum": 1,
          "no_sharp_tip": true,
          "min_tip_width": "0.10000000000000001",
+         "no_tip_past_mate_flank": false,
          "dedendum": "1.2500000000000000",
          "root_radius": "0.38000000000000000",
          "helix_angle": {
@@ -9226,6 +9274,7 @@
          "addendum": 1,
          "no_sharp_tip": true,
          "min_tip_width": "0.10000000000000001",
+         "no_tip_past_mate_flank": false,
          "dedendum": "1.2500000000000000",
          "root_radius": "0.38000000000000000",
          "helix_angle": {
@@ -9369,6 +9418,7 @@
          "addendum": 1,
          "no_sharp_tip": true,
          "min_tip_width": "0.10000000000000001",
+         "no_tip_past_mate_flank": false,
          "dedendum": "1.2500000000000000",
          "root_radius": "0.38000000000000000",
          "helix_angle": {
@@ -9437,6 +9487,7 @@
          "addendum": 1,
          "no_sharp_tip": true,
          "min_tip_width": "0.10000000000000001",
+         "no_tip_past_mate_flank": false,
          "dedendum": "1.2500000000000000",
          "root_radius": "0.38000000000000000",
          "helix_angle": {
@@ -9505,6 +9556,7 @@
          "addendum": 1,
          "no_sharp_tip": true,
          "min_tip_width": "0.10000000000000001",
+         "no_tip_past_mate_flank": true,
          "dedendum": "1.2500000000000000",
          "root_radius": "0.38000000000000000",
          "helix_angle": {
@@ -9665,6 +9717,7 @@
          "addendum": 1,
          "no_sharp_tip": true,
          "min_tip_width": "0.10000000000000001",
+         "no_tip_past_mate_flank": false,
          "dedendum": "1.2500000000000000",
          "root_radius": "0.38000000000000000",
          "helix_angle": {
@@ -9733,6 +9786,7 @@
          "addendum": 1,
          "no_sharp_tip": true,
          "min_tip_width": "0.10000000000000001",
+         "no_tip_past_mate_flank": true,
          "dedendum": "1.2500000000000000",
          "root_radius": "0.38000000000000000",
          "helix_angle": {
@@ -9805,6 +9859,7 @@
          "addendum": 1,
          "no_sharp_tip": true,
          "min_tip_width": "0.10000000000000001",
+         "no_tip_past_mate_flank": true,
          "dedendum": "1.2500000000000000",
          "root_radius": "0.38000000000000000",
          "helix_angle": {
@@ -9969,6 +10024,7 @@
          "addendum": 1,
          "no_sharp_tip": true,
          "min_tip_width": "0.10000000000000001",
+         "no_tip_past_mate_flank": false,
          "dedendum": "1.2500000000000000",
          "root_radius": "0.38000000000000000",
          "helix_angle": {
@@ -10037,6 +10093,7 @@
          "addendum": 1,
          "no_sharp_tip": true,
          "min_tip_width": "0.10000000000000001",
+         "no_tip_past_mate_flank": true,
          "dedendum": "1.2500000000000000",
          "root_radius": "0.38000000000000000",
          "helix_angle": {
@@ -10109,6 +10166,7 @@
          "addendum": 1,
          "no_sharp_tip": true,
          "min_tip_width": "0.10000000000000001",
+         "no_tip_past_mate_flank": true,
          "dedendum": "1.2500000000000000",
          "root_radius": "0.38000000000000000",
          "helix_angle": {
@@ -10181,6 +10239,7 @@
          "addendum": 1,
          "no_sharp_tip": true,
          "min_tip_width": "0.10000000000000001",
+         "no_tip_past_mate_flank": false,
          "dedendum": "1.2500000000000000",
          "root_radius": "0.38000000000000000",
          "helix_angle": {
@@ -10249,6 +10308,7 @@
          "addendum": 1,
          "no_sharp_tip": true,
          "min_tip_width": "0.10000000000000001",
+         "no_tip_past_mate_flank": false,
          "dedendum": "1.2500000000000000",
          "root_radius": "0.38000000000000000",
          "helix_angle": {
@@ -10418,6 +10478,7 @@
          "addendum": 1,
          "no_sharp_tip": true,
          "min_tip_width": "0.10000000000000001",
+         "no_tip_past_mate_flank": false,
          "dedendum": "1.2500000000000000",
          "root_radius": "0.38000000000000000",
          "helix_angle": {
@@ -10486,6 +10547,7 @@
          "addendum": 1,
          "no_sharp_tip": true,
          "min_tip_width": "0.10000000000000001",
+         "no_tip_past_mate_flank": true,
          "dedendum": "1.2500000000000000",
          "root_radius": "0.38000000000000000",
          "helix_angle": {
@@ -10647,6 +10709,7 @@
          "addendum": 1,
          "no_sharp_tip": true,
          "min_tip_width": "0.10000000000000001",
+         "no_tip_past_mate_flank": false,
          "dedendum": "1.2500000000000000",
          "root_radius": "0.38000000000000000",
          "helix_angle": {
@@ -10715,6 +10778,7 @@
          "addendum": 1,
          "no_sharp_tip": true,
          "min_tip_width": "0.10000000000000001",
+         "no_tip_past_mate_flank": false,
          "dedendum": "1.2500000000000000",
          "root_radius": "0.38000000000000000",
          "helix_angle": {
@@ -10783,6 +10847,7 @@
          "addendum": 1,
          "no_sharp_tip": true,
          "min_tip_width": "0.10000000000000001",
+         "no_tip_past_mate_flank": false,
          "dedendum": "1.2500000000000000",
          "root_radius": "0.38000000000000000",
          "helix_angle": {
@@ -10851,6 +10916,7 @@
          "addendum": 1,
          "no_sharp_tip": true,
          "min_tip_width": "0.10000000000000001",
+         "no_tip_past_mate_flank": true,
          "dedendum": "1.2500000000000000",
          "root_radius": "0.38000000000000000",
          "helix_angle": {
@@ -11074,7 +11140,7 @@
         "teeth": 72,
         "profile_shift": 0,
         "helix_angle": 0,
-        "addendum": 1,
+        "addendum": "0.91439013608962938",
         "dedendum": "1.2500000000000000",
         "root_radius": "0.38000000000000000",
         "thickness_mod": 1,
@@ -11298,6 +11364,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -11366,6 +11433,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -11434,6 +11502,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -11502,6 +11571,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -11570,6 +11640,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": true,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -11897,6 +11968,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -11965,6 +12037,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -12033,6 +12106,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -12101,6 +12175,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -12169,6 +12244,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": true,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -12494,6 +12570,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -12562,6 +12639,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -12630,6 +12708,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -12698,6 +12777,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -12766,6 +12846,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": true,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -13093,6 +13174,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -13161,6 +13243,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -13229,6 +13312,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -13297,6 +13381,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -13365,6 +13450,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": true,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -13692,6 +13778,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -13760,6 +13847,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -13828,6 +13916,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -13896,6 +13985,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -13964,6 +14054,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": true,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -14369,6 +14460,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -14437,6 +14529,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -14505,6 +14598,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -14573,6 +14667,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -14641,6 +14736,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": true,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -15043,6 +15139,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -15111,6 +15208,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -15179,6 +15277,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -15247,6 +15346,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -15315,6 +15415,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": true,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -15721,6 +15822,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -15789,6 +15891,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -15857,6 +15960,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -15925,6 +16029,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -15993,6 +16098,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -16061,6 +16167,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": true,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -16133,6 +16240,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -16572,6 +16680,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -16640,6 +16749,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -16708,6 +16818,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -16776,6 +16887,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -16844,6 +16956,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -16912,6 +17025,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": true,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -16984,6 +17098,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -17052,6 +17167,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -17120,6 +17236,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -17188,6 +17305,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -17256,6 +17374,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -17324,6 +17443,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -17392,6 +17512,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -17460,6 +17581,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -17982,6 +18104,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -18050,6 +18173,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -18118,6 +18242,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -18186,6 +18311,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -18254,6 +18380,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -18322,6 +18449,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": true,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -18394,6 +18522,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -18462,6 +18591,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -18530,6 +18660,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -18598,6 +18729,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -18666,6 +18798,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -18734,6 +18867,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -18802,6 +18936,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -19244,6 +19379,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -19312,6 +19448,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -19380,6 +19517,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -19448,6 +19586,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -19516,6 +19655,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -19584,6 +19724,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": true,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -19656,6 +19797,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -19724,6 +19866,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -19792,6 +19935,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -19860,6 +20004,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -19928,6 +20073,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -19996,6 +20142,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -20064,6 +20211,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -20132,6 +20280,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -20200,6 +20349,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": true,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -20685,6 +20835,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -20753,6 +20904,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -20821,6 +20973,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -20889,6 +21042,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -20957,6 +21111,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -21025,6 +21180,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": true,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -21097,6 +21253,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -21165,6 +21322,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -21233,6 +21391,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -21301,6 +21460,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -21369,6 +21529,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -21437,6 +21598,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -21505,6 +21667,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -21573,6 +21736,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -21641,6 +21805,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": true,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -22140,6 +22305,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -22208,6 +22374,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -22276,6 +22443,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -22344,6 +22512,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -22412,6 +22581,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -22480,6 +22650,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": true,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -22552,6 +22723,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -22620,6 +22792,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -22688,6 +22861,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -22756,6 +22930,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -22824,6 +22999,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -22892,6 +23068,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -22960,6 +23137,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -23028,6 +23206,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -23096,6 +23275,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": true,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -23168,6 +23348,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -23687,6 +23868,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -23755,6 +23937,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -23823,6 +24006,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -23891,6 +24075,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -23959,6 +24144,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -24027,6 +24213,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": true,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -24099,6 +24286,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -24167,6 +24355,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -24235,6 +24424,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -24303,6 +24493,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -24371,6 +24562,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -24439,6 +24631,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -24507,6 +24700,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -24575,6 +24769,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -24643,6 +24838,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": true,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -25137,6 +25333,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -25205,6 +25402,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -25273,6 +25471,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -25341,6 +25540,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -25409,6 +25609,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -25477,6 +25678,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": true,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -25549,6 +25751,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -25617,6 +25820,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -25685,6 +25889,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -25753,6 +25958,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -25821,6 +26027,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -25889,6 +26096,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -25957,6 +26165,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -26025,6 +26234,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -26093,6 +26303,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": true,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -26165,6 +26376,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -26233,6 +26445,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -26753,6 +26966,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -26821,6 +27035,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -26889,6 +27104,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -26957,6 +27173,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -27025,6 +27242,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -27093,6 +27311,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": true,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -27165,6 +27384,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -27233,6 +27453,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -27301,6 +27522,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -27369,6 +27591,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -27437,6 +27660,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -27505,6 +27729,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -27573,6 +27798,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -27641,6 +27867,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -27709,6 +27936,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": true,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -27781,6 +28009,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -27849,6 +28078,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -27917,6 +28147,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -27985,6 +28216,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -28053,6 +28285,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": true,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -29783,6 +30016,7 @@
             "addendum": 1,
             "no_sharp_tip": true,
             "min_tip_width": "0.10000000000000001",
+            "no_tip_past_mate_flank": false,
             "dedendum": "1.2500000000000000",
             "root_radius": "0.38000000000000000",
             "helix_angle": {
@@ -29851,6 +30085,7 @@
             "addendum": 1,
             "no_sharp_tip": true,
             "min_tip_width": "0.10000000000000001",
+            "no_tip_past_mate_flank": false,
             "dedendum": "1.2500000000000000",
             "root_radius": "0.38000000000000000",
             "helix_angle": {
@@ -31086,7 +31321,7 @@
           "teeth": 72,
           "profile_shift": 0,
           "helix_angle": 0,
-          "addendum": 1,
+          "addendum": "0.91439013608962938",
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "thickness_mod": 1,
@@ -31094,7 +31329,7 @@
           "index_offset": 0
          },
          "profile_shift": 0,
-         "addendum": 1,
+         "addendum": "0.91439013608962938",
          "face_width": "0.053066292166551135",
          "recommended_face_width": null,
          "pitch_diameter": 72,
@@ -31109,11 +31344,11 @@
            "speed": 0,
            "speed_against_carrier": "1694.3521594684387",
            "cycles": null,
-           "bending_stress": "446.01789087814467",
-           "contact_stress": "1090.9403953890285",
+           "bending_stress": "446.01789087815132",
+           "contact_stress": "1090.9403953890262",
            "min_face_width": {
-            "bending": "0.017339571947874395",
-            "contact": "0.010686590889632488"
+            "bending": "0.017339571947874652",
+            "contact": "0.010686590889632445"
            }
           },
           {
@@ -31123,11 +31358,11 @@
            "speed": 0,
            "speed_against_carrier": 0,
            "cycles": null,
-           "bending_stress": "788.40394060017013",
-           "contact_stress": "1450.4383577738831",
+           "bending_stress": "788.40394060018207",
+           "contact_stress": "1450.4383577738802",
            "min_face_width": {
-            "bending": "0.030650310518057770",
-            "contact": "0.018890162348375397"
+            "bending": "0.030650310518058235",
+            "contact": "0.018890162348375317"
            }
           },
           {
@@ -31140,16 +31375,23 @@
             "bending": 209,
             "contact": 209
            },
-           "bending_stress": "89.203578175628905",
-           "contact_stress": "487.88337669807322",
+           "bending_stress": "89.203578175630255",
+           "contact_stress": "487.88337669807220",
            "min_face_width": {
-            "bending": "0.0063116041890262774",
-            "contact": "0.017661950613927609"
+            "bending": "0.0063116041890263720",
+            "contact": "0.017661950613927536"
            }
           }
          ],
          "clamps": [],
-         "notes": [],
+         "notes": [
+          {
+           "key": "gear.addendum_held_to_mate_flank",
+           "values": {
+            "addendum": "0.9144"
+           }
+          }
+         ],
          "material": {
           "name": "4340 Hardened Steel",
           "class": "steel",
@@ -31245,7 +31487,7 @@
            "exclusive_max": false
           },
           "dedendum": {
-           "min": -1,
+           "min": "-0.91439013608962938",
            "max": "2.1578637172918165",
            "exclusive_min": false,
            "exclusive_max": false
@@ -31380,7 +31622,7 @@
         },
         {
          "coprime": false,
-         "contact_ratio": "1.8614618788535788",
+         "contact_ratio": "1.8614618788535735",
          "efficiency": {
           "forward": "0.99488564655697287",
           "backward": "0.99488564655697287"
@@ -31419,28 +31661,20 @@
           }
          ],
          "flank_interference": [
-          true,
+          false,
           false
          ],
          "tips": {
           "tip_interference": false,
-          "far_gap": "40.315337340751441"
+          "far_gap": "40.400947204661811"
          },
-         "notes": [
-          {
-           "key": "mesh.flank_interference",
-           "values": {
-            "depth": "0.328",
-            "member": "1"
-           }
-          }
-         ],
+         "notes": [],
          "line": {
           "operating_pressure_angle": "21.054925260088243",
           "contact_ratios": {
-           "transverse": "1.8614618788535788",
+           "transverse": "1.8614618788535735",
            "overlap": 0,
-           "total": "1.8614618788535788"
+           "total": "1.8614618788535735"
           }
          },
          "point": null
@@ -31921,6 +32155,7 @@
             "addendum": 1,
             "no_sharp_tip": true,
             "min_tip_width": "0.10000000000000001",
+            "no_tip_past_mate_flank": false,
             "dedendum": "1.2500000000000000",
             "root_radius": "0.38000000000000000",
             "helix_angle": {
@@ -31989,6 +32224,7 @@
             "addendum": 1,
             "no_sharp_tip": true,
             "min_tip_width": "0.10000000000000001",
+            "no_tip_past_mate_flank": false,
             "dedendum": "1.2500000000000000",
             "root_radius": "0.38000000000000000",
             "helix_angle": {
@@ -32146,6 +32382,7 @@
             "addendum": 1,
             "no_sharp_tip": true,
             "min_tip_width": "0.10000000000000001",
+            "no_tip_past_mate_flank": false,
             "dedendum": "1.2500000000000000",
             "root_radius": "0.38000000000000000",
             "helix_angle": {
@@ -32214,6 +32451,7 @@
             "addendum": 1,
             "no_sharp_tip": true,
             "min_tip_width": "0.10000000000000001",
+            "no_tip_past_mate_flank": false,
             "dedendum": "1.2500000000000000",
             "root_radius": "0.38000000000000000",
             "helix_angle": {
@@ -32282,6 +32520,7 @@
             "addendum": 1,
             "no_sharp_tip": true,
             "min_tip_width": "0.10000000000000001",
+            "no_tip_past_mate_flank": true,
             "dedendum": "1.2500000000000000",
             "root_radius": "0.38000000000000000",
             "helix_angle": {
@@ -32704,7 +32943,7 @@
    }
   },
   "export_train": {
-   "ok": "# Geartrain.\n#\n# Inputs only — every ratio, stress, efficiency and backlash is recomputed from\n# these, so nothing here can go stale. Units: mm, degrees, rpm, N·m.\n#\n# Materials are named; the library that defines them is a separate document.\n# Editing this file by hand is expected.\n\nname = \"probe\"\n\n[train]\nreversed_bending = false\nheld = []\n\n[[train.load_cases]]\nkind = \"ultimate\"\nenabled = true\napplication_factor = 1.0\n\n[[train.load_cases.loads]]\nat = 1\nrole = \"load\"\n\n[train.load_cases.loads.torque]\nauto = false\nmanual = 0.1\n\n[train.load_cases.loads.speed]\nauto = false\nmanual = 30000.0\n\n[[train.load_cases.loads]]\nat = 2\nrole = \"reacted\"\n\n[train.load_cases.loads.torque]\nauto = true\nmanual = 0.0\n\n[train.load_cases.loads.speed]\nauto = true\nmanual = 0.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nat = 2\nactuations = 1000\nreversing = false\n\n[[train.load_cases]]\nkind = \"ultimate\"\nenabled = true\napplication_factor = 1.0\n\n[[train.load_cases.loads]]\nat = 2\nrole = \"load\"\n\n[train.load_cases.loads.torque]\nauto = false\nmanual = 3.0\n\n[train.load_cases.loads.speed]\nauto = false\nmanual = 0.0\n\n[[train.load_cases.loads]]\nat = 1\nrole = \"reacted\"\n\n[train.load_cases.loads.torque]\nauto = true\nmanual = 0.0\n\n[train.load_cases.loads.speed]\nauto = true\nmanual = 0.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nat = 2\nactuations = 1000\nreversing = false\n\n[[train.load_cases]]\nkind = \"fatigue\"\nenabled = true\napplication_factor = 1.0\n\n[[train.load_cases.loads]]\nat = 1\nrole = \"load\"\n\n[train.load_cases.loads.torque]\nauto = false\nmanual = 0.02\n\n[train.load_cases.loads.speed]\nauto = false\nmanual = 30000.0\n\n[[train.load_cases.loads]]\nat = 2\nrole = \"reacted\"\n\n[train.load_cases.loads.torque]\nauto = true\nmanual = 0.0\n\n[train.load_cases.loads.speed]\nauto = true\nmanual = 0.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nat = 2\nactuations = 1000\nreversing = false\n\n[train.shape]\ncouplings = []\n\n[[train.shape.axes]]\ncarried_by = 0\ncount = 1\nmin_planet_clearance = 0.3\n\n[[train.shape.axes]]\ncarried_by = 0\ncount = 1\nmin_planet_clearance = 0.3\n\n[[train.shape.bodies]]\nbody = 1\naxis = 0\n\n[[train.shape.bodies]]\nbody = 2\naxis = 1\n\n[[train.shape.members]]\nbody = 1\n\n[train.shape.members.gear]\nteeth = 17\nno_undercut = true\naddendum = 1.0\nno_sharp_tip = true\nmin_tip_width = 0.1\ndedendum = 1.25\nroot_radius = 0.38\nmaterial = \"4340 Hardened Steel\"\n\n[train.shape.members.gear.profile_shift]\nauto = true\nmanual = 0.0\n\n[train.shape.members.gear.working_depth]\nauto = true\nmanual = 1.0\n\n[train.shape.members.gear.helix_angle]\nauto = true\nmanual = 0.0\n\n[train.shape.members.gear.face_width]\nauto = true\nmanual = 5.0\n\n[train.shape.members.gear.face_sources.bending]\nultimate = true\nfatigue = true\n\n[train.shape.members.gear.face_sources.contact]\nultimate = false\nfatigue = false\n\n[train.shape.members.gear.material_overrides]\n\n[train.shape.members.module]\nauto = false\nmanual = 1.0\n\n[train.shape.members.pressure_angle]\nauto = false\nmanual = 20.0\n\n[train.shape.members.thickness_mod]\nauto = false\nmanual = 1.0\n\n[train.shape.members.pitch_diameter]\nauto = true\nmanual = 17.0\n\n[[train.shape.members]]\nbody = 2\n\n[train.shape.members.gear]\nteeth = 43\nno_undercut = true\naddendum = 1.0\nno_sharp_tip = true\nmin_tip_width = 0.1\ndedendum = 1.25\nroot_radius = 0.38\nmaterial = \"4340 Hardened Steel\"\n\n[train.shape.members.gear.profile_shift]\nauto = true\nmanual = 0.0\n\n[train.shape.members.gear.working_depth]\nauto = true\nmanual = 1.0\n\n[train.shape.members.gear.helix_angle]\nauto = true\nmanual = 0.0\n\n[train.shape.members.gear.face_width]\nauto = true\nmanual = 5.0\n\n[train.shape.members.gear.face_sources.bending]\nultimate = true\nfatigue = true\n\n[train.shape.members.gear.face_sources.contact]\nultimate = false\nfatigue = false\n\n[train.shape.members.gear.material_overrides]\n\n[train.shape.members.module]\nauto = true\nmanual = 1.0\n\n[train.shape.members.pressure_angle]\nauto = true\nmanual = 20.0\n\n[train.shape.members.thickness_mod]\nauto = true\nmanual = 1.0\n\n[train.shape.members.pitch_diameter]\nauto = true\nmanual = 0.0\n\n[[train.shape.meshes]]\na = 0\nb = 1\nsliding_friction = 0.08\nstatic_friction = 0.16\nmin_contact_ratio = 1.2\nload_sharing = \"none\"\nsearch = false\n\n[train.shape.meshes.overlap]\nauto = true\nmanual = 1.0\n\n[[train.shape.distances]]\naxes = [\n    0,\n    1,\n]\nangle = 0.0\nworm = false\ntip_clearance = 0.0\ntolerance_plus = 0.02\ntolerance_minus = 0.02\naxial_clearance = 0.0\n\n[train.shape.distances.distance]\nauto = true\nmanual = 0.0\n\n[train.shape.distances.clearance]\nauto = false\nmanual = 0.02\n"
+   "ok": "# Geartrain.\n#\n# Inputs only — every ratio, stress, efficiency and backlash is recomputed from\n# these, so nothing here can go stale. Units: mm, degrees, rpm, N·m.\n#\n# Materials are named; the library that defines them is a separate document.\n# Editing this file by hand is expected.\n\nname = \"probe\"\n\n[train]\nreversed_bending = false\nheld = []\n\n[[train.load_cases]]\nkind = \"ultimate\"\nenabled = true\napplication_factor = 1.0\n\n[[train.load_cases.loads]]\nat = 1\nrole = \"load\"\n\n[train.load_cases.loads.torque]\nauto = false\nmanual = 0.1\n\n[train.load_cases.loads.speed]\nauto = false\nmanual = 30000.0\n\n[[train.load_cases.loads]]\nat = 2\nrole = \"reacted\"\n\n[train.load_cases.loads.torque]\nauto = true\nmanual = 0.0\n\n[train.load_cases.loads.speed]\nauto = true\nmanual = 0.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nat = 2\nactuations = 1000\nreversing = false\n\n[[train.load_cases]]\nkind = \"ultimate\"\nenabled = true\napplication_factor = 1.0\n\n[[train.load_cases.loads]]\nat = 2\nrole = \"load\"\n\n[train.load_cases.loads.torque]\nauto = false\nmanual = 3.0\n\n[train.load_cases.loads.speed]\nauto = false\nmanual = 0.0\n\n[[train.load_cases.loads]]\nat = 1\nrole = \"reacted\"\n\n[train.load_cases.loads.torque]\nauto = true\nmanual = 0.0\n\n[train.load_cases.loads.speed]\nauto = true\nmanual = 0.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nat = 2\nactuations = 1000\nreversing = false\n\n[[train.load_cases]]\nkind = \"fatigue\"\nenabled = true\napplication_factor = 1.0\n\n[[train.load_cases.loads]]\nat = 1\nrole = \"load\"\n\n[train.load_cases.loads.torque]\nauto = false\nmanual = 0.02\n\n[train.load_cases.loads.speed]\nauto = false\nmanual = 30000.0\n\n[[train.load_cases.loads]]\nat = 2\nrole = \"reacted\"\n\n[train.load_cases.loads.torque]\nauto = true\nmanual = 0.0\n\n[train.load_cases.loads.speed]\nauto = true\nmanual = 0.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nat = 2\nactuations = 1000\nreversing = false\n\n[train.shape]\ncouplings = []\n\n[[train.shape.axes]]\ncarried_by = 0\ncount = 1\nmin_planet_clearance = 0.3\n\n[[train.shape.axes]]\ncarried_by = 0\ncount = 1\nmin_planet_clearance = 0.3\n\n[[train.shape.bodies]]\nbody = 1\naxis = 0\n\n[[train.shape.bodies]]\nbody = 2\naxis = 1\n\n[[train.shape.members]]\nbody = 1\n\n[train.shape.members.gear]\nteeth = 17\nno_undercut = true\naddendum = 1.0\nno_sharp_tip = true\nmin_tip_width = 0.1\nno_tip_past_mate_flank = false\ndedendum = 1.25\nroot_radius = 0.38\nmaterial = \"4340 Hardened Steel\"\n\n[train.shape.members.gear.profile_shift]\nauto = true\nmanual = 0.0\n\n[train.shape.members.gear.working_depth]\nauto = true\nmanual = 1.0\n\n[train.shape.members.gear.helix_angle]\nauto = true\nmanual = 0.0\n\n[train.shape.members.gear.face_width]\nauto = true\nmanual = 5.0\n\n[train.shape.members.gear.face_sources.bending]\nultimate = true\nfatigue = true\n\n[train.shape.members.gear.face_sources.contact]\nultimate = false\nfatigue = false\n\n[train.shape.members.gear.material_overrides]\n\n[train.shape.members.module]\nauto = false\nmanual = 1.0\n\n[train.shape.members.pressure_angle]\nauto = false\nmanual = 20.0\n\n[train.shape.members.thickness_mod]\nauto = false\nmanual = 1.0\n\n[train.shape.members.pitch_diameter]\nauto = true\nmanual = 17.0\n\n[[train.shape.members]]\nbody = 2\n\n[train.shape.members.gear]\nteeth = 43\nno_undercut = true\naddendum = 1.0\nno_sharp_tip = true\nmin_tip_width = 0.1\nno_tip_past_mate_flank = false\ndedendum = 1.25\nroot_radius = 0.38\nmaterial = \"4340 Hardened Steel\"\n\n[train.shape.members.gear.profile_shift]\nauto = true\nmanual = 0.0\n\n[train.shape.members.gear.working_depth]\nauto = true\nmanual = 1.0\n\n[train.shape.members.gear.helix_angle]\nauto = true\nmanual = 0.0\n\n[train.shape.members.gear.face_width]\nauto = true\nmanual = 5.0\n\n[train.shape.members.gear.face_sources.bending]\nultimate = true\nfatigue = true\n\n[train.shape.members.gear.face_sources.contact]\nultimate = false\nfatigue = false\n\n[train.shape.members.gear.material_overrides]\n\n[train.shape.members.module]\nauto = true\nmanual = 1.0\n\n[train.shape.members.pressure_angle]\nauto = true\nmanual = 20.0\n\n[train.shape.members.thickness_mod]\nauto = true\nmanual = 1.0\n\n[train.shape.members.pitch_diameter]\nauto = true\nmanual = 0.0\n\n[[train.shape.meshes]]\na = 0\nb = 1\nsliding_friction = 0.08\nstatic_friction = 0.16\nmin_contact_ratio = 1.2\nload_sharing = \"none\"\nsearch = false\n\n[train.shape.meshes.overlap]\nauto = true\nmanual = 1.0\n\n[[train.shape.distances]]\naxes = [\n    0,\n    1,\n]\nangle = 0.0\nworm = false\ntip_clearance = 0.0\ntolerance_plus = 0.02\ntolerance_minus = 0.02\naxial_clearance = 0.0\n\n[train.shape.distances.distance]\nauto = true\nmanual = 0.0\n\n[train.shape.distances.clearance]\nauto = false\nmanual = 0.02\n"
   },
   "import_train": {
    "ok": {
@@ -32871,6 +33110,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {
@@ -32939,6 +33179,7 @@
           "addendum": 1,
           "no_sharp_tip": true,
           "min_tip_width": "0.10000000000000001",
+          "no_tip_past_mate_flank": false,
           "dedendum": "1.2500000000000000",
           "root_radius": "0.38000000000000000",
           "helix_angle": {

@@ -1182,6 +1182,12 @@ impl Shape {
     /// The parameters a member builds at, at a shift: the addendum held to
     /// its tip width where that was asked.
     fn params_at(&self, i: usize, x: f64, helix: &[f64]) -> GearParams {
+        self.params_bounded(i, x, helix, None)
+    }
+
+    /// [`Self::params_at`], the tip held too to where its meshes put its
+    /// mates' usable flanks, `mate` modules of addendum.
+    fn params_bounded(&self, i: usize, x: f64, helix: &[f64], mate: Option<f64>) -> GearParams {
         let with_shift = GearParams {
             profile_shift: x,
             ..self.base_params(i, helix)
@@ -1189,7 +1195,7 @@ impl Shape {
         GearParams {
             addendum: self.members[i]
                 .gear
-                .addendum_asked(&with_shift, self.members[i].ring.as_ref())
+                .addendum_asked(&with_shift, self.members[i].ring.as_ref(), mate)
                 .used,
             ..with_shift
         }
@@ -2389,9 +2395,9 @@ struct Plan {
 /// per distance the mesh whose tips sized it.
 type TipSizing = (Vec<Option<f64>>, Vec<Option<usize>>);
 
-/// The teeth a search has cut, by member, shift and helix.
+/// The teeth a search has cut, by member, shift, helix and addendum.
 type TeethCache =
-    std::cell::RefCell<std::collections::HashMap<(usize, u64, u64), std::rc::Rc<BuiltMember>>>;
+    std::cell::RefCell<std::collections::HashMap<(usize, u64, u64, u64), std::rc::Rc<BuiltMember>>>;
 
 /// One axis of the efficiency search, over the free members.
 #[derive(Clone, Copy, Debug)]
@@ -2452,6 +2458,19 @@ impl BuiltMember {
     }
 
     /// The tip radius, as the cutter left it.
+    /// **The addendum at which this member's tip stands at `radius`**, in
+    /// modules: its tip radius inverted, `r_a = r + σ m h_a + m x` with `σ`
+    /// the side its teeth point to, one for a rack-cut tooth and minus one
+    /// for a ring. Before either kind's tip clamps, which are the cut's.
+    fn addendum_at_tip(&self, radius: f64) -> f64 {
+        let p = self.params();
+        let (r, sigma) = match self {
+            Self::Rack { tooth } => (tooth.r, 1.0),
+            Self::Ring { ring, .. } => (ring.r, -1.0),
+        };
+        sigma * ((radius - r) / p.module - p.profile_shift)
+    }
+
     pub(crate) fn tip_radius(&self) -> f64 {
         match self {
             Self::Rack { tooth } => tooth.ra,
@@ -2885,6 +2904,9 @@ pub(crate) struct Built {
     pub(crate) meshes: Vec<BuiltMesh>,
     /// Per distance: the running distance every mesh on it agrees at.
     pub(crate) running: Vec<Option<f64>>,
+    /// Per member: the addendum its meshes held its tip to, where one did
+    /// ([`Shape::hold_tips_to_mates`]).
+    pub(crate) mate: Vec<Option<f64>>,
 }
 
 impl Shape {
@@ -2907,40 +2929,108 @@ impl Shape {
         for k in (0..self.meshes.len()).filter(|&k| self.is_crossed(k)) {
             self.screw_helices(k, helix)?;
         }
-        let cut = |i: usize| -> std::rc::Rc<BuiltMember> {
-            let p = self.params_at(i, x[i], helix);
-            std::rc::Rc::new(match &self.members[i].ring {
-                Some(cutter) => BuiltMember::Ring {
-                    ring: Box::new(Ring::cut_by(&p, cutter)),
-                    as_gear: Tooth::new(p),
-                },
-                None => BuiltMember::Rack {
-                    tooth: Tooth::new(p),
-                },
-            })
+        let cut = |i: usize, mate: Option<f64>| -> std::rc::Rc<BuiltMember> {
+            let p = self.params_bounded(i, x[i], helix, mate);
+            let build = || {
+                std::rc::Rc::new(match &self.members[i].ring {
+                    Some(cutter) => BuiltMember::Ring {
+                        ring: Box::new(Ring::cut_by(&p, cutter)),
+                        as_gear: Tooth::new(p),
+                    },
+                    None => BuiltMember::Rack {
+                        tooth: Tooth::new(p),
+                    },
+                })
+            };
+            let Some(cache) = cache else {
+                return build();
+            };
+            let key = (i, x[i].to_bits(), helix[i].to_bits(), p.addendum.to_bits());
+            let mut kept = cache.borrow_mut();
+            if let Some(m) = kept.get(&key) {
+                return std::rc::Rc::clone(m);
+            }
+            let m = build();
+            // A search walks a few hundred trials; the cache is never let
+            // past a few thousand teeth.
+            if kept.len() > 4096 {
+                kept.clear();
+            }
+            kept.insert(key, std::rc::Rc::clone(&m));
+            m
         };
-        let members: Vec<std::rc::Rc<BuiltMember>> = (0..self.members.len())
-            .map(|i| match cache {
-                None => cut(i),
-                Some(cache) => {
-                    let key = (i, x[i].to_bits(), helix[i].to_bits());
-                    let mut kept = cache.borrow_mut();
-                    if let Some(m) = kept.get(&key) {
-                        return std::rc::Rc::clone(m);
-                    }
-                    let m = cut(i);
-                    // A search walks a few hundred trials; the cache is
-                    // never let past a few thousand teeth.
-                    if kept.len() > 4096 {
-                        kept.clear();
-                    }
-                    kept.insert(key, std::rc::Rc::clone(&m));
-                    m
-                }
-            })
-            .collect();
-        let mut running: Vec<Option<f64>> = vec![None; self.distances.len()];
+        let mut members: Vec<std::rc::Rc<BuiltMember>> =
+            (0..self.members.len()).map(|i| cut(i, None)).collect();
+        let (running, placed) = self.place_meshes(&members, x, helix, held)?;
+        let mate = self.hold_tips_to_mates(&mut members, &placed, &cut);
         let mut meshes = Vec::with_capacity(self.meshes.len());
+        for (m, (kind, at, zero)) in self.meshes.iter().zip(placed) {
+            let contact = match zero {
+                Placed::Line(design, operating) => {
+                    let ends = [members[m.a].flank_ends(), members[m.b].flank_ends()];
+                    // No usable path: the tips never reach, or they reach
+                    // only past each other's usable flanks.
+                    let path = ContactPath::new(members[m.a].as_gear(), ends[1], &operating)
+                        .ok_or_else(|| {
+                            if operating.flank_interference(ends).contains(&true) {
+                                TrainError::FlankInterference
+                            } else {
+                                TrainError::NoContact
+                            }
+                        })?;
+                    BuiltContact::Line(LineBuilt {
+                        design,
+                        operating,
+                        path,
+                    })
+                }
+                Placed::Point(screw) => {
+                    // The tips are the teeth's own: this is the one place a
+                    // crossed pair's tooth form reaches an answer, which is
+                    // why it is specified at all (docs/reference.md#crossed-axes).
+                    // No zone at all is teeth that never meet, refused as a
+                    // line contact's is. With faces centred on the common
+                    // perpendicular, a pair whose tips reach across it has
+                    // faces that overlap there, so this is the one case in
+                    // which the faces hold no contact.
+                    let path = screw
+                        .path_of_contact_at(
+                            members[m.a].tip_radius(),
+                            members[m.b].tip_radius(),
+                            at,
+                        )
+                        .ok_or(TrainError::NoContact)?;
+                    BuiltContact::Point(PointBuilt { screw, path })
+                }
+            };
+            meshes.push(BuiltMesh {
+                kind,
+                running: at,
+                contact,
+            });
+        }
+        Ok(Built {
+            members,
+            meshes,
+            running,
+            mate,
+        })
+    }
+
+    /// **Every mesh at its running distance**: the distance each pair of
+    /// axes runs at, and each mesh's geometry there — which reads the
+    /// members' shifts and never their tips, so it holds for a member cut
+    /// again at a shorter tip.
+    #[allow(clippy::type_complexity)]
+    fn place_meshes(
+        &self,
+        members: &[std::rc::Rc<BuiltMember>],
+        x: &[f64],
+        helix: &[f64],
+        held: &[Option<f64>],
+    ) -> Result<(Vec<Option<f64>>, Vec<(MeshKind, f64, Placed)>), TrainError> {
+        let mut running: Vec<Option<f64>> = vec![None; self.distances.len()];
+        let mut placed = Vec::with_capacity(self.meshes.len());
         for (k, m) in self.meshes.iter().enumerate() {
             let kind = self
                 .kind_of(k)
@@ -2990,57 +3080,134 @@ impl Shape {
                     r
                 }
             };
-            let contact = match zero {
-                Zero::Line(design) => {
-                    let operating = design.at(at).map_err(TrainError::Mesh)?;
-                    let ends = [members[m.a].flank_ends(), members[m.b].flank_ends()];
-                    // No usable path: the tips never reach, or they reach
-                    // only past each other's usable flanks.
-                    let path = ContactPath::new(members[m.a].as_gear(), ends[1], &operating)
-                        .ok_or_else(|| {
-                            if operating.flank_interference(ends).contains(&true) {
-                                TrainError::FlankInterference
-                            } else {
-                                TrainError::NoContact
-                            }
-                        })?;
-                    BuiltContact::Line(LineBuilt {
-                        design,
-                        operating,
-                        path,
-                    })
-                }
-                Zero::Point(screw) => {
-                    // The tips are the teeth's own: this is the one place a
-                    // crossed pair's tooth form reaches an answer, which is
-                    // why it is specified at all (docs/reference.md#crossed-axes).
-                    // No zone at all is teeth that never meet, refused as a
-                    // line contact's is. With faces centred on the common
-                    // perpendicular, a pair whose tips reach across it has
-                    // faces that overlap there, so this is the one case in
-                    // which the faces hold no contact.
-                    let path = screw
-                        .path_of_contact_at(
-                            members[m.a].tip_radius(),
-                            members[m.b].tip_radius(),
-                            at,
-                        )
-                        .ok_or(TrainError::NoContact)?;
-                    BuiltContact::Point(PointBuilt { screw, path })
-                }
-            };
-            meshes.push(BuiltMesh {
+            placed.push((
                 kind,
-                running: at,
-                contact,
-            });
+                at,
+                match zero {
+                    Zero::Line(design) => {
+                        let operating = design.at(at).map_err(TrainError::Mesh)?;
+                        Placed::Line(design, operating)
+                    }
+                    Zero::Point(screw) => Placed::Point(screw),
+                },
+            ));
         }
-        Ok(Built {
-            members,
-            meshes,
-            running,
-        })
+        Ok((running, placed))
     }
+
+    /// **Each tip held to its mates' usable flanks**, where its member asks
+    /// ([`super::MemberGear::no_tip_past_mate_flank`]): per member, the
+    /// addendum at which its tip meets the start of the nearest mate's usable
+    /// flank on the line of action, the lowest over its meshes, and the
+    /// member cut again wherever that bound binds. Returns the bound each
+    /// member was handed.
+    ///
+    /// **The bound is the mesh's and the tip is the gear's.** The radius the
+    /// tip may reach is the conjugate of the mate's junction at the running
+    /// geometry ([`Mesh::contact_radius_at`]) — a question of both gears —
+    /// and it reaches the member as a number of modules, which its own
+    /// [`super::MemberGear::addendum_asked`] weighs beside its tip width.
+    /// Neither the geometry nor a mate's junction reads a tip, so one pass
+    /// finds every bound.
+    ///
+    /// **Exactly met, then checked on the path.** The closed form lands the
+    /// tip on the junction's conjugate to a rounding either side; the path of
+    /// contact the report reads is asked whether the tip still reaches past,
+    /// and a tip that does by a rounding is shortened by what the path says
+    /// it reaches past, doubled each time the cut does not move. On a line
+    /// contact only: a crossed mesh's point contact meets its faces by
+    /// another geometry, and asks nothing of this bound.
+    fn hold_tips_to_mates(
+        &self,
+        members: &mut [std::rc::Rc<BuiltMember>],
+        placed: &[(MeshKind, f64, Placed)],
+        cut: &dyn Fn(usize, Option<f64>) -> std::rc::Rc<BuiltMember>,
+    ) -> Vec<Option<f64>> {
+        let n = self.members.len();
+        let mut mate: Vec<Option<f64>> = vec![None; n];
+        // Each line mesh, as (member, the side it is on, its mate).
+        let sides = |k: usize| {
+            let m = self.meshes[k];
+            [(m.a, MeshSide::First, m.b), (m.b, MeshSide::Second, m.a)]
+        };
+        for (k, (_, _, p)) in placed.iter().enumerate() {
+            let Placed::Line(_, operating) = p else {
+                continue;
+            };
+            for (i, side, j) in sides(k) {
+                if !self.members[i].gear.no_tip_past_mate_flank {
+                    continue;
+                }
+                let Some(r) = operating.contact_radius_at(side, members[j].flank_ends().junction)
+                else {
+                    // The mate's usable flank begins where no tip of this
+                    // member reaches on the line of action: nothing to
+                    // hold the tip to.
+                    continue;
+                };
+                let c = members[i].addendum_at_tip(r);
+                mate[i] = Some(mate[i].map_or(c, |o: f64| o.min(c)));
+            }
+        }
+        for i in 0..n {
+            let Some(mut c) = mate[i] else {
+                continue;
+            };
+            let before = members[i].params().addendum;
+            if c >= before {
+                continue;
+            }
+            // Shortened by what the path says it reaches past, converted at
+            // one module a millimetre of tip — never less than the path's
+            // reach, since a tip moves along the line of action at least as
+            // far as it moves radially.
+            let module = members[i].params().module;
+            let mut step = 0.0_f64;
+            for _ in 0..f64::MANTISSA_DIGITS {
+                members[i] = cut(i, Some(c));
+                let past = placed
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(k, (_, _, p))| match p {
+                        Placed::Line(_, operating) => Some((k, operating)),
+                        Placed::Point(_) => None,
+                    })
+                    .flat_map(|(k, operating)| {
+                        let m = self.meshes[k];
+                        sides(k)
+                            .into_iter()
+                            .filter(move |&(at, _, _)| at == i)
+                            .map(move |(_, side, _)| (m, side, operating))
+                    })
+                    .map(|(m, side, operating)| {
+                        let ends = [members[m.a].flank_ends(), members[m.b].flank_ends()];
+                        // The mate's end is the other side's.
+                        ContactPath::new(members[m.a].as_gear(), ends[1], operating)
+                            .map_or(f64::INFINITY, |p| p.past_usable_flank()[1 - side.index()])
+                    })
+                    .fold(0.0_f64, f64::max);
+                if past <= 0.0 {
+                    break;
+                }
+                step = if past.is_finite() {
+                    (past / module).max(2.0 * step)
+                } else {
+                    2.0 * step
+                }
+                .max(c.abs().max(1.0) * f64::EPSILON);
+                c -= step;
+            }
+            mate[i] = Some(c);
+        }
+        mate
+    }
+}
+
+/// A mesh placed at its running distance, before its contact is found.
+enum Placed {
+    /// A line contact: its zero-backlash design and its geometry as it runs.
+    Line(Mesh, Mesh),
+    Point(Screw),
 }
 
 /// What a member is, as a designer names it — read off the shape by
@@ -3928,6 +4095,7 @@ pub fn rate(
                     ..shape.base_params(i, helix)
                 },
                 cutter,
+                built.mate[i],
             )
             .note(),
         );

@@ -403,8 +403,8 @@ relation among three shifts and so two of them a design; the sun and ring cases
 are closed form where the planet's needs a solve. On an ideal ring with nothing
 else asked that is the planet thinned by the clearance; the shipped 12/30/72
 has a sun small enough to need shift, so it opens with +0.298 on the sun and
-−0.170 on the planet, and its planet–ring mesh fouls at a full-depth ring as
-the reference records. The
+−0.170 on the planet, and its ring's tip is held off the planet's usable
+flank rather than fouling it at full depth (reference.md#interference-a-tip-reaching-past-the-flank-it-meshes-with). The
 ring sweep (`gear-cli planetary`), layout checks, Willis kinematics,
 Pennestrì–Freudenstein efficiency in all six arrangements, and backlash referred to the output body —
 which on the ideal ring a centre tolerance cannot move, the sun mesh gaining
@@ -883,7 +883,21 @@ whose size is unmeasured is a debt still owed, and is marked as one.
   against no movement at all on the other 29 sets of
   `the_search_is_converged_not_budgeted`, which pins the bound so it can only
   shrink. The size is below the last digit printed; the cure is the structural
-  search (redesign C), not a larger budget.
+  search (redesign C), not a larger budget. **13/18 (ring 49) joined it** when
+  a ring's tip came to be held off its planet's usable flank rather than
+  refused there: the region the refusal closed is open, with a kink along the
+  form circle where the hold begins, and four times the budget moves `η₀` by
+  **5.3e-9** (higher; sixteen and sixty-four times agree with four). The other
+  28 sets do not move at all.
+- **A ring's held tip is sized for its tips' room at the typed tip.** The
+  distance a small tooth difference is opened to (`tip_clearance`) and the
+  ring's undercut floor are both read at the addendum as typed, before its
+  meshes hold it shorter, since the hold needs the running distance they
+  decide. Both err toward the taller tooth: the far gap is sized for a tip the
+  ring does not have (larger as built, by the height held), and the undercut
+  floor asks a flank reach a tip it no longer has (the shift higher than the
+  built tip needs; on the shipped 12/30/72 it starts to raise the shift at
+  about 1.02 modules typed).
 
 ---
 

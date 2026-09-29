@@ -441,7 +441,7 @@
    *  rather than repeating the keys. */
   const FIELD_NOTES = {
     profile_shift: ["gear.shift_raised_for_undercut"],
-    addendum: ["gear.addendum_held_to_tip_width"],
+    addendum: ["gear.addendum_held_to_tip_width", "gear.addendum_held_to_mate_flank"],
     face_width: ["gear.face_width_no_source", "gear.face_width_as_entered"],
   } as const;
   const UNDER_A_FIELD: readonly string[] = Object.values(FIELD_NOTES).flat();
@@ -1518,6 +1518,18 @@
       <em>{t("ui.train_mm")}</em>
     </label>
   {/if}
+  <!-- The addendum's second bound: the tip held off its mates' usable flanks.
+       The core finds where that is, mesh by mesh; on for a ring as laid in. -->
+  <label class="sub">
+    <span>{t("ui.train_no_tip_past_mate_flank")}</span>
+    <Switch
+      small
+      label={t("ui.train_no_tip_past_mate_flank")}
+      on={gear.no_tip_past_mate_flank}
+      title={t("ui.train_note_no_tip_past_mate_flank")}
+      set={(v) => (gear.no_tip_past_mate_flank = v)}
+    />
+  </label>
   {#if !shaper}
     <!-- The bounds are the gear tab's sentences, from the catalogue. -->
     <label>
