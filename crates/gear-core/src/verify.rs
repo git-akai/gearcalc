@@ -618,7 +618,7 @@ pub fn check_ring_cut(ring: &crate::ring::Ring, radii: usize, phases: usize) -> 
                 // Nothing to compare against where no fillet was cut; the flank
                 // reference above already runs to the root circle there.
                 ring.fillet
-                    .map(|f| ring.trochoid_at(f.s_j + (f.s_root - f.s_j) * t)),
+                    .map(|f| ring.trochoid_at(f.phi_j + (f.phi_root - f.phi_j) * t)),
             ]
             .into_iter()
             .flatten()

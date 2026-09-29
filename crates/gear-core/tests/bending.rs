@@ -391,8 +391,8 @@ fn the_virtual_spur_ring_is_the_identity_at_zero_helix() {
         assert_eq!(v.psi_b, ring.psi_b, "z={teeth}: tooth thickness");
         assert_eq!(v.u_j, ring.u_j, "z={teeth}: junction");
         assert_eq!(
-            v.fillet.map(|f| f.s_j),
-            ring.fillet.map(|f| f.s_j),
+            v.fillet.map(|f| f.phi_j),
+            ring.fillet.map(|f| f.phi_j),
             "z={teeth}: junction travel"
         );
     }

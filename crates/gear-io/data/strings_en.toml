@@ -90,10 +90,11 @@ ring_space_capped = "space width capped: shift or thickness modification too pos
 ring_space_raised = "space width increased: shift or thickness modification too negative"
 space_closed = "tooth space closes at radius {radius} mm where flanks meet: root is truncated"
 ring_tip_raised = "tip radius increased to {radius} mm: below it, the tooth has no thickness"
+ring_tip_at_base = "tip radius increased to {radius} mm, the base circle: inside it there is no involute to cut"
 cutter_teeth_reduced = "cutter reduced to {teeth} teeth: ring needs more teeth than its shaper"
 ring_flank_ungenerated = "flank below {limit} mm not generated; increase cutter teeth"
 ring_fully_filleted = "fully filleted root: corner rounds meet, leaving no root arc"
-ring_flank_fillet_gap = "flank and fillet do not meet: cutter does not reach this ring's flank; profile not generated"
+ring_flank_fillet_gap = "flank and fillet do not meet between tip and root: fillet not drawn"
 
 # ----------------------------------------------------------------- part notes
 #

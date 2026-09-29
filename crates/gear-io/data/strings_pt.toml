@@ -36,10 +36,11 @@ ring_space_capped = "largura do vão limitada: correção do perfil ou correçã
 ring_space_raised = "largura do vão aumentada: correção do perfil ou correção de espessura demasiado negativa"
 space_closed = "o vão entre dentes fecha no raio {radius} mm, onde os flancos se encontram: a raiz é truncada"
 ring_tip_raised = "raio de topo aumentado para {radius} mm: abaixo disso, o dente não tem espessura"
+ring_tip_at_base = "raio de topo aumentado para {radius} mm, o círculo de base: dentro dele não há evolvente a cortar"
 cutter_teeth_reduced = "ferramenta reduzida a {teeth} dentes: a engrenagem anular precisa de mais dentes do que a ferramenta que a gera"
 ring_flank_ungenerated = "flanco abaixo de {limit} mm não gerado; aumente o número de dentes da ferramenta"
 ring_fully_filleted = "raiz totalmente concordada: os raios dos cantos encontram-se e não resta arco de raiz"
-ring_flank_fillet_gap = "flanco e concordância não se encontram: a ferramenta não alcança o flanco desta engrenagem anular; perfil não gerado"
+ring_flank_fillet_gap = "flanco e concordância não se encontram entre o topo e a raiz: concordância não desenhada"
 
 [part]
 distance_not_reached = "nenhum deslocamento admissível alcança {asked} mm: o par é construído a {reached} mm, e a folga indicada é o vão"

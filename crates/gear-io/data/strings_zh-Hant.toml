@@ -31,10 +31,11 @@ ring_space_capped = "齒槽寬已限制：變位或齒厚修正過正"
 ring_space_raised = "齒槽寬已增大：變位或齒厚修正過負"
 space_closed = "齒槽在半徑 {radius} mm 處閉合，兩側齒面在此相交：齒根被截斷"
 ring_tip_raised = "齒頂半徑已增大至 {radius} mm：低於此值，輪齒將沒有厚度"
+ring_tip_at_base = "齒頂半徑已增大至 {radius} mm，即基圓：基圓以內沒有可切出的漸開線"
 cutter_teeth_reduced = "刀具齒數已減至 {teeth}：內齒輪的齒數必須多於插齒刀"
 ring_flank_ungenerated = "{limit} mm 以下的齒面未被展成；請增加插齒刀齒數"
 ring_fully_filleted = "齒根全為圓角：兩側圓角相交，未留下齒根圓弧"
-ring_flank_fillet_gap = "齒面與齒根圓角不相接：刀具夠不到該內齒輪的齒面；齒廓未生成"
+ring_flank_fillet_gap = "齒面與齒根圓角在齒頂與齒根之間不相接：未繪製齒根圓角"
 
 [part]
 distance_not_reached = "沒有可用的變位係數能達到 {asked} mm：齒輪對實際按 {reached} mm 建構，所報間隙即為該間距"

@@ -88,23 +88,26 @@ impl Default for Cutter {
     }
 }
 
-/// The root fillet a shaper cut, as the span of cutter travel that traced it.
+/// The root fillet a shaper cut, as the span of the cutter corner's normal
+/// angle that traced it (radians, see [`ShaperCut::trochoid_at`]).
 ///
-/// The two travels are what the trochoid is read at; the radii and angles come
-/// from [`Ring::trochoid_at`] rather than being stored, so there is one place
-/// the curve is defined.
+/// The two angles are what the trochoid is read at; the radii and angles
+/// round the ring come from [`Ring::trochoid_at`] rather than being stored, so
+/// there is one place the curve is defined. The corner's normal angle rather
+/// than the cutter's travel, because the travel stands still where the corner
+/// rides on the pitch point and the whole round is cut at one travel.
 #[derive(Clone, Copy, Debug)]
 pub struct Fillet {
-    /// Cutter travel at the flank/fillet junction.
-    pub s_j: f64,
-    /// Travel at which the fillet ends.
+    /// Normal angle at the flank/fillet junction, radians: negative.
+    pub phi_j: f64,
+    /// Normal angle at which the fillet ends, radians.
     ///
     /// Zero when a root arc follows — the deepest cut, at mid-space. Non-zero
     /// when the fillets from the two flanks meet before they get there, which
     /// leaves a **fully filleted root** with no flat at all. Common, and not a
     /// fault: it simply means the cutter's tip is wide enough that its corner
     /// rounds overlap.
-    pub s_root: f64,
+    pub phi_root: f64,
 }
 
 /// A ring gear's cross-section, so far as the involute goes.
@@ -215,7 +218,18 @@ impl Ring {
     ) -> Self {
         let mut clamps = Vec::new();
         let beta = params.helix_angle.to_radians();
-        let alpha_n = params.pressure_angle.to_radians();
+        // Guarded as `Tooth` guards it: at or below the floor the base circle
+        // meets the pitch circle and the involute degenerates.
+        let alpha_floor = guard::MIN_PRESSURE_ANGLE_DEG.to_radians();
+        let mut alpha_n = params.pressure_angle.to_radians();
+        if alpha_n <= alpha_floor {
+            alpha_n = alpha_floor;
+            clamps.push(Note::new(key::CLAMP_PRESSURE_ANGLE_RAISED).number(
+                "degrees",
+                guard::MIN_PRESSURE_ANGLE_DEG,
+                1,
+            ));
+        }
         let m = params.module;
         let mt = m / beta.cos();
         let alpha_t = crate::plane::transverse_pressure_angle(alpha_n, beta);
@@ -279,8 +293,7 @@ impl Ring {
 
         // The tip cannot dip below the base circle: there is no involute there
         // to cut it from.
-        let mut ra_min = rb * (1.0 + 1e-9);
-
+        //
         // ...and on a large ring the tooth runs out of *thickness* first.
         //
         // A ring's tooth narrows **inward**, so its tip is its thinnest section.
@@ -293,14 +306,23 @@ impl Ring {
         // Unclamped this is not a thin tooth but a **crossed** one: a 150-tooth
         // ring at a 3-module addendum came out at −0.211 mm of thickness, and its
         // outline is a self-intersecting polygon that would go into a DXF.
-        if psi_b < 0.0 {
-            if let Some(alpha_point) = crate::involute::inv_inverse(-psi_b) {
-                ra_min = ra_min.max(rb / alpha_point.cos());
+        //
+        // Whichever floor binds, the tip is clamped onto it and the note names
+        // that floor (decision 1): the base circle exactly, with no margin.
+        let pointed = (psi_b < 0.0)
+            .then(|| crate::involute::inv_inverse(-psi_b))
+            .flatten()
+            .map(|alpha_point| rb / alpha_point.cos());
+        match pointed {
+            Some(ra_point) if ra < ra_point => {
+                clamps.push(Note::new(key::CLAMP_RING_TIP_RAISED).number("radius", ra_point, 4));
+                ra = ra_point;
             }
-        }
-        if ra < ra_min {
-            clamps.push(Note::new(key::CLAMP_RING_TIP_RAISED).number("radius", ra_min, 4));
-            ra = ra_min;
+            _ if ra < rb => {
+                clamps.push(Note::new(key::CLAMP_RING_TIP_AT_BASE).number("radius", rb, 4));
+                ra = rb;
+            }
+            _ => {}
         }
 
         let roll_at = |radius: f64| crate::involute::roll_at_radius(radius, rb);
@@ -470,11 +492,11 @@ impl Ring {
             return ring;
         }
         match ring.solve_junction() {
-            Some((u_j, s_j)) => {
+            Some((u_j, phi_j)) => {
                 ring.u_j = u_j;
                 ring.fillet = Some(Fillet {
-                    s_j,
-                    s_root: ring.solve_root_end(s_j),
+                    phi_j,
+                    phi_root: ring.solve_root_end(phi_j),
                 });
                 if !ring.fully_generated() {
                     let limit = ring.generation_limit();
@@ -484,7 +506,7 @@ impl Ring {
                             .number("tip", ring.ra, 4),
                     );
                 }
-                if ring.fillet.is_some_and(|f| f.s_root != 0.0) {
+                if ring.fillet.is_some_and(|f| f.phi_root != 0.0) {
                     ring.clamps.push(Note::new(key::CLAMP_RING_FULLY_FILLETED));
                 }
             }
@@ -513,19 +535,21 @@ impl Ring {
     /// on the line of action, and each member's distance from the pitch point
     /// along it is `√(r² − r_b²)`. For an internal pair the ring's tangency
     /// point lies beyond the cutter's, so the two distances differ by
-    /// `a sin α_t` rather than summing to it:
+    /// `a sin α_w` rather than summing to it:
     ///
     /// ```text
-    /// √(r_j² − r_bw²) = a sin α_t + √(r_tan² − r_bc²)
+    /// √(r_j² − r_b²) = a sin α_w + √(r_tan² − r_bc²)
     /// ```
     ///
     /// and `r_tan` — where the cutter's round meets its flank — comes from the
     /// same offset-involute fact the phase used: the round's centre sits at roll
     /// `t_g`, so the tangency is at roll `t_g + ρ/r_bc` on the flank itself.
-    /// Nothing here iterates.
     ///
-    /// The one solve left is turning that radius back into a cutter travel, and
-    /// the trochoid's radius is monotone either side of the deepest cut.
+    /// The fillet's end of it is closed form too: there the round's normal is
+    /// the flank's, tangent to the cutter's base circle, so its angle from the
+    /// corner centre's radial line is `−atan t_g`
+    /// ([`ShaperCut::junction_normal`]) — on a prolate path and a curtate one
+    /// alike. Nothing here iterates.
     fn solve_junction(&self) -> Option<(f64, f64)> {
         let r_bc = self.cut.cutter_radius * self.alpha_t.cos();
         let t_g = crate::involute::roll_at_radius(self.cut.corner_radius, r_bc);
@@ -536,37 +560,25 @@ impl Ring {
         if !(r_j.is_finite() && r_j > self.ra && r_j < self.rf) {
             return None;
         }
-
-        // ...and back to a travel. Monotone in `s` away from the deepest cut,
-        // which is what makes one bracketed step enough.
-        let radius_at = |s: f64| self.cut.trochoid_at(s).0 - r_j;
-        let mut far = -self.mt;
-        for _ in 0..64 {
-            if radius_at(far) < 0.0 {
-                let s_j = brent(radius_at, far, 0.0, Tol::default())?;
-                return Some((self.roll_at(r_j), s_j));
-            }
-            far *= 1.4;
-        }
-        None
+        Some((self.roll_at(r_j), self.cut.junction_normal(self.alpha_t)))
     }
 
     /// Where the fillet ends: the deepest cut, or mid-space if it gets there
     /// first.
     ///
     /// The fillet is symmetric about mid-space, so two of them meeting there is
-    /// the same statement as one of them reaching it. Monotone in `s`, so one
-    /// bracketed step again.
+    /// the same statement as one of them reaching it. Monotone in the normal
+    /// angle, so one bracketed step again.
     ///
-    /// Takes the junction travel rather than reading it back off `self`,
-    /// because it is called while the fillet is being built and there is
-    /// nothing to read yet.
-    fn solve_root_end(&self, s_j: f64) -> f64 {
+    /// Takes the junction's normal angle rather than reading it back off
+    /// `self`, because it is called while the fillet is being built and there
+    /// is nothing to read yet.
+    fn solve_root_end(&self, phi_j: f64) -> f64 {
         if self.trochoid_at(0.0).1 <= self.half_pitch {
             return 0.0;
         }
-        let over = |s: f64| self.trochoid_at(s).1 - self.half_pitch;
-        brent(over, s_j, 0.0, Tol::default()).unwrap_or(0.0)
+        let over = |phi: f64| self.trochoid_at(phi).1 - self.half_pitch;
+        brent(over, phi_j, 0.0, Tol::default()).unwrap_or(0.0)
     }
 
     /// A circle to draw the rim at, mm — `r + 2 m_t`, so the annulus is two
@@ -623,10 +635,11 @@ impl Ring {
         crate::involute::roll_at_radius(radius, self.rb)
     }
 
-    /// The fillet at cutter travel `s`, as `(radius, angle)`.
+    /// The fillet at the cutter corner's normal angle `phi` (radians), as
+    /// `(radius, angle)`.
     #[must_use]
-    pub fn trochoid_at(&self, s: f64) -> (f64, f64) {
-        self.cut.trochoid_at(s)
+    pub fn trochoid_at(&self, phi: f64) -> (f64, f64) {
+        self.cut.trochoid_at(phi)
     }
 
     /// The **virtual spur ring**: this ring's normal section, as a spur ring.
@@ -678,8 +691,8 @@ impl Ring {
     /// bending model reads its own geometry off the ring rather than reaching
     /// into the cut.
     #[must_use]
-    pub fn fillet_point_and_tangent(&self, s: f64) -> ([f64; 2], [f64; 2]) {
-        self.cut.trochoid_point_and_tangent(s)
+    pub fn fillet_point_and_tangent(&self, phi: f64) -> ([f64; 2], [f64; 2]) {
+        self.cut.trochoid_point_and_tangent(phi)
     }
 
     /// The flank point and its tangent, Cartesian, tooth centred on `+y`.
@@ -689,19 +702,16 @@ impl Ring {
     /// tooth gains angle outward where an external gear's loses it.
     #[must_use]
     pub fn flank_point_and_tangent(&self, u: f64) -> ([f64; 2], [f64; 2]) {
-        let root = f64::hypot(1.0, u);
-        let r = self.rb * root;
+        let r = self.rb * f64::hypot(1.0, u);
         let th = self.psi_b + inv_from_roll(u);
         let (st, ct) = th.sin_cos();
-
-        let dr = self.rb * u / root;
-        // Positive, where `Tooth`'s is negative — the flipped `inv` term of the
-        // module documentation, differentiated.
-        let dth = (u * u) / (1.0 + u * u);
-        (
-            [r * st, r * ct],
-            [dr * st + r * ct * dth, dr * ct - r * st * dth],
-        )
+        // `d/du (r sin θ, r cos θ)` is `(r_b u / √(1+u²)) (sin θ + u cos θ,
+        // cos θ − u sin θ)` — positive `dθ/du`, where `Tooth`'s is negative:
+        // the flipped `inv` term of the module documentation, differentiated.
+        // Only the direction is used, so the vanishing factor is left off: at
+        // the base circle the involute's speed is zero but its direction is
+        // radial, and a zero vector there read as a tangency everywhere.
+        ([r * st, r * ct], [st + u * ct, ct - u * st])
     }
 
     /// The flank point and the direction of the load there.
@@ -709,29 +719,28 @@ impl Ring {
     /// The load acts along the involute normal, which is the line from the
     /// contact point to the base-circle tangency point. For a ring that tangency
     /// sits `roll` radians **forward** around the base circle rather than back,
-    /// which is the same sign as above.
+    /// which is the same sign as above. That line is `(r_b u / √(1+u²)) (u sin θ
+    /// − cos θ, u cos θ + sin θ)`, so its unit direction is written without the
+    /// factor, and it is the base circle's tangent where `u = 0`.
     #[must_use]
     pub fn flank_point_and_load_direction(&self, roll: f64) -> ([f64; 2], [f64; 2]) {
         let (r, th) = self.involute_at(roll);
-        let p = [r * th.sin(), r * th.cos()];
-        let tangent_angle = self.psi_b + roll;
-        let t = [self.rb * tangent_angle.sin(), self.rb * tangent_angle.cos()];
-        let (dx, dy) = (p[0] - t[0], p[1] - t[1]);
-        let len = f64::hypot(dx, dy);
-        if len < f64::MIN_POSITIVE {
-            return (p, [1.0, 0.0]);
-        }
-        (p, [dx / len, dy / len])
+        let (st, ct) = th.sin_cos();
+        let root = f64::hypot(1.0, roll);
+        (
+            [r * st, r * ct],
+            [(roll * st - ct) / root, (roll * ct + st) / root],
+        )
     }
 
-    /// Radius of curvature of the fillet at travel `s`, mm.
+    /// Radius of curvature of the fillet at normal angle `phi` (radians), mm.
     ///
     /// The cutter's, since the cutter is what leaves it —
     /// [`ShaperCut::trochoid_curvature_radius`](crate::shaper::ShaperCut::trochoid_curvature_radius),
     /// closed form and shared with the rack-cut case.
     #[must_use]
-    pub fn fillet_curvature_radius(&self, s: f64) -> f64 {
-        self.cut.trochoid_curvature_radius(s)
+    pub fn fillet_curvature_radius(&self, phi: f64) -> f64 {
+        self.cut.trochoid_curvature_radius(phi)
     }
 
     /// The involute flank at roll parameter `u`, as `(radius, angle from the
@@ -788,7 +797,7 @@ impl Ring {
     pub(crate) fn space_starts_at(&self) -> f64 {
         self.fillet.map_or_else(
             || self.involute_at(self.u_j).1,
-            |f| self.trochoid_at(f.s_root).1,
+            |f| self.trochoid_at(f.phi_root).1,
         )
     }
 
@@ -805,7 +814,7 @@ impl Ring {
                 // begins, which is the curve the fillet would have joined.
                 Section::Trochoid => self.fillet.map_or_else(
                     || self.involute_at(self.u_j),
-                    |f| self.trochoid_at(lerp(f.s_j, f.s_root, i)),
+                    |f| self.trochoid_at(lerp(f.phi_j, f.phi_root, i)),
                 ),
                 Section::RootArc => (self.rf, lerp(self.space_starts_at(), self.half_pitch, i)),
             })
@@ -1262,7 +1271,7 @@ mod tests {
                     &Cutter::default(),
                 )
             };
-            let clamped = |r: &Ring| r.clamps.iter().any(|c| c.is(key::CLAMP_RING_TIP_RAISED));
+            let clamped = |r: &Ring| r.clamps.iter().any(|c| c.is(key::CLAMP_RING_TIP_AT_BASE));
             assert!(
                 !clamped(&build(smallest)),
                 "a={addendum} α={alpha_deg} β={beta_deg}: z={smallest} should fit"
@@ -1291,7 +1300,7 @@ mod tests {
             );
             let f = g.fillet.expect("z={teeth} is cut with a fillet");
             let (r_flank, a_flank) = g.involute_at(g.u_j);
-            let (r_fillet, a_fillet) = g.trochoid_at(f.s_j);
+            let (r_fillet, a_fillet) = g.trochoid_at(f.phi_j);
             assert!(
                 (r_flank - r_fillet).abs() < 1e-9,
                 "z={teeth}: radius {r_flank} against {r_fillet}"
@@ -1334,7 +1343,7 @@ mod tests {
         for i in 0..=40 {
             #[allow(clippy::cast_precision_loss)]
             let t = i as f64 / 40.0;
-            let (r, a) = g.trochoid_at(f.s_j + (f.s_root - f.s_j) * t);
+            let (r, a) = g.trochoid_at(f.phi_j + (f.phi_root - f.phi_j) * t);
             assert!(
                 r >= radius - 1e-9,
                 "fillet turned back at {r} from {radius}"
@@ -1351,7 +1360,7 @@ mod tests {
             "the fillet ran past mid-space to {angle}, beyond {}",
             g.half_pitch
         );
-        if f.s_root == 0.0 {
+        if f.phi_root == 0.0 {
             assert!(
                 (radius - g.rf).abs() < 1e-9,
                 "fillet reached {radius}, root {}",
@@ -1467,7 +1476,7 @@ mod tests {
         // root that is where the two fillets meet at mid-space, a hair *inside*
         // the root circle — the root circle is the cutter's reach, not the
         // part's boundary, and the two only coincide when a root arc exists.
-        let deepest = g.trochoid_at(fillet_of(&g).s_root).0;
+        let deepest = g.trochoid_at(fillet_of(&g).phi_root).0;
         assert!(
             (ring_max - deepest).abs() < 1e-9,
             "a ring's furthest point is where its fillet ends: {ring_max} against {deepest}"
@@ -1476,7 +1485,7 @@ mod tests {
             deepest <= g.rf + 1e-12,
             "and that cannot be beyond the root circle"
         );
-        if fillet_of(&g).s_root != 0.0 {
+        if fillet_of(&g).phi_root != 0.0 {
             assert!(
                 deepest < g.rf,
                 "a fully filleted root never reaches the root circle"
@@ -2345,8 +2354,12 @@ mod tests {
             let g = ring(teeth);
             assert!(g.ra < g.r, "z={teeth}: tip {} against pitch {}", g.ra, g.r);
             assert!(g.rf > g.r, "z={teeth}: root {} against pitch {}", g.rf, g.r);
-            assert!(g.rb < g.ra, "z={teeth}: the tip must clear the base circle");
-            assert!(g.u_tip > 0.0 && g.u_j > g.u_tip);
+            // z = 31 asks for a tip inside the base circle and is set on it.
+            assert!(
+                g.rb <= g.ra,
+                "z={teeth}: the tip must not be inside the base circle"
+            );
+            assert!(g.u_tip >= 0.0 && g.u_j > g.u_tip);
         }
     }
 
@@ -2628,7 +2641,7 @@ mod tests {
         );
         assert!(g.ra >= g.rb);
         assert!(
-            g.clamps.iter().any(|c| c.is(key::CLAMP_RING_TIP_RAISED)),
+            g.clamps.iter().any(|c| c.is(key::CLAMP_RING_TIP_AT_BASE)),
             "clamps: {:?}",
             g.clamps
         );
@@ -2692,5 +2705,359 @@ mod tests {
                  checks nothing"
             );
         }
+    }
+
+    /// **A ring's pressure angle is guarded as a tooth's is**: the same floor,
+    /// the same note, and the same angle carried, so a ring and the pinion
+    /// asked with it cannot disagree about the rack they share.
+    #[test]
+    fn a_rings_pressure_angle_is_guarded_as_a_tooths_is() {
+        for degrees in [0.0_f64, -5.0, 0.25, guard::MIN_PRESSURE_ANGLE_DEG] {
+            let p = GearParams {
+                teeth: 43,
+                pressure_angle: degrees,
+                ..Default::default()
+            };
+            let g = Ring::cut_by(&p, &Cutter::default());
+            let t = Tooth::new(p);
+            assert_eq!(g.alpha_n.to_bits(), t.alpha_n.to_bits(), "α={degrees}");
+            assert_eq!(g.alpha_t.to_bits(), t.alpha_t.to_bits(), "α={degrees}");
+            let noted = |c: &[Note]| c.iter().any(|n| n.is(key::CLAMP_PRESSURE_ANGLE_RAISED));
+            assert_eq!(
+                noted(&g.clamps),
+                t.clamps.fired(key::CLAMP_PRESSURE_ANGLE_RAISED),
+                "α={degrees}: the ring and the tooth disagree on the note"
+            );
+            for v in [g.ra, g.rf, g.rb, g.psi_b, g.u_tip, g.u_j, g.x_thick] {
+                assert!(v.is_finite(), "α={degrees}: {g:?}");
+            }
+        }
+    }
+
+    /// **A tip asked inside the base circle is set on it**, exactly, and says
+    /// why: the base circle, not a hair outside it, is where the involute
+    /// begins. The radius is continuous in the addendum through the clamp.
+    #[test]
+    fn a_tip_inside_the_base_circle_is_set_on_it_and_says_so() {
+        let at = |addendum: f64| {
+            Ring::cut_by(
+                &GearParams {
+                    teeth: 20,
+                    addendum,
+                    ..Default::default()
+                },
+                &Cutter::default(),
+            )
+        };
+        let g = at(3.0);
+        assert_eq!(
+            g.ra.to_bits(),
+            g.rb.to_bits(),
+            "tip {} against base {}",
+            g.ra,
+            g.rb
+        );
+        assert!(
+            g.clamps.iter().any(|c| c.is(key::CLAMP_RING_TIP_AT_BASE)),
+            "clamps: {:?}",
+            g.clamps
+        );
+        assert!(!g.clamps.iter().any(|c| c.is(key::CLAMP_RING_TIP_RAISED)));
+        // The addendum at which the tip reaches the base circle, and either
+        // side of it.
+        let edge = (g.r - g.rb) / g.params.module;
+        let (below, above) = (at(edge * (1.0 - 1e-9)), at(edge * (1.0 + 1e-9)));
+        assert!(
+            (below.ra - above.ra).abs() < 1e-8,
+            "{} against {}",
+            below.ra,
+            above.ra
+        );
+        assert!(!below
+            .clamps
+            .iter()
+            .any(|c| c.is(key::CLAMP_RING_TIP_AT_BASE)));
+        assert!(above
+            .clamps
+            .iter()
+            .any(|c| c.is(key::CLAMP_RING_TIP_AT_BASE)));
+    }
+
+    /// **A flank that starts on the base circle has a direction there.** The
+    /// involute's speed vanishes at the base circle and its direction does
+    /// not: radial, and the load along the base circle's tangent. Read as a
+    /// zero vector, a tip set on the base circle was a tangency for any
+    /// parabola, and the rating was 0/0.
+    #[test]
+    fn a_flank_on_the_base_circle_has_a_direction_there() {
+        let g = Ring::cut_by(
+            &GearParams {
+                teeth: 40,
+                profile_shift: -0.4,
+                ..Default::default()
+            },
+            &Cutter::default(),
+        );
+        assert_eq!(g.u_tip, 0.0, "the tip is set on the base circle");
+        let (p, t) = g.flank_point_and_tangent(0.0);
+        let (_, load) = g.flank_point_and_load_direction(0.0);
+        let radial = [p[0] / g.rb, p[1] / g.rb];
+        let n = f64::hypot(t[0], t[1]);
+        assert!(
+            (t[0] * radial[1] - t[1] * radial[0]).abs() / n < 1e-15,
+            "{t:?}"
+        );
+        assert!(
+            (load[0] * radial[0] + load[1] * radial[1]).abs() < 1e-15,
+            "{load:?}"
+        );
+        // ...and away from it, the direction is the one a difference gives.
+        for u in [0.05, 0.3, 0.6] {
+            let h = 1e-6;
+            let (a, _) = g.flank_point_and_tangent(u - h);
+            let (b, _) = g.flank_point_and_tangent(u + h);
+            let (_, t) = g.flank_point_and_tangent(u);
+            let d = [b[0] - a[0], b[1] - a[1]];
+            let cross =
+                (d[0] * t[1] - d[1] * t[0]) / (f64::hypot(d[0], d[1]) * f64::hypot(t[0], t[1]));
+            assert!(cross.abs() < 1e-8, "u={u}: {cross}");
+        }
+        let rated = crate::strength::root_section_with(
+            &g,
+            g.u_tip,
+            crate::strength::CriticalSection::LewisParabola,
+        )
+        .expect("a section");
+        assert!(
+            rated.form_factor > 0.0 && rated.form_factor.is_finite(),
+            "{rated:?}"
+        );
+    }
+
+    /// Rings cut with the corner's path on both sides of the cutter's
+    /// operating pitch circle: prolate (the corner centre outside it, a
+    /// looped path) and curtate (inside it), reached by large shifts on small
+    /// tooth differences, blunt or short cutters and thin cutter teeth.
+    fn prolate_and_curtate() -> Vec<Ring> {
+        let mut out = Vec::new();
+        for teeth in [24_u32, 25, 30, 43, 60, 90] {
+            for cutter_teeth in [12_u32, 14, 20, 80] {
+                if cutter_teeth >= teeth {
+                    continue;
+                }
+                for x in [-0.3, 0.0, 0.5, 0.8, 1.0] {
+                    for addendum in [0.8, 1.0, 1.25] {
+                        for k in [0.8, 1.0] {
+                            for tip_round in [0.0, 0.2] {
+                                out.push(Ring::cut_by(
+                                    &GearParams {
+                                        teeth,
+                                        profile_shift: x,
+                                        thickness_mod: k,
+                                        ..Default::default()
+                                    },
+                                    &Cutter {
+                                        teeth: cutter_teeth,
+                                        addendum,
+                                        tip_round,
+                                    },
+                                ));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        out
+    }
+
+    /// Whether the corner centre runs inside the cutter's operating pitch
+    /// circle.
+    fn curtate(g: &Ring) -> bool {
+        g.cut.corner_radius < g.cut.cutter_operating_radius
+    }
+
+    /// Whether the cut sits where the ring's shift puts it: inside the
+    /// involute domain of the cutter–ring pair. Outside it the cut falls back
+    /// to reference centres, a fault of its own (T05.4), and profile and cut
+    /// describe two different rings.
+    fn cut_where_asked(g: &Ring) -> bool {
+        let z_c = 2.0 * g.cut.cutter_radius / g.mt;
+        crate::mesh::operating_geometry(
+            g.mt,
+            g.alpha_t,
+            g.alpha_n,
+            z_c - f64::from(g.teeth),
+            -g.params.profile_shift,
+        )
+        .is_some()
+    }
+
+    /// **The fillet meets the flank on every path, prolate or curtate**: the
+    /// trochoid at the junction is the involute at the junction, to 1e-9 mm.
+    ///
+    /// Before, the fillet point was taken on the far side of the corner
+    /// whenever the path was curtate, and 841 fillets broke this (T05.2).
+    #[test]
+    fn the_fillet_meets_the_flank_on_a_curtate_path_too() {
+        use crate::strength::ToothOutline;
+        let rings = prolate_and_curtate();
+        let (mut checked, mut curtate_checked) = (0, 0);
+        for g in &rings {
+            if g.fillet.is_none() || !cut_where_asked(g) {
+                continue;
+            }
+            let (r_flank, a_flank) = g.involute_at(g.u_j);
+            let (r_fillet, a_fillet) = g.trochoid_at(ToothOutline::fillet_junction(g));
+            let off = f64::hypot(r_flank - r_fillet, r_flank * (a_flank - a_fillet));
+            assert!(
+                off < 1e-9,
+                "z={}/{} x={} k={} h_a0={} ρ={} ({}): the fillet misses the flank by {off} mm",
+                g.teeth,
+                g.cutter.teeth,
+                g.params.profile_shift,
+                g.params.thickness_mod,
+                g.cutter.addendum,
+                g.cutter.tip_round,
+                if curtate(g) { "curtate" } else { "prolate" },
+            );
+            checked += 1;
+            curtate_checked += usize::from(curtate(g));
+        }
+        assert!(
+            curtate_checked > 100,
+            "{curtate_checked} curtate of {checked}"
+        );
+        assert!(checked > curtate_checked + 100, "{checked} checked");
+    }
+
+    /// **The corner cuts to the root it was set to**: the deepest point of
+    /// the fillet is `a_cut + r_tip`, the root radius, whichever side of the
+    /// operating pitch circle the corner runs. A curtate path read the near
+    /// side of the round and stopped `2ρ` short.
+    #[test]
+    fn the_deepest_cut_is_the_root_on_every_path() {
+        let mut curtate_checked = 0;
+        for g in prolate_and_curtate() {
+            if g.fillet.is_none() || g.clamps.iter().any(|c| c.is(key::CLAMP_SPACE_CLOSED)) {
+                continue;
+            }
+            let deepest = g.trochoid_at(0.0).0;
+            assert!(
+                (deepest - g.rf).abs() < 1e-9,
+                "z={}/{} x={} ρ={}: the deepest cut is {deepest}, the root {}",
+                g.teeth,
+                g.cutter.teeth,
+                g.params.profile_shift,
+                g.cut.tip_round,
+                g.rf
+            );
+            curtate_checked += usize::from(curtate(&g));
+        }
+        assert!(curtate_checked > 100, "{curtate_checked}");
+    }
+
+    /// **Nothing jumps where the path turns from prolate to curtate.** On
+    /// 30/20 that is at x ≈ 0.683; before, the junction jumped 0.094 mm there
+    /// and the profile was not a number at the crossing itself.
+    #[test]
+    fn a_ring_is_continuous_in_its_shift_through_the_curtate_turn() {
+        let at = |x: f64| {
+            Ring::cut_by(
+                &GearParams {
+                    teeth: 30,
+                    profile_shift: x,
+                    ..Default::default()
+                },
+                &Cutter::default(),
+            )
+        };
+        let step = 5e-4;
+        let mut previous: Option<(f64, f64)> = None;
+        let (mut seen_prolate, mut seen_curtate) = (false, false);
+        for i in 0..=100 {
+            let x = 0.66 + step * f64::from(i);
+            let g = at(x);
+            assert!(g.fillet.is_some(), "x={x}: {:?}", g.clamps);
+            seen_prolate |= !curtate(&g);
+            seen_curtate |= curtate(&g);
+            let now = (g.rf, g.involute_at(g.u_j).0);
+            assert!(now.0.is_finite() && now.1.is_finite(), "x={x}: {now:?}");
+            if let Some(before) = previous {
+                // A shift moves the form by about a module per unit: twenty
+                // times that over one step is a jump, not a slope.
+                let limit = 20.0 * step * g.params.module;
+                assert!(
+                    (now.0 - before.0).abs() < limit && (now.1 - before.1).abs() < limit,
+                    "x={x}: root {} → {}, junction {} → {}",
+                    before.0,
+                    now.0,
+                    before.1,
+                    now.1
+                );
+            }
+            previous = Some(now);
+        }
+        assert!(
+            seen_prolate && seen_curtate,
+            "the sweep does not cross the turn"
+        );
+        // At the turn itself the corner stands on the pitch point and cuts
+        // its own arc: still a fillet, still a number.
+        let turn = at(0.683_258_95);
+        let f = turn.fillet.expect("a fillet at the turn");
+        let _ = f;
+        for v in [turn.rf, turn.u_j, turn.involute_at(turn.u_j).0] {
+            assert!(v.is_finite(), "{turn:?}");
+        }
+    }
+
+    /// **A curtate cut is the shape its cutter leaves**, by the simulation
+    /// that shares no code with the profile: large shifts on small tooth
+    /// differences, a thinner cutter tooth, the hula's proportions and the
+    /// cutter's addendum turned. Before, 30/20 at x 0.8 read 0.065 mm.
+    ///
+    /// Not here: 24/20 at x 0.5, which misses by 0.335 mm at the ring's tip,
+    /// where the cutter's tip trims it — T05.10's case, not the fillet's.
+    #[test]
+    fn a_curtate_ring_is_the_shape_its_cutter_leaves() {
+        let cases: &[(u32, u32, f64, f64, f64, f64)] = &[
+            // (z, z_c, x, k, h_a, h_a0)
+            (30, 20, 0.8, 1.0, 1.0, 1.25),
+            (30, 20, 0.9, 1.0, 1.0, 1.25),
+            (30, 20, 1.0, 1.0, 1.0, 1.25),
+            (30, 20, 0.8, 1.0, 1.0, 0.8),
+            (30, 20, 0.8, 1.0, 1.0, 1.0),
+            // At k 0.6 this cutter has no tip corner at all (T05.9's case),
+            // and at h_a 1 its tip trims the ring's by 5 µm (T05.10's).
+            (25, 20, 1.0, 0.8, 0.8, 1.25),
+            (19, 14, 0.607, 1.0, 0.7, 1.0),
+        ];
+        let mut curtate_seen = 0;
+        for &(teeth, cutter_teeth, x, k, addendum, cutter_addendum) in cases {
+            let g = Ring::cut_by(
+                &GearParams {
+                    teeth,
+                    profile_shift: x,
+                    thickness_mod: k,
+                    addendum,
+                    ..Default::default()
+                },
+                &Cutter {
+                    teeth: cutter_teeth,
+                    addendum: cutter_addendum,
+                    ..Cutter::default()
+                },
+            );
+            curtate_seen += usize::from(curtate(&g));
+            let report = crate::verify::check_ring_cut(&g, 400, 4_000);
+            assert!(
+                report.worst_distance < 5e-3,
+                "z={teeth}/{cutter_teeth} x={x} k={k} h_a={addendum} h_a0={cutter_addendum}: \
+                 cut and profile differ by {} mm",
+                report.worst_distance
+            );
+        }
+        assert!(curtate_seen >= 4, "{curtate_seen} of the cases are curtate");
     }
 }

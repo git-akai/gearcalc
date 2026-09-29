@@ -59,17 +59,17 @@ parabola · Y_F·K_f                  5.6172%         10               0.00424%
 == 1. continuity ==
 model                          worst z step       at z    worst x step (fine)
 60° · Y_F only                      2.1224%         33               0.00713%
-60° · Y_F·Y_S                       0.8760%         34               0.00172%
-parabola · Y_F only                 3.3880%         33               0.00949%
-parabola · Y_F·K_f                  3.7105%         34               0.00808%
+60° · Y_F·Y_S                       0.8767%         34               0.00172%
+parabola · Y_F only                 3.3879%         33               0.00949%
+parabola · Y_F·K_f                  3.7135%         34               0.00808%
 
 == 2. rank agreement (Spearman) ==
   60° · Y_F only         vs 60° · Y_F·Y_S          rho = 0.425510  (n=160)
-  60° · Y_F only         vs parabola · Y_F only    rho = 0.537411  (n=160)
+  60° · Y_F only         vs parabola · Y_F only    rho = 0.537329  (n=160)
   60° · Y_F only         vs parabola · Y_F·K_f     rho = 0.492421  (n=160)
-  60° · Y_F·Y_S          vs parabola · Y_F only    rho = 0.263638  (n=160)
+  60° · Y_F·Y_S          vs parabola · Y_F only    rho = 0.263325  (n=160)
   60° · Y_F·Y_S          vs parabola · Y_F·K_f     rho = 0.671244  (n=160)
-  parabola · Y_F only    vs parabola · Y_F·K_f     rho = 0.763178  (n=160)
+  parabola · Y_F only    vs parabola · Y_F·K_f     rho = 0.763301  (n=160)
 
 == 3. gradient sign agreement, ignoring effects below 0.0% ==
                                                      shift  fillet  dedend

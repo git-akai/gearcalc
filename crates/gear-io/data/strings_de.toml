@@ -35,10 +35,11 @@ ring_space_capped = "Lückenweite begrenzt: Profilverschiebung oder Dickenänder
 ring_space_raised = "Lückenweite erhöht: Profilverschiebung oder Dickenänderung zu negativ"
 space_closed = "Zahnlücke schließt sich bei Radius {radius} mm, wo die Flanken zusammentreffen: der Fuß ist dort abgeschnitten"
 ring_tip_raised = "Kopfradius auf {radius} mm erhöht: darunter hat der Zahn keine Dicke"
+ring_tip_at_base = "Kopfradius auf {radius} mm erhöht, den Grundkreis: innerhalb davon gibt es keine Evolvente zu schneiden"
 cutter_teeth_reduced = "Werkzeug auf {teeth} Zähne verringert: das Hohlrad braucht mehr Zähne als sein Schneidrad"
 ring_flank_ungenerated = "Flanke unterhalb {limit} mm nicht erzeugt; Schneidradzähnezahl erhöhen"
 ring_fully_filleted = "vollständig verrundeter Fuß: die Eckradien treffen sich, es bleibt kein Fußbogen"
-ring_flank_fillet_gap = "Flanke und Fußrundung treffen sich nicht: das Werkzeug erreicht die Flanke dieses Hohlrads nicht; Profil nicht erzeugt"
+ring_flank_fillet_gap = "Flanke und Fußrundung treffen sich nicht zwischen Kopf und Fuß: Fußrundung nicht gezeichnet"
 
 [part]
 distance_not_reached = "keine zulässigen Profilverschiebungen erreichen {asked} mm: das Paar wird stattdessen bei {reached} mm gebaut, und das gemeldete Spiel ist die Lücke"

@@ -11,7 +11,7 @@
 //! cutter's tooth count up and watch the difference fall away as `1/z_c`.
 //!
 //! ```text
-//! external gear, rack cutter     z_c → ∞      profile::Tooth::trochoid_at
+//! external gear, rack cutter     z_c → ∞      tooth::Tooth::trochoid_at
 //! external gear, shaper          z_c finite   here, MeshKind::External
 //! internal gear, shaper          z_c finite   here, MeshKind::Internal
 //! ```
@@ -23,16 +23,20 @@
 //! circle of radius `ρ` about a centre `C` that the rolling carries around. The
 //! fillet is the envelope of that circle, so the fillet point lies on the common
 //! normal — and **the common normal of a rolling pair passes through the pitch
-//! point**. So the fillet point is simply `C` pushed a further `ρ` along the line
-//! from the pitch point `P`:
+//! point**. So the fillet point is the round's point whose outward normal
+//! `n` runs through the pitch point `P`:
 //!
 //! ```text
-//! F = P + (1 + ρ/|C − P|)(C − P)
+//! F = C + ρ n,        P = C + t n
 //! ```
 //!
-//! `profile::Tooth::trochoid_at` is that expression with `C − P = (s, −b_c)`, the
-//! rack's corner centre. Here `C` goes round a circle instead. Nothing else
-//! differs.
+//! with `t` signed: negative when `C` runs outside the operating pitch circle
+//! (a prolate path, `F = P + (1 + ρ/|C − P|)(C − P)`), positive inside it (a
+//! curtate one), zero on it. The fillet is therefore read by the normal's
+//! angle rather than by the travel ([`ShaperCut::trochoid_at`]): one
+//! expression on both sides. `tooth::Tooth::trochoid_at` is the prolate form
+//! with `C − P = (s, −b_c)`, the rack's corner centre. Here `C` goes round a
+//! circle instead.
 //!
 //! # One sign, not two cases
 //!
@@ -99,6 +103,27 @@ pub struct ShaperCut {
     pub phase: f64,
     /// External or internal workpiece.
     pub kind: MeshKind,
+}
+
+/// The cutter's turn `ψ = s / r′_c` where the corner touches at one normal
+/// angle, and its first two derivatives in that angle.
+#[derive(Clone, Copy, Debug)]
+struct Touch {
+    psi: f64,
+    dpsi: f64,
+    ddpsi: f64,
+}
+
+/// A fillet point in the fixed frame, its first two derivatives in the
+/// corner's normal angle, and the workpiece's turn with its two.
+#[derive(Clone, Copy, Debug)]
+struct Fixed {
+    q: [f64; 2],
+    dq: [f64; 2],
+    ddq: [f64; 2],
+    turn: f64,
+    dturn: f64,
+    ddturn: f64,
 }
 
 /// Everything needed to describe one cut.
@@ -233,37 +258,128 @@ impl ShaperCut {
         )
     }
 
-    /// The trochoid fillet at pitch-line travel `s`, as `(radius, angle from the
-    /// tooth centreline)` — the same pair [`Tooth::trochoid_at`] returns.
+    /// Where the rolling has the corner touching at normal angle `phi`, and
+    /// how fast that moves: the cutter's turn `ψ = s / r′_c` and its first two
+    /// derivatives in `phi`.
+    ///
+    /// # Parameterised by the corner's normal, not by travel
+    ///
+    /// A point of the round with outward normal at angle `φ` from the corner
+    /// centre's own radial line touches the workpiece when that normal passes
+    /// through the pitch point. In the cutter's frame the normal line from the
+    /// centre `C` (at `r_g`) meets the operating pitch circle (`r′_c`) at a
+    /// signed distance
+    ///
+    /// ```text
+    /// t = −r_g cos φ + √(r′_c² − r_g² sin² φ) = (r′_c² − r_g²) / (√(r′_c² − r_g² sin² φ) + r_g cos φ)
+    /// ```
+    ///
+    /// the root that lies on the pitch point's side of the cutter. Positive
+    /// when the corner runs inside the operating pitch circle (a curtate path),
+    /// negative outside it (prolate), and zero where it runs on it — then the
+    /// corner stands on the pitch point and cuts its own arc. One expression
+    /// for all three: the fillet point is always `C + ρ n(φ)`, which is what a
+    /// travel parameter could not say, since `C − P` turns round through the
+    /// crossing and a curtate path read the near side of the round.
+    ///
+    /// The quotient form has no cancellation at the crossing, and the travel
+    /// is `ψ = −atan2(t sin φ, r_g + t cos φ)` with `dψ/dφ = −t / √(r′_c² −
+    /// r_g² sin² φ)`, so `s` stands still exactly when `t` is zero.
+    fn touch(&self, phi: f64) -> Touch {
+        let (rg, rw) = (self.corner_radius, self.cutter_operating_radius);
+        let (sin, cos) = phi.sin_cos();
+        let w = (rw * rw - rg * rg * sin * sin).sqrt();
+        let dw = -rg * rg * sin * cos / w;
+        let den = w + rg * cos;
+        let t = (rw - rg) * (rw + rg) / den;
+        let dt = -t * (dw - rg * sin) / den;
+        Touch {
+            psi: -(t * sin).atan2(rg + t * cos),
+            dpsi: -t / w,
+            ddpsi: -(dt * w - t * dw) / (w * w),
+        }
+    }
+
+    /// The cutter's travel at which the corner touches with normal angle
+    /// `phi`, radians: arc length rolled, as [`Self::corner_centre_at`] takes
+    /// it.
     #[must_use]
-    pub fn trochoid_at(&self, s: f64) -> (f64, f64) {
-        // The pitch point sits on the OPERATING circle, and the workpiece turns
-        // by arc over that same radius. Identical to the reference radius
-        // whenever the cut is at reference centres.
+    pub fn travel_at(&self, phi: f64) -> f64 {
+        self.cutter_operating_radius * self.touch(phi).psi
+    }
+
+    /// The corner's normal angle at the flank junction, radians: the normal
+    /// of the offset involute the corner centre sits on. It is tangent to the
+    /// cutter's base circle, so it stands `π/2 − α_g` off the centre's radial
+    /// line, `cos α_g = r_bc / r_g`. Closed form; negative on the side the
+    /// fillet runs from, and its travel is `r′_c (α_w − α_g)`.
+    #[must_use]
+    pub fn junction_normal(&self, alpha_t: f64) -> f64 {
+        let r_bc = self.cutter_radius * alpha_t.cos();
+        -f64::atan2(
+            1.0,
+            crate::involute::roll_at_radius(self.corner_radius, r_bc),
+        )
+    }
+
+    /// The fillet point in the fixed frame at normal angle `phi`, with its
+    /// first two derivatives, and the workpiece's turn with its two.
+    fn fixed_frame(&self, phi: f64) -> Fixed {
+        let sigma = self.kind.sign();
+        let (rg, rho) = (self.corner_radius, self.tip_round);
+        let Touch { psi, dpsi, ddpsi } = self.touch(phi);
+        let (sp, cp) = psi.sin_cos();
+        let (sx, cx) = (psi + phi).sin_cos();
+        let (dchi, ddchi) = (dpsi + 1.0, ddpsi);
+        // The corner centre `C(ψ)`, as `corner_centre_at` places it, and the
+        // outward normal `n` at `ψ + φ` in the same frame.
+        let c = [rg * sp, self.centre_distance - sigma * rg * cp];
+        let dc = [rg * dpsi * cp, sigma * rg * dpsi * sp];
+        let ddc = [
+            rg * (ddpsi * cp - dpsi * dpsi * sp),
+            sigma * rg * (ddpsi * sp + dpsi * dpsi * cp),
+        ];
+        let n = [sx, -sigma * cx];
+        let dn = [dchi * cx, sigma * dchi * sx];
+        let ddn = [
+            ddchi * cx - dchi * dchi * sx,
+            sigma * (ddchi * sx + dchi * dchi * cx),
+        ];
         let r = self.workpiece_operating_radius;
-        let (cx, cy) = self.corner_centre_at(s);
-        // From the pitch point to the corner centre; the fillet is a further ρ
-        // along it, because the contact normal runs through the pitch point.
-        let (dx, dy) = (cx, cy - r);
-        let d = f64::hypot(dx, dy);
-        let k = 1.0 + self.tip_round / d;
-        let (fx, fy) = (k * dx, r + k * dy);
+        let rw = self.cutter_operating_radius;
+        Fixed {
+            q: [c[0] + rho * n[0], c[1] + rho * n[1]],
+            dq: [dc[0] + rho * dn[0], dc[1] + rho * dn[1]],
+            ddq: [ddc[0] + rho * ddn[0], ddc[1] + rho * ddn[1]],
+            // The workpiece turns `(s − phase)/r` either way round — see
+            // `trochoid_at`.
+            turn: (rw * psi - self.phase) / r,
+            dturn: rw * dpsi / r,
+            ddturn: rw * ddpsi / r,
+        }
+    }
+
+    /// The trochoid fillet at the corner's normal angle `phi` (radians, see
+    /// [`Self::touch`]), as `(radius, angle from the tooth centreline)` — the
+    /// same pair [`Tooth::trochoid_at`] returns. `phi = 0` is the deepest cut.
+    #[must_use]
+    pub fn trochoid_at(&self, phi: f64) -> (f64, f64) {
         // ...then into the workpiece frame. **No `σ` here**, and that is a
         // result rather than an oversight: an internal workpiece does roll the
         // other way relative to its cutter, but the cutter also turns the other
         // way for increasing `s`, because its corner points outward instead of
         // inward. The two reversals cancel, and the workpiece turns
         // `(s − phase)/r` either way.
-        let rotation = (s - self.phase) / r;
-        (f64::hypot(fx, fy), fx.atan2(fy) - rotation)
+        let f = self.fixed_frame(phi);
+        (f64::hypot(f.q[0], f.q[1]), f.q[0].atan2(f.q[1]) - f.turn)
     }
 
     /// The fillet point **and its tangent**, in Cartesian workpiece coordinates.
     ///
     /// `(x, y)` with the tooth centred on `+y`, the same frame
     /// [`crate::strength`] inscribes its parabola in, and the tangent is the
-    /// derivative with respect to travel `s` — not normalised, since only its
-    /// direction is used.
+    /// derivative with respect to the normal angle `phi` — not normalised,
+    /// since only its direction is used.
     ///
     /// # Analytic, deliberately
     ///
@@ -274,98 +390,36 @@ impl ShaperCut {
     /// [`crate::tooth::Tooth`]'s rack fillet uses:
     ///
     /// ```text
-    /// X = u cos φ − v sin φ        X′ = u′ cos φ − v′ sin φ − φ′ Y
-    /// Y = v cos φ + u sin φ        Y′ = u′ sin φ + v′ cos φ + φ′ X
+    /// X = u cos φ_w − v sin φ_w        X′ = u′ cos φ_w − v′ sin φ_w − φ_w′ Y
+    /// Y = v cos φ_w + u sin φ_w        Y′ = u′ sin φ_w + v′ cos φ_w + φ_w′ X
     /// ```
     ///
-    /// with `(u, v)` the fillet point in the *fixed* frame and `φ` the
-    /// workpiece's own rotation. That the rack and the shaper share the pattern
-    /// is not a coincidence: both are a curve carried round by a rolling frame,
-    /// and only the curve differs — a corner going round a circle here, along a
-    /// line there.
+    /// with `(u, v)` the fillet point in the *fixed* frame and `φ_w` the
+    /// workpiece's own rotation.
     #[must_use]
-    pub fn trochoid_point_and_tangent(&self, s: f64) -> ([f64; 2], [f64; 2]) {
-        let r = self.workpiece_operating_radius;
-        let sigma = self.kind.sign();
-        let rc = self.corner_radius;
-
-        // The corner centre and its velocity. `φ_c = s / r′_c`, so the cutter
-        // turns `1/r′_c` per unit travel.
-        let phi_c = s / self.cutter_operating_radius;
-        let (sin_c, cos_c) = phi_c.sin_cos();
-        let w = 1.0 / self.cutter_operating_radius;
-        let (cx, cy) = (rc * sin_c, self.centre_distance - sigma * rc * cos_c);
-        let (dcx, dcy) = (rc * w * cos_c, sigma * rc * w * sin_c);
-
-        // From the pitch point to the corner centre, then a further ρ along it.
-        let (dx, dy) = (cx, cy - r);
-        let d = f64::hypot(dx, dy);
-        let dd = (dx * dcx + dy * dcy) / d;
-        let k = 1.0 + self.tip_round / d;
-        let dk = -self.tip_round * dd / (d * d);
-
-        let (u, v) = (k * dx, r + k * dy);
-        let (du, dv) = (dk * dx + k * dcx, dk * dy + k * dcy);
-
-        // ...and into the workpiece frame, which has turned `(s − phase)/r`.
-        let phi = (s - self.phase) / r;
-        let dphi = 1.0 / r;
-        let (c, sn) = (phi.cos(), phi.sin());
-
+    pub fn trochoid_point_and_tangent(&self, phi: f64) -> ([f64; 2], [f64; 2]) {
+        let f = self.fixed_frame(phi);
+        let ([u, v], [du, dv]) = (f.q, f.dq);
+        let (sn, c) = f.turn.sin_cos();
         let x = u * c - v * sn;
         let y = v * c + u * sn;
-        let dxx = du * c - dv * sn - dphi * y;
-        let dyy = du * sn + dv * c + dphi * x;
-        ([x, y], [dxx, dyy])
+        let dx = du * c - dv * sn - f.dturn * y;
+        let dy = du * sn + dv * c + f.dturn * x;
+        ([x, y], [dx, dy])
     }
 
-    /// Radius of curvature of the generated fillet at cutter travel `s`, mm.
+    /// Radius of curvature of the generated fillet at normal angle `phi`, mm.
     ///
-    /// Closed form, and the same construction as
-    /// [`trochoid_point_and_tangent`](Self::trochoid_point_and_tangent) carried
-    /// one derivative further — the corner centre runs on a *circle* here where
-    /// the rack's runs on a line, so it has a centripetal term the rack's does
-    /// not:
-    ///
-    /// ```text
-    /// c   = ( r_c sin φ_c , a − σ r_c cos φ_c )        φ_c = s / r′_c
-    /// c′  = r_c ω ( cos φ_c , σ sin φ_c )              ω   = 1 / r′_c
-    /// c″  = r_c ω² ( −sin φ_c , σ cos φ_c )
-    /// ```
-    ///
-    /// The rolling itself is [`rolling_curvature_radius`](crate::tooth::rolling_curvature_radius),
-    /// shared with the rack — one formula rather than the two central
-    /// differences this replaced.
+    /// Closed form, the construction of
+    /// [`trochoid_point_and_tangent`](Self::trochoid_point_and_tangent)
+    /// carried one derivative further; the rolling is
+    /// [`rolling_curvature_radius_turning`](crate::tooth::rolling_curvature_radius_turning),
+    /// whose turn is not uniform in `phi`. Where the corner stands on the
+    /// pitch point it is `ρ`, the round's own.
     #[must_use]
-    pub fn trochoid_curvature_radius(&self, s: f64) -> f64 {
-        let r = self.workpiece_operating_radius;
-        let sigma = self.kind.sign();
-        let rc = self.corner_radius;
-
-        let w = 1.0 / self.cutter_operating_radius;
-        let (sin_c, cos_c) = (s * w).sin_cos();
-        let c = [rc * sin_c, self.centre_distance - sigma * rc * cos_c];
-        let dc = [rc * w * cos_c, sigma * rc * w * sin_c];
-        let ddc = [-rc * w * w * sin_c, sigma * rc * w * w * cos_c];
-
-        // From the pitch point to the corner centre, then a further ρ along it.
-        let (dx, dy) = (c[0], c[1] - r);
-        let d = f64::hypot(dx, dy);
-        let dd = (dx * dc[0] + dy * dc[1]) / d;
-        let ddd = (dc[0] * dc[0] + dx * ddc[0] + dc[1] * dc[1] + dy * ddc[1] - dd * dd) / d;
-
-        let k = 1.0 + self.tip_round / d;
-        let dk = -self.tip_round * dd / (d * d);
-        let ddk = -self.tip_round * (ddd * d - 2.0 * dd * dd) / d.powi(3);
-
-        let q = [k * dx, r + k * dy];
-        let dq = [dk * dx + k * dc[0], dk * dy + k * dc[1]];
-        let ddq = [
-            ddk * dx + 2.0 * dk * dc[0] + k * ddc[0],
-            ddk * dy + 2.0 * dk * dc[1] + k * ddc[1],
-        ];
-
-        crate::tooth::rolling_curvature_radius(q, dq, ddq, 1.0 / r)
+    pub fn trochoid_curvature_radius(&self, phi: f64) -> f64 {
+        let f = self.fixed_frame(phi);
+        crate::tooth::rolling_curvature_radius_turning(f.q, f.dq, f.ddq, f.dturn, f.ddturn)
     }
 
     /// Where the cutter's tip-round centre sits, as an angle from the cutter's
@@ -552,29 +606,33 @@ mod tests {
                 let Some(cut) = ShaperCut::equivalent_to_rack(&g, cutter_teeth, kind) else {
                     continue;
                 };
+                let phi_j = cut.junction_normal(g.alpha_t);
                 let mut worst = 0.0_f64;
                 for i in 0..=20 {
-                    #[allow(clippy::cast_precision_loss)]
-                    let s = -0.6 + 1.2 * (i as f64 / 20.0);
-                    // Balanced, not guessed: a central difference's error is
-                    // truncation `~h²` plus cancellation `~ε|f|/h`, minimised
-                    // near `(ε|f|)^(1/3)` — about 1e-5 for coordinates of tens
-                    // of mm. At 1e-7 the cancellation alone is 1.4e-7, which is
-                    // the quotient's floor rather than the tangent's error.
-                    let h = 1e-5;
-                    let (a, _) = cut.trochoid_point_and_tangent(s - h);
-                    let (b, _) = cut.trochoid_point_and_tangent(s + h);
+                    // The fillet's own span, and a little past its root.
+                    let s = phi_j * (1.0 - 1.2 * f64::from(i) / 20.0);
+                    // Balanced, not guessed: a five-point difference's error is
+                    // truncation `~h⁴` plus cancellation `~ε|f|/h`. The speed
+                    // in the normal angle is the fillet's radius of curvature,
+                    // near the round's 0.15 mm, against coordinates of tens of
+                    // mm, so the cancellation is the larger at small `h` and a
+                    // central difference's `h²` too coarse at large.
+                    let h = 1e-4;
+                    let at = |k: f64| cut.trochoid_point_and_tangent(s + k * h).0;
+                    let (a, b, c, d) = (at(-2.0), at(-1.0), at(1.0), at(2.0));
                     let (_, t) = cut.trochoid_point_and_tangent(s);
-                    let numeric = [(b[0] - a[0]) / (2.0 * h), (b[1] - a[1]) / (2.0 * h)];
+                    let numeric = [
+                        (a[0] - 8.0 * b[0] + 8.0 * c[0] - d[0]) / (12.0 * h),
+                        (a[1] - 8.0 * b[1] + 8.0 * c[1] - d[1]) / (12.0 * h),
+                    ];
                     // Compare directions, since only the direction is used.
                     let na = f64::hypot(numeric[0], numeric[1]);
                     let ta = f64::hypot(t[0], t[1]);
                     let cross = (numeric[0] * t[1] - numeric[1] * t[0]).abs() / (na * ta);
                     worst = worst.max(cross);
                 }
-                // 1.2e-9 is the quotient's measured floor at this `h`; the sharp
-                // check on the tangent itself is the rack limit below, where two
-                // independent analytic derivations meet.
+                // The sharp check on the tangent itself is the rack limit
+                // below, where two independent analytic derivations meet.
                 assert!(
                     worst < 1e-8,
                     "{kind:?} z_c={cutter_teeth}: tangent direction off by {worst}"
@@ -597,9 +655,9 @@ mod tests {
             let Some(cut) = ShaperCut::equivalent_to_rack(&g, 20, kind) else {
                 continue;
             };
+            let phi_j = cut.junction_normal(g.alpha_t);
             for i in 0..=10 {
-                #[allow(clippy::cast_precision_loss)]
-                let s = -0.5 + 1.0 * (i as f64 / 10.0);
+                let s = phi_j * (1.0 - 1.2 * f64::from(i) / 10.0);
                 let (radius, angle) = cut.trochoid_at(s);
                 let ([x, y], _) = cut.trochoid_point_and_tangent(s);
                 assert!((f64::hypot(x, y) - radius).abs() < 1e-12);
@@ -626,11 +684,11 @@ mod tests {
         for cutter_teeth in [1_000u32, 10_000, 100_000] {
             let cut = ShaperCut::equivalent_to_rack(&g, cutter_teeth, MeshKind::External).unwrap();
             let mut worst = 0.0_f64;
+            let phi_j = cut.junction_normal(g.alpha_t);
             for i in 0..=10 {
-                #[allow(clippy::cast_precision_loss)]
-                let s = -0.4 + 0.8 * (i as f64 / 10.0);
-                let (_, shaper) = cut.trochoid_point_and_tangent(s);
-                let (_, rack) = crate::strength::fillet_point_and_tangent(&g, s);
+                let phi = phi_j * (1.0 - 1.2 * f64::from(i) / 10.0);
+                let (_, shaper) = cut.trochoid_point_and_tangent(phi);
+                let (_, rack) = crate::strength::fillet_point_and_tangent(&g, cut.travel_at(phi));
                 let ns = f64::hypot(shaper[0], shaper[1]);
                 let nr = f64::hypot(rack[0], rack[1]);
                 worst = worst.max((shaper[0] * rack[1] - shaper[1] * rack[0]).abs() / (ns * nr));
@@ -677,14 +735,16 @@ mod tests {
                 let z_c = 10_u32.pow(power);
                 let cut = ShaperCut::equivalent_to_rack(&g, z_c, MeshKind::External).unwrap();
 
-                // Compare over the fillet's own travel range.
+                // Compare over the fillet's own span, the rack at the travel
+                // the shaper's corner touches at.
+                let phi_j = cut.junction_normal(g.alpha_t);
                 let mut worst: f64 = 0.0;
                 for i in 0..=20 {
                     #[allow(clippy::cast_precision_loss)]
                     let t = i as f64 / 20.0;
-                    let s = g.s_j * (1.0 - t);
-                    let (r_rack, a_rack) = g.trochoid_at(s);
-                    let (r_shaper, a_shaper) = cut.trochoid_at(s);
+                    let phi = phi_j * (1.0 - t);
+                    let (r_rack, a_rack) = g.trochoid_at(cut.travel_at(phi));
+                    let (r_shaper, a_shaper) = cut.trochoid_at(phi);
                     worst = worst
                         .max((r_shaper - r_rack).abs())
                         .max((a_shaper - a_rack).abs() * g.r);
@@ -754,12 +814,14 @@ mod tests {
         let g = gear(17, 0.0);
         let error = |z_c: u32| {
             let cut = ShaperCut::equivalent_to_rack(&g, z_c, MeshKind::External).unwrap();
+            let phi_j = cut.junction_normal(g.alpha_t);
             let mut worst: f64 = 0.0;
             for i in 0..=20 {
                 #[allow(clippy::cast_precision_loss)]
                 let t = i as f64 / 20.0;
-                let s = g.s_j * (1.0 - t);
-                worst = worst.max((cut.trochoid_at(s).0 - g.trochoid_at(s).0).abs());
+                let phi = phi_j * (1.0 - t);
+                let rack = g.trochoid_at(cut.travel_at(phi)).0;
+                worst = worst.max((cut.trochoid_at(phi).0 - rack).abs());
             }
             worst
         };
@@ -787,11 +849,13 @@ mod tests {
                 let g = gear(teeth, 0.0);
                 let cut = ShaperCut::equivalent_to_rack(&g, z_c, kind).unwrap();
 
+                let phi_j = cut.junction_normal(g.alpha_t);
                 for i in 0..=10 {
                     #[allow(clippy::cast_precision_loss)]
                     let t = i as f64 / 10.0;
-                    let s0 = g.s_j * (1.0 - t) * 0.9;
-                    let (radius, angle) = cut.trochoid_at(s0);
+                    let phi0 = phi_j * (1.0 - t) * 0.9;
+                    let s0 = cut.travel_at(phi0);
+                    let (radius, angle) = cut.trochoid_at(phi0);
                     // The fillet point, back in the fixed frame at travel s0.
                     let rotation = (s0 - cut.phase) / g.r;
                     let world = angle + rotation;
@@ -855,5 +919,74 @@ mod tests {
     fn a_cutter_too_small_to_reach_the_root_is_refused() {
         let g = gear(17, 0.0);
         assert!(ShaperCut::equivalent_to_rack(&g, 0, MeshKind::External).is_none());
+    }
+
+    /// **The fillet point is the corner round's point on the normal through
+    /// the pitch point, on the side the round cuts with**, read off the
+    /// travel construction independently: `F = P + (1 − ρ/t)(C − P)`, where
+    /// `t` is the signed distance from `C` to `P` along the round's outward
+    /// normal — negative on a prolate path, positive on a curtate one. The
+    /// travel form wrote `1 + ρ/|C − P|` for both, which is the prolate value
+    /// and the near side of the round on a curtate path.
+    #[test]
+    fn the_fillet_point_is_the_far_side_of_the_round_on_either_path() {
+        let mut sides = [0_u32; 2];
+        for (teeth, cutter_teeth, shift) in [
+            (30_u32, 20_u32, 0.0),
+            (30, 20, 0.9),
+            (24, 20, 0.5),
+            (60, 20, 0.0),
+        ] {
+            let ring = crate::ring::Ring::cut_by(
+                &GearParams {
+                    teeth,
+                    profile_shift: shift,
+                    ..Default::default()
+                },
+                &crate::ring::Cutter {
+                    teeth: cutter_teeth,
+                    ..crate::ring::Cutter::default()
+                },
+            );
+            let cut = ring.cut;
+            let curtate = cut.corner_radius < cut.cutter_operating_radius;
+            sides[usize::from(curtate)] += 1;
+            let phi_j = cut.junction_normal(ring.alpha_t);
+            for i in 0..=20 {
+                let phi = phi_j * f64::from(i) / 20.0;
+                let s = cut.travel_at(phi);
+                let (cx, cy) = cut.corner_centre_at(s);
+                let (px, py) = (0.0, cut.workpiece_operating_radius);
+                let d = f64::hypot(cx - px, cy - py);
+                // The pitch point lies behind the centre on a prolate path.
+                let t = if curtate { d } else { -d };
+                let k = 1.0 - cut.tip_round / t;
+                let (fx, fy) = (px + k * (cx - px), py + k * (cy - py));
+                let turn = (s - cut.phase) / cut.workpiece_operating_radius;
+                let expected = (f64::hypot(fx, fy), fx.atan2(fy) - turn);
+                let got = cut.trochoid_at(phi);
+                assert!(
+                    (got.0 - expected.0).abs() < 1e-9 && (got.1 - expected.1).abs() < 1e-9,
+                    "{teeth}/{cutter_teeth} x={shift} φ={phi}: {got:?} against {expected:?}"
+                );
+            }
+        }
+        assert!(sides[0] > 0 && sides[1] > 0, "{sides:?}");
+    }
+
+    /// **Where the corner rides on the pitch point it cuts its own round.**
+    /// The travel stands still over the whole fillet and the fillet's
+    /// curvature is the round's, with no special case to reach it.
+    #[test]
+    fn a_corner_on_the_pitch_point_cuts_its_own_round() {
+        let g = gear(60, 0.0);
+        let mut cut = ShaperCut::equivalent_to_rack(&g, 20, MeshKind::Internal).unwrap();
+        cut.cutter_operating_radius = cut.corner_radius;
+        for i in 0..=10 {
+            let phi = -f64::from(i) / 10.0;
+            assert!(cut.travel_at(phi).abs() < 1e-12, "φ={phi}");
+            let rho = cut.trochoid_curvature_radius(phi);
+            assert!((rho - cut.tip_round).abs() < 1e-9, "φ={phi}: {rho}");
+        }
     }
 }

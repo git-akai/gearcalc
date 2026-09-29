@@ -1694,14 +1694,17 @@ mod tests {
     /// found**, and each is a question rather than a settled fact.
     ///
     /// - `clamp.ring_fully_filleted` — the ring's two corner rounds meeting
-    ///   before mid-space. Re-searched over **71,750** combinations of ring
-    ///   teeth, cutter teeth, tip round, cutter addendum, thickness modification,
-    ///   profile shift and module, and it never fires. (The first search was
-    ///   ~11,000 and this is the one the entry now rests on — evidence has a
-    ///   date, and a crate that has changed underneath it deserves a fresh
-    ///   look.) The likely reason is that `ShaperCut` already refuses a tool
-    ///   whose own rounds overlap, which is close to the same condition — so the
-    ///   guard may be shadowing it entirely.
+    ///   before mid-space. The reason it cannot: the tool's round is capped
+    ///   short of the largest its tip holds (`ShaperCut::largest_tip_round`),
+    ///   so the corner centre stays an angle `γ > 0` on its own side of the
+    ///   cutter tooth's centreline, and the deepest cut — the round's point on
+    ///   that centre's radial line, normal angle zero — stands at `π/z −
+    ///   r_c γ / r` from the tooth centre: short of mid-space, whichever side
+    ///   of the operating pitch circle the corner runs. Searched after the
+    ///   curtate path was cut on its own side (T05.2) over 21,000 rings — tooth counts
+    ///   18–150, cutters 8–90, shifts −1 to 1.2, rounds 0–0.7, thickness
+    ///   modifications 0.05–2.5 and cutter addenda 0.8–1.6 — and it never
+    ///   fires, as it never did over the 71,750 before.
     ///
     /// It is live code with a live message, so it is not deleted on suspicion.
     ///

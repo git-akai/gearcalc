@@ -881,6 +881,20 @@ impl Tooth {
 /// Returns `f64::INFINITY` where the curve is locally straight.
 #[must_use]
 pub(crate) fn rolling_curvature_radius(q: [f64; 2], dq: [f64; 2], ddq: [f64; 2], dphi: f64) -> f64 {
+    rolling_curvature_radius_turning(q, dq, ddq, dphi, 0.0)
+}
+
+/// [`rolling_curvature_radius`] for a parameter the frame does **not** turn
+/// uniformly in: `P″` gains `φ″ J q`. A shaper's fillet read by its corner's
+/// normal angle is the case — the travel, and with it the turn, stands still
+/// where the corner rides on the pitch point.
+pub(crate) fn rolling_curvature_radius_turning(
+    q: [f64; 2],
+    dq: [f64; 2],
+    ddq: [f64; 2],
+    dphi: f64,
+    ddphi: f64,
+) -> f64 {
     // J: a quarter turn, so `J(x, y) = (−y, x)`.
     let j = |v: [f64; 2]| [-v[1], v[0]];
     let jq = j(q);
@@ -888,8 +902,8 @@ pub(crate) fn rolling_curvature_radius(q: [f64; 2], dq: [f64; 2], ddq: [f64; 2],
 
     let vel = [dq[0] + dphi * jq[0], dq[1] + dphi * jq[1]];
     let acc = [
-        ddq[0] + 2.0 * dphi * jdq[0] - dphi * dphi * q[0],
-        ddq[1] + 2.0 * dphi * jdq[1] - dphi * dphi * q[1],
+        ddq[0] + 2.0 * dphi * jdq[0] - dphi * dphi * q[0] + ddphi * jq[0],
+        ddq[1] + 2.0 * dphi * jdq[1] - dphi * dphi * q[1] + ddphi * jq[1],
     ];
 
     let speed = f64::hypot(vel[0], vel[1]);

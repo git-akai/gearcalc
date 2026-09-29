@@ -3887,7 +3887,11 @@ pub fn rate(
             }
         }
         if let BuiltMember::Ring { ring, .. } = &*built.members[i] {
-            if ring.clamps.iter().any(|c| c.is(key::CLAMP_RING_TIP_RAISED)) {
+            if ring
+                .clamps
+                .iter()
+                .any(|c| c.is(key::CLAMP_RING_TIP_RAISED) || c.is(key::CLAMP_RING_TIP_AT_BASE))
+            {
                 out.push(Note::new(key::GEAR_RING_ADDENDUM_CLAMPED));
             }
         }
@@ -6225,12 +6229,20 @@ mod hula_recorded {
             0.05,
             "z17 σ_F",
         );
-        for i in [2, 3] {
-            assert!(
-                r.members[i].cases[0].bending_stress.is_none(),
-                "no fillet, no rating"
-            );
-        }
+        // The rings' fillets are cut on the curtate side of their cutters'
+        // pitch circles, and rated since that side was read (T05.2).
+        close(
+            4839.5,
+            r.members[2].cases[0].bending_stress.unwrap(),
+            0.05,
+            "z19 ring σ_F",
+        );
+        close(
+            5103.7,
+            r.members[3].cases[0].bending_stress.unwrap(),
+            0.05,
+            "z18 ring σ_F",
+        );
     }
 
     #[test]

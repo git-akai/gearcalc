@@ -363,7 +363,7 @@ impl crate::ring::Ring {
             let fillet = |t: f64| {
                 self.fillet.map_or_else(
                     || self.involute_at(self.u_j),
-                    |f| self.trochoid_at(f.s_root + t * (f.s_j - f.s_root)),
+                    |f| self.trochoid_at(f.phi_root + t * (f.phi_j - f.phi_root)),
                 )
             };
             if self.fillet.is_some() {
@@ -459,8 +459,8 @@ mod tests {
                 dense.push((g.ra, -g.involute_at(g.u_tip).1 * (1.0 - 2.0 * t)));
                 dense.push(g.involute_at(g.u_tip + (g.u_j - g.u_tip) * t));
                 let f = g.fillet.expect("this ring is cut with a fillet");
-                dense.push(g.trochoid_at(f.s_j + (f.s_root - f.s_j) * t));
-                let space = g.trochoid_at(f.s_root).1;
+                dense.push(g.trochoid_at(f.phi_j + (f.phi_root - f.phi_j) * t));
+                let space = g.trochoid_at(f.phi_root).1;
                 dense.push((g.rf, space + (g.half_pitch - space) * t));
             }
             let cartesian: Vec<(f64, f64)> = dense

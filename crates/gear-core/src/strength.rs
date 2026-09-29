@@ -591,14 +591,15 @@ impl ToothOutline for crate::ring::Ring {
         TANGENT_ANGLE_INTERNAL_DEG
     }
     fn fillet_bracket(&self) -> (f64, f64) {
-        self.fillet
-            .map_or((0.0, 0.0), |f| (f.s_root.min(f.s_j), f.s_root.max(f.s_j)))
+        self.fillet.map_or((0.0, 0.0), |f| {
+            (f.phi_root.min(f.phi_j), f.phi_root.max(f.phi_j))
+        })
     }
     fn fillet_junction(&self) -> f64 {
-        self.fillet.map_or(0.0, |f| f.s_j)
+        self.fillet.map_or(0.0, |f| f.phi_j)
     }
     fn fillet_root(&self) -> f64 {
-        self.fillet.map_or(0.0, |f| f.s_root)
+        self.fillet.map_or(0.0, |f| f.phi_root)
     }
     fn flank_bracket(&self) -> (f64, f64) {
         (self.u_tip, self.u_j)
