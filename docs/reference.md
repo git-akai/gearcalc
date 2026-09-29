@@ -566,13 +566,19 @@ and a member asking `no_tip_past_mate_flank` has its addendum held to it:
 `h_a = σ((r_a − r)/m − x)`, the lowest over its meshes, beside the tip-width
 bound and never above the number typed (`gear.addendum_held_to_mate_flank`).
 The mesh finds the bound at its running geometry and hands the gear a number;
-the gear never reads its mate. It is on for a ring as the tool lays one in —
-an internal pair at full depth interferes as a matter of course — and off for
-an external gear, whose interference a search answers by shift. The path of
+the gear never reads its mate. It is on for every gear by default: an internal
+pair at full depth interferes as a matter of course, and on an external pair it
+tops a tip that a search or a designer has pushed past its mate's flank, where
+the search had held the shifts off that wall instead. The path of
 contact is unchanged by holding, since it was already cut at that junction:
-only the ring's tooth is shorter. The closed form lands within a rounding of
-the junction either side, so the tip is checked on the path the report reads
-and shortened by what it still reaches past.
+only the ring's tooth is shorter. The cut lands the tip on that radius only to a
+rounding either side, so the mesh side that holds it is tagged and the path takes
+that end from the mate's junction itself: a held tip reaches past nothing, by
+construction. Where no tip length clears — the conjugate falls inside the
+member's base circle, or the addendum it needs is not positive — the tip stands
+as typed and the gear says so (`gear.tip_cannot_clear_mate_flank`). A crossed
+mesh holds a tip the same way through its own conjugate relation
+(`CrossedPath::contact_radius_at`).
 
 The one condition that does not generalise is two tips fouling **away from the
 line of action**, which is `TipRoom`: an external pair's tip circles cross on the
@@ -673,7 +679,7 @@ toward unity, and the loss falls with it.
 | pair, shifts | `Σx` | `ε` | `η` |
 |---|---|---|---|
 | `z 9/37`, least that clears undercut | 0.4736 | 1.3280 | 97.561 % |
-| `z 9/37`, least loss | 1.4078 | 1.2929 | **97.678 %** |
+| `z 9/37`, least loss | 1.6441 | 1.2003 | **97.753 %** |
 | `z 17/43`, least that clears undercut | 0.0057 | 1.5993 | 98.345 % |
 | `z 17/43`, least loss | 1.2566 | 1.4626 | **98.488 %** |
 
@@ -684,11 +690,14 @@ buildable, so nothing holds it there but the loss turning over. On 9/37 it is
 that cannot run, and the search stops where the geometry runs out rather than
 where the derivative vanishes.
 
-Which constraint, on 9/37, is **interference**: the wheel's tip reaching past the
-end of the pinion's usable flank. That pair used to be answered at `Σx = 1.6697`
-for 97.706 %, and those teeth foul — the condition was asked of internal meshes
-under two classical names and of external ones not at all. Nought point nought
-three of a point is what the honest answer costs. That difference is why choosing the shifts is a
+Which constraint, on 9/37, is the **contact ratio**. The wheel's tip reaches past
+the end of the pinion's usable flank there, and is held off it
+([interference](#interference-a-tip-reaching-past-the-flank-it-meshes-with)):
+both tips are shortened to meet their mates' form circles, which shortens the
+path, and the loss falls until `ε` meets its floor. Before tips were held that
+flank was a wall the search stopped at, `Σx = 1.4078` for 97.678 % at `ε` 1.2929;
+holding them buys 0.075 of a point for 0.09 of contact ratio. That the answer
+sits on a bound is why choosing the shifts is a
 search and not a solve, and [rationale.md](rationale.md#and-the-one-thing-in-the-crate-that-is-none-of-the-above)
 argues it at length.
 
@@ -2127,13 +2136,13 @@ addendum, the shaper and each mesh's shift division free (`gear-cli hulaband`):
 | 2 | 36 | 0.500 | 99.784 % | **58.9 %** | 35.2° | 0.154° |
 | 3 | 54 | 0.333 | 99.956 % | **87.6 %** | 25.4° | 0.077° |
 | 4 | 72 | 0.250 | 99.980 % | **94.0 %** | 19.4° | 0.046° |
-| 6 | 108 | 0.167 | 99.983 % | **94.7 %** | 17.3° | 0.027° |
-| 9 | 162 | 0.111 | 99.923 % | **80.1 %** | 13.8° | 0.014° |
+| 6 | 108 | 0.167 | 99.986 % | **95.8 %** | 15.7° | 0.025° |
+| 9 | 162 | 0.111 | 99.989 % | **96.6 %** | 16.3° | 0.017° |
 
 *(The operating angle is the **running** mesh's, 0.02 mm inside the
 zero-backlash crank; the solver that generated the first version of this table
-quoted the zero-backlash angle. The rings' tips are held off their pinions'
-usable flanks, which opened a larger shaper to the rows from `d = 6`.)*
+quoted the zero-backlash angle. Every tip is held off its mate's usable flank,
+which opens the rows from `d = 6` to shifts that fouled before.)*
 
 **These are optimised divisions, and they sit on a bound rather than at an
 optimum.** The *sum* of a mesh's two shifts is never free — the crank offset is
@@ -2144,16 +2153,15 @@ where they land: on these stages the mesh loses least at divisions of `+2.85`,
 three is admissible, because contact has gone discontinuous or the tips have
 fouled well before. The rows through `d = 4` sit at `ε` between 1.00 and 1.04
 with the tip margin at zero instead; from `d = 5` the winning row's contact
-ratio rises again — 1.11, then 1.33 — which is the turn-over the last rows
-show. The loss is still falling when the geometry runs out, so what a designer
+ratio sits between 1.07 and 1.13, its tips held off their mates' flanks. The loss is still falling when the geometry runs out, so what a designer
 wants to know is which bound stops it — and that is what these are.
 
 Three times better at four teeth of difference than at one, on the same
 reduction in the same envelope — and an eighth of the backlash. The mesh
 figures explain it: a one-tooth pair has to be opened to 44° of operating
 pressure angle to clear itself, and the loss carries `1/z₁ + 1/z₂`, which halves
-as the counts double. It turns over past six, where the contact ratio has grown
-and the path sits further from the pitch point again.
+as the counts double. It flattens past six, peaking at eight teeth of
+difference (96.75 %) and easing at nine.
 
 **A pair's loss is dimensionless, so the two meshes do not constrain each
 other.** Every term is a ratio — the ends of the path in base pitches, the

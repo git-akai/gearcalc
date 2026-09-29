@@ -90,6 +90,21 @@ impl ContactPath {
     /// whose involutes never touch.
     #[must_use]
     pub fn new(g1: &Tooth, mate: crate::mesh::FlankEnds, mesh: &Mesh) -> Option<Self> {
+        Self::held(g1, mate, mesh, [false, false])
+    }
+
+    /// [`Self::new`], with a member's tip **held to its mate's junction**
+    /// where `held` says so, gear 1 first: that tip's end of the path is the
+    /// mate's junction reach itself, not the tip's own reach, which the cut
+    /// lands on only to a rounding either side. So a held tip reaches past
+    /// nothing, by construction ([`Self::past_usable_flank`] is zero there).
+    #[must_use]
+    pub fn held(
+        g1: &Tooth,
+        mate: crate::mesh::FlankEnds,
+        mesh: &Mesh,
+        held: [bool; 2],
+    ) -> Option<Self> {
         let (r1, r2) = mesh.operating_radii();
         let (rb1, rb2) = mesh.base_radii();
         // The tangent length carries the sign of its base radius, so a ring's
@@ -102,14 +117,24 @@ impl ContactPath {
         // uses a_w, since r′₁ + r′₂ = a_w, which is why the familiar
         // contact-ratio formula has a_w in it and this does not.
         let sin_aw = mesh.alpha_w.sin();
-        let tip_recess = tangent(g1.ra, rb1) - r1 * sin_aw;
-        let tip_approach = tangent(mate.tip, rb2) - r2 * sin_aw;
         // Each member's junction bounds the end where that member is lowest:
         // member 1 at the start, member 2 at the end. `r_b tan α_w` is where
         // the pitch point sits from each base tangent point.
         let tan_aw = mesh.alpha_w.tan();
-        let approach = tip_approach.min(rb1 * tan_aw - tangent(g1.r_j, rb1));
-        let recess = tip_recess.min(rb2 * tan_aw - tangent(mate.junction, rb2));
+        let junction_approach = rb1 * tan_aw - tangent(g1.r_j, rb1);
+        let junction_recess = rb2 * tan_aw - tangent(mate.junction, rb2);
+        let tip_recess = if held[0] {
+            junction_recess
+        } else {
+            tangent(g1.ra, rb1) - r1 * sin_aw
+        };
+        let tip_approach = if held[1] {
+            junction_approach
+        } else {
+            tangent(mate.tip, rb2) - r2 * sin_aw
+        };
+        let approach = tip_approach.min(junction_approach);
+        let recess = tip_recess.min(junction_recess);
         // **A path needs a length, not two positive halves.** `approach` and
         // `recess` are signed coordinates along the line of action, measured
         // from the pitch point, and the familiar mesh has one either side of it.

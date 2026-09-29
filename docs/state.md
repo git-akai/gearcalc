@@ -893,11 +893,15 @@ whose size is unmeasured is a debt still owed, and is marked as one.
   distance a small tooth difference is opened to (`tip_clearance`) and the
   ring's undercut floor are both read at the addendum as typed, before its
   meshes hold it shorter, since the hold needs the running distance they
-  decide. Both err toward the taller tooth: the far gap is sized for a tip the
-  ring does not have (larger as built, by the height held), and the undercut
-  floor asks a flank reach a tip it no longer has (the shift higher than the
-  built tip needs; on the shipped 12/30/72 it starts to raise the shift at
-  about 1.02 modules typed).
+  decide. Both err toward the taller tooth. The far gap as built is **larger**
+  than the one the distance was sized for, by exactly `m (h_typed − h_held)`:
+  on a 56-in-61 planocentric at 1.2 modules typed, held to 1.076, 0.124 mm
+  (3.069 → 3.193 mm) at the same running distance; at 1.0 typed, held to
+  0.968, 0.032 mm. **Zero on every shipped design**: no tip-sized ring (the
+  hula's, a planocentric's) is held at its default addendum. The undercut
+  floor asks a flank reach a tip it no longer has, so the shift is higher than
+  the built tip needs; on the shipped 12/30/72 it starts to raise the shift at
+  about 1.02 modules typed.
 
 ---
 

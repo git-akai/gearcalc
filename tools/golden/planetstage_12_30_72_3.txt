@@ -19,8 +19,8 @@ note: 3 planets assumed to share load equally; real sets do not without a floati
 
 axis distance given, shifts chosen to reach it
 a mm             x_sun  x_planet    x_ring    residual     eta_0
-20.9453        -0.1082    0.0345    0.0000     3.6e-15    0.9782
-21.0453         0.0914   -0.0660    0.0000     3.6e-15    0.9753
+20.9453        -0.1082    0.0345    0.0000     3.6e-15    0.9788
+21.0453         0.0914   -0.0660    0.0000     3.6e-15    0.9754
 21.1453         0.2981   -0.1701    0.0000     3.6e-15    0.9734
 21.2453         0.5115   -0.2774    0.0000       0.0e0    0.9718
 21.3453         0.7313   -0.3879    0.0000       0.0e0    0.9688

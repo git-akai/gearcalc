@@ -122,6 +122,7 @@ planet_clearance_below_minimum = "adjacent planets clear by {gap} mm, below the 
 shift_raised_for_undercut = "profile shift increased to {shift} to prevent undercut"
 addendum_held_to_tip_width = "addendum limited to {addendum}"
 addendum_held_to_mate_flank = "addendum limited to {addendum}, where the tip meets its mate's usable flank"
+tip_cannot_clear_mate_flank = "no tip length keeps this tooth off a mate's usable flank; its addendum stands as typed"
 face_width_as_entered = "automatic face width has nothing to size it on crossed shafts: it stands as entered"
 bending_unrated_in_mesh = "bending not rated on the flank mesh {mesh} loads: its load point leaves no root section there; the other flank's rating stands"
 bending_unrated = "bending not rated: no load point leaves a root section the bending model reads — the moment arm or the factor is not positive there, or the tooth has no section"

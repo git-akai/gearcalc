@@ -1240,6 +1240,18 @@ mod tests {
                     record(&r.every_note());
                 }
             }
+            // **A tip no length holds off its mate's flank**: the 300's tip
+            // held off a 7-tooth pinion at x −0.8, which it reaches past at
+            // any length.
+            {
+                let mut s = arr::pair([7, 300]);
+                s.members[0].gear.profile_shift = gear_core::params::Auto::fixed(-0.8);
+                s.members[0].gear.no_undercut = false;
+                s.members[1].gear.no_tip_past_mate_flank = true;
+                if let Ok(r) = solve_spur(&s, 2.0, 0.0, &lib) {
+                    record(&r.every_note());
+                }
+            }
             // **A member left no rated section**: since the path of contact
             // ends at the usable flanks, only deep flank interference leaves
             // a load point off every section — a 7-tooth pinion at x −0.8

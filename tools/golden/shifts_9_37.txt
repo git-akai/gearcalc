@@ -2,27 +2,25 @@ pair z 9/37  module 1  alpha 20 deg  mu 0.06
 
                                           x1        x2       sum       eps    eta fwd
 least shift that clears undercut      0.4736    0.0000    0.4736    1.3280    97.561 %
-least loss                            0.6746    0.7332    1.4078    1.2929    97.678 %
+least loss                            0.7951    0.8490    1.6441    1.2003    97.753 %
 
-  the trade: 0.12 points of efficiency for 0.04 of contact ratio
+  the trade: 0.19 points of efficiency for 0.13 of contact ratio
 
 axis distance given, shifts chosen to reach it
 a mm                                      x1        x2       sum       eps    eta fwd
 23.0200                               0.4736   -0.4736    0.0000    1.3641    97.381 %
-23.2207                               0.4736   -0.2665    0.2071    1.3408    97.473 %
-23.4213                               0.4736   -0.0473    0.4263    1.3291    97.548 %
-23.6220                               0.4736    0.1831    0.6567    1.3269    97.603 %
-23.8226                               0.4736    0.4239    0.8975    1.3323    97.636 %
-24.0233                               0.6559    0.4922    1.1481    1.2793    97.652 %
-24.2240                               0.6735    0.7342    1.4078    1.2933    97.678 %
+23.2502                               0.4736   -0.2350    0.2386    1.3384    97.485 %
+23.4803                               0.4736    0.0193    0.4929    1.3276    97.566 %
+23.7105                               0.4736    0.2881    0.7617    1.3284    97.620 %
+23.9407                               0.4736    0.5702    1.0438    1.3386    97.645 %
+24.1708                               0.7579    0.5803    1.3382    1.2289    97.686 %
+24.4010                               0.8221    0.8221    1.6441    1.1795    97.753 %
 
 ...and with the shift optimiser off
 a mm                                      x1        x2       sum       eps    eta fwd
 23.0200                               0.4736    0.0000    0.4736    1.4292    97.345 %
                                     no admissible shifts reach 23.0000 mm: the pair is built at 23.4433 mm instead, and the clearance reported is the gap
                                     the running distance is 0.4233 mm inside the zero-backlash 23.4433 mm: these teeth cannot be assembled
-23.4213                               0.4736    0.0000    0.4736    1.3647    97.518 %
-                                    no admissible shifts reach 23.4013 mm: the pair is built at 23.4433 mm instead, and the clearance reported is the gap
-                                    the running distance is 0.0220 mm inside the zero-backlash 23.4433 mm: these teeth cannot be assembled
-23.8226                               0.4736    0.4239    0.8975    1.3323    97.636 %
-24.2240                               0.7039    0.7039    1.4078    1.2704    97.690 %
+23.4803                               0.4736    0.0193    0.4929    1.3276    97.566 %
+23.9407                               0.5219    0.5219    1.0438    1.3288    97.635 %
+24.4010                               0.8221    0.8221    1.6441    1.1795    97.753 %

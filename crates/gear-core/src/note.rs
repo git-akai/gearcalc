@@ -101,6 +101,8 @@ pub mod key {
     pub const GEAR_ADDENDUM_HELD_TO_TIP_WIDTH: &str = "gear.addendum_held_to_tip_width";
     /// `gear.addendum_held_to_mate_flank`
     pub const GEAR_ADDENDUM_HELD_TO_MATE_FLANK: &str = "gear.addendum_held_to_mate_flank";
+    /// `gear.tip_cannot_clear_mate_flank`
+    pub const GEAR_TIP_CANNOT_CLEAR_MATE_FLANK: &str = "gear.tip_cannot_clear_mate_flank";
     /// `gear.shift_raised_for_undercut`
     pub const GEAR_SHIFT_RAISED_FOR_UNDERCUT: &str = "gear.shift_raised_for_undercut";
     /// `gear.bending_unrated_in_mesh`
@@ -330,6 +332,7 @@ pub mod key {
         GEAR_FACE_WIDTH_AS_ENTERED,
         GEAR_ADDENDUM_HELD_TO_TIP_WIDTH,
         GEAR_ADDENDUM_HELD_TO_MATE_FLANK,
+        GEAR_TIP_CANNOT_CLEAR_MATE_FLANK,
         GEAR_SHIFT_RAISED_FOR_UNDERCUT,
         GEAR_BENDING_UNRATED_IN_MESH,
         GEAR_BENDING_UNRATED,

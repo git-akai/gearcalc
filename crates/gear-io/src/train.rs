@@ -262,10 +262,12 @@
 //!   place — its contact fatigue is now judged against the library's flank
 //!   figure, not its root figure — and that is the correction, not a reading.
 //! - A member's gear gained `no_tip_past_mate_flank`, which **defaults
-//!   rather than refusing**, as `load_sharing` did: absent is `false`, the
-//!   tip as typed, which is what every file written before it meant. A ring
-//!   the tool lays in now writes `true`, its tip held off its mates' usable
-//!   flanks.
+//!   rather than refusing**: absent is `true`, the tip held off its mates'
+//!   usable flanks, which is what every gear the tool lays in now does. A
+//!   file written before it builds a tip that reached past a mate's flank
+//!   shorter than it did; `no_tip_past_mate_flank = false` on that gear keeps
+//!   the tip as typed. `gear-cli convert` names the field where a converted
+//!   file differs only by it.
 //!
 //! No compatibility shim, deliberately. Accepting both shapes means carrying two
 //! readers for one format and testing both forever, and the thing that would go

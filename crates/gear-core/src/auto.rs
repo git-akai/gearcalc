@@ -1198,6 +1198,9 @@ pub struct MeshTrial<'a> {
     /// mesh's input, not this one's decision.
     pub min_contact_ratio: f64,
     pub friction: f64,
+    /// Per side: the tip held to its mate's junction, which reaches past
+    /// nothing by construction (`train::shape`'s tip hold).
+    pub held: [bool; 2],
 }
 
 /// **One candidate crossed-axis mesh, as a search judges it** — the point
@@ -1214,6 +1217,9 @@ pub struct CrossedTrial<'a> {
     pub centre: f64,
     pub min_contact_ratio: f64,
     pub friction: f64,
+    /// Per side: the tip held to its mate's junction, which reaches past
+    /// nothing by construction (`train::shape`'s tip hold).
+    pub held: [bool; 2],
 }
 
 impl CrossedTrial<'_> {
@@ -1237,11 +1243,10 @@ impl CrossedTrial<'_> {
             return None;
         }
         let path = self.path?;
-        if path
-            .flank_interference(self.screw, [a.flank_ends(), b.flank_ends()])
-            .iter()
-            .any(|&bad| bad)
-        {
+        let fouled = path.flank_interference(self.screw, [a.flank_ends(), b.flank_ends()]);
+        // A held tip reaches past nothing; the flank it would reach is the
+        // mate's, the other side.
+        if (0..2).any(|s| fouled[s] && !self.held[1 - s]) {
             return None;
         }
         if path.contact_ratio < self.min_contact_ratio {
@@ -1290,12 +1295,12 @@ impl MeshTrial<'_> {
         // internal pair's other question — whether two tips foul away from the
         // line of action — and is `true` by construction on an external pair;
         // this one is not, and had never been asked of one at all.
-        if self
+        let fouled = self
             .mesh
-            .flank_interference(self.members.map(|m| m.flank_ends()))
-            .iter()
-            .any(|&bad| bad)
-        {
+            .flank_interference(self.members.map(|m| m.flank_ends()));
+        // A held tip reaches past nothing; the flank it would reach is the
+        // mate's, the other side.
+        if (0..2).any(|s| fouled[s] && !self.held[1 - s]) {
             return None;
         }
         if self.path.contact_ratio < self.min_contact_ratio {
@@ -1571,6 +1576,7 @@ pub fn shifts_for_efficiency(
             path: &path,
             min_contact_ratio,
             friction,
+            held: [false, false],
         }
         .efficiency()
     };
@@ -2186,6 +2192,7 @@ mod tests {
                     path: &path,
                     min_contact_ratio: 1.0,
                     friction: 0.08,
+                    held: [false, false],
                 }
                 .efficiency(),
             )

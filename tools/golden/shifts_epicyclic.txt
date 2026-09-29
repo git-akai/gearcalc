@@ -8,7 +8,7 @@ d             x mesh 1  x mesh 2    eta0 fwd   what the optimiser found
 epicyclic sets  z_sun/z_planet, ring = sun + 2 planet
 
 z_s/z_p          x sun  x planet    x ring    eta0 fwd     cut as asked
-11/18           0.8230    0.4631    1.8059    97.0890 %             true
+11/18           0.8243    0.4621    1.8050    97.0888 %             true
 13/25           0.5353    0.6768    1.9421    97.6087 %             true
 17/17           0.6576    0.5869    1.8860    97.4071 %             true
 24/18           0.7592    0.5649    1.9421    97.6789 %             true

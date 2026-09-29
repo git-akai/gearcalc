@@ -581,7 +581,10 @@ mod tests {
         let r = solve_train(t, &lib);
         match &r {
             Err(e) if solved && wiring(e) => return Err(format!("solved, then {e:?}")),
-            Ok(r) => super::super::groupings::says_everything_once(t, r)?,
+            Ok(r) => {
+                super::super::groupings::says_everything_once(t, r)?;
+                super::super::rating_laws::held_tips_reach_past_nothing(t, r)?;
+            }
             Err(_) => {}
         }
         let json = serde_json::to_string(t).unwrap();

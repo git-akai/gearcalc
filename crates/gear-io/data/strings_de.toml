@@ -57,6 +57,7 @@ planet_clearance_below_minimum = "benachbarte Planeten haben {gap} mm Abstand, w
 shift_raised_for_undercut = "Profilverschiebung auf {shift} erhöht, um Unterschnitt zu vermeiden"
 addendum_held_to_tip_width = "Kopfhöhe auf {addendum} begrenzt"
 addendum_held_to_mate_flank = "Kopfhöhe auf {addendum} begrenzt, wo der Kopf die nutzbare Flanke des Gegenrads erreicht"
+tip_cannot_clear_mate_flank = "keine Kopfhöhe hält diesen Zahn von der nutzbaren Flanke des Gegenrads fern; die Kopfhöhe bleibt wie eingegeben"
 face_width_as_entered = "die automatische Zahnbreite hat bei gekreuzten Wellen nichts, was sie bemisst: sie bleibt wie eingegeben"
 bending_unrated_in_mesh = "Biegung an der von Eingriff {mesh} belasteten Flanke nicht bewertet: der Kraftangriffspunkt lässt dort keinen Fußquerschnitt; die Bewertung der anderen Flanke bleibt"
 bending_unrated = "Biegung nicht bewertet: kein Kraftangriffspunkt lässt einen Fußquerschnitt, den das Biegemodell liest — Hebelarm oder Faktor sind dort nicht positiv, oder der Zahn hat keinen Querschnitt"

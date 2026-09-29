@@ -2335,6 +2335,7 @@ impl Shape {
                     path: &l.path,
                     min_contact_ratio,
                     friction: m.sliding_friction,
+                    held: bm.held,
                 }
                 .efficiency()?,
                 BuiltContact::Point(p) => crate::auto::CrossedTrial {
@@ -2344,6 +2345,7 @@ impl Shape {
                     centre: bm.running,
                     min_contact_ratio,
                     friction: m.sliding_friction,
+                    held: bm.held,
                 }
                 .efficiency()?,
             };
@@ -2529,6 +2531,9 @@ pub(crate) struct BuiltMesh {
     pub(crate) kind: MeshKind,
     pub(crate) running: f64,
     pub(crate) contact: BuiltContact,
+    /// Per side: the tip held to its mate's junction on this mesh
+    /// ([`Shape::tip_holds`]), so it reaches past nothing.
+    pub(crate) held: [bool; 2],
 }
 
 /// **What the teeth of a mesh do to each other**: a line of contact on
@@ -2905,8 +2910,10 @@ pub(crate) struct Built {
     /// Per distance: the running distance every mesh on it agrees at.
     pub(crate) running: Vec<Option<f64>>,
     /// Per member: the addendum its meshes held its tip to, where one did
-    /// ([`Shape::hold_tips_to_mates`]).
+    /// ([`Shape::tip_holds`]).
     pub(crate) mate: Vec<Option<f64>>,
+    /// Per member: asked to be held, and no tip length clears a mate.
+    pub(crate) unholdable: Vec<bool>,
 }
 
 impl Shape {
@@ -2962,29 +2969,39 @@ impl Shape {
         let mut members: Vec<std::rc::Rc<BuiltMember>> =
             (0..self.members.len()).map(|i| cut(i, None)).collect();
         let (running, placed) = self.place_meshes(&members, x, helix, held)?;
-        let mate = self.hold_tips_to_mates(&mut members, &placed, &cut);
+        let hold = self.tip_holds(&members, &placed);
+        for (i, bound) in hold.bound.iter().enumerate() {
+            if let Some(c) = *bound {
+                members[i] = cut(i, Some(c));
+            }
+        }
         let mut meshes = Vec::with_capacity(self.meshes.len());
-        for (m, (kind, at, zero)) in self.meshes.iter().zip(placed) {
+        for (k, (m, (kind, at, zero))) in self.meshes.iter().zip(placed).enumerate() {
+            let tagged = hold.tagged[k];
+            let ends = [members[m.a].flank_ends(), members[m.b].flank_ends()];
             let contact = match zero {
                 Placed::Line(design, operating) => {
-                    let ends = [members[m.a].flank_ends(), members[m.b].flank_ends()];
                     // No usable path: the tips never reach, or they reach
                     // only past each other's usable flanks.
-                    let path = ContactPath::new(members[m.a].as_gear(), ends[1], &operating)
-                        .ok_or_else(|| {
-                            if operating.flank_interference(ends).contains(&true) {
-                                TrainError::FlankInterference
-                            } else {
-                                TrainError::NoContact
-                            }
-                        })?;
+                    let path =
+                        ContactPath::held(members[m.a].as_gear(), ends[1], &operating, tagged)
+                            .ok_or_else(|| {
+                                let fouled = operating.flank_interference(ends);
+                                // A held tip reaches past nothing; the side it
+                                // would have reached is the mate's, `1 − s`.
+                                if (0..2).any(|s| fouled[s] && !tagged[1 - s]) {
+                                    TrainError::FlankInterference
+                                } else {
+                                    TrainError::NoContact
+                                }
+                            })?;
                     BuiltContact::Line(LineBuilt {
                         design,
                         operating,
                         path,
                     })
                 }
-                Placed::Point(screw) => {
+                Placed::Point(screw, _) => {
                     // The tips are the teeth's own: this is the one place a
                     // crossed pair's tooth form reaches an answer, which is
                     // why it is specified at all (docs/reference.md#crossed-axes).
@@ -3007,20 +3024,23 @@ impl Shape {
                 kind,
                 running: at,
                 contact,
+                held: tagged,
             });
         }
         Ok(Built {
             members,
             meshes,
             running,
-            mate,
+            mate: hold.bound,
+            unholdable: hold.unholdable,
         })
     }
 
     /// **Every mesh at its running distance**: the distance each pair of
     /// axes runs at, and each mesh's geometry there — which reads the
     /// members' shifts and never their tips, so it holds for a member cut
-    /// again at a shorter tip.
+    /// again at a shorter tip. A crossed mesh carries the path its tips as
+    /// first cut give it, whose tangency points are what a hold reads.
     #[allow(clippy::type_complexity)]
     fn place_meshes(
         &self,
@@ -3088,126 +3108,122 @@ impl Shape {
                         let operating = design.at(at).map_err(TrainError::Mesh)?;
                         Placed::Line(design, operating)
                     }
-                    Zero::Point(screw) => Placed::Point(screw),
+                    Zero::Point(screw) => {
+                        let path = screw.path_of_contact_at(
+                            members[m.a].tip_radius(),
+                            members[m.b].tip_radius(),
+                            at,
+                        );
+                        Placed::Point(screw, path)
+                    }
                 },
             ));
         }
         Ok((running, placed))
     }
 
-    /// **Each tip held to its mates' usable flanks**, where its member asks
-    /// ([`super::MemberGear::no_tip_past_mate_flank`]): per member, the
-    /// addendum at which its tip meets the start of the nearest mate's usable
-    /// flank on the line of action, the lowest over its meshes, and the
-    /// member cut again wherever that bound binds. Returns the bound each
-    /// member was handed.
+    /// **Where each tip is held off its mates' usable flanks**, where its
+    /// member asks ([`super::MemberGear::no_tip_past_mate_flank`]).
     ///
-    /// **The bound is the mesh's and the tip is the gear's.** The radius the
-    /// tip may reach is the conjugate of the mate's junction at the running
-    /// geometry ([`Mesh::contact_radius_at`]) — a question of both gears —
-    /// and it reaches the member as a number of modules, which its own
-    /// [`super::MemberGear::addendum_asked`] weighs beside its tip width.
-    /// Neither the geometry nor a mate's junction reads a tip, so one pass
-    /// finds every bound.
+    /// **The bound is the mesh's and the tip is the gear's.** On each mesh
+    /// the radius a member's tip may reach is the conjugate of its mate's
+    /// junction at the running geometry — [`Mesh::contact_radius_at`] on a
+    /// line contact, [`crate::screw::CrossedPath::contact_radius_at`] on a
+    /// point contact — a question of both gears. The member reads that
+    /// radius as its own addendum ([`BuiltMember::addendum_at_tip`]) and is
+    /// held to the lowest over its meshes, beside its tip width
+    /// ([`super::MemberGear::addendum_asked`]). Neither the geometry nor a
+    /// mate's junction reads a tip, so one pass finds every bound and a
+    /// held member is cut once more.
     ///
-    /// **Exactly met, then checked on the path.** The closed form lands the
-    /// tip on the junction's conjugate to a rounding either side; the path of
-    /// contact the report reads is asked whether the tip still reaches past,
-    /// and a tip that does by a rounding is shortened by what the path says
-    /// it reaches past, doubled each time the cut does not move. On a line
-    /// contact only: a crossed mesh's point contact meets its faces by
-    /// another geometry, and asks nothing of this bound.
-    fn hold_tips_to_mates(
+    /// **Exact by construction.** The cut lands the tip on that radius only
+    /// to a rounding either side, so each mesh side whose bound is the one
+    /// the member was held to is tagged, and the path takes that end from
+    /// the mate's junction ([`ContactPath::held`]): it reaches past nothing.
+    ///
+    /// **No tip length clears** where the conjugate falls inside the
+    /// member's base circle (`None`: every tip it could have touches the
+    /// mate below its junction) or where the addendum it needs is not
+    /// positive. There the member is not cut into a negative tooth: its tip
+    /// stands as asked, the mesh says what it reaches past, and the member
+    /// says it could not be held (`gear.tip_cannot_clear_mate_flank`).
+    fn tip_holds(
         &self,
-        members: &mut [std::rc::Rc<BuiltMember>],
+        members: &[std::rc::Rc<BuiltMember>],
         placed: &[(MeshKind, f64, Placed)],
-        cut: &dyn Fn(usize, Option<f64>) -> std::rc::Rc<BuiltMember>,
-    ) -> Vec<Option<f64>> {
+    ) -> Holds {
         let n = self.members.len();
-        let mut mate: Vec<Option<f64>> = vec![None; n];
-        // Each line mesh, as (member, the side it is on, its mate).
-        let sides = |k: usize| {
-            let m = self.meshes[k];
-            [(m.a, MeshSide::First, m.b), (m.b, MeshSide::Second, m.a)]
-        };
+        let mut per_side: Vec<[Option<f64>; 2]> = vec![[None, None]; placed.len()];
+        let mut lowest: Vec<Option<f64>> = vec![None; n];
+        let mut unholdable = vec![false; n];
         for (k, (_, _, p)) in placed.iter().enumerate() {
-            let Placed::Line(_, operating) = p else {
-                continue;
-            };
-            for (i, side, j) in sides(k) {
+            let m = self.meshes[k];
+            for (s, side, i, j) in [
+                (0, MeshSide::First, m.a, m.b),
+                (1, MeshSide::Second, m.b, m.a),
+            ] {
                 if !self.members[i].gear.no_tip_past_mate_flank {
                     continue;
                 }
-                let Some(r) = operating.contact_radius_at(side, members[j].flank_ends().junction)
+                let junction = members[j].flank_ends().junction;
+                let radius = match p {
+                    Placed::Line(_, operating) => operating.contact_radius_at(side, junction),
+                    Placed::Point(screw, Some(path)) => {
+                        path.contact_radius_at(screw, side, junction)
+                    }
+                    // No zone at all: the build refuses the mesh.
+                    Placed::Point(_, None) => continue,
+                };
+                let Some(c) = radius
+                    .map(|r| members[i].addendum_at_tip(r))
+                    .filter(|&c| c > 0.0)
                 else {
-                    // The mate's usable flank begins where no tip of this
-                    // member reaches on the line of action: nothing to
-                    // hold the tip to.
+                    unholdable[i] = true;
                     continue;
                 };
-                let c = members[i].addendum_at_tip(r);
-                mate[i] = Some(mate[i].map_or(c, |o: f64| o.min(c)));
+                per_side[k][s] = Some(c);
+                lowest[i] = Some(lowest[i].map_or(c, |o: f64| o.min(c)));
             }
         }
-        for i in 0..n {
-            let Some(mut c) = mate[i] else {
-                continue;
-            };
-            let before = members[i].params().addendum;
-            if c >= before {
-                continue;
-            }
-            // Shortened by what the path says it reaches past, converted at
-            // one module a millimetre of tip — never less than the path's
-            // reach, since a tip moves along the line of action at least as
-            // far as it moves radially.
-            let module = members[i].params().module;
-            let mut step = 0.0_f64;
-            for _ in 0..f64::MANTISSA_DIGITS {
-                members[i] = cut(i, Some(c));
-                let past = placed
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(k, (_, _, p))| match p {
-                        Placed::Line(_, operating) => Some((k, operating)),
-                        Placed::Point(_) => None,
-                    })
-                    .flat_map(|(k, operating)| {
-                        let m = self.meshes[k];
-                        sides(k)
-                            .into_iter()
-                            .filter(move |&(at, _, _)| at == i)
-                            .map(move |(_, side, _)| (m, side, operating))
-                    })
-                    .map(|(m, side, operating)| {
-                        let ends = [members[m.a].flank_ends(), members[m.b].flank_ends()];
-                        // The mate's end is the other side's.
-                        ContactPath::new(members[m.a].as_gear(), ends[1], operating)
-                            .map_or(f64::INFINITY, |p| p.past_usable_flank()[1 - side.index()])
-                    })
-                    .fold(0.0_f64, f64::max);
-                if past <= 0.0 {
-                    break;
-                }
-                step = if past.is_finite() {
-                    (past / module).max(2.0 * step)
-                } else {
-                    2.0 * step
-                }
-                .max(c.abs().max(1.0) * f64::EPSILON);
-                c -= step;
-            }
-            mate[i] = Some(c);
+        // Held only where the bound binds: below what the member would
+        // build at on its own.
+        let bound: Vec<Option<f64>> = (0..n)
+            .map(|i| lowest[i].filter(|&c| c < members[i].params().addendum))
+            .collect();
+        let tagged = per_side
+            .iter()
+            .enumerate()
+            .map(|(k, sides)| {
+                let m = self.meshes[k];
+                [0, 1].map(|s| sides[s].is_some() && sides[s] == bound[[m.a, m.b][s]])
+            })
+            .collect();
+        Holds {
+            bound,
+            tagged,
+            unholdable,
         }
-        mate
     }
+}
+
+/// What [`Shape::tip_holds`] found.
+struct Holds {
+    /// Per member: the addendum its meshes hold its tip to, where it binds.
+    bound: Vec<Option<f64>>,
+    /// Per mesh, per side: whether that side's tip is held to its mate's
+    /// junction on this mesh.
+    tagged: Vec<[bool; 2]>,
+    /// Per member: asked to be held, and no tip length clears some mate.
+    unholdable: Vec<bool>,
 }
 
 /// A mesh placed at its running distance, before its contact is found.
 enum Placed {
     /// A line contact: its zero-backlash design and its geometry as it runs.
     Line(Mesh, Mesh),
-    Point(Screw),
+    /// A point contact, and its path at the tips as first cut, where there
+    /// is one.
+    Point(Screw, Option<CrossedPath>),
 }
 
 /// What a member is, as a designer names it — read off the shape by
@@ -4099,6 +4115,9 @@ pub fn rate(
             )
             .note(),
         );
+        if built.unholdable[i] {
+            out.push(Note::new(key::GEAR_TIP_CANNOT_CLEAR_MATE_FLANK));
+        }
         out.extend(g.face_width_note());
         out.extend(as_entered(i).then(|| Note::new(key::GEAR_FACE_WIDTH_AS_ENTERED)));
         // ...and each mesh whose load point leaves this member no section
@@ -4284,9 +4303,14 @@ pub fn rate(
                         case_power,
                         backlash,
                         row_play,
-                        flank_interference: p
-                            .path
-                            .flank_interference(&p.screw, [a.flank_ends(), b.flank_ends()]),
+                        flank_interference: {
+                            let fouled = p
+                                .path
+                                .flank_interference(&p.screw, [a.flank_ends(), b.flank_ends()]);
+                            // A held tip reaches past nothing: the flank it
+                            // would reach is the mate's, the other side.
+                            [0, 1].map(|s| fouled[s] && !bm.held[1 - s])
+                        },
                         first_reference_radius: f64::from(shape.members[m.a].gear.teeth)
                             * shape.members[m.a].normal_module()
                             / helix[m.a].to_radians().cos()

@@ -94,17 +94,12 @@ min_tip_width: number,
  * (`crate::ring::mesh_with`): the bound meets it exactly, rather than a
  * fixed shorter addendum that is right for one pair of counts.
  *
- * **On for a ring where one is laid in, off otherwise**
- * ([`Shape::push_member`](shape::Shape::push_member)). The bound is one
- * rule for either kind; the default differs because the need does. An
- * internal pair at full depth interferes as a matter of course, so its
- * ring is built short. An external pair interferes only where a search
- * or a designer pushes it, and there the searches hold the shifts off
- * the interference instead. Turned on there, the bound takes that
- * limit away and a search tops the tips to gain efficiency: at 9/37 the
- * least loss moves from Σx 1.41 to 1.64 and ε drops from 1.29 to 1.20.
- * A document that does not say is read as off, so a saved train builds
- * as it did.
+ * **On for every gear**, a ring and an external gear alike, and in a
+ * document that does not say. On an internal pair at full depth it is
+ * what keeps the ring off its planet's form circle; on an external pair
+ * it tops a tip a search or a designer has pushed past its mate's
+ * flank, where without it the search held the shifts off that wall — at
+ * 9/37 the least loss moves from Σx 1.41 to 1.64, `ε` to 1.20.
  *
  * Off, the addendum stands as asked and a tip that reaches too far is
  * said on the mesh (`mesh.flank_interference`).

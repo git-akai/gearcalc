@@ -484,13 +484,91 @@ fn the_canary_says_its_flank_is_past_its_allowable() {
     );
 }
 
-/// **No default design reaches a flank past its usable end.** Every preset,
-/// every arrangement of a set, a Ravigneaux, the hula and a worm beside a
-/// pair, solved alone as shipped: no mesh reports flank interference and
-/// none says so. A full-depth ring's tip reaches below its planet's form
-/// circle, so a default that interferes is a default nobody would cut.
+/// **A tip asked to be held reaches past nothing, exactly, and is never cut
+/// into a negative tooth.** For every member whose
+/// [`super::MemberGear::no_tip_past_mate_flank`] is on: either no mesh
+/// reports its mate's flank reached (the path's `past_usable_flank` is
+/// exactly zero there, which is what the flag reads), or the member says no
+/// tip length clears (`gear.tip_cannot_clear_mate_flank`); and a held
+/// member builds at a positive addendum.
+pub(super) fn held_tips_reach_past_nothing(
+    t: &Train,
+    r: &super::TrainResult,
+) -> Result<(), String> {
+    use crate::note::key;
+    let says = |i: usize, k: &str| r.members[i].notes.iter().any(|n| n.is(k));
+    for (k, mesh) in r.meshes.iter().enumerate() {
+        let m = t.shape.meshes[k];
+        for (s, i) in [m.a, m.b].into_iter().enumerate() {
+            if !t.shape.members[i].gear.no_tip_past_mate_flank
+                || says(i, key::GEAR_TIP_CANNOT_CLEAR_MATE_FLANK)
+            {
+                continue;
+            }
+            if mesh.flank_interference[1 - s] {
+                return Err(format!(
+                    "mesh {k}: member {i}'s tip is held and reaches past its mate"
+                ));
+            }
+        }
+    }
+    for (i, g) in r.members.iter().enumerate() {
+        if says(i, key::GEAR_ADDENDUM_HELD_TO_MATE_FLANK) && g.addendum <= 0.0 {
+            return Err(format!("member {i} held to an addendum of {}", g.addendum));
+        }
+    }
+    Ok(())
+}
+
+/// **Every tip held, on every preset and arrangement**: each shipped design
+/// with the bound turned on for every member, external ones included, and
+/// solved. Each member is held exactly or says it cannot be
+/// ([`held_tips_reach_past_nothing`]), and at least one is each, so the law
+/// reaches both arms.
 #[test]
-fn no_default_design_raises_flank_interference() {
+fn every_tip_held_reaches_past_nothing() {
+    let mut held = 0;
+    for (name, mut t) in default_trains() {
+        for m in &mut t.shape.members {
+            m.gear.no_tip_past_mate_flank = true;
+        }
+        let Ok(r) = solve_train(&t, &test_library()) else {
+            continue;
+        };
+        held_tips_reach_past_nothing(&t, &r).unwrap_or_else(|e| panic!("{name}: {e}"));
+        held += r
+            .members
+            .iter()
+            .filter(|g| {
+                g.notes
+                    .iter()
+                    .any(|n| n.is(crate::note::key::GEAR_ADDENDUM_HELD_TO_MATE_FLANK))
+            })
+            .count();
+    }
+    assert!(held > 0, "nothing was held: the law is vacuous");
+    // The unholdable arm: a 7-tooth pinion at x −0.8 against 300, whose
+    // wheel's tip reaches past the pinion's flank at any length.
+    let mut s = pair([7, 300]);
+    s.members[0].gear.profile_shift = Auto::fixed(-0.8);
+    s.members[0].gear.no_undercut = false;
+    s.members[1].gear.no_tip_past_mate_flank = true;
+    let t = Train::alone(&s, 2.0, 100.0);
+    let r = solve_train(&t, &test_library()).expect("the deep pair solves");
+    assert!(
+        r.members[1]
+            .notes
+            .iter()
+            .any(|n| n.is(crate::note::key::GEAR_TIP_CANNOT_CLEAR_MATE_FLANK)),
+        "the wheel says it cannot be held: {:?}",
+        r.members[1].notes
+    );
+    held_tips_reach_past_nothing(&t, &r).unwrap();
+}
+
+/// Every preset, every arrangement of a set, a Ravigneaux, the hula and a
+/// worm beside a pair, each alone as shipped.
+fn default_trains() -> Vec<(String, Train)> {
     use super::arrangements::{hula, planetary, ravigneaux, worm_and_pair};
     use crate::planetary::{Arrangement, PlanetaryShaft};
     let mut trains: Vec<(String, Train)> = Preset::ALL
@@ -516,6 +594,36 @@ fn no_default_design_raises_flank_interference() {
     ] {
         trains.push((name.into(), Train::alone(&shape, 2.0, 3000.0)));
     }
+    trains
+}
+
+/// **No default design reaches a flank past its usable end.** Every preset,
+/// every arrangement of a set, a Ravigneaux, the hula, a worm beside a pair
+/// and four small-pinion pairs, solved alone as shipped and searched: no
+/// mesh reports flank interference and none says so. A full-depth ring's
+/// tip reaches below its planet's form circle, so a default that interferes
+/// is a default nobody would cut.
+#[test]
+fn no_default_design_raises_flank_interference() {
+    // As shipped, and searched: the search chooses shifts that push a tip
+    // against its mate's flank, where the hold then tops it. Small pinions
+    // on parallel axes besides, where an external pair's interference bites.
+    let mut trains = default_trains();
+    for teeth in [[9_u32, 37], [9, 20], [12, 29], [7, 30]] {
+        trains.push((
+            format!("pair {teeth:?}"),
+            Train::alone(&pair(teeth), 2.0, 3000.0),
+        ));
+    }
+    let searched: Vec<(String, Train)> = trains
+        .iter()
+        .map(|(name, t)| {
+            let mut t = t.clone();
+            t.shape.set_search(true);
+            (format!("{name}, searched"), t)
+        })
+        .collect();
+    trains.extend(searched);
     let mut fouled = Vec::new();
     for (name, t) in &trains {
         let r = solve_train(t, &test_library()).unwrap_or_else(|e| panic!("{name}: {e}"));
@@ -530,4 +638,38 @@ fn no_default_design_raises_flank_interference() {
         }
     }
     assert!(fouled.is_empty(), "defaults that interfere: {fouled:#?}");
+}
+/// **A point contact holds a tip as a line contact does**: a crossed pair
+/// and a worm at 1.8 modules of addendum reach past each other's usable
+/// flanks as typed, and with the bound on every tip that reaches is held,
+/// through [`crate::screw::CrossedPath::contact_radius_at`], and none does.
+#[test]
+fn a_crossed_mesh_holds_its_tips() {
+    for p in [Preset::Crossed, Preset::Worm] {
+        let mut s = p.build();
+        for m in &mut s.members {
+            m.gear.addendum = 1.8;
+            m.gear.no_sharp_tip = false;
+            m.gear.no_tip_past_mate_flank = false;
+        }
+        let typed = solve_train(&Train::alone(&s, 2.0, 100.0), &test_library()).unwrap();
+        assert_eq!(typed.meshes[0].flank_interference, [true, true], "{p:?}");
+        for m in &mut s.members {
+            m.gear.no_tip_past_mate_flank = true;
+        }
+        let t = Train::alone(&s, 2.0, 100.0);
+        let r = solve_train(&t, &test_library()).unwrap();
+        assert_eq!(r.meshes[0].flank_interference, [false, false], "{p:?}");
+        held_tips_reach_past_nothing(&t, &r).unwrap_or_else(|e| panic!("{p:?}: {e}"));
+        let held = r
+            .members
+            .iter()
+            .filter(|g| {
+                g.notes
+                    .iter()
+                    .any(|n| n.is(crate::note::key::GEAR_ADDENDUM_HELD_TO_MATE_FLANK))
+            })
+            .count();
+        assert!(held > 0, "{p:?}: nothing was held");
+    }
 }

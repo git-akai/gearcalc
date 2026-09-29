@@ -1592,6 +1592,8 @@ mod tests {
         let tall = solved(&member(arr::worm(1, 40), 1, |g| {
             g.addendum = 3.0;
             g.no_sharp_tip = false;
+            // As typed: the interference is what is reported.
+            g.no_tip_past_mate_flank = false;
         }));
         assert!(
             point(&tall).flank_interference[0],

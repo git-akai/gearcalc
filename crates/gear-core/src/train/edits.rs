@@ -419,14 +419,9 @@ impl Shape {
             let teeth = 2 * self.members[mate].gear.teeth;
             self.push_follower(mate, body, teeth, true);
         } else {
-            let gear = MemberGear {
-                no_tip_past_mate_flank: false,
-                ..self.members[mate].gear.clone()
-            };
             self.members.push(Member {
                 body,
                 ring: None,
-                gear,
                 ..self.members[mate].clone()
             });
             let new = self.members.len() - 1;
@@ -547,9 +542,6 @@ impl Shape {
             gear: MemberGear {
                 teeth,
                 profile_shift: Auto::automatic(0.0),
-                // Its kind's, not the mate's: a ring's tip is held off its
-                // mates' usable flanks.
-                no_tip_past_mate_flank: ring,
                 ..self.members[mate].gear.clone()
             },
             module: Auto::automatic(module),

@@ -1570,7 +1570,8 @@ fn convert_report(path: Option<&str>) {
                     if same { "yes" } else { "NO" }
                 );
             }
-            let text = |d: &gear_io::TrainDocument| gear_io::train::to_toml(d).ok();
+            let text = |d: &gear_io::TrainDocument| gear_io::train::to_toml(d).unwrap_or_default();
+            let fields = differing_fields(&text(doc), &text(&now));
             println!(
                 "\n  {}\n  {}",
                 if all {
@@ -1578,15 +1579,39 @@ fn convert_report(path: Option<&str>) {
                 } else {
                     "THE CONVERSION MOVED A FIGURE - see the rows marked NO"
                 },
-                if text(doc) == text(&now) {
-                    "and it writes the file the tool writes of the drive now"
+                if fields.is_empty() {
+                    "and it writes the file the tool writes of the drive now".to_string()
                 } else {
-                    "BUT IT WRITES A DIFFERENT FILE from the drive built now"
+                    format!(
+                        "and it writes the file the tool writes of the drive now, but for: {}",
+                        fields.join(", ")
+                    )
                 }
             );
         }
         (a, b) => println!("a train did not solve: {:?} / {:?}", a.err(), b.err()),
     }
+}
+
+/// **The fields two TOML documents disagree on**, by name: every
+/// `key = value` line one has and the other does not, counted as a multiset
+/// so a field repeated per member is weighed per line, its key named once.
+fn differing_fields(a: &str, b: &str) -> Vec<String> {
+    let mut count: std::collections::HashMap<&str, i64> = std::collections::HashMap::new();
+    for l in a.lines() {
+        *count.entry(l.trim()).or_default() += 1;
+    }
+    for l in b.lines() {
+        *count.entry(l.trim()).or_default() -= 1;
+    }
+    let mut keys: Vec<String> = count
+        .into_iter()
+        .filter(|(_, n)| *n != 0)
+        .map(|(l, _)| l.split_once(" = ").map_or(l, |(k, _)| k).trim().to_string())
+        .collect();
+    keys.sort();
+    keys.dedup();
+    keys
 }
 
 /// **What choosing a pair's shifts for efficiency is worth**, and what it costs.

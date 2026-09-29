@@ -58,6 +58,7 @@ planet_clearance_below_minimum = "planetas adjacentes afastam-se {gap} mm, abaix
 shift_raised_for_undercut = "correção de perfil aumentada para {shift} para evitar adelgaçamento"
 addendum_held_to_tip_width = "adendo limitado a {addendum}"
 addendum_held_to_mate_flank = "adendo limitado a {addendum}, onde o topo encontra o flanco útil do par"
+tip_cannot_clear_mate_flank = "nenhum adendo mantém este dente fora do flanco útil do par; o adendo fica como digitado"
 face_width_as_entered = "a largura de face automática não tem nada que a dimensione em eixos cruzados: fica como introduzida"
 bending_unrated_in_mesh = "flexão não classificada no flanco carregado pelo engrenamento {mesh}: o ponto de carga não deixa aí secção de raiz; a classificação do outro flanco mantém-se"
 bending_unrated = "flexão não classificada: nenhum ponto de carga deixa uma secção de raiz que o modelo de flexão leia — o braço ou o fator não é positivo aí, ou o dente não tem secção"

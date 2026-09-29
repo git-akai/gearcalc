@@ -53,6 +53,7 @@ planet_clearance_below_minimum = "相鄰行星輪的間隙為 {gap} mm，低於�
 shift_raised_for_undercut = "變位係數增大到 {shift} 以避免根切"
 addendum_held_to_tip_width = "齒頂高限制為 {addendum}"
 addendum_held_to_mate_flank = "齒頂高限制為 {addendum}，齒頂恰到配對齒輪的有效齒面"
+tip_cannot_clear_mate_flank = "任何齒頂高都無法使此齒避開配對齒輪的有效齒面；齒頂高保持輸入值"
 face_width_as_entered = "交錯軸上沒有任何依據可確定自動齒寬：保持輸入值"
 bending_unrated_in_mesh = "嚙合 {mesh} 所加載的齒面未做彎曲評定：載荷作用點在此處無齒根截面；另一齒面的評定仍然有效"
 bending_unrated = "未做彎曲評定：沒有任何負載作用點能給出彎曲模型可讀取的齒根截面——該處力臂或係數不為正，或輪齒沒有截面"

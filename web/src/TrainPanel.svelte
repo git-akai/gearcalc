@@ -1519,7 +1519,7 @@
     </label>
   {/if}
   <!-- The addendum's second bound: the tip held off its mates' usable flanks.
-       The core finds where that is, mesh by mesh; on for a ring as laid in. -->
+       The core finds where that is, mesh by mesh; on by default. -->
   <label class="sub">
     <span>{t("ui.train_no_tip_past_mate_flank")}</span>
     <Switch

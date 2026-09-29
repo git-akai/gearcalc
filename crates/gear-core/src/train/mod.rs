@@ -1251,21 +1251,16 @@ pub struct MemberGear {
     /// (`crate::ring::mesh_with`): the bound meets it exactly, rather than a
     /// fixed shorter addendum that is right for one pair of counts.
     ///
-    /// **On for a ring where one is laid in, off otherwise**
-    /// ([`Shape::push_member`](shape::Shape::push_member)). The bound is one
-    /// rule for either kind; the default differs because the need does. An
-    /// internal pair at full depth interferes as a matter of course, so its
-    /// ring is built short. An external pair interferes only where a search
-    /// or a designer pushes it, and there the searches hold the shifts off
-    /// the interference instead. Turned on there, the bound takes that
-    /// limit away and a search tops the tips to gain efficiency: at 9/37 the
-    /// least loss moves from Σx 1.41 to 1.64 and ε drops from 1.29 to 1.20.
-    /// A document that does not say is read as off, so a saved train builds
-    /// as it did.
+    /// **On for every gear**, a ring and an external gear alike, and in a
+    /// document that does not say. On an internal pair at full depth it is
+    /// what keeps the ring off its planet's form circle; on an external pair
+    /// it tops a tip a search or a designer has pushed past its mate's
+    /// flank, where without it the search held the shifts off that wall — at
+    /// 9/37 the least loss moves from Σx 1.41 to 1.64, `ε` to 1.20.
     ///
     /// Off, the addendum stands as asked and a tip that reaches too far is
     /// said on the mesh (`mesh.flank_interference`).
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(feature = "serde", serde(default = "yes"))]
     pub no_tip_past_mate_flank: bool,
     pub dedendum: f64,
     pub root_radius: f64,
@@ -1453,7 +1448,7 @@ impl Default for MemberGear {
             addendum: 1.0,
             no_sharp_tip: true,
             min_tip_width: 0.1,
-            no_tip_past_mate_flank: false,
+            no_tip_past_mate_flank: true,
             dedendum: 1.25,
             root_radius: 0.38,
             helix_angle: Auto::automatic(0.0),
@@ -5733,7 +5728,9 @@ mod tests {
                 s
             };
             let x = stage.shifts_at(&Search::SHIPPED);
-            let g = [0, 1].map(|i| Tooth::new(stage.params_of(i, x[i])));
+            // The teeth as built, tips held where their mates ask it.
+            let built = stage.build_at(&x).expect("the pair builds");
+            let g = [0, 1].map(|i| Tooth::new(*built.members[i].params()));
             let zero = crate::mesh::Mesh::new(&g[0], &g[1], crate::mesh::MeshKind::External)
                 .expect("the pair meshes");
             let mesh = zero
@@ -5864,6 +5861,11 @@ mod tests {
         assert!(checked >= 25, "only {checked} sets solved at all");
     }
 
+    /// **What a pair's search is converged to**, in efficiency: ten parts in
+    /// a million, two orders below the last digit the tool prints
+    /// (`the_search_is_converged_not_budgeted` argues it).
+    const CONVERGED_EFFICIENCY: f64 = 1e-5;
+
     /// **Ask for the centre distance the tool chose and get the gears it chose.**
     ///
     /// A stage with the shift optimiser on and no centre distance picks both;
@@ -5910,33 +5912,48 @@ mod tests {
                 .expect("...and with it given")
             };
 
-            // At the distance it chose: the same answer, to **twice** the
-            // search's own stopping distance in the shifts it is reading.
+            // At the distance it chose: the same answer — to **twice** the
+            // search's own stopping distance in the shifts, or, where the
+            // division is flat, to what `the_search_is_converged_not_budgeted`
+            // holds a pair's efficiency to.
             //
-            // Twice rather than once because of where these answers now sit. The
-            // interference refusal puts a small pinion's optimum **on a wall**,
-            // and the two searches arrive at that wall along different
-            // coordinates — one free in both shifts, the other with their sum
-            // pinned — so each resolves it to its own last step and the two
-            // steps need not be the same one. One step apart would be a claim
-            // about the walk; two is a claim about the wall, which is what this
-            // is measuring.
+            // Twice rather than once because of where these answers sit: on a
+            // wall, which the two searches reach along different coordinates —
+            // one free in both shifts, the other with their sum pinned — each
+            // resolving it to its own last step. **And the efficiency beside
+            // it** since tips are held off their mates' flanks: at 9/37 both
+            // tips are held at the optimum, the division is flat to 6.6e-6 of
+            // efficiency across 0.027 of shift (free 0.795/0.849, given
+            // 0.822/0.822), and the claim is about the answer, not the point.
             let given = at(free.distances[0].running);
+            let flat = (free.meshes[0].efficiency.forward - given.meshes[0].efficiency.forward)
+                .abs()
+                < CONVERGED_EFFICIENCY;
             for i in 0..2 {
                 let (a, b) = (
                     free.members[i].profile_shift,
                     given.members[i].profile_shift,
                 );
                 assert!(
-                    (a - b).abs() < 2.0 * crate::auto::Search::SHIPPED.resolution,
+                    flat || (a - b).abs() < 2.0 * crate::auto::Search::SHIPPED.resolution,
                     "{teeth:?} gear {i}: free chose {a} and {:.6} mm given chose {b}",
                     free.distances[0].running
                 );
             }
 
             // ...and on the way there, every distance is answered rather than
-            // refused, with an efficiency that climbs toward the free answer
-            // rather than collapsing to the floor.
+            // refused, with an efficiency no lower than the unsearched answer
+            // at the same distance — the floor a search that dropped out
+            // collapses to.
+            //
+            // **Not climbing**, which is what this asked until tips were held
+            // off their mates' flanks. At 12/29 the answer at a given distance
+            // peaks at 21.447 mm (0.979670), falls to 0.979617 at 21.684 and
+            // rises again to 0.979847 at 21.802, where the wheel's tip starts
+            // to be held: two regions, and between them a dip. A scan of the
+            // pinion's shift at 401 points agrees with the search at each of
+            // those distances to 5e-9, so the dip is the model's, not a walk
+            // that stopped.
             let mut last = 0.0;
             let steps = 12;
             for k in 1..=steps {
@@ -5946,10 +5963,25 @@ mod tests {
                         * f64::from(steps - k)
                         / f64::from(steps);
                 let here = at(a).meshes[0].efficiency.forward;
+                let floor = solve_preset(
+                    &{
+                        let mut s = stage.clone();
+                        s.distances[0].distance = Auto::fixed(a);
+                        s.set_search(false);
+                        s
+                    },
+                    2.0,
+                    0.0,
+                    &lib,
+                )
+                .expect("...and unsearched")
+                .meshes[0]
+                    .efficiency
+                    .forward;
                 assert!(
-                    here > last - 1e-9,
-                    "{teeth:?}: {a:.4} mm gives {here}, below the {last} a tighter \
-                     distance gave — the search dropped out somewhere between"
+                    here >= floor - 1e-12,
+                    "{teeth:?}: {a:.4} mm gives {here}, below the {floor} it has \
+                     unsearched — the search dropped out"
                 );
                 last = here;
             }
@@ -5957,7 +5989,7 @@ mod tests {
             // holds a pair to, and for the same reason: both answers sit on the
             // interference wall and each resolves it to its own last step.
             assert!(
-                (last - free.meshes[0].efficiency.forward).abs() < 1e-5,
+                (last - free.meshes[0].efficiency.forward).abs() < CONVERGED_EFFICIENCY,
                 "{teeth:?}: the last step reaches {last} where the free answer is {}",
                 free.meshes[0].efficiency.forward
             );
@@ -6016,7 +6048,7 @@ mod tests {
         // wall to its own step, so the objective there inherits the *shift*
         // resolution this test already holds the shifts to. It is the same
         // standard, read on the other axis.
-        let converged = 1e-5;
+        let converged = CONVERGED_EFFICIENCY;
 
         // --- pairs. 9/37 is the fixture whose surface has a second summit
         // beyond a trough, so it is the one that punishes a short walk.
@@ -8929,18 +8961,13 @@ mod tests {
                 m.gear.teeth = z;
             }
             let x = stage.shifts();
-            let g = [0, 1].map(|i| Tooth::new(stage.params_of(i, x[i])));
-            let Ok(zero) = crate::mesh::Mesh::new(&g[0], &g[1], crate::mesh::MeshKind::External)
-            else {
+            // What the solve reports of the teeth it built at those shifts —
+            // a tip held off its mate's flank reaches past nothing.
+            let Ok(r) = solve_preset(&stage, 2.0, 0.0, &library()) else {
                 continue;
             };
-            // At the distance it runs, which is the mesh every figure is read
-            // off and the less conservative of the two.
-            let mesh = zero
-                .at(zero.a_w + stage.distances[0].clearance.manual)
-                .unwrap_or(zero);
             checked += 1;
-            let foul = mesh.flank_interference([g[0].flank_ends(), g[1].flank_ends()]);
+            let foul = r.meshes[0].flank_interference;
             assert_eq!(
                 foul,
                 [false, false],
@@ -10310,6 +10337,8 @@ mod tests {
                 for g in stage.members.iter_mut().map(|m| &mut m.gear) {
                     g.addendum = asked;
                     g.min_tip_width = want;
+                    // The tip width alone is the bound under study.
+                    g.no_tip_past_mate_flank = false;
                 }
                 let r = solve_preset(&stage, 2.0, 0.0, &library()).unwrap();
 
@@ -10758,6 +10787,11 @@ mod tests {
             let mut s = arr::pair([9, 37]);
             for m in &mut s.members {
                 m.gear.root_radius = rho;
+                // The root round's bound alone. Held, a mate's tip follows
+                // the higher form circle a larger round leaves, and the
+                // shorter path it cuts is efficiency the search then buys
+                // with shift — a different claim.
+                m.gear.no_tip_past_mate_flank = false;
             }
             s.set_search(true);
             s
