@@ -2018,10 +2018,13 @@ mod tests {
 
     /// **A ratio goes on the body asked.** A layshaft's next ratio shares
     /// the body the edit names — the layshaft, or the input shaft — and a
-    /// body on neither of the distance's axes is refused.
+    /// body on neither of the distance's axes, the output of a pair after
+    /// it, is refused.
     #[test]
     fn a_ratio_goes_on_the_body_asked() {
-        let t = Train::chained(vec![Preset::Layshaft.build()], |_| Vec::new());
+        let t = Train::chained(vec![Preset::Layshaft.build(), Preset::Spur.build()], |_| {
+            Vec::new()
+        });
         let s = &t.shape;
         let across: Vec<usize> = s
             .bodies
@@ -2046,15 +2049,14 @@ mod tests {
             let axis = s.bodies.iter().find(|x| x.body == b).unwrap().axis;
             !s.distances[0].axes.contains(&axis)
         });
-        if let Some(b) = elsewhere {
-            let mut u = t.clone();
-            assert_eq!(
-                u.edit(Edit::AddRatio {
-                    distance: 0,
-                    shared: b
-                }),
-                Err(EditRefused::NotOnTheAxis)
-            );
-        }
+        let b = elsewhere.expect("the pair's output is off the layshaft's axes");
+        let mut u = t.clone();
+        assert_eq!(
+            u.edit(Edit::AddRatio {
+                distance: 0,
+                shared: b
+            }),
+            Err(EditRefused::NotOnTheAxis)
+        );
     }
 }

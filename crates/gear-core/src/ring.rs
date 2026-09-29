@@ -1525,18 +1525,15 @@ mod tests {
             "the fillet ran past mid-space to {angle}, beyond {}",
             g.half_pitch
         );
-        if f.phi_root == 0.0 {
-            assert!(
-                (radius - g.rf).abs() < 1e-9,
-                "fillet reached {radius}, root {}",
-                g.rf
-            );
-        } else {
-            assert!(
-                (angle - g.half_pitch).abs() < 1e-9,
-                "a fully filleted root must stop exactly at mid-space, not {angle}"
-            );
-        }
+        // This ring keeps a root arc: a fully filleted root is a case no
+        // fixture here reaches (ring#5, T05.2's), so it is said rather than
+        // tested in a branch that never runs.
+        assert_eq!(f.phi_root, 0.0, "the fillet ends on the root circle");
+        assert!(
+            (radius - g.rf).abs() < 1e-9,
+            "fillet reached {radius}, root {}",
+            g.rf
+        );
     }
 
     /// A bigger cutter takes more out: its tip corner is flatter, so the fillet
@@ -1637,10 +1634,10 @@ mod tests {
             .iter()
             .map(|[x, y]| f64::hypot(*x, *y))
             .fold(0.0_f64, f64::max);
-        // The furthest point is where the fillet stops. With a fully filleted
-        // root that is where the two fillets meet at mid-space, a hair *inside*
-        // the root circle — the root circle is the cutter's reach, not the
-        // part's boundary, and the two only coincide when a root arc exists.
+        // The furthest point is where the fillet stops: on the root circle,
+        // since this ring keeps a root arc (a fully filleted root is no
+        // fixture's here; ring#5, T05.2).
+        assert_eq!(fillet_of(&g).phi_root, 0.0, "a root arc");
         let deepest = g.trochoid_at(fillet_of(&g).phi_root).0;
         assert!(
             (ring_max - deepest).abs() < 1e-9,
@@ -1650,12 +1647,6 @@ mod tests {
             deepest <= g.rf + 1e-12,
             "and that cannot be beyond the root circle"
         );
-        if fillet_of(&g).phi_root != 0.0 {
-            assert!(
-                deepest < g.rf,
-                "a fully filleted root never reaches the root circle"
-            );
-        }
         assert!(
             (ext_max - external.ra).abs() < 1e-9,
             "an external gear's furthest point is its tip"
