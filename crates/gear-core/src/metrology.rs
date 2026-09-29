@@ -505,19 +505,13 @@ fn pin_seat(
     // The contact point lies on the flank normal through the pin centre, at the
     // pin's radius from it: unwrapped length r_b·tan φ, less the pin's radius
     // rolled into the transverse plane.
-    // The contact point inside the base circle is the same failure as the
-    // centre there, and reads the same way: a pin too small for an external
-    // gear's space, which it has sunk into, and — were it reachable — too large
-    // for a ring's. It was reported as too large on both, which sent an
-    // external gear's designer the wrong way over the first few microns above
-    // the smallest pin that reaches the base circle.
+    // A contact inside the base circle: the pin has sunk into an external
+    // gear's space. A ring's contact rolls outward from its centre, so
+    // `u_contact = tan φ + d_p cos β_b / (2 r_b) > 0` and never lands here.
     let u_contact = phi.tan() - sigma * transverse_roll(pin_diameter / 2.0, beta_b) / rb;
     if u_contact <= 0.0 {
-        return Err(if sigma > 0.0 {
-            MeasurementError::PinTooSmall
-        } else {
-            MeasurementError::PinTooLarge
-        });
+        debug_assert!(sigma > 0.0, "a ring's contact is outside its base circle");
+        return Err(MeasurementError::PinTooSmall);
     }
     Ok((r_m, rb * f64::hypot(1.0, u_contact)))
 }

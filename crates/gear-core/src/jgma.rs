@@ -8,7 +8,7 @@
 //!
 //! The document contains two tables, and they are **independent grade scales**.
 //! A grade number on one is not the same tolerance as the same number on the
-//! other. At module 1.0–1.6 and a 12 mm pitch diameter, where both tables apply:
+//! other. At module (1, 1.6] and a 12 mm pitch diameter, where both tables apply:
 //!
 //! | Grade | fine | standard |
 //! |---|---|---|
@@ -24,7 +24,7 @@
 //! grade numbers simply do not denote the same thing on the two tables.
 //!
 //! They are therefore kept separate and never compared. The document's own
-//! annotation supports this: the fine table's 1.0–1.6 column is marked 選用
+//! annotation supports this: the fine table's (1, 1.6] column is marked 選用
 //! (*optional*), while its finer columns are 適用 (*applicable*).
 //!
 //! # The data lives in a file
@@ -96,42 +96,30 @@ pub struct CompositeError {
 }
 
 /// A band as the standard prints it: closed above (以下), and closed below
-/// (以上) or open below (をこえ) as the printed label says.
+/// (以上) or open below (をこえ) as the printed label says. Every printed band
+/// is closed above, so only the lower end carries a closure.
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct Band {
     lo: f64,
     lo_closed: bool,
     hi: f64,
-    hi_closed: bool,
 }
 
 impl Band {
-    /// `[lo~hi]`, `(lo~hi]`, `[lo~hi)` or `(lo~hi)`, as the data file writes
-    /// a printed band.
+    /// `[lo~hi]` or `(lo~hi]`, as the data file writes a printed band.
     fn parse(s: &str) -> Option<Self> {
         let lo_closed = match s.get(..1)? {
             "[" => true,
             "(" => false,
             _ => return None,
         };
-        let hi_closed = match s.get(s.len().checked_sub(1)?..)? {
-            "]" => true,
-            ")" => false,
-            _ => return None,
-        };
-        let (lo, hi) = s.get(1..s.len() - 1)?.split_once('~')?;
+        let (lo, hi) = s.get(1..)?.strip_suffix(']')?.split_once('~')?;
         let (lo, hi) = (lo.parse().ok()?, hi.parse().ok()?);
-        (lo < hi).then_some(Self {
-            lo,
-            lo_closed,
-            hi,
-            hi_closed,
-        })
+        (lo < hi).then_some(Self { lo, lo_closed, hi })
     }
 
     fn contains(&self, v: f64) -> bool {
-        (v > self.lo || self.lo_closed && v == self.lo)
-            && (v < self.hi || self.hi_closed && v == self.hi)
+        (v > self.lo || self.lo_closed && v == self.lo) && v <= self.hi
     }
 }
 
@@ -257,7 +245,7 @@ mod tests {
             }
         );
 
-        // fine, grade 6, module 1.0-1.6, largest diameter band: 60 / 200
+        // fine, grade 6, module (1, 1.6], largest diameter band: 60 / 200
         let e = lookup(
             Class {
                 scale: Scale::Fine,
@@ -453,7 +441,7 @@ mod tests {
             bands.dedup();
             for w in bands.windows(2) {
                 assert!(
-                    w[1].lo == w[0].hi && w[0].hi_closed != w[1].lo_closed,
+                    w[1].lo == w[0].hi && !w[1].lo_closed,
                     "{what}: {:?} then {:?}",
                     w[0],
                     w[1]
@@ -489,9 +477,11 @@ mod tests {
 
     /// **The data file's bands, against the labels as printed, typed a second
     /// time.** 以上 is closed below, をこえ open below, 以下 closed above. The
-    /// fine table's labels are the Japanese reproduction's; the standard
-    /// scale's follow ISO 1328:1975's printing of the same scheme. A band
-    /// edge or its closure mistyped in either copy fails here.
+    /// fine table's labels are the Japanese reproduction's, seen printed. The
+    /// standard scale's were **not** seen printed: they are written here as
+    /// ISO 1328:1975 prints the same scheme, an assumption recorded in
+    /// `docs/state.md`. A band edge or its closure mistyped in either copy
+    /// fails here.
     #[test]
     fn the_bands_are_the_printed_labels() {
         fn label(s: &str) -> Band {
@@ -503,12 +493,7 @@ mod tests {
                 (0.0, true, s)
             };
             let hi = rest.strip_suffix("以下").unwrap().parse().unwrap();
-            Band {
-                lo,
-                lo_closed,
-                hi,
-                hi_closed: true,
-            }
+            Band { lo, lo_closed, hi }
         }
         const FINE_D: [&str; 8] = [
             "1.5以上3以下",
@@ -600,9 +585,9 @@ mod tests {
             // An edge the row holds reads the row; one it does not reads
             // whatever holds it, and a hair inward reads the row.
             for (mm, dd, holds) in [
-                (r.module.hi, d, r.module.hi_closed),
+                (r.module.hi, d, true),
                 (r.module.lo, d, r.module.lo_closed),
-                (m, r.diameter.hi, r.diameter.hi_closed),
+                (m, r.diameter.hi, true),
                 (m, r.diameter.lo, r.diameter.lo_closed),
             ] {
                 if holds {

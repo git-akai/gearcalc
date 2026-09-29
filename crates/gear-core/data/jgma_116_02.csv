@@ -10,7 +10,8 @@
 #   tooth_to_tooth  両歯面1ピッチかみあい誤差  一齒嚙合誤差  single-pitch (tooth-to-tooth)
 #   total           両歯面全かみあい誤差      全齒嚙合誤差  total
 #
-# Bands are stored as printed, in interval notation: "[" closed, "(" open.
+# Bands are stored as printed, in interval notation: "[" closed below, "(" open
+# below, "]" closed above — every printed band is.
 # The Japanese table prints 以上 (at or above), をこえ (above) and 以下 (at or
 # below): m0.2以上0.6以下, m0.6をこえ1以下, m1をこえ1.6以下; 1.5以上3以下,
 # 3をこえ6以下, … . Every band is closed above. Only the m0.2–0.6 block's module

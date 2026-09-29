@@ -768,6 +768,15 @@ whose size is unmeasured is a debt still owed, and is marked as one.
   equivalent shift, and the model would need to say what that does to
   backlash and to the tips before it could be offered — so it is not
   offered, and relief keeps the pair on the rule.
+- **The JGMA standard scale's band edges are read `(lo, hi]` by convention,
+  not from the standard.** The fine table's labels were seen printed; the
+  standard scale's (modules 1, 3.5, 6.3, 10; diameters 125, 400, 800, 1600,
+  2500, 4000) follow ISO 1328:1975's printing of the same scheme. Only a gear
+  exactly on an edge is affected: it reads the lower band, and if the
+  standard means the upper one the tolerance shown is **tighter, by 0 to 23 %**
+  (standard 4 at m 3.5: 7/20 µm against 9/25). At the far edges — m 10,
+  d 4000 — it is an answer where the other reading would give none. A debt
+  until the standard's main body is read.
 - **A planet's net body torque is reported as zero**, which is what it is —
   a free idler's two meshes balance — and what the set's own solver never printed.
   The torque its teeth carry is on its gear card, per mesh, as every member's is.
