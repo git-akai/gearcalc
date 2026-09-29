@@ -224,6 +224,19 @@ caught, test workspace included) and the 130-constant perturbation.
     - a closed-form limit at Σ → 0;
     - tooth stiffness in series, derived from the generated tooth and gated against ISO 6336-1's c′
       and c_γ.
+- 2026-09-29 — owner accepted the recommendations after the second contact verification
+  (`review/contact-verify2.md`):
+  - Ratings are read at ISO's points by default, with the field maximum reported beside them, until a
+    lengthwise-coupled field is verified.
+  - The search keeps today's closed forms, held by a law to agree with the field model; the field
+    model serves the final solve and validation.
+  - Next round:
+    - couple the slices lengthwise through an influence function (the physical cure for the helical
+      jump);
+    - remove the two remaining special cases;
+    - correct the ISO comparisons: Z_ε at point B, and the ring's M1;
+    - record the tooth-stiffness spread (about ±15 %) with size and sign;
+    - test the matched worm set, whose meshing equation is linear in phase and may be exposable.
 - 2026-09-26 — owner's rulings:
   - Redesigns first.
   - Docs and comments rewritten concisely, overriding `CLAUDE.md`'s prose-ratio note.
