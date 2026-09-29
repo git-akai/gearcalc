@@ -8706,22 +8706,10 @@ mod tests {
         );
     }
 
-    /// **Whether note `n` names both `asked` and `reached`**: two of its
-    /// values read, at the digits each is printed to, as the two figures.
-    fn names_both(n: &Note, asked: f64, reached: f64) -> bool {
-        let reads = |v: &str, x: f64| {
-            let digits = v.split_once('.').map_or(0, |(_, d)| d.len());
-            v.parse::<f64>().is_ok() && format!("{x:.digits$}") == v
-        };
-        let values: Vec<&String> = n.values.values().collect();
-        values.iter().any(|a| reads(a, asked)) && values.iter().any(|r| reads(r, reached))
-    }
-
-    /// Where a given input the relief law nudges is neither the figure the
-    /// solve reached nor named by a note beside the figure it reached:
-    /// arrangement and freedom, each with the task that clears it. The law
-    /// fails on an entry that passes as well as on one missing, so the list
-    /// only shrinks.
+    /// Where a given input the relief law nudges is not the figure the solve
+    /// reached, or the solve refuses it: arrangement and freedom, each with
+    /// the task that clears it. The law fails on an entry that passes as
+    /// well as on one missing, so the list only shrinks.
     const UNHONOURED: &[(&str, &str, &str)] = &[
         // A second mesh's overlap ratio, given where a first sets the helix:
         // the note names the ratio asked and not the one reached.
@@ -8734,15 +8722,26 @@ mod tests {
         ("Ravigneaux", "Overlap(1)", "T10.11"),
         ("Ravigneaux", "Overlap(2)", "T10.11"),
         ("Ravigneaux", "Overlap(3)", "T10.11"),
-        // A given shift or distance relief leaves standing where the solve
-        // spends it on a closure, or refuses the shape it leaves.
-        ("Worm", "Distance(0)", "T10.9"),
+        // A given shift or clearance relief leaves standing where the solve
+        // spends it on a closure.
         ("Worm", "Member(0, Shift)", "T10.9"),
-        ("WormAndPair", "Distance(0)", "T10.9"),
         ("WormAndPair", "Member(0, Shift)", "T10.9"),
         ("Wolfrom", "Member(2, Shift)", "T10.9"),
-        ("MeshedPlanets", "Distance(1)", "T10.9"),
         ("Ravigneaux", "Clearance(2)", "T10.9"),
+        // A worm's given distance, refused `NoContact`. The name is wrong:
+        // the cause is relief leaving the worm's size and both shifts
+        // pinned beside the distance, so nothing can absorb it, and the
+        // refusal should say that (T10.9, with T02's naming).
+        ("Worm", "Distance(0)", "T10.9"),
+        ("WormAndPair", "Distance(0)", "T10.9"),
+        // Not relief's: the shipped set sits 0.06 mm from where its planets
+        // can be placed (21.02 + 18.02 against 38.98), so its planet
+        // distance moved 0.1 mm is refused `AxesCannotBePlaced` with every
+        // other input free as well. A preset with margin (T10.2's note).
+        ("MeshedPlanets", "Distance(1)", "preset margin, T10.2"),
+        // Refused `AxesCannotBePlaced` only with the rest pinned; with them
+        // free, the sun at k = 1.1 solves (T10.4, one thickness freedom per
+        // mesh group).
         ("MeshedPlanets", "Member(0, ThicknessMod)", "T10.4"),
         // A clearance the tips hold open, said by `sized_by` and no note.
         ("Planocentric", "Clearance(0)", "T10.10"),
@@ -8753,10 +8752,15 @@ mod tests {
     /// ([`every_input_relief_leaves_given_is_honoured_by_the_solve`] is the
     /// structural one). Every input pinned at what the arrangement solved
     /// to, one freedom `f` nudged, and relief asked with `just = f`, which
-    /// keeps `f` given: the solve then reaches `f`'s typed value, or a note
-    /// names both the value asked and the value reached — a note alone is
-    /// physics, not a failure, where the model cannot reach what was asked
-    /// and says so. On every arrangement of the grid, every input it has.
+    /// keeps `f` given: the solve then reaches `f`'s typed value. On every
+    /// arrangement of the grid, every input it has.
+    ///
+    /// Where the model cannot reach what was asked, a note that named both
+    /// the value asked and the value reached would honour the input as
+    /// well — it is physics, said. No note does today: the ones that fire
+    /// here name one of the two, or a figure beside `f` (a nominal distance
+    /// beside a running one). So that escape is not written; each input it
+    /// would cover is in [`UNHONOURED`] until a note names both.
     ///
     /// Reached means within [`HONOURED`], the distance a solve for a given
     /// figure lands on it (`distance_notes`' `REACHED`), relative to the
@@ -8801,12 +8805,7 @@ mod tests {
                         let Some(reached) = r.figure(f) else {
                             panic!("{name}: {f:?} has no figure");
                         };
-                        let close = (reached - asked).abs() <= HONOURED * asked.abs().max(1.0);
-                        close
-                            || r.parts
-                                .iter()
-                                .flat_map(|p| &p.notes)
-                                .any(|n| names_both(n, asked, reached))
+                        (reached - asked).abs() <= HONOURED * asked.abs().max(1.0)
                     }
                     // A refusal names no figure reached.
                     Err(_) => false,

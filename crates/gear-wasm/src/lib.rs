@@ -2156,15 +2156,40 @@ mod tests {
         assert!(classes.iter().any(|c| c["scale"] == "standard"));
     }
 
-    /// **The panics [`degenerate_input_cannot_panic`] finds, by site**: the
-    /// start of the message and the task that removes it — T01.6's
-    /// `GearParams::check` at every boundary, and a profile that never
-    /// indexes an empty flank.
-    const KNOWN_PANICS: &[(&str, &str)] = &[
-        // tooth.rs, `debug_assert!` on the junction the flank solve found.
-        ("unsolved flank junction", "T01.6"),
-        // gear.rs and ring.rs, `&r[1..]` on a flank that came out empty.
-        ("range start index 1 out of range", "T01.6"),
+    /// **The calls [`degenerate_input_cannot_panic`] finds panicking**, each
+    /// `(entry point, input, task)`, where debug assertions are on (the test
+    /// profile CI runs): the flank junction's `debug_assert!` (tooth.rs) and
+    /// `&r[1..]` on an empty flank (gear.rs, ring.rs). T01.6's
+    /// `GearParams::check` at every boundary removes both.
+    const KNOWN_PANICS_WITH_DEBUG_ASSERTIONS: &[(&str, &str, &str)] = &[
+        ("solve_gear", "teeth 0", "T01.6"),
+        ("gear_profile", "teeth 0", "T01.6"),
+        ("export_dxf", "teeth 0", "T01.6"),
+        ("solve_gear", "module 0", "T01.6"),
+        ("gear_profile", "module 0", "T01.6"),
+        ("export_dxf", "module 0", "T01.6"),
+        ("ring_profile", "module 0", "T01.6"),
+        ("solve_train", "module 0", "T01.6"),
+        ("adopt_member", "module 0", "T01.6"),
+        ("relieve_case", "module 0", "T01.6"),
+        ("preview_edit", "module 0", "T01.6"),
+        ("solve_gear", "module -1", "T01.6"),
+        ("gear_profile", "module -1", "T01.6"),
+        ("export_dxf", "module -1", "T01.6"),
+        ("solve_train", "module -1", "T01.6"),
+        ("adopt_member", "module -1", "T01.6"),
+        ("relieve_case", "module -1", "T01.6"),
+        ("preview_edit", "module -1", "T01.6"),
+        ("gear_profile", "helix 90", "T01.6"),
+    ];
+
+    /// The same where debug assertions are off (`--release`): the calls the
+    /// junction's assertion stopped run on, to an empty flank or to an answer.
+    const KNOWN_PANICS_WITHOUT_DEBUG_ASSERTIONS: &[(&str, &str, &str)] = &[
+        ("gear_profile", "teeth 0", "T01.6"),
+        ("gear_profile", "module 0", "T01.6"),
+        ("ring_profile", "module 0", "T01.6"),
+        ("gear_profile", "helix 90", "T01.6"),
     ];
 
     /// **Degenerate input cannot panic, through any entry point.** Every
@@ -2173,8 +2198,9 @@ mod tests {
     /// carry of `gear-core`'s own degenerate set (`tests/degenerate.rs`),
     /// which has the not-a-numbers — and every entry that takes a train
     /// is sent the default train with its first gear so; each returns,
-    /// refused or not. A panic is allowed only at a listed site, and every
-    /// listed site must still be reached, so the list only shrinks.
+    /// refused or not. The calls that panic must be exactly the listed
+    /// ones, in the profile's list — a new one fails, and so does a listed
+    /// one that returns — so the lists only shrink.
     #[test]
     fn degenerate_input_cannot_panic() {
         use serde_json::{json, Value};
@@ -2192,7 +2218,7 @@ mod tests {
         // An entry point, answering whether it accepted what it was sent.
         type Asks = fn(&str) -> bool;
         type Call = Box<dyn Fn() -> bool>;
-        let mut calls: Vec<(String, Call)> = Vec::new();
+        let mut calls: Vec<(&str, &str, Call)> = Vec::new();
         for (name, field, value) in degenerate {
             let mut g = gear.clone();
             g["params"][field] = value.clone();
@@ -2207,7 +2233,7 @@ mod tests {
             ];
             for (entry, f) in entries {
                 let g = g.clone();
-                calls.push((format!("{entry} at {name}"), Box::new(move || f(&g))));
+                calls.push((entry, name, Box::new(move || f(&g))));
             }
             // The train's first gear so: its teeth on the gear, the rest on
             // the member, where a train states them.
@@ -2264,17 +2290,18 @@ mod tests {
             ];
             for (entry, f, request) in requests {
                 let r = request.to_string();
-                calls.push((format!("{entry} at {name}"), Box::new(move || f(&r))));
+                calls.push((entry, name, Box::new(move || f(&r))));
             }
         }
         std::panic::set_hook(Box::new(|_| {}));
-        let mut panics: Vec<(String, String)> = Vec::new();
+        let mut panics: Vec<(&str, &str, String)> = Vec::new();
         let mut answered = 0;
-        for (name, call) in &calls {
+        for (entry, input, call) in &calls {
             match catch_unwind(AssertUnwindSafe(call)) {
                 Ok(accepted) => answered += usize::from(accepted),
                 Err(e) => panics.push((
-                    name.clone(),
+                    entry,
+                    input,
                     e.downcast_ref::<String>()
                         .cloned()
                         .or_else(|| e.downcast_ref::<&str>().map(ToString::to_string))
@@ -2283,17 +2310,26 @@ mod tests {
             }
         }
         let _ = std::panic::take_hook();
-        let site = |m: &str| KNOWN_PANICS.iter().position(|(s, _)| m.starts_with(s));
-        let new: Vec<_> = panics.iter().filter(|(_, m)| site(m).is_none()).collect();
-        let reached: Vec<usize> = panics.iter().filter_map(|(_, m)| site(m)).collect();
-        let cured: Vec<_> = (0..KNOWN_PANICS.len())
-            .filter(|k| !reached.contains(k))
-            .map(|k| KNOWN_PANICS[k])
+        let known = if cfg!(debug_assertions) {
+            KNOWN_PANICS_WITH_DEBUG_ASSERTIONS
+        } else {
+            KNOWN_PANICS_WITHOUT_DEBUG_ASSERTIONS
+        };
+        let listed = |e: &str, i: &str| known.iter().any(|(x, y, _)| (*x, *y) == (e, i));
+        let new: Vec<String> = panics
+            .iter()
+            .filter(|(e, i, _)| !listed(e, i))
+            .map(|(e, i, m)| format!("(\"{e}\", \"{i}\", \"T01.6\"), // {m}"))
+            .collect();
+        let cured: Vec<_> = known
+            .iter()
+            .filter(|(e, i, _)| !panics.iter().any(|(x, y, _)| (*x, *y) == (*e, *i)))
             .collect();
         assert!(
             new.is_empty() && cured.is_empty(),
-            "of {} calls ({answered} answered), panicking at no listed site: {new:?}; listed and never reached: {cured:?}",
-            calls.len()
+            "of {} calls ({answered} answered), panicking and not listed:\n{}\nlisted and now returning: {cured:?}",
+            calls.len(),
+            new.join("\n")
         );
         assert_eq!(calls.len(), 5 * 14);
     }

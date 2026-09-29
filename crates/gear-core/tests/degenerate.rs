@@ -5,10 +5,14 @@
 //! should return (a refusal under rule 5) is T01.6's; this law asks only that
 //! it does not panic.
 //!
-//! A panic this law finds and nothing yet cures is listed by its site in
-//! [`KNOWN`] with the task that cures it. Every panic must be at a listed
-//! site, and every listed site must still be reached, so the list only
-//! shrinks.
+//! A panic this law finds and nothing yet cures is listed, by entry point
+//! and input, with the task that cures it ([`known`]). The calls that panic
+//! must be exactly the listed ones: a new panic fails the law, and so does
+//! a listed call that stops panicking, so the list only shrinks.
+//!
+//! **The list is per profile**, because what panics is: a `debug_assert!`
+//! fires only where debug assertions are on (the test profile CI runs), and
+//! a call it stops may panic further on where they are off (`--release`).
 
 #![allow(clippy::unwrap_used)]
 
@@ -20,16 +24,232 @@ use gear_core::{GearParams, Tooth};
 use std::hint::black_box;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
-/// **The panics the law finds today, by site**: the start of the message and
-/// the task that removes it. Both are T01.6's: `GearParams::check` at every
-/// boundary refuses what reaches the first, and `Gear::profile` and
-/// `Ring::profile` never index an empty flank.
-const KNOWN: &[(&str, &str)] = &[
-    // tooth.rs, `debug_assert!` on the junction the flank solve found.
-    ("panicked: unsolved flank junction", "T01.6"),
-    // gear.rs and ring.rs, `&r[1..]` on a flank that came out empty.
-    ("panicked: range start index 1 out of range", "T01.6"),
+/// **Calls that panic today**: on `input`, each of `entries`, and the task
+/// that removes the panic.
+struct Known {
+    input: &'static str,
+    entries: &'static [&'static str],
+    task: &'static str,
+}
+
+/// T01.6: `GearParams::check` at every boundary refuses these inputs, and
+/// `Gear::profile` and `Ring::profile` never index an empty flank.
+const T01_6: &str = "T01.6";
+
+/// Where debug assertions are on, the flank junction's `debug_assert!`
+/// (tooth.rs) stops every call that builds a tooth first; the rest are
+/// `&r[1..]` on an empty flank (gear.rs, ring.rs).
+const KNOWN_WITH_DEBUG_ASSERTIONS: &[Known] = &[
+    Known {
+        input: "teeth 0",
+        entries: &[
+            "Gear::new",
+            "Gear::profile",
+            "Gear::outline",
+            "metrology::best_span_around",
+            "metrology::pin_diameter_range_around",
+        ],
+        task: T01_6,
+    },
+    Known {
+        input: "module 0",
+        entries: &[
+            "Tooth::new",
+            "Tooth::with_flank_clamped_at_base",
+            "Gear::new",
+            "Gear::profile",
+            "Gear::outline",
+            "metrology::best_span",
+            "metrology::pin_geometry",
+            "metrology::cutter_tip_width",
+            "metrology::best_span_around",
+            "metrology::pin_diameter_range_around",
+            "Ring::profile",
+        ],
+        task: T01_6,
+    },
+    Known {
+        input: "module -1",
+        entries: &[
+            "Tooth::new",
+            "Tooth::with_flank_clamped_at_base",
+            "Gear::new",
+            "Gear::profile",
+            "Gear::outline",
+            "metrology::best_span",
+            "metrology::pin_geometry",
+            "metrology::cutter_tip_width",
+            "metrology::best_span_around",
+            "metrology::pin_diameter_range_around",
+        ],
+        task: T01_6,
+    },
+    Known {
+        input: "helix 90",
+        entries: &["Gear::profile"],
+        task: T01_6,
+    },
+    Known {
+        input: "module NaN",
+        entries: &[
+            "Tooth::new",
+            "Tooth::with_flank_clamped_at_base",
+            "Gear::new",
+            "Gear::profile",
+            "Gear::outline",
+            "metrology::best_span",
+            "metrology::pin_geometry",
+            "metrology::cutter_tip_width",
+            "metrology::best_span_around",
+            "metrology::pin_diameter_range_around",
+            "Ring::profile",
+        ],
+        task: T01_6,
+    },
+    Known {
+        input: "pressure_angle NaN",
+        entries: &["Gear::profile", "Ring::profile"],
+        task: T01_6,
+    },
+    Known {
+        input: "profile_shift NaN",
+        entries: &[
+            "Tooth::new",
+            "Tooth::with_flank_clamped_at_base",
+            "Gear::new",
+            "Gear::profile",
+            "Gear::outline",
+            "metrology::best_span",
+            "metrology::pin_geometry",
+            "metrology::cutter_tip_width",
+            "metrology::best_span_around",
+            "metrology::pin_diameter_range_around",
+            "Ring::profile",
+        ],
+        task: T01_6,
+    },
+    Known {
+        input: "helix_angle NaN",
+        entries: &[
+            "Tooth::new",
+            "Tooth::with_flank_clamped_at_base",
+            "Gear::new",
+            "Gear::profile",
+            "Gear::outline",
+            "metrology::best_span",
+            "metrology::pin_geometry",
+            "metrology::cutter_tip_width",
+            "metrology::best_span_around",
+            "metrology::pin_diameter_range_around",
+            "Ring::profile",
+        ],
+        task: T01_6,
+    },
+    Known {
+        input: "dedendum NaN",
+        entries: &[
+            "Tooth::new",
+            "Tooth::with_flank_clamped_at_base",
+            "Gear::profile",
+            "metrology::best_span",
+            "metrology::pin_geometry",
+            "metrology::cutter_tip_width",
+        ],
+        task: T01_6,
+    },
+    Known {
+        input: "thickness_mod NaN",
+        entries: &[
+            "Tooth::new",
+            "Tooth::with_flank_clamped_at_base",
+            "Gear::new",
+            "Gear::profile",
+            "Gear::outline",
+            "metrology::best_span",
+            "metrology::pin_geometry",
+            "metrology::cutter_tip_width",
+            "metrology::best_span_around",
+            "metrology::pin_diameter_range_around",
+            "Ring::profile",
+        ],
+        task: T01_6,
+    },
+    Known {
+        input: "angular_shift NaN",
+        entries: &[
+            "Gear::new",
+            "Gear::profile",
+            "Gear::outline",
+            "metrology::best_span_around",
+            "metrology::pin_diameter_range_around",
+        ],
+        task: T01_6,
+    },
 ];
+
+/// Where debug assertions are off, the calls the junction's assertion
+/// stopped run on, and those that reach an empty flank index it.
+const KNOWN_WITHOUT_DEBUG_ASSERTIONS: &[Known] = &[
+    Known {
+        input: "teeth 0",
+        entries: &["Gear::profile"],
+        task: T01_6,
+    },
+    Known {
+        input: "module 0",
+        entries: &["Gear::profile", "Ring::profile"],
+        task: T01_6,
+    },
+    Known {
+        input: "helix 90",
+        entries: &["Gear::profile"],
+        task: T01_6,
+    },
+    Known {
+        input: "module NaN",
+        entries: &["Gear::profile", "Ring::profile"],
+        task: T01_6,
+    },
+    Known {
+        input: "pressure_angle NaN",
+        entries: &["Gear::profile", "Ring::profile"],
+        task: T01_6,
+    },
+    Known {
+        input: "profile_shift NaN",
+        entries: &["Gear::profile", "Ring::profile"],
+        task: T01_6,
+    },
+    Known {
+        input: "helix_angle NaN",
+        entries: &["Gear::profile", "Ring::profile"],
+        task: T01_6,
+    },
+    Known {
+        input: "dedendum NaN",
+        entries: &["Gear::profile"],
+        task: T01_6,
+    },
+    Known {
+        input: "thickness_mod NaN",
+        entries: &["Gear::profile", "Ring::profile"],
+        task: T01_6,
+    },
+    Known {
+        input: "angular_shift NaN",
+        entries: &["Gear::profile"],
+        task: T01_6,
+    },
+];
+
+/// The list for the profile this runs in.
+fn known() -> &'static [Known] {
+    if cfg!(debug_assertions) {
+        KNOWN_WITH_DEBUG_ASSERTIONS
+    } else {
+        KNOWN_WITHOUT_DEBUG_ASSERTIONS
+    }
+}
 
 /// Every input that describes no gear, named: each on the default gear.
 fn degenerate() -> Vec<(String, GearParams)> {
@@ -165,6 +385,27 @@ fn ask(entry: fn(GearParams), p: GearParams) -> Option<String> {
     })
 }
 
+/// The panics found, as the [`Known`] rows that would list them.
+fn table(failed: &[(String, String, String)]) -> String {
+    let mut inputs: Vec<&str> = failed.iter().map(|(_, i, _)| i.as_str()).collect();
+    inputs.dedup();
+    inputs
+        .iter()
+        .map(|input| {
+            let entries: Vec<String> = failed
+                .iter()
+                .filter(|(_, i, _)| i == input)
+                .map(|(e, _, _)| format!("\"{e}\""))
+                .collect();
+            format!(
+                "    Known {{ input: \"{input}\", entries: &[{}], task: T01_6 }},",
+                entries.join(", ")
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 #[test]
 fn degenerate_input_cannot_panic() {
     // The panics are collected, not printed as they happen.
@@ -180,30 +421,32 @@ fn degenerate_input_cannot_panic() {
         }
     }
     let _ = std::panic::take_hook();
-    let site = |how: &str| KNOWN.iter().position(|(start, _)| how.starts_with(start));
+    let listed: Vec<(&str, &str)> = known()
+        .iter()
+        .flat_map(|k| k.entries.iter().map(|e| (*e, k.input)))
+        .collect();
     let new: Vec<_> = failed
         .iter()
-        .filter(|(_, _, how)| site(how).is_none())
+        .filter(|(e, i, _)| !listed.contains(&(e.as_str(), i.as_str())))
+        .map(|(e, i, how)| format!("  {e} at {i}: {how}"))
         .collect();
-    let mut at = vec![0; KNOWN.len()];
-    for (_, _, how) in &failed {
-        if let Some(k) = site(how) {
-            at[k] += 1;
-        }
-    }
-    let cured: Vec<_> = KNOWN
+    let cured: Vec<_> = listed
         .iter()
-        .zip(&at)
-        .filter(|(_, n)| **n == 0)
-        .map(|(k, _)| k)
+        .filter(|(e, i)| {
+            !failed
+                .iter()
+                .any(|(x, y, _)| (x.as_str(), y.as_str()) == (*e, *i))
+        })
         .collect();
     assert!(
         new.is_empty() && cured.is_empty(),
-        "of {asked} calls, failing at no listed site:\n{}\nlisted sites now never reached: {cured:?}",
-        new.iter()
-            .map(|(e, i, h)| format!("  {e} at {i}: {h}"))
-            .collect::<Vec<_>>()
-            .join("\n")
+        "of {asked} calls ({} listed in this profile), panicking and not listed:\n{}\nlisted and now returning: {cured:?}\n\nthe panics as found, by input:\n{}",
+        listed.len(),
+        new.join("\n"),
+        table(&failed)
     );
+    for k in known() {
+        assert!(!k.task.is_empty(), "{}: no task removes these", k.input);
+    }
     assert_eq!(asked, degenerate().len() * entries().len());
 }
