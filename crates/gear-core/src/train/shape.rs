@@ -7037,7 +7037,6 @@ mod rings_as_members {
 #[allow(clippy::unwrap_used)]
 mod tip_sizing {
     use super::super::arrangements::{hula, planocentric};
-    use super::*;
 
     /// The sized distance has room ≥ 0 exactly — the tips may touch — and a
     /// bracket's width below it (the solver's `2(2ε|e| + x_tol/2)` bounds
