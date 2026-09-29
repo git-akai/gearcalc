@@ -2286,6 +2286,8 @@ impl Shape {
         cache: Option<&TeethCache>,
         only: Option<&[usize]>,
     ) -> Option<f64> {
+        #[cfg(test)]
+        crate::testing::work::trial();
         let built = self.build_cached(x, helix, &plan.held, cache).ok()?;
         let cut = |i: usize| -> crate::auto::Cut<'_> {
             match &*built.members[i] {

@@ -65,6 +65,44 @@ pub mod work {
         static TEETH: Cell<u64> = const { Cell::new(0) };
         static RINGS: Cell<u64> = const { Cell::new(0) };
         static EVALUATIONS: Cell<u64> = const { Cell::new(0) };
+        static TRIALS: Cell<u64> = const { Cell::new(0) };
+        static SEARCHES: std::cell::RefCell<Vec<Walked>> = const { std::cell::RefCell::new(Vec::new()) };
+    }
+
+    /// One `auto::Search::maximise` call's control flow: what its structure
+    /// says it evaluates, recorded where it runs so a test can hold the
+    /// evaluation count to it.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub struct Walked {
+        /// Steps across each axis of the sweep (`Search::scan`).
+        pub scan: u64,
+        /// Free coordinates.
+        pub dof: u32,
+        /// Walks started (each evaluates its start once).
+        pub walks: u64,
+        /// Rounds of the walks together (each tries every direction once).
+        pub rounds: u64,
+    }
+
+    impl Walked {
+        /// What the search's definition evaluates: every point of the sweep's
+        /// grid, `(scan + 1)^dof`; each walk's start; and in each round every
+        /// direction of the `3^dof − 1` about the point.
+        #[must_use]
+        pub fn evaluations(self) -> u64 {
+            (self.scan + 1).pow(self.dof) + self.walks + self.rounds * (3u64.pow(self.dof) - 1)
+        }
+    }
+
+    pub fn walked(w: Walked) {
+        SEARCHES.with(|s| s.borrow_mut().push(w));
+    }
+
+    /// The searches `f` ran on this thread, and what it returns.
+    pub fn searches<T>(f: impl FnOnce() -> T) -> (Vec<Walked>, T) {
+        let from = SEARCHES.with(|s| s.borrow().len());
+        let out = f();
+        (SEARCHES.with(|s| s.borrow()[from..].to_vec()), out)
     }
 
     /// What was counted on this thread.
@@ -76,6 +114,8 @@ pub mod work {
         pub rings: u64,
         /// Objective evaluations by `auto::Search::maximise`.
         pub evaluations: u64,
+        /// Candidate trains a shape's search scored (`trial_efficiency`).
+        pub trials: u64,
     }
 
     fn bump(c: &'static std::thread::LocalKey<Cell<u64>>) {
@@ -94,12 +134,17 @@ pub mod work {
         bump(&EVALUATIONS);
     }
 
+    pub fn trial() {
+        bump(&TRIALS);
+    }
+
     /// The work `f` does on this thread, and what it returns.
     pub fn of<T>(f: impl FnOnce() -> T) -> (Work, T) {
         let read = || Work {
             teeth: TEETH.with(Cell::get),
             rings: RINGS.with(Cell::get),
             evaluations: EVALUATIONS.with(Cell::get),
+            trials: TRIALS.with(Cell::get),
         };
         let before = read();
         let out = f();
@@ -109,6 +154,7 @@ pub mod work {
                 teeth: after.teeth - before.teeth,
                 rings: after.rings - before.rings,
                 evaluations: after.evaluations - before.evaluations,
+                trials: after.trials - before.trials,
             },
             out,
         )

@@ -10436,46 +10436,65 @@ mod tests {
 
     /// **Every search costs like an input**, counted rather than timed.
     ///
-    /// Two claims per search, both in work no machine changes:
+    /// Two claims per search, in work no machine changes:
     ///
-    /// - **A candidate costs at most a whole solve.** The teeth and rings a
-    ///   searched solve cuts are at most `evaluations + 1` times what the
-    ///   unsearched solve of the same shape cuts. Every regression recorded
-    ///   against this gate (800 ms, 100 ms, 68 ms) was a candidate building
-    ///   something nothing then read.
-    /// - **The search evaluates no more candidates than it did.** A ceiling 5 %
-    ///   over the measured count — pair 1 967, epicyclic set 3 846, hula stage
-    ///   524 — so a search asked to work harder fails here and says by how
-    ///   much: doubling `Search::SHIPPED.starts` takes them to 2 249, 4 120 and
-    ///   712. The count is deterministic; the margin is for a change to the
-    ///   efficiency model moving a walk's path, which moves the count a little
-    ///   and on purpose.
+    /// - **It evaluates exactly what its structure says.** Each call of
+    ///   `auto::Search::maximise` evaluates every point of its sweep,
+    ///   `(scan + 1)^dof`, each walk's start, and every one of the
+    ///   `3^dof − 1` directions in each round of its walks
+    ///   ([`crate::testing::work::Walked::evaluations`]). The walks and
+    ///   rounds are the search's own control flow, recorded where it runs;
+    ///   the count of evaluations must equal the sum, so a candidate evaluated
+    ///   twice, or a point evaluated that the structure does not name, fails.
+    /// - **A candidate is scored at most once per evaluation**: the trains the
+    ///   searched solve scores, less those the same shape scores unsearched,
+    ///   are no more than the evaluations and the answer's own checks (a
+    ///   one-part search scores its answer at most twice after it: at the
+    ///   latest plan, then at the round's), so an objective that solves a
+    ///   candidate twice fails.
+    /// - **The totals are the recorded ones, exactly.** How many rounds a walk
+    ///   takes, and how many teeth and rings a candidate cuts (the shape keeps
+    ///   the teeth it has cut; the hula sizes its crank by a root over built
+    ///   teeth, a data-dependent number of trials), follow from the loss
+    ///   surface, not from any bound the search's definition gives; they are
+    ///   deterministic, so they are held exactly, as the corpus holds a figure.
+    ///   A change to them is a question, the answer to which is this list.
+    ///   Doubling `Search::SHIPPED.starts` takes the evaluations to 2 249,
+    ///   4 120 and 712.
     ///
     /// A Layshaft is not here, and is the case this count exists to see: with
     /// its search on it evaluates about 46 000 candidates and cuts about
     /// 99 000 teeth per solve, about 1.4 s native (the audit's lens-performance#3).
     #[test]
     fn every_search_costs_like_an_input() {
-        use crate::testing::work::{self, Work};
+        use crate::testing::work;
         let lib = library();
-        let cuts = |w: Work| w.teeth + w.rings;
-        let each = |name: &str, ceiling: u64, searched: &dyn Fn(), plain: &dyn Fn()| {
-            let (one, ()) = work::of(plain);
-            let (w, ()) = work::of(searched);
-            assert!(
-                w.evaluations <= ceiling,
-                "the {name} search evaluated {} candidates, over its {ceiling}",
+        // name, (evaluations, trials, teeth, rings) recorded, the solve.
+        let each =
+            |name: &str, recorded: (u64, u64, u64, u64), searched: &dyn Fn(), plain: &dyn Fn()| {
+                let (unsearched, ()) = work::of(plain);
+                let (w, (calls, ())) = work::of(|| work::searches(searched));
+                let structural: u64 = calls.iter().map(|c| c.evaluations()).sum();
+                assert_eq!(
+                w.evaluations, structural,
+                "the {name} search evaluated {} candidates where its structure names {structural} \
+                 ({calls:?})",
                 w.evaluations
             );
-            assert!(
-                cuts(w) <= (w.evaluations + 1) * cuts(one),
-                "the {name} search cut {} teeth and rings over {} candidates, more than \
-                 the {} a whole solve cuts, per candidate",
-                cuts(w),
-                w.evaluations,
-                cuts(one)
-            );
-        };
+                // The answer's checks after a one-part search: at most two.
+                const ANSWER_CHECKS: u64 = 2;
+                assert!(
+                    w.trials - unsearched.trials <= w.evaluations + ANSWER_CHECKS,
+                    "the {name} search scored {} candidates in {} evaluations",
+                    w.trials - unsearched.trials,
+                    w.evaluations
+                );
+                assert_eq!(
+                    (w.evaluations, w.trials, w.teeth, w.rings),
+                    recorded,
+                    "the {name} search's (evaluations, trials, teeth, rings) moved"
+                );
+            };
 
         let pair = |search: bool| {
             let mut s = arr::pair([17, 43]);
@@ -10485,13 +10504,9 @@ mod tests {
         let (on, off) = (pair(true), pair(false));
         each(
             "pair's",
-            2_065,
-            &|| {
-                solve_preset(&on, 2.0, 0.0, &lib).unwrap();
-            },
-            &|| {
-                solve_preset(&off, 2.0, 0.0, &lib).unwrap();
-            },
+            (1_967, 1_968, 1_822, 0),
+            &|| drop(solve_preset(&on, 2.0, 0.0, &lib).unwrap()),
+            &|| drop(solve_preset(&off, 2.0, 0.0, &lib).unwrap()),
         );
 
         let set = |search: bool| {
@@ -10504,13 +10519,9 @@ mod tests {
         let (on, off) = (set(true), set(false));
         each(
             "epicyclic set's",
-            4_038,
-            &|| {
-                solve_preset(&on, 2.0, 0.0, &lib).unwrap();
-            },
-            &|| {
-                solve_preset(&off, 2.0, 0.0, &lib).unwrap();
-            },
+            (3_846, 3_847, 4_930, 961),
+            &|| drop(solve_preset(&on, 2.0, 0.0, &lib).unwrap()),
+            &|| drop(solve_preset(&off, 2.0, 0.0, &lib).unwrap()),
         );
 
         let drive = |search: bool| {
@@ -10521,58 +10532,22 @@ mod tests {
         let (on, off) = (drive(true), drive(false));
         each(
             "hula stage's",
-            550,
-            &|| {
-                solve_hula(&on, 2.0, 0.0, &lib).unwrap();
-            },
-            &|| {
-                solve_hula(&off, 2.0, 0.0, &lib).unwrap();
-            },
+            (524, 525, 1_361, 8_388),
+            &|| drop(solve_hula(&on, 2.0, 0.0, &lib).unwrap()),
+            &|| drop(solve_hula(&off, 2.0, 0.0, &lib).unwrap()),
         );
     }
 
-    /// **Every search runs on every keystroke**, so each has to cost like an
-    /// input and not like a build.
+    /// **Every search runs on every keystroke**: the order of magnitude, by
+    /// the clock.
     ///
-    /// All three, because the point is the slowest one: the pair's search was
-    /// what this was written for, and by the time the epicyclic set had its own
-    /// it was twice as dear and ungated. Each stage names its own bound, since
-    /// what they do differs — an epicyclic candidate solves a planet and cuts a
-    /// ring where a pair's builds two teeth.
-    ///
-    /// The bounds are loose, but only by about a decade. Wall-clock in a suite
-    /// that runs its tests in parallel measures the machine as much as the
-    /// code, so a bound near the measurement would fail on a loaded one and
-    /// teach a reader to ignore it — while a bound far above it stops catching
-    /// anything. They sit at roughly five times what each search costs (8 ms,
-    /// 39 ms and 2.6 ms), which is loose enough for a busy machine and tight
-    /// enough to catch the kind of regression that has actually happened here:
-    /// 800 ms, 100 ms and 68 ms at various points, every time because something
-    /// was built per candidate that nothing then read.
-    ///
-    /// # These went up, and why
-    ///
-    /// They were 10 / 60 / 20 ms against 0.7 / 10 / 1.8, and the first of those
-    /// measurements was of a search doing **a sixth of its own work**:
-    /// `auto::Search::budget` was a pool shared across the starts, so the first
-    /// walk spent it and the other five never ran. Per walk they all run, which
-    /// costs a pair eight times what it was paying and buys it nothing — its
-    /// answer is the same at a fifth of the guard — while it is the whole of an
-    /// epicyclic set's missing 3.2e-4.
-    ///
-    /// **A ceiling raised to fit a change needs its reason written down**, so:
-    /// the number went up because the work went up, the work went up because it
-    /// was being silently skipped, and the multiplier came *down* from ten to
-    /// five so the gate did not go slack while the measurement grew. The
-    /// optimiser is off by default, so nothing pays this unless it was asked
-    /// for.
-    ///
-    /// # Ignored in the suite
-    ///
-    /// A timing canary: wall-clock measures the machine as much as the code,
-    /// and this failed 21 of 40 runs under load alone.
-    /// `every_search_costs_like_an_input` is the gate; CI runs this one on its
-    /// own, serially.
+    /// A timing canary, ignored in the suite and run alone and serially in CI:
+    /// wall-clock measures the machine as much as the code (it failed 21 of 40
+    /// runs under load when it was the gate). `every_search_costs_like_an_input`
+    /// is the gate, in counts. Each ceiling is a decade over what its search
+    /// costs alone (about 8, 39 and 25 ms), which is what an order of
+    /// magnitude means; the regressions recorded against this were 800, 100
+    /// and 68 ms, each something built per candidate that nothing then read.
     #[test]
     #[ignore = "timing canary: run serially (cargo nextest run --run-ignored only)"]
     fn every_search_is_quick_enough_to_type_over() {
@@ -10594,7 +10569,7 @@ mod tests {
             s.set_search(true);
             s
         };
-        each("pair's", 40, &|| {
+        each("pair's", 80, &|| {
             solve_preset(&pair, 2.0, 0.0, &lib).unwrap();
         });
 
@@ -10602,15 +10577,10 @@ mod tests {
         set.set_search(true);
         set.members[0].gear.profile_shift = Auto::automatic(0.0);
         set.members[2].gear.profile_shift = Auto::automatic(0.0);
-        each("epicyclic set's", 200, &|| {
+        each("epicyclic set's", 400, &|| {
             solve_preset(&set, 2.0, 0.0, &lib).unwrap();
         });
 
-        // **250 ms, a decade over the measurement** (some 25 ms; the shape
-        // sizes the crank by a bracketed root over built teeth, then searches
-        // each mesh apart). This is an order-of-magnitude canary, not the gate
-        // (`every_search_costs_like_an_input` is): at 60 ms it failed alone
-        // and serially, at 64.6 ms, on a machine another build was loading.
         let mut drive = hula_shape([65, 61, 57, 61]);
         drive.set_search(true);
         each("hula stage's", 250, &|| {

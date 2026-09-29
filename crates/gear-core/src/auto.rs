@@ -1915,6 +1915,13 @@ impl Search {
         });
         starts.dedup();
 
+        #[cfg(test)]
+        let mut walked = crate::testing::work::Walked {
+            scan: u64::try_from(scan).unwrap_or(0),
+            dof: u32::try_from(dof).unwrap_or(0),
+            walks: starts.len() as u64,
+            rounds: 0,
+        };
         let mut best: Option<(Vec<f64>, f64)> = None;
         for from in starts {
             let Some(value) = objective(&from) else {
@@ -1941,6 +1948,10 @@ impl Search {
             // see it (`docs/corrections.md`).
             let mut step = (spacing * first_step).max(resolution);
             while step >= resolution && spent < budget {
+                #[cfg(test)]
+                {
+                    walked.rounds += 1;
+                }
                 // Every direction is tried from the *same* point and the best taken,
                 // rather than the first that happens to improve: otherwise the step
                 // a direction is judged by depends on which came before it, and the
@@ -1968,6 +1979,8 @@ impl Search {
                 best = Some((at, here));
             }
         }
+        #[cfg(test)]
+        crate::testing::work::walked(walked);
         best.map(|(at, _)| at)
     }
 }
