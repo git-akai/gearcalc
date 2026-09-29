@@ -487,7 +487,7 @@ pub fn first_yield_factor(kappa: f64, nu: f64) -> Option<f64> {
     // A pure function of two numbers, asked for the same patch in every case
     // a rating reads: kept, bit for bit, per thread.
     thread_local! {
-        static SEEN: std::cell::RefCell<Vec<((u64, u64), Option<f64>)>> =
+        static SEEN: std::cell::RefCell<Vec<Remembered>> =
             const { std::cell::RefCell::new(Vec::new()) };
     }
     let key = (kappa.to_bits(), nu.to_bits());
@@ -505,6 +505,9 @@ pub fn first_yield_factor(kappa: f64, nu: f64) -> Option<f64> {
     });
     c
 }
+
+/// One remembered answer: `(κ, ν)` as bits, and `C`.
+type Remembered = ((u64, u64), Option<f64>);
 
 fn first_yield_uncached(kappa: f64, nu: f64) -> Option<f64> {
     // Depths in the minor semi-axis: the peak sits at 0.48 (circle) to 0.79
