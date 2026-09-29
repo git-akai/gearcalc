@@ -1743,15 +1743,11 @@ impl Shape {
                     continue;
                 }
             }
-            let e = crate::solve::brent(room_at, lo, hi, crate::solve::Tol::default())
+            // The end of the solver's last bracket with room: the tips may
+            // touch (room 0), and the verdict is on room below it.
+            let [b, c] = crate::solve::brent_bracket(room_at, lo, hi, crate::solve::Tol::default())
                 .ok_or(TrainError::TipsUnclearable { mesh })?;
-            // Lean to the clear side of the root, so the parts built at it
-            // have the room asked for: by a part in 10⁹ of the distance, far
-            // past the solver's tolerance, and scaled with it so the module
-            // scales the answer and nothing else. Always, rather than where
-            // the root landed a hair short: which side it lands on is the
-            // solver's last step, and it differs from one module to another.
-            let e = hi.min(e * (1.0 + 1e-9));
+            let e = if room_at(b) >= 0.0 { b } else { c };
             held[d] = Some(e);
             bound_by[d] = self
                 .closed(&self.plan_held(helix, held.clone()), free, helix)
@@ -7032,5 +7028,66 @@ mod rings_as_members {
             }
         }
         assert!(rings > 0, "no ring's interval was asked");
+    }
+}
+
+/// **A distance the tips size is the least that clears them**, to the
+/// solver's own resolution and with no margin of its own.
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tip_sizing {
+    use super::super::arrangements::{hula, planocentric};
+    use super::*;
+
+    /// The sized distance has room ≥ 0 exactly — the tips may touch — and a
+    /// bracket's width below it (the solver's `2(2ε|e| + x_tol/2)` bounds
+    /// the bracket it closed) they cross.
+    #[test]
+    fn a_sized_distance_is_the_clear_end_of_its_bracket() {
+        let mut sized = 0;
+        for shape in [
+            planocentric(28, 30),
+            planocentric(29, 30),
+            hula([65, 61, 57, 61], [1.0, 1.0]),
+            {
+                // The harness's hula, a gap asked for.
+                let mut s = hula([19, 18, 17, 18], [1.0, 1.0]);
+                s.distances[0].tip_clearance = 0.2;
+                for (m, teeth) in [14, 13].into_iter().enumerate() {
+                    s.members[2 + m].ring.as_mut().unwrap().teeth = teeth;
+                }
+                s
+            },
+        ] {
+            let helix = shape.helix_angles();
+            let plan = shape.plan(&helix);
+            let (held, bound_by) = shape.sized(&helix, &plan, &[]).unwrap();
+            for d in 0..shape.distances.len() {
+                if bound_by[d].is_none() {
+                    continue;
+                }
+                let e = held[d].unwrap();
+                let room = |at: f64| {
+                    let mut h = held.clone();
+                    h[d] = Some(at);
+                    let plan = shape.plan_held(&helix, h.clone());
+                    shape
+                        .closed(&plan, &[], &helix)
+                        .and_then(|x| shape.tip_room(d, &x, &helix, &h))
+                        .unwrap()
+                        .0
+                };
+                let width =
+                    2.0 * (2.0 * f64::EPSILON * e.abs() + 0.5 * crate::solve::Tol::default().x_tol);
+                assert!(room(e) >= 0.0, "distance {d} at {e}: room {}", room(e));
+                assert!(
+                    room(e - width) < 0.0,
+                    "distance {d}: {e} less {width} still has room {}",
+                    room(e - width)
+                );
+                sized += 1;
+            }
+        }
+        assert!(sized >= 3, "{sized} sized distances");
     }
 }

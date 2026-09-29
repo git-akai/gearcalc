@@ -49,16 +49,28 @@ pub fn brent<F>(f: F, lo: f64, hi: f64, tol: Tol) -> Option<f64>
 where
     F: Fn(f64) -> f64,
 {
+    brent_bracket(f, lo, hi, tol).map(|[b, _]| b)
+}
+
+/// [`brent`]'s final bracket: `[b, c]`, the root estimate and the far end of
+/// the bracket it closed, with `f(b)` and `f(c)` of opposite signs or `f(b)`
+/// zero (then `c = b`). For a caller that needs the root **on one side** — a
+/// clearance that must not be negative — rather than wherever the last step
+/// landed.
+pub fn brent_bracket<F>(f: F, lo: f64, hi: f64, tol: Tol) -> Option<[f64; 2]>
+where
+    F: Fn(f64) -> f64,
+{
     let (mut a, mut b) = (lo, hi);
     let (mut fa, mut fb) = (f(a), f(b));
     if !fa.is_finite() || !fb.is_finite() {
         return None;
     }
     if fa == 0.0 {
-        return Some(a);
+        return Some([a, a]);
     }
     if fb == 0.0 {
-        return Some(b);
+        return Some([b, b]);
     }
     if (fa < 0.0) == (fb < 0.0) {
         return None; // not bracketed
@@ -86,8 +98,11 @@ where
 
         let tol1 = 2.0 * f64::EPSILON * b.abs() + 0.5 * tol.x_tol;
         let xm = 0.5 * (c - b);
-        if xm.abs() <= tol1 || fb == 0.0 {
-            return Some(b);
+        if fb == 0.0 {
+            return Some([b, b]);
+        }
+        if xm.abs() <= tol1 {
+            return Some([b, c]);
         }
 
         if e.abs() >= tol1 && fa.abs() > fb.abs() {
