@@ -235,13 +235,6 @@ fn a_pointed_tooth_under_load_sharing_is_a_number() {
     };
     let (alone, shared) = (build(LoadSharing::None), build(LoadSharing::LinearRamp));
     assert!(bending_is_absent_or_positive(&shared, "12/40 shared") > 0);
-    assert!(
-        shared.members[1]
-            .notes
-            .iter()
-            .any(|n| n.is(crate::note::key::GEAR_BENDING_ON_FILLET_POINTED)),
-        "the pointed wheel does not say where it is rated"
-    );
     bending_is_absent_or_positive(&alone, "12/40 alone");
     for (a, b) in alone.members.iter().zip(&shared.members) {
         for (ca, cb) in a.cases.iter().zip(&b.cases) {

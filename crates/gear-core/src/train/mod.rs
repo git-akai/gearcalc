@@ -721,8 +721,7 @@ pub struct Widths {
 pub(crate) const PROBE: f64 = 10.0;
 
 /// **What one member bends at in one mesh**: the critical section the model
-/// rates, the share of the mesh load acting on it, the rim under it, and
-/// whether the section was sought on the fillet alone.
+/// rates, the share of the mesh load acting on it, and the rim under it.
 ///
 /// All are per *(member, mesh)*, which is why they travel together and why
 /// this is one place rather than one per stage type. Absent where no load
@@ -736,10 +735,6 @@ pub(crate) struct Bending {
     /// rather than its root section's. `None` where nobody described a rim,
     /// which is every gear this crate rated before it existed.
     pub rim: Option<crate::strength::RimSupport>,
-    /// **Whether the section was sought on the fillet alone**, because the
-    /// virtual tooth comes to a point
-    /// ([`crate::strength::ToothOutline::tip_is_pointed`]).
-    pub fillet_alone: bool,
 }
 
 impl Bending {
@@ -762,7 +757,6 @@ impl Bending {
             section,
             share,
             rim: rim.map(|s| member.rim_support(s)),
-            fillet_alone: member.virtual_spur().tip_is_pointed(),
         })
     }
 }
@@ -776,7 +770,8 @@ impl Bending {
 /// the whole load, low on the flank where Dolan–Broghamer's factor shrinks
 /// toward zero and then has no reading. Shared, the ramp never reaches a full
 /// share; measured across high-contact-ratio spur designs it runs from a
-/// 24 % relief to a 15 % increase (T06.7 re-measures it). ISO corrects the
+/// 6–26 % relief on high-contact-ratio spur pairs, a direction the model does
+/// not fix (T06.7 re-measures it). ISO corrects the
 /// band with `Y_DT`, which this crate declines. **A mesh's finding**, raised
 /// once per mesh whatever the sharing model.
 pub(crate) fn single_pair_band(contact_ratio: f64, base_helix: f64) -> Option<Note> {

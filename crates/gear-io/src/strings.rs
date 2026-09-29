@@ -1220,8 +1220,8 @@ mod tests {
                     record(&r.every_note());
                 }
             }
-            // **A pointed tooth**, rated on its fillet alone: the 12/40 pair
-            // at 25° with sharp tips allowed and a long addendum.
+            // **A pointed tooth**: the 12/40 pair at 25° with sharp tips
+            // allowed and a long addendum.
             {
                 let mut s = arr::pair([12, 40]);
                 for m in &mut s.members {

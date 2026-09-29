@@ -3,8 +3,10 @@
 //! A message that states a number is a documented figure like any other, and
 //! documented figures drift. `stage.load_sharing_out_of_band` said the ramp
 //! "relieves the tooth by about a third" for two model revisions after that
-//! stopped being true — it now runs from a 24 % relief to a 15 % **increase**,
-//! and the sign was the part nobody was watching.
+//! stopped being true — it ran from a 24 % relief to a 15 % **increase** while
+//! the sweep searched a new section at every load point, and the sign was the
+//! part nobody was watching. With the section found once it is a 6–26 %
+//! relief on the same designs.
 //!
 //! This lives in `gear-io` because that is where the catalogue is: the crate
 //! that owns the sentence owns the check on it.
@@ -55,18 +57,13 @@ fn the_sharing_note_quotes_a_number_the_sweep_still_produces() {
 
     let lo = seen.iter().copied().fold(f64::INFINITY, f64::min);
     let hi = seen.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    // The message quotes a 6–26 % relief; the sign exactly, the size to the
+    // percent it prints.
     assert!(
-        lo < 0.0,
-        "sharing must still be seen *raising* a figure — the message says so, \
-         and it is the half that was wrong for two revisions: {seen:?}"
-    );
-    assert!(hi > 0.0, "...and relieving one: {seen:?}");
-    // The message quotes 24 % and 15 %; hold the size loosely, the sign exactly.
-    assert!(
-        (0.15..0.35).contains(&hi) && (-0.30..-0.05).contains(&lo),
-        "the quoted magnitudes have moved: relief {:.1}%, increase {:.1}%",
-        100.0 * hi,
-        -100.0 * lo
+        (0.055..0.065).contains(&lo) && (0.255..0.265).contains(&hi),
+        "the quoted relief has moved: {:.1}% to {:.1}% ({seen:?})",
+        100.0 * lo,
+        100.0 * hi
     );
 
     // ...and below the band the model changes nothing at all, which is the

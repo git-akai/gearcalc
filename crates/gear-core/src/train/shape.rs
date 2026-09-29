@@ -3875,12 +3875,6 @@ pub fn rate(
         if on_a_line(i) && bendings[i].iter().all(|(_, b)| b.is_none()) {
             out.push(Note::new(key::GEAR_BENDING_UNRATED));
         }
-        if bendings[i]
-            .iter()
-            .any(|(_, b)| b.as_ref().is_some_and(|b| b.fillet_alone))
-        {
-            out.push(Note::new(key::GEAR_BENDING_ON_FILLET_POINTED));
-        }
         if bendings[i].iter().any(|(_, b)| b.is_some()) {
             for (k, b) in &bendings[i] {
                 if b.is_none() {

@@ -667,9 +667,13 @@ whose size is unmeasured is a debt still owed, and is marked as one.
   stiffness model it is unmeasured. Where Dolan–Broghamer's factor
   there is not positive the member is **unrated** (`gear.bending_unrated`), and
   every such mesh says it is in the band (`mesh.load_sharing_out_of_band`).
-- **A pointed tooth is rated on its fillet alone** (`gear.bending_on_fillet_pointed`),
-  a step at the pointed limit: one hair short of pointed, the flank is still
-  searched and the thin tip's own section can govern. Size unmeasured.
+- **Under load sharing the section is the one at the highest point of
+  single-pair contact**, with the load moved across the cycle on it rather
+  than a section searched at every load point. Where the worst shared load
+  point would, searched afresh, find a weaker section of its own, the figure
+  is **low** by the difference; unmeasured in general, and the reason is the
+  alternative's: searched afresh near a pointed apex the section shrinks onto
+  the point and the figure has no bound.
 
 <!-- figures: tools/iso_6336_3_stack.py -->
 - **Against ISO, measured by the stack script the marker names**, which computes ISO
@@ -783,9 +787,11 @@ whose size is unmeasured is a debt still owed, and is marked as one.
   more reason the comparison set is a comparison rather than the default, since
   `K_f`'s constants are functions of `α_n`.
 - **Load sharing above a virtual contact ratio of 2** is the ramp extrapolating:
-  no single-pair zone exists, and what it does to the figure has **no fixed
-  direction** — measured from a 24 % relief to a 15 % increase across
-  high-contact-ratio spur designs. Each
+  no single-pair zone exists, and what it does to the figure has **no
+  direction the model fixes** — measured as a 6–26 % relief across
+  high-contact-ratio spur designs, with the section found once and the load
+  moved on it (it read a 24 % relief to a 15 % increase while every load
+  point searched a section of its own). Each
   mesh says so where its figure is shown, so a set with one mesh in the band and
   one out names which. **Below the band it changes nothing** — the single-pair
   boundary is in the sweep at a share of exactly 1, so the maximum is the point

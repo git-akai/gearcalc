@@ -491,15 +491,6 @@ pub trait ToothOutline {
     /// down in roll for a tooth, up for a ring — and, since the bracket is the
     /// generated flank either way, where it stops being on the part.
     fn tip_at_high_roll(&self) -> bool;
-    /// **Whether the tooth comes to a point** (`clamp.tip_capped_pointed`).
-    ///
-    /// Near a pointed apex the Lewis parabola tangent to the flank shrinks
-    /// onto the point, and its form factor grows like `1/d` as the load
-    /// approaches it — `0/0` at the apex. That is the stress in the point, not
-    /// at the root, so on such a tooth the root section is sought on the
-    /// fillet alone ([`root_section_with`]). A ring's tooth widens toward its
-    /// tip and never comes to one.
-    fn tip_is_pointed(&self) -> bool;
     /// The **virtual spur** member: the one whose own transverse plane is the
     /// normal plane this member bends in. A spur member is itself.
     fn virtual_spur(&self) -> Self
@@ -570,10 +561,6 @@ impl ToothOutline for Tooth {
         // tip, so the tip is the far end and the load travels back down.
         true
     }
-    fn tip_is_pointed(&self) -> bool {
-        self.clamps
-            .fired(crate::note::key::CLAMP_TIP_CAPPED_POINTED)
-    }
     fn virtual_spur(&self) -> Self {
         Tooth::virtual_spur(self)
     }
@@ -643,9 +630,6 @@ impl ToothOutline for crate::ring::Ring {
     fn tip_at_high_roll(&self) -> bool {
         // A ring's tip is at its *smallest* radius and so its smallest roll,
         // and the load travels up from it.
-        false
-    }
-    fn tip_is_pointed(&self) -> bool {
         false
     }
     fn virtual_spur(&self) -> Self {
@@ -738,12 +722,6 @@ pub fn root_section_with<T: ToothOutline + ?Sized>(
             // tangency, which is every ring; they can differ on an external
             // tooth, where the fillet usually has one and the flank was never
             // consulted.
-            //
-            // **On a pointed tooth the flank is not searched**: its tangency
-            // near the apex is the point's own section, whose form factor
-            // grows without bound as the load nears it
-            // ([`ToothOutline::tip_is_pointed`]). The rating says so
-            // (`gear.bending_on_fillet_pointed`).
             let candidates = [
                 brent(
                     |s| {
@@ -755,20 +733,16 @@ pub fn root_section_with<T: ToothOutline + ?Sized>(
                     Tol::default(),
                 )
                 .and_then(|s| finish(g, method, s, false, load_point, dir, crossing, vertex)),
-                (!g.tip_is_pointed())
-                    .then(|| {
-                        brent(
-                            |u| {
-                                let (q, t) = g.flank_at(u);
-                                condition(q, t)
-                            },
-                            flank_lo,
-                            flank_hi,
-                            Tol::default(),
-                        )
-                    })
-                    .flatten()
-                    .and_then(|u| finish(g, method, u, true, load_point, dir, crossing, vertex)),
+                brent(
+                    |u| {
+                        let (q, t) = g.flank_at(u);
+                        condition(q, t)
+                    },
+                    flank_lo,
+                    flank_hi,
+                    Tol::default(),
+                )
+                .and_then(|u| finish(g, method, u, true, load_point, dir, crossing, vertex)),
             ];
             // A candidate with no finite form factor is no section; of the
             // rest the higher wins, the fillet's on a tie.
@@ -842,10 +816,7 @@ fn finish<T: ToothOutline + ?Sized>(
 
     let m = g.transverse_module();
     let alpha_n = g.normal_pressure_angle();
-    let form_factor =
-        6.0 * (moment_arm / m) * load_angle.cos() / ((root_chord / m).powi(2) * alpha_n.cos());
-    // ...and the along-tooth half of the same load. See `axial_compression`.
-    let axial_compression = load_angle.sin() / ((root_chord / m) * alpha_n.cos());
+    let (form_factor, axial_compression) = beam(moment_arm, load_angle, root_chord, m, alpha_n);
 
     Some(RootSection {
         s,
@@ -869,6 +840,56 @@ fn finish<T: ToothOutline + ?Sized>(
         load_point,
         load_line_crossing: crossing,
     })
+}
+
+/// `Y_F` and the axial term of a section of chord `root_chord` under a load
+/// at `moment_arm` above it and `load_angle` off the across-tooth direction.
+fn beam(moment_arm: f64, load_angle: f64, root_chord: f64, m: f64, alpha_n: f64) -> (f64, f64) {
+    let form_factor =
+        6.0 * (moment_arm / m) * load_angle.cos() / ((root_chord / m).powi(2) * alpha_n.cos());
+    // ...and the along-tooth half of the same load. See `axial_compression`.
+    let axial_compression = load_angle.sin() / ((root_chord / m) * alpha_n.cos());
+    (form_factor, axial_compression)
+}
+
+impl RootSection {
+    /// **This section with the load moved** to roll `load_roll` on `g`: the
+    /// chord, the notch and where they are stay; the moment arm, the load's
+    /// angle and what they make of `Y_F` and the axial term follow the load.
+    ///
+    /// How a section found once is read over a mesh cycle, as ISO reads its
+    /// tangent section: the arm is bounded by the tooth, so the figure stays
+    /// bounded wherever the load is — the tip of a pointed tooth included,
+    /// where a section searched afresh would shrink onto the apex.
+    #[must_use]
+    pub fn loaded_at<T: ToothOutline + ?Sized>(&self, g: &T, load_roll: f64) -> Option<Self> {
+        if !load_roll.is_finite() {
+            return None;
+        }
+        let (load_point, dir) = g.load_at(load_roll);
+        if dir[0].abs() < 1e-12 {
+            return None;
+        }
+        let crossing = [0.0, load_point[1] + (-load_point[0] / dir[0]) * dir[1]];
+        let moment_arm = crossing[1] - self.tangency[1];
+        let load_angle = dir[0].abs().clamp(-1.0, 1.0).acos();
+        let (form_factor, axial_compression) = beam(
+            moment_arm,
+            load_angle,
+            self.root_chord,
+            self.module,
+            self.pressure_angle_rad,
+        );
+        Some(Self {
+            moment_arm,
+            load_angle,
+            form_factor,
+            axial_compression,
+            load_point,
+            load_line_crossing: crossing,
+            ..*self
+        })
+    }
 }
 
 /// **Which published bending model a root stress is taken under.**
@@ -1504,6 +1525,11 @@ struct LoadPoint<'a, T: ToothOutline + ?Sized> {
 
 impl<T: ToothOutline + ?Sized> LoadPoint<'_, T> {
     fn at(&self, d: f64) -> Option<RootSection> {
+        root_section_with(self.v, self.roll(d)?, self.method)
+    }
+
+    /// The roll `d` base pitches back from the tip, where it is on the flank.
+    fn roll(&self, d: f64) -> Option<f64> {
         let roll = self.u_tip + self.sense * d * self.base_pitch / self.rb;
         // **The load point has to be on the flank**, and `flank_bracket` is
         // where the flank is for either kind of member: an external tooth's
@@ -1513,10 +1539,7 @@ impl<T: ToothOutline + ?Sized> LoadPoint<'_, T> {
         // that only a shaper-cut flank stops early. Both stop; they stop at the
         // two ends of the same bracket.
         let (lo, hi) = self.v.flank_bracket();
-        if roll < lo.min(hi) || roll > lo.max(hi) {
-            return None;
-        }
-        root_section_with(self.v, roll, self.method)
+        (roll >= lo.min(hi) && roll <= lo.max(hi)).then_some(roll)
     }
 }
 
@@ -1533,18 +1556,27 @@ fn worst_over_cycle<T: ToothOutline + ?Sized>(
     model: LoadSharing,
     samples_wanted: usize,
 ) -> Option<(RootSection, f64)> {
-    // A section is a candidate only where the model rates it
+    // **The section is found once**, at the highest point of single-pair
+    // contact, and the sweep moves only the load on it
+    // ([`RootSection::loaded_at`]). A section searched afresh at every load
+    // point shrinks onto a pointed apex as the load reaches it — `1/d`, and
+    // `0/0` at the tip — so the swept maximum grew with the sample count and
+    // jumped at the pointed limit. A candidate is one the model rates
     // ([`RootSection::bending_factor`]); where it does not, the tooth has no
     // rating at that load point rather than a number.
-    let rated = |d: f64| {
-        at.at(d).and_then(|s| {
-            s.bending_factor(RootStressModel::DolanBroghamer)
-                .map(|f| (s, f))
-        })
-    };
+    let section = at.at(highest_single_pair(eps_n))?;
+    section.bending_factor(RootStressModel::DolanBroghamer)?;
     if matches!(model, LoadSharing::None) {
-        return rated(highest_single_pair(eps_n)).map(|(s, _)| (s, 1.0));
+        return Some((section, 1.0));
     }
+    let rated = |d: f64| {
+        at.roll(d)
+            .and_then(|roll| section.loaded_at(at.v, roll))
+            .and_then(|s| {
+                s.bending_factor(RootStressModel::DolanBroghamer)
+                    .map(|f| (s, f))
+            })
+    };
     // The candidates the sweep must not miss, then the sweep itself.
     let mut samples = vec![0.0, eps_n, highest_single_pair(eps_n), eps_n.min(1.0)];
     for i in 0..=samples_wanted {
@@ -2047,6 +2079,82 @@ mod tests {
                         fine >= coarse * (1.0 - 1e-12),
                         "z={teeth} ε={eps}: a finer sweep found a smaller maximum"
                     );
+                }
+            }
+        }
+    }
+
+    /// **Continuous across the pointed limit, and independent of the sweep.**
+    /// A tooth one hair short of pointed and one at the limit are the same
+    /// tooth to within the hair, so their ratings may differ by no more than
+    /// the hair moves them; and a rating is a maximum over the mesh cycle,
+    /// not over where a sweep happened to sample. Before the section was
+    /// found once per tooth, z25 x0.5 28° under the ramp read 86.9 at 1e-3
+    /// short, 51,764 at 1e-6 short, 11.6 or 140 at the limit by sample count,
+    /// and 2.157 once pointed; z40 x0.8 25° unshared read 4.45 short and
+    /// nothing at the limit.
+    #[test]
+    fn the_rating_is_continuous_across_the_pointed_limit() {
+        for (teeth, profile_shift, pressure_angle) in [
+            (25_u32, 0.5_f64, 28.0_f64),
+            (40, 0.8, 25.0),
+            (12, 0.5, 25.0),
+        ] {
+            let build = |addendum: f64| {
+                Tooth::new(GearParams {
+                    teeth,
+                    profile_shift,
+                    pressure_angle,
+                    addendum,
+                    ..Default::default()
+                })
+            };
+            // The addendum at which the tooth comes to a point.
+            let capped = build(4.0);
+            assert!(capped
+                .clamps
+                .fired(crate::note::key::CLAMP_TIP_CAPPED_POINTED));
+            let m = capped.params.module;
+            let limit = (capped.ra - capped.r) / m - profile_shift;
+            for eps in [1.1_f64, 1.4] {
+                for model in [LoadSharing::None, LoadSharing::LinearRamp] {
+                    let rate = |g: &Tooth, n: usize| {
+                        bending_section_shared_with(g, eps, model, n).and_then(|(s, f)| {
+                            s.bending_factor(RootStressModel::DolanBroghamer)
+                                .map(|b| b * f)
+                        })
+                    };
+                    let label =
+                        format!("z{teeth} x{profile_shift} {pressure_angle}° ε{eps} {model:?}");
+                    let mut last: Option<f64> = None;
+                    let mut rated = Vec::new();
+                    for short in [1e-2_f64, 1e-3, 1e-6, 0.0] {
+                        let g = if short == 0.0 {
+                            capped.clone()
+                        } else {
+                            build(limit * (1.0 - short))
+                        };
+                        let (coarse, fine) =
+                            (rate(&g, SHARING_SAMPLES), rate(&g, 16 * SHARING_SAMPLES));
+                        let (Some(coarse), Some(fine)) = (coarse, fine) else {
+                            panic!("{label}, {short} short: unrated ({coarse:?}, {fine:?})");
+                        };
+                        assert!(
+                            (fine - coarse).abs() / coarse < 1e-4,
+                            "{label}, {short} short: {coarse} at {SHARING_SAMPLES} samples, {fine} at 16x"
+                        );
+                        rated.push((short, coarse));
+                        last = Some(coarse);
+                    }
+                    // Against the limit, each hair moves the figure by no more
+                    // than a fixed multiple of itself: a slope, not a step.
+                    let limit_value = last.unwrap_or(f64::NAN);
+                    for (short, v) in rated {
+                        assert!(
+                            (v - limit_value).abs() / limit_value <= 20.0 * short + 1e-9,
+                            "{label}: {v} at {short} short against {limit_value} at the limit"
+                        );
+                    }
                 }
             }
         }

@@ -831,15 +831,21 @@ says it is unrated** (`gear.bending_unrated`). `max(Y_F ± axial)` would rate th
 compressive fillet, a third model neither source states; ISO's own remedy for the
 band, `Y_DT`, is declined with the rest of its factors.
 
-**A pointed tooth is rated on its fillet alone.** Near a pointed apex the Lewis
-parabola tangent to the flank shrinks onto the point and its form factor grows
-like `1/d` — the point's own stress, not the root's, and `0/0` at the apex, which
-a sharing sweep samples. Skipping the apex would only trade the `NaN` for
-whatever the finest sample reaches (17.4 at 200 samples, 208.6 at 3200, against
-an unshared 2.28). So on a tooth whose tip is capped pointed the section is
-sought on the fillet, and the member says so (`gear.bending_on_fillet_pointed`).
-This is a step, not a limit: a tooth one hair short of pointed still searches its
-flank, and near the tip that search finds the thin tip's own large section.
+**The section is found once per tooth, and the sweep moves only the load on
+it.** The sweep used to search a new inscribed parabola at every load point.
+Near a pointed apex that parabola shrinks onto the point and its form factor
+grows like `1/d` — the point's own stress, not the root's, and `0/0` at the
+apex, which a sharing sweep samples. Skipping the apex would only trade the
+`NaN` for whatever the finest sample reaches (17.4 at 200 samples, 208.6 at
+3200, against an unshared 2.28), and rating a pointed tooth on its fillet alone
+left a step at the limit — 51,764 one millionth short, 2.157 at it. So the
+section is taken where the unshared rating takes it, at the highest point of
+single-pair contact, and across the cycle only the moment arm and the load's
+angle follow the load (`RootSection::loaded_at`), as ISO holds its tangent
+section and moves `h_Fe`. The arm is bounded by the tooth, so the figure is
+bounded as the load reaches the tip, pointed or not, and continuous across the
+pointed limit (`the_rating_is_continuous_across_the_pointed_limit`). The
+unshared rating is the same section it always was, to the bit.
 
 **What would change this:** a calibrated stiffness model, which would replace the
 ramp rather than the control. The two conditions that would make one worth having
