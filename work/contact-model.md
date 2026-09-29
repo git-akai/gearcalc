@@ -1,399 +1,400 @@
 # Unified contact model: phase-exact prototype
 
-Author: contact-proto, 2026-09-26/29. Read-only on the repo; pure Python (no numpy).
-- **Scripts and their outputs:** `~/.cache/gearcalc-work/contact-proto/` (README there).
-- **Built on:** `work/plan.md` §5 (the owner's rulings), `work/spike-contact.md` and
-  `work/review/spike-verify.md`.
+Authors: contact-proto (2026-09-26/29), contact-proto-2 (2026-09-29, this round). Read-only on the
+repo; pure Python, no numpy.
+- **Scripts and outputs:** `~/.cache/gearcalc-work/contact-proto/` (README there). This round's are
+  `kernel.py`, `coupled.py`, `foundation.py`, `rating.py`, `matched.py` and the `t_*.py` named below.
+- **Built on:** `work/plan.md` §5 (the 2026-09-29 decisions), `work/review/contact-verify2.md`.
 
-**Verdict.** The model is right wherever it can be checked:
-- **ε:** ISO 21771's value exactly.
-- **Spur:** ISO 6336-2's pitch point and point B exactly.
-- **Helical and ring:** the pitch value within +1.0 to +3.6 % of ISO with Z_ε (elastic teeth).
-- **Worm:** the crate's curvatures, ellipse, efficiency table and locking thresholds, to the
-  printed digit.
-- **Continuity:** continuous through Σ = 0 for shifted pairs, where the spike's construction was
-  not.
-
-It is 10²–10³ times too slow for the search hot path. **Recommendation:**
-- the search keeps closed forms;
-- the field runs once per solve, for the rating and the report;
-- the field is also the validation instrument, held to the closed forms by laws (§7).
-
-**Three results need the owner before any default is set** (§6):
-- the field maximum sits at the unrelieved start of active profile, +45–54 % over ISO on
-  helicals, and it jumps +30 % between β 0 and 0.1°;
-- the "tips relieved" option should be a relief profile, not a classification;
-- the crate's worm wheel is an involute helical gear, which nobody hobs.
+**Verdict of this round.**
+1. **Lengthwise coupling does not cure the helical jump; it makes it slightly worse.** The jump
+   comes from the line construction: a helical line entering at the tip edge must continue *along*
+   that edge. With that rule the field max is continuous in β at 20 and 60 N·m, with or without
+   coupling (§2.1). The coupling is kept for the reason it was wanted: it removes the contact-
+   compliance formula and its κ_L = 0 switch, and it reproduces the Hertz ellipse (O(N⁻²)).
+2. **The two special cases are gone** (§2.2), but only with the tip-edge radius r_e as a stated
+   input. With r_e → 0 (a sharp edge) the edge pressure is singular, as elasticity says it is.
+3. **ISO comparisons are corrected** (§3.3). The field max is +8.7 % over ISO at B on FZG-C-like.
+   The ring's M1 is 1.345.
+4. **Found: the ring's tooth compliance was about 2300× too large.** Sainsot's fit fails at a
+   rack tooth, so the previous round's elastic ring rows were invalid. A derived half-plane
+   foundation replaces the fit (§2.4).
+5. **The matched worm set needs no new kind of solve, but it is a second wheel geometry** (§4).
+6. **Cost, counted over whole analyses:** 0.56–4.6 s per mesh in Rust as built with slices, and
+   2–6.6 s coupled. The fast routes at Σ = 0 are estimated at 10–30 ms with slices and 20–70 ms
+   coupled (§5).
 
 ## 1. The model: every mesh, one construction
 
-Signed tooth count (z < 0 is a ring) and the shaft angle Σ are parameters; nothing branches on
-the kind of mesh. Files: `field.py`, `phase.py`, `carlson.py`, `stiff.py`.
+Signed tooth count (z < 0 is a ring) and the shaft angle Σ are parameters; nothing branches on the
+kind of mesh.
 
-1. **Exact rigid gap.** Rotated involute helicoids are parallel surfaces, so the normal distance
-   from any point Y to member i's flank is closed form:
+1. **Exact rigid gap** (unchanged). Rotated involute helicoids are parallel surfaces, so
+   d_i(Y) = k_i (v_i(ρ) ∓ (ψ − n p_i)), with k_i = r_bi cos β_bi. The gap is
+   g = d₁ + d₂ + R₁ + R₂, where R_i = C_a(1 − u/L_a)₊² is the optional tip relief.
+2. **One line per tooth pair, now a polyline.**
+   - The anchor A is the minimum of g over the pair's field, as before.
+   - The segment runs along e_L, the minor eigenvector of K = Σ κ_i u_i u_iᵀ, and is clipped in
+     closed form.
+   - **New rule, one for every anchor:** where the segment leaves the flank through a tip edge, the
+     valley of the gap continues along that edge (the tip helix's tangent), away from the segment,
+     clipped by the faces and the other member's bands.
+   - A tip anchor's segment may have zero length; its edge then runs both ways.
+   - `CField.edge_lines`; `coupled.py:pair`.
+3. **Load: coupled lines, tooth in series** (`coupled.py`, `kernel.py`):
    ```text
-   d_i(Y) = k_i (v_i(ρ) ∓ (ψ − n p_i)),    k_i = r_bi cos β_bi
-   v(ρ)   = e/(2|r|) − sgn z (inv α_t − inv α_ρ),    e = m_n (π/2 − 2x tan α_n)/cos β
+   Δ − g(y_i) = c_t(y_i) q_i + Σ_j K_ij q_j,   q ≥ 0
+   K_ij = Σ_bodies (1−ν²)/(πE) [G(η₂/b_j) − G(η₁/b_j)] − (depth-h Boussinesq term)
+   G(r) = (4/π)∫₀^{π/2} cos²θ asinh(r/sin θ) dθ,   G′(r) = (4/(3π))(1+r²) R_D(0, r², 1+r²)
+   b_j  = √(4q_j/(πE*κ_A))/C,   C² = 3/(s R_D(0,1,s)),   s = aspect(κ_L/κ_A)²
    ```
-   The gap between the facing flanks near Y is g(Y) = d₁(Y) + d₂(Y) + R₁ + R₂. R_i is an
-   optional tip relief, C_a(1 − u/L_a)₊², with u the depth below the tip. There is no parabola
-   and no line of action.
-2. **One line per tooth pair.** Tooth j of member 1 always meets void k₀ − sgn(z₂)·j of member 2.
-   - The anchor A is the minimum of g over the pair's field: the flank patches of both members,
-     faces and tips included. It comes from a damped 2-D Newton plus bracketed 1-D edge minima on
-     a continuous feasibility margin.
-   - The line is A + y·e_L. e_L is the minor eigenvector of K = κ₁u₁u₁ᵀ + κ₂u₂u₂ᵀ, where
-     κ_i = sgn z_i · cos β_bi/ρ_ti (negative on a ring) and u_i = n × (axis_i projected).
-   - The small root is taken stably, κ_L = det K/κ_A. It is exactly 0 at Σ = 0, where e_L is the
-     contact line; at Σ > 0 e_L is the Hertz ellipse's major axis.
-3. **Clip, closed form.** Two face slabs (linear) and four radial bands (quadratics): the tip
-   and the flank start of each member. The flank starts at the generated form radius, not at r_b.
-   The clip keeps the component that contains y = 0 and tags each end with its constraint.
-4. **Load.** Winkler slices along each line: q(y) = (Δ − g(y))₊/c(y).
-   - Δ is one approach per phase, from the **torque balance with friction in the normal force**:
-     T = Σ∫q τ dy, with τ = ((Y−O) × (∓n ∓ μŝ))·axis.
-   - The compliances are in series: c = c_H + c_t1 + c_t2.
-     - c_t is `stiff.py`'s potential-energy tooth: bending, shear and compression over the
-       generated profile, fillet included, plus the foundation term of Sainsot, Velex and Duverger
-       2004. A ring is treated as a rack tooth, as ISO 6336-1 uses z_n2 = ∞.
-     - c_H is the contact term, B″, below.
-   - The pressure is p = C·√(q E* κ_A/π), where C = p₀/p_line comes from the pair's own ellipse.
-     C is 1 for a line.
-5. **Phase.** Every phase function is piecewise smooth over one pitch of member 1.
-   - **Breakpoints** are where the signature changes: the set of loaded pairs, or the constraint
-     at a loaded end (face, tip, root, gap). They are bracketed on a 24-point scan and bisected to
-     1e-10 of a pitch.
-   - **Means** are Gauss–Legendre per piece. This is exact for the piecewise-constant pair count
-     and spectral for the rest.
-   - **Maxima** are the piece ends plus the interior stationary points, found by golden section.
-   - **ε** is the mean number of loaded pairs.
+   - The cross-section of each load element is the Hertz half-ellipse of its own local width. This
+     is the Hertz ellipse's own kernel: the untruncated ellipse solves the continuous equations
+     exactly.
+   - The depth reference h is the tooth model's; it is where the tooth compliance takes over.
+   - G is one special function of one variable. It is odd, G(0) = 0, and
+     G ~ ln 4r + ½ + 1/(16r²); its derivative is closed form.
+   - **Per phase:**
+     - N panels on the rigid overlap of each line (N = 24);
+     - one N × N Gauss solve per loaded line per iterate, with two right-hand sides;
+     - Δ closed form per iterate, because q and the torque are affine in Δ on a fixed active set;
+     - an active set for q ≥ 0;
+     - a fixed point on b (logarithmically weak, 3–6 iterates).
+   - **Why a linear solve is acceptable:** the kernel decays like h²/d³ beyond the depth h. The
+     matrix is therefore diagonally dominant, and 24 panels hold the pressure to 0.1 %.
+ 4. **Phase** (unchanged): breakpoints by a signature scan plus bisection, Gauss means per piece,
+   maxima by golden section.
+5. **Tooth compliance** is `stiff.py`'s potential-energy tooth. The foundation term is now derived
+   (§2.4); `derive_foundation`.
 
-**The contact compliance B″ (new).** The spike's k_W = 3πE*/(2R_D(β²,0,1)) is exactly the
-half-space *surface drop* from the patch centre to its end, u₀ − u_a. It is right for the patch
-shape, but it tends to 0 like 1/ln(1/β) as Σ → 0. A finite tooth holds the material below depth
-h, Weber's distance to the tooth centreline, and the tooth model already carries that material.
-So subtract the same drop measured at depth h. Per body, per unit centre line load q₀ = πp₀b/2,
-with k_b = 2(1−ν²)/(πE), from Dyson's potential of the Hertz pressure
-(u_z = (2(1−ν)ψ − zψ_z)/4πG):
+The previous B″ slice compliance (Dyson's potential, depth-referenced) is not needed now. It
+survives as the check: the kernel integrated over an infinite line equals its line form to 3e-12
+(`kernel.txt`).
 
-```text
-c_H/k_b = (u₀ − u_a) − (w₀ − w_a)
-  u₀ = a R_F(a²,b²,0)            u_a = a [R_F(a²,b²,0) − a² R_D(b²,0,a²)/3]
-  w₀ = a [R_F(A,B,H) + ν/(3(1−ν)) h² R_D(A,B,H)],       (A,B,H) = (a²+h², b²+h², h²)
-  w_a = (a/2)[2R_F(Aλ,Bλ,λ) − (2/3)a² R_D(Bλ,λ,Aλ) + (2/3)h² R_D(Aλ,Bλ,λ) ν/(1−ν)],
-        λ = (h² + √(h⁴ + 4a²h²))/2
-```
+## 2. This round's items
 
-- **The Winkler term is recovered exactly.** u₀ − u_a = R_D(β²,0,1)/3, which is 1/k_W; checked to
-  the digit.
-- **Small patch (a ≪ h):** B″ → 1/k_W, so the Hertz ellipse's length, shape and peak come out
-  exact.
-- **Line (a → ∞, Σ = 0):** B″ → asinh(h/b) − ν/(1−ν)·h/(√(h²+b²) + h). That is the exact 2-D
-  depth-referenced line formula; its b ≪ h limit is Johnson's ln(2h/b) − ν/(2(1−ν)), matched to
-  1e-6.
-- **Convergence to the line** goes as −0.29 h/a (`t_limit.py`): −2.3e-4 at a/h = 1250, −2.3e-7 at
-  1.25e6. Over the same range the Winkler term alone diverges, 10.3 → 17.2.
-- **So Σ → 0 is a value.** R_D/3 ≈ ln(4a/b) − 1 and its depth-h counterpart cancel.
-- **The prototype** evaluates the line limit when κ_L = 0 exactly. That is a removable
-  singularity, not a model branch. In Rust it is line(h,b) + ρ₁(β) − ρ₂(h/a), written as a
-  regularised special function (§7).
+### 2.1 Lengthwise coupling and the β → 0 jump (`t_beta.py` → `beta_20_final.txt`, `beta_60_final.txt`)
 
-**Aspect ratio, the one inverse.** q = A/B = R_D(0,s,1)/R_D(0,1,s), with s = κ² (DLMF 19.25.1). It
-is solved by bisection on ln s over [ln q − 60, 0]. On 1e-16..1 q(s) is monotone and s ≤ q(s),
-which bounds the bracket (`t_limit.py`).
+Setup: 17/43, m 1, b 10, μ 0.06, elastic, tips counted, Σ 0. Field max in MPa at β 0 → 0.1 / 0.5 /
+2°:
 
-**Internal gears use the same formulas.**
-- Signed r, r_a = r + m(h_a + x) and a = r₁ + r₂ carry the ring.
-- The ring's flank is concave through κ₂ < 0.
-- It turns with its pinion: the ratio −z₁/z₂ is positive.
-- ISO's x sign applies, and the tip band is on the far side.
+| Model, 20 N·m | C_a 0 | C_a 2 µm | C_a 5 µm |
+|---|---|---|---|
+| slices, e_L lines (the verifier's case) | 3188 → 3945 (+23.7 %) / 3959 / 4057 | 2729 → 3538 (+29.6 %) | 2225 → 2836 (+27.5 %) |
+| **coupled, e_L lines** | 3198 → 4053 (**+26.7 %**) / 4200 / 4313 | 2738 → 3323 (+21.4 %) | 2231 → 3185 (**+42.7 %**) |
+| slices + edge rule | 3188 → 3201 (+0.4 %) / 3229 / 3545 | 2729 → 2773 (+1.6 %) | 2225 → 2230 (+0.3 %) |
+| **coupled + edge rule** | 3198 → 3212 (+0.4 %) / 3239 / 3556 | 2738 → 2782 (+1.6 %) / 2818 / 3118 | 2231 → 2237 (+0.3 %) / 2287 / 2554 |
+| coupled + edge rule, **60 N·m** | 5538 → 5535 (−0.05 %) / 5512 / 5733 | 5017 → 5015 / 5027 / 5241 | 4407 → 4408 / 4428 / 4655 |
+| field.py, 60 N·m (before) | 5586 → 6926 (+24 %) | 5079 → 6543 (+29 %) | 4489 → 5590 (+25 %) |
 
-## 2. The five defects left at the pause, and one more
+- **Why coupling cannot cure it.** The entering corner is a vanishing segment on a tooth that
+  carries nothing else, so its own load is all that deflects it.
+  - Coupled, a segment of length ℓ < h loses the depth-referenced line compliance
+    (2/πE*) ln(2h/ℓ). It becomes *stiffer* per unit length, not softer.
+  - The approach is still the single-pair Δ₁, so q and p rise.
+  - The same holds for a plate-coupled tooth: a point load on a plate deflects less than a line
+    load per unit length.
+  - This refutes the verifier's hypothesis in claim 3 ("a coupled model would give a continuous
+    limit").
+- **What does cure it.**
+  - At small β the conjugate line reaches the tip edge nearly parallel to it. The wheel's tip edge
+    "ahead" of the corner is within (b tan β_b)²/2ρ of the pinion flank, so at β → 0 it touches
+    across the face as a spur tip edge does.
+  - The field.py line through the corner ran on along e_L and missed that edge, so Δ stayed at the
+    single-pair level. That is the jump.
+  - Continuing the valley along the edge makes Δ fall before the corner loads. It is continuous at
+    every relief and load tried, **because the geometry is now right, not because relief is sized
+    for the load** (the verifier's finding 1 is resolved).
+  - The residual slope, +10…+16 % by β 2°, is real: the edge's contact length shrinks as
+    (b tan β_b)² grows past Δ/k.
+- **Continuity in Σ held** (`sigma2.txt`; β 20, 2 N·m, Σ 0 / 0.01 / 0.1 / 1°): field max
+  744.7 / 744.3 / 744.6 / 744.0; L/(b/cos β_b) 1.5693 / 1.5697 / 1.5709 / 1.5584; η 98.823 /
+  98.827 / 98.823 / 98.793 %.
+  - A first version that laid a tip anchor's line only along the edge broke Σ-continuity (+20 % at
+    0.01°), because at small Σ many anchors land on the tip edge by a hair. The one rule above
+    fixed it.
+- **Ellipse reproduced** (`t_kernel.py` → `kernel.txt`; bare half-space, κ_L/κ_A 0.1–0.5): q₀
+  error −9.6e-3 / −2.4e-3 / −6.0e-4 at N 16 / 32 / 64 (O(N⁻²); Richardson < 1e-5); a within
+  1e-4, p₀ −3e-4 at N 64.
+  - Depth-referenced, the solve tends to Hertz as a/h → 0: p₀ +0.34 % at a/h 0.35, −5e-4 at 0.035
+    (the panel floor). A finite a/h *should* depart from Hertz, since the tooth is finite.
+- **What the coupling changes on long lines:** ≤ 1 % in the interior. At square face ends it adds
+  +2…+6 % (the end effect, bounded by the series c_t; `t_c1.py`).
+- **ε at light load, rigid:** 2.58179 loaded pairs against ε_γ 2.580562. L comes out −0.57 %
+  because the prototype counts loaded panels; Rust must take L from the overlap roots, as field.py
+  did.
 
-1. **The k branch at Σ → 0.**
-   - Replaced by B″, which is finite and continuous at Σ = 0.
-   - The predecessor's "the series stiffness tends to the tooth's" was wrong: with k_W it tends to
-     **0**. With B″ it tends to 1/(c_line + c_t), which is ISO's picture.
-2. **Play.**
-   - Exact: the minimum over phase of the anchor gaps, which is the oracle's computation.
-   - Closed form, for the search: derived from the gap parabola,
-     j = 2 sin α_n (a − a_lin) + K u²(a − a_ref)². Using d(u(a − a_ref))/da = 1, it gives
-     **slope = 2 sin α_n (1 + 2D₀u/(a₀ − a_ref))**, which needs no parallel slope.
-   - Against the exact slope (`play.txt`), derived / spike's interpolation: Σ 0 +0.60/0.00 %;
-     Σ 1° +0.32/−0.12; 5° −0.61/−0.53; 10° −2.82/−2.35; 30 mm face −1.16/−0.57 and −0.39/−0.39;
-     x −0.3 −1.26/−1.42; x 1 at Σ 6° −2.64/−3.66 %.
-   - The derived law replaces the interpolation, but it is no more accurate: both carry the
-     parabola's error, up to −3.7 %.
-3. **The ε staircase.** The breakpoints are now exact (§3.2).
-4. **The oracle** (`oracle.py`) is new, independent and exact per phase.
-   - Interior stationary points come from a 2-D Newton; edge minima on both bodies (tip, faces)
-     from bracketed golden section to 1e-13. Edge-on-edge contacts are the ends of the feasible
-     intervals.
-   - The minimum over phase comes from every local minimum of a scan, refined. A minimum of a sum
-     of lower envelopes cannot sit at one of their kinks.
-   - It **includes internal gears** through signed z.
-5. **Base-cylinder tangency** is no longer needed: the anchor search replaces the line of action.
-6. **(New) The spike's anchoring is wrong for shifted near-parallel pairs.**
-   - As Σ → 0 with a ≠ a_ref, the line of action recedes to z* ~ D/Σ. Its lines, run back along
-     e_L, land in the face on the base-tangent plane at the *reference* α_t, not the operating
-     α_wt.
-   - At x .5/.5, the spike's Σ → 0 ε_path × cos²β_b is 1.13, against the parallel 1.23 at a_lin.
-   - Anchoring at the in-field minimum of the exact gap cures it: L/(b/cos β_b) is 1.36421 at Σ 0
-     and 1.36425 at 0.01°.
-   - The verifier's rows were all x = 0, where a_lin = a_ref, so they could not see it.
+### 2.2 The two special cases (`t_ring.py` → `ring_kA.txt`)
+
+- **The κ_L = 0 switch is gone.** No contact-compliance formula is left to switch.
+  - The ellipse enters only through C(q), whose value tends continuously to 1 (C = 1.1284 / 1.0187
+    / 1.0021 / 1.000023 / 1.0000000024 at q 1 / 0.1 / 1e-2 / 1e-4 / 1e-8).
+  - Its removable 0·∞ at s = 0 lives inside `shape_C`: below s = 1e-24 the value is 1 to double
+    precision.
+- **The κ_A ≤ 0 skip is gone, given a tip-edge radius r_e.**
+  - Every skip is a tip anchor: 46 on the ring 17/−43 β15 and 5 on the spur ring.
+  - A point on an edge has the edge's curvature, so K gains (1/r_e) e_A e_Aᵀ there. The edge pieces
+    carry the same term. With r_e 0.2 or 0.1 mm there are 0 skips.
+  - κ_L = det K/κ_A is then always defined, so the ZeroDivisionError of `cost.txt` cannot recur.
+- **Unloaded remainder.** Stations with κ_A ≤ 0 remain on the non-conjugate stretch of a ring
+  pair's segment (5157 of them). **None was loaded** over 24 phases of the ring β15.
+- **Size and sign of r_e** (ring β15, 60 N·m):
+  - the field max goes 1204 (flank convention) → 3818 (r_e 0.2 mm) → 5336 MPa (0.1 mm), at the
+    pinion's tip edge;
+  - the loaded pairs and the ISO-point readings do not move;
+  - r_e → 0 is singular.
+- **So r_e must be a named, visible input**: an edge break or a tip chamfer. The field max without
+  it is an unrelieved-edge figure, not a property of the gear.
+
+### 2.3 ISO 6336-2, corrected (`rating.py`, `t_iso2.py` → `iso2.txt`)
+
+- **σ_H at B is Z_B σ_H0**, and σ_H0 carries Z_ε. On FZG-C-like that is 1.0702 × 1522.6 =
+  **1629.5 MPa**.
+- **M1 and M2 come from signed radii of curvature:** ρ₂ = T₁T₂ − ρ₁ for an external pair and
+  −(ρ₁ + T₁T₂) for a ring, so one formula serves both.
+  - Ring 17/−43 x0/−0.3: **M1 1.3447** (the verifier's 1.3447, not 2.315), M2 1.1739. ISO's σ_H at
+    B is 886.6, not 1794.8.
+  - 20/60 β15 (ε_β 0.824 < 1): Z_B = M1 − ε_β(M1 − 1) = 1.0157, so 851.0.
+- **"FZG-C" is relabelled FZG-C-like** (tips untrimmed, as the verifier noted).
+
+### 2.4 Tooth stiffness: spread, the fitted term, and a derived foundation (`foundation.py`, `t_found.py` → `found.txt`)
+
+**Spread at 17/43 x0** (q 300 N/mm, E 206 GPa; N/(mm·µm)):
+
+| Source | c′ | c_γ | Against ISO Method B c′ |
+|---|---|---|---|
+| idealised PE tooth (verifier; no generated fillet) | 11.6 | – | −7 % |
+| ISO 6336-1 Method B, c′ = c′_th C_M C_R C_B (C_M 0.8) | 12.50 | 18.33 | 0 |
+| model, Sainsot foundation (fitted) | 13.65 | 19.79 | +9 % |
+| **model, derived half-plane foundation** | **15.60** | **22.48** | **+25 %** |
+| ISO c′_th (theory, before C_M) | 16.03 | 23.50 | +28 % |
+
+- **The spread is 11.6–16.0, about ±16 % around 13.8.**
+  - Its sign is set by the foundation, which is 44 % of the compliance, and by the fillet
+    geometry.
+  - Over the 5 × 3 grid the derived model sits −3 … −13 % under c′_th.
+  - ISO's C_M = 0.8 is ISO's *measured* correction from theory to real gears, so the derived model
+    agrees with ISO's theory and is 25 % stiffer than ISO's rating value.
+- **Effect on rating.** Stiffness enters σ_H only through sharing. The 17/43 β20 pitch reading
+  moved −0.5 % → −0.1 %, and the field max 1430 → 1422, between the two foundations.
+- **Sainsot, Velex & Duverger 2004's L*, M*, P*, Q* are fitted** polynomials in (h_f, θ_f),
+  fitted to Muskhelishvili's annulus solution.
+  - They fail outside the fitted range: at z = 400, P* = −0.21; at z = 4000 (the rack tooth used
+    for rings), L* = −86 and M* = 1032.
+  - That makes the ring's foundation 44.65 µm/(N/mm) against about 0.019: **2300× too compliant**.
+  - The previous round's elastic ring rows (±% at the pitch, 2.54 pairs) are **withdrawn**. The
+    corrected rings, with the derived foundation, give 2.03 and 2.57 loaded pairs (§3.3).
+- **Derived alternative (prototyped).** The root section is a segment S_f on an elastic
+  half-plane under the beam's section tractions (Weber 1949; O'Donnell 1960), with work-conjugate
+  section displacements.
+  - **L* = 18(1−ν²)/π = 5.214** exactly, since ∫∫xy ln|x−y| over the unit square is −1/16.
+  - **M* = 2(1−2ν)(1+ν) = 1.040.** Both are closed form and need no reference.
+  - P* and P*Q* are the mean shear and normal translations. A half-plane's are log-divergent, so
+    they are referenced at the depth H below the section: the bore, H = r_f(1 − 1/h_f), or a
+    ring's rim.
+  - They come from Boussinesq and Cerruti integrated along the face. The formulas are in
+    `foundation.py`'s docstring and are checked at s → 0 against the axis limits; the section
+    averages are closed form except one 1-D quadrature.
+  - It is valid for any z, the rack included. It is monotone in H: c′ 16.37 / 15.60 / 14.87 /
+    14.38 at h_f 1.2 / 1.4 / 2 / 4, while Sainsot's fit gives 9.47 at h_f 4.
+  - Muskhelishvili's annulus itself is a series, not a closed form: it is what Sainsot fitted.
+  - The ring's rim depth is a stated input (3.5 m_n here; the crate has
+    `MemberGear::rim_thickness`).
 
 ## 3. Validations
 
-### 3.1 Oracle (`t_oracle1.py`, `t_oracle2.py`, `t_a0.py` → `a0.txt`)
+### 3.1 Oracle, ε and breakpoints (unchanged; confirmed by the verifier)
 
-Oracle play against ISO 21771 j_n (µm): 17/23 spur, a_par + 0.05: 34.5219 µm, 34.5219; 17/43 β20, x
-.5/.2: 38.6366, 38.6366; ring 17/−43 β15, x .3/−.3, a_par − 0.05: 33.7489, 33.7489; ring 20/−60 β20:
-37.7174, 37.7174.
+- ISO 21771 j_n, oracle against formula: 34.5219 / 38.6366 / 33.7489 / 37.7174 µm (spur,
+  helical, two rings). a₀ table 10/10 rows; the u² play law is +6.40 µm off at x 1/1, Σ 6°.
+- Interference: ring 17/−43 x0 needs |r_a2| ≥ 20.687 and has 20.5. The corner goes 24.5 µm into
+  the generated fillet below r_b, which the oracle cannot see, so `flank_interference` must be
+  checked against the generated root.
+- Breakpoints at 0.41581 / 0.50451 / 0.90770 / 0.99641 of a pitch (the closed-form corners);
+  ε_γ 2.58060 against 2.580562; mean length / (b/cos β_b) = ε_α 1.4918785.
 
-- **The verifier's a₀ table** agrees on all 10 shared rows, to the printed 1e-6 mm.
-- **New row, x 1/1 at Σ 6°:** the u² law is +6.40 µm off, 1.8 % of D₀.
-- **Found: the unshifted ring 17/−43 has involute interference.** The ring's tip meets the line
-  of action beyond T₁: it needs |r_a2| ≥ 20.687 and has 20.5. The oracle measures −1.63 µm; a ring
-  x₂ of −0.3 clears it, bar −0.04 µm.
+### 3.3 The rating read at ISO's points, with the field max beside it (`iso2.txt`)
 
-### 3.2 ISO 21771 ε (`t_field2.py`)
+Coupled field, edge rule, tips counted, no relief, μ 0, derived foundation. The default reading is
+the pinion's max(C, B) and the wheel's max(C, D), read off the field in the mid-plane.
 
-Case: 17/43 β20, b 10, rigid, light load.
-- **Breakpoints** at 0.41581, 0.50451, 0.90770 and 0.99641 of a pitch. Their spacings, 0.0887,
-  0.4032, 0.0887 and 0.4194, are the closed-form corners.
-- **ε_γ:** 2.58060 against 2.580562. The 3.9e-5 is tip contacts loaded at Δ ~ 1e-10.
-- **Mean length / (b/cos β_b):** 1.4918785 against ε_α 1.4918785 (difference 1.1e-8).
+| Pair | ISO σ_H0 · σ_H,B · σ_H,D | Field at C · B · D | Pinion · wheel reading against ISO | Field max against ISO's largest |
+|---|---|---|---|---|
+| FZG-C-like 16/24, 302 N·m | 1522.6 · 1629.5 · 1522.6 | 1648.5 · 1336.5 · 1236.7 | **+1.2 % · +8.3 %** | 1770.9, **+8.7 %** |
+| 17/43 β20 m2, 60 N·m | 961.3 · 961.3 · 961.3 | 960.7 · 1036.8 · 905.1 | **+7.9 % · −0.1 %** | 1421.6, +47.9 % (SAP) |
+| 20/60 β15 m4, 500 N·m | 837.8 · 851.0 · 837.8 | 847.9 · 903.9 · 810.2 | **+6.2 % · +1.2 %** | 1158.2, +36.1 % (SAP) |
+| ring 17/−43 β15 x.3/−.3, 60 N·m | 639.1 · 647.2 · 639.1 | 655.5 · 683.1 · 575.3 | **+5.5 % · +2.6 %** | 1212.8, +87 % (face end, SAP) |
+| ring 17/−43 x0/−.3 spur, 60 N·m | 659.3 · 886.6 · 773.9 | 591.8 · 785.4 · 719.7 | −11.4 % · −7.0 % | 12 347 (SAP at r_b: singular) |
 
-### 3.3 Tooth compliance against ISO 6336-1 (`stiff.py` → `stiff.txt`, E 206 GPa, q 300 N/mm)
+- **At C the field agrees with ISO** within −0.1 … +2.6 % on helicals and rings. On the spur, C
+  lies in the single-pair zone, and the field's +8.3 % is ISO's Z_ε, which ISO applies there and
+  the field does not.
+- **At B the field is lower on spurs.**
+  - Tip contact under load (302 N·m, elastic) carries the two-pair zone past B, which ISO's rigid
+    Z_B ignores.
+  - The field max sits where the single-pair zone now starts (r₁ 35.75 against r_B 35.40).
+- **The helical and ring maxima sit at the start of active profile (SAP)** or a face end, where ISO
+  does not look. They are unrelieved-edge figures (§2.2).
+- **The spur ring's 12 347 MPa** is the pinion's SAP at 15.975, next to r_b 15.97: κ ∝ 1/ρ_t → ∞.
+  The rating must flag it; the default reading is unaffected.
 
-At 17/43 x0, model against ISO: c′: 13.65, c′ 12.51 (C_M 0.8, C_B 0.975), +9 %; c′: 13.65, c′_th 16.03, −15 %;
-c_γ: 19.79, 18.33 (from c′), +8 %; c_γ: 19.79, 23.50 (from c′_th), −16 %.
+### 3.4 The shipped worm, involute wheel (unchanged; closed forms confirmed by the verifier)
 
-- **The rounded gate holds:** c′ ≈ 14 and c_γ ≈ 20.
-- **Over a 5 × 3 grid** the model sits −9…+12 % around c′ and always 13–28 % below c′_th, which is
-  where ISO's C_M puts real gears.
-- **Split at the pitch point:** foundation 44 %, shear 27 %, contact 21 %, bending 7 %,
-  compression 1 %.
-- **Module-independent**, as a law.
+Curvatures 0.081615 / 0.173242; Hertz at 54.953 N·m, μ 0.06: 1.6328 × 0.9898 mm, 3487.4 MPa; the
+golden efficiency table and locking μ 6.5104 / 0.1356. Full field (elastic, Sainsot): 3.31 pairs,
+η 66.49 %, max 2172 MPa.
 
-### 3.4 ISO 6336-2 σ_H (`t_iso.py` → `iso.txt`, `iso_ring2.txt`; nominal, K = 1, steel, relieved)
+## 4. Worm types and the matched set (`wormtypes.py`; `matched.py`, `t_matched.py` → `matched.txt`)
 
-**FZG-C gears** (16/24, m 4.5, x .1817/.1715, b 14, a 91.5, 302 N·m):
-- **Pitch:** the field gives 1655.6 MPa, exactly ISO's Z_H Z_E √(F_t(u+1)/(d₁bu)), because C lies
-  in the single-pair zone. ISO applies Z_ε 0.9197 and gets 1522.6, so the field is **+8.7 %**.
-- **Field maximum:** 1771.8 at r₁ 35.403, which **is ISO's point B**. ISO's Z_B σ_H is 1771.8
-  (0.0 %).
-- **Loaded pairs:** 1.4624 = ε_α.
+- **The flank type is a parameter:** ZA, ZN and ZI are one ruled helicoid at three (e, μ), with
+  closed-form curvatures. This holds for ruled types only; ZK and ZC are outside the family (the
+  verifier).
+- **Matched set, prototyped for ZN, ZA and ZI** (wheel hobbed by a hob of the worm's own type, same
+  a and Σ).
+  - **Lines:** the meshing equation N·v₁₂ = 0 is a quadratic in u per generator, closed form, and
+    linear in phase (the verifier is right). The contact set at phase φ is the curve
+    v ↦ X(u(v), v). It needs no anchor search and no wheel surface.
+  - **Clip:** where the curve is inside both bodies:
+    - worm tip and root (closed form in u);
+    - worm length and wheel face (planes fixed in space);
+    - wheel tip (a surface of revolution fixed in space);
+    - the discriminant.
+    Each end is a **bracketed 1-D root in v**, the same kind as the field's loaded-interval ends.
+  - **Load:** conjugate, so g ≡ 0 on each line and Δ is closed form (no root). The load is coupled
+    along the arc length. κ_across comes from the rank-one update at every station (0.142083 at the
+    pitch point for all three types, as before).
+  - **Phase:** the same breakpoint scan and bisection, Gauss means and golden maxima.
+- **Results** (steel on C360, μ 0.06, worm torque 2 N·m for η, wheel torque 54.953 N·m for the
+  maximum):
 
-**Helical and ring pairs:**
-
-| Pair | Pitch against ISO with Z_ε, elastic (rigid) | Field max against ISO σ_H0 |
-|---|---|---|
-| 17/43 β20 (m 2, b 20) | **+1.0 %** (−4.2 %) | 1479 against 961, **+54 %** |
-| 20/60 β15 (m 4, b 40) | **+3.6 %** (−1.1 %) | 1213 against 838, **+45 %** |
-| ring 17/−43 β15 (x .3/−.3) | **+1.6 %** (−0.1 %) | 1234 against 639 |
-
-- **The helical maxima sit at the pinion's start of active profile**, for example r₁ 16.95 on a
-  16.90 form radius. There κ ∝ 1/ρ_t, and ISO does not look there.
-- **For comparison, the crate** is +32.7 % over ISO on a full-overlap helical (T08.3).
-
-### 3.5 The shipped worm (`t_worm.py`, `t_worm2.py`)
-
-The worm: 1 start, 40 teeth, d₁ 7, m 1, α_n 20°, Σ 90°; 4340 on C360, E* 70 811 MPa.
-- **Curvatures:** the pair whose anchor passes the pitch point (to 1.6e-9 mm) has κ_L 0.081615
-  and κ_A 0.173242, **the crate's**.
-- **Hertz, worm torque 2 N·m, no friction:** 1.8448 × 1.1184 mm and 3940.3 MPa, the verifier's.
-- **Hertz, wheel torque 54.953 N·m with μ 0.06, as the crate rates:** F_n 2951.2 N, 1.6328 ×
-  0.9898 mm, **3487.4 MPa, the golden**.
-- **Winkler slice:** q₀ 2711.18 against πp₀b/2 = 2711.18; ∫q = 2951.2 N.
-- **The field's own force balance at the pitch point** equals the golden table to the printed
-  digit:
-  - worm driving, at μ 0/.02/.06/.10: **100.000 / 86.882 / 68.691 / 56.677 %**;
-  - wheel driving: **100.000 / 84.993 / 55.254 / 25.874 %**;
-  - locking μ **6.5104 forward and 0.1356 back** (BS 721).
-- **The full field, with sharing** (phase-exact; `worm_field_*.txt`), η at μ 0.06, field max on
-  the wheel torque: rigid, pure k_W: 2.55 pairs, 68.02 %, 3137 MPa; rigid, B″: 2.51, 68.05 %, 3314;
-  **elastic: 3.31, 66.49 %, 2172**; elastic + 5 µm relief: 3.29, 66.67 %, 2105. Against the pitch
-  point (68.69 %, 3487.4): sharing costs 0.6–2.2 pt of efficiency (the spike found ≈1) and lowers
-  the peak 5–38 %; the peak sits at the worm's tip (r₁ 4.50) unless relieved.
-
-### 3.6 Continuity sweeps (`sweep.py` → `sweep_all.txt`, `sweep_fine.txt`, `relief.txt`)
-
-Setup: 17/43, m 1, 2 N·m, μ 0.06, elastic teeth, each pair at its exact zero-play distance.
-
-**Σ at x 0** (Σ°: L/(b/cos β_b), η %, field max MPa): 0: 1.49188, 98.850, 768; 0.01: 1.49188, 98.851, 762; 0.1:
-1.49170, 98.849, 762; 1: 1.49019, 98.818, 760; 3: 1.48731, 98.710, 777; 5: 1.48522, 98.581, 839; 6:
-1.47376, 98.516, 878; 7: 1.41019, 98.448, 921; 8: 1.32540, 98.377, 962; 10: 1.16104, 98.230, 1040;
-12: 1.02995, 98.072, 1104; 20: 0.73692, 97.368, 1298; 45: 0.46038, 94.663, 1704; 90: 0.44132,
-80.571, 1783.
-
-- It is continuous. The patch becomes shorter than the face between 5 and 12°.
-- Jitter of ±1 % in the maximum below 2° comes from the 24-point scan.
-
-**Σ at x .5/.5:**
-- L: 1.36421 → 1.36425 at 0.01° → 1.36479 at 0.5°, which is **continuous**.
-- The field max climbs steeply: 516, 517, 549, 676 and 803 MPa at 0, .01, .1, .5 and 1°.
-- The lengthwise tilt κ_L·y* ∝ ΣD loads the face edge. That is physical: it is ISO's K_Hβ for
-  helix mismatch.
-
-**β 0 → 45 at Σ 0:**
-- With tips relieved, L/(b/cos β_b) is continuous: 1.6211 at 0, 1.6182 at 0.1°, 1.6210 at 0.5°.
-  η is smooth.
-- **The field maximum jumps**: 1031 at 0, then 1338, 1337, 1335 and 1328 at 0.1, 0.5, 1 and 2°,
-  then down to 387 at 45°. See §6.
-- With tip contacts counted, L also jumps (1.705 → 1.615). A spur tip edge touches along the whole
-  face, while the model lays a helical tip contact along e_L.
-
-**Face through ε_β = 1** (b 6, 8, 9, 9.185, 9.5, 10, 12):
-- L/(b/cos β_b) = ε_α to 1e-4 at every width.
-- The field max is smooth: 1054, 861, 797, 789, 780, 764 and 714 MPa.
-
-**Shift x at Σ 0 / 1°:** the field max is 1700 / 2284 MPa at x −0.3, 768 / 760 at 0, 570 / 781 at
-.3 and 496 / 807 at .6. At x −0.3 it sits at the undercut form radius.
-
-**Tips relieved (drop tip-anchored pairs) breaks continuity in Σ:** loaded pairs fall 2.5806 →
-1.6113 between Σ 0 and 0.1°. At small Σ many lines have their minimum on the tip edge by a
-hair. **Relief as a gap** (R above; C_a, L_a = 0.4 m_n) is continuous (`relief.txt`):
-
-| Case | C_a 0 | C_a 2 µm | C_a 5 µm |
-|---|---|---|---|
-| spur → β 0.1/0.5/2°: field max | 1028 → 1287/1337/1328 | **724.6 → 725.5/724.9/724.4** | 759.1 → 759.0/758.6/757.2 |
-| β20, Σ 0 → 0.01/0.1/1°: field max | 768 → 762/762/760 | **651.5 → 647.5/647.4/647.7** | 673.7 → 670.0/669.6/667.9 |
-| β20, Σ 0 → 0.01/0.1/1°: L/(b/cos β_b) | 1.49188 → …/1.49019 | 1.43606 → 1.43634/1.43600/1.43344 | 1.27308 → 1.27310/1.27287/1.27121 |
-
-A 2 µm relief lowers the helical field maximum by 15 % and removes the β = 0 jump; η rises by
-0.15 pt (less load near the tips, where sliding is fastest).
-
-## 4. Worm types (item 8; `wormtypes.py` → `wormtypes.txt`)
-
-- **One surface, no branch.** ZA, ZN and ZI are one ruled helicoid,
-  S(u,v) = R_z(v)(e, u cos μ, u sin μ) + p v ẑ, at three values of (e, μ):
-  - ZA: e = 0, μ = α_x.
-  - ZN: e = −0.1817, μ = 19.79°.
-  - ZI: e = r_b, tan μ = p/e (the developable case).
-- **Curvature in closed form.** With c = cos μ, s = sin μ:
-  N = (cp − se, −usc, uc²); M = −c(cp−se)/|N|; N₂ = (u²sc² − e(cp−se))/|N|;
-  K = −c²(cp−se)²/|N|⁴.
-  - It agrees with `tools/worm_flank_curvature.py`'s finite differences to 7e-8.
-  - For ZI it equals cos β_b/ρ_t to 1e-16.
-  - With the involute wheel it gives the crate's 0.081615 / 0.173242, and p₀ of −4.19 % (ZN) and
-    −3.24 % (ZA).
-- **A matched set** (the wheel hobbed by a hob of the worm's type) is **line contact**.
-  - The contact on each generator is closed form: quadratic in u, linear for ZI.
-  - The wheel's curvature is a rank-one update, S₂ = S₁ − aaᵀ/(a₃₃ − a·v), with no wheel surface
-    needed. Checked on parallel helicals to 1e-15 and on a finite-difference envelope to 1e-6.
-  - **But the contact lines are space curves that are not linear in phase:** their second
-    differences are ~1e-3 mm everywhere except a ZA worm's mid-plane. Clip limits, breakpoints and
-    stationary points therefore need 1-D roots, and the load runs along a curve.
-  - That is **an additional solve**, so under the ruling it is implemented and not exposed. This
-    holds for ZI as well.
-- **At the pitch point** κ_across is 0.142083 /mm for all three types, and falls from 0.1447 to
-  0.1116 over lead angles of 5–25°.
-  - Off the pitch point, ZN runs −6.9…+4.1 % in stress against ZI.
-  - The old "ZN 1–15 % below ZI" holds only against the non-conjugate involute wheel, where it
-    reaches −55 % at 25°.
-
-## 5. Cost and the hot path (`t_cost.py` → `cost.txt`)
-
-| Mesh | Pieces | States | Gap evaluations per state | Total | Python |
+| Wheel | Lines (mean) | Line length (mean) | η | Field max | Where |
 |---|---|---|---|---|---|
-| spur 17/43 | 3 | 168 | 3 605 | 0.61 M | 13.5 s |
-| helical 17/43 | 5 | 280 | 4 890 | 1.37 M | 11.2 s |
-| crossed 17/43, Σ 10° | 4 | 224 | 6 247 | 1.40 M | 18.3 s |
-| ring 17/−43 β15, tips counted | 25 | 1 400 | 9 070 | 12.7 M | 204 s |
-| worm 1/40 (shipped) | 5–7 | 560–728 | 8 600–9 700 | 5–7 M | 32–57 s |
+| **ZN matched**, elastic, coupled | 2.045 | 8.14 mm | 67.29 % | 1842 MPa | worm tip, r 4.50 |
+| ZA matched | 2.031 | 8.14 mm | 67.30 % | 1875 | worm tip |
+| ZI matched | 1.988 | 8.12 mm | 67.34 % | 1766 | worm tip |
+| ZN, slices (uncoupled) | 2.045 | – | 67.30 % | 1744 | worm tip |
+| ZN, rigid teeth, coupled | 2.045 | – | 67.60 % | 43 721 | line end at the wheel tip |
+| involute wheel (crate), elastic field | 3.31 pairs, points | – | 66.49 % | 2172 | worm tip |
+| crate rating, pitch-point Hertz | 1 | – | 68.69 % | 3487 | – |
 
-- **Where the time goes:** about 95 % is the anchor search: a 2-D Newton plus six bracketed edge
-  scans per pair per state.
-- **Rust as built:** at ~80 ns per gap evaluation (2 atan2, 1 acos, ~40 flops), 50–110 ms per
-  mesh.
-- **Rust with the fast routes:** closed-form anchors (the plane of action at Σ = 0; the line of
-  action while the vertex is in the field; edge scans only when it leaves) and a Δ that is linear
-  per line (∫dy/c precomputed). That comes to ~5 000 evaluations, **≈ 0.5 ms per mesh**.
-- **Verdict:** not for the search hot path (today's closed forms take µs; the search tries
-  thousands of candidates). Fit for the final solve (rating and report, once per mesh per case)
-  and as the validation instrument.
+- **Reading the table.**
+  - The matched set carries the load on about 2 lines of 8 mm where the involute wheel has 3.3
+    point contacts. Its peak is 15 % lower than the involute field and 47 % lower than the crate's
+    rating.
+  - The rigid coupled line has square ends, so it is singular at the wheel tip edge, as §2.1
+    predicts. Only elastic figures are meaningful.
+- **Additional branch or solve?**
+  - **No new kind of solve:** a closed-form quadratic, bracketed 1-D roots, a linear Δ.
+  - **But it is a second wheel geometry.** The field's gap d₂ is closed form only for a wheel whose
+    flank is an involute helicoid (a rack- or involute-hob-cut wheel). A worm-hobbed wheel exists
+    only as the worm's envelope.
+  - The line then comes from the meshing equation instead of the gap's minimum. It is exact for a
+    conjugate pair, but it has no gap off the line, so there is no play, no misalignment and no
+    oversize hob.
+  - As a parameter, this is "the wheel's generating tool: a rack, or the mating worm". It is the
+    same kind of parameter as `ShaperCut`'s z → ∞ (CLAUDE.md rule 4).
+  - It becomes branch-free only if the worm wheel is *always* the worm's envelope, replacing the
+    involute wheel rather than sitting beside it.
+  - **Owner's call:** replace the involute worm wheel (no extra branch, and play would need the
+    envelope's gap), or keep it and do not expose the matched set.
+- **Cost of the matched set:** 5.98–7.2 M meshing-equation evaluations per full analysis (both
+  loads), with each curve scanned over the whole worm length. Bracketing each clip from the
+  previous phase cuts this about 20×.
+
+## 5. Cost, counted (`t_cost2.py` → `cost2.txt`)
+
+Whole analyses (scan, bisection, Gauss, golden, nominal), nothing extrapolated. Rust = counts ×
+unit costs in ns (hypot + atan2 35, acos + tan 45, cos + sin 25, G 15, depth panel 200, LU 1 per
+flop), about ×2 uncertain.
+
+| Mesh | Model | States | Anchors | d_i evals | Transcendental calls (local / v / glob) | G / depth panels | LU (Σn³) | Python | **Rust estimate** |
+|---|---|---|---|---|---|---|---|---|---|
+| spur 17/43 | field.py | 180 | 2 376 | 0.97 M | 9.0 / 5.3 / 4.3 M | – | – | 41 s | **0.66 s** |
+| spur 17/43 | coupled + edge | 180 | 2 376 | 1.07 M | 9.4 / 5.4 / 4.4 M | 16.3 / 5.4 M | 3 713 (5.1e7) | 73 s | **2.0 s** |
+| helical 17/43 β20 | field.py | 301 | 3 987 | 2.05 M | 7.8 / 5.5 / 3.5 M | – | – | 37 s | 0.61 s |
+| helical 17/43 β20 | coupled + edge | 296 | 3 942 | 3.12 M | 9.5 / 6.5 / 3.4 M | 36.3 / 12.1 M | 10 531 | 117 s | 3.7 s |
+| crossed Σ10 | field.py / coupled | 240 / 240 | 3 177 | 2.4 / 2.5 M | 7.5 / 5.1 / 2.7 M | – / 29.9 / 10.0 M | – / 10 181 | 45 / 100 s | 0.56 / 3.0 s |
+| ring β15 | field.py (25 pieces) | 1 500 | 19 998 | 19.0 M | 60.7 / 41.5 / 22.5 M | – | – | 179 s | **4.6 s** |
+| ring β15 | coupled + edge (6 pieces) | 360 | 4 779 | 4.7 M | 14.4 / 10.1 / 5.4 M | 66.3 / 22.1 M | 14 844 | 163 s | 6.6 s |
+| worm, involute wheel | field.py / coupled | 358 / 419 | 4 761 / 5 571 | 4.4 / 4.4 M | 14.2 / 9.3 / 4.8 M | – / 66.3 / 22.1 M | – / 23 906 | 65 / 157 s | 1.0 / 6.6 s |
+
+- **The previous round undercounted.** Gap evaluations are 1.6× its extrapolation on the spur (the
+  verifier: 1.5–2.6×). They are also only a tenth of the transcendental work: the feasibility
+  margins and flank points in the anchor search dominate. The old "50–110 ms per mesh" is wrong by
+  6–40×.
+- **The ring's 25 pieces were spurious signature changes** from 2300×-compliant teeth. With a sound
+  tooth it has 6.
+- **Where coupled time goes:** depth panels 54–67 %, the anchor search's transcendental calls 16–34 %. The LU is < 2 %.
+- **Derived fast routes.**
+  - **Σ = 0:**
+    - the anchors, clips and breakpoints are closed form (plane of action; the verifier), which
+      removes about 95 % of the transcendental calls;
+    - the depth kernel is independent of b to O(b²/h²), so it is built once per discretisation,
+      not per b-iterate (÷4–6);
+    - maxima by Brent's method with derivatives, not 25-step golden sections (states ÷3).
+  - **Estimate per mesh:** about 100 states × 2.5 lines × (24 stations × 0.4 µs + kernel about
+    60 µs + LU 8 × 9 µs) ≈ **35 ms coupled** (×2 band: 20–70 ms), **10–30 ms with slices**.
+  - **Σ ≠ 0 and the worm:** the interior anchor lies on the closed-form crossed line of action, and
+    edge scans are needed only when it leaves the field. Allow 2–5× the Σ = 0 figure.
+- **Verdict (unchanged in kind):** not for the search hot path (closed forms take µs); fit for the
+  final solve (once per mesh per load case) and validation. Slices carry the interior within 1 %,
+  so coupling can be confined to line ends and short lines if 35 ms is too much.
 
 ## 6. Open issues (size and sign)
 
-- **The field maximum is at the unrelieved start of active profile.**
-  - It is +45–54 % over ISO σ_H0 on helicals, and 30 % higher at β 0.1° than at spur.
-  - On a helical, the entering corner meets the load while the approach is still at its
-    single-pair level. A spur line enters whole and shares at once.
-  - The discontinuity is in the maximum over phase: a vanishing phase interval carries the peak.
-  - The cure is physical, not a rule: tip relief as a gap (R above), which is ISO 21771's C_a and
-    L_a.
-  - **Owner's call:** either the default rating is the field maximum *with* a stated relief, or it
-    is ISO's points with the maximum reported beside them.
-- **Tip-edge contact as the default ("counted").**
-  - Loaded pairs run 2.62–2.65 against ε_γ 2.58 at 2 N·m.
-  - A tip contact is given the *flank* curvature, the spike's convention. A sharp corner is
-    singular, so the model **underestimates** corner pressure.
-  - "Tips relieved" as a classification is discontinuous (§3.6). Recommendation: express it as a
-    relief (C_a, L_a) or as a tip-edge radius, a named and visible setting.
-- **Interference is singular.** A ring 17/−43 with x₂ −0.3 and a pinion at x 0 gives p_max 1.2–1.4e4
-  MPa at the pinion's base circle; the oracle measures −0.04 µm there. The rating must flag or
-  refuse such a case (`flank_interference`) rather than print a number.
-- **The start of the flank** is the generated form radius from `stiff.py`, which is marginal on
-  17 teeth: the fillet meets the involute near r_b. The field maximum at the start of active
-  profile is sensitive to it.
-- **Uncoupled slices** overestimate a short patch's tooth compliance (worm 2a ≈ 1.6 mm, m 1),
-  conservative for sharing; **c_H at a nominal load** (log dependence: c′ ±5 % over 100–1000 N/mm).
-- **Rings:** tooth compliance as a rack tooth (no shaper fillet); a ring tip edge on the pinion
-  can give κ_A ≤ 0 by flank curvature, and such a pair is skipped and counted (`Field.skipped`).
-- **Breakpoints** are bracketed on 24 samples; at Σ = 0 they matched the closed-form corners.
-- **The crate's worm wheel is an involute helical gear, so its contact is a point.** A hobbed
-  wheel carries the load on lines, which is §4's matched set. The 3487 MPa point-contact rating
-  therefore describes a wheel nobody hobs. **Owner's call:** is the involute-wheel worm a
-  deliberate simplification to be stated, or a model to replace (implemented, not exposed, per
-  the ruling)?
+- **The field max is an unrelieved-edge figure.**
+  - Helicals are +36…+48 % over ISO at the SAP, rings +87 % at a face end and SAP, and a spur ring
+    is singular near r_b.
+  - It is now continuous in β and Σ. It is finite only through the flank-curvature convention or a
+    stated r_e, and it rises as r_e falls (§2.2).
+  - The default rating reads ISO's points (§3.3), as decided.
+- **Line direction at an edge is a rule, not a solve.**
+  - The valley continues along a tip edge. Face edges are not continued: there the gap grows at the
+    κ_A rate across e_L, so their contact is within a Hertz width of the corner.
+  - Edge pieces are straight tangents to the helix, which is exact as β → 0. At large β the edge
+    load is short.
+  - Coupling across the bend treats the polyline as straightened, which is exact as the bend angle
+    (about β_b) → 0.
+- **Tooth coupling along the face** (plate action) is not modelled (series per station); by §2.1's
+  argument it would raise short-segment loads. Size not measured.
+- **A ring's tooth** is the rack tooth on a half-plane rim (3.5 m_n, stated); shaper-cut fillets
+  need redesign G. **Interference** must be flagged against the generated root (§3.1).
 
 ## 7. Rust migration plan (Stage 3, beside redesigns G, R, L and X)
 
 Each step lands green, with the identity harness on everything not named.
 
-1. **`tools/contact_oracle.py`** (from `oracle.py`) becomes the independent instrument.
-   - Gates: the crossed a₀ and play (the u² law within 2 % of D₀), and ISO backlash to 1e-9 on
-     spur, helical and ring pairs.
-   - It replaces the planned `tools/skew_gap.py`, which was the spike's `geom.py`.
-2. **`elliptic.rs`** gains:
-   - `aspect(q)`, the bracketed inverse, replacing `hertz.rs::aspect_ratio` and
-     `curvature_ratio`;
-   - `depth_drop(a,b,h,ν)`, which is B″, with its line form and the regularised terms
-     ρ₁(β) = R_D(β²,0,1)/3 − ln(4/β) + 1 and ρ₂. Both are continuous at 0 by a series below a
-     stated threshold, inside the special function only.
-3. **`gap.rs`** (new): d_i(Y) by the void function with signed z, the relief, the anchor search
-   (closed form first, then the edges), and the clip.
-   - It retires `screw.rs`'s `ZoneLimit`, `limited_by_face`, `face_widths_for`, `half_span` and
-     `axial_centre`, and `contact.rs`'s path limits.
-4. **`tooth_compliance.rs`** (new): from `stiff.py`, over `tooth.rs`'s generated profile (the real
-   fillet), Sainsot coefficients cited; gated against ISO 6336-1 (§3.3); a ring needs redesign G.
-5. **`field.rs`** (new): slices; the Δ solve (linear per line at κ_L = 0, otherwise a bracketed
-   monotone root); the torque balance with friction; breakpoints, means and maxima. It replaces:
-   `contact.rs`'s `load_share`, `efficiency`, `efficient_split`, `split_residual`; `screw.rs`'s
-   `CrossedPath::efficiency`, `single_pair_bounds`, sampled `locking_friction`; `hertz.rs`'s
-   max(σ_ell, σ_line); `strength.rs`'s single-pair points (ISO's C and B become probes).
-6. **`BuiltContact`'s two arms** (shape.rs:2502) collapse into one `Field`. `MeshReport` gains the
-   field maximum and where it sits, ISO C and B, ε, and the tip-contact share.
-7. **Laws:** ε and the mean length equal the Σ = 0 closed forms to 1e-9; the pitch point at
-   Σ 90° equals screw.rs's efficiency and locking to 1e-12; a spur's single-pair field equals
-   ISO Z_B; continuity in Σ, β, x and face; module homogeneity; load conservation every phase.
-8. **The search** keeps closed forms: the u² law and the derived play slope. A law holds each to
-   the field within its stated bound.
+1. **`tools/contact_oracle.py`** (from `oracle.py`) is the independent instrument: a₀ and play, ISO
+   backlash to 1e-9, interference against the generated root.
+2. **`elliptic.rs`** gains `aspect(q)`, `hertz_shape(q)` = C (C(0) = 1 inside the function) and
+   `strip(r)` = G with its R_D derivative (Chebyshev in ln r plus the two asymptotes).
+3. **`gap.rs`** (new): the void function with signed z, relief, the anchor (closed form at Σ = 0,
+   the crossed line of action, then edges), the clip, and the edge continuation. It retires
+   `screw.rs`'s `ZoneLimit` family and `contact.rs`'s path limits.
+4. **`tooth_compliance.rs`** (new): `stiff.py` over `tooth.rs`'s profile with the **derived
+   foundation**, not Sainsot's fit; gated against c′_th (−3 … −13 %) and Method B (C_M an option).
+5. **`field.rs`** (new): coupled lines (N panels; depth kernel once per discretisation), the
+   active set, Δ closed form, the torque balance with friction, breakpoints, means and maxima. It
+   replaces the functions listed in the previous round (`contact.rs` sharing and efficiency,
+   `screw.rs` path efficiency and locking, `hertz.rs`'s max of two, `strength.rs`'s single-pair
+   points).
+6. **The rating:** `MemberRating` reads the field at ISO's C, B and D by default. `MeshReport` gains
+   the field max, where it sits and its kind (interior, face, edge), ε, the tip-contact share and
+   r_e.
+7. **Laws:** ε and mean length at Σ = 0 equal the closed forms; the ellipse converges at
+   O(N⁻²); the infinite line equals the 2-D depth formula; the Σ 90° pitch point equals
+   `screw.rs`; continuity in Σ, β (2, 20, 60 N·m), x and face; module homogeneity; load
+   conservation; no loaded station with κ_A ≤ 0 given r_e.
+8. **The search** keeps the closed forms (the u² law, the derived play slope), held by a law to the
+   field.
+9. **Matched worm set:** only if the owner replaces the involute wheel (§4). Then `gap.rs` takes
+   the wheel's tool as a parameter.
 
-**Audit tasks this subsumes:** T06.5 (share conserved by construction), T06.8 and T06.9
-(efficiency is the field's torque balance, friction exact), T06.10; T07.2, T07.3 (kept only for
-faces that do not overlap), T07.5, T07.14, T07.15, T07.18, T07.19; T08.11 (the truncated patch is
-the Winkler clip), T08.12; redesigns U4/L and X; strength#6 (Z_ε), strength#7, added#28, added#59,
-added2#15, lens-feature-gaps#4/#5.
+**Subsumed audit tasks (unchanged):** T06.5, T06.8–10, T07.2–3, T07.5, T07.14–15, T07.18–19,
+T08.11–12, U4/L, X, strength#6–7, added#28, added#59, added2#15, lens-feature-gaps#4/#5.
 
-**Overturned:** T07.4, as the spike found. **Not subsumed:** T07.9, T07.16, T07.20 (AGMA μ(v)) and
-T08.3's bending bands.
+**Overturned:** T07.4. **Not subsumed:** T07.9, T07.16, T07.20, T08.3's bands.
 
-## Owner's ruling (2026-09-28) on worm types, answered
-
-Matched sets are worth adding only with no extra branch or solve. The flank type needs no branch,
-but a matched set needs a solve (curved contact lines, not linear in phase), so ZA/ZN/ZI are
-implemented and not exposed (§4). The ZI-only position (`docs/rationale.md#the-worm-is-a-zi-involute-helicoid`)
-stands for the shipped involute-wheel model, subject to the question in §6.
+**Owner's decisions of 2026-09-29, status:** ratings at ISO's points, field max beside
+(implemented, §3.3); coupling (done, not the cure, §2.1); special cases (removed given r_e, §2.2);
+Z_ε at B and ring M1 (§2.3); stiffness spread (±16 %, §2.4); matched worm set (owner's call, §4).
