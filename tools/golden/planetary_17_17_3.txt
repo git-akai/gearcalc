@@ -1,9 +1,10 @@
 planetary  z_sun 17  z_planet 17  N 3  x_sun 0  x_ring 0  module 1  alpha 20 deg
 ideal ring (needs no planet shift): 51
 
-why it starts: z_ring 48: the teeth never come into contact
+why it starts: z_ring 47: no profile shift brings the meshes to one axis distance; these tooth counts cannot be assembled
 
 z_ring   x_planet         a mm   residual   a_w sun    even  simult   clearance
+    48    -0.6684    16.092415      0.0e0     6.932      no      no      10.210
     49    -0.4807    16.439068      0.0e0    13.650     yes      no      10.435
     50    -0.2478    16.735718      0.0e0    17.344      no      no      10.483
     51     0.0000    17.000000      0.0e0    20.000      no      no      10.445

@@ -581,8 +581,9 @@ r_b2 = σ m_t z₂/2 cos α_t                      signed, hence concave
 ### Path of contact and contact ratio
 
 ```text
-recess    = T(r_a1, r_b1) − r′₁ sin α_w        T(r_a, r_b) = sgn(r_b)√(r_a² − r_b²)
-approach  = T(r_a2, r_b2) − r′₂ sin α_w
+recess    = min(T(r_a1, r_b1) − r′₁ sin α_w,  r_b2 tan α_w − T(r_j2, r_b2))
+approach  = min(T(r_a2, r_b2) − r′₂ sin α_w,  r_b1 tan α_w − T(r_j1, r_b1))
+                                               T(r, r_b) = sgn(r_b)√(r² − r_b²)
 ε_α       = (approach + recess) / p_bt         p_bt = π m_t cos α_t
 ε_β       = b sin β / (π m)
 ε_γ       = ε_α + ε_β
@@ -592,14 +593,25 @@ Each length is measured from the pitch point, so each subtracts its own gear's
 share. Only the sum uses `a_w`, since `r′₁ + r′₂ = a_w`. With gear 2's radii
 signed, one pair of expressions gives both kinds.
 
+Each end is the nearer of the mate's tip and the member's own **junction**
+`r_j`, where its involute meets its fillet: contact is conjugate only on the
+usable flanks, which is ISO 21771's `ε_α` limited by the form diameter. Where a
+tip reaches past a junction the mesh reports flank interference
+(`mesh.flank_interference`, with the length cut), and every figure below — the
+contact ratio, the load points, the efficiency — counts only the usable flanks.
+An unshifted 9/37 keeps `ε_α` 1.00 of the 1.52 its tips span. Where nothing is
+left, or the single-pair point sits on a base circle, the solve refuses
+(`error.train_flank_interference`).
+
 `ε_β` counts axial overlap the way `ε_α` counts profile overlap; spur gears have
 `ε_β = 0` identically. It is a design check and enters no stress.
 
 **Load point.** The highest point of single-pair contact, one base pitch along
-from first contact. Measured from the tip it needs no mate:
+from first contact. Measured from the tip it needs no mate but where the
+mate's junction ends the path short of the tip, by `s` base pitches:
 
 ```text
-u_load = u_tip − (ε_α − 1) p_b / r_b
+u_load = u_tip − (ε_α − 1 + s) p_b / r_b
 ```
 
 ### Efficiency, parallel axes
@@ -2021,12 +2033,14 @@ about 61:
 | 0.60 | clear | 1.17 | 90.4 % |
 | 0.65 | clear | 1.26 | 86.2 % |
 | 0.70 | clear | 1.35 | 81.9 % |
-| 0.75 | **fouls** | 1.44 | 78.2 % |
-| 0.80 | **fouls** | 1.52 | 75.0 % |
+| 0.75 | **fouls** | 1.43 | 78.3 % |
+| 0.80 | **fouls** | 1.47 | 75.3 % |
 
 The threshold sits between 0.70 and 0.75, so 0.7 is the last proportion that
 ships clean — and the taller tooth costs efficiency on the way as well, since a
-longer path is a dearer one ([Efficiency](#efficiency-parallel-axes)). That
+longer path is a dearer one ([Efficiency](#efficiency-parallel-axes)). The
+fouling rows count only the contact left on the usable flanks: the path is cut
+where the ring's tip passes the pinion's. That
 coupling is reported rather than assumed, and a stage taken to another
 difference will want its own proportion.
 

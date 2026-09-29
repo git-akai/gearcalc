@@ -145,6 +145,8 @@ pub mod key {
     pub const MESH_SELF_LOCKING: &str = "mesh.self_locking";
     /// `mesh.load_sharing_out_of_band`
     pub const MESH_LOAD_SHARING_OUT_OF_BAND: &str = "mesh.load_sharing_out_of_band";
+    /// `mesh.flank_interference`
+    pub const MESH_FLANK_INTERFERENCE: &str = "mesh.flank_interference";
 
     // ---- the part --------------------------------------------------- //
     //
@@ -257,6 +259,8 @@ pub mod key {
     pub const ERROR_TRAIN_WIRING: &str = "error.train_wiring";
     /// `error.train_unknown_material`
     pub const ERROR_TRAIN_UNKNOWN_MATERIAL: &str = "error.train_unknown_material";
+    /// `error.train_flank_interference`
+    pub const ERROR_TRAIN_FLANK_INTERFERENCE: &str = "error.train_flank_interference";
     /// `error.train_overdetermined`
     pub const ERROR_TRAIN_OVERDETERMINED: &str = "error.train_overdetermined";
     /// `error.train_no_such_body`
@@ -338,6 +342,7 @@ pub mod key {
         MESH_OVERLAP_BELOW_ONE,
         MESH_SELF_LOCKING,
         MESH_LOAD_SHARING_OUT_OF_BAND,
+        MESH_FLANK_INTERFERENCE,
         PART_DISTANCE_NOT_REACHED,
         PART_CLEARANCE_NEGATIVE,
         PART_OPTIMISER_FOUND_NOTHING,
@@ -370,6 +375,7 @@ pub mod key {
         ERROR_TRAIN_NO_COMMON_DISTANCE,
         ERROR_TRAIN_WIRING,
         ERROR_TRAIN_UNKNOWN_MATERIAL,
+        ERROR_TRAIN_FLANK_INTERFERENCE,
         ERROR_TRAIN_OVERDETERMINED,
         ERROR_TRAIN_NO_SUCH_BODY,
         ERROR_TRAIN_OVERFLOW,

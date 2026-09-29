@@ -1561,7 +1561,7 @@ pub fn shifts_for_efficiency(
         let mesh = zero_backlash
             .at(zero_backlash.running_distance(clearance))
             .ok()?;
-        let path = crate::contact::ContactPath::new(&a, b.ra, &mesh)?;
+        let path = crate::contact::ContactPath::new(&a, b.flank_ends(), &mesh)?;
         MeshTrial {
             members: [
                 member(&a, floor[0], pinned.shift[0]),
@@ -2146,7 +2146,7 @@ mod tests {
             });
             let mesh = crate::mesh::Mesh::new(&pinion, &as_gear, crate::mesh::MeshKind::Internal)
                 .expect("a 60/20 internal pair meshes");
-            let path = crate::contact::ContactPath::new(&pinion, ring.ra, &mesh)
+            let path = crate::contact::ContactPath::new(&pinion, ring.flank_ends(), &mesh)
                 .expect("and it reaches contact");
             // **The whole question**, which is now two: the tips crossing away
             // from the line of action is an internal pair's alone, and a tip
@@ -2880,7 +2880,14 @@ mod tests {
                     return None;
                 }
                 let mesh = crate::mesh::Mesh::new(&a, &b, crate::mesh::MeshKind::External).ok()?;
-                let path = crate::contact::ContactPath::new(&a, b.ra, &mesh)?;
+                // And no tip past a usable flank, which the chooser refuses too.
+                if mesh
+                    .flank_interference([a.flank_ends(), b.flank_ends()])
+                    .contains(&true)
+                {
+                    return None;
+                }
+                let path = crate::contact::ContactPath::new(&a, b.flank_ends(), &mesh)?;
                 (path.contact_ratio >= MIN_RATIO).then(|| {
                     crate::contact::efficiency(
                         &path,

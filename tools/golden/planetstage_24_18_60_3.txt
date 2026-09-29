@@ -1,26 +1,27 @@
 planetary stage  z 24/18/60  N=3  helix 0 deg  module 1  alpha 20 deg
 
 running axis distance 21.013928 mm (zero-backlash 20.993928 sun-planet, 21.033928 planet-ring; residual 3.6e-15)  shifts +0.0000 / -0.0061 / +0.0281
-eps_a  sun-planet 1.548   planet-ring 1.906   eta_0 0.9715   even spacing true   planet gap 16.409 mm
+eps_a  sun-planet 1.548   planet-ring 1.757   eta_0 0.9725   even spacing true   planet gap 16.409 mm
 sun-planet flank interference  member 1 false  member 2 false
 planet-ring flank interference  member 1 true  member 2 false   tips false (+2.9468 deg of pinion)
 sigma_H at pitch  sun-planet 332.2 MPa   planet-ring 208.1 MPa
 sigma_F  sun 15.0 MPa   planet 16.1 MPa   ring 10.3 MPa
 
     input      held    output        ratio  efficiency
-      sun   carrier      ring      -2.5000     97.154 %
-      sun      ring   carrier       3.5000     97.967 %
-  carrier       sun      ring       0.7143     99.170 %
-  carrier      ring       sun       0.2857     97.951 %
-     ring       sun   carrier       1.4000     99.187 %
-     ring   carrier       sun      -0.4000     97.154 %
+      sun   carrier      ring      -2.5000     97.248 %
+      sun      ring   carrier       3.5000     98.034 %
+  carrier       sun      ring       0.7143     99.198 %
+  carrier      ring       sun       0.2857     98.019 %
+     ring       sun   carrier       1.4000     99.214 %
+     ring   carrier       sun      -0.4000     97.248 %
 
+note: planet-ring: member 1's flank is reached 0.438 mm past its usable end along the line of action: contact ratio, efficiency and ratings count only the usable flanks
 note: 3 planets assumed to share load equally; real sets do not without a floating member, and the remedy is a mesh-load factor this tool declines to apply
 
 axis distance given, shifts chosen to reach it
 a mm             x_sun  x_planet    x_ring    residual     eta_0
-20.8139        -0.3872    0.1890    0.0281       0.0e0    0.9709
-20.9139        -0.1974    0.0933    0.0281     7.1e-15    0.9716
-21.0139        -0.0000   -0.0061    0.0281     3.6e-15    0.9715
-21.1139         0.2045   -0.1090    0.0281     3.6e-15    0.9707
-21.2139         0.4158   -0.2153    0.0281       0.0e0    0.9690
+20.8139        -0.3872    0.1890    0.0281       0.0e0    0.9714
+20.9139        -0.1974    0.0933    0.0281     7.1e-15    0.9724
+21.0139        -0.0000   -0.0061    0.0281     3.6e-15    0.9725
+21.1139         0.2045   -0.1090    0.0281     3.6e-15    0.9723
+21.2139         0.4158   -0.2153    0.0281       0.0e0    0.9719

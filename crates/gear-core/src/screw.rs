@@ -1537,7 +1537,7 @@ mod tests {
                 ..Default::default()
             });
             let mesh = Mesh::new(&g1, &g2, MeshKind::External).unwrap();
-            let path = ContactPath::new(&g1, g2.ra, &mesh).unwrap();
+            let path = ContactPath::new(&g1, g2.flank_ends(), &mesh).unwrap();
             let load = Load::new(2.0, 10.0);
             let e_star = 113_000.0;
             let cs = contact_stress(&path, &mesh, &g1, PARALLEL_AXES, &load, e_star).unwrap();
@@ -2615,7 +2615,7 @@ mod tests {
         };
         let (g1, g2) = (gear(z1, beta_add), gear(z2, -beta_add));
         let mesh = Mesh::new(&g1, &g2, MeshKind::External).expect("a mesh");
-        let parallel_path = ContactPath::new(&g1, g2.ra, &mesh).expect("a path");
+        let parallel_path = ContactPath::new(&g1, g2.flank_ends(), &mesh).expect("a path");
 
         let mut previous = f64::INFINITY;
         for mu in [0.12f64, 0.06, 0.03, 0.01, 0.003] {

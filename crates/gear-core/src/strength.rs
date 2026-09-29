@@ -1734,7 +1734,7 @@ pub fn bending_section_shared_with<T: ToothOutline>(
     samples: usize,
 ) -> Option<(RootSection, f64)> {
     let v = g.virtual_spur();
-    let (at, eps_n) = load_point(g, &v, transverse_contact_ratio, CriticalSection::default())?;
+    let (at, eps_n) = load_point(g, &v, transverse_contact_ratio, 0.0, CriticalSection::default())?;
     worst_over_cycle(&at, eps_n, model, samples, false)
 }
 
@@ -1750,16 +1750,45 @@ pub fn bending_section_searched_afresh<T: ToothOutline>(
     samples: usize,
 ) -> Option<(RootSection, f64)> {
     let v = g.virtual_spur();
-    let (at, eps_n) = load_point(g, &v, transverse_contact_ratio, CriticalSection::default())?;
+    let (at, eps_n) = load_point(g, &v, transverse_contact_ratio, 0.0, CriticalSection::default())?;
     worst_over_cycle(&at, eps_n, model, samples, true)
 }
 
+/// [`bending_section_shared`] on a path whose far end falls `short_of_tip`
+/// base pitches below this member's tip
+/// ([`crate::contact::ContactPath::short_of_tip`]): the mate's usable flank
+/// ends before this tooth's tip is reached, so the cycle is counted from where
+/// contact ends. At zero it is [`bending_section_shared`] to the bit.
+///
+/// # Errors
+///
+/// As [`bending_section_shared`].
+#[must_use]
+pub fn bending_section_on_path<T: ToothOutline>(
+    g: &T,
+    transverse_contact_ratio: f64,
+    short_of_tip: f64,
+    model: LoadSharing,
+) -> Option<(RootSection, f64)> {
+    let v = g.virtual_spur();
+    let (at, eps_n) = load_point(
+        g,
+        &v,
+        transverse_contact_ratio,
+        short_of_tip,
+        CriticalSection::default(),
+    )?;
+    worst_over_cycle(&at, eps_n, model, SHARING_SAMPLES, false)
+}
+
 /// Where the load sits on `v`, the virtual spur member of `g`, and the
-/// virtual contact ratio `ε_αn` the cycle is counted in.
+/// virtual contact ratio `ε_αn` the cycle is counted in. `short_of_tip` is how
+/// far, in transverse base pitches, contact ends below the tip.
 fn load_point<'a, T: ToothOutline>(
     g: &T,
     v: &'a T,
     transverse_contact_ratio: f64,
+    short_of_tip: f64,
     method: CriticalSection,
 ) -> Option<(LoadPoint<'a, T>, f64)> {
     if !transverse_contact_ratio.is_finite() || !v.is_usable() {
@@ -1778,14 +1807,16 @@ fn load_point<'a, T: ToothOutline>(
     } else {
         (lo, 1.0)
     };
+    let base_pitch = crate::plane::base_pitch(v.transverse_module(), v.transverse_pressure_angle());
+    let rb = v.base_radius();
+    // Where contact ends, in the virtual gear's roll: a length along the line
+    // of action scales to the virtual plane as `ε` does.
+    let short_n = short_of_tip / (cos_bb * cos_bb);
     Some((
         LoadPoint {
-            base_pitch: crate::plane::base_pitch(
-                v.transverse_module(),
-                v.transverse_pressure_angle(),
-            ),
-            u_tip,
-            rb: v.base_radius(),
+            base_pitch,
+            u_tip: u_tip + sense * short_n * base_pitch / rb,
+            rb,
             sense,
             method,
             v,
@@ -1807,7 +1838,7 @@ pub fn bending_section_by<T: ToothOutline>(
     method: CriticalSection,
 ) -> Option<RootSection> {
     let v = g.virtual_spur();
-    let (at, eps_n) = load_point(g, &v, transverse_contact_ratio, method)?;
+    let (at, eps_n) = load_point(g, &v, transverse_contact_ratio, 0.0, method)?;
     at.at(highest_single_pair(eps_n))
 }
 
@@ -3059,7 +3090,7 @@ mod tests {
     #[test]
     fn minimum_face_width_is_independent_of_the_face_width_used() {
         let (g1, g2, mesh) = pair(19, 31);
-        let path = ContactPath::new(&g1, g2.ra, &mesh).unwrap();
+        let path = ContactPath::new(&g1, g2.flank_ends(), &mesh).unwrap();
         let sec = root_section(&g1, path.roll_at(path.highest_single_pair())).unwrap();
 
         let mut checked = 0u32;
@@ -3107,7 +3138,7 @@ mod tests {
     #[test]
     fn contact_stress_matches_the_half_width_route() {
         let (g1, g2, mesh) = pair(17, 43);
-        let path = ContactPath::new(&g1, g2.ra, &mesh).unwrap();
+        let path = ContactPath::new(&g1, g2.flank_ends(), &mesh).unwrap();
         let load = Load::new(2.0, 8.0);
         let e_star = 113_000.0;
         let cs = contact_stress(&path, &mesh, &g1, PARALLEL_AXES, &load, e_star).unwrap();
@@ -3147,7 +3178,7 @@ mod tests {
                     ..Default::default()
                 });
                 let mesh = Mesh::new(&g1, &g2, MeshKind::External).unwrap();
-                let path = ContactPath::new(&g1, g2.ra, &mesh).unwrap();
+                let path = ContactPath::new(&g1, g2.flank_ends(), &mesh).unwrap();
                 let load = Load::new(2.0, 10.0);
                 let e_star = 113_000.0;
                 let cs = contact_stress(&path, &mesh, &g1, PARALLEL_AXES, &load, e_star).unwrap();
@@ -3181,7 +3212,7 @@ mod tests {
     #[test]
     fn stress_rises_monotonically_with_lengthwise_curvature_and_returns_to_the_line() {
         let (g1, g2, mesh) = pair(17, 43);
-        let path = ContactPath::new(&g1, g2.ra, &mesh).unwrap();
+        let path = ContactPath::new(&g1, g2.flank_ends(), &mesh).unwrap();
         let load = Load::new(2.0, 10.0);
         let e_star = 113_000.0;
 
@@ -3230,7 +3261,7 @@ mod tests {
     #[test]
     fn the_two_local_radii_sum_to_the_line_of_action() {
         let (g1, g2, mesh) = pair(17, 43);
-        let path = ContactPath::new(&g1, g2.ra, &mesh).unwrap();
+        let path = ContactPath::new(&g1, g2.flank_ends(), &mesh).unwrap();
         let sz = f64::from(mesh.z1) + f64::from(mesh.z2);
         let rb2 = mesh.a_w * f64::from(mesh.z2) / sz * mesh.alpha_w.cos();
         let want = mesh.a_w * mesh.alpha_w.sin();
@@ -3403,7 +3434,7 @@ mod tests {
                 ..Default::default()
             });
             let mesh = Mesh::new(&g1, &g2, MeshKind::External).unwrap();
-            let path = ContactPath::new(&g1, g2.ra, &mesh).unwrap();
+            let path = ContactPath::new(&g1, g2.flank_ends(), &mesh).unwrap();
             let cs = contact_stress(&path, &mesh, &g1, PARALLEL_AXES, &load, 113_000.0).unwrap();
 
             // The transverse geometry itself changes with beta (m_t grows), so
@@ -3435,10 +3466,10 @@ mod tests {
     fn contact_stress_does_not_depend_on_which_gear_is_called_first() {
         for (za, zb) in [(17u32, 43u32), (13, 60), (25, 25), (43, 17), (60, 13)] {
             let (g1, g2, mesh) = pair(za, zb);
-            let path = ContactPath::new(&g1, g2.ra, &mesh).unwrap();
+            let path = ContactPath::new(&g1, g2.flank_ends(), &mesh).unwrap();
 
             let m_rev = Mesh::new(&g2, &g1, MeshKind::External).unwrap();
-            let path_rev = ContactPath::new(&g2, g1.ra, &m_rev).unwrap();
+            let path_rev = ContactPath::new(&g2, g1.flank_ends(), &m_rev).unwrap();
 
             // Same physical mesh and same transmitted power, so the same load
             // along the line of action.
@@ -3553,7 +3584,7 @@ mod tests {
     #[test]
     fn contact_stress_is_worst_off_the_pitch_point_and_softens_with_a_softer_pair() {
         let (g1, g2, mesh) = pair(17, 43);
-        let path = ContactPath::new(&g1, g2.ra, &mesh).unwrap();
+        let path = ContactPath::new(&g1, g2.flank_ends(), &mesh).unwrap();
         let load = Load::new(2.0, 8.0);
 
         let steel = contact_stress(&path, &mesh, &g1, PARALLEL_AXES, &load, 113_000.0).unwrap();

@@ -2464,12 +2464,17 @@ impl BuiltMember {
     fn bending(
         &self,
         contact_ratio: f64,
+        short_of_tip: f64,
         model: LoadSharing,
         rim: Option<f64>,
     ) -> Option<super::Bending> {
         match self {
-            Self::Rack { tooth } => super::Bending::of(tooth, contact_ratio, model, rim),
-            Self::Ring { ring, .. } => super::Bending::of(ring.as_ref(), contact_ratio, model, rim),
+            Self::Rack { tooth } => {
+                super::Bending::of(tooth, contact_ratio, short_of_tip, model, rim)
+            }
+            Self::Ring { ring, .. } => {
+                super::Bending::of(ring.as_ref(), contact_ratio, short_of_tip, model, rim)
+            }
         }
     }
 }
@@ -2689,6 +2694,28 @@ impl PointBuilt {
         let slide = axial_clearance * n[2].abs();
         crate::mesh::angular_play(separation + slide, teeth, s.normal_base_pitch())
     }
+}
+
+/// **A flank reached past its usable end**, said per member with the length
+/// of path it cost: the figures beside it count only the usable flanks.
+///
+/// **Along the line of action, not radially**, which the audit asked for.
+/// The radial depth, junction radius minus the radius the mate's tip
+/// touches, has no value where the tip would touch inside the base circle —
+/// the strongest interference, and the unshifted 9/37's — since no involute
+/// radius is there; and `√(r_b² + ρ²)` is not monotone through `ρ = 0`, so
+/// it would shrink as the interference deepened past it. The length cut is
+/// defined everywhere, zero at the onset and growing with it, and it is the
+/// quantity every figure beside it lost.
+fn flank_interference_notes(path: &ContactPath) -> impl Iterator<Item = Note> {
+    (1_u32..)
+        .zip(path.past_usable_flank())
+        .filter(|(_, depth)| *depth > 0.0)
+        .map(|(member, depth)| {
+            Note::new(key::MESH_FLANK_INTERFERENCE)
+                .count("member", member)
+                .number("depth", depth, 3)
+        })
 }
 
 /// Quadrature points for the friction balance a point contact reports: the
@@ -2933,12 +2960,17 @@ impl Shape {
             let contact = match zero {
                 Zero::Line(design) => {
                     let operating = design.at(at).map_err(TrainError::Mesh)?;
-                    let path = ContactPath::new(
-                        members[m.a].as_gear(),
-                        members[m.b].tip_radius(),
-                        &operating,
-                    )
-                    .ok_or(TrainError::NoContact)?;
+                    let ends = [members[m.a].flank_ends(), members[m.b].flank_ends()];
+                    // No usable path: the tips never reach, or they reach
+                    // only past each other's usable flanks.
+                    let path = ContactPath::new(members[m.a].as_gear(), ends[1], &operating)
+                        .ok_or_else(|| {
+                            if operating.flank_interference(ends).contains(&true) {
+                                TrainError::FlankInterference
+                            } else {
+                                TrainError::NoContact
+                            }
+                        })?;
                     BuiltContact::Line(LineBuilt {
                         design,
                         operating,
@@ -3338,11 +3370,13 @@ pub fn cut(shape: &Shape, lib: &MaterialLibrary) -> Result<Cut, TrainError> {
             continue;
         };
         let cr = line.path.contact_ratio;
-        for i in [m.a, m.b] {
+        let short = line.path.short_of_tip();
+        for (i, short) in [m.a, m.b].into_iter().zip(short) {
             bendings[i].push((
                 k,
                 cut.built.members[i].bending(
                     cr,
+                    short,
                     m.load_sharing,
                     cut.shape.members[i].gear.rim_thickness,
                 ),
@@ -3439,7 +3473,11 @@ pub fn rate(
                 &Load::new(scaled[k].0, width),
                 e_star[k],
             )
-            .ok_or(TrainError::NoContact)
+            // The path is cut to the usable flanks, so every point on it has
+            // a curvature radius of at least zero; a stress with no value is
+            // a single-pair point exactly at a base circle, which only
+            // interference puts there.
+            .ok_or(TrainError::FlankInterference)
             .map(Some)
         };
     let probes: Vec<Option<crate::strength::ContactStress>> = (0..shape.meshes.len())
@@ -4010,9 +4048,9 @@ pub fn rate(
                         case_power,
                         backlash,
                         row_play,
-                        flank_interference: l
-                            .operating
-                            .flank_interference([a.flank_ends(), b.flank_ends()]),
+                        // Read off the path, which is cut exactly where a
+                        // flank is reached past its usable end.
+                        flank_interference: l.path.past_usable_flank().map(|d| d > 0.0),
                         tips: match &**b {
                             BuiltMember::Ring { ring, .. } => {
                                 super::TipRoom::at(ring, a.as_gear(), bm.running)
@@ -4024,6 +4062,7 @@ pub fn rate(
                             a.as_gear().base_helix_angle(),
                         )
                         .into_iter()
+                        .chain(flank_interference_notes(&l.path))
                         .collect(),
                     },
                 ),
@@ -6604,8 +6643,11 @@ mod the_pieces_own {
     fn sharing_is_each_meshes_own() {
         let solve = |ramp: [bool; 2]| {
             let mut s = arr::planetary(12, 30, 72, 3);
+            // A tall tooth, and a root deep enough that its mate's tip stays
+            // on usable flank rather than reaching the fillet.
             for m in &mut s.members {
                 m.gear.addendum = 1.35;
+                m.gear.dedendum = 1.6;
             }
             for (k, on) in ramp.into_iter().enumerate() {
                 s.meshes[k].load_sharing = if on {

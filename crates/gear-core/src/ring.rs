@@ -2161,7 +2161,7 @@ mod tests {
             let pin = Tooth::new(p(zp, xp));
             let mesh =
                 crate::mesh::Mesh::new(&pin, &Tooth::new(p(zr, xr)), MeshKind::Internal).unwrap();
-            let path = crate::contact::ContactPath::new(&pin, g.ra, &mesh).unwrap();
+            let path = crate::contact::ContactPath::new(&pin, g.flank_ends(), &mesh).unwrap();
             let own = mesh_with(&g, &pin).unwrap();
 
             assert!(
@@ -2170,10 +2170,14 @@ mod tests {
                 path.alpha_w,
                 own.alpha_w
             );
+            // `mesh_with`'s ratio is the tips' path; the general one is cut
+            // where a tip reaches past a usable flank, which a standard ring
+            // does (`mesh.flank_interference`).
+            let [tip_approach, tip_recess] = path.tip_limited;
+            let tips = (tip_approach + tip_recess) / path.base_pitch;
             assert!(
-                (path.contact_ratio - own.contact_ratio).abs() < 1e-12,
-                "z={zr}/{zp} x={xr}/{xp}: contact ratio {} vs {}",
-                path.contact_ratio,
+                (tips - own.contact_ratio).abs() < 1e-12,
+                "z={zr}/{zp} x={xr}/{xp}: contact ratio {tips} vs {}",
                 own.contact_ratio
             );
             // Both ends of the path are real, and the ring's tip is the shallow
@@ -2209,12 +2213,12 @@ mod tests {
 
             let internal = {
                 let m = Mesh::new(&pin, &wheel, MeshKind::Internal).unwrap();
-                let path = ContactPath::new(&pin, g.ra, &m).unwrap();
+                let path = ContactPath::new(&pin, g.flank_ends(), &m).unwrap();
                 contact_stress(&path, &m, &pin, PARALLEL_AXES, &load, e_star).unwrap()
             };
             let external = {
                 let m = Mesh::new(&pin, &wheel, MeshKind::External).unwrap();
-                let path = ContactPath::new(&pin, wheel.ra, &m).unwrap();
+                let path = ContactPath::new(&pin, wheel.flank_ends(), &m).unwrap();
                 contact_stress(&path, &m, &pin, PARALLEL_AXES, &load, e_star).unwrap()
             };
 
@@ -2365,7 +2369,7 @@ mod tests {
             let a = pinion(pinion_teeth);
             let b = pinion(ring_teeth);
             let m = crate::mesh::Mesh::new(&a, &b, crate::mesh::MeshKind::External).unwrap();
-            let external = crate::contact::ContactPath::new(&a, b.ra, &m)
+            let external = crate::contact::ContactPath::new(&a, b.flank_ends(), &m)
                 .unwrap()
                 .contact_ratio;
 

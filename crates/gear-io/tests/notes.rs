@@ -5,8 +5,10 @@
 //! "relieves the tooth by about a third" for two model revisions after that
 //! stopped being true — it ran from a 24 % relief to a 15 % **increase** while
 //! the sweep searched a new section at every load point, and the sign was the
-//! part nobody was watching. With the section found once it is a 6–26 %
-//! relief on the same designs.
+//! part nobody was watching. With the section found once it was a 6–26 %
+//! relief on the same designs, and 25–32 % once their tall tips were given
+//! roots deep enough to stay on usable flank: the smaller figures were paths
+//! running through interference.
 //!
 //! This lives in `gear-io` because that is where the catalogue is: the crate
 //! that owns the sentence owns the check on it.
@@ -25,9 +27,12 @@ use gear_core::train::{arrangements, solve_alone, MemberGear, Train};
 fn the_sharing_note_quotes_a_number_the_sweep_still_produces() {
     let lib = gear_io::default_library();
     let rated = |teeth: u32, addendum: f64, model: LoadSharing| {
+        // A root a working clearance below the mate's tip, so the tall tip
+        // stays on usable flank: a tip on the fillet is interference.
         let g = MemberGear {
             teeth,
             addendum,
+            dedendum: addendum + 0.25,
             profile_shift: gear_core::params::Auto::fixed(0.0),
             ..Default::default()
         };
@@ -57,10 +62,10 @@ fn the_sharing_note_quotes_a_number_the_sweep_still_produces() {
 
     let lo = seen.iter().copied().fold(f64::INFINITY, f64::min);
     let hi = seen.iter().copied().fold(f64::NEG_INFINITY, f64::max);
-    // The message quotes a 6–26 % relief; the sign exactly, the size to the
+    // The message quotes a 25–32 % relief; the sign exactly, the size to the
     // percent it prints.
     assert!(
-        (0.055..0.065).contains(&lo) && (0.255..0.265).contains(&hi),
+        (0.245..0.255).contains(&lo) && (0.315..0.325).contains(&hi),
         "the quoted relief has moved: {:.1}% to {:.1}% ({seen:?})",
         100.0 * lo,
         100.0 * hi

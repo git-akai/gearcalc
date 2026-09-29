@@ -2271,7 +2271,7 @@ fn strength_report(
         eprintln!("z={z1}/{z2} cannot mesh");
         return;
     };
-    let Some(path) = ContactPath::new(&g1, g2.ra, &mesh) else {
+    let Some(path) = ContactPath::new(&g1, g2.flank_ends(), &mesh) else {
         eprintln!("z={z1}/{z2} has no usable path of contact");
         return;
     };
@@ -2336,7 +2336,7 @@ fn strength_report(
         (
             2,
             &g2,
-            reversed.and_then(|m| ContactPath::new(&g2, g1.ra, &m)),
+            reversed.and_then(|m| ContactPath::new(&g2, g1.flank_ends(), &m)),
         ),
     ] {
         let Some(p) = p else {
@@ -2473,8 +2473,8 @@ fn iso_report(z: [u32; 2], alpha: f64, helix: f64, x: [f64; 2], face: f64, torqu
         return;
     };
     let (Some(path), Some(path_back)) = (
-        ContactPath::new(&g[0], g[1].ra, &mesh),
-        ContactPath::new(&g[1], g[0].ra, &back),
+        ContactPath::new(&g[0], g[1].flank_ends(), &mesh),
+        ContactPath::new(&g[1], g[0].flank_ends(), &back),
     ) else {
         println!("z={}/{} has no usable path of contact", z[0], z[1]);
         return;
@@ -2582,10 +2582,13 @@ fn sharing_bias_report() {
     for teeth in [17_u32, 25, 40, 60, 100] {
         for alpha in [14.5_f64, 20.0] {
             for addendum in [1.0_f64, 1.1, 1.2, 1.3, 1.4] {
+                // A root a working clearance below the mate's tip, so the
+                // tall tip stays on usable flank rather than being cut off it.
                 let g = Tooth::new(GearParams {
                     teeth,
                     pressure_angle: alpha,
                     addendum,
+                    dedendum: addendum + 0.25,
                     ..Default::default()
                 });
                 if g.clamps
@@ -2595,7 +2598,7 @@ fn sharing_bias_report() {
                 }
                 let Some(eps) = Mesh::new(&g, &g, MeshKind::External)
                     .ok()
-                    .and_then(|m| ContactPath::new(&g, g.ra, &m))
+                    .and_then(|m| ContactPath::new(&g, g.flank_ends(), &m))
                     .map(|p| p.contact_ratio)
                 else {
                     continue;
@@ -3227,7 +3230,7 @@ fn loadcase_report() {
             println!("{name}: mesh failed");
             continue;
         };
-        let Some(path) = ContactPath::new(&g1, g2.ra, &m) else {
+        let Some(path) = ContactPath::new(&g1, g2.flank_ends(), &m) else {
             println!("{name}: path failed");
             continue;
         };

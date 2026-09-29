@@ -26,7 +26,10 @@ Every stress is nominal on both sides: no `K_A`, `K_v`, `K_Fβ`, `K_Fα`.
 
 # Why it can be trusted
 
-Nothing here shares code with the crate. **Before any ratio is printed it
+Nothing here shares code with the crate. Its contact ratio is ISO 21771's,
+limited by form diameters it finds from the basic rack alone — in closed form,
+or where the rack undercuts, by a material test on the swept tip round — and
+it must match the tool's to 1e-8. **Before any ratio is printed it
 reproduces the tool's own ISO set** — ISO's 30° tangent section and `Y_S`,
 which `gear-cli iso` measures off the generated profile — to 1e-8 on every
 pair it rates, spur and helical, on the tool's own virtual gear. Method B is
@@ -152,6 +155,60 @@ def f_eps(eps_beta: float, eps_alpha_n: float) -> float:
     return math.sqrt((1.0 - eps_beta) / 2.0 + eps_beta / eps_alpha_n)
 
 
+def undercut_form_roll(z, m, alpha, h_fp, rho_fp):
+    """The form circle of an unshifted spur gear its rack undercuts, as a roll
+    length `√(r_Nf² − r_b²)`, by a material test on the swept rack alone.
+
+    An involute point below the form circle is swept away by the rack's tip
+    round: some roll angle brings the round's centre within `ρ_fP` of it. So
+    the form circle is the largest radius whose involute point comes within
+    the round's radius of the centre's path — each nearest approach found by
+    sampling the roll angle and refining by golden section, the radius by
+    bisection. Shares nothing with the crate but the basic rack's numbers."""
+    r = z * m / 2
+    rb = r * math.cos(alpha)
+    half = math.pi * m / 4  # the rack tooth's half-width at the pitch line
+    rho, y_tip = rho_fp * m, r - h_fp * m
+    y_c = y_tip + rho
+    x_c = half - (r - y_c) * math.tan(alpha) - rho / math.cos(alpha)
+    span = 4 * math.pi / z
+
+    def nearest(px, py, cx):
+        # The round centre (cx, y_c) of the rack rolled by φ, in the gear frame.
+        def d(phi):
+            c, s_ = math.cos(phi), math.sin(phi)
+            x, y = cx - r * phi, y_c
+            return math.hypot(c * x + s_ * y - px, -s_ * x + c * y - py)
+
+        n = 2000
+        best = min(range(n + 1), key=lambda i: d(-span + 2 * span * i / n))
+        lo, hi = -span + 2 * span * (best - 1) / n, -span + 2 * span * (best + 1) / n
+        g = (math.sqrt(5) - 1) / 2
+        for _ in range(120):
+            a, b = hi - g * (hi - lo), lo + g * (hi - lo)
+            if d(a) < d(b):
+                hi = b
+            else:
+                lo = a
+        return d((lo + hi) / 2)
+
+    def covered(R):
+        # The involute point of the tooth right of the gap, in the gear frame.
+        w = math.pi / (2 * z) - inv(alpha) + inv(math.acos(rb / R))
+        px, py = R * math.sin(w), R * math.cos(w)
+        return min(nearest(px, py, cx) for cx in (x_c, x_c + math.pi * m)) < rho
+
+    lo, hi = rb * (1 + 1e-15), r + m
+    if not covered(lo):
+        return 0.0
+    for _ in range(200):
+        mid = (lo + hi) / 2
+        if covered(mid):
+            lo = mid
+        else:
+            hi = mid
+    return math.sqrt(lo * lo - rb * rb)
+
 def y_beta(beta: float, eps_beta: float) -> float:
     """The 2019 helix angle factor, Formula (66): `ε_β` held at 1 and `β` at
     30° above them, as the clause says."""
@@ -177,10 +234,36 @@ def rate(z1, z2, alpha_deg, beta_deg=0.0, face=10.0):
     d_a = [g["d_a"] for g in r["gear"]]
     # Unshifted, so the pair runs at its reference distance and angle.
     a_w, alpha_wt = (d[0] + d[1]) / 2, alpha_t
-    eps = (
-        sum(math.sqrt((da / 2) ** 2 - (db / 2) ** 2) for da, db in zip(d_a, d_b))
-        - a_w * math.sin(alpha_wt)
-    ) / (math.pi * m_n / math.cos(beta) * math.cos(alpha_t))
+    # ISO 21771's transverse contact ratio limited by the form diameters:
+    # each end of the path is the nearer of the mate's tip and this member's
+    # own form circle. The form circle of a rack-cut, unshifted external gear
+    # in closed form from the basic rack alone: the involute starts where the
+    # rack's straight flank ends above its tip round, a roll length
+    # r sin α_t − (h_fP − ρ_fP (1 − sin α_n)) m_n / sin α_t from the base
+    # tangent point. A negative length is undercut, where the form circle is
+    # the crossing of the swept tip round with the involute: found by a
+    # material test on the swept rack for a spur gear, and the pair skipped
+    # on a helical one.
+    def form_roll(i, z):
+        g = r["gear"][i]
+        lift = (g["h_fP"] - g["rho_fP"] * (1 - math.sin(alpha_n))) * m_n
+        roll = d[i] / 2 * math.sin(alpha_t) - lift / math.sin(alpha_t)
+        if roll >= 0:
+            return roll
+        if beta_deg:
+            return None
+        return undercut_form_roll(z, m_n, alpha_n, g["h_fP"], g["rho_fP"])
+
+    rolls = [form_roll(i, z) for i, z in enumerate((z1, z2))]
+    if None in rolls:
+        return None
+    d_nf = [2 * math.hypot(d_b[i] / 2, rolls[i]) for i in (0, 1)]
+    t = lambda d, db: math.sqrt(max((d / 2) ** 2 - (db / 2) ** 2, 0.0))
+    g_line = a_w * math.sin(alpha_wt)
+    ends = [
+        min(t(d_a[i], d_b[i]), g_line - t(d_nf[1 - i], d_b[1 - i])) for i in (0, 1)
+    ]
+    eps = (sum(ends) - g_line) / (math.pi * m_n / math.cos(beta) * math.cos(alpha_t))
     assert abs(eps - r["eps_alpha"]) < AGREE, (z1, z2, eps, r["eps_alpha"])
     eps_beta = face * abs(math.sin(beta)) / (math.pi * m_n)
 
@@ -237,12 +320,17 @@ def main() -> None:
     print("\n== spur bending at the outer point of single-pair contact, tool / ISO ==")
     print(f"  pairs z1 {pinions} with z2 {wheels} (z2 >= z1), x = 0, both members")
     for alpha in (14.5, 20.0, 25.0):
-        ratios = []
+        ratios, skipped = [], []
         for z1 in pinions:
             for z2 in wheels:
                 if z2 >= z1:
-                    ratios += [b for b, _ in rate(z1, z2, alpha)[0]]
-        print(f"  alpha {alpha:4.1f} deg  {min(ratios):.3f}–{max(ratios):.3f}  ({len(ratios)} members)")
+                    rated = rate(z1, z2, alpha)
+                    if rated is None:
+                        skipped.append(f"{z1}/{z2}")
+                        continue
+                    ratios += [b for b, _ in rated[0]]
+        print(f"  alpha {alpha:4.1f} deg  {min(ratios):.3f}–{max(ratios):.3f}  ({len(ratios)} members)"
+              + (f", undercut and skipped: {' '.join(skipped)}" if skipped else ""))
 
     print("\n== helical bending, tool / ISO = spur base x helix pair 1/(f_ε·Y_β) ==")
     print("  pairs 17/43 and 25/70, x = 0, alpha 20 deg, beta 10/20/30 deg, both members")

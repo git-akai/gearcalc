@@ -1069,7 +1069,7 @@ mod tests {
         // of 1,482 sets that solve.
         let mut ring_cases_solved = 0;
         for (sun, planet, addendum, shift) in [
-            (11_u32, 13_u32, 0.5_f64, -1.0_f64),
+            (11_u32, 13_u32, 0.5_f64, -0.8_f64),
             (11, 13, 0.7, -1.4),
             (17, 18, 0.5, -1.6),
         ] {
@@ -1235,6 +1235,24 @@ mod tests {
                 s.members[0].gear.profile_shift = gear_core::params::Auto::fixed(0.5);
                 if let Ok(r) = solve_spur(&s, 2.0, 0.0, &lib) {
                     record(&r.every_note());
+                }
+            }
+            // **A member left no rated section**: since the path of contact
+            // ends at the usable flanks, only deep flank interference leaves
+            // a load point off every section — a 7-tooth pinion at x −0.8
+            // against 300 at 20°.
+            {
+                let mut s = arr::pair([7, 300]).with_first_helix(20.0);
+                s.members[0].gear.profile_shift = gear_core::params::Auto::fixed(-0.8);
+                s.members[1].gear.profile_shift = gear_core::params::Auto::fixed(0.0);
+                for m in &mut s.members {
+                    m.gear.no_undercut = false;
+                }
+                if let Ok(r) = solve_spur(&s, 10.0, 100.0, &lib) {
+                    record(&r.every_note());
+                    for g in &r.members {
+                        record(&g.notes);
+                    }
                 }
             }
             // An automatic face width with every rating switched off.
@@ -1489,6 +1507,7 @@ mod tests {
                     }
                 }
             }
+            err(TrainError::FlankInterference.note());
             if let Err(e) = gear_core::train::solve_train(
                 &Train::chained(Vec::new(), |_| {
                     vec![gear_core::train::LoadCase::ultimate(1, 2, 2.0, 3000.0)]
@@ -1709,7 +1728,19 @@ mod tests {
     ///   modifications 0.05–2.5 and cutter addenda 0.8–1.6 — and it never
     ///   fires, as it never did over the 71,750 before.
     ///
-    /// It is live code with a live message, so it is not deleted on suspicion.
+    /// - `gear.bending_unrated_in_mesh` — one mesh's load point leaving a
+    ///   member no root section while another mesh's does not. It fired while
+    ///   the path of contact ran tip to tip: a planet's load point on the
+    ///   ring side fell below its usable flank. Since the path is cut at the
+    ///   usable flank (T06.1) the load point lies on it, and a sweep of 2,555
+    ///   solving sets and pairs found none (2026-09-29: sets of sun 8–20 and
+    ///   planet 8–30 teeth, pairs of 5–20 against 20–80, helix 0–35°,
+    ///   addenda 0.6–1.3, shifts −0.8 to 0.4, undercut floor off). What can
+    ///   still reach it is a helical member's virtual flank, whose bracket is
+    ///   not the real one's.
+    ///
+    /// Each is live code with a live message, so it is not deleted on
+    /// suspicion.
     ///
     /// # Those that left this list, and how one got on it
     ///
@@ -1744,7 +1775,11 @@ mod tests {
     /// asserts it never does. The whole of `cargo nextest run` builds teeth
     /// with that assertion on (it found the α = 0° thickness shift, fixed
     /// 2026-09-29), and none has reached it since.
-    const UNFIRED: &[&str] = &["clamp.ring_fully_filleted", "clamp.flank_unsolved"];
+    const UNFIRED: &[&str] = &[
+        "clamp.ring_fully_filleted",
+        "clamp.flank_unsolved",
+        "gear.bending_unrated_in_mesh",
+    ];
 
     #[test]
     fn a_document_that_is_not_a_catalogue_is_refused() {

@@ -20,6 +20,11 @@ pub struct ContactPath {
     pub approach: f64,
     /// Recess length: from the pitch point to last contact.
     pub recess: f64,
+    /// Approach and recess as the two tips alone bound them. They differ from
+    /// the fields above only where a tip reaches past its mate's usable flank
+    /// ([`crate::mesh::Mesh::flank_interference`]); elsewhere they are equal to
+    /// the bit.
+    pub tip_limited: [f64; 2],
     /// Transverse base pitch — the spacing of successive tooth pairs along the
     /// line of action.
     pub base_pitch: f64,
@@ -44,10 +49,20 @@ impl ContactPath {
     /// Build the contact path for a pair meshing at their zero-backlash centre
     /// distance.
     ///
-    /// `tip_radius_2` is gear 2's tip radius. It is passed rather than read off a
-    /// [`Tooth`] because gear 2 may be a **ring**, whose tip radius is *inside*
-    /// its pitch circle and comes from [`crate::ring::Ring`] — the one thing this
-    /// ever needed from gear 2, and the thing a `Tooth` cannot supply for a ring.
+    /// `mate` is gear 2's usable flank: its tip and the radius where its
+    /// involute meets its fillet. It is passed rather than read off a [`Tooth`]
+    /// because gear 2 may be a **ring**, whose tip is *inside* its pitch circle
+    /// and whose flank runs outward — only the member can say
+    /// ([`crate::mesh::FlankEnds`]).
+    ///
+    /// # Cut at the usable flank
+    ///
+    /// Contact is conjugate only where both flanks are involute. Each end of
+    /// the path is therefore the nearer of the mate's tip and this member's own
+    /// junction, `ρ ≥ √(r_j² − r_b²)` along the line of action, signed as the
+    /// tip is. That is ISO 21771's `ε_α` limited by the form diameter. Where a
+    /// tip reaches past the junction, the path ends at the junction and the
+    /// part beyond it is flank interference, which the mesh reports.
     ///
     /// # One path, both kinds
     ///
@@ -71,10 +86,10 @@ impl ContactPath {
     /// external, `T₁ − T₂ + a sin α_w` internal — and it agrees with
     /// [`crate::ring::mesh_with`]'s independently written form.
     ///
-    /// Returns `None` when either end of the path is not reached, which is a mesh
-    /// whose teeth never touch.
+    /// Returns `None` when the usable flanks leave no path, which is a mesh
+    /// whose involutes never touch.
     #[must_use]
-    pub fn new(g1: &Tooth, tip_radius_2: f64, mesh: &Mesh) -> Option<Self> {
+    pub fn new(g1: &Tooth, mate: crate::mesh::FlankEnds, mesh: &Mesh) -> Option<Self> {
         let (r1, r2) = mesh.operating_radii();
         let (rb1, rb2) = mesh.base_radii();
         // The tangent length carries the sign of its base radius, so a ring's
@@ -87,8 +102,14 @@ impl ContactPath {
         // uses a_w, since r′₁ + r′₂ = a_w, which is why the familiar
         // contact-ratio formula has a_w in it and this does not.
         let sin_aw = mesh.alpha_w.sin();
-        let recess = tangent(g1.ra, rb1) - r1 * sin_aw;
-        let approach = tangent(tip_radius_2, rb2) - r2 * sin_aw;
+        let tip_recess = tangent(g1.ra, rb1) - r1 * sin_aw;
+        let tip_approach = tangent(mate.tip, rb2) - r2 * sin_aw;
+        // Each member's junction bounds the end where that member is lowest:
+        // member 1 at the start, member 2 at the end. `r_b tan α_w` is where
+        // the pitch point sits from each base tangent point.
+        let tan_aw = mesh.alpha_w.tan();
+        let approach = tip_approach.min(rb1 * tan_aw - tangent(g1.r_j, rb1));
+        let recess = tip_recess.min(rb2 * tan_aw - tangent(mate.junction, rb2));
         // **A path needs a length, not two positive halves.** `approach` and
         // `recess` are signed coordinates along the line of action, measured
         // from the pitch point, and the familiar mesh has one either side of it.
@@ -108,13 +129,14 @@ impl ContactPath {
         Some(Self {
             approach,
             recess,
+            tip_limited: [tip_approach, tip_recess],
             base_pitch,
             contact_ratio: (approach + recess) / base_pitch,
             operating_radius_1: r1,
             base_radius_1: g1.rb,
             tip_pressure_angle: [
                 (g1.rb / g1.ra).clamp(-1.0, 1.0).acos(),
-                (rb2 / tip_radius_2).clamp(-1.0, 1.0).acos(),
+                (rb2 / mate.tip).clamp(-1.0, 1.0).acos(),
             ],
             alpha_w: mesh.alpha_w,
         })
@@ -126,10 +148,35 @@ impl ContactPath {
         (self.operating_radius_1 * self.alpha_w.sin() + xi) / self.base_radius_1
     }
 
-    /// Where gear 1 is at its tip: the last instant of contact.
+    /// The last instant of contact: gear 1 at its tip, or lower where gear 2's
+    /// usable flank ends first.
     #[must_use]
     pub fn tip(&self) -> f64 {
         self.recess
+    }
+
+    /// How far each member's last contact falls short of its own tip, in base
+    /// pitches along the line of action, gear 1 first. Exactly zero on a
+    /// member whose mate's usable flank reaches its tip; positive where the
+    /// mate's junction ends the path first.
+    ///
+    /// A member's bending load point is placed from its tip
+    /// ([`crate::strength::bending_section_on_path`]), so this is what moves
+    /// it to where contact actually ends.
+    #[must_use]
+    pub fn short_of_tip(&self) -> [f64; 2] {
+        let [first, second] = self.past_usable_flank();
+        [second / self.base_pitch, first / self.base_pitch]
+    }
+
+    /// How far along the line of action the mate's tip would reach past each
+    /// member's usable flank, mm, gear 1 first: the length the cut removed at
+    /// that member's end. Positive exactly where that member's flank is
+    /// interfered with, and zero elsewhere.
+    #[must_use]
+    pub fn past_usable_flank(&self) -> [f64; 2] {
+        let [tip_approach, tip_recess] = self.tip_limited;
+        [tip_approach - self.approach, tip_recess - self.recess]
     }
 
     /// The highest point of single-pair tooth contact on gear 1.
@@ -1087,6 +1134,14 @@ mod tests {
         }
     }
 
+    /// The path, where neither tip reaches past its mate's usable flank. The
+    /// loss laws below are about pairs that can be cut and run, which is what
+    /// the search admits (`auto::MeshTrial`); an interfering pair's teeth
+    /// collide, and its cut path is not a design to optimise.
+    fn usable_only(p: ContactPath) -> Option<ContactPath> {
+        p.past_usable_flank().iter().all(|d| *d <= 0.0).then_some(p)
+    }
+
     fn pair(z1: u32, z2: u32) -> (Tooth, Tooth, Mesh) {
         let a = Tooth::new(GearParams {
             teeth: z1,
@@ -1113,7 +1168,7 @@ mod tests {
         for (z1, z2, sum) in [
             (17_u32, 43_u32, 0.0),
             (20, 20, 0.4),
-            (13, 61, -0.2),
+            (13, 61, 0.6),
             (25, 31, 0.6),
         ] {
             let at = |d: f64| {
@@ -1126,7 +1181,7 @@ mod tests {
                 };
                 let (a, b) = (g(z1, sum / 2.0 + d), g(z2, sum / 2.0 - d));
                 let m = Mesh::new(&a, &b, MeshKind::External).ok()?;
-                let p = ContactPath::new(&a, b.ra, &m)?;
+                let p = usable_only(ContactPath::new(&a, b.flank_ends(), &m)?)?;
                 Some((p, efficiency(&p, &m, &a, 0.08, Drive::Forward), m.a_w))
             };
 
@@ -1177,7 +1232,7 @@ mod tests {
         for (z1, z2, sum) in [
             (17_u32, 43_u32, 0.0),
             (20, 20, 0.4),
-            (13, 61, -0.2),
+            (13, 61, 0.6),
             (25, 31, 0.6),
         ] {
             let built = |d: f64| {
@@ -1190,10 +1245,18 @@ mod tests {
                 };
                 let (a, b) = (g(z1, sum / 2.0 + d), g(z2, sum / 2.0 - d));
                 let m = Mesh::new(&a, &b, MeshKind::External).ok()?;
-                let p = ContactPath::new(&a, b.ra, &m)?;
+                let p = usable_only(ContactPath::new(&a, b.flank_ends(), &m)?)?;
                 Some((p, efficiency(&p, &m, &a, 0.08, Drive::Forward)))
             };
-            let best = efficient_split(&|d| built(d).map(|(p, _)| p), (-0.6, 0.6))
+            // The divisions either way of even that keep both flanks usable.
+            let edge = |sense: f64| {
+                (0..=100)
+                    .map(|i| sense * f64::from(i) * 0.006)
+                    .take_while(|d| built(*d).is_some())
+                    .last()
+                    .unwrap_or(0.0)
+            };
+            let best = efficient_split(&|d| built(d).map(|(p, _)| p), (edge(-1.0), edge(1.0)))
                 .unwrap_or_else(|| panic!("z{z1}/z{z2}: no division satisfies the condition"));
             let here = built(best).expect("a pair at the best division").1;
             for i in -100..=100 {
@@ -1229,7 +1292,7 @@ mod tests {
                 };
                 let (a, b) = (g(d), g(-d));
                 let m = Mesh::new(&a, &b, MeshKind::External).ok()?;
-                ContactPath::new(&a, b.ra, &m)
+                ContactPath::new(&a, b.flank_ends(), &m)
             };
             let d = efficient_split(&built, (-0.4, 0.4)).expect("a symmetric pair has an answer");
             assert!(
@@ -1266,7 +1329,7 @@ mod tests {
             let of = |m: f64| {
                 let (a, b) = (g(17, m), g(43, m));
                 let mesh = Mesh::new(&a, &b, MeshKind::External).unwrap();
-                let path = ContactPath::new(&a, b.ra, &mesh).unwrap();
+                let path = ContactPath::new(&a, b.flank_ends(), &mesh).unwrap();
                 (
                     efficiency(&path, &mesh, &a, 0.08, Drive::Forward),
                     split_residual(&path),
@@ -1289,19 +1352,20 @@ mod tests {
     /// the smallest one that clears undercut.
     ///
     /// The loss is an integral along the whole path, so a *longer* path is a
-    /// dearer one: positive shift shortens it, the contact ratio falls toward
-    /// unity, and the loss falls with it. On 17/43 the best admissible pair
-    /// keeps 98.47 % at `Σx = +1.25` where the least-shift design keeps 96.87 %
-    /// at `Σx = −1.20`, and the contact ratio is 1.48 against 3.04.
+    /// dearer one: positive shift shortens the sliding either side of the pitch
+    /// point, and the loss falls with it. Over pairs whose tips stay on usable
+    /// flank, 17/43 keeps 98.47 % at its best, `Σx = +1.25`, against 98.23 % at
+    /// the least shift that clears, `Σx = −0.35`; 9/37 keeps 97.69 % at
+    /// `Σx = +3.70` against 96.40 % at `−0.25`.
     ///
     /// It matters because the automatic shift this crate has always offered is
     /// the *undercut* one — the least that clears — and that is a floor rather
     /// than an answer. The optimum is interior: stepping either shift further
     /// makes it worse, so nothing is holding it there but the loss itself.
     ///
-    /// A pinion small enough to need shift to exist does not change the
-    /// direction, only where the shift goes: at 9 teeth the floor pins `x₁` at
-    /// +0.50 and the optimum puts the rest on its wheel.
+    /// An earlier statement of this compared against a least-shift 17/43 at
+    /// `Σx = −1.20` with a contact ratio of 3.04: a path running tip to tip
+    /// through flank interference, which the path now cuts.
     #[test]
     fn an_external_pair_loses_least_well_above_its_undercut_floor() {
         for (z1, z2) in [(9_u32, 37_u32), (17, 43)] {
@@ -1316,16 +1380,11 @@ mod tests {
                 let (a, b) = (g(z1, x1), g(z2, x2));
                 let spoiled = a.undercut || b.undercut || a.severed || b.severed;
                 let mesh = Mesh::new(&a, &b, MeshKind::External).ok()?;
-                let path = ContactPath::new(&a, b.ra, &mesh)?;
-                (!spoiled && path.contact_ratio >= 1.0).then(|| {
-                    (
-                        efficiency(&path, &mesh, &a, 0.08, Drive::Forward),
-                        x1 + x2,
-                        path.contact_ratio,
-                    )
-                })
+                let path = usable_only(ContactPath::new(&a, b.flank_ends(), &mesh)?)?;
+                (!spoiled && path.contact_ratio >= 1.0)
+                    .then(|| (efficiency(&path, &mesh, &a, 0.08, Drive::Forward), x1 + x2))
             };
-            let (mut best, mut least) = (None::<(f64, f64, f64)>, None::<(f64, f64, f64)>);
+            let (mut best, mut least) = (None::<(f64, f64)>, None::<(f64, f64)>);
             for i1 in -10..=40 {
                 for i2 in -25..=40 {
                     let Some(v) = at(f64::from(i1) * 0.05, f64::from(i2) * 0.05) else {
@@ -1346,16 +1405,10 @@ mod tests {
                 best.1
             );
             assert!(
-                best.0 > least.0 + 0.005,
+                best.0 > least.0,
                 "z{z1}/z{z2}: {} against the least shift's {}",
                 best.0,
                 least.0
-            );
-            assert!(
-                best.2 < least.2,
-                "z{z1}/z{z2}: and it gets there by shortening the path, {} against {}",
-                best.2,
-                least.2
             );
         }
     }
@@ -1390,7 +1443,7 @@ mod tests {
         let wheel = Tooth::new(params(zr));
         let ring = crate::ring::Ring::cut_by(&params(zr), &crate::ring::Cutter::default());
         let m = Mesh::new(&pinion, &wheel, MeshKind::Internal).unwrap();
-        let path = ContactPath::new(&pinion, ring.ra, &m).unwrap();
+        let path = ContactPath::new(&pinion, ring.flank_ends(), &m).unwrap();
         (pinion, wheel, m, path)
     }
 
@@ -1486,7 +1539,7 @@ mod tests {
         for (z1, z2) in [(17u32, 43u32), (13, 60), (25, 25)] {
             for beta in [0.0, 15.0, 30.0] {
                 let (a, b, m) = helical_pair(z1, z2, beta);
-                let path = ContactPath::new(&a, b.ra, &m).unwrap();
+                let path = ContactPath::new(&a, b.flank_ends(), &m).unwrap();
                 let s = sliding_at(&path, &m, &a, 0.0, 100.0);
                 let reference = 100.0 * path.operating_radius_1;
                 assert!(
@@ -1512,7 +1565,7 @@ mod tests {
         for (z1, z2) in [(17u32, 43u32), (19, 31)] {
             for beta in [0.0, 8.0, 20.0, 35.0] {
                 let (a, b, m) = helical_pair(z1, z2, beta);
-                let path = ContactPath::new(&a, b.ra, &m).unwrap();
+                let path = ContactPath::new(&a, b.flank_ends(), &m).unwrap();
                 for step in 0..=10 {
                     #[allow(clippy::cast_precision_loss)]
                     let t = step as f64 / 10.0;
@@ -1541,7 +1594,7 @@ mod tests {
         for (z1, z2) in [(17u32, 43u32), (13, 60), (25, 25)] {
             for beta in [0.0, 12.0, 25.0] {
                 let (a, b, m) = helical_pair(z1, z2, beta);
-                let path = ContactPath::new(&a, b.ra, &m).unwrap();
+                let path = ContactPath::new(&a, b.flank_ends(), &m).unwrap();
                 let omega_1 = 100.0;
                 let omega_2 = omega_1 * f64::from(z1) / f64::from(z2);
                 for step in 0..=8 {
@@ -1611,7 +1664,7 @@ mod tests {
         for (z1, z2) in [(17u32, 43u32), (13, 60), (19, 31)] {
             for beta in [0.0, 12.0, 25.0] {
                 let (a, b, m) = helical_pair(z1, z2, beta);
-                let path = ContactPath::new(&a, b.ra, &m).unwrap();
+                let path = ContactPath::new(&a, b.flank_ends(), &m).unwrap();
                 let mu = 0.06;
                 let omega_1 = 100.0;
 
@@ -1642,14 +1695,17 @@ mod tests {
     fn approach_and_recess_sum_to_the_standard_length_of_action() {
         for (z1, z2) in [(17u32, 17u32), (17, 43), (13, 60), (25, 25)] {
             let (a, b, m) = pair(z1, z2);
-            let path = ContactPath::new(&a, b.ra, &m).unwrap();
+            let path = ContactPath::new(&a, b.flank_ends(), &m).unwrap();
             let standard = (a.ra.powi(2) - a.rb.powi(2)).sqrt()
                 + (b.ra.powi(2) - b.rb.powi(2)).sqrt()
                 - m.a_w * m.alpha_w.sin();
+            // The tips' path: 13 teeth at no shift are undercut, and 60's tip
+            // reaches past the usable flank, which cuts the path used.
+            let [tip_approach, tip_recess] = path.tip_limited;
             assert!(
-                (path.approach + path.recess - standard).abs() < 1e-12,
+                (tip_approach + tip_recess - standard).abs() < 1e-12,
                 "z={z1}/{z2}: {} vs {standard}",
-                path.approach + path.recess
+                tip_approach + tip_recess
             );
             assert!(path.approach > 0.0 && path.recess > 0.0);
         }
@@ -1659,7 +1715,7 @@ mod tests {
     fn contact_ratio_is_in_the_usual_range_for_spur_gears() {
         for (z1, z2) in [(17u32, 17u32), (17, 43), (25, 25), (13, 60)] {
             let (a, b, m) = pair(z1, z2);
-            let path = ContactPath::new(&a, b.ra, &m).unwrap();
+            let path = ContactPath::new(&a, b.flank_ends(), &m).unwrap();
             assert!(
                 path.contact_ratio > 1.0 && path.contact_ratio < 2.0,
                 "z={z1}/{z2}: contact ratio {} outside (1, 2)",
@@ -1672,7 +1728,7 @@ mod tests {
     fn hpstc_lies_between_the_pitch_point_and_the_tip() {
         for (z1, z2) in [(17u32, 17u32), (17, 43), (25, 60)] {
             let (a, b, m) = pair(z1, z2);
-            let path = ContactPath::new(&a, b.ra, &m).unwrap();
+            let path = ContactPath::new(&a, b.flank_ends(), &m).unwrap();
             let h = path.highest_single_pair();
             assert!(h > 0.0, "HPSTC should be on the recess side, got {h}");
             assert!(h < path.tip(), "HPSTC must be inside the tip");
@@ -1684,7 +1740,7 @@ mod tests {
     #[test]
     fn load_fraction_is_one_in_the_single_pair_zone_and_ramps_outside() {
         let (a, b, m) = pair(17, 43);
-        let path = ContactPath::new(&a, b.ra, &m).unwrap();
+        let path = ContactPath::new(&a, b.flank_ends(), &m).unwrap();
         assert!((path.load_fraction(0.0, LoadSharing::LinearRamp) - 1.0).abs() < 1e-12);
         assert!((path.load_fraction(0.0, LoadSharing::None) - 1.0).abs() < 1e-12);
         // at the very ends of contact the tooth carries the least
@@ -1722,7 +1778,7 @@ mod tests {
                     ..Default::default()
                 });
                 let m = Mesh::new(&a, &b, MeshKind::External).unwrap();
-                let path = ContactPath::new(&a, b.ra, &m).unwrap();
+                let path = ContactPath::new(&a, b.flank_ends(), &m).unwrap();
                 let mu = 0.06;
 
                 // Instantaneous fractional loss is mu|xi|(1/rb1 + 1/rb2)/cos(beta_b);
@@ -1746,7 +1802,7 @@ mod tests {
     #[test]
     fn the_helical_efficiency_formula_reduces_exactly_at_zero_helix() {
         let (a, b, m) = pair(17, 43);
-        let path = ContactPath::new(&a, b.ra, &m).unwrap();
+        let path = ContactPath::new(&a, b.flank_ends(), &m).unwrap();
         assert!((a.base_helix_angle().cos() - 1.0).abs() < f64::EPSILON);
 
         // The loss carries the 1/cos(beta_b), so at a fixed transverse geometry
@@ -1774,7 +1830,7 @@ mod tests {
     #[test]
     fn efficiency_is_unity_without_friction_and_falls_linearly_with_it() {
         let (a, b, m) = pair(17, 43);
-        let path = ContactPath::new(&a, b.ra, &m).unwrap();
+        let path = ContactPath::new(&a, b.flank_ends(), &m).unwrap();
         assert!((efficiency(&path, &m, &a, 0.0, Drive::Forward) - 1.0).abs() < 1e-15);
 
         let l1 = 1.0 - efficiency(&path, &m, &a, 0.05, Drive::Forward);
@@ -1804,7 +1860,7 @@ mod tests {
         for (z1, z2) in [(17u32, 43u32), (13, 60), (25, 25), (19, 31)] {
             for beta in [0.0, 15.0, 30.0] {
                 let (a, b, m) = helical_pair(z1, z2, beta);
-                let path = ContactPath::new(&a, b.ra, &m).unwrap();
+                let path = ContactPath::new(&a, b.flank_ends(), &m).unwrap();
                 let both = Directional::of(|d| efficiency(&path, &m, &a, 0.07, d));
                 assert_eq!(
                     both.forward, both.backward,
@@ -1822,7 +1878,7 @@ mod tests {
         for (z1, z2) in [(17u32, 43u32), (13, 60), (25, 25)] {
             let (a, b, m) = pair(z1, z2);
             let forward = efficiency(
-                &ContactPath::new(&a, b.ra, &m).unwrap(),
+                &ContactPath::new(&a, b.flank_ends(), &m).unwrap(),
                 &m,
                 &a,
                 0.07,
@@ -1830,7 +1886,7 @@ mod tests {
             );
             let m_rev = Mesh::new(&b, &a, MeshKind::External).unwrap();
             let relabelled = efficiency(
-                &ContactPath::new(&b, a.ra, &m_rev).unwrap(),
+                &ContactPath::new(&b, a.flank_ends(), &m_rev).unwrap(),
                 &m_rev,
                 &b,
                 0.07,
@@ -1843,11 +1899,128 @@ mod tests {
         }
     }
 
+    /// **Every path end lies on a usable flank**, for an external and an
+    /// internal pair alike.
+    ///
+    /// A member's flank is involute from its junction with the fillet
+    /// (`r_j`) to its tip; along the line of action that is
+    /// `ρ ≥ √(r_j² − r_b²)` in the member's own signed sense. The path starts
+    /// where member 1 is lowest and ends where member 2 is, so both ends are
+    /// asked. Shifts run into undercut on purpose: that is where a tip-limited
+    /// path started 0.97 mm inside the base circle of an unshifted 9-tooth
+    /// pinion.
+    #[test]
+    fn the_path_starts_and_ends_on_usable_flank() {
+        let usable = |r_j: f64, rb: f64| rb.signum() * (r_j * r_j - rb * rb).max(0.0).sqrt();
+        let mut asked = 0;
+        for z1 in 5..=20_u32 {
+            for i in 0..=16 {
+                let x1 = -0.6 + 0.1 * f64::from(i);
+                let a = Tooth::new(GearParams {
+                    teeth: z1,
+                    profile_shift: x1,
+                    ..Default::default()
+                });
+                if a.severed {
+                    continue;
+                }
+                for (z2, x2) in [(z1, 0.0), (37, -0.3), (37, 0.0), (80, 0.5)] {
+                    let p2 = GearParams {
+                        teeth: z2,
+                        profile_shift: x2,
+                        ..Default::default()
+                    };
+                    let b = Tooth::new(p2);
+                    let Ok(m) = Mesh::new(&a, &b, MeshKind::External) else {
+                        continue;
+                    };
+                    let Some(path) = ContactPath::new(&a, b.flank_ends(), &m) else {
+                        continue;
+                    };
+                    // Cut exactly where a flank is reached past its usable
+                    // end, and elsewhere the tips' path to the bit.
+                    let flagged = m.flank_interference([a.flank_ends(), b.flank_ends()]);
+                    let cut = path.past_usable_flank().map(|d| d > 0.0);
+                    assert_eq!(cut, flagged, "z={z1}/{z2} x={x1:.1}/{x2}");
+                    if flagged == [false, false] {
+                        assert_eq!(
+                            [path.approach, path.recess].map(f64::to_bits),
+                            path.tip_limited.map(f64::to_bits),
+                            "z={z1}/{z2} x={x1:.1}/{x2}"
+                        );
+                    }
+                    let (rho1, _) = m.curvature_radii(-path.approach);
+                    let (_, rho2) = m.curvature_radii(path.recess);
+                    let tol = 1e-9 * m.a_w;
+                    assert!(
+                        rho1 >= usable(a.r_j, a.rb) - tol && rho2 >= usable(b.r_j, b.rb) - tol,
+                        "z={z1}/{z2} x={x1:.1}/{x2}: path runs from rho1 {rho1} (usable from \
+                         {}) to rho2 {rho2} (usable from {})",
+                        usable(a.r_j, a.rb),
+                        usable(b.r_j, b.rb)
+                    );
+                    asked += 1;
+                    // And inside a ring, whose flank runs outward from its tip.
+                    if z2 > z1 + 8 {
+                        let ring = crate::ring::Ring::cut_by(&p2, &crate::ring::Cutter::default());
+                        let Ok(m) = Mesh::new(&a, &b, MeshKind::Internal) else {
+                            continue;
+                        };
+                        let Some(path) = ContactPath::new(&a, ring.flank_ends(), &m) else {
+                            continue;
+                        };
+                        let (rb1, rb2) = m.base_radii();
+                        let (rho1, _) = m.curvature_radii(-path.approach);
+                        let (_, rho2) = m.curvature_radii(path.recess);
+                        let r_j2 = ring.flank_ends().junction;
+                        assert!(
+                            rho1 >= usable(a.r_j, rb1) - tol && rho2 >= usable(r_j2, rb2) - tol,
+                            "ring z={z1}/{z2} x={x1:.1}/{x2}: path runs from rho1 {rho1} (usable \
+                             from {}) to rho2 {rho2} (usable from {})",
+                            usable(a.r_j, rb1),
+                            usable(r_j2, rb2)
+                        );
+                        asked += 1;
+                    }
+                }
+            }
+        }
+        assert!(asked > 500, "the grid asked only {asked} pairs");
+    }
+
+    /// **An unshifted 9/37 has the contact its usable flank leaves**: usable
+    /// `ε` 1.002525 at `x₁ = 0` and 0.743004 at `x₁ = −0.3`, at zero
+    /// backlash, where the tip-to-tip path gives 1.519 and 1.686. The
+    /// package check reproduced both figures exactly from its own geometry;
+    /// the audit's rack-generation simulation, which shares no code with the
+    /// crate, gives 1.009 and 0.746, the difference its discretisation.
+    #[test]
+    fn an_undercut_pinion_keeps_only_its_usable_contact() {
+        for (x1, usable) in [(0.0, 1.002_525), (-0.3, 0.743_004)] {
+            let a = Tooth::new(GearParams {
+                teeth: 9,
+                profile_shift: x1,
+                ..Default::default()
+            });
+            let b = Tooth::new(GearParams {
+                teeth: 37,
+                ..Default::default()
+            });
+            let m = Mesh::new(&a, &b, MeshKind::External).unwrap();
+            let path = ContactPath::new(&a, b.flank_ends(), &m).unwrap();
+            assert!(
+                (path.contact_ratio - usable).abs() < 1e-4,
+                "x1={x1}: contact ratio {} against the usable {usable}",
+                path.contact_ratio
+            );
+        }
+    }
+
     /// Sharing can only reduce what a tooth carries, never increase it.
     #[test]
     fn sharing_never_raises_the_load() {
         let (a, b, m) = pair(19, 31);
-        let path = ContactPath::new(&a, b.ra, &m).unwrap();
+        let path = ContactPath::new(&a, b.flank_ends(), &m).unwrap();
         for i in 0..=200 {
             #[allow(clippy::cast_precision_loss)]
             let t = i as f64 / 200.0;

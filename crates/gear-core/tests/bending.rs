@@ -187,7 +187,7 @@ fn j_factors_at(z: u32, cutter_teeth: u32, beta: f64) -> (Option<f64>, Option<f6
     use gear_core::contact::ContactPath;
     use gear_core::mesh::{Mesh, MeshKind};
     use gear_core::ring::{Cutter, Ring};
-    use gear_core::strength::{bending_section, RootStressModel};
+    use gear_core::strength::RootStressModel;
 
     let pinion = Tooth::new(GearParams {
         teeth: 25,
@@ -212,6 +212,20 @@ fn j_factors_at(z: u32, cutter_teeth: u32, beta: f64) -> (Option<f64>, Option<f6
             tip_round: 0.3,
         },
     );
+    // The second member's section, loaded where its contact ends: below its
+    // tip where the pinion's usable flank ends first.
+    fn on_path<T: gear_core::strength::ToothOutline>(
+        g: &T,
+        p: &ContactPath,
+    ) -> Option<gear_core::strength::RootSection> {
+        gear_core::strength::bending_section_on_path(
+            g,
+            p.contact_ratio,
+            p.short_of_tip()[1],
+            gear_core::contact::LoadSharing::None,
+        )
+        .map(|(s, _)| s)
+    }
     let j = |s: Option<gear_core::strength::RootSection>| {
         s.and_then(|s| s.bending_factor(RootStressModel::Iso6336))
             .map(|f| 1.0 / f)
@@ -223,12 +237,12 @@ fn j_factors_at(z: u32, cutter_teeth: u32, beta: f64) -> (Option<f64>, Option<f6
     });
     let external = Mesh::new(&pinion, &mirrored, MeshKind::External)
         .ok()
-        .and_then(|m| ContactPath::new(&pinion, mirrored.ra, &m))
-        .and_then(|p| j(bending_section(&mirrored, p.contact_ratio)));
+        .and_then(|m| ContactPath::new(&pinion, mirrored.flank_ends(), &m))
+        .and_then(|p| j(on_path(&mirrored, &p)));
     let internal = Mesh::new(&pinion, &wheel, MeshKind::Internal)
         .ok()
-        .and_then(|m| ContactPath::new(&pinion, ring.ra, &m))
-        .and_then(|p| j(bending_section(&ring, p.contact_ratio)));
+        .and_then(|m| ContactPath::new(&pinion, ring.flank_ends(), &m))
+        .and_then(|p| j(on_path(&ring, &p)));
     (external, internal)
 }
 

@@ -158,26 +158,26 @@ fn says_unrated(r: &super::TrainResult, i: usize) -> bool {
 }
 
 /// **A mate loaded low on its flank is not rated negative.** Against a
-/// long-addendum member the unshifted 300/300 pair runs at `ε_α` 2.75, so the
-/// unshared load point `d = ε − 1` sits low on the other member's flank:
-/// the load line crosses the centreline below the section, the moment arm
-/// shrinks, `Y_F` falls below the axial term and Dolan–Broghamer's factor goes
-/// negative. It used to report −1.30 MPa and a negative minimum width, with
-/// no note (−0.26 MPa at 2 N·m). The model has no reading there, so the
-/// member is unrated and says so, and the mesh says it is past `ε_n = 2`
-/// whatever the sharing model.
+/// long-addendum member the unshifted 300/300 pair runs past `ε_n = 2`, so the
+/// unshared load point `d = ε − 1` sits low on the other member's flank. It
+/// used to report −1.30 MPa and a negative minimum width, with no note, on a
+/// mate whose standard root the long tip reached into: a path through flank
+/// interference, whose load point was off the usable flank. With the mate's
+/// root deep enough for the tip, the path stays on usable flank, both members
+/// rate positive, and the mesh says it is past `ε_n = 2`.
 #[test]
-fn a_mate_loaded_low_on_its_flank_is_unrated_not_negative() {
+fn a_mate_loaded_low_on_its_flank_is_not_rated_negative() {
     let mut s = pair([300, 300]);
     s.members[0].gear.addendum = 1.9;
     s.members[0].gear.dedendum = 2.15;
+    s.members[1].gear.dedendum = 2.15;
     let r = solve_train(&Train::alone(&s, 10.0, 100.0), &test_library()).unwrap();
+    assert_eq!(r.meshes[0].flank_interference, [false, false]);
     bending_is_absent_or_positive(&r, "300/300 at h_a 1.9");
-    assert!(r.members[1]
-        .cases
+    assert!(r
+        .members
         .iter()
-        .all(|c| c.bending_stress.is_none()));
-    assert!(says_unrated(&r, 1), "{:?}", r.members[1].notes);
+        .all(|g| g.cases.iter().all(|c| c.bending_stress.is_some())));
     assert!(
         r.meshes[0]
             .notes
@@ -188,18 +188,82 @@ fn a_mate_loaded_low_on_its_flank_is_unrated_not_negative() {
     );
 }
 
+/// **A pair whose tips stay on usable flank rates every member.** Since the
+/// path of contact ends at the usable flanks, a load point off every section
+/// is reached only through flank interference: over the grid below, every
+/// pair that solves with no flagged mesh has both members rated, and the
+/// grid does reach unrated members with one.
+#[test]
+fn only_flank_interference_leaves_a_member_unrated() {
+    let lib = test_library();
+    let (mut clean, mut unrated_with) = (0, 0);
+    for (z0, z1) in [
+        (5_u32, 40_u32),
+        (7, 300),
+        (9, 100),
+        (12, 300),
+        (20, 40),
+        (40, 300),
+    ] {
+        for beta in [0.0, 20.0, 35.0] {
+            for addendum in [1.0, 1.6, 2.2] {
+                for x in [-0.8, 0.0, 1.0] {
+                    for sharp in [true, false] {
+                        let mut s = pair([z0, z1]).with_first_helix(beta);
+                        s.members[0].gear.addendum = addendum;
+                        s.members[1].gear.dedendum = addendum + 0.25;
+                        s.members[0].gear.profile_shift = crate::params::Auto::fixed(x);
+                        s.members[1].gear.profile_shift = crate::params::Auto::fixed(0.0);
+                        for m in &mut s.members {
+                            m.gear.no_sharp_tip = sharp;
+                            m.gear.no_undercut = false;
+                        }
+                        let Ok(r) = solve_train(&Train::alone(&s, 10.0, 100.0), &lib) else {
+                            continue;
+                        };
+                        let unrated = (0..2).any(|i| {
+                            r.members[i]
+                                .cases
+                                .iter()
+                                .all(|c| c.bending_stress.is_none())
+                        });
+                        if r.meshes[0].flank_interference.contains(&true) {
+                            unrated_with += usize::from(unrated);
+                        } else {
+                            clean += 1;
+                            assert!(
+                                !unrated,
+                                "{z0}/{z1} β {beta} h_a {addendum} x {x}: unrated on usable flank"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+    assert!(
+        clean > 100 && unrated_with > 0,
+        "{clean} clean, {unrated_with} unrated"
+    );
+}
+
 /// **A member with no root section costs its own rating, not the train's.**
-/// At `h_a` 2.2 with sharp tips allowed, a 300/300 pair keeps no rated
-/// section on one member in its one mesh; the train was refused whole
-/// (`NoRootSection`, which blamed undercut).
+/// Reached only through flank interference
+/// (`only_flank_interference_leaves_a_member_unrated`): the 7-tooth pinion
+/// at `x` −0.8 against 300 at 20° is one; the train was refused whole there
+/// once (a root-section error that blamed undercut).
 #[test]
 fn a_member_with_no_root_section_is_unrated_and_the_train_solves() {
-    let mut s = pair([300, 300]);
-    s.members[0].gear.addendum = 2.2;
-    s.members[0].gear.no_sharp_tip = false;
+    let mut s = pair([7, 300]).with_first_helix(20.0);
+    s.members[0].gear.profile_shift = crate::params::Auto::fixed(-0.8);
+    s.members[1].gear.profile_shift = crate::params::Auto::fixed(0.0);
+    for m in &mut s.members {
+        m.gear.no_undercut = false;
+    }
     let r = solve_train(&Train::alone(&s, 10.0, 100.0), &test_library())
         .unwrap_or_else(|e| panic!("refused whole: {e}"));
-    bending_is_absent_or_positive(&r, "300/300 at h_a 2.2");
+    assert!(r.meshes[0].flank_interference.contains(&true));
+    bending_is_absent_or_positive(&r, "7/300 at x -0.8");
     let unrated: Vec<usize> = (0..2)
         .filter(|&i| {
             r.members[i]

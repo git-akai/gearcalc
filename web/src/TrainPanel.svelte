@@ -1232,20 +1232,26 @@
        that can have it.
 
        Named by member rather than by the classical pair, because the classical
-       names describe which member is a ring and the condition does not. -->
+       names describe which member is a ring and the condition does not.
+       A flank the mesh's own note already names (`mesh.flank_interference`,
+       a line contact's, with the length cut) is not said twice. -->
   {#if m}
-    <dt>{t("ui.train_interference")}</dt>
-    <dd>
-      {#each [[
-        m.flank_interference[0] ? t("ui.train_interference_flank", { member: members[0] }) : null,
-        m.flank_interference[1] ? t("ui.train_interference_flank", { member: members[1] }) : null,
-        m.tips?.tip_interference ? t("ui.train_interference_tip") : null,
-      ].filter((x) => x !== null)] as fouling (0)}
+    {@const said = (i: number) =>
+      m.notes.some((n) => n.key === "mesh.flank_interference" && n.values.member === String(i + 1))}
+    {@const fouling = [
+      m.flank_interference[0] && !said(0) ? t("ui.train_interference_flank", { member: members[0] }) : null,
+      m.flank_interference[1] && !said(1) ? t("ui.train_interference_flank", { member: members[1] }) : null,
+      m.tips?.tip_interference ? t("ui.train_interference_tip") : null,
+    ].filter((x) => x !== null)}
+    <!-- Nothing left to say here when the note says it all. -->
+    {#if fouling.length > 0 || !m.flank_interference.some((f) => f)}
+      <dt>{t("ui.train_interference")}</dt>
+      <dd>
         <span class:warn={fouling.length > 0}>
           {fouling.join(" · ") || t("ui.train_interference_none")}
         </span>
-      {/each}
-    </dd>
+      </dd>
+    {/if}
   {/if}
   {#if m?.point}
     <dt>{t("ui.train_contact_travel")}</dt>

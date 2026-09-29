@@ -291,6 +291,34 @@ fn scaled(train: &Train, s: f64, keep: Option<&str>) -> Train {
     t
 }
 
+/// **How much a flank junction near its base circle magnifies a rounding**,
+/// where the path of contact is cut there.
+///
+/// A mesh whose tip reaches past a flank's usable end has its path end at
+/// that member's junction, `ρ_j = r_b u_j` along the line of action. Near the
+/// base circle the involute is a cusp: its radius moves as `r_b u du`, so a
+/// junction located to a rounding `ε r_b` in position is located to
+/// `ε / u_j` in roll — a derivative, not a solver's tolerance — and every
+/// figure read off the cut path carries that factor. `u_j` itself resolves
+/// to no better than `√ε` there (`r − r_b = r_b u²/2`), which bounds the
+/// factor. One on every train whose paths no junction cuts; a ring's
+/// junction is its generation limit, well off its base circle, and is not
+/// counted.
+fn cusp(train: &Train, r: &super::TrainResult) -> f64 {
+    let mut worst: f64 = 1.0;
+    for (k, mesh) in r.meshes.iter().enumerate() {
+        let m = train.shape.meshes[k];
+        for (side, i) in [m.a, m.b].into_iter().enumerate() {
+            if !mesh.flank_interference[side] || train.shape.members[i].ring.is_some() {
+                continue;
+            }
+            let u = crate::Tooth::new(r.members[i].params).u_j.abs();
+            worst = worst.max(1.0 / u.max(f64::EPSILON.sqrt()));
+        }
+    }
+    worst
+}
+
 /// The smallest millimetre input the train is given, other than zero: the
 /// smallest length a difference in the solve comes down to.
 fn smallest_input(train: &Train) -> f64 {
@@ -430,7 +458,8 @@ fn breaches(keep: Option<&str>, plant: &dyn Fn(String, f64) -> String) -> Breach
                 }
             }
         }
-        let kappa = operand_scale(1, &largest) / smallest_input(&train);
+        let kappa = operand_scale(1, &largest) / smallest_input(&train)
+            * solved.as_ref().map_or(1.0, |r| cusp(&train, r));
         for s in SCALES {
             let t = scaled(&train, s, keep);
             let at = leaves(&plant(format!("{:#?}", solve_train(&t, &lib)), s));

@@ -745,14 +745,17 @@ impl Bending {
     /// thickness is measured against is the member's own business
     /// ([`ToothOutline::rim_support`]), as the direction its load point travels
     /// is; this was two functions and they differed in nothing else.
+    /// `short_of_tip` is how far this member's last contact falls below its
+    /// tip, in base pitches ([`crate::contact::ContactPath::short_of_tip`]).
     pub(crate) fn of<T: crate::strength::ToothOutline>(
         member: &T,
         contact_ratio: f64,
+        short_of_tip: f64,
         model: crate::contact::LoadSharing,
         rim: Option<f64>,
     ) -> Option<Self> {
         let (section, share) =
-            crate::strength::bending_section_shared(member, contact_ratio, model)?;
+            crate::strength::bending_section_on_path(member, contact_ratio, short_of_tip, model)?;
         Some(Self {
             section,
             share,
@@ -770,7 +773,7 @@ impl Bending {
 /// the whole load, low on the flank where Dolan–Broghamer's factor shrinks
 /// toward zero and then has no reading. Shared, the ramp never reaches a full
 /// share; measured across high-contact-ratio spur designs it runs from a
-/// 6–26 % relief on high-contact-ratio spur pairs, a direction the model does
+/// 25–32 % relief on high-contact-ratio spur pairs, a direction the model does
 /// not fix (T06.7 re-measures it). ISO corrects the
 /// band with `Y_DT`, which this crate declines. **A mesh's finding**, raised
 /// once per mesh whatever the sharing model.
@@ -1683,6 +1686,13 @@ pub enum TrainError {
 
     /// A material name that is not in the library.
     UnknownMaterial(String),
+    /// **A tip reaches so far past its mate's usable flank that nothing can
+    /// be rated.** The path of contact is cut to the usable flanks
+    /// ([`crate::contact::ContactPath::new`]); here the cut leaves no path, or
+    /// ends it at a base circle where, below a contact ratio of one, the
+    /// whole load sits on a radius of curvature of zero. The teeth do touch —
+    /// they collide — so this is not [`Self::NoContact`].
+    FlankInterference,
     /// **Two conditions cannot both hold**, at this body: what it is asked
     /// to do contradicts what the meshes and the other conditions already
     /// decided — a sun driven while its carrier and its ring are both held.
@@ -1790,6 +1800,7 @@ impl crate::note::Explain for TrainError {
             Self::UnknownMaterial(n) => {
                 Note::new(key::ERROR_TRAIN_UNKNOWN_MATERIAL).text("name", n.clone())
             }
+            Self::FlankInterference => Note::new(key::ERROR_TRAIN_FLANK_INTERFERENCE),
             Self::Overdetermined { at } => located(key::ERROR_TRAIN_OVERDETERMINED, *at),
             Self::NoSuchBody { at } => located(key::ERROR_TRAIN_NO_SUCH_BODY, *at),
             Self::Overflow => Note::new(key::ERROR_TRAIN_OVERFLOW),
@@ -1898,6 +1909,11 @@ impl std::fmt::Display for TrainError {
                 }
             },
             Self::UnknownMaterial(n) => write!(f, "no material named {n:?} in the library"),
+            Self::FlankInterference => write!(
+                f,
+                "a tip reaches so far past its mate's usable flank that no involute contact is \
+                 left to rate"
+            ),
             Self::Overdetermined { at } => {
                 write!(f, "two conditions cannot both hold at {}", place(*at))
             }
@@ -6546,6 +6562,143 @@ mod tests {
         }
     }
 
+    /// A 9/37 spur pair at a pinion shift as typed: no undercut floor, no
+    /// search, so the shift can be walked into undercut.
+    fn fixed_9_37(x1: f64, sharing: crate::contact::LoadSharing) -> Shape {
+        let mut s = arr::pair([9, 37]);
+        s.members[0].gear.profile_shift = Auto::fixed(x1);
+        s.members[1].gear.profile_shift = Auto::fixed(0.0);
+        for m in &mut s.members {
+            m.gear.no_undercut = false;
+        }
+        s.meshes[0].load_sharing = sharing;
+        s
+    }
+
+    /// **A pair rates continuously through the onset of flank interference**
+    /// (T06.1).
+    ///
+    /// The 9-tooth pinion's shift is walked from −0.6 to 0.6 in steps of
+    /// 0.002, through the shift near 0.45 where the wheel's tip stops reaching
+    /// past the pinion's usable flank. Every step solves — the teeth touch and
+    /// the root has a section, so `NoContact` is not true
+    /// — and no figure jumps: a step is never more than twice the larger
+    /// of its neighbours, which a piecewise-smooth figure keeps at a kink and
+    /// a jump breaks. The tip-to-tip path broke it at −0.337, where the shared
+    /// bending factor fell 34 % in one step, and refused from −0.343.
+    #[test]
+    fn a_pair_rates_continuously_through_the_onset_of_interference() {
+        use crate::contact::LoadSharing;
+        let lib = library();
+        for sharing in [LoadSharing::None, LoadSharing::LinearRamp] {
+            let figures: Vec<(f64, [f64; 5])> = (0..=600)
+                .map(|i| {
+                    let x1 = -0.6 + 0.002 * f64::from(i);
+                    let r = solve_preset(&fixed_9_37(x1, sharing), 2.0, 1000.0, &lib)
+                        .unwrap_or_else(|e| panic!("x1={x1:.3} {sharing:?}: refused: {e}"));
+                    let mesh = &r.meshes[0];
+                    let bending = |i: usize| {
+                        r.members[i].cases[0]
+                            .bending_stress
+                            .unwrap_or_else(|| panic!("x1={x1:.3}: member {i} unrated"))
+                    };
+                    (
+                        x1,
+                        [
+                            mesh.contact_ratio,
+                            mesh.efficiency.forward,
+                            bending(0),
+                            bending(1),
+                            mesh.cases[0].contact.max_pressure,
+                        ],
+                    )
+                })
+                .collect();
+            for k in 0..5 {
+                for i in 1..figures.len() - 1 {
+                    let d = |i: usize| (figures[i + 1].1[k] - figures[i].1[k]).abs();
+                    let (before, here) = (d(i - 1), d(i));
+                    let after = if i + 1 < figures.len() - 1 {
+                        d(i + 1)
+                    } else {
+                        before
+                    };
+                    assert!(
+                        here <= 2.0 * before.max(after) + 1e-12 * figures[i].1[k].abs(),
+                        "{sharing:?}: figure {k} jumps by {here} between x1 {:.3} and {:.3} \
+                         against neighbouring steps {before} and {after}",
+                        figures[i].0,
+                        figures[i + 1].0
+                    );
+                }
+            }
+        }
+    }
+
+    /// **Flank interference is said by the solve**, not only drawn by the
+    /// panel: a mesh whose mate's tip reaches past a usable flank carries a
+    /// note naming the member and how far, and a mesh that does not, none.
+    #[test]
+    fn flank_interference_is_said_by_the_mesh() {
+        let lib = library();
+        let mut seen = 0;
+        for i in 0..=60 {
+            let x1 = -0.6 + 0.02 * f64::from(i);
+            let r = solve_preset(
+                &fixed_9_37(x1, crate::contact::LoadSharing::None),
+                2.0,
+                1000.0,
+                &lib,
+            )
+            .unwrap_or_else(|e| panic!("x1={x1:.2}: refused: {e}"));
+            let mesh = &r.meshes[0];
+            let said = mesh
+                .notes
+                .iter()
+                .filter(|n| n.is("mesh.flank_interference"))
+                .count();
+            let flagged = mesh.flank_interference.iter().filter(|f| **f).count();
+            assert_eq!(
+                said, flagged,
+                "x1={x1:.2}: {:?} {:?}",
+                mesh.flank_interference, mesh.notes
+            );
+            seen += flagged;
+        }
+        assert!(seen > 0, "the walk never reached interference");
+    }
+
+    /// **Which presets' default proportions reach past a usable flank**,
+    /// stated rather than assumed: on those the path is cut, and the corpus
+    /// moved with it. Every other preset's figures are the tips' path to the
+    /// bit (`contact::tests::the_path_starts_and_ends_on_usable_flank`).
+    #[test]
+    fn the_presets_that_interfere_are_the_ones_named() {
+        let lib = library();
+        let interfering: Vec<arr::Preset> = arr::Preset::ALL
+            .into_iter()
+            .filter(|p| {
+                let r = solve_preset(&p.build(), 2.0, 1000.0, &lib).expect("a preset solves");
+                r.meshes
+                    .iter()
+                    .any(|m| m.flank_interference.contains(&true))
+            })
+            .collect();
+        // The four with a full-depth ring at no shift: its tip reaches past
+        // the planet's usable flank, as
+        // `a_shipped_sets_full_depth_ring_interferes_and_a_shorter_tooth_clears_it`
+        // records.
+        assert_eq!(
+            interfering,
+            [
+                arr::Preset::Planetary,
+                arr::Preset::Wolfrom,
+                arr::Preset::Compound,
+                arr::Preset::MeshedPlanets,
+            ]
+        );
+    }
+
     /// **A full-depth internal pair interferes, and a shipped epicyclic set is
     /// one.**
     ///
@@ -10150,17 +10303,16 @@ mod tests {
     fn the_sharing_model_reaches_every_member_that_bends() {
         use crate::contact::LoadSharing;
         let lib = library();
-        // Tall enough that every mesh is above `ε_n = 2` **where it runs**:
-        // the set's sun–planet mesh sits at 1.997 at 1.35 modules once rated a
-        // clearance off its zero-backlash distance, which is just the wrong
-        // side of the band and exactly what this test would misread as a
-        // member the model does not reach.
+        // Tall enough that every mesh is above `ε_n = 2` **where it runs**,
+        // on counts large enough that the tall tips stay on usable flank: a
+        // path cut by interference falls back below the band.
         let tall = |g: &MemberGear| MemberGear {
             addendum: 1.4,
+            dedendum: 1.65,
             ..g.clone()
         };
         let bending_of = |sharing: LoadSharing| {
-            let mut spur = arr::pair([17, 43]);
+            let mut spur = arr::pair([25, 80]);
             spur.set_load_sharing(sharing);
             for m in &mut spur.members {
                 m.gear = tall(&m.gear);
@@ -10177,23 +10329,16 @@ mod tests {
             // would otherwise hold lower, and at its shift as typed.
             set.members[2].gear.no_sharp_tip = false;
             set.members[2].gear.no_undercut = false;
-            set.members[0].gear.teeth = 24;
-            set.members[1].gear.teeth = 18;
-            set.members[2].gear.teeth = 60;
-            // **A hula stage needs a taller tooth than it can be built with**,
-            // and that is the point of the row below rather than a defect in
-            // the fixture: at 1.1 modules its meshes reach `ε_n ≈ 2.02` and its
-            // teeth foul, which the stage reports. The rating path is the one a
-            // buildable stage uses, so this is what says the input reaches it.
-            let mut hula = hula_shape([65, 61, 57, 61]);
-            hula.set_load_sharing(sharing);
-            for m in &mut hula.members {
-                m.gear.addendum = 1.1;
-            }
-
+            set.members[0].gear.teeth = 40;
+            set.members[1].gear.teeth = 30;
+            set.members[2].gear.teeth = 100;
+            // **No hula stage**: its internal meshes, four teeth apart, foul
+            // before they reach `ε_n = 2`, and the path cut at the usable
+            // flank keeps them below the band, where the ramp is the unshared
+            // rating by construction. Its members bend through the same
+            // `Bending::of` as the set's planet and ring.
             let s = solve_preset(&spur, 2.0, 0.0, &lib).unwrap();
             let p = solve_preset(&set, 2.0, 0.0, &lib).unwrap();
-            let h = solve_hula(&hula, 2.0, 0.0, &lib).unwrap();
             let mut out: Vec<(String, Option<f64>)> = Vec::new();
             for (i, g) in s.members.iter().enumerate() {
                 out.push((format!("spur {i}"), g.cases[0].bending_stress));
@@ -10204,12 +10349,6 @@ mod tests {
                 ("ring", &p.members[2]),
             ] {
                 out.push((what.to_string(), g.cases[0].bending_stress));
-            }
-            for g in &h.members {
-                out.push((
-                    format!("hula z{}", g.params.teeth),
-                    g.cases[0].bending_stress,
-                ));
             }
             out
         };
@@ -10241,8 +10380,8 @@ mod tests {
             );
         }
         assert!(
-            rated >= 8,
-            "most members should have a bending rating: {off:?}"
+            rated >= 5,
+            "every member should have a bending rating: {off:?}"
         );
     }
 

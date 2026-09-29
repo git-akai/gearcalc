@@ -671,18 +671,22 @@ whose size is unmeasured is a debt still owed, and is marked as one.
   stiffness model it is unmeasured. Where Dolan–Broghamer's factor
   there is not positive the member is **unrated** (`gear.bending_unrated`), and
   every such mesh says it is in the band (`mesh.load_sharing_out_of_band`).
+  Since the path of contact ends at the usable flanks, that is reached only
+  through flank interference (`only_flank_interference_leaves_a_member_unrated`
+  in `train/rating_laws.rs` sweeps it).
 
 <!-- figures: gear-cli sharingbias -->
 - **Under load sharing the section is held at the highest point of
   single-pair contact** and the load moved on it, rather than searched afresh
   at every load point, which near a pointed apex shrinks onto the point with
   no bound. Measured over 50 equal pairs short of pointed (z 17–100, 14.5° and
-  20°, `h_a` 1.0–1.4): held over afresh 0.810 to 1.000 — **low**, so
-  unconservative, by up to 19.0 %, at z 100, 20°, `h_a` 1.4, ε 2.535, and
+  20°, `h_a` 1.0–1.4, each root a working clearance below its mate's tip so
+  the path stays on usable flank): held over afresh 0.871 to 1.000 — **low**,
+  so unconservative, by up to 12.9 %, at z 100, 20°, `h_a` 1.4, ε 2.535, and
   only past `ε_n = 2`, where the ramp governs away from the single-pair point.
   **Part of the sharing relief is this bias**: at `ε_n ≥ 2` the held section
-  relieves 4.2 to 35.2 %, where sections searched afresh range from -18.3
-  (an increase) to 35.1 %.
+  relieves 22.9 to 33.7 %, where sections searched afresh relieve 12.9 to
+  33.6 %.
 
 
 <!-- figures: tools/iso_6336_3_stack.py -->
@@ -690,8 +694,9 @@ whose size is unmeasured is a debt still owed, and is marked as one.
   6336-3 Method B and 6336-2 on its own and reproduces the tool's ISO set on
   every pair before it prints a ratio. Tool over ISO, unshifted pairs, both
   members, every `K` at 1:
-  - **spur bending** at the outer point of single-pair contact: 0.889–1.139 at
-    14.5°, 0.781–0.985 at 20°, 0.656–0.845 at 25°. **Low** over most of the
+  - **spur bending** at the outer point of single-pair contact, ISO's `ε_α`
+    limited by the form diameters as the standard limits it: 0.889–1.030 at
+    14.5°, 0.781–0.949 at 20°, 0.656–0.845 at 25°. **Low** over most of the
     grid — unconservative, the more so the higher the pressure angle;
   - **helical bending** at 20°: 0.920–1.246 at `ε_β` 1.0 and above,
     0.599–0.975 at 0.3, 0.542–0.919 at 0.1. Low overlap is low, and a mesh
@@ -769,10 +774,19 @@ whose size is unmeasured is a debt still owed, and is marked as one.
   rating reads it: bending is taken on the virtual spur with the normal round,
   and a crossed rating never touches the fillet. What it does move is the
   junction radius the interference verdict reads, upward, which makes that
-  verdict **conservative** by the difference, and it is why a worm's
+  verdict **conservative** by the difference — and, where it binds, the path
+  of contact cut there shorter by as much — and it is why a worm's
   `clamp.fillet_capped` fires at every shift. A normal round's transverse
   section is an ellipse and neither circle is it; sign stated, size stated,
   unrepaired.
+- **A path cut at a usable flank rates the conjugate contact only.** Past
+  the junction a tip passes through space an undercut left, or meets a
+  fillet the cutter did not undercut, where the teeth collide. The
+  collision is not rated: `mesh.flank_interference` names the member and the
+  length cut, and is the verdict to read there. A bending load point on the
+  member whose tip the mate's junction keeps from contact is placed where
+  contact ends (`contact::ContactPath::short_of_tip`), carried to the virtual
+  spur gear by `1/cos² β_b` as ISO carries `ε_α`.
 - **The two contacts do not quite meet where the shafts straighten**, and
   the reported figures carry the seams
   ([reference](reference.md#contact-stress)): the pitch-point pressure of a
@@ -805,7 +819,7 @@ whose size is unmeasured is a debt still owed, and is marked as one.
   `K_f`'s constants are functions of `α_n`.
 - **Load sharing above a virtual contact ratio of 2** is the ramp extrapolating:
   no single-pair zone exists, and what it does to the figure has **no
-  direction the model fixes** — measured as a 6–26 % relief across
+  direction the model fixes** — measured as a 25–32 % relief across
   high-contact-ratio spur designs, with the section found once and the load
   moved on it (it read a 24 % relief to a 15 % increase while every load
   point searched a section of its own; part of the relief is the held
