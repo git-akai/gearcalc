@@ -611,14 +611,23 @@ UNREACHED = {
 
 def golden_speeds():
     """`{section: {(label, where): speed}}`, exact, from the corpus's
-    `graph` blocks: `b3     ring 2    of part 1  speed 16/3721`."""
-    out, section = {}, None
+    `graph` blocks: `b3     ring 2    of part 1  speed 16/3721`; and
+    `{section: (from, to, total)}`: the headline path's end bodies (its first
+    `path` line) and the `total ratio` the graph prints."""
+    out, ratios, section, numbered = {}, {}, None, {}
     for line in GOLDEN.read_text().splitlines():
         m = re.match(r"^== (.+) ==$", line)
         if m:
             section = m.group(1)
             out[section] = {}
+            numbered = {}
             continue
+        m = re.match(r"^  path (b\d+)\s+-> (b\d+)\s", line)
+        if m and section and section not in ratios:
+            ratios[section] = [m.group(1), m.group(2), None, numbered]
+        m = re.search(r"total ratio (.+?)\s*$", line)
+        if m and section:
+            ratios.setdefault(section, [None, None, None, numbered])[2] = m.group(1)
         if section and re.match(r"^  graph\s+no motion", line):
             out[section] = None
             continue
@@ -629,9 +638,10 @@ def golden_speeds():
         )
         if m and section:
             body = (m.group(1), m.group(2))
+            numbered[line.split()[0]] = body
             # A family: a speed plus a multiple of a free body's speed.
             out[section][body] = (F(m.group(3)), F(m.group(4) or 0), m.group(5))
-    return out
+    return out, ratios
 
 
 def crate_cases():
@@ -740,7 +750,7 @@ def crate_cases():
 def against_crate(verbose):
     """Every body speed the corpus records, against the rigid-body one."""
     fail = 0
-    recorded = golden_speeds()
+    recorded, ratios = golden_speeds()
     cases = crate_cases()
     for section, bodies in recorded.items():
         if section in UNREACHED and UNREACHED[section] is None:
@@ -796,6 +806,22 @@ def against_crate(verbose):
                     f"{body[0]} ({body[1]}): crate {speed} + {per_free} w, "
                     f"rigid body {mine[0]} + {mine[1]} w"
                 )
+        # The headline ratio, the input's speed over the output's.
+        start, end, total, numbered = ratios.get(section, [None, None, None, {}])
+        if total is None:
+            wrong.append("the corpus prints no total ratio")
+        elif total == "a family":
+            if not free:
+                wrong.append("the corpus calls the ratio a family and nothing is free")
+        elif start is not None and not (
+            {numbered.get(start), numbered.get(end)} & set(UNREACHED.get(section) or ())
+        ):
+            a, b = names.get(numbered.get(start)), names.get(numbered.get(end))
+            if a is None or b is None:
+                wrong.append(f"total ratio: {start} or {end} is not in the layout")
+            elif at[0][b] == 0 or at[0][a] / at[0][b] != F(total):
+                got = "locked" if at[0][b] == 0 else at[0][a] / at[0][b]
+                wrong.append(f"total ratio: crate {total}, rigid body {got}")
         ok = not wrong
         shown = " ".join(f"{b[0]}={v[0]}" for b, v in bodies.items()) if verbose else ""
         print(f"  {section:<38}{'ok' if ok else 'DISAGREE':>9}   {len(bodies)} bodies {shown}")
