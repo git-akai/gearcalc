@@ -114,7 +114,7 @@ pub(crate) fn undercut_bound(
     }
     match how {
         Decided::Chosen => Some(automatic_profile_shift(p, depth)),
-        Decided::Absorbed => Some(crate::auto::minimum_profile_shift(p, depth).with_cutter_radius),
+        Decided::Absorbed => crate::auto::minimum_profile_shift(p, depth).with_cutter_radius,
     }
 }
 

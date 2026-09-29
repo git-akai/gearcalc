@@ -107,10 +107,17 @@
       t("ui.bound_profile_shift", {
         min: n(r.bound.min ?? 0),
         max: n(r.bound.max ?? 0),
-        undercut: n(r.undercut),
-        sharp: n(r.sharp_rack_undercut),
       }),
     ];
+    // Either threshold is absent where no shift is on its edge of undercut:
+    // a round that no shift undercuts can sit beside a sharp rack that does.
+    if (r.undercut !== null || r.sharp_rack_undercut !== null)
+      parts.push(
+        t("ui.bound_profile_shift_undercut", {
+          undercut: r.undercut === null ? "—" : n(r.undercut),
+          sharp: r.sharp_rack_undercut === null ? "—" : n(r.sharp_rack_undercut),
+        }),
+      );
     if (r.shallow_cut < (r.bound.max ?? Infinity))
       parts.push(t("ui.bound_profile_shift_deep_cut", { deep: n(r.shallow_cut) }));
     if (r.pointed !== null)

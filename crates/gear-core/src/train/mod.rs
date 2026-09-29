@@ -1308,7 +1308,9 @@ impl MemberGear {
         // negative shift somebody meant is not an undercut one. Nothing is
         // choosing it, so it carries no search bound.
         let typed = self.profile_shift.manual;
-        let used = typed.max(crate::auto::minimum_profile_shift(base, depth).with_cutter_radius);
+        let used = crate::auto::minimum_profile_shift(base, depth)
+            .with_cutter_radius
+            .map_or(typed, |x_min| typed.max(x_min));
         ShiftAsked {
             search_floor: None,
             given: Some(used),

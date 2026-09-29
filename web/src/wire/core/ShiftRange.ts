@@ -18,13 +18,16 @@ bound: Bound,
  * Below this the flank is undercut at the stated working depth — the same
  * figure [`minimum_profile_shift`] returns. **Advisory, not a limit:** an
  * undercut gear is a real gear, and this crate generates it exactly.
+ * `None` where no shift is on the edge of undercut
+ * ([`MinimumShift::with_cutter_radius`]).
  */
-undercut: number, 
+undercut: number | null, 
 /**
  * The undercut threshold a sharp-cornered rack would give. Reported so the
- * classical rule's hidden assumption stays visible.
+ * classical rule's hidden assumption stays visible. `None` on the same
+ * terms.
  */
-sharp_rack_undercut: number, 
+sharp_rack_undercut: number | null, 
 /**
  * Above this the tooth would be pointed at the requested addendum, so the
  * tip radius is capped and a clamp note is raised. `None` when the tooth

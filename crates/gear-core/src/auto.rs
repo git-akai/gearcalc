@@ -20,15 +20,18 @@ use crate::tooth::{Rack, Tooth, POINTED_TOOTH_MAX_ROLL};
 #[derive(Clone, Copy, Debug)]
 pub struct MinimumShift {
     /// Using the root radius coefficient actually entered — the real answer.
-    pub with_cutter_radius: f64,
+    /// `None` where no shift is on the edge: the tool the tooth gets moves
+    /// with the shift so that the flank is undercut, or whole, at every shift
+    /// alike.
+    pub with_cutter_radius: Option<f64>,
     /// The same question asked of a sharp-cornered rack, `ρ = 0`.
     ///
     /// This is the assumption behind the classical "17 teeth at 20°" rule, and
     /// it is **more demanding** than reality: a real cutter's tip round ends the
     /// straight flank higher up, so there is less undercut than the sharp-rack
     /// figure predicts. Reported alongside so the gap is visible rather than
-    /// arguable.
-    pub sharp_rack: f64,
+    /// arguable. `None` on the same terms as the real answer.
+    pub sharp_rack: Option<f64>,
 }
 
 /// Minimum profile shift to keep the flank free of undercut down to
@@ -99,9 +102,11 @@ pub struct MinimumShift {
 /// the tenth solve in docs/rationale.md#where-closed-form-is-impossible's
 /// inventory, and it is reached only where the closed form is not exact.
 ///
-/// Where no bracket exists the tool is clamped to a depth the shift no longer
-/// moves, and the flank is undercut — or not — at every shift alike; the
-/// closed-form value is returned, and the tooth reports what it is.
+/// Where no bracket exists a clamp holds the tool's depth below the rolling
+/// line wherever the sign could change — the rack's tooth closing on a
+/// thickness already at its floor is one — and the flank is undercut, or
+/// whole, at every shift alike. There is no edge, and the figure is `None`
+/// rather than a shift at which nothing happens; the tooth reports what it is.
 #[must_use]
 pub fn minimum_profile_shift(p: &GearParams, working_depth: f64) -> MinimumShift {
     let asked = GearParams {
@@ -124,37 +129,49 @@ pub fn minimum_profile_shift(p: &GearParams, working_depth: f64) -> MinimumShift
         .0
     };
     let x_min_of = |tool: Rack| tool.undercut_shift(p.module, r, alpha_t);
-    // Zero exactly where the tooth built at `x` is on the edge of undercut.
-    let residual = |x: f64| x - x_min_of(tool_at(x));
-
-    let x0 = x_min_of(tool_at(p.profile_shift));
-    let f0 = residual(x0);
-    let x_min = if f0 == 0.0 {
-        x0
-    } else {
-        // Non-decreasing, so the root lies on the side the sign says; walk
-        // that way in doubling steps of a module until it is bracketed.
-        let dir = if f0 < 0.0 { 1.0 } else { -1.0 };
-        let mut step = 1.0;
-        let mut far = x0;
-        let bracketed = (0..MINIMUM_SHIFT_BRACKET_STEPS).any(|_| {
-            far = x0 + dir * step;
-            step *= 2.0;
-            (residual(far) < 0.0) != (f0 < 0.0)
-        });
-        bracketed
-            .then(|| brent(residual, x0.min(far), x0.max(far), Tol::default()))
-            .flatten()
-            .unwrap_or(x0)
+    let sharp = |tool: Rack| Rack {
+        tip_round: 0.0,
+        ..tool
     };
-
-    let tool = tool_at(x_min);
     MinimumShift {
-        with_cutter_radius: x_min,
-        sharp_rack: x_min_of(Rack {
-            tip_round: 0.0,
-            ..tool
-        }),
+        with_cutter_radius: edge_of_undercut(|x| x_min_of(tool_at(x)), p.profile_shift),
+        sharp_rack: edge_of_undercut(|x| x_min_of(sharp(tool_at(x))), p.profile_shift),
+    }
+}
+
+/// The shift `x` at which the tooth built there is on the edge of undercut:
+/// the root of `x − x_min(x)`, where `x_min(x)` is the undercut shift of the
+/// tool the tooth at `x` is cut by. `None` where the residual keeps one sign.
+///
+/// Ordinarily the tool is the same at every shift and the first closed-form
+/// step is the root. Where the tool moves with the shift the residual is
+/// continuous and non-decreasing, so it is bracketed by walking the way its
+/// sign says and solved. Where a clamp holds the tool's depth below the
+/// rolling line fixed (`b_d`, so its depth from the reference moves one for
+/// one with `x`), the residual is constant: every shift in that regime is
+/// undercut alike or whole alike, and if no other regime changes its sign
+/// there is no edge to report.
+fn edge_of_undercut(x_min: impl Fn(f64) -> f64, start: f64) -> Option<f64> {
+    let residual = |x: f64| x - x_min(x);
+    let x0 = x_min(start);
+    let f0 = residual(x0);
+    if f0 == 0.0 {
+        return Some(x0);
+    }
+    // Non-decreasing, so the root lies on the side the sign says; walk that
+    // way in doubling steps of a module until it is bracketed.
+    let dir = if f0 < 0.0 { 1.0 } else { -1.0 };
+    let mut step = 1.0;
+    let mut far = x0;
+    let bracketed = (0..MINIMUM_SHIFT_BRACKET_STEPS).any(|_| {
+        far = x0 + dir * step;
+        step *= 2.0;
+        (residual(far) < 0.0) != (f0 < 0.0)
+    });
+    if bracketed {
+        brent(residual, x0.min(far), x0.max(far), Tol::default())
+    } else {
+        None
     }
 }
 
@@ -181,11 +198,14 @@ const MINIMUM_SHIFT_BRACKET_STEPS: u32 = 16;
 /// it, otherwise leave it alone. Deliberate negative shift remains available by
 /// switching the toggle off, which is the right place for it — it is a decision
 /// about centre distance or balance, not about undercut.
+///
+/// Where there is no edge of undercut to find, no shift changes whether the
+/// flank is undercut, so none is applied.
 #[must_use]
 pub fn automatic_profile_shift(p: &GearParams, working_depth: f64) -> f64 {
     minimum_profile_shift(p, working_depth)
         .with_cutter_radius
-        .max(0.0)
+        .map_or(0.0, |x| x.max(0.0))
 }
 
 /// What profile shifts a gear can be built at, and the design thresholds inside
@@ -207,10 +227,13 @@ pub struct ShiftRange {
     /// Below this the flank is undercut at the stated working depth — the same
     /// figure [`minimum_profile_shift`] returns. **Advisory, not a limit:** an
     /// undercut gear is a real gear, and this crate generates it exactly.
-    pub undercut: f64,
+    /// `None` where no shift is on the edge of undercut
+    /// ([`MinimumShift::with_cutter_radius`]).
+    pub undercut: Option<f64>,
     /// The undercut threshold a sharp-cornered rack would give. Reported so the
-    /// classical rule's hidden assumption stays visible.
-    pub sharp_rack_undercut: f64,
+    /// classical rule's hidden assumption stays visible. `None` on the same
+    /// terms.
+    pub sharp_rack_undercut: Option<f64>,
     /// Above this the tooth would be pointed at the requested addendum, so the
     /// tip radius is capped and a clamp note is raised. `None` when the tooth
     /// never comes to a point anywhere in the buildable range.
@@ -372,8 +395,8 @@ pub fn admissible_profile_shift(p: &GearParams, working_depth: f64) -> ShiftRang
         // moved out furthest there.
         shallow_cut: shallow_cut - off_hi,
         // The low tooth, shift `x̄ + off_lo`, undercuts first.
-        undercut: shift.with_cutter_radius - off_lo,
-        sharp_rack_undercut: shift.sharp_rack - off_lo,
+        undercut: shift.with_cutter_radius.map(|x| x - off_lo),
+        sharp_rack_undercut: shift.sharp_rack.map(|x| x - off_lo),
         pointed,
     }
 }
@@ -2193,18 +2216,17 @@ mod tests {
             ..Default::default()
         };
         let m = minimum_profile_shift(&p, 1.0);
+        let (Some(cutter), Some(sharp)) = (m.with_cutter_radius, m.sharp_rack) else {
+            panic!("z12 has an edge of undercut: {m:?}");
+        };
 
         // Sharp rack: x_min = h_w - z sin^2(a)/2, computed independently.
         let sa = p.pressure_angle.to_radians().sin();
         let want = 1.0 - f64::from(p.teeth) * sa * sa / 2.0;
-        assert!(
-            (m.sharp_rack - want).abs() < 1e-12,
-            "{} vs {want}",
-            m.sharp_rack
-        );
+        assert!((sharp - want).abs() < 1e-12, "{sharp} vs {want}");
 
         // A real cutter tip round always needs LESS shift than a sharp rack.
-        assert!(m.with_cutter_radius < m.sharp_rack);
+        assert!(cutter < sharp);
     }
 
     /// The strongest check available: set the addendum to what this returns,
@@ -2273,10 +2295,15 @@ mod tests {
                 teeth,
                 ..Default::default()
             };
-            let bound = minimum_profile_shift(&p, 1.0).with_cutter_radius;
             let applied = automatic_profile_shift(&p, 1.0);
-
             assert!(applied >= 0.0, "z={teeth}: automatic shift went negative");
+            // z100's edge would be below −4, where the rack's tooth has closed
+            // on a thickness at its floor: no shift undercuts it, none is applied.
+            let Some(bound) = minimum_profile_shift(&p, 1.0).with_cutter_radius else {
+                assert!(applied == 0.0, "z={teeth}: shifted with no edge to clear");
+                continue;
+            };
+
             assert!(
                 applied >= bound - 1e-15,
                 "z={teeth}: below the undercut bound"
@@ -2297,7 +2324,7 @@ mod tests {
             },
             1.0,
         );
-        assert!(big.with_cutter_radius < -1.5);
+        assert!(big.with_cutter_radius.is_some_and(|x| x < -1.5));
     }
 
     /// The closed-form bounds against the generator itself: just inside each
@@ -2570,12 +2597,15 @@ mod tests {
                 ..Default::default()
             };
             let r = admissible_profile_shift(&p, 1.0);
+            let (Some(undercut), Some(sharp)) = (r.undercut, r.sharp_rack_undercut) else {
+                panic!("z={teeth}: a spur gear at the default rack has an edge: {r:?}");
+            };
             assert!(
-                r.undercut > r.bound.min.unwrap() && r.undercut < r.bound.max.unwrap(),
+                undercut > r.bound.min.unwrap() && undercut < r.bound.max.unwrap(),
                 "z={teeth}"
             );
             // A real cutter always needs less shift than a sharp rack.
-            assert!(r.undercut < r.sharp_rack_undercut);
+            assert!(undercut < sharp);
 
             if let Some(pointed) = r.pointed {
                 assert!(pointed > r.bound.min.unwrap() && pointed <= r.bound.max.unwrap());
@@ -2589,6 +2619,46 @@ mod tests {
                     "z={teeth}: no pointed-tooth cap past {pointed}"
                 );
             }
+        }
+    }
+
+    /// **Where the tool's depth below the rolling line is held, there is no
+    /// edge of undercut, and none is reported.**
+    ///
+    /// z43 at β = 45° (the crossed preset's wheel) reaches the edge its round
+    /// and depth would put it at only below −5 modules, where the tooth's
+    /// thickness is at its floor and the rack's tooth closes before the depth
+    /// asked. Past that the tool's depth below the rolling line is fixed, so
+    /// the undercut indicator no longer moves with the shift: the flank is
+    /// whole at every shift, and both figures are absent. It used to fall back
+    /// to the first closed-form step, −5.4100 with the cutter and −7.4823 with
+    /// a sharp rack, a threshold at which nothing happens and one that put the
+    /// sharp rack below the round, which no tool does.
+    #[test]
+    fn where_no_shift_undercuts_there_is_no_threshold() {
+        let p = GearParams {
+            teeth: 43,
+            helix_angle: 45.0,
+            ..Default::default()
+        };
+        let m = minimum_profile_shift(&p, p.dedendum);
+        assert!(
+            m.with_cutter_radius.is_none() && m.sharp_rack.is_none(),
+            "{m:?}"
+        );
+        let r = admissible_profile_shift(&p, p.dedendum);
+        assert_eq!((r.undercut, r.sharp_rack_undercut), (None, None));
+        assert!(automatic_profile_shift(&p, p.dedendum) == 0.0);
+        // No shift the gear is built at, from the range's floor to far below
+        // it, cuts its flank.
+        let floor = r.bound.min.unwrap();
+        for i in 0..=40 {
+            let x = floor - 0.25 * f64::from(i);
+            let t = Tooth::new(GearParams {
+                profile_shift: x,
+                ..p
+            });
+            assert!(!t.undercut, "undercut at x = {x}");
         }
     }
 

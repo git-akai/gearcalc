@@ -212,8 +212,8 @@ for a concentric gear. **Two tiers**, and they are not interchangeable: `min` an
 
 | Threshold | Meaning |
 |---|---|
-| `undercut` | below this the flank is undercut at the stated working depth |
-| `sharp_rack_undercut` | the same question asked of a sharp-cornered rack |
+| `undercut` | below this the flank is undercut at the stated working depth; absent where no shift is on that edge (the rack's tooth closes on a thickness at its floor first, and the flank is whole, or undercut, at every shift) |
+| `sharp_rack_undercut` | the same question asked of a sharp-cornered rack, absent on the same terms |
 | `pointed` | above this the tip is capped and reported |
 | `shallow_cut` | above this the cutter reaches deeper than the dedendum asked for |
 

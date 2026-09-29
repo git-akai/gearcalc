@@ -11,7 +11,7 @@
 
 #![allow(clippy::unwrap_used)]
 
-use gear_core::auto::minimum_profile_shift;
+use gear_core::auto::{admissible_profile_shift, minimum_profile_shift};
 use gear_core::gear::Gear;
 use gear_core::note::key;
 use gear_core::{inv, inv_from_roll, GearParams, Tooth};
@@ -818,6 +818,11 @@ fn a_tooth_called_unsevered_is_not_severed_at_a_finer_scan() {
 fn a_gear_at_its_minimum_shift_is_on_the_edge_of_undercut_and_not_over_it() {
     let mut worst = 0.0_f64;
     let mut on_edge = 0u32;
+    let mut no_edge = 0u32;
+    // Shifts a gear with no edge is built at across its range. Every one is
+    // compared with the first, so any count finds a flag that changes; this
+    // is how finely it looks.
+    const NO_EDGE_SAMPLES: u32 = 16;
     for p in Grid::new()
         .teeth(AWKWARD_TEETH)
         .pressure_angle(PRESSURE_ANGLES)
@@ -828,16 +833,14 @@ fn a_gear_at_its_minimum_shift_is_on_the_edge_of_undercut_and_not_over_it() {
         .dedendum(&[1.0, 1.25, 1.4])
         .build()
     {
-        let x_min = minimum_profile_shift(&p, p.dedendum).with_cutter_radius;
         let at = |x: f64| {
             Tooth::new(GearParams {
                 profile_shift: x,
                 ..p
             })
         };
-        let g = at(x_min);
         let case = format!(
-            "z={} a={} b={} rho={} m={} k={} hf={} x_min={x_min}",
+            "z={} a={} b={} rho={} m={} k={} hf={}",
             p.teeth,
             p.pressure_angle,
             p.helix_angle,
@@ -846,16 +849,25 @@ fn a_gear_at_its_minimum_shift_is_on_the_edge_of_undercut_and_not_over_it() {
             p.thickness_mod,
             p.dedendum
         );
-        if [
-            key::CLAMP_DEDENDUM_RAISED,
-            key::CLAMP_DEDENDUM_CAPPED,
-            key::CLAMP_SPACE_CLOSED,
-        ]
-        .iter()
-        .any(|k| g.clamps.fired(k))
-        {
-            continue; // the tool no longer follows the shift; nothing clears it
-        }
+        let Some(x_min) = minimum_profile_shift(&p, p.dedendum).with_cutter_radius else {
+            // No edge: then no shift the gear can be built at changes whether
+            // its flank is undercut.
+            let range = admissible_profile_shift(&p, p.dedendum).bound;
+            let (lo, hi) = (range.min.unwrap(), range.max.unwrap());
+            let first = at(lo).undercut;
+            for i in 1..=NO_EDGE_SAMPLES {
+                let x = lo + (hi - lo) * f64::from(i) / f64::from(NO_EDGE_SAMPLES);
+                assert_eq!(
+                    at(x).undercut,
+                    first,
+                    "{case}: no edge of undercut reported, but x={lo} and x={x} disagree"
+                );
+            }
+            no_edge += 1;
+            continue;
+        };
+        let g = at(x_min);
+        let case = format!("{case} x_min={x_min}");
         assert!(
             !g.undercut,
             "{case}: reported undercut at its own minimum shift"
@@ -874,7 +886,10 @@ fn a_gear_at_its_minimum_shift_is_on_the_edge_of_undercut_and_not_over_it() {
         on_edge += 1;
     }
     assert!(on_edge > 1000, "only {on_edge} cases reached the edge");
-    println!("{on_edge} gears on the edge of undercut; worst residual {worst:.3e} modules");
+    println!(
+        "{on_edge} gears on the edge of undercut; worst residual {worst:.3e} modules; \
+         {no_edge} with no edge"
+    );
 }
 
 #[test]
@@ -1138,7 +1153,6 @@ fn the_depth_stops_where_the_racks_tooth_closes() {
 /// addenda down to −1, which is where the grids stopped short.
 #[test]
 fn the_tooth_ends_at_its_tip() {
-    use gear_core::auto::admissible_profile_shift;
     use gear_core::note::key;
     let mut ended = 0;
     for mut p in Grid::new()

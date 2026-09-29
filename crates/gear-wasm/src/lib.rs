@@ -2842,6 +2842,13 @@ mod tests {
         // ...and the shift above which the tooth would be pointed, where
         // the tooth never comes to a point anywhere it can be built.
         "pointed",
+        // ...and the shift below which the flank is undercut, where no shift
+        // is on that edge: the rack's tooth has closed on a thickness at its
+        // floor first, so the flank is undercut, or whole, at every shift
+        // (z43 at β = 45°, the crossed preset's wheel). Paths, because a
+        // tooth's `undercut` is a flag that always has a value.
+        "profile_shift.undercut",
+        "profile_shift.sharp_rack_undercut",
         // A material value with nothing to say beyond its number.
         "note",
         // An **external** mesh's tips meet on the line of centres or not at

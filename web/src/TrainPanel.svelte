@@ -1554,12 +1554,21 @@
           shaper
             ? null
             : r
-              ? t("ui.bound_profile_shift", {
-                  min: n(r.bound.min ?? 0),
-                  max: n(r.bound.max ?? 0),
-                  undercut: n(r.undercut),
-                  sharp: n(r.sharp_rack_undercut),
-                })
+              ? [
+                  t("ui.bound_profile_shift", {
+                    min: n(r.bound.min ?? 0),
+                    max: n(r.bound.max ?? 0),
+                  }),
+                  // Either threshold is absent where no shift is on its edge.
+                  ...(r.undercut === null && r.sharp_rack_undercut === null
+                    ? []
+                    : [
+                        t("ui.bound_profile_shift_undercut", {
+                          undercut: r.undercut === null ? "—" : n(r.undercut),
+                          sharp: r.sharp_rack_undercut === null ? "—" : n(r.sharp_rack_undercut),
+                        }),
+                      ]),
+                ].join(" · ")
               : null,
           r ? outside(gear.profile_shift.manual, r.bound) : null,
         )
