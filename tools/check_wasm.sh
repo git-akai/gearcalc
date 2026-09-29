@@ -53,8 +53,10 @@ scratch="$(mktemp -d)"
 trap 'rm -rf "$scratch"' EXIT
 
 # **The shipped recipe, not a re-creation of it.** `tools/build_wasm.sh` is what
-# `flake.nix` and `web/package.json` run, so the module measured here is the
-# module people download. A check that assembled its own build would answer a
+# `flake.nix` and `web/package.json` run, so the module measured here is a
+# module built by the shipped recipe. Its bytes are not the download's: the
+# nix build differs in the paths embedded in panic messages, and nothing here
+# asserts a hash. A check that assembled its own build would answer a
 # question nobody asked.
 #
 # `--target nodejs` rather than `web` is the one difference, and it is in the
@@ -101,10 +103,21 @@ printf '  %s -> %s bytes (-%s %%)\n' \
       "$(wc -c <"$scratch/unoptimised.wasm")" "$(wc -c <"$scratch/optimised.wasm")")"
 
 # --- the coverage claim -----------------------------------------------------
-# The crate's exports, from the crate. `#[wasm_bindgen]` on a `pub fn` is the
-# declaration, so this reads the source rather than a second list.
-exported="$(grep -A2 '^#\[wasm_bindgen\]$' "$root/crates/gear-wasm/src/lib.rs" \
-  | sed -n 's/^pub fn \([a-z_0-9]*\).*/\1/p' | sort -u)"
+# The entry points, read from the optimised module itself: every function it
+# exports, less wasm-bindgen's own glue (`__wbindgen_*`, `__wbg_*`). Reading
+# the module rather than the source sees an entry point however it is
+# declared — `js_name`, a doc comment between the attribute and the `fn`, an
+# `async fn` — which a pattern over `lib.rs` did not.
+exported="$(node -e '
+  const m = new WebAssembly.Module(require("fs").readFileSync(process.argv[1]));
+  console.log(WebAssembly.Module.exports(m)
+    .filter(e => e.kind === "function" && !/^__(wbindgen|wbg)/.test(e.name))
+    .map(e => e.name).join("\n"));
+' "$scratch/optimised.wasm" | sort -u)"
+if [[ -z "$exported" ]]; then
+  echo "wasm: the module exports no entry point — the build is not the crate's" >&2
+  exit 1
+fi
 called="$(node -e '
   console.log(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).entries.join("\n"))
 ' "$scratch/after.json" | sort -u)"
