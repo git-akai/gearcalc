@@ -5,18 +5,18 @@ on:
   push:
   workflow_dispatch:
 
-# One deploy at a time, and a queued one waits rather than cancelling: the
-# published site should end up at the newest commit that passed, not at whichever
-# job happened to survive a race.
+# One run per ref: a newer push to a pull request cancels the older run, which
+# is checking a commit nobody will merge; on a branch every pushed commit is
+# checked to the end. The deploy serialises on its own group, below.
 concurrency:
-  group: pages
-  cancel-in-progress: false
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   tests:
     runs-on: ubuntu-latest
+    # Reads the repository and nothing else: this job runs project code.
     permissions:
-      id-token: write
       contents: read
     steps:
       - uses: actions/checkout@v7.0.1
@@ -35,17 +35,17 @@ jobs:
       # one deliberately (FlakeHub or Cachix, with its secret) if CI time
       # becomes a problem — the from-scratch build is ~5 min today.
 
-      # Everything CI needs to check: build, clippy --deny warnings, fmt, tests.
-      - run: nix flake check -L
+      # The checks that take seconds run first, so a dead pointer or a
+      # unitless angle is reported before the five-minute build.
 
-      # The deployable browser build. Separate from `flake check` because it
-      # pulls the Node toolchain, and a failure here is a packaging problem
-      # rather than a code one.
-      - run: nix build .#web -L
+      # This job's steps are the one list of what CI runs: `tools/check_all.sh`
+      # runs each of them locally and refuses a step it has not classified.
+      - name: check_all.sh runs what this job runs
+        run: nix develop --command tools/check_all.sh --list
 
-      # Every pointer from the code into the documents resolves to a heading
-      # that exists. 389 of these went unchecked until the documents were
-      # restructured, at which point every one of them would have broken
+      # Every pointer from the code and the documents resolves: the file it
+      # names exists and so does the heading. These went unchecked until the
+      # documents were restructured, when every one of them would have broken
       # silently.
       - name: Documentation pointers resolve
         run: nix develop --command tools/check_doc_links.py
@@ -54,6 +54,21 @@ jobs:
       # checks itself; this is the half no `Note` stands behind.
       - name: The string catalogue is complete
         run: nix develop --command tools/check_strings.py
+
+      # Every angle says what unit it is in, and no name means both. The crate
+      # works in degrees where a designer states a number and radians in the
+      # mathematics, which is right; a *name* that means one in one module and
+      # the other in the next is how that becomes a bug, and it did.
+      - name: Angular units are unambiguous
+        run: nix develop --command tools/check_units.py
+
+      # Everything CI needs to check: build, clippy --deny warnings, fmt, tests.
+      - run: nix flake check -L
+
+      # The deployable browser build. Separate from `flake check` because it
+      # pulls the Node toolchain, and a failure here is a packaging problem
+      # rather than a code one.
+      - run: nix build .#web -L
 
       # The committed TypeScript in `web/src/wire` is generated from the Rust
       # types. Regenerating it and requiring no diff is what stops it becoming a
@@ -80,25 +95,17 @@ jobs:
       # hand — both found by running the old code and reading *all* of its
       # output, which is what these two do mechanically.
       #
-      # One release build serves both, and the corpus is run **whole** — about a
-      # minute, of which the figure check would have paid for two commands
-      # anyway. `--fast` exists for a working tree, not for here: a partial check
+      # One release build, which check_golden.sh makes, serves both, and the
+      # corpus is run **whole** — about a minute, of which the figure check
+      # would have paid for two commands anyway. `--fast` exists for a working tree, not for here: a partial check
       # that reads as a complete one is the failure this project keeps recording.
       - name: The harness prints what it printed, and the documents quote it
         run: |
           nix develop --command bash -c '
             set -euo pipefail
-            cargo build --release --bin gear-cli
             tools/check_golden.sh
             tools/check_figures.py
           '
-
-      # Every angle says what unit it is in, and no name means both. The crate
-      # works in degrees where a designer states a number and radians in the
-      # mathematics, which is right; a *name* that means one in one module and
-      # the other in the next is how that becomes a bug, and it did.
-      - name: Angular units are unambiguous
-        run: nix develop --command tools/check_units.py
 
       # **The payload, executed.** Everything above checks the boundary without
       # running it: the binding check compares its generated *shape* against the
@@ -120,14 +127,16 @@ jobs:
           nix develop --command bash -c '
             set -euo pipefail
             cli="cargo run -q --release --bin gear-cli --"
-            $cli dxf 17 0.2 0.001 > /tmp/gear17.dxf
-            python3 tools/validate_dxf.py /tmp/gear17.dxf --teeth 17 --shift 0.2
-            $cli dxf 9 -0.3 0.001 > /tmp/gear9.dxf
-            python3 tools/validate_dxf.py /tmp/gear9.dxf --teeth 9 --shift -0.3
-            $cli dxf 24 0 0.001 0.25 > /tmp/gear24e.dxf
-            python3 tools/validate_dxf.py /tmp/gear24e.dxf --teeth 24 --angular-shift 0.25
-            $cli dxf ring 43 0 0.001 > /tmp/ring43.dxf
-            python3 tools/validate_dxf.py /tmp/ring43.dxf --ring --teeth 43
+            out="$(mktemp -d)"
+            trap "rm -rf $out" EXIT
+            $cli dxf 17 0.2 0.001 > $out/gear17.dxf
+            python3 tools/validate_dxf.py $out/gear17.dxf --teeth 17 --shift 0.2
+            $cli dxf 9 -0.3 0.001 > $out/gear9.dxf
+            python3 tools/validate_dxf.py $out/gear9.dxf --teeth 9 --shift -0.3
+            $cli dxf 24 0 0.001 0.25 > $out/gear24e.dxf
+            python3 tools/validate_dxf.py $out/gear24e.dxf --teeth 24 --angular-shift 0.25
+            $cli dxf ring 43 0 0.001 > $out/ring43.dxf
+            python3 tools/validate_dxf.py $out/ring43.dxf --ring --teeth 43
           '
 
       # ---- and, on `main` only, hand the site to the deploy job -------------
@@ -152,12 +161,18 @@ jobs:
   # token, and nothing that runs project code should be able to.
   #
   # `needs: tests` is the point of merging the two workflows: the site cannot
-  # move unless `nix flake check`, the four consistency checks, the typecheck and
-  # the independent DXF read have all passed on that commit.
+  # move unless every step of the tests job has passed on that commit.
+  #
+  # One deploy at a time, and a queued one waits rather than cancelling: the
+  # published site should end up at the newest commit that passed, not at
+  # whichever job happened to survive a race.
   deploy:
     needs: tests
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    concurrency:
+      group: pages
+      cancel-in-progress: false
     permissions:
       contents: read
       pages: write

@@ -80,7 +80,17 @@ slug() { echo "$1" | tr ' /' '__'; }
 
 scratch="$(mktemp -d)"
 fresh=""
-trap 'rm -rf "$scratch" ${fresh:+"$fresh"}' EXIT
+old=""
+# On any exit: the scratch set and an unswapped fresh set go, and the set moved
+# aside by `--write` either goes (the swap finished) or goes back (it did not),
+# so an interrupted write never leaves the store missing.
+cleanup() {
+  rm -rf "$scratch" ${fresh:+"$fresh"}
+  if [[ -n "$old" && -d "$old" ]]; then
+    if [[ -d "$store" ]]; then rm -rf "$old"; else mv "$old" "$store"; fi
+  fi
+}
+trap cleanup EXIT
 
 # `speed \t keep \t invocation \t why`, from the harness itself. Captured
 # first so `set -e` sees the binary fail, and refused when empty: a list that
@@ -166,11 +176,13 @@ if [[ "$mode" == write ]]; then
     echo "refusing to --write: $count files for ${#cases[@]} cases" >&2
     exit 1
   fi
-  old="$root/tools/.golden.old.$$"
-  [[ -d "$store" ]] && mv "$store" "$old"
+  if [[ -d "$store" ]]; then
+    old="$root/tools/.golden.old.$$"
+    mv "$store" "$old"
+  fi
   mv "$fresh" "$store"
+  fresh=""
   chmod 755 "$store"
-  rm -rf "$old"
   echo "tools/golden: $count files written"
   exit 0
 fi
