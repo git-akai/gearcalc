@@ -327,7 +327,7 @@ pub fn fillet_point_and_tangent(g: &Tooth, s: f64) -> ([f64; 2], [f64; 2]) {
 /// q  = ( k s , r − k b_c )
 /// ```
 ///
-/// and [`rolling_curvature_radius`] carries the rolling. It used to be a
+/// and [`crate::tooth::rolling_curvature_radius`] carries the rolling. It used to be a
 /// central difference with a chosen step; see that function for why that was
 /// worth removing.
 ///

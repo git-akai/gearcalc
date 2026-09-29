@@ -86,7 +86,7 @@ use crate::mesh::MeshKind;
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(tag = "kind", rename_all = "snake_case"))]
 pub enum BodyLabel {
-    /// The one held frame — see [`GROUND`].
+    /// The one held frame — see [`crate::kinematics::GROUND`].
     Ground,
     /// The body a member spins with, by member index in
     /// [`super::ShapeResult::members`] order. Where several members share one
@@ -306,8 +306,8 @@ impl Wiring {
     }
 }
 
-/// **Every constrainable member a shape has, as tooth counts** — the companion
-/// of [`super::member_inputs`], and the argument [`Wiring::alone`] wants.
+/// **Every constrainable member a shape has, as tooth counts** — the argument
+/// [`Wiring::alone`] wants.
 pub(crate) fn teeth_of<'a>(members: impl IntoIterator<Item = &'a MemberGear>) -> Vec<u32> {
     members.into_iter().map(|g| g.teeth).collect()
 }

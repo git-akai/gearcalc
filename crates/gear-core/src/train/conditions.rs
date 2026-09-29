@@ -157,7 +157,7 @@ pub struct TrainMotion {
     /// How many conditions the train needs, and which bodies nothing touches.
     pub mobility: Mobility,
     /// The solution in full, for a caller that wants a body this does not
-    /// name — a member's, through its part's [`Wiring::mounts`].
+    /// name.
     pub solution: Solution,
 }
 

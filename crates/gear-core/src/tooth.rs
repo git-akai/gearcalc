@@ -344,9 +344,9 @@ impl Tooth {
     ///
     /// The count is fractional, which is exactly why [`Tooth::z`] exists. Nothing
     /// else in the construction cares: the tooth *form* is a continuous function
-    /// of `z`. What is **not** meaningful on the result is [`Tooth::profile`],
-    /// which replicates a whole number of teeth around a real gear — this object
-    /// exists to be measured, not drawn.
+    /// of `z`. What is **not** meaningful is seating this tooth round a gear
+    /// ([`crate::gear::Gear::profile`] replicates a whole number of teeth) — this
+    /// object exists to be measured, not drawn.
     ///
     /// # Spur gears are not a special case
     ///

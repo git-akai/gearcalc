@@ -762,7 +762,7 @@ impl crate::note::Explain for MeshError {
 }
 
 /// English, for the CLI and for `Debug`. **Not** what the browser renders — see
-/// [`MeshError::note`], which is where the words come from there.
+/// [`crate::note::Explain::note`], which is where the words come from there.
 impl std::fmt::Display for MeshError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {

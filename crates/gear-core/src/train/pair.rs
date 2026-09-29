@@ -90,19 +90,19 @@ pub(crate) enum Decided {
 /// **The undercut bound a member answers to**, or `None` where it answers to
 /// none.
 ///
-/// One question, three answers, and each of them is the honest one for how the
-/// number arrived:
+/// One question, two answers, each the honest one for how the number arrived:
 ///
 /// | how | bound | why |
 /// |---|---|---|
 /// | [`Decided::Chosen`] | `max(x_min, 0)` | a chooser should not thin a tooth that needed no help |
-/// | [`Decided::Given`] | none | it was held to `x_min` when it was read; re-judging it here rejects legal designs |
 /// | [`Decided::Absorbed`] | `x_min` | nothing can move it, so the only honest question is whether it *does* undercut |
 ///
-/// The middle row is a bug this had twice: a search that re-judges a number it
-/// was handed throws away every candidate built on a perfectly legal one. The
-/// last row is the same mistake wearing different clothes — an absorbed shift
-/// clamped to a chooser's floor would break the relation that produced it.
+/// A shift a designer gave is not asked here at all: it is held to `x_min`
+/// when it is read and pinned before any bound is asked
+/// ([`crate::auto::Cut::Pinned`]), and re-judging it would throw away every
+/// candidate built on a legal one. An absorbed shift clamped to a chooser's
+/// floor would break the relation that produced it, which is why the second
+/// row is not the first.
 pub(crate) fn undercut_bound(
     no_undercut: bool,
     p: &crate::params::GearParams,

@@ -48,10 +48,7 @@ STANDINS = {
         "env RUSTDOCFLAGS={RUSTDOCFLAGS!r} cargo doc {cargoDocExtraArgs}",
         {"inherit cargoArtifacts", "RUSTDOCFLAGS", "cargoDocExtraArgs"},
     ),
-    "craneLib.cargoDocTest": (
-        "cargo test --doc {cargoTestExtraArgs}",
-        {"inherit cargoArtifacts", "cargoTestExtraArgs"},
-    ),
+    "craneLib.cargoDocTest": ("cargo test --doc", {"inherit cargoArtifacts"}),
 }
 
 
@@ -144,7 +141,10 @@ def read_flake(flake=FLAKE):
         name, body = entry.strip().split(" = ", 1)
         inner = set(re.findall(r"^\s+(\w+)\s*=", body, re.M))
         inner |= {"inherit " + w for w in re.findall(r"inherit (\w+);", body)}
-        head = next((k for k in STANDINS if body.startswith(k)), None)
+        # The builder is the body's first word, matched whole: `cargoDoc` is a
+        # prefix of `cargoDocTest`.
+        first = body.split(None, 1)[0]
+        head = first if first in STANDINS else None
         if head is None:
             errors.append(f"flake.nix check {name!r}: {body.splitlines()[0]!r} has no cargo stand-in here")
             continue

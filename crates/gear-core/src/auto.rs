@@ -1067,7 +1067,7 @@ pub fn member_is_buildable(tooth: &Tooth, floor: Option<f64>) -> bool {
 /// root and its fillet are its shaper's rather than inputs of its own — so it is
 /// asked of the **tool** instead, and this is where.
 ///
-/// [`crate::Ring`] records every guard that altered its geometry, so the
+/// [`crate::ring::Ring`] records every guard that altered its geometry, so the
 /// question is already answered by the time a candidate exists: a space capped
 /// against the pitch, a space raised off zero, a tip lifted to the base circle,
 /// a root past where the two flanks close. **Any of them means the tool did not

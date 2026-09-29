@@ -3,7 +3,7 @@
 //! from the graph and tried on a copy, so an interface lists complete
 //! outcomes rather than controls to fill in, and shows a refusal as a verb
 //! it cannot press, with its reason (docs/reference.md#the-graph, *what a
-//! piece offers*). What each would come to is [`super::preview`]'s to say.
+//! piece offers*). What each would come to is [`super::preview()`]'s to say.
 //!
 //! **An offer is its edit**: refused exactly where [`Train::edit`] refuses
 //! it, and never one that would change nothing — a gear alone on its body

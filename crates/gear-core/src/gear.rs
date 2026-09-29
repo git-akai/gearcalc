@@ -5,7 +5,7 @@
 //! verification alike — because an ordinary gear is this construction with the
 //! variation set to zero, not a separate thing that happens to look similar.
 //!
-//! A [`Tooth`](crate::tooth::Tooth) is one tooth's *form*: one involute at one
+//! A [`Tooth`] is one tooth's *form*: one involute at one
 //! profile shift, on one base circle. A `Gear` is the assembly of them, and it
 //! owns what the pieces share — the tool, the root envelope, the datum. That
 //! division is not filing: every guard rail that belongs to the whole and was
@@ -261,7 +261,7 @@ impl Gear {
     /// per-tooth question once per *answer* rather than once per position, since
     /// teeth `k` and `z − k` are the same gear. A concentric gear yields one.
     ///
-    /// This is what an output becoming a range is built on — [`Self::span`] for
+    /// This is what an output becoming a range is built on — [`Self::extremes`] for
     /// the scalar case, and this directly for anything that is not a scalar.
     /// The measurements over teeth and pins are the obvious next customers: they
     /// return `Option`s rather than numbers, so they want the iterator and their

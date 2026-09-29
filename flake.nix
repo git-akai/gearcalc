@@ -197,6 +197,21 @@
             partitions = 1;
             partitionType = "count";
           });
+
+          # Every intra-doc link resolves, private items documented: their
+          # docs carry the reasoning, so a link from a public item to a private
+          # one is kept and checked rather than silenced, and only the lint
+          # against making it is allowed.
+          doc = craneLib.cargoDoc (commonArgs // {
+            inherit cargoArtifacts;
+            RUSTDOCFLAGS = "-D warnings -A rustdoc::private_intra_doc_links";
+            cargoDocExtraArgs = "--workspace --no-deps --document-private-items";
+          });
+
+          # The examples in doc comments, which nextest does not run.
+          doctest = craneLib.cargoDocTest (commonArgs // {
+            inherit cargoArtifacts;
+          });
         });
 
       devShells = eachSystem (system:

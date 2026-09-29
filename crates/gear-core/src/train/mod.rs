@@ -291,7 +291,7 @@ pub struct MeshReport {
     /// the row — `j |Σz| / a` on a line contact, plus the axial float's — at
     /// its distance's minus, running and plus tolerance in turn. What a
     /// play referred to any body of the train is read from
-    /// ([`kinematics::System::play`]), so a path's backlash sums every mesh
+    /// ([`crate::kinematics::System::play`]), so a path's backlash sums every mesh
     /// it crosses and none it does not ([`PathReport`]). **Not sent**: the
     /// path's, read in the core.
     #[cfg_attr(feature = "serde", serde(skip))]
@@ -745,7 +745,7 @@ impl Bending {
     /// `rim` is the thickness of the rim under its teeth, mm, or `None` where
     /// nobody said — see [`crate::strength::RimSupport`]. Which reference that
     /// thickness is measured against is the member's own business
-    /// ([`ToothOutline::rim_support`]), as the direction its load point travels
+    /// ([`crate::strength::ToothOutline::rim_support`]), as the direction its load point travels
     /// is; this was two functions and they differed in nothing else.
     /// `short_of_tip` is how far this member's last contact falls below its
     /// tip, in base pitches ([`crate::contact::ContactPath::short_of_tip`]).
@@ -828,8 +828,8 @@ pub(crate) fn contact_notes(rated: &[Rated]) -> Vec<Note> {
 /// past where the standard will go, and it says so instead of returning a
 /// number that looks like the others.
 ///
-/// A **member's** finding rather than a mesh's, which is why it is here and not
-/// in [`Bending::note`]: two members of one mesh have two rims and one sharing
+/// A **member's** finding rather than a mesh's, which is why it is raised per
+/// member and not with the mesh's bending: two members of one mesh have two rims and one sharing
 /// model between them.
 pub(crate) fn rim_below_minimum(rim: Option<crate::strength::RimSupport>) -> Option<Note> {
     rim.filter(|r| !r.in_range())
@@ -955,10 +955,8 @@ pub(crate) struct MemberRating<'a> {
     ///
     /// Per case rather than one list and a factor, because "the next case is
     /// this one times a number" is a claim about a *power flow* rather
-    /// than about gearing. It holds for the shape's flow and
-    /// [`Loading::for_cases`] is how it says so; a flow that did not scale with
-    /// what passes through it would build each case for itself, and would need
-    /// nothing added here to do it.
+    /// than about gearing, and a flow that did not scale with what passes
+    /// through it would build each case for itself.
     pub cases: Vec<CaseLoadings>,
 }
 
@@ -1178,7 +1176,7 @@ pub struct MemberGear {
     /// reached from a centre distance or a crank offset, and a shift the
     /// efficiency search chose, all in the same words.
     ///
-    /// The bound is the **true** minimum from [`minimum_profile_shift`], which
+    /// The bound is the **true** minimum from [`crate::auto::minimum_profile_shift`], which
     /// on a comfortable tooth count is negative — so a deliberate negative
     /// shift is left alone and only a genuinely undercut one is raised. That is
     /// deliberate: negative shift is a decision about centre distance or
@@ -1852,7 +1850,7 @@ fn place(at: usize) -> String {
 }
 
 /// English, for the CLI and for `Debug`. **Not** what the browser renders — see
-/// [`TrainError::note`].
+/// [`crate::note::Explain::note`].
 impl std::fmt::Display for TrainError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -2265,7 +2263,7 @@ pub struct Figure {
 /// and at most one of them stands.
 ///
 /// A kind lists its readings in **relief order, least precious first**, and
-/// the solve honours the **last** one given ([`stated_helix`]). So the reading
+/// the solve honours the **last** one given ([`Shape::helix_angles`]). So the reading
 /// relief leaves standing is the reading the solve reads, by construction —
 /// there is no second list stating the precedence again in an `if` chain, and
 /// nothing for the two to disagree about.
@@ -2417,8 +2415,7 @@ pub(crate) fn distance_and_clearance(d: usize) -> FreedomGroup {
     }
 }
 
-/// **An input that is never read**, the mirror of [`always_given`]: relief
-/// turns it automatic whatever was touched, so a box the solve would
+/// **An input that is never read**: relief turns it automatic whatever was touched, so a box the solve would
 /// disregard is not left showing a number as if it were being read.
 pub(crate) fn always_automatic(f: Freedom) -> FreedomGroup {
     FreedomGroup {
@@ -3037,7 +3034,7 @@ impl Duty {
 /// and a back-driving one at the output — were the first two entries of this
 /// list with their ports and directions written into the field names. A case
 /// applied at the far end is not a sign on one applied at the near end; it is
-/// the same kind of thing entering elsewhere, and [`Port`] is what says where.
+/// the same kind of thing entering elsewhere, and [`PortBody`] is what says where.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(deny_unknown_fields))]

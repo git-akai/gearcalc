@@ -747,7 +747,7 @@ impl crate::note::Explain for MeasurementError {
 }
 
 /// English, for the CLI and for `Debug`. **Not** what the browser renders — see
-/// [`MeasurementError::note`].
+/// [`crate::note::Explain::note`].
 impl std::fmt::Display for MeasurementError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {

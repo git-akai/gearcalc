@@ -1466,7 +1466,7 @@ fn adopt_member_impl(input: &str) -> Result<String, String> {
 /// **The train's graph with its over-determined inputs relieved.**
 ///
 /// `{ shape, just, figures }` JSON in — the train's graph as it now stands,
-/// the [`Freedom`] the designer has this moment pinned (`null` where what
+/// the [`Freedom`](gear_core::train::Freedom) the designer has this moment pinned (`null` where what
 /// changed was not a toggle), and what the graph's inputs last came to
 /// ([`TrainOutcome::figures`]), every index the graph's — and the corrected
 /// graph out, with every box relief turned given seeded from its figure.
@@ -1521,7 +1521,7 @@ fn relieve_impl(input: &str) -> Result<String, String> {
 /// with exactly the train's mobility of its speeds given and the torques one
 /// statics equation short of the bodies that carry one, every figure relief
 /// turned derived seeded from what the case comes to
-/// ([`Train::relieve_case`]). The same relation [`relieve`] keeps on a
+/// ([`Train::relieve_case`](gear_core::train::Train::relieve_case)). The same relation [`relieve`] keeps on a
 /// shape's geometry, kept on a case's loads: a pair with a speed at each end
 /// has asked for a contradiction, and the one not this moment pinned gives
 /// way. A case with fewer given than that is left short — relief never

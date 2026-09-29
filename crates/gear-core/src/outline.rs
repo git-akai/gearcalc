@@ -1,6 +1,6 @@
 //! The gear outline as a CAD-ready closed path.
 //!
-//! Two things distinguish this from [`Tooth::profile`], which returns plain
+//! Two things distinguish this from [`Gear::profile`](crate::gear::Gear::profile), which returns plain
 //! points:
 //!
 //! 1. **Point spacing follows from a stated chord tolerance**, not a chosen

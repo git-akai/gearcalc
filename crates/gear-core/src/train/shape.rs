@@ -1485,8 +1485,9 @@ impl Shape {
     }
 
     /// The shift of member `i` at which mesh `m` runs at the distance mesh
-    /// `first` runs at — a bracketed Newton, as `planetary::solve` absorbs
-    /// into the planet.
+    /// `first` runs at: [`crate::solve::newton_bracketed`] on the difference of
+    /// the two running distances, its slope each mesh's `dA/dx_i` in closed
+    /// form, inside the bracket where both meshes' operating geometry exists.
     fn absorb(&self, i: usize, first: usize, m: usize, x: &[f64], helix: &[f64]) -> Option<f64> {
         let with = |v: f64| {
             let mut y = x.to_vec();

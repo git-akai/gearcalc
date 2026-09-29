@@ -1061,7 +1061,7 @@ fn tip_clearance(ring: &Ring, pinion: &Tooth, a: f64) -> Option<f64> {
 /// Mesh a ring with an external pinion at their zero-backlash centre distance.
 ///
 /// Shifts on either member are carried, through the same
-/// [`operating_geometry`](crate::mesh::operating_geometry) the external mesh
+/// [`crate::mesh::operating_geometry`] the external mesh
 /// uses: the pinion is member 1 and the ring member 2, so the sums are
 /// `z_p − z_r` and `x_p − x_r`. A standard pair is the value of that at zero,
 /// where `α_w = α_t` and `a = r_ring − r_pinion` — not a separate case.
