@@ -11,6 +11,7 @@ hula  z 19/18/17/18  module 1/1  alpha 20 deg  clearance 0.2 mm
     sigma_H 627.5 MPa at the pitch point   rho 8.2376 mm
     z19   T   201.5572 Nm  b  10.000 mm  sigma_F        —  sigma_H  1279.7 MPa
     ! z19: flank and fillet do not meet: cutter does not reach this ring's flank; profile not generated
+    ! z19: bending not rated: no load point leaves a root section the bending model reads — the moment arm or the factor is not positive there, or the tooth has no section
     z18   T   190.9489 Nm  b  10.000 mm  sigma_F   6685.4  sigma_H  3008.2 MPa
 
   mesh 2  pinion z17 x+0.0000  ring z18 x+0.4519   alpha_w 49.673 deg   shaper z13
@@ -21,3 +22,4 @@ hula  z 19/18/17/18  module 1/1  alpha 20 deg  clearance 0.2 mm
     z17   T   191.6182 Nm  b  10.000 mm  sigma_F   7171.7  sigma_H  3385.9 MPa
     z18   T   202.8899 Nm  b  10.000 mm  sigma_F        —  sigma_H  1369.7 MPa
     ! z18: flank and fillet do not meet: cutter does not reach this ring's flank; profile not generated
+    ! z18: bending not rated: no load point leaves a root section the bending model reads — the moment arm or the factor is not positive there, or the tooth has no section

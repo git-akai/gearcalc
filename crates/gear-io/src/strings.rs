@@ -1213,6 +1213,20 @@ mod tests {
                     record(&r.every_note());
                 }
             }
+            // **A pointed tooth**, rated on its fillet alone: the 12/40 pair
+            // at 25° with sharp tips allowed and a long addendum.
+            {
+                let mut s = arr::pair([12, 40]);
+                for m in &mut s.members {
+                    m.gear.addendum = 1.6;
+                    m.gear.no_sharp_tip = false;
+                    m.pressure_angle = gear_core::params::Auto::fixed(25.0);
+                }
+                s.members[0].gear.profile_shift = gear_core::params::Auto::fixed(0.5);
+                if let Ok(r) = solve_spur(&s, 2.0, 0.0, &lib) {
+                    record(&r.every_note());
+                }
+            }
             // An automatic face width with every rating switched off.
             let no_source = gear_core::train::MemberGear {
                 face_width: gear_core::params::Auto::automatic(0.0),
@@ -1465,7 +1479,6 @@ mod tests {
                     }
                 }
             }
-            err(TrainError::NoRootSection.note());
             if let Err(e) = gear_core::train::solve_train(
                 &Train::chained(Vec::new(), |_| {
                     vec![gear_core::train::LoadCase::ultimate(1, 2, 2.0, 3000.0)]

@@ -443,7 +443,7 @@
 
   /** **A mesh's notes are drawn beside the figure each is about.** Those
    *  about its contact — a ratio below one, a helical pair short of full
-   *  overlap, a sharing model extrapolating past the single-pair zone — go
+   *  overlap, a mesh past the single-pair zone — go
    *  under the contact ratio; everything else a mesh can say is about its
    *  efficiency — locking, nearly locking, losing more than it keeps — and
    *  goes under that. Two groups and a remainder rather than a key per note,

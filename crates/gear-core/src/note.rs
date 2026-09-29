@@ -101,6 +101,10 @@ pub mod key {
     pub const GEAR_SHIFT_RAISED_FOR_UNDERCUT: &str = "gear.shift_raised_for_undercut";
     /// `gear.bending_unrated_in_mesh`
     pub const GEAR_BENDING_UNRATED_IN_MESH: &str = "gear.bending_unrated_in_mesh";
+    /// `gear.bending_unrated`
+    pub const GEAR_BENDING_UNRATED: &str = "gear.bending_unrated";
+    /// `gear.bending_on_fillet_pointed`
+    pub const GEAR_BENDING_ON_FILLET_POINTED: &str = "gear.bending_on_fillet_pointed";
     /// `gear.ring_addendum_clamped`
     pub const GEAR_RING_ADDENDUM_CLAMPED: &str = "gear.ring_addendum_clamped";
     /// `gear.face_width_no_source`
@@ -245,8 +249,6 @@ pub mod key {
     pub const ERROR_TRAIN_WIRING: &str = "error.train_wiring";
     /// `error.train_unknown_material`
     pub const ERROR_TRAIN_UNKNOWN_MATERIAL: &str = "error.train_unknown_material";
-    /// `error.train_no_root_section`
-    pub const ERROR_TRAIN_NO_ROOT_SECTION: &str = "error.train_no_root_section";
     /// `error.train_overdetermined`
     pub const ERROR_TRAIN_OVERDETERMINED: &str = "error.train_overdetermined";
     /// `error.train_no_such_body`
@@ -309,6 +311,8 @@ pub mod key {
         GEAR_ADDENDUM_HELD_TO_TIP_WIDTH,
         GEAR_SHIFT_RAISED_FOR_UNDERCUT,
         GEAR_BENDING_UNRATED_IN_MESH,
+        GEAR_BENDING_UNRATED,
+        GEAR_BENDING_ON_FILLET_POINTED,
         GEAR_RING_ADDENDUM_CLAMPED,
         GEAR_FACE_WIDTH_NO_SOURCE,
         GEAR_REVERSED_BENDING_UNCORRECTED,
@@ -354,7 +358,6 @@ pub mod key {
         ERROR_TRAIN_NO_COMMON_DISTANCE,
         ERROR_TRAIN_WIRING,
         ERROR_TRAIN_UNKNOWN_MATERIAL,
-        ERROR_TRAIN_NO_ROOT_SECTION,
         ERROR_TRAIN_OVERDETERMINED,
         ERROR_TRAIN_NO_SUCH_BODY,
         ERROR_TRAIN_OVERFLOW,

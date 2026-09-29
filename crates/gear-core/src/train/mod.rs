@@ -720,16 +720,13 @@ pub struct Widths {
 /// member needs before it is given one.
 pub(crate) const PROBE: f64 = 10.0;
 
-/// **What one member bends at in one mesh**: the critical section, the share of
-/// the mesh load acting on it, and what the sharing model has to say about
-/// being asked outside the band it was described in.
+/// **What one member bends at in one mesh**: the critical section the model
+/// rates, the share of the mesh load acting on it, the rim under it, and
+/// whether the section was sought on the fillet alone.
 ///
-/// All three are per *(member, mesh)*, which is why they travel together and
-/// why this is one place rather than one per stage type. It had been none: the
-/// pair asked for the section and the share inline and raised the note itself,
-/// and the two epicyclic stages asked for neither — so the one estimate this
-/// crate ships reached one stage of three, and a set that switched the model on
-/// got it on the members it happened to share code with.
+/// All are per *(member, mesh)*, which is why they travel together and why
+/// this is one place rather than one per stage type. Absent where no load
+/// point leaves a section the model rates ([`crate::strength::RootSection::bending_factor`]).
 pub(crate) struct Bending {
     pub section: crate::strength::RootSection,
     /// Exactly 1 where no sharing model was asked for, so the ordinary rating
@@ -739,22 +736,10 @@ pub(crate) struct Bending {
     /// rather than its root section's. `None` where nobody described a rim,
     /// which is every gear this crate rated before it existed.
     pub rim: Option<crate::strength::RimSupport>,
-    /// **The ramp outside the band it was described in.** It is a first-order
-    /// stand-in for a mesh with a single-pair zone; at `ε_n ≥ 2` there is no
-    /// such zone and the ramp never reaches a full share. **What that does to
-    /// the figure has no fixed direction**: measured across high-contact-ratio
-    /// spur designs it runs from a 24 % relief to a 15 % *increase*, because
-    /// the swept maximum is a product of a form factor rising toward the tip
-    /// and a share falling away there, and which wins is the tooth's business.
-    /// A large number either way from an uncalibrated model — exactly what
-    /// `docs/rationale.md` refuses to let pass silently — so it is said where
-    /// the figure is shown. The model is still the one the designer asked for;
-    /// what they are owed is knowing it is extrapolating.
-    ///
-    /// A *mesh's* finding, so a part raises it once per mesh rather than once
-    /// per member; a member's own findings — its notch band, its rim — go in
-    /// its own list.
-    pub note: Option<Note>,
+    /// **Whether the section was sought on the fillet alone**, because the
+    /// virtual tooth comes to a point
+    /// ([`crate::strength::ToothOutline::tip_is_pointed`]).
+    pub fillet_alone: bool,
 }
 
 impl Bending {
@@ -773,32 +758,31 @@ impl Bending {
     ) -> Option<Self> {
         let (section, share) =
             crate::strength::bending_section_shared(member, contact_ratio, model)?;
-        let cos_bb = member.base_helix_angle().cos();
-        Some(Self::new(
+        Some(Self {
             section,
             share,
-            model,
-            contact_ratio / (cos_bb * cos_bb),
-            rim.map(|s| member.rim_support(s)),
-        ))
+            rim: rim.map(|s| member.rim_support(s)),
+            fillet_alone: member.virtual_spur().tip_is_pointed(),
+        })
     }
+}
 
-    fn new(
-        section: crate::strength::RootSection,
-        share: f64,
-        model: crate::contact::LoadSharing,
-        eps_n: f64,
-        rim: Option<crate::strength::RimSupport>,
-    ) -> Self {
-        let out_of_band = !matches!(model, crate::contact::LoadSharing::None) && eps_n >= 2.0;
-        Self {
-            section,
-            share,
-            rim,
-            note: out_of_band
-                .then(|| Note::new(key::MESH_LOAD_SHARING_OUT_OF_BAND).number("ratio", eps_n, 3)),
-        }
-    }
+/// **A mesh past the single-pair band**, `ε_αn ≥ 2`: two pairs are always
+/// engaged, so there is no single-pair zone.
+///
+/// Both ways of rating bending lean on that zone. Unshared, the tooth is
+/// loaded alone at the highest point of single-pair contact, `d = ε_n − 1`
+/// base pitches from the tip, which here is a point where it never carries
+/// the whole load, low on the flank where Dolan–Broghamer's factor shrinks
+/// toward zero and then has no reading. Shared, the ramp never reaches a full
+/// share; measured across high-contact-ratio spur designs it runs from a
+/// 24 % relief to a 15 % increase (T06.7 re-measures it). ISO corrects the
+/// band with `Y_DT`, which this crate declines. **A mesh's finding**, raised
+/// once per mesh whatever the sharing model.
+pub(crate) fn single_pair_band(contact_ratio: f64, base_helix: f64) -> Option<Note> {
+    let cos_bb = base_helix.cos();
+    let eps_n = contact_ratio / (cos_bb * cos_bb);
+    (eps_n >= 2.0).then(|| Note::new(key::MESH_LOAD_SHARING_OUT_OF_BAND).number("ratio", eps_n, 3))
 }
 
 /// The note a rating raises about one member's **rim**: it is thinner than the
@@ -1619,8 +1603,6 @@ pub enum TrainError {
 
     /// A material name that is not in the library.
     UnknownMaterial(String),
-    /// A tooth so undercut there is no root section left to rate.
-    NoRootSection,
     /// **Two conditions cannot both hold**, at this body: what it is asked
     /// to do contradicts what the meshes and the other conditions already
     /// decided — a sun driven while its carrier and its ring are both held.
@@ -1728,7 +1710,6 @@ impl crate::note::Explain for TrainError {
             Self::UnknownMaterial(n) => {
                 Note::new(key::ERROR_TRAIN_UNKNOWN_MATERIAL).text("name", n.clone())
             }
-            Self::NoRootSection => Note::new(key::ERROR_TRAIN_NO_ROOT_SECTION),
             Self::Overdetermined { at } => located(key::ERROR_TRAIN_OVERDETERMINED, *at),
             Self::NoSuchBody { at } => located(key::ERROR_TRAIN_NO_SUCH_BODY, *at),
             Self::Overflow => Note::new(key::ERROR_TRAIN_OVERFLOW),
@@ -1837,7 +1818,6 @@ impl std::fmt::Display for TrainError {
                 }
             },
             Self::UnknownMaterial(n) => write!(f, "no material named {n:?} in the library"),
-            Self::NoRootSection => write!(f, "the tooth is too undercut to have a root section"),
             Self::Overdetermined { at } => {
                 write!(f, "two conditions cannot both hold at {}", place(*at))
             }

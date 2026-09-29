@@ -1,7 +1,7 @@
 planetary  z_sun 17  z_planet 17  N 3  x_sun 0  x_ring 0  module 1  alpha 20 deg
 ideal ring (needs no planet shift): 51
 
-why it starts: z_ring 48: the tooth is too undercut to have a root section
+why it starts: z_ring 48: the teeth never come into contact
 
 z_ring   x_planet         a mm   residual   a_w sun    even  simult   clearance
     49    -0.4807    16.439068      0.0e0    13.650     yes      no      10.435

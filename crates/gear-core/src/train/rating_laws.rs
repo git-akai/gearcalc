@@ -121,3 +121,180 @@ fn the_canary_at_a_light_application_factor_asks_more_than_its_face() {
     assert!((light / one - 1.25).abs() < 1e-12, "K_A 1.25: {light}");
     assert!(light > 10.0, "K_A 1.25 asks {light}, within the face");
 }
+
+/// Every bending figure a result reports is absent or a positive number —
+/// a stress, and the minimum width inverted from it — or zero on a member
+/// that carries nothing (a layshaft's idle pair).
+fn bending_is_absent_or_positive(r: &super::TrainResult, label: &str) -> usize {
+    let mut rated = 0;
+    for (i, g) in r.members.iter().enumerate() {
+        for c in &g.cases {
+            for (what, v) in [
+                ("stress", c.bending_stress),
+                ("min width", c.min_face_width.bending),
+            ] {
+                if let Some(v) = v {
+                    assert!(
+                        v.is_finite() && (v > 0.0 || (v == 0.0 && c.torque == 0.0)),
+                        "{label} member {i}: bending {what} {v} at {} N·m",
+                        c.torque
+                    );
+                    rated += 1;
+                }
+            }
+        }
+    }
+    rated
+}
+
+/// Whether member `i` says its bending went unrated.
+fn says_unrated(r: &super::TrainResult, i: usize) -> bool {
+    r.members[i]
+        .notes
+        .iter()
+        .any(|n| n.is(crate::note::key::GEAR_BENDING_UNRATED))
+}
+
+/// **A mate loaded low on its flank is not rated negative.** Against a
+/// long-addendum member the unshifted 300/300 pair runs at `ε_α` 2.75, so the
+/// unshared load point `d = ε − 1` sits low on the other member's flank:
+/// the load line crosses the centreline below the section, the moment arm
+/// shrinks, `Y_F` falls below the axial term and Dolan–Broghamer's factor goes
+/// negative. It used to report −1.30 MPa and a negative minimum width, with
+/// no note (−0.26 MPa at 2 N·m). The model has no reading there, so the
+/// member is unrated and says so, and the mesh says it is past `ε_n = 2`
+/// whatever the sharing model.
+#[test]
+fn a_mate_loaded_low_on_its_flank_is_unrated_not_negative() {
+    let mut s = pair([300, 300]);
+    s.members[0].gear.addendum = 1.9;
+    s.members[0].gear.dedendum = 2.15;
+    let r = solve_train(&Train::alone(&s, 10.0, 100.0), &test_library()).unwrap();
+    bending_is_absent_or_positive(&r, "300/300 at h_a 1.9");
+    assert!(r.members[1]
+        .cases
+        .iter()
+        .all(|c| c.bending_stress.is_none()));
+    assert!(says_unrated(&r, 1), "{:?}", r.members[1].notes);
+    assert!(
+        r.meshes[0]
+            .notes
+            .iter()
+            .any(|n| n.is(crate::note::key::MESH_LOAD_SHARING_OUT_OF_BAND)),
+        "no band note at ε {}",
+        r.meshes[0].contact_ratio
+    );
+}
+
+/// **A member with no root section costs its own rating, not the train's.**
+/// At `h_a` 2.2 with sharp tips allowed, a 300/300 pair keeps no rated
+/// section on one member in its one mesh; the train was refused whole
+/// (`NoRootSection`, which blamed undercut).
+#[test]
+fn a_member_with_no_root_section_is_unrated_and_the_train_solves() {
+    let mut s = pair([300, 300]);
+    s.members[0].gear.addendum = 2.2;
+    s.members[0].gear.no_sharp_tip = false;
+    let r = solve_train(&Train::alone(&s, 10.0, 100.0), &test_library())
+        .unwrap_or_else(|e| panic!("refused whole: {e}"));
+    bending_is_absent_or_positive(&r, "300/300 at h_a 2.2");
+    let unrated: Vec<usize> = (0..2)
+        .filter(|&i| {
+            r.members[i]
+                .cases
+                .iter()
+                .all(|c| c.bending_stress.is_none())
+        })
+        .collect();
+    assert!(!unrated.is_empty(), "both members rated");
+    for i in unrated {
+        assert!(says_unrated(&r, i), "member {i}: {:?}", r.members[i].notes);
+    }
+}
+
+/// **A pointed tooth under load sharing is a number.** The 12/40 pair at 25°
+/// with sharp tips allowed, `h_a` 1.6 and the pinion at `x` 0.5: the sweep
+/// sampled the wheel's apex, where the Lewis section is `0/0`, and the `NaN`
+/// latched as its worst (`Some(NaN)`). Below `ε_n = 2` sharing may only
+/// relieve the unshared figure, by the fraction the seeded sweep leaves.
+#[test]
+fn a_pointed_tooth_under_load_sharing_is_a_number() {
+    use crate::contact::LoadSharing;
+    let build = |sharing| {
+        let mut s = pair([12, 40]);
+        s.set_load_sharing(sharing);
+        for m in &mut s.members {
+            m.gear.addendum = 1.6;
+            m.gear.no_sharp_tip = false;
+            m.pressure_angle = Auto::fixed(25.0);
+        }
+        s.members[0].gear.profile_shift = Auto::fixed(0.5);
+        solve_train(&Train::alone(&s, 50.0, 3000.0), &test_library()).unwrap()
+    };
+    let (alone, shared) = (build(LoadSharing::None), build(LoadSharing::LinearRamp));
+    assert!(bending_is_absent_or_positive(&shared, "12/40 shared") > 0);
+    assert!(
+        shared.members[1]
+            .notes
+            .iter()
+            .any(|n| n.is(crate::note::key::GEAR_BENDING_ON_FILLET_POINTED)),
+        "the pointed wheel does not say where it is rated"
+    );
+    bending_is_absent_or_positive(&alone, "12/40 alone");
+    for (a, b) in alone.members.iter().zip(&shared.members) {
+        for (ca, cb) in a.cases.iter().zip(&b.cases) {
+            if let (Some(x), Some(y)) = (ca.bending_stress, cb.bending_stress) {
+                assert!(y / x <= 1.002, "sharing raised {x} to {y}");
+            }
+        }
+    }
+}
+
+/// The presets, the hula and the arrangements no button reaches.
+fn every_arrangement() -> Vec<super::Shape> {
+    use super::arrangements as arr;
+    Preset::ALL
+        .into_iter()
+        .map(Preset::build)
+        .chain([
+            arr::hula([65, 61, 57, 61], [1.0, 1.0]),
+            arr::ravigneaux([18, 30], [22, 18], 62, 3),
+            arr::worm_and_pair((1, 40), (17, 43)),
+            arr::planocentric(52, 56),
+        ])
+        .collect()
+}
+
+/// **Every bending figure is absent or positive**, on every preset and
+/// arrangement with one member's addendum swept 1.0–1.8, sharp tips allowed
+/// on it, under both sharing models. The sweep carries `ε_α` through 1.5–3.2
+/// and teeth to a point; a fuzz of 20,000 trains found 36 `NaN`, 10 negative
+/// and 2 `−∞` bending results.
+#[test]
+fn every_bending_figure_is_absent_or_positive() {
+    use crate::contact::LoadSharing;
+    let lib = test_library();
+    let (mut solved, mut rated) = (0, 0);
+    for (a, base) in every_arrangement().into_iter().enumerate() {
+        for i in 0..base.members.len() {
+            for addendum in [1.0, 1.2, 1.4, 1.6, 1.8] {
+                for sharing in [LoadSharing::None, LoadSharing::LinearRamp] {
+                    let mut s = base.clone();
+                    s.set_load_sharing(sharing);
+                    s.members[i].gear.addendum = addendum;
+                    s.members[i].gear.no_sharp_tip = false;
+                    let Ok(r) = solve_train(&Train::alone(&s, 2.0, 100.0), &lib) else {
+                        continue;
+                    };
+                    solved += 1;
+                    rated += bending_is_absent_or_positive(
+                        &r,
+                        &format!("arrangement {a}, member {i} at h_a {addendum}, {sharing:?}"),
+                    );
+                }
+            }
+        }
+    }
+    assert!(solved > 0 && rated > 0, "the law is vacuous");
+    eprintln!("{solved} trains solved, {rated} bending figures");
+}

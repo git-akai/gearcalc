@@ -3362,17 +3362,8 @@ pub fn cut(shape: &Shape, lib: &MaterialLibrary) -> Result<Cut, TrainError> {
             ));
         }
     }
-    // **A member with no root section in any of its line meshes refuses the
-    // shape**; one rated in some mesh keeps that rating and says which flank
-    // went unrated — a planet whose ring-side load point falls off its flank
-    // is still rated on its sun side, which is what the set's own kind did
-    // without saying so. A ring refuses only its own rating.
-    for (i, (m, b)) in cut.shape.members.iter().zip(&bendings).enumerate() {
-        if m.ring.is_none() && cut.on_a_line(i) && b.iter().all(|(_, b)| b.is_none()) {
-            return Err(TrainError::NoRootSection);
-        }
-    }
-
+    // A member with no rated section in a mesh costs its own bending rating
+    // there and says so (`gear_notes`); the train still solves.
     cut.bendings = bendings;
     Ok(cut)
 }
@@ -3869,7 +3860,17 @@ pub fn rate(
         out.extend(g.face_width_note());
         out.extend(as_entered(i).then(|| Note::new(key::GEAR_FACE_WIDTH_AS_ENTERED)));
         // ...and each mesh whose load point leaves this member no section
-        // to rate, where another mesh's did.
+        // to rate, where another mesh's did — or, where none did, that the
+        // member is not rated in bending at all.
+        if on_a_line(i) && bendings[i].iter().all(|(_, b)| b.is_none()) {
+            out.push(Note::new(key::GEAR_BENDING_UNRATED));
+        }
+        if bendings[i]
+            .iter()
+            .any(|(_, b)| b.as_ref().is_some_and(|b| b.fillet_alone))
+        {
+            out.push(Note::new(key::GEAR_BENDING_ON_FILLET_POINTED));
+        }
         if bendings[i].iter().any(|(_, b)| b.is_some()) {
             for (k, b) in &bendings[i] {
                 if b.is_none() {
@@ -4019,12 +4020,12 @@ pub fn rate(
                             }
                             BuiltMember::Rack { .. } => None,
                         },
-                        notes: bendings[m.a]
-                            .iter()
-                            .find(|(kk, _)| *kk == k)
-                            .and_then(|(_, b)| b.as_ref().and_then(|b| b.note.clone()))
-                            .into_iter()
-                            .collect(),
+                        notes: super::single_pair_band(
+                            l.path.contact_ratio,
+                            crate::metrology::base_helix_angle(a.as_gear()),
+                        )
+                        .into_iter()
+                        .collect(),
                     },
                 ),
                 BuiltContact::Point(p) => point_mesh_report(

@@ -285,6 +285,7 @@
   mesh 1  members 1 2  alpha_w 19.849390  eps 1.916246 / 0.000000 / 1.916246  efficiency 99.028738 / 99.028738 %  play 0.092350 / 0.027705 deg  shares a factor
     power through, by case: 26.928822 / 49.801996 / 26.928822
   mesh 2  members 1 3  alpha_w 15.638132  eps 2.121494 / 0.000000 / 2.121494  efficiency 98.953143 / 98.953143 %  play 0.073491 / 0.021686 deg  coprime
+    ! mesh.load_sharing_out_of_band
     power through, by case: 27.213711 / 49.318288 / 27.213711
   distance 1  running 20.980000  clearance 0.020000
 
@@ -829,6 +830,7 @@
   mesh 2  members 3 4  alpha_w 19.849390  eps 1.916246 / 0.000000 / 1.916246  efficiency 99.028738 / 99.028738 %  play 0.092350 / 0.027705 deg  shares a factor
     power through, by case: 26.483144 / 49.646067 / 26.483144
   mesh 3  members 3 5  alpha_w 15.638132  eps 2.121494 / 0.000000 / 2.121494  efficiency 98.953143 / 98.953143 %  play 0.073491 / 0.021686 deg  coprime
+    ! mesh.load_sharing_out_of_band
     power through, by case: 26.763317 / 49.163874 / 26.763317
   distance 2  running 20.980000  clearance 0.020000
 
@@ -1492,6 +1494,7 @@
   mesh 3  members 4 5  alpha_w 19.849390  eps 1.916246 / 0.000000 / 1.916246  efficiency 99.028738 / 99.028738 %  play 0.092350 / 0.027705 deg  shares a factor
     power through, by case: 26.066251 / 49.496308 / 26.066251
   mesh 4  members 4 6  alpha_w 15.638132  eps 2.121494 / 0.000000 / 2.121494  efficiency 98.953143 / 98.953143 %  play 0.073491 / 0.021686 deg  coprime
+    ! mesh.load_sharing_out_of_band
     power through, by case: 26.342014 / 49.015569 / 26.342014
   distance 3  running 20.980000  clearance 0.020000
 
@@ -2293,6 +2296,7 @@
   mesh 4  members 7 8  alpha_w 19.849390  eps 1.916246 / 0.000000 / 1.916246  efficiency 99.028738 / 99.028738 %  play 0.092350 / 0.027705 deg  shares a factor
     power through, by case: 26.120649 / 49.516068 / 26.120649
   mesh 5  members 7 9  alpha_w 15.638132  eps 2.121494 / 0.000000 / 2.121494  efficiency 98.953143 / 98.953143 %  play 0.073491 / 0.021686 deg  coprime
+    ! mesh.load_sharing_out_of_band
     power through, by case: 26.396988 / 49.035138 / 26.396988
   distance 2  running 20.980000  clearance 0.020000
 
@@ -2964,6 +2968,7 @@
   mesh 2  members 3 4  alpha_w 19.849390  eps 1.916246 / 0.000000 / 1.916246  efficiency 99.028738 / 99.028738 %  play 0.092350 / 0.027705 deg  shares a factor
     power through, by case: 16.643253 / 44.651856 / 16.643253
   mesh 3  members 3 5  alpha_w 15.638132  eps 2.121494 / 0.000000 / 2.121494  efficiency 98.953143 / 98.953143 %  play 0.073491 / 0.021686 deg  coprime
+    ! mesh.load_sharing_out_of_band
     power through, by case: 16.819327 / 44.218170 / 16.819327
   distance 2  running 20.980000  clearance 0.020000
 
@@ -3553,6 +3558,7 @@
   mesh 2  members 3 4  alpha_w 19.849390  eps 1.916246 / 0.000000 / 1.916246  efficiency 99.028738 / 99.028738 %  play 0.092350 / 0.027705 deg  shares a factor
     power through, by case: 22.688959 / 48.123636 / 22.688959
   mesh 3  members 3 5  alpha_w 15.638132  eps 2.121494 / 0.000000 / 2.121494  efficiency 98.953143 / 98.953143 %  play 0.073491 / 0.021686 deg  coprime
+    ! mesh.load_sharing_out_of_band
     power through, by case: 22.928993 / 47.656230 / 22.928993
   distance 2  running 20.980000  clearance 0.020000
 
@@ -4230,6 +4236,7 @@
   mesh 3  members 4 5  alpha_w 19.849390  eps 1.916246 / 0.000000 / 1.916246  efficiency 99.028738 / 99.028738 %  play 0.092350 / 0.027705 deg  shares a factor
     power through, by case: 26.304561 / 49.582386 / 26.304561
   mesh 4  members 4 6  alpha_w 15.638132  eps 2.121494 / 0.000000 / 2.121494  efficiency 98.953143 / 98.953143 %  play 0.073491 / 0.021686 deg  coprime
+    ! mesh.load_sharing_out_of_band
     power through, by case: 26.582845 / 49.100811 / 26.582845
   distance 2  running 20.980000  clearance 0.020000
 
@@ -4517,6 +4524,7 @@
   mesh 1  members 1 2  alpha_w 19.849390  eps 1.916246 / 0.000000 / 1.916246  efficiency 99.028738 / 99.028738 %  play 0.092350 / 0.027705 deg  shares a factor
     power through, by case: 26.928822 / 49.129514 / 26.928822
   mesh 2  members 1 3  alpha_w 15.638132  eps 2.121494 / 0.000000 / 2.121494  efficiency 98.953143 / 98.953143 %  play 0.073491 / 0.021686 deg  coprime
+    ! mesh.load_sharing_out_of_band
     power through, by case: 27.213711 / 48.652337 / 27.213711
   distance 1  running 20.980000  clearance 0.020000
   member 4  z 17  m 1  alpha 20  x 0.005657  b 10.000000  beta 0.000000  d 17.000000
@@ -4581,6 +4589,7 @@
   mesh 1  members 1 2  alpha_w 19.849390  eps 1.916246 / 0.000000 / 1.916246  efficiency 99.028738 / 99.028738 %  play 0.092350 / 0.027705 deg  shares a factor
     power through, by case: 26.928822 / 48.496682 / 26.928822
   mesh 2  members 1 3  alpha_w 15.638132  eps 2.121494 / 0.000000 / 2.121494  efficiency 98.953143 / 98.953143 %  play 0.073491 / 0.021686 deg  coprime
+    ! mesh.load_sharing_out_of_band
     power through, by case: 27.213711 / 48.025652 / 27.213711
   distance 1  running 20.980000  clearance 0.020000
   member 4  z 17  m 1  alpha 20  x 0.005657  b 10.000000  beta 0.000000  d 17.000000
@@ -4656,6 +4665,7 @@
   mesh 1  members 1 2  alpha_w 19.849390  eps 1.916246 / 0.000000 / 1.916246  efficiency 99.028738 / 99.028738 %  play 0.092350 / 0.027705 deg  shares a factor
     power through, by case: 26.928822 / 48.579467 / 26.928822
   mesh 2  members 1 3  alpha_w 15.638132  eps 2.121494 / 0.000000 / 2.121494  efficiency 98.953143 / 98.953143 %  play 0.073491 / 0.021686 deg  coprime
+    ! mesh.load_sharing_out_of_band
     power through, by case: 27.213711 / 48.107633 / 27.213711
   distance 1  running 20.980000  clearance 0.020000
   member 4  z 17  m 1  alpha 20  x 0.005657  b 10.000000  beta 0.000000  d 17.000000
@@ -4737,6 +4747,7 @@
   mesh 1  members 1 2  alpha_w 19.849390  eps 1.916246 / 0.000000 / 1.916246  efficiency 99.028738 / 99.028738 %  play 0.092350 / 0.027705 deg  shares a factor
     power through, by case: 26.928822 / 0.000000 / 26.928822
   mesh 2  members 1 3  alpha_w 15.638132  eps 2.121494 / 0.000000 / 2.121494  efficiency 98.953143 / 98.953143 %  play 0.073491 / 0.021686 deg  coprime
+    ! mesh.load_sharing_out_of_band
     power through, by case: 27.213711 / 0.000000 / 27.213711
   distance 1  running 20.980000  clearance 0.020000
   member 4  z 1  m 1  alpha 20  x 0.000000  b 13.538864  beta 81.786789  d 7.000000
@@ -4799,6 +4810,7 @@
   mesh 1  members 1 2  alpha_w 19.849390  eps 1.916246 / 0.000000 / 1.916246  efficiency 99.028738 / 99.028738 %  play 0.092350 / 0.027705 deg  shares a factor
     power through, by case: 26.928822 / 43.230429 / 26.928822
   mesh 2  members 1 3  alpha_w 15.638132  eps 2.121494 / 0.000000 / 2.121494  efficiency 98.953143 / 98.953143 %  play 0.073491 / 0.021686 deg  coprime
+    ! mesh.load_sharing_out_of_band
     power through, by case: 27.213711 / 42.810549 / 27.213711
   distance 1  running 20.980000  clearance 0.020000
   member 4  z 17  m 1  alpha 20  x 0.000000  b 10.000000  beta 45.000000  d 24.041631
@@ -4866,6 +4878,7 @@
   mesh 1  members 1 2  alpha_w 19.849390  eps 1.916246 / 0.000000 / 1.916246  efficiency 99.028738 / 99.028738 %  play 0.092350 / 0.027705 deg  shares a factor
     power through, by case: 26.928822 / 48.855206 / 26.928822
   mesh 2  members 1 3  alpha_w 15.638132  eps 2.121494 / 0.000000 / 2.121494  efficiency 98.953143 / 98.953143 %  play 0.073491 / 0.021686 deg  coprime
+    ! mesh.load_sharing_out_of_band
     power through, by case: 27.213711 / 48.380694 / 27.213711
   distance 1  running 20.980000  clearance 0.020000
   member 4  z 12  m 1  alpha 20  x 0.298101  b 10.000000  beta 0.000000  d 12.000000
@@ -4940,6 +4953,7 @@
   mesh 1  members 1 2  alpha_w 19.849390  eps 1.916246 / 0.000000 / 1.916246  efficiency 99.028738 / 99.028738 %  play 0.092350 / 0.027705 deg  shares a factor
     power through, by case: 26.928822 / 9.046636 / 26.928822
   mesh 2  members 1 3  alpha_w 15.638132  eps 2.121494 / 0.000000 / 2.121494  efficiency 98.953143 / 98.953143 %  play 0.073491 / 0.021686 deg  coprime
+    ! mesh.load_sharing_out_of_band
     power through, by case: 27.213711 / 9.142344 / 27.213711
   distance 1  running 20.980000  clearance 0.020000
   member 4  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
@@ -4960,6 +4974,7 @@
   mesh 3  members 4 5  alpha_w 19.849390  eps 1.916246 / 0.000000 / 1.916246  efficiency 99.028738 / 99.028738 %  play 0.092350 / 0.027705 deg  shares a factor
     power through, by case: 12.213886 / 40.659652 / 12.213886
   mesh 4  members 4 6  alpha_w 15.638132  eps 2.121494 / 0.000000 / 2.121494  efficiency 98.953143 / 98.953143 %  play 0.073491 / 0.021686 deg  coprime
+    ! mesh.load_sharing_out_of_band
     power through, by case: 12.343101 / 40.264740 / 12.343101
   distance 2  running 20.980000  clearance 0.020000
 
@@ -5019,6 +5034,7 @@
   mesh 1  members 1 2  alpha_w 19.849390  eps 1.916246 / 0.000000 / 1.916246  efficiency 99.028738 / 99.028738 %  play 0.092350 / 0.027705 deg  shares a factor
     power through, by case: 26.928822 / 26.729356 / 26.928822
   mesh 2  members 1 3  alpha_w 15.638132  eps 2.121494 / 0.000000 / 2.121494  efficiency 98.953143 / 98.953143 %  play 0.073491 / 0.021686 deg  coprime
+    ! mesh.load_sharing_out_of_band
     power through, by case: 27.213711 / 26.469744 / 27.213711
   distance 1  running 20.980000  clearance 0.020000
   member 4  z 24  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 24.000000
@@ -5106,6 +5122,7 @@
   mesh 1  members 1 2  alpha_w 19.849390  eps 1.916246 / 0.000000 / 1.916246  efficiency 99.028738 / 99.028738 %  play 0.092350 / 0.027705 deg  shares a factor
     power through, by case: 26.928822 / 48.612886 / 26.928822
   mesh 2  members 1 3  alpha_w 15.638132  eps 2.121494 / 0.000000 / 2.121494  efficiency 98.953143 / 98.953143 %  play 0.073491 / 0.021686 deg  coprime
+    ! mesh.load_sharing_out_of_band
     power through, by case: 27.213711 / 48.140727 / 27.213711
   distance 1  running 20.980000  clearance 0.020000
   member 4  z 30  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 30.000000
@@ -5176,6 +5193,7 @@
   mesh 1  members 1 2  alpha_w 19.849390  eps 1.916246 / 0.000000 / 1.916246  efficiency 99.028738 / 99.028738 %  play 0.092350 / 0.027705 deg  shares a factor
     power through, by case: 26.928822 / 47.122850 / 26.928822
   mesh 2  members 1 3  alpha_w 15.638132  eps 2.121494 / 0.000000 / 2.121494  efficiency 98.953143 / 98.953143 %  play 0.073491 / 0.021686 deg  coprime
+    ! mesh.load_sharing_out_of_band
     power through, by case: 27.213711 / 46.665164 / 27.213711
   distance 1  running 20.980000  clearance 0.020000
   member 4  z 24  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 24.000000
@@ -5794,6 +5812,7 @@
   mesh 4  members 6 7  alpha_w 19.849390  eps 1.916246 / 0.000000 / 1.916246  efficiency 99.028738 / 99.028738 %  play 0.092350 / 0.027705 deg  shares a factor
     power through, by case: 17.651430 / 45.353192 / 17.651430
   mesh 5  members 6 8  alpha_w 15.638132  eps 2.121494 / 0.000000 / 2.121494  efficiency 98.953143 / 98.953143 %  play 0.073491 / 0.021686 deg  coprime
+    ! mesh.load_sharing_out_of_band
     power through, by case: 17.838170 / 44.912694 / 17.838170
   distance 2  running 20.980000  clearance 0.020000
 
@@ -6509,6 +6528,7 @@
   mesh 2  members 3 4  alpha_w 19.849390  eps 1.916246 / 0.000000 / 1.916246  efficiency 99.028738 / 99.028738 %  play 0.092350 / 0.027705 deg  shares a factor
     power through, by case: 26.162949 / 49.531388 / 26.162949
   mesh 3  members 3 5  alpha_w 15.638132  eps 2.121494 / 0.000000 / 2.121494  efficiency 98.953143 / 98.953143 %  play 0.073491 / 0.021686 deg  coprime
+    ! mesh.load_sharing_out_of_band
     power through, by case: 26.439735 / 49.050308 / 26.439735
   distance 2  running 20.980000  clearance 0.020000
 
@@ -7288,6 +7308,7 @@
   mesh 4  members 5 6  alpha_w 19.849390  eps 1.916246 / 0.000000 / 1.916246  efficiency 99.028738 / 99.028738 %  play 0.092350 / 0.027705 deg  shares a factor
     power through, by case: 25.140258 / 49.149403 / 25.140258
   mesh 5  members 5 7  alpha_w 15.638132  eps 2.121494 / 0.000000 / 2.121494  efficiency 98.953143 / 98.953143 %  play 0.073491 / 0.021686 deg  coprime
+    ! mesh.load_sharing_out_of_band
     power through, by case: 25.406225 / 48.672033 / 25.406225
   distance 4  running 20.980000  clearance 0.020000
 

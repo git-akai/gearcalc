@@ -810,6 +810,28 @@ reach it at any helix angle, but an ordinary **high-contact-ratio** design
 (addendum 1.35) reaches it immediately, and that is exactly the design a user
 would switch sharing on for.
 
+**The unshared rating leaves the same band, so the note is the mesh's whatever
+the sharing model.** Unshared, the tooth carries everything at `d = ε_n − 1`
+base pitches from its tip, which past `ε_n = 2` is a point where it never
+carries the whole load, low on the flank. There the moment arm shrinks, `Y_F`
+falls below the axial term and `K_f` grows without bound, so Dolan–Broghamer's
+`(Y_F − axial)·K_f` passes through zero to negative: a 300/300 pair against a
+1.9-module addendum reported −1.30 MPa and a negative minimum width. **The
+factor is `None` wherever it is not a finite positive number, and the member
+says it is unrated** (`gear.bending_unrated`). `max(Y_F ± axial)` would rate the
+compressive fillet, a third model neither source states; ISO's own remedy for the
+band, `Y_DT`, is declined with the rest of its factors.
+
+**A pointed tooth is rated on its fillet alone.** Near a pointed apex the Lewis
+parabola tangent to the flank shrinks onto the point and its form factor grows
+like `1/d` — the point's own stress, not the root's, and `0/0` at the apex, which
+a sharing sweep samples. Skipping the apex would only trade the `NaN` for
+whatever the finest sample reaches (17.4 at 200 samples, 208.6 at 3200, against
+an unshared 2.28). So on a tooth whose tip is capped pointed the section is
+sought on the fillet, and the member says so (`gear.bending_on_fillet_pointed`).
+This is a step, not a limit: a tooth one hair short of pointed still searches its
+flank, and near the tip that search finds the thin tip's own large section.
+
 **What would change this:** a calibrated stiffness model, which would replace the
 ramp rather than the control. The two conditions that would make one worth having
 are unchanged — a duty-cycle or transmission-error calculation, where the whole

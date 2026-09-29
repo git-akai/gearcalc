@@ -655,6 +655,17 @@ whose size is unmeasured is a debt still owed, and is marked as one.
   The allowables are not ISO's `σ_Flim` or `σ_Hlim` either, so this entry
   states the stress's bias, not the whole margin's
   ([rationale](rationale.md#no-isoagma-correction-factors)).
+- **Bending past `ε_αn = 2` is taken where the tooth never carries the whole
+  load**, `ε_n − 1` base pitches from the tip, and ISO's `Y_DT` is declined.
+  Against ISO the figure is **high** by `1/Y_DT`, up to 1.43× past
+  `ε_αn = 2.5`, where a tolerance class of 4 or better and a trapezoidal
+  profile modification are asserted, and equal otherwise; against a mesh
+  stiffness model it is unmeasured. Where Dolan–Broghamer's factor
+  there is not positive the member is **unrated** (`gear.bending_unrated`), and
+  every such mesh says it is in the band (`mesh.load_sharing_out_of_band`).
+- **A pointed tooth is rated on its fillet alone** (`gear.bending_on_fillet_pointed`),
+  a step at the pointed limit: one hair short of pointed, the flank is still
+  searched and the thin tip's own section can govern. Size unmeasured.
 - **Helical bending is conservative against ISO 6336-3:2019 by 26–36 %** at
   full axial overlap, and **below it by up to 22 %** at an overlap ratio under
   0.3 with a helix over 20° — the one regime where this model runs under the
