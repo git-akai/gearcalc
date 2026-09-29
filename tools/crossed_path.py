@@ -54,6 +54,11 @@ import numpy as np
 
 AXIS_1 = np.array([0.0, 0.0, 1.0])
 RECORD = Path(__file__).resolve().parent / "golden" / "crossed_17_23_90.txt"
+# The clearance a shipped crossed pair runs open by, mm: a stated input of the
+# harness's pairs (every clearance "the shipped 0.02 mm"), not a figure it
+# computes. The running centre is the nominal one, from the pitch radii, plus
+# this.
+CLEARANCE_MM = 0.02
 FAILURES = []
 
 
@@ -481,15 +486,17 @@ def check_crate(mn, alpha_n):
     z1, z2 = int(head.group(1)), int(head.group(2))
     sigma = np.radians(float(head.group(3)))
     mn, alpha_n = float(head.group(4)), np.radians(float(head.group(5)))
-    # A stage runs open by the default clearance, the running centre the
-    # harness's own shift table prints beside the nominal one.
-    running = float(re.search(r"least shift that clears undercut\s+\S+\s+\S+\s+(\S+)", text).group(1))
-    even = re.search(r"at the even split \((\S+)/", text).group(1)
     rows = re.findall(
         r"^\s+(\d+\.\d)\s+(\d+\.\d)\s+\S+\s+\S+\s+(\S+)\s.*?\s(\d\.\d{9})$", text, re.M
     )
-    clearance = running - float(next(r[2] for r in rows if r[0] == even))
-    print(f"     running {clearance:.4f} mm open, as the shift table prints it")
+    # The running centre is derived, and the harness's shift table held to it.
+    even = float(re.search(r"at the even split \((\S+)/", text).group(1))
+    printed = float(re.search(r"least shift that clears undercut\s+\S+\s+\S+\s+(\S+)", text).group(1))
+    g_even = [geometry(z, np.radians(b), mn, alpha_n) for z, b in ((z1, even), (z2, np.degrees(sigma) - even))]
+    derived = g_even[0]["r"] + g_even[1]["r"] + CLEARANCE_MM
+    expect(f"{derived:.4f}" == f"{printed:.4f}", f"running centre {printed}, derived {derived:.4f}")
+    clearance = CLEARANCE_MM
+    print(f"     running {clearance} mm open: {derived:.4f} mm at the even split, as printed")
     worst = 0.0
     for b1, b2, a_nom, eps in rows:
         g1 = geometry(z1, np.radians(float(b1)), mn, alpha_n)
