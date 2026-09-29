@@ -422,6 +422,11 @@ pub struct Bound {
     pub exclusive_max: bool,
 }
 
+/// **The bound on every count**: a gear's or a cutter's teeth, an axis's
+/// planets, a duty's actuations. At least one, since none is no gear, no
+/// tool, no axis and no duty; the wire carries them as `u32`.
+pub const COUNT: Bound = Bound::between(Some(1.0), None);
+
 impl Bound {
     /// Inclusive on both sides.
     #[must_use]
@@ -715,7 +720,7 @@ fn ranges_at_shift(p: &GearParams, working_depth: f64) -> Ranges {
             exclusive_max: false,
         },
         pressure_angle: Bound::strictly(0.0, 90.0),
-        teeth: Bound::between(Some(1.0), None),
+        teeth: COUNT,
         helix_angle: Bound::strictly(-90.0, 90.0),
         thickness_mod: Bound::strictly(0.0, 2.0),
 

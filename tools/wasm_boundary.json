@@ -52,7 +52,12 @@
      "pin_diameter": "1.7500000000000000",
      "chord_tolerance": "0.0010000000000000000",
      "reference_circles": true,
-     "eccentric_throw": "0.10000000000000001"
+     "eccentric_throw": "0.10000000000000001",
+     "mate": {
+      "teeth": 43,
+      "profile_shift": 0,
+      "internal": false
+     }
     },
     "train": {
      "load_cases": [
@@ -3539,7 +3544,13 @@
       "label": "ui.train_family_epicyclic"
      }
     ],
-    "reverse_loading_coefficient": "0.69999999999999996"
+    "reverse_loading_coefficient": "0.69999999999999996",
+    "count": {
+     "min": 1,
+     "max": null,
+     "exclusive_min": false,
+     "exclusive_max": false
+    }
    }
   },
   "languages": {
@@ -3584,23 +3595,23 @@
    "ok": [
     [
      "en",
-     554
+     556
     ],
     [
      "de",
-     554
+     556
     ],
     [
      "pt",
-     554
+     556
     ],
     [
      "zh-Hans",
-     554
+     556
     ],
     [
      "zh-Hant",
-     554
+     556
     ]
    ]
   },
@@ -4020,7 +4031,7 @@
     },
     "centre_profile": {
      "unavailable": {
-      "key": "ui.gear_no_mate",
+      "key": "ui.gear_concentric_has_no_profile",
       "values": {}
      }
     },

@@ -34,10 +34,10 @@ test('`type="number"` is written in NumberBox.svelte alone', () => {
 function trainsToTry(): Train[] {
   const base = defaultTrain();
   return offersAt(base, "train")
-    .filter((o) => o.refused === null)
+    .offers.filter((o) => o.refused === null)
     .map((o) => {
       const train = structuredClone(base);
-      expect(editTrain(train, o.edit)).toBeNull();
+      expect(editTrain(train, { graph: o.edit })).toBeNull();
       return train;
     });
 }
@@ -155,15 +155,39 @@ test("clearing the throw box keeps the throw as the input", () => {
   panel = mounted(GearPanel, { tab });
   setKind(tab, "eccentric");
   flushSync();
-  const throwRow = row(panel.target, "ui.gear_axis_distance_throw");
-  (throwRow.querySelector("button") as HTMLButtonElement).click();
+  const amplitude = () => box(panel!.target, "ui.gear_field_angular_shift");
+  const throwBox = () => box(panel!.target, "ui.gear_axis_distance_throw");
+  expect(amplitude().disabled).toBe(false);
+  expect(throwBox().disabled).toBe(true);
+  // The throw's own switch: the throw becomes the input, the amplitude the
+  // solve's.
+  (row(panel.target, "ui.gear_axis_distance_throw").querySelector("button") as HTMLButtonElement).click();
   flushSync();
-  expect(tab.throwIsInput).toBe(true);
-  const held = tab.eccentricThrow;
-  type(box(panel.target, "ui.gear_axis_distance_throw"), "");
-  expect(tab.throwIsInput).toBe(true);
-  expect(tab.eccentricThrow).toBe(held);
-  expect(t("ui.validation_required")).toBe(
+  expect(amplitude().disabled).toBe(true);
+  expect(throwBox().disabled).toBe(false);
+  const held = throwBox().value;
+  type(throwBox(), "");
+  // Still the throw that is typed, and still the amplitude that is locked.
+  expect(amplitude().disabled).toBe(true);
+  expect(throwBox().disabled).toBe(false);
+  expect(String(tab.eccentricThrow)).toBe(held);
+  expect(
     row(panel.target, "ui.gear_axis_distance_throw").querySelector("small.err:not(.hidden)")?.textContent?.trim(),
-  );
+  ).toBe(t("ui.validation_required"));
+});
+
+test("a figure the reader did not choose is shown rounded for reading", () => {
+  const tab = open(defaultTrain());
+  panel = mounted(TrainPanel, { tab });
+  let seen = 0;
+  for (const sel of selections(tab.train)) {
+    tab.view.selection = sel;
+    flushSync();
+    for (const input of panel.target.querySelectorAll<HTMLInputElement>("input.computed")) {
+      if (input.value === "") continue;
+      expect(input.value).toBe(String(Number(Number(input.value).toFixed(4))));
+      seen++;
+    }
+  }
+  expect(seen).toBeGreaterThan(0);
 });

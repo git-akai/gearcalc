@@ -4231,9 +4231,9 @@ pub struct TrainResult {
 pub struct AxisReport {
     /// The layout, its `axis` the graph's number for it.
     pub layout: Option<shape::LayoutReport>,
-    /// **The counts the axis may be replicated to** ([`shape::Axis::count`]): at
-    /// least once, since `N = 0` is no axis. Sent so the panel holds the box
-    /// to the core's bound rather than one written beside it.
+    /// **The counts the axis may be replicated to** ([`shape::Axis::count`]),
+    /// [`crate::auto::COUNT`]. Sent so the panel holds the box to the core's
+    /// bound rather than one written beside it.
     pub count: Bound,
 }
 
@@ -4284,7 +4284,7 @@ impl TrainResult {
         let mut axes: Vec<AxisReport> = (0..shape.axes.len())
             .map(|_| AxisReport {
                 layout: None,
-                count: Bound::between(Some(1.0), None),
+                count: crate::auto::COUNT,
             })
             .collect();
         let mut own = Vec::with_capacity(parts.len());

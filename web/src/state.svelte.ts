@@ -147,7 +147,7 @@ function freshTab(name = t("ui.gear_default_name")): GearTab {
     view: { circles: true, zoom: 1, panX: 0, panY: 0 },
     kind: "external",
     cutter: d.cutter,
-    mate: { teeth: 43, profile_shift: 0, internal: false },
+    mate: d.mate,
     eccentricThrow: d.eccentric_throw,
     throwIsInput: false,
   };

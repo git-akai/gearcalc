@@ -195,6 +195,15 @@ import init, {
   edit_train,
   adopt_member,
 } from "./wasm/gear_wasm.js";
+import { failureDetail, wire } from "./boundary";
+
+/** **A call into the core that failed**, as the catalogue words it: the
+ *  front end's own key, since nothing in Rust can emit it — it means the call
+ *  did not return — with a number that would not cross named by its box. */
+export function boundaryFailure(e: unknown): Note {
+  return { key: "ui.train_boundary_failed", values: { detail: failureDetail(e) } };
+}
+const failed = (e: unknown): string => t("ui.train_boundary_failed", { detail: failureDetail(e) });
 
 /** Narrow a `Maybe` to its "there is no value" arm.
  *
@@ -432,20 +441,6 @@ export const FIELDS: FieldSpec[] = [
   },
 ];
 
-/** **A request as it crosses**: JSON, refusing a number that is not finite.
- *
- *  `JSON.stringify` writes NaN and ±∞ as `null`, which serde then refuses as
- *  the wrong type for the whole request — and a train that fails that way
- *  loses its lists, ports and names with it. No box commits such a number
- *  (`NumberBox`); this is the guard behind that, which names the field
- *  rather than letting serde name a type. */
-function wire(v: unknown): string {
-  return JSON.stringify(v, (key, x) => {
-    if (typeof x === "number" && !Number.isFinite(x)) throw new Error(`${key}: ${x}`);
-    return x;
-  });
-}
-
 // --------------------------------------------------------------------- //
 
 let ready: Promise<void> | null = null;
@@ -513,6 +508,13 @@ export function defaults(): Defaults {
   return structuredClone(cachedDefaults);
 }
 
+/** The bound every count is held to — teeth, planets, actuations — as the
+ *  core states it. Not a copy: it is read-only. */
+export function countBound(): Bound {
+  if (!cachedDefaults) throw new Error("the count bound was asked for before the core finished loading");
+  return cachedDefaults.count;
+}
+
 export function coreVersion(): string {
   return version();
 }
@@ -523,7 +525,7 @@ export function solve(
   try {
     return { ok: JSON.parse(solve_gear(wire(req))) as GearSummary };
   } catch (e) {
-    return { error: e instanceof Error ? e.message : String(e) };
+    return { error: failed(e) };
   }
 }
 
@@ -542,7 +544,7 @@ export function dxf(req: GearRequest): { ok: string } | { error: string } {
   try {
     return { ok: export_dxf(wire(req)) };
   } catch (e) {
-    return { error: e instanceof Error ? e.message : String(e) };
+    return { error: failed(e) };
   }
 }
 
@@ -552,7 +554,7 @@ export function solveRing(
   try {
     return { ok: JSON.parse(solve_ring(wire(req))) as RingSummary };
   } catch (e) {
-    return { error: e instanceof Error ? e.message : String(e) };
+    return { error: failed(e) };
   }
 }
 
@@ -571,7 +573,7 @@ export function ringDxf(req: RingRequest): { ok: string } | { error: string } {
   try {
     return { ok: export_ring_dxf(wire(req)) };
   } catch (e) {
-    return { error: e instanceof Error ? e.message : String(e) };
+    return { error: failed(e) };
   }
 }
 
@@ -610,7 +612,7 @@ export function exportTrain(
   try {
     return { ok: export_train(wire(doc)) };
   } catch (e) {
-    return { error: e instanceof Error ? e.message : String(e) };
+    return { error: failureDetail(e) };
   }
 }
 
@@ -640,7 +642,7 @@ export function exportLibrary(
   try {
     return { ok: export_materials(wire(lib)) };
   } catch (e) {
-    return { error: e instanceof Error ? e.message : String(e) };
+    return { error: failureDetail(e) };
   }
 }
 
@@ -673,17 +675,18 @@ export function exportLibrary(
  *  as the designer's own toggle does. This side forwards the list and never
  *  learns which figure is which.
  *
- *  A train that will not cross the boundary is left alone. Relief runs on a
- *  click, and a click is not the place to discover a broken boundary.
+ *  A train that will not cross the boundary is left alone, and the failure
+ *  comes back as `boundaryFailure`'s note for the panel to say.
  */
-export function relieveTrain(train: Train, just: Freedom | null, figures: Figure[] = []): void {
+export function relieveTrain(train: Train, just: Freedom | null, figures: Figure[] = []): Note | null {
   let corrected: Shape;
   try {
     corrected = JSON.parse(relieve(wire({ shape: train.shape, just, figures }))) as Shape;
-  } catch {
-    return;
+  } catch (e) {
+    return boundaryFailure(e);
   }
   assignLeaves(train.shape, corrected);
+  return null;
 }
 
 /** **A load case with its over-determined figures relieved**, the same
@@ -698,25 +701,27 @@ export function relieveTrain(train: Train, just: Freedom | null, figures: Figure
  *  Called after every change to a case's loads — a port loaded or released,
  *  a toggle flipped — with the library the train is rated under, so the
  *  seeding is the same solve the panel shows. A train that will not cross
- *  the boundary leaves the case as it stands. */
+ *  the boundary leaves the case as it stands, and the failure comes back as
+ *  `boundaryFailure`'s note. */
 export function relieveCase(
   train: Train,
   index: number,
   just: CaseFreedom | null,
   materials?: MaterialLibrary,
-): void {
+): Note | null {
   const c = train.load_cases[index];
-  if (!c) return;
+  if (!c) return null;
   let corrected: LoadCase;
   try {
     const library = materials ?? defaultLibrary();
     corrected = JSON.parse(relieve_case(wire({ train, library, case: index, just }))) as LoadCase;
-  } catch {
-    return;
+  } catch (e) {
+    return boundaryFailure(e);
   }
   // Loads are a list and relief neither adds nor removes one, so each is
   // the same load before and after; only its toggles and seeded numbers move.
   corrected.loads.forEach((l, j) => assignLeaves(c.loads[j], l));
+  return null;
 }
 
 /** Write every leaf of `from` that differs into `into`, in place, shape-blind:
@@ -749,7 +754,7 @@ export function adoptMember(
     const body = wire({ train, materials: materials ?? null, member });
     return JSON.parse(adopt_member(body)) as AdoptOutcome;
   } catch (e) {
-    return { error: e instanceof Error ? e.message : String(e) };
+    return { error: failed(e) };
   }
 }
 
@@ -774,16 +779,7 @@ export function solveTrain(train: Train, materials?: MaterialLibrary): TrainOutc
   } catch (e) {
     return {
       result: null,
-      failure: {
-        // **This one is the front end's own**, so its words live in the `[ui]`
-        // section rather than in `[error]`, which is the core's: nothing in
-        // Rust can emit it, because it means the call into Rust did not return.
-        note: {
-          key: "ui.train_boundary_failed",
-          values: { detail: e instanceof Error ? e.message : String(e) },
-        },
-        part: null,
-      },
+      failure: { note: boundaryFailure(e), part: null },
       figures: [],
       parts: [],
       ports: [],
@@ -813,16 +809,16 @@ export type TrainEdit =
   | { add_case: CaseKind }
   | { duty: { case: number; intermittent: boolean } };
 /** The train edited by the core's rules, in place. An edit the core
- *  refuses leaves the train as it was and comes back as the catalogue key of
- *  the reason, for the panel to say; any other failure is a defect on this
- *  side of the boundary and is swallowed as before. */
-export function editTrain(train: Train, edit: TrainEdit): string | null {
+ *  refuses leaves the train as it was and comes back as the note of the
+ *  reason, for the panel to say; a train that would not cross comes back as
+ *  `boundaryFailure`'s. */
+export function editTrain(train: Train, edit: TrainEdit): Note | null {
   let edited: Train;
   try {
     edited = JSON.parse(edit_train(wire({ train, edit }))) as Train;
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    return message.startsWith("ui.") ? message : null;
+    return message.startsWith("ui.") ? { key: message, values: {} } : boundaryFailure(e);
   }
   train.shape = edited.shape;
   train.held = edited.held;
@@ -833,28 +829,28 @@ export function editTrain(train: Train, edit: TrainEdit): string | null {
 /** **What an edit would do, before it is made** — the core makes it on a
  *  copy by the rule `editTrain` would, solves both trains and says the
  *  refusal, or what would change and what the headline path would come
- *  to, as notes for the catalogue. Nothing is kept. `null` where the
- *  boundary failed, which is a defect on this side of it. */
-export function previewEdit(train: Train, edit: TrainEdit, materials?: MaterialLibrary): Preview | null {
+ *  to, as notes for the catalogue. Nothing is kept. Where the call failed,
+ *  the edited train is said to be unsolved, with `boundaryFailure`'s note. */
+export function previewEdit(train: Train, edit: TrainEdit, materials?: MaterialLibrary): Preview {
   try {
     return JSON.parse(
       preview_edit(wire({ train, materials: materials ?? null, edit })),
     ) as Preview;
-  } catch {
-    return null;
+  } catch (e) {
+    return { refused: null, changes: [], paths: [], unsolved: boundaryFailure(e) };
   }
 }
 
 /** **What can be done to a piece of the train** — every edit the core
  *  offers there, in the order a menu lists them, each with its refusal's key
  *  where it would be refused and none that would change nothing. The graph
- *  is read and every edit tried by the core; this side lists them. An empty
- *  list where the boundary failed, which is a defect on this side of it. */
-export function offersAt(train: Train, at: Target): Offer[] {
+ *  is read and every edit tried by the core; this side lists them. None,
+ *  with `boundaryFailure`'s note, where the call failed. */
+export function offersAt(train: Train, at: Target): { offers: Offer[]; failure: Note | null } {
   try {
-    return JSON.parse(wasm_offers(wire({ train, at }))) as Offer[];
-  } catch {
-    return [];
+    return { offers: JSON.parse(wasm_offers(wire({ train, at }))) as Offer[], failure: null };
+  } catch (e) {
+    return { offers: [], failure: boundaryFailure(e) };
   }
 }
 

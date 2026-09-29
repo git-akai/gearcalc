@@ -84,10 +84,12 @@
   const error = $derived(
     auto || reading === null ? null : typeof reading === "string" ? reading : judge(reading),
   );
-  /** The text for the value. A locked figure is rounded for reading; a
-   *  value the reader holds is shown whole, since it is what they hold. */
+  /** The text for the value. A figure the reader did not choose — the
+   *  solve's, or a library's the reader has not overridden — is rounded for
+   *  reading; a value the reader holds is shown whole, since it is what they
+   *  hold. */
   const shown = $derived(
-    value === null ? "" : auto ? String(Number(value.toFixed(4))) : String(value),
+    value === null ? "" : auto || inherited ? String(Number(value.toFixed(4))) : String(value),
   );
 
   // A value changed from outside drops a draft that does not read as it.

@@ -8,6 +8,7 @@
     profile,
     solve,
     boundFor,
+    countBound,
     ringDxf,
     ringProfile,
     solveRing,
@@ -353,6 +354,7 @@
               set={(v) => (tab.mate.teeth = v)}
               step="1"
               integer
+              bound={countBound()}
               note={t("ui.gear_mate_shares_module_angle_helix")}
             />
             <em></em>
@@ -468,6 +470,7 @@
             set={(v) => (tab.cutter.teeth = v)}
             step="1"
             integer
+            bound={countBound()}
             note={t("ui.gear_note_cutter_teeth")}
           />
           <em></em>

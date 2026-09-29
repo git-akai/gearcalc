@@ -39,7 +39,7 @@
     t,
   } from "./core";
   import { trains, library, type TrainTab, type Selection, type Grouping } from "./state.svelte";
-  import { exportTrain, relieveCase, relieveTrain, editTrain, type Freedom } from "./core";
+  import { countBound, exportTrain, relieveCase, relieveTrain, editTrain, type Freedom } from "./core";
   import FieldNote from "./FieldNote.svelte";
   import NumberBox from "./NumberBox.svelte";
   import Switch from "./Switch.svelte";
@@ -124,7 +124,10 @@
    *  figures the train last came to, so a box relief turns given holds the
    *  number it showed. An empty list where the train has not solved, and the
    *  box keeps what it had. */
-  const relieve = (just: Freedom | null) => relieveTrain(tab.train, just, result.figures);
+  const relieve = (just: Freedom | null) => (crossing = relieveTrain(tab.train, just, result.figures));
+  /** **Why the last edit or relief could not be asked of the core**, said
+   *  with the train's own failure; cleared by the next that could. */
+  let crossing = $state<Note | null>(null);
   /** The case the flow and the workspace are shown for — the view's, held
    *  to the cases the train has. */
   const shownCase = $derived(Math.max(0, Math.min(tab.view.case, tab.train.load_cases.length - 1)));
@@ -272,7 +275,7 @@
     "intermittent" in c.duty ? "intermittent" : "continuous";
   function setDuty(i: number, c: LoadCase, m: "intermittent" | "continuous") {
     if (m === dutyMode(c)) return;
-    editTrain(tab.train, { duty: { case: i, intermittent: m === "intermittent" } });
+    crossing = editTrain(tab.train, { duty: { case: i, intermittent: m === "intermittent" } });
   }
 
   /** **The load cases are a list**, added one of each kind by the core,
@@ -281,7 +284,8 @@
    *  every rating row stands empty, and the two buttons on the strip are
    *  how one comes back. */
   function addCaseOfKind(kind: CaseKindSpec) {
-    editTrain(tab.train, { add_case: kind.key });
+    crossing = editTrain(tab.train, { add_case: kind.key });
+    if (crossing !== null) return;
     tab.view.case = tab.train.load_cases.length - 1;
     select({ case: tab.view.case });
   }
@@ -330,14 +334,14 @@
     } else {
       c.loads.push({ at: b.body, role, torque: { auto: true, manual: 0 }, speed: { auto: true, manual: 0 } });
     }
-    relieveCase(tab.train, i, null, ratedUnder());
+    crossing = relieveCase(tab.train, i, null, ratedUnder());
   }
   /** The library the train is rated under, which relief seeds from too. */
   const ratedUnder = () => (library.origin === null ? undefined : library.materials);
   /** A figure of a load toggled: relief keeps this one and turns another. */
   const touched = (i: number, load: Load, which: LoadFreedom) => () => {
     const j = tab.train.load_cases[i].loads.indexOf(load);
-    relieveCase(tab.train, i, j < 0 ? null : { load: j, which }, ratedUnder());
+    crossing = relieveCase(tab.train, i, j < 0 ? null : { load: j, which }, ratedUnder());
   };
   /** What the case comes to at a port: its row of the train-level result,
    *  which a derived box shows and a blank stands for where the case did
@@ -837,7 +841,7 @@
           set={(v) => (axis.count = v)}
           step="1"
           integer
-          bound={solved?.axes[a]?.count ?? null}
+          bound={solved?.axes[a]?.count ?? countBound()}
         />
         <em></em>
       </label>
@@ -913,7 +917,7 @@
             </select>
             <em></em>
           </label>
-          {@render numberField("ui.train_actuation_count", () => act.actuations, (v) => (act.actuations = v), 100, "", undefined, undefined, true)}
+          {@render numberField("ui.train_actuation_count", () => act.actuations, (v) => (act.actuations = v), 100, "", undefined, undefined, true, countBound())}
           <!-- It changes nothing but the cycle count and which roots are
                loaded both ways, and the note says how — whether or not
                it is on. -->
@@ -1392,6 +1396,7 @@
         set={(v) => (cut.teeth = v)}
         step="1"
         integer
+        bound={countBound()}
         note={t("ui.gear_note_cutter_teeth")}
       />
       <em></em>
@@ -1407,7 +1412,7 @@
       set={(v) => (gear.teeth = v)}
       step="1"
       integer
-      bound={g?.ranges.teeth ?? null}
+      bound={g?.ranges.teeth ?? countBound()}
     />
     <em></em>
   </label>
@@ -1791,10 +1796,12 @@
   args?: Record<string, string>,
   /** A count, which crosses as a whole number. */
   integer?: boolean,
+  /** The core's bound on the number, where it has one. */
+  bound?: Bound | null,
 )}
   <label>
     <span>{t(key, args)}</span>
-    <NumberBox value={get()} {set} {step} {integer} {note} />
+    <NumberBox value={get()} {set} {step} {integer} {bound} {note} />
     <em>{unit === "°" ? "°" : unit ? t(unit) : ""}</em>
   </label>
 {/snippet}
@@ -2165,8 +2172,11 @@
          planets — each naming the part by its meshes and showing it on a
          click; and the one train-wide decision about how a gear is judged. -->
     <div class="said">
-      {#if failure || partNotes.length > 0}
+      {#if failure || crossing || partNotes.length > 0}
         <ul class="notes">
+          {#if crossing && note(crossing) !== (failure ? note(failure.note) : null)}
+            <li class="warn">{note(crossing)}</li>
+          {/if}
           {#if failure}
             <li class="warn">
               {#if failure.part !== null}

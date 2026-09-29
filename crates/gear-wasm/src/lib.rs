@@ -82,7 +82,7 @@ pub struct GearRequest {
 /// Not a whole [`GearParams`]: a mate shares this gear's module, pressure angle
 /// and helix by definition — a pair that did not could not mesh — so sending
 /// them again would be sending a constraint that can be broken.
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[cfg_attr(
     feature = "typescript",
     derive(ts_rs::TS),
@@ -1100,6 +1100,9 @@ pub struct Defaults {
     /// and nothing else — a number the interface shows is a number Rust decided,
     /// this one included.
     pub reverse_loading_coefficient: f64,
+    /// The bound every count an input box takes is held to — a mate's teeth,
+    /// a cutter's, a duty's actuations ([`gear_core::auto::COUNT`]).
+    pub count: gear_core::auto::Bound,
 }
 
 /// A family as the menu groups by it: which, and called what.
@@ -1154,6 +1157,9 @@ pub struct GearTabDefaults {
     /// carried this one in TypeScript, which is the class of drift that put a
     /// rack's tip round on a shaper (`docs/corrections.md`).
     pub eccentric_throw: f64,
+    /// What an eccentric gear's commanded centre distance is commanded
+    /// against until the designer says otherwise.
+    pub mate: MateRef,
 }
 
 fn defaults_impl() -> Result<String, String> {
@@ -1195,6 +1201,13 @@ fn defaults_impl() -> Result<String, String> {
             chord_tolerance: gear_core::outline::DEFAULT_CHORD_TOLERANCE,
             reference_circles: true,
             eccentric_throw: 0.1,
+            // The wheel of the harness's canary pair (`gear-cli strength 17
+            // 43`), unshifted: an external spur mate of ordinary size.
+            mate: MateRef {
+                teeth: 43,
+                profile_shift: 0.0,
+                internal: false,
+            },
         },
         train: {
             // The three loads a fresh train used to hold as fields, between
@@ -1230,6 +1243,7 @@ fn defaults_impl() -> Result<String, String> {
             })
             .collect(),
         reverse_loading_coefficient: gear_core::material::REVERSED_BENDING_FRACTION,
+        count: gear_core::auto::COUNT,
     };
     serde_json::to_string(&defaults).map_err(|e| format!("could not encode defaults: {e}"))
 }

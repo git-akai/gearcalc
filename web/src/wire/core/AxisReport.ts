@@ -11,8 +11,8 @@ export type AxisReport = {
  */
 layout: LayoutReport | null, 
 /**
- * **The counts the axis may be replicated to** ([`shape::Axis::count`]): at
- * least once, since `N = 0` is no axis. Sent so the panel holds the box
- * to the core's bound rather than one written beside it.
+ * **The counts the axis may be replicated to** ([`shape::Axis::count`]),
+ * [`crate::auto::COUNT`]. Sent so the panel holds the box to the core's
+ * bound rather than one written beside it.
  */
 count: Bound, };

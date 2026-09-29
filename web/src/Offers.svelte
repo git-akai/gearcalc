@@ -17,6 +17,7 @@
     t,
     type Edit,
     type MaterialLibrary,
+    type Note,
     type Offer,
     type Target,
     type Train,
@@ -38,15 +39,19 @@
   }
   let { train, at, kind, names, materials, made }: Props = $props();
 
-  /** Each piece's offers of this kind; a piece with none is left out. */
-  const groups = $derived(
+  /** Each piece's offers of this kind, and why the core could not be asked
+   *  there, where it could not. `groups` leaves out a piece with none. */
+  const asked = $derived(
     at
       .map((g) => ({
         ...g,
-        offers: offersAt(train, g.target).filter((o) => adds(o.edit) === (kind === "adds")),
+        ...offersAt(train, g.target),
       }))
-      .filter((g) => g.offers.length > 0),
+      .map((g) => ({ ...g, offers: g.offers.filter((o) => adds(o.edit) === (kind === "adds")) })),
   );
+  const groups = $derived(asked.filter((g) => g.offers.length > 0));
+  /** Why the core could not be asked, where it could not. */
+  const unasked = $derived(asked.find((g) => g.failure !== null)?.failure ?? null);
 
   /** **Listed under a verb** rather than pressed as one: a join, which the
    *  body's *Join to…* lists by the body it goes to, and a gear's move,
@@ -85,7 +90,7 @@
   /** The refusal of an edit pressed, which the core said as it refused it —
    *  an entry marked refused is never sent, so this is one the offer did
    *  not foresee. */
-  let refusal = $state<string | null>(null);
+  let refusal = $state<Note | null>(null);
   function make(o: Offer) {
     if (o.refused !== null) return;
     const meshes = train.shape.meshes.length;
@@ -179,7 +184,9 @@
   {/each}
 {/if}
 {#if refusal !== null}
-  <p class="refusal">{t(refusal)}</p>
+  <p class="refusal">{note(refusal)}</p>
+{:else if unasked !== null}
+  <p class="refusal">{note(unasked)}</p>
 {/if}
 
 <!-- **The dry run**: the core made the edit on a copy and solved both. -->
