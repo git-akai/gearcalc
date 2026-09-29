@@ -58,3 +58,15 @@ Carried from the ring-tip package (into Stage 3, the search redesign):
   - hula: teeth 1,361 → 2,135.
   The redesigned search should resolve the tip bound once per shift plan, not once per candidate.
 - A test comment's "4,120 set evaluations at doubled starts" predates the holds. Re-measure it.
+
+Carried from the P2 check (into Stage 2):
+- A trap can reach the browser through a file. `import_train` validates only the graph, so a TOML
+  with helix 90° is adopted, and `gear_profile` then panics: `&r[1..]` at helix 90° or a NaN input.
+  This is T01.6 plus redesign V. Validate every float on import.
+- Relief leaves given inputs the solve ignores: Ravigneaux Clearance(2), WormAndPair worm shift
+  (T10.9 / redesign C).
+- Worm NoContact at ±0.01–0.2 mm with all other inputs pinned: relief pins too much, and the refusal
+  names the wrong cause.
+- The MeshedPlanets preset sits 0.06 mm from its placeability limit. Give it margin.
+- An Overlap(k>0) note names the ratio asked, never the one reached: the second mesh's ratio never
+  sets the helix.
