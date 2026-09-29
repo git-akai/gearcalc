@@ -785,6 +785,39 @@ pub(crate) fn single_pair_band(contact_ratio: f64, base_helix: f64) -> Option<No
     (eps_n >= 2.0).then(|| Note::new(key::MESH_LOAD_SHARING_OUT_OF_BAND).number("ratio", eps_n, 3))
 }
 
+/// **What a member's contact ratings have to say**: that its contact stress
+/// stands above its allowable in some case — the worst such, numbered from
+/// one — and which kinds of case it has no contact allowable for.
+///
+/// Said whether or not contact sizes the face: with contact sizing off, which
+/// is the default, a width sized by bending can leave the flank far past its
+/// endurance, and the designer is owed knowing.
+pub(crate) fn contact_notes(rated: &[Rated]) -> Vec<Note> {
+    let mut out = Vec::new();
+    let worst = rated
+        .iter()
+        .filter_map(|r| r.contact_worst.map(|(s, a)| (r.case, s, a)))
+        .filter(|(_, s, a)| s > a)
+        .max_by(|x, y| (x.1 / x.2).total_cmp(&(y.1 / y.2)));
+    if let Some((case, stress, allowable)) = worst {
+        out.push(
+            Note::new(key::GEAR_CONTACT_ABOVE_ALLOWABLE)
+                .number("stress", stress, 1)
+                .number("allowable", allowable, 1)
+                .text("case", (case + 1).to_string()),
+        );
+    }
+    for (kind, k) in [
+        (CaseKind::Fatigue, key::GEAR_CONTACT_FATIGUE_UNJUDGED),
+        (CaseKind::Ultimate, key::GEAR_CONTACT_ULTIMATE_UNJUDGED),
+    ] {
+        if rated.iter().any(|r| r.kind == kind && r.contact_unjudged) {
+            out.push(Note::new(k));
+        }
+    }
+    out
+}
+
 /// The note a rating raises about one member's **rim**: it is thinner than the
 /// clause will rate.
 ///
@@ -845,6 +878,10 @@ pub(crate) struct Loading {
     /// here. Such a loading is taken at its own width, case by case, and
     /// neither scales nor asks.
     pub sizes_face: bool,
+    /// The contact patch's aspect ratio `κ = b/a`: 0 for a line, which every
+    /// parallel mesh is. What first yield below the flank depends on
+    /// ([`Rating::Contact`]).
+    pub aspect: f64,
 }
 
 impl Loading {
@@ -932,6 +969,12 @@ pub(crate) struct Rated {
     pub bending_stress: Option<f64>,
     pub contact_stress: f64,
     pub min_face_width: Widths,
+    /// The mesh whose contact stress stands highest over its allowable at
+    /// the width it is carried at: `(stress, allowable)`, MPa. `None` where
+    /// no mesh's contact can be judged.
+    pub contact_worst: Option<(f64, f64)>,
+    /// Whether this case's kind has no contact allowable for the material.
+    pub contact_unjudged: bool,
 }
 
 impl Rated {
@@ -978,8 +1021,18 @@ impl MemberRating<'_> {
                 // can be read off, which is what the width is inverted from.
                 let mut sizable: Option<f64> = None;
                 let mut width = 0.0_f64;
+                // The contact figure standing highest over its own
+                // allowable: first yield depends on each patch's shape.
+                let mut worst: Option<(f64, f64)> = None;
                 for l in &c.meshes {
                     let (b, s) = l.at_width();
+                    let judged =
+                        allowable(self.material, Rating::Contact { aspect: l.aspect }, c.kind);
+                    if let Some(a) = judged {
+                        if worst.is_none_or(|(ws, wa)| s / a > ws / wa) {
+                            worst = Some((s, a));
+                        }
+                    }
                     if let Some(b) = b {
                         bending = Some(bending.map_or(b, |had: f64| had.max(b)));
                     }
@@ -992,11 +1045,15 @@ impl MemberRating<'_> {
                     }
                 }
                 let reverses = self.reversal.reverses(self.always_reverses, c.reverses);
+                // A line contact is what a width is inverted from.
+                let flank = allowable(self.material, Rating::Contact { aspect: 0.0 }, c.kind);
                 Rated {
                     case: c.case,
                     kind: c.kind,
                     bending_stress: bending,
                     contact_stress: contact,
+                    contact_worst: worst,
+                    contact_unjudged: flank.is_none() && !c.meshes.is_empty(),
                     // **Each figure is inverted at the width it was taken at**,
                     // and the widest mesh is the one that answers: a minimum
                     // is what this member would need, and it needs enough for
@@ -1012,12 +1069,8 @@ impl MemberRating<'_> {
                                     .bending_allowable(self.material, c.kind, reverses),
                             )
                         }),
-                        contact: sizable.map(|contact| {
-                            crate::strength::min_face_width_contact(
-                                contact,
-                                width,
-                                allowable(self.material, c.kind),
-                            )
+                        contact: sizable.zip(flank).map(|(contact, flank)| {
+                            crate::strength::min_face_width_contact(contact, width, flank)
                         }),
                     },
                 }
@@ -1902,6 +1955,11 @@ pub(super) fn test_library() -> MaterialLibrary {
         },
         fatigue_load_ratio: Some(crate::material::LoadRatio::Reversed),
         fatigue_specimen: Some(crate::material::Specimen::Coupon),
+        contact_fatigue_allowable: Some(Value {
+            value: 845.68,
+            basis: Basis::Estimated,
+            note: Some("test".into()),
+        }),
     };
     let bronze = Material {
         name: "Brass C360".into(),
@@ -1914,6 +1972,7 @@ pub(super) fn test_library() -> MaterialLibrary {
             basis: Basis::Estimated,
             note: Some("test".into()),
         },
+        contact_fatigue_allowable: None,
         ..steel.clone()
     };
     MaterialLibrary {
@@ -2567,20 +2626,14 @@ impl Default for FaceSources {
                 fatigue: true,
             },
             // **Neither contact rating sizes a width by default.** Both are
-            // offered and both are computed; what they are not is *assumed*.
-            //
-            // The ultimate kind is the weaker of the two: a Hertzian pressure is not
-            // a tensile stress, and the library's `ultimate_allowable` is a
-            // tensile figure — a flank under a single overload fails by
-            // subsurface shear, at a contact pressure well above it. Comparing
-            // them is arithmetic with no mechanism behind it.
-            //
-            // The fatigue kind is sounder — the fatigue allowable is a flank
-            // figure — but it is the one that *dominates*, by an order of
-            // magnitude: on the reference train it asks 8.5 mm where bending
-            // asks 0.9. A default that decides the answer is a default making
-            // the design decision, so both are left to the designer and bending
-            // is what a fresh gear is sized from.
+            // offered, computed and judged against a flank's own figure —
+            // first yield below the surface, and a pitting endurance
+            // ([`allowable`]) — and a member above either says so. What they
+            // are not is *assumed*: contact genuinely governs, asking 6.7 mm
+            // on the strength canary where bending asks 0.9, and a default
+            // that decides the answer is a default making the design
+            // decision. So both are left to the designer and bending is what
+            // a fresh gear is sized from (docs/state.md).
             contact: ByKind {
                 ultimate: false,
                 fatigue: false,
@@ -2730,10 +2783,11 @@ impl Reversal {
     #[must_use]
     pub fn bending_allowable(self, m: &Material, kind: CaseKind, reverses: bool) -> f64 {
         let (fraction, _) = m.reversed_bending_fraction();
+        let figure = root_allowable(m, kind);
         if self.correct && reverses && kind == CaseKind::Fatigue && fraction != 1.0 {
-            allowable(m, kind) * fraction
+            figure * fraction
         } else {
-            allowable(m, kind)
+            figure
         }
     }
 }
@@ -2806,9 +2860,45 @@ impl<T> ByKind<T> {
     }
 }
 
-/// The allowable a load case's kind is judged against, MPa.
+/// **What is being judged**: a root in bending, or a flank in contact, and a
+/// flank by the shape of its patch.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Rating {
+    /// A root's tensile bending stress.
+    Bending,
+    /// A flank's Hertzian pressure, on a patch of aspect ratio `κ = b/a`:
+    /// 0 for a line contact, 1 for a circle.
+    Contact { aspect: f64 },
+}
+
+/// **The allowable a rating is judged against in a load case's kind**, MPa,
+/// or `None` where the material publishes nothing it could be.
+///
+/// | | ultimate | fatigue |
+/// |---|---|---|
+/// | bending | `ultimate_allowable` | `fatigue_allowable` |
+/// | contact | first yield below the flank, `C(κ, ν)·σ_y` — only where `ultimate_allowable` is a yield stress | `contact_fatigue_allowable` |
+///
+/// A root figure is never handed to a flank: the two fail differently, and
+/// the only figure a flank shares with a root is the yield stress, through
+/// the subsurface field ([`crate::hertz::first_yield_factor`]).
 #[must_use]
-pub fn allowable(material: &Material, kind: CaseKind) -> f64 {
+pub fn allowable(material: &Material, rating: Rating, kind: CaseKind) -> Option<f64> {
+    match (rating, kind) {
+        (Rating::Bending, kind) => Some(root_allowable(material, kind)),
+        (Rating::Contact { .. }, CaseKind::Fatigue) => {
+            material.contact_fatigue_allowable.as_ref().map(|v| v.value)
+        }
+        (Rating::Contact { aspect }, CaseKind::Ultimate) => (material.ultimate_measure
+            == crate::material::Measure::Yield)
+            .then(|| crate::hertz::first_yield_factor(aspect, material.poissons_ratio.value))
+            .flatten()
+            .map(|c| c * material.ultimate_allowable.value),
+    }
+}
+
+/// A root's allowable: always published, one per kind.
+fn root_allowable(material: &Material, kind: CaseKind) -> f64 {
     match kind {
         CaseKind::Ultimate => material.ultimate_allowable.value,
         CaseKind::Fatigue => material.fatigue_allowable.value,
@@ -10637,14 +10727,24 @@ mod tests {
             // Twice **this material's** figure, read from the answer rather than
             // written down again: a test that repeats the library's numbers
             // stops testing the arithmetic the moment the library moves.
-            let doubled = 2.0 * allowable(&base.members[0].material, case);
+            // Contact ultimate is first yield, `C·σ_y`, so doubling the
+            // yield stress doubles it; contact fatigue is its own column.
             let over = match case {
                 CaseKind::Ultimate => Overrides {
-                    ultimate_allowable: Some(doubled),
+                    ultimate_allowable: Some(
+                        2.0 * base.members[0].material.ultimate_allowable.value,
+                    ),
                     ..Default::default()
                 },
                 CaseKind::Fatigue => Overrides {
-                    fatigue_allowable: Some(doubled),
+                    contact_fatigue_allowable: Some(
+                        2.0 * allowable(
+                            &base.members[0].material,
+                            Rating::Contact { aspect: 0.0 },
+                            case,
+                        )
+                        .unwrap(),
+                    ),
                     ..Default::default()
                 },
             };
@@ -10995,10 +11095,18 @@ mod tests {
         let allowable = |x: f64| Overrides {
             ultimate_allowable: Some(x),
             fatigue_allowable: Some(x),
+            contact_fatigue_allowable: Some(x),
             ..Default::default()
         };
         let wide = base;
-        let half = allowable(0.5 * super::allowable(&wide.members[1].material, CaseKind::Fatigue));
+        let half = allowable(
+            0.5 * super::allowable(
+                &wide.members[1].material,
+                super::Rating::Contact { aspect: 0.0 },
+                CaseKind::Fatigue,
+            )
+            .unwrap(),
+        );
         let derated = solved(false, [Overrides::default(), half]);
         assert_eq!(
             derated.meshes[0].cases[0].contact.at_pitch_point,

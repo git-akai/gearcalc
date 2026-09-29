@@ -24,4 +24,9 @@ fatigue_load_ratio: LoadRatio | null,
 /**
  * What a replaced fatigue figure was measured on, likewise.
  */
-fatigue_specimen: Specimen | null, };
+fatigue_specimen: Specimen | null, 
+/**
+ * A flank's contact endurance, replacing the library's or standing where
+ * it has none.
+ */
+contact_fatigue_allowable: number | null, };

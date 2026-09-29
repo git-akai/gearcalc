@@ -2380,14 +2380,25 @@ fn strength_report(
             );
         }
         println!("  relative radius           {:>7.3} mm", cs.relative_radius);
-        println!(
-            "  b_min against fatigue     {:>7.3} mm",
-            min_face_width_contact(cs.worst, B, mat.fatigue_allowable.value)
-        );
-        println!(
-            "  b_min against ultimate    {:>7.3} mm",
-            min_face_width_contact(cs.worst, B, mat.ultimate_allowable.value)
-        );
+        // Each against the flank's own allowable: pitting endurance, and
+        // first yield below the surface for a line contact.
+        for (label, kind) in [
+            ("fatigue ", gear_core::train::CaseKind::Fatigue),
+            ("ultimate", gear_core::train::CaseKind::Ultimate),
+        ] {
+            let flank = gear_core::train::allowable(
+                mat,
+                gear_core::train::Rating::Contact { aspect: 0.0 },
+                kind,
+            );
+            match flank {
+                Some(a) => println!(
+                    "  b_min against {label}    {:>7.3} mm   (allowable {a:.1} MPa)",
+                    min_face_width_contact(cs.worst, B, a)
+                ),
+                None => println!("  b_min against {label}          —   (no flank allowable)"),
+            }
+        }
     }
 
     // --- efficiency
@@ -2504,6 +2515,17 @@ fn iso_report(z: [u32; 2], alpha: f64, helix: f64, x: [f64; 2], face: f64, torqu
         mat.elastic_modulus.value,
         mat.poissons_ratio.value
     );
+    // First subsurface yield, `p_Y = C·σ_y`, at the line and circle limits:
+    // for `tools/first_yield.py`, which derives both from the closed-form
+    // fields itself.
+    for nu in [0.3, mat.poissons_ratio.value] {
+        let c = |kappa: f64| gear_core::hertz::first_yield_factor(kappa, nu).unwrap_or(f64::NAN);
+        println!(
+            "yield nu {nu} C_line {:.12} C_circle {:.12}",
+            c(0.0),
+            c(1.0)
+        );
+    }
     if let Some(cs) = contact_stress(&path, &mesh, &g[0], PARALLEL_AXES, &load, e_star) {
         println!(
             "contact pitch {:.12} rated_1 {:.12} rated_2 {:.12}",

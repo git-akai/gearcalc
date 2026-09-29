@@ -3533,6 +3533,7 @@ pub fn rate(
                                     measured_at: PROBE,
                                     carried_at: widths[k],
                                     sizes_face: true,
+                                    aspect: 0.0,
                                 }
                                 .under(scaled[k].1[c])
                             }
@@ -3546,6 +3547,11 @@ pub fn rate(
                                 measured_at: widths[k],
                                 carried_at: widths[k],
                                 sizes_face: false,
+                                aspect: crate::hertz::patch_aspect(
+                                    patches[c].curvature_along,
+                                    patches[c].curvature_across,
+                                )
+                                .unwrap_or(0.0),
                             },
                             (None, None) => Loading {
                                 bending: None,
@@ -3553,6 +3559,7 @@ pub fn rate(
                                 measured_at: widths[k],
                                 carried_at: widths[k],
                                 sizes_face: false,
+                                aspect: 0.0,
                             },
                         }
                     })
@@ -3917,8 +3924,10 @@ pub fn rate(
         .map(|i| {
             let shaft = shape.slot_of_member(i);
             let frame = shape.frame_of_member(i);
-            let rated_cases = rating(i, &mesh_widths)
-                .rated()
+            let rated = rating(i, &mesh_widths).rated();
+            let mut notes = gear_notes(i);
+            notes.extend(super::contact_notes(&rated));
+            let rated_cases = rated
                 .into_iter()
                 .zip(cases)
                 .map(|(r, c)| {
@@ -3958,7 +3967,7 @@ pub fn rate(
                 recommended_face_width: recommended[i],
                 material: materials[i].clone(),
                 clamps: built.members[i].clamps(),
-                notes: gear_notes(i),
+                notes,
             })
         })
         .collect();

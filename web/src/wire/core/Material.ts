@@ -49,9 +49,9 @@ poissons_ratio: Value,
 ultimate_allowable: Value, 
 /**
  * What `ultimate_allowable` measures: yield, or break for materials with
- * no yield point. Nothing reads it yet, the panel included, and it is
- * kept on purpose, so a library taken through the panel keeps it
- * (docs/state.md#worth-doing-next).
+ * no yield point. The ultimate contact rating reads it: first yield below
+ * a flank is `C·σ_y` ([`crate::hertz::first_yield_factor`]) and has no
+ * reading from a stress at break.
  */
 ultimate_measure: Measure, 
 /**
@@ -68,4 +68,12 @@ fatigue_load_ratio?: LoadRatio | null,
  * What [`Self::fatigue_allowable`] was measured on. `None` where the
  * source does not say.
  */
-fatigue_specimen?: Specimen | null, };
+fatigue_specimen?: Specimen | null, 
+/**
+ * MPa. The limit on a **cyclic contact pressure** — a flank's pitting
+ * endurance, ISO 6336-5's `σ_Hlim` or a figure measured like it. A
+ * different figure from [`Self::fatigue_allowable`], which is a root's.
+ * **`None` where nothing publishes one**: contact fatigue is then not
+ * judged, and the rating says so rather than borrowing a number.
+ */
+contact_fatigue_allowable?: Value | null, };

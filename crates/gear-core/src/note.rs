@@ -101,6 +101,12 @@ pub mod key {
     pub const GEAR_SHIFT_RAISED_FOR_UNDERCUT: &str = "gear.shift_raised_for_undercut";
     /// `gear.bending_unrated_in_mesh`
     pub const GEAR_BENDING_UNRATED_IN_MESH: &str = "gear.bending_unrated_in_mesh";
+    /// `gear.contact_above_allowable`
+    pub const GEAR_CONTACT_ABOVE_ALLOWABLE: &str = "gear.contact_above_allowable";
+    /// `gear.contact_fatigue_unjudged`
+    pub const GEAR_CONTACT_FATIGUE_UNJUDGED: &str = "gear.contact_fatigue_unjudged";
+    /// `gear.contact_ultimate_unjudged`
+    pub const GEAR_CONTACT_ULTIMATE_UNJUDGED: &str = "gear.contact_ultimate_unjudged";
     /// `gear.fatigue_ratio_unstated`
     pub const GEAR_FATIGUE_RATIO_UNSTATED: &str = "gear.fatigue_ratio_unstated";
     /// `gear.bending_unrated`
@@ -315,6 +321,9 @@ pub mod key {
         GEAR_BENDING_UNRATED_IN_MESH,
         GEAR_BENDING_UNRATED,
         GEAR_FATIGUE_RATIO_UNSTATED,
+        GEAR_CONTACT_ABOVE_ALLOWABLE,
+        GEAR_CONTACT_FATIGUE_UNJUDGED,
+        GEAR_CONTACT_ULTIMATE_UNJUDGED,
         GEAR_BENDING_ON_FILLET_POINTED,
         GEAR_RING_ADDENDUM_CLAMPED,
         GEAR_FACE_WIDTH_NO_SOURCE,

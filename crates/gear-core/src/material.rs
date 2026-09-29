@@ -270,9 +270,9 @@ pub struct Material {
     /// MPa. The limit on a **peak** load — see the module documentation.
     pub ultimate_allowable: Value,
     /// What `ultimate_allowable` measures: yield, or break for materials with
-    /// no yield point. Nothing reads it yet, the panel included, and it is
-    /// kept on purpose, so a library taken through the panel keeps it
-    /// (docs/state.md#worth-doing-next).
+    /// no yield point. The ultimate contact rating reads it: first yield below
+    /// a flank is `C·σ_y` ([`crate::hertz::first_yield_factor`]) and has no
+    /// reading from a stress at break.
     pub ultimate_measure: Measure,
     /// MPa. The limit on a **cyclic** load.
     pub fatigue_allowable: Value,
@@ -291,6 +291,16 @@ pub struct Material {
         serde(default, skip_serializing_if = "Option::is_none")
     )]
     pub fatigue_specimen: Option<Specimen>,
+    /// MPa. The limit on a **cyclic contact pressure** — a flank's pitting
+    /// endurance, ISO 6336-5's `σ_Hlim` or a figure measured like it. A
+    /// different figure from [`Self::fatigue_allowable`], which is a root's.
+    /// **`None` where nothing publishes one**: contact fatigue is then not
+    /// judged, and the rating says so rather than borrowing a number.
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Option::is_none")
+    )]
+    pub contact_fatigue_allowable: Option<Value>,
 }
 
 impl Material {
@@ -309,6 +319,7 @@ impl Material {
             self.fatigue_allowable.basis,
         ]
         .into_iter()
+        .chain(self.contact_fatigue_allowable.as_ref().map(|v| v.basis))
         .max()
         .unwrap_or(Basis::Estimated)
     }
@@ -376,6 +387,10 @@ pub struct Overrides {
     /// What a replaced fatigue figure was measured on, likewise.
     #[cfg_attr(feature = "serde", serde(default))]
     pub fatigue_specimen: Option<Specimen>,
+    /// A flank's contact endurance, replacing the library's or standing where
+    /// it has none.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub contact_fatigue_allowable: Option<f64>,
 }
 
 impl Overrides {
@@ -393,6 +408,7 @@ impl Overrides {
         .any(Option::is_some)
             || self.fatigue_load_ratio.is_some()
             || self.fatigue_specimen.is_some()
+            || self.contact_fatigue_allowable.is_some()
     }
 }
 
@@ -429,6 +445,14 @@ impl Material {
             fatigue_allowable: swap(&self.fatigue_allowable, o.fatigue_allowable),
             fatigue_load_ratio: keep(replaced, self.fatigue_load_ratio, o.fatigue_load_ratio),
             fatigue_specimen: keep(replaced, self.fatigue_specimen, o.fatigue_specimen),
+            contact_fatigue_allowable: match o.contact_fatigue_allowable {
+                Some(x) => Some(Value {
+                    value: x,
+                    basis: Basis::Overridden,
+                    note: None,
+                }),
+                None => self.contact_fatigue_allowable.clone(),
+            },
             ..self.clone()
         }
     }
@@ -499,6 +523,7 @@ mod tests {
             fatigue_allowable: Value::datasheet(330.0),
             fatigue_load_ratio: Some(LoadRatio::Reversed),
             fatigue_specimen: Some(Specimen::Coupon),
+            contact_fatigue_allowable: None,
         }
     }
 

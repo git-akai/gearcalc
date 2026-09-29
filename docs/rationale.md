@@ -596,8 +596,10 @@ test gears: it is the designer's statement of what the driving and driven
 machines add to the torque, which only they can make. So it is an input on
 each load case, 1 unless stated, and it multiplies the force every stress is
 rated under — `σ_F` by `K_A`, a line contact by `√K_A` — and no torque the train
-reports. On the canary pair a light `K_A = 1.25` takes the fatigue contact
-width from 8.48 to 10.60 mm, past its 10 mm face.
+reports. On the canary pair, its flank judged at 750 MPa, a light
+`K_A = 1.25` takes the fatigue contact width from 8.48 to 10.60 mm, past its
+10 mm face; against the library's own flank estimate, 845.7 MPa, from 6.67 to
+8.34 mm.
 
 **Three reasons, in order of weight.**
 
@@ -1311,19 +1313,35 @@ port it is measured at, and defaults to the end — where it was always measured
 
 ### A contact pressure is not a tensile stress
 
-Peak contact is the one of the four ratings that is **off** by default. The other
-three compare like with like: a root bending stress against a tensile allowable,
-and a flank pressure against a fatigue figure that was derived for flanks.
-Comparing a Hertzian pressure with the library's `ultimate_allowable` — a tensile
-number — is arithmetic with no mechanism behind it. A flank under a single
-overload fails by *subsurface shear*, which arrives at a contact pressure well
-above the tensile ultimate, so the comparison is not merely unfounded, it is
-unfounded in the conservative direction and would dominate a face width for no
-reason a designer could defend.
+**A flank is judged against a flank's figure.** Both contact ratings used to be
+judged against a root's: the fatigue case against `fatigue_allowable`, a
+rotating-beam or flexural endurance this document called "derived for flanks"
+when it was not, and the peak case against `ultimate_allowable`, a tensile yield.
+Now each has its own (`train::allowable`, keyed by rating and kind):
 
-It is offered rather than removed, because a designer who *has* a
-contact-pressure limit can put it in the override and switch the rating on. What
-the tool declines to do is assume one.
+- **Fatigue**: `contact_fatigue_allowable`, a pitting endurance. The steels carry
+  an estimate from hardness by ISO 6336-5's through-hardened alloy line at
+  quality grade MQ, the grade and the other two grades' figures in the note;
+  nothing publishes one for the brass, POM or the polyamides, so they carry
+  none, and contact fatigue on them is **not judged** and says so
+  (`gear.contact_fatigue_unjudged`) rather than borrowing a number.
+- **Ultimate**: first yield below the flank, `p_Y = C(κ, ν)·σ_y` by von Mises.
+  A flank under a single overload fails by subsurface shear, not at the tensile
+  figure. `C` is 1.79 for a line contact and 1.60 for a circle at `ν = 0.3`
+  (Johnson 4.2), and **it has no closed form**: it is a bracketed maximisation
+  over depth of the stress field on the axis, which is closed form only at the
+  line and, on the axis, the circle; between them the field is Boussinesq's
+  summed over the patch (`hertz::first_yield_factor`,
+  `tools/first_yield.py`). It needs a yield stress, so a material whose
+  ultimate figure is a stress at break has no reading and is not judged
+  (`gear.contact_ultimate_unjudged`).
+
+**Neither sizes a face by default**, and that is kept: contact genuinely
+governs — on the strength canary a flank at its estimate asks 6.71 mm against
+bending's 0.89 — so a default that switched it on would be making the design
+decision. What changed is that nothing is silent: a member whose contact stress
+stands above its allowable at the width it was given says so
+(`gear.contact_above_allowable`), whether or not contact sizes it.
 
 ### One pressure, two ratings — and the curvature is not what separates them
 

@@ -15,8 +15,8 @@ contact   E* 103723 MPa (like on like)
   gear 1 single-pair          692.7 MPa   -> rated at   692.7 MPa
   gear 2 single-pair          607.2 MPa   -> rated at   629.9 MPa
   relative radius             1.723 mm
-  b_min against fatigue       8.529 mm
-  b_min against ultimate      2.575 mm
+  b_min against fatigue       6.708 mm   (allowable 845.7 MPa)
+  b_min against ultimate      0.812 mm   (allowable 2431.0 MPa)
 
 efficiency (equal in both directions for a parallel-axis mesh)
   mu 0.02   99.580 %

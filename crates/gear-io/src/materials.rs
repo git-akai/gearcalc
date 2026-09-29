@@ -157,6 +157,29 @@ mod tests {
         }
     }
 
+    /// **Every flank allowable names its source, and none is borrowed.** The
+    /// steels' are ISO 6336-5 estimates from hardness, each naming the grade
+    /// and the formula; nothing publishes one for the brass, POM or the
+    /// polyamides, so they carry none rather than a number from elsewhere.
+    #[test]
+    fn every_flank_allowable_names_its_source_and_none_is_borrowed() {
+        for m in &default_library().materials {
+            match &m.contact_fatigue_allowable {
+                Some(v) => {
+                    let note = v.note.as_deref().unwrap_or_default();
+                    assert_eq!(m.class, Family::Steel, "{}", m.name);
+                    assert!(
+                        note.contains("ISO 6336-5") && note.contains("grade MQ"),
+                        "{}: {note}",
+                        m.name
+                    );
+                    assert_eq!(v.basis, Basis::Estimated, "{}", m.name);
+                }
+                None => assert_ne!(m.class, Family::Steel, "{}", m.name),
+            }
+        }
+    }
+
     #[test]
     fn the_default_library_round_trips_through_toml_unchanged() {
         // The property the export/import feature rests on: what we write, we
@@ -271,7 +294,13 @@ mod tests {
                 ("poissons_ratio", &m.poissons_ratio),
                 ("ultimate_allowable", &m.ultimate_allowable),
                 ("fatigue_allowable", &m.fatigue_allowable),
-            ] {
+            ]
+            .into_iter()
+            .chain(
+                m.contact_fatigue_allowable
+                    .as_ref()
+                    .map(|v| ("contact_fatigue_allowable", v)),
+            ) {
                 if v.basis != Basis::Datasheet {
                     assert!(
                         v.note.is_some(),

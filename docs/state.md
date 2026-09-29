@@ -534,8 +534,12 @@ three — the peak, the load from the end and the operating duty it used to hold
 as fields, at the same defaults. **Neither contact rating is enabled by
 default**: both are computed and shown, but a fresh gear is sized from bending
 alone, so its face width will not satisfy contact until a designer says which
-rating should decide it — the figures are on screen, and the minimum face width
-each rating asks for is beside them. The two gears of a mesh are rated at different points on the path
+rating should decide it — the figures are on screen, the minimum face width
+each rating asks for is beside them, and a member above its flank allowable
+says so. **The size of that default**: the canary train's bending-sized
+widths run its flanks at 2.1–2.6 GPa, 2.5–3.1× the 845.7 MPa flank estimate
+for its steel; on the strength canary contact asks 6.71 mm where bending asks
+0.89. The two gears of a mesh are rated at different points on the path
 — each where its own dedendum is loaded alone — so they carry different contact
 stresses, each on its own card; the one patch they share — its pitch-point
 figure, its size and where on the path it is worst — is the harness's, and

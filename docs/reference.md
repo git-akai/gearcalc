@@ -2913,8 +2913,9 @@ provably cannot bite.
 **Automatic face width.** Four toggles per gear — bending and contact, each by
 kind — and the width is the largest any *enabled* rating asks for over every
 enabled case of a kind that is switched on: the highest case sizes the part,
-however many overlap. Ultimate contact is off by default — see
-[rationale](rationale.md#a-contact-pressure-is-not-a-tensile-stress). With none
+however many overlap. Neither contact rating sizes by default — see
+[rationale](rationale.md#a-contact-pressure-is-not-a-tensile-stress) — and a
+member whose contact stress stands above its flank allowable says so. With none
 enabled there is nothing to invert, so the width **stands at the number in its
 box** and the gear says so: an automatic value with nothing to choose between
 has nothing to choose, and the alternative is a zero every rating is then divided

@@ -1,4 +1,4 @@
-//! Scalar root finding.
+//! Scalar root finding, and one bracketed maximiser.
 //!
 //! Two solvers cover every transcendental step in this crate (docs/rationale.md#where-closed-form-is-impossible).
 //! Both are **bracketed**, so neither can diverge: a Newton step that leaves the
@@ -206,6 +206,50 @@ where
     None
 }
 
+/// **The maximum of a unimodal `f` on `[lo, hi]`**, by golden-section search:
+/// `(x, f(x))`.
+///
+/// Bracketed like the root finders, so it cannot leave the interval: each
+/// step keeps the sub-interval that holds the larger of two interior values.
+/// `f` must have one interior maximum on the bracket; `None` where a value is
+/// not finite, where the search runs out of iterations, or where the maximum
+/// sits at an end — a bracket that did not hold it.
+pub fn maximise<F>(f: F, lo: f64, hi: f64, tol: Tol) -> Option<(f64, f64)>
+where
+    F: Fn(f64) -> f64,
+{
+    // 1/φ, the golden ratio's reciprocal: each step keeps this share.
+    let r = (5.0_f64.sqrt() - 1.0) / 2.0;
+    let (mut a, mut b) = (lo, hi);
+    let (mut c, mut d) = (b - r * (b - a), a + r * (b - a));
+    let (mut fc, mut fd) = (f(c), f(d));
+    for _ in 0..tol.max_iter {
+        if !fc.is_finite() || !fd.is_finite() {
+            return None;
+        }
+        if (b - a).abs() <= tol.x_tol + 4.0 * f64::EPSILON * (a.abs() + b.abs()) {
+            let (x, fx) = if fc > fd { (c, fc) } else { (d, fd) };
+            let edge = 2.0 * (b - a).abs().max(tol.x_tol);
+            let at_end = (x - lo).abs() <= edge || (hi - x).abs() <= edge;
+            return (!at_end).then_some((x, fx));
+        }
+        if fc > fd {
+            b = d;
+            d = c;
+            fd = fc;
+            c = b - r * (b - a);
+            fc = f(c);
+        } else {
+            a = c;
+            c = d;
+            fc = fd;
+            d = a + r * (b - a);
+            fd = f(d);
+        }
+    }
+    None
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
@@ -304,5 +348,23 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn the_maximiser_finds_an_interior_peak_and_refuses_an_edge() {
+        let tol = Tol {
+            x_tol: 1e-12,
+            max_iter: 200,
+        };
+        let (x, fx) = maximise(|x: f64| -(x - 0.3).powi(2) + 2.0, 0.0, 1.0, tol).unwrap();
+        assert!(
+            (x - 0.3).abs() < 1e-6 && (fx - 2.0).abs() < 1e-12,
+            "{x} {fx}"
+        );
+        assert!(
+            maximise(|x: f64| x, 0.0, 1.0, tol).is_none(),
+            "a peak at the end"
+        );
+        assert!(maximise(|_| f64::NAN, 0.0, 1.0, tol).is_none());
     }
 }

@@ -57,7 +57,7 @@
 //! mesh the tool supports today, without a branch and without moving a digit.
 
 use crate::elliptic::{r_d, r_f};
-use crate::solve::{brent, Tol};
+use crate::solve::{brent, maximise, Tol};
 use std::f64::consts::PI;
 
 /// The contact patch and the pressure in it.
@@ -386,6 +386,18 @@ pub fn relative_curvatures(
     Some((flatter, sharper))
 }
 
+/// **The aspect ratio `κ = b/a` of the patch two relative curvatures make**:
+/// 0 for a line (one curvature nought), 1 for a circle. `None` where a
+/// curvature is negative or both are nought.
+#[must_use]
+pub fn patch_aspect(curvature_x: f64, curvature_y: f64) -> Option<f64> {
+    let (c_long, c_short) = (curvature_x.min(curvature_y), curvature_x.max(curvature_y));
+    if !(c_long >= 0.0 && c_short > 0.0) {
+        return None;
+    }
+    aspect_ratio(c_long / c_short)
+}
+
 /// The ellipse's aspect ratio `κ = b/a ∈ [0,1]` for a curvature ratio
 /// `q = (1/R_long)/(1/R_short) ∈ [0,1]`.
 ///
@@ -443,6 +455,189 @@ fn aspect_ratio(q: f64) -> Option<f64> {
 fn curvature_ratio(kappa: f64) -> Option<f64> {
     let k2 = kappa * kappa;
     Some(r_d(k2, 0.0, 1.0)? / r_d(1.0, 0.0, k2)?)
+}
+
+// ------------------------------------------------ first yield below ----
+
+/// **The peak pressure at which the material first yields below the surface,
+/// over its yield stress**: `C` in `p_Y = C·σ_y`, for a Hertz patch of aspect
+/// ratio `κ = b/a` on a material of Poisson's ratio `ν`, by von Mises.
+///
+/// The largest von Mises stress under a Hertz patch lies below the centre,
+/// on the axis, and its depth has no closed form: this is a bracketed 1-D
+/// maximisation over depth ([`maximise`]) of the stress field on that axis.
+/// Only the field is closed form, and only at the two ends:
+///
+/// - `κ = 0`, line contact in plane strain (McEwen): on the axis, with
+///   `ζ = z/b`, `σ_x = −p₀((1+2ζ²)/√(1+ζ²) − 2ζ)`, `σ_z = −p₀/√(1+ζ²)`,
+///   `σ_y = ν(σ_x + σ_z)`. `C = 1.79` at `ν = 0.3`.
+/// - `0 < κ ≤ 1`, an ellipse: the field is Boussinesq's point-load solution
+///   summed over the semi-ellipsoidal pressure by Gauss–Legendre quadrature,
+///   in panels scaled to the depth so the answer does not rest on where a
+///   sweep stopped. `C = 1.60` at `κ = 1` and `ν = 0.3` (Johnson, *Contact
+///   Mechanics*, 4.2, to three figures; 1.6128 here), and it tends to the line's as `κ → 0`.
+///
+/// `None` outside `0 ≤ κ ≤ 1` or `0 ≤ ν < 0.5`, or if the maximum is not
+/// found inside the depths searched.
+#[must_use]
+pub fn first_yield_factor(kappa: f64, nu: f64) -> Option<f64> {
+    if !(0.0..=1.0).contains(&kappa) || !(0.0..0.5).contains(&nu) {
+        return None;
+    }
+    // A pure function of two numbers, asked for the same patch in every case
+    // a rating reads: kept, bit for bit, per thread.
+    thread_local! {
+        static SEEN: std::cell::RefCell<Vec<((u64, u64), Option<f64>)>> =
+            const { std::cell::RefCell::new(Vec::new()) };
+    }
+    let key = (kappa.to_bits(), nu.to_bits());
+    if let Some(hit) = SEEN.with(|s| s.borrow().iter().find(|(k, _)| *k == key).map(|(_, c)| *c)) {
+        return hit;
+    }
+    let c = first_yield_uncached(kappa, nu);
+    SEEN.with(|s| {
+        let mut s = s.borrow_mut();
+        // Bounded: a long session's patches, not every one it ever met.
+        if s.len() >= 256 {
+            s.remove(0);
+        }
+        s.push((key, c));
+    });
+    c
+}
+
+fn first_yield_uncached(kappa: f64, nu: f64) -> Option<f64> {
+    // Depths in the minor semi-axis: the peak sits at 0.48 (circle) to 0.79
+    // (line) of it for any ν in range, well inside [0.1, 2].
+    let (_, peak) = maximise(
+        |z| von_mises(axis_stress(kappa, nu, z)),
+        0.1,
+        2.0,
+        Tol {
+            x_tol: 1e-7,
+            max_iter: 200,
+        },
+    )?;
+    Some(1.0 / peak)
+}
+
+/// Von Mises equivalent of three principal stresses.
+fn von_mises([a, b, c]: [f64; 3]) -> f64 {
+    (((a - b).powi(2) + (b - c).powi(2) + (c - a).powi(2)) / 2.0).sqrt()
+}
+
+/// The three normal stresses on the axis under a Hertz patch's centre, over
+/// `p₀`, at depth `z` in minor semi-axes. On the axis they are principal: the
+/// shears cancel by the patch's symmetry.
+fn axis_stress(kappa: f64, nu: f64, z: f64) -> [f64; 3] {
+    if kappa == 0.0 {
+        let q = (1.0 + z * z).sqrt();
+        let sx = -((1.0 + 2.0 * z * z) / q - 2.0 * z);
+        let sz = -1.0 / q;
+        return [sx, nu * (sx + sz), sz];
+    }
+    ellipse_axis_stress(kappa, nu, z)
+}
+
+/// Gauss–Legendre nodes and weights on `[-1, 1]`, by Newton on `P_n`.
+fn gauss_legendre<const N: usize>() -> [(f64, f64); N] {
+    let mut out = [(0.0, 0.0); N];
+    #[allow(clippy::cast_precision_loss)]
+    let n = N as f64;
+    for (i, slot) in out.iter_mut().enumerate() {
+        #[allow(clippy::cast_precision_loss)]
+        let mut x = (PI * (i as f64 + 0.75) / (n + 0.5)).cos();
+        let mut dp = 1.0;
+        for _ in 0..100 {
+            let (mut p0, mut p1) = (1.0, x);
+            for k in 2..=N {
+                #[allow(clippy::cast_precision_loss)]
+                let k = k as f64;
+                let p2 = ((2.0 * k - 1.0) * x * p1 - (k - 1.0) * p0) / k;
+                p0 = p1;
+                p1 = p2;
+            }
+            dp = n * (x * p1 - p0) / (x * x - 1.0);
+            let step = p1 / dp;
+            x -= step;
+            if step.abs() < 1e-16 {
+                break;
+            }
+        }
+        *slot = (x, 2.0 / ((1.0 - x * x) * dp * dp));
+    }
+    out
+}
+
+/// A composite Gauss–Legendre sum of `f` over the panels between `edges`.
+fn panels(edges: &[f64], rule: &[(f64, f64)], mut f: impl FnMut(f64) -> [f64; 3]) -> [f64; 3] {
+    let mut sum = [0.0; 3];
+    for w in edges.windows(2) {
+        let (mid, half) = ((w[0] + w[1]) / 2.0, (w[1] - w[0]) / 2.0);
+        for &(x, weight) in rule {
+            let v = f(mid + half * x);
+            for (s, v) in sum.iter_mut().zip(v) {
+                *s += weight * half * v;
+            }
+        }
+    }
+    sum
+}
+
+/// Edges from 0 to `end`, geometric about `scale` by factors of `ratio`:
+/// panels fine where the integrand varies on `scale` and coarse beyond.
+fn graded(scale: f64, ratio: f64, end: f64, map: impl Fn(f64) -> f64) -> Vec<f64> {
+    let mut edges = vec![0.0];
+    let mut t = scale / (ratio * ratio);
+    while t < 1e3 * scale.max(1.0) {
+        let e = map(t);
+        if e >= end {
+            break;
+        }
+        if e > *edges.last().unwrap_or(&0.0) {
+            edges.push(e);
+        }
+        t *= ratio;
+    }
+    edges.push(end);
+    edges
+}
+
+/// The axis stresses under an elliptical patch — semi-axes `1/κ` along `x`
+/// and 1 along `y`, peak pressure 1 — by Boussinesq's point load summed over
+/// the patch. In polar coordinates about the axis, `s = S(θ) sin φ` puts the
+/// pressure's square root at `cos φ`, smooth; `θ` is graded about `atan κ`,
+/// where the patch's radius turns from long to short, and `φ` about the depth.
+fn ellipse_axis_stress(kappa: f64, nu: f64, z: f64) -> [f64; 3] {
+    use std::f64::consts::FRAC_PI_2;
+    let rule = gauss_legendre::<12>();
+    let a = 1.0 / kappa;
+    let theta_edges = graded(kappa, 4.0, FRAC_PI_2, f64::atan);
+    let quadrant = panels(&theta_edges, &rule, |theta| {
+        let (sin, cos) = theta.sin_cos();
+        let (c2, s2) = (cos * cos, sin * sin);
+        let radius = 1.0 / (c2 / (a * a) + s2).sqrt();
+        let phi_edges = graded(z / radius, 2.0, FRAC_PI_2, |t| t.min(1.0).asin());
+        panels(&phi_edges, &rule, |phi| {
+            let (sp, cp) = phi.sin_cos();
+            let s = radius * sp;
+            // Pressure times area: cos φ · S² sin φ cos φ dφ dθ.
+            let load = cp * radius * radius * sp * cp;
+            let rho = (s * s + z * z).sqrt();
+            let rho3 = rho * rho * rho;
+            let rho5 = rho3 * rho * rho;
+            // (1 − z/ρ)/s², written so it stays finite as s → 0.
+            let near = 1.0 / ((rho + z) * rho);
+            let k = (1.0 - 2.0 * nu) * load;
+            [
+                k * ((c2 - s2) * near + z * s2 / rho3) - 3.0 * z * s * s * c2 / rho5 * load,
+                k * ((s2 - c2) * near + z * c2 / rho3) - 3.0 * z * s * s * s2 / rho5 * load,
+                -3.0 * z * z * z / rho5 * load,
+            ]
+        })
+    });
+    // Four quadrants, and Boussinesq's 1/2π.
+    quadrant.map(|v| 4.0 * v / (2.0 * PI))
 }
 
 #[cfg(test)]
@@ -833,5 +1028,49 @@ mod tests {
         assert!(peak_pressure(0.0, 0.5, -1.0, 10.0, 113_000.0).is_none());
         assert!(peak_pressure(0.0, 0.5, 250.0, 10.0, 0.0).is_none());
         assert!(peak_pressure(f64::NAN, 0.5, 250.0, 10.0, 113_000.0).is_none());
+    }
+
+    /// **The ellipse's field reproduces the circle's closed form on the axis**
+    /// (Johnson 3.45: `σ_r = −(1+ν)(1 − ζ atan(1/ζ)) + ½/(1+ζ²)`,
+    /// `σ_z = −1/(1+ζ²)`, over `p₀`), which holds Boussinesq's kernel, its
+    /// signs and the quadrature against a result derived another way.
+    #[test]
+    fn the_summed_field_is_the_circles_closed_form() {
+        for nu in [0.0, 0.29, 0.3, 0.45] {
+            for z in [0.1, 0.3, 0.48, 0.8, 1.5, 2.0] {
+                let [sx, sy, sz] = ellipse_axis_stress(1.0, nu, z);
+                let r = -(1.0 + nu) * (1.0 - z * (1.0 / z).atan()) + 0.5 / (1.0 + z * z);
+                let zz = -1.0 / (1.0 + z * z);
+                for (got, want) in [(sx, r), (sy, r), (sz, zz)] {
+                    assert!((got - want).abs() < 1e-9, "ν {nu} z {z}: {got} vs {want}");
+                }
+            }
+        }
+    }
+
+    /// **`C` at its two published values, and continuous between them.**
+    /// 1.79 for a line and 1.60 for a circle at `ν = 0.3` (Johnson 4.2,
+    /// von Mises); from the circle towards the line it moves monotonically and
+    /// arrives at the line's value.
+    #[test]
+    fn the_first_yield_factor_is_johnsons_at_both_ends() {
+        let line = first_yield_factor(0.0, 0.3).unwrap();
+        let circle = first_yield_factor(1.0, 0.3).unwrap();
+        // Johnson prints both to three figures; on the axis von Mises is
+        // Tresca (two of the principal stresses are equal under a circle), so
+        // the circle's is 1/(2·0.31) = 1.61 at the next figure, 1.6128 here.
+        assert!((line - 1.79).abs() < 0.01, "line {line}");
+        assert!((circle - 1.60).abs() < 0.015, "circle {circle}");
+        eprintln!("C(0) {line:.6}  C(1) {circle:.6}");
+        let mut last = circle;
+        for kappa in [0.8, 0.5, 0.2, 0.1, 0.03, 0.01, 1e-3] {
+            let c = first_yield_factor(kappa, 0.3).unwrap();
+            assert!(c >= last - 1e-9, "κ {kappa}: {c} after {last}");
+            last = c;
+        }
+        assert!(
+            (last - line).abs() < 2e-3 * line,
+            "κ 1e-3: {last} against the line's {line}"
+        );
     }
 }

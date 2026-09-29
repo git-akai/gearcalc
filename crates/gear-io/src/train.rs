@@ -255,6 +255,12 @@
 //!   pre-existing file will not have. Like `load_sharing` it **defaults
 //!   rather than refusing**: 1 is the default and what every file written
 //!   before it meant — the torque entered rated as it stands.
+//! - **A member's `material_overrides` may carry `fatigue_load_ratio`,
+//!   `fatigue_specimen` and `contact_fatigue_allowable`**, which a
+//!   pre-existing file will not have. Each **defaults to absent**: the
+//!   library's figure stands, as it did. What a file meant does move in one
+//!   place — its contact fatigue is now judged against the library's flank
+//!   figure, not its root figure — and that is the correction, not a reading.
 //!
 //! No compatibility shim, deliberately. Accepting both shapes means carrying two
 //! readers for one format and testing both forever, and the thing that would go

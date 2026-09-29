@@ -35,6 +35,15 @@
 # state neither, and a reversed root reads such a figure one way (R = 0), the
 # lower allowable, and says so. A file that omits both keys reads the same way.
 #
+# `contact_fatigue_allowable` is a flank's pitting endurance, a different
+# figure from the root's `fatigue_allowable`. The two steels carry an estimate
+# from hardness by ISO 6336-5's through-hardened alloy steel line at quality
+# grade MQ, the grade and the other grades' figures named in each note. No
+# published contact endurance was found for the brass, POM or any polyamide
+# (nothing quotable from VDI 2736 or a datasheet), so they carry none, and
+# contact fatigue on them is not judged: the rating says so rather than
+# borrowing a number.
+#
 # Two conventions used for the estimates, applied uniformly so entries stay
 # comparable with each other even where the absolute value is a guess:
 #
@@ -59,6 +68,7 @@ ultimate_measure = "yield"
 fatigue_allowable = { value = 330.0, basis = "datasheet", note = "Published fatigue strength; the source does not state the cycle count." }
 fatigue_load_ratio = "reversed"
 fatigue_specimen = "coupon"
+contact_fatigue_allowable = { value = 675.0, basis = "estimated", note = "Pitting endurance estimated from hardness by ISO 6336-5:2016 Table 1, through-hardened wrought alloy steel, contact, quality grade MQ: σ_Hlim = 1.313 HV + 373, at 230 HV (the source's 220 HB, converted by ASTM E140). Grade ML gives 490 MPa and ME 769; MQ is the grade ISO describes as met by experienced manufacturers at moderate cost. Override with your own figure for another grade. No published contact endurance for this steel in this condition was found." }
 
 [[material]]
 name = "4340 Hardened Steel"
@@ -74,6 +84,7 @@ ultimate_measure = "yield"
 fatigue_allowable = { value = 750.0, basis = "estimated", note = "0.5 × UTS, the classical steel endurance ratio, which reproduces the annealed entry's published 330 MPa to within 5 %. No published fatigue figure was found at THIS temper. Treat as optimistic: the endurance ratio is known to fall away above roughly 1400 MPa UTS rather than track 0.5 indefinitely, so the true figure is plausibly nearer 700 MPa. The first number here worth replacing with your own data." }
 fatigue_load_ratio = "reversed"
 fatigue_specimen = "coupon"
+contact_fatigue_allowable = { value = 845.7, basis = "estimated", note = "Pitting endurance estimated from hardness by ISO 6336-5:2016 Table 1, through-hardened wrought alloy steel, contact, quality grade MQ: σ_Hlim = 1.313 HV + 373, taken at the table's 360 HV cap. 46 HRC is about 458 HV (ASTM E140), past the cap, and the table gives nothing there; the capped figure is the table's highest. Grade ML gives 660.7 MPa and ME 1123.1 (at its 390 HV cap); MQ is the grade ISO describes as met by experienced manufacturers at moderate cost. Override with your own figure for another grade. No published contact endurance for this steel at this temper was found." }
 
 # The 425 °C temper is chosen deliberately. Tempering 4340 lower gives more
 # strength (1860 MPa yield at 205 °C) but takes the hardness to 53 HRC, past

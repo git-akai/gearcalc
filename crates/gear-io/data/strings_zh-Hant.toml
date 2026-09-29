@@ -61,6 +61,9 @@ rim_below_minimum = "輪緣支承比 {ratio} 等於或低於 ISO 6336-3 可評�
 reversed_bending_uncorrected = "齒根兩側齒面均受載，按單向測得的疲勞值評定：開啟雙向彎曲後將按 ISO 折減後的許用應力評定"
 reversed_bending_applied = "齒根兩側齒面均受載，按單向測得的疲勞值的 {fraction} 倍評定（ISO 6336-3 附錄 B）"
 fatigue_ratio_unstated = "該疲勞值未說明是完全對稱循環測得，還是在齒根上單向測得：雙向受載的齒根按單向測得讀取，即較低的許用應力"
+contact_above_allowable = "在工況 {case} 下，此齒寬處接觸應力 {stress} MPa 高於齒面許用值 {allowable} MPa：除非開啟，接觸不參與齒寬確定"
+contact_fatigue_unjudged = "該材料沒有公開的接觸疲勞極限：不評定接觸疲勞"
+contact_ultimate_unjudged = "該極限值為斷裂應力，而齒面下的初始降伏需讀取降伏應力：不評定極限接觸"
 
 # ---------------------------------------------------------------- mesh notes
 
@@ -375,7 +378,8 @@ train_even_spacing = "均勻分布"
 train_export = "匯出"
 train_export_failed = "匯出失敗：{reason}"
 train_face_width = "齒寬"
-train_fatigue_allowable = "許用疲勞應力"
+train_fatigue_allowable = "齒根疲勞許用應力"
+train_contact_fatigue_allowable = "接觸疲勞許用應力"
 train_flank_type = "齒面型式"
 train_flank_type_zi = "ZI（漸開線螺旋面）"
 train_gear_name = "齒輪 {number}"

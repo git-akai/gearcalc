@@ -95,16 +95,18 @@ fn an_application_factor_scales_bending_by_itself_and_contact_by_its_root() {
 }
 
 /// **The canary pair at `K_A = 1.25` fails its 10 mm face.** The unshifted
-/// 17/43 pair at 2 N·m asks 8.483 mm of the pinion for fatigue contact at
-/// `K_A = 1`; a light application factor asks 1.25 times that, past the
-/// 10 mm the preset gives it. (`gear-cli strength 17 43 2.0` builds its pair
-/// with the library's default tooth rather than the preset's, and asks
-/// 8.529 mm.)
+/// 17/43 pair at 2 N·m, its flank judged at 750 MPa, asks 8.483 mm of the
+/// pinion for fatigue contact at `K_A = 1`; a light application factor asks
+/// 1.25 times that, past the 10 mm the preset gives it. (`gear-cli strength
+/// 17 43 2.0` builds its pair with the library's default tooth rather than
+/// the preset's.) The flank figure is pinned by override: the finding is
+/// about the factor, and the library's estimate is its own question.
 #[test]
 fn the_canary_at_a_light_application_factor_asks_more_than_its_face() {
     let mut s = pair([17, 43]);
     for m in &mut s.members {
         m.gear.profile_shift = Auto::fixed(0.0);
+        m.gear.material_overrides.contact_fatigue_allowable = Some(750.0);
     }
     let fatigue = |k: f64| {
         let r = with_factor(&s, 2.0, k).unwrap();
@@ -297,4 +299,130 @@ fn every_bending_figure_is_absent_or_positive() {
     }
     assert!(solved > 0 && rated > 0, "the law is vacuous");
     eprintln!("{solved} trains solved, {rated} bending figures");
+}
+
+/// The canary pair, unshifted, both members at `width` mm.
+fn canary(width: f64) -> super::Shape {
+    let mut s = at_given_width(&pair([17, 43]), width);
+    for m in &mut s.members {
+        m.gear.profile_shift = Auto::fixed(0.0);
+    }
+    s
+}
+
+/// Every member's `(bending, contact)` minimum widths, case by case.
+fn widths(s: &super::Shape) -> Vec<(Option<f64>, Option<f64>)> {
+    let r = solve_train(&Train::alone(s, 2.0, 100.0), &test_library()).unwrap();
+    r.members
+        .iter()
+        .flat_map(|g| {
+            g.cases
+                .iter()
+                .map(|c| (c.min_face_width.bending, c.min_face_width.contact))
+        })
+        .collect()
+}
+
+/// **Each allowable moves its own width and nothing else.** A root limit and
+/// a flank limit are two figures; overriding the fatigue (root) figure used to
+/// move the contact width too, because contact was judged against it: on the
+/// canary at 1088 MPa the bending width went 0.8953 -> 0.6172 mm and the
+/// contact width with it.
+#[test]
+fn each_allowable_moves_its_own_width_and_nothing_else() {
+    let base = canary(10.0);
+    let before = widths(&base);
+    let mut root = base.clone();
+    root.members[0].gear.material_overrides.fatigue_allowable = Some(1088.0);
+    let after = widths(&root);
+    let mut moved = 0;
+    for ((b0, c0), (b1, c1)) in before.iter().zip(&after) {
+        assert_eq!(
+            c0.map(f64::to_bits),
+            c1.map(f64::to_bits),
+            "the root figure moved a contact width"
+        );
+        moved += usize::from(b0 != b1);
+    }
+    assert!(moved > 0, "the root figure moved no bending width");
+
+    let mut flank = base.clone();
+    flank.members[0]
+        .gear
+        .material_overrides
+        .contact_fatigue_allowable = Some(1088.0);
+    let after = widths(&flank);
+    let mut moved = 0;
+    for ((b0, c0), (b1, c1)) in before.iter().zip(&after) {
+        assert_eq!(
+            b0.map(f64::to_bits),
+            b1.map(f64::to_bits),
+            "the flank figure moved a bending width"
+        );
+        moved += usize::from(c0 != c1);
+    }
+    assert!(moved > 0, "the flank figure moved no contact width");
+}
+
+/// **With contact sizing on, every flank holds its allowable at the width it
+/// is given**, on every preset, in every case: the automatic width is the
+/// largest any rating asks, so no line contact is left above its own figure.
+#[test]
+fn with_contact_sizing_on_every_flank_holds_its_allowable() {
+    use super::{allowable, ByKind, FaceSources, Rating};
+    let lib = test_library();
+    let mut judged = 0;
+    for p in Preset::ALL {
+        let mut s = p.build();
+        for m in &mut s.members {
+            // The box a member no rating sizes keeps: a layshaft's idle pair.
+            m.gear.face_width = Auto::automatic(10.0);
+            m.gear.face_sources = FaceSources {
+                bending: ByKind::of(|_| true),
+                contact: ByKind::of(|_| true),
+            };
+        }
+        let t = Train::alone(&s, 2.0, 100.0);
+        let r = solve_train(&t, &lib).unwrap_or_else(|e| panic!("{p:?}: {e:?}"));
+        for g in &r.members {
+            for (c, case) in g.cases.iter().zip(&t.load_cases) {
+                // A member sized by a line contact: the one kind of contact
+                // a width answers to.
+                if c.min_face_width.contact.is_none() {
+                    continue;
+                }
+                let a = allowable(&g.material, Rating::Contact { aspect: 0.0 }, case.kind).unwrap();
+                assert!(
+                    c.contact_stress <= a * (1.0 + 1e-9),
+                    "{p:?}: {} MPa against {a} at {} mm",
+                    c.contact_stress,
+                    g.face_width
+                );
+                judged += 1;
+            }
+        }
+    }
+    assert!(judged > 0, "no flank was judged: the law is vacuous");
+}
+
+/// **The canary runs past its flank's endurance, and says so.** At the
+/// bending-sized default width its pinion's contact stress is well above any
+/// published contact endurance for 46 HRC 4340; contact sizing is off by
+/// default, so the member says the stress exceeds the allowable.
+#[test]
+fn the_canary_says_its_flank_is_past_its_allowable() {
+    let mut s = pair([17, 43]);
+    for m in &mut s.members {
+        m.gear.profile_shift = Auto::fixed(0.0);
+        m.gear.face_width = Auto::automatic(0.0);
+    }
+    let r = solve_train(&Train::alone(&s, 2.0, 100.0), &test_library()).unwrap();
+    assert!(
+        r.members[0]
+            .notes
+            .iter()
+            .any(|n| n.is("gear.contact_above_allowable")),
+        "{:?}",
+        r.members[0].notes
+    );
 }

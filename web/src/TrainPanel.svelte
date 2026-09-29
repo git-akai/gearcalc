@@ -1049,10 +1049,11 @@
     <input
       type="number"
       {step}
-      value={gear.material_overrides[key] ?? used?.value ?? 0}
+      value={gear.material_overrides[key] ?? used?.value ?? ""}
       class:computed={gear.material_overrides[key] === null}
       oninput={(e) => {
-        const v = Number(e.currentTarget.value);
+        const raw = e.currentTarget.value;
+        const v = raw === "" ? NaN : Number(raw);
         gear.material_overrides[key] = Number.isFinite(v) ? v : null;
       }}
     />
@@ -1669,6 +1670,7 @@
     {@render property(t("ui.train_poissons_ratio"), gear, "poissons_ratio", g?.material.poissons_ratio ?? mat?.poissons_ratio, 0.01, "")}
     {@render property(t("ui.train_ultimate_allowable"), gear, "ultimate_allowable", g?.material.ultimate_allowable ?? mat?.ultimate_allowable, 10, t("ui.train_mpa"))}
     {@render property(t("ui.train_fatigue_allowable"), gear, "fatigue_allowable", g?.material.fatigue_allowable ?? mat?.fatigue_allowable, 10, t("ui.train_mpa"))}
+    {@render property(t("ui.train_contact_fatigue_allowable"), gear, "contact_fatigue_allowable", g?.material.contact_fatigue_allowable ?? mat?.contact_fatigue_allowable ?? undefined, 10, t("ui.train_mpa"))}
   </div>
   <!-- **What every load case does to this gear**, one row per enabled case:
        the torque it puts on it and the speed it turns at, how often it is

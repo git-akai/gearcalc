@@ -65,6 +65,9 @@ rim_below_minimum = "das Kranzdickenverhältnis {ratio} liegt auf oder unter dem
 reversed_bending_uncorrected = "Zahnfuß wird von beiden Flanken belastet und gegen einen einseitig gemessenen Dauerfestigkeitswert bewertet: Wechselbiegung einschalten, um gegen den reduzierten zulässigen Wert nach ISO zu bewerten"
 reversed_bending_applied = "Zahnfuß wird von beiden Flanken belastet und gegen {fraction} eines einseitig gemessenen Dauerfestigkeitswerts bewertet (ISO 6336-3 Anhang B)"
 fatigue_ratio_unstated = "der Dauerfestigkeitswert gibt nicht an, dass er wechselnd oder einseitig am Zahnfuß gemessen wurde: ein wechselnd belasteter Zahnfuß liest ihn als einseitig gemessen, den niedrigeren zulässigen Wert"
+contact_above_allowable = "Pressung {stress} MPa liegt in Lastfall {case} bei dieser Breite über dem zulässigen Wert der Flanke von {allowable} MPa: die Pressung bestimmt die Breite nur, wenn eingeschaltet"
+contact_fatigue_unjudged = "für diesen Werkstoff ist keine Grübchendauerfestigkeit veröffentlicht: die Pressung auf Dauer wird nicht bewertet"
+contact_ultimate_unjudged = "der Grenzwert ist eine Bruchspannung, das erste Fließen unter der Flanke liest aber eine Streckgrenze: die Pressung im Grenzfall wird nicht bewertet"
 
 # ---------------------------------------------------------------- mesh notes
 
@@ -379,7 +382,8 @@ train_even_spacing = "Gleichmäßige Teilung"
 train_export = "Exportieren"
 train_export_failed = "Export fehlgeschlagen: {reason}"
 train_face_width = "Zahnbreite"
-train_fatigue_allowable = "Zulässige Dauerfestigkeit"
+train_fatigue_allowable = "Zulässige Zahnfuß-Dauerfestigkeit"
+train_contact_fatigue_allowable = "Zulässige Grübchenfestigkeit"
 train_flank_type = "Flankenform"
 train_flank_type_zi = "ZI (Evolventenschraubfläche)"
 train_gear_name = "Rad {number}"
