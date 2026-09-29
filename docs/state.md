@@ -118,7 +118,7 @@ cargo run --release --bin gear-cli -- matrix        # the bending matrix, on ext
 cargo run --release --bin gear-cli -- verify 100   # the two-sided cutter check
 python3 tools/worm_flank_curvature.py              # ZI vs ZN vs ZA, from the surface
 python3 tools/crossed_path.py                      # the crossed path, from the surfaces
-python3 tools/hula_kinematics.py                   # the hula ratio, from the rolling circles
+python3 tools/hula_kinematics.py                   # the hula ratio, from the no-slip condition
 python3 tools/train_kinematics.py                  # every topology's speeds and torques, from rigid-body velocities
 python3 tools/breakaway.py                         # whether a preset breaks away, each way, with the sign kept
 python3 tools/iso_6336_3_stack.py                  # where this tool stands against ISO 6336-3, factor by factor
@@ -162,8 +162,9 @@ counts only the power that leaves, so a drive that cannot start reads as
 nought there and below nought here. That is the difference the breakaway rule
 turns on, and rounding once decided it.
 
-`crossed_path.py` builds both flanks as parametric surfaces and reaches the line
-of action through differential geometry; the crate reaches it through a
+`crossed_path.py` builds both flanks as parametric surfaces, checks the line of
+action the construction gives against their normals, and measures the zone of
+action off them; the crate reaches the same line and zone through a
 construction in lines and angles.
 
 <!-- figures-by-test: the_construction_reproduces_the_surfaces_derivation -->

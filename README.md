@@ -204,10 +204,11 @@ ZN or ZA worm flank actually costs — and its answer is in
 `docs/reference.md#crossed-axes`.
 
 `crossed_path.py` builds both crossed flanks as parametric surfaces and takes their
-normals by numerical differentiation, so the line of action, the contact ratio
-and conjugate action all come out of differential geometry with nothing about
-gears in the derivation. `gear-core` reaches the same line by a construction in
-lines and angles instead, and the two agree:
+normals by numerical differentiation: the constructed line of action is checked
+against those normals, and the zone of action and conjugate action are measured
+off the surfaces, with nothing about gears in the derivation. `gear-core`
+reaches the same line and zone by a construction in lines and angles instead,
+and the two agree:
 
 <!-- figures-by-test: the_construction_reproduces_the_surfaces_derivation -->
 for a 17/23 pair at 45°/45° with shafts at 90°, tips at `r + m_n`, the

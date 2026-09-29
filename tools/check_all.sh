@@ -31,6 +31,7 @@ CHEAP=(
   "The string catalogue is complete"
   "Angular units are unambiguous"
   "The figure checker fails on planted faults"
+  "Independent derivations agree with the recorded crate"
 )
 NIX=(
   "nix flake check -L"

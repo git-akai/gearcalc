@@ -181,7 +181,9 @@ The checks, by what each catches. `nix flake check` is **not** all of them.
 | `tools/check_units.py` | **an angle that does not say its unit, or a name that means both.** The crate is degrees where a designer states a number and radians in the mathematics; a name meaning one in one module and the other in the next is how that becomes a bug, and it did | yes |
 | `tools/check_wasm.sh` | **the payload, executed** — everything else checks the boundary's shape or `gear-core`'s values, and nothing ran the `.wasm` the browser downloads. Asserts a law (optimising it changes no answer), records what it answers, and fails if an entry point has no probe | yes |
 | `python3 tools/validate_dxf.py` | an export read back by a parser that shares no code with the writer | yes |
-| `tools/worm_flank_curvature.py` · `crossed_path.py` · `helical_measurement.py` · `first_yield.py` · `hula_kinematics.py` · `train_kinematics.py` · `breakaway.py` · `iso_6336_3_stack.py` | the crate against derivations that share no code with it | no — by hand |
+| `python3 tools/train_kinematics.py` · `python3 tools/hula_kinematics.py` · `python3 tools/breakaway.py` · `python3 tools/crossed_path.py` | **the crate's recorded output against derivations that share no code with it** — each reads `tools/golden/` and exits non-zero on a disagreement, so a defect in the crate that reaches the corpus fails here | yes |
+| `tools/worm_flank_curvature.py` · `tools/helical_measurement.py` · `tools/first_yield.py` | the crate against derivations that share no code with it, compared by eye | no — by hand |
+| `tools/iso_6336_3_stack.py` | an **analysis**, not a check: where the ratings stand against ISO 6336-2/-3, after reproducing the tool's own ISO set | no — by hand |
 | `tools/check_identity.sh <base-rev>` | **any float that moved by a bit** since `<base-rev>`, across every preset, arrangement and a gear grid (`gear-cli identity`) — for a refactor meant to move nothing | no — by hand |
 
 **Before pushing, run `tools/check_all.sh`** — it reads every step of CI's

@@ -2245,8 +2245,9 @@ mod tests {
     /// approaching its own degeneracy: at `Σ = 0` there is no line, but the limit
     /// from above is a number, and it is the right one.
     /// **The construction against the surfaces.** `tools/crossed_path.py`
-    /// builds both flanks as parametric surfaces and reads the line of action
-    /// off them by numerical differentiation, sharing no code with this file;
+    /// builds both flanks as parametric surfaces, checks the constructed line
+    /// of action against their normals (taken by numerical differentiation)
+    /// and measures the zone off them, sharing no code with this file;
     /// on a 17/23 pair at 45°/45° with shafts at 90°, tips at `r + m_n`, it
     /// reports `ε = 1.777921669562`. The construction here must land on that,
     /// and it does to 4.4e-10. `README.md` and `docs/state.md` quote the pair
@@ -2278,6 +2279,40 @@ mod tests {
         let from_the_surfaces = 1.777_921_669_562;
         assert!(
             (path.contact_ratio - from_the_surfaces).abs() < 1e-9,
+            "the construction gives ε = {:.9} against the surfaces' {from_the_surfaces}",
+            path.contact_ratio
+        );
+    }
+
+    /// **The zone is one-sided about each base tangency, as the surfaces
+    /// say.** A flank is the helicoid's sheet `u ≥ 0`; the other branch is
+    /// not a flank, so where a tall tooth's tip would reach past the mate's
+    /// base tangency the path stops at the tangency. `tools/crossed_path.py`
+    /// measures the zone off the surfaces on a 9/37 pair at 20°/70°, shafts at
+    /// 90°, tips at `r + 2 m_n`: 1.829147466, where the band `t ∓ ρ` about
+    /// each tangency would give 3.160992031.
+    #[test]
+    fn the_zone_stops_at_the_base_tangency_as_the_surfaces_say() {
+        let (mn, alpha_n) = (1.0, 20.0f64.to_radians());
+        let beta_1 = 20.0f64.to_radians();
+        let d1 = 9.0 * mn / (std::f64::consts::FRAC_PI_2 - beta_1).sin();
+        let s = Screw::new(&ScrewParams {
+            normal_module: mn,
+            normal_pressure_angle_rad: alpha_n,
+            shaft_angle_rad: 90.0f64.to_radians(),
+            starts: 9,
+            wheel_teeth: 37,
+            worm_pitch_diameter: d1,
+            profile_shifts: [0.0; 2],
+        })
+        .expect("a buildable pair");
+        let r = [s.worm_pitch_diameter / 2.0, s.wheel_pitch_diameter / 2.0];
+        let path = s
+            .path_of_contact_at(r[0] + 2.0 * mn, r[1] + 2.0 * mn, s.centre_distance)
+            .expect("a path of contact");
+        let from_the_surfaces = 1.829_147_466;
+        assert!(
+            (path.contact_ratio - from_the_surfaces).abs() < 1e-8,
             "the construction gives ε = {:.9} against the surfaces' {from_the_surfaces}",
             path.contact_ratio
         );

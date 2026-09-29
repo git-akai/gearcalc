@@ -1,16 +1,20 @@
 #!/usr/bin/env python3
 """Where this tool's ratings stand against ISO 6336-2 and 6336-3, measured.
 
+**An analysis, not a check**: it prints where the tool stands and asserts only
+that it reproduces the tool's own ISO set before it does.
+
 Run it after `cargo build --release --bin gear-cli`:
 
     python3 tools/iso_6336_3_stack.py
 
 # What it does
 
-For a grid of external pairs it asks `gear-cli iso` for the inputs of each
-pair (the tips as cut, the rack's dedendum and tip radius, the contact ratios)
-and for what the tool rates; it then computes ISO's figures itself and prints
-the ratio tool / ISO:
+For a grid of external pairs it asks `gear-cli iso` for what the tool rates;
+the inputs (the tips, the rack's dedendum and tip radius, the contact ratio)
+it derives itself from the pair's stated proportions and asserts the harness
+reports the same, so no figure the harness computed is taken as given. It then
+computes ISO's figures itself and prints the ratio tool / ISO:
 
 - **bending**: ISO 6336-3 Method B, `Y_F · Y_S` (6.2, 7.2: E, G, H, the θ
   iteration, s_Fn, ρ_F, d_en, α_Fen, h_Fe), with the 2019 helix pair `f_ε`
@@ -231,7 +235,26 @@ def rate(z1, z2, alpha_deg, beta_deg=0.0, face=10.0):
     beta_b = math.asin(math.sin(beta) * math.cos(alpha_n))
     d = [z * m_n / math.cos(beta) for z in (z1, z2)]
     d_b = [di * math.cos(alpha_t) for di in d]
-    d_a = [g["d_a"] for g in r["gear"]]
+    # The default proportions `gear-cli iso` states: addendum 1, dedendum
+    # 1.25 and root radius 0.38, in modules, unshifted. Derived here and the
+    # harness held to them, rather than read from it -- but for the rack's
+    # tip round where 0.38 does not fit the rack's tip: there the tool settles
+    # a smaller one by its own convention, and that round is the tool Method B
+    # is asked about, so it is read, held below the largest that fits,
+    # `w_tip cos a / (2 (1 - sin a))` with `w_tip = pi m / 2 - 2 h_fP tan a`.
+    d_a = [di + 2 * m_n for di in d]
+    h_fP = 1.25 * m_n
+    w_tip = math.pi * m_n / 2 - 2 * h_fP * math.tan(alpha_n)
+    fits = w_tip * math.cos(alpha_n) / (2 * (1 - math.sin(alpha_n)))
+    rho_fP = 0.38 * m_n
+    for g, da in zip(r["gear"], d_a):
+        assert abs(g["d_a"] - da) < AGREE, (z1, z2, g["d_a"], da)
+        assert abs(g["h_fP"] - h_fP) < AGREE, (z1, z2, g["h_fP"], h_fP)
+        if rho_fP > fits:
+            assert g["rho_fP"] < fits, (z1, z2, g["rho_fP"], fits)
+        else:
+            assert abs(g["rho_fP"] - rho_fP) < AGREE, (z1, z2, g["rho_fP"], rho_fP)
+    rho_fP = r["gear"][0]["rho_fP"] if rho_fP > fits else rho_fP
     # Unshifted, so the pair runs at its reference distance and angle.
     a_w, alpha_wt = (d[0] + d[1]) / 2, alpha_t
     # ISO 21771's transverse contact ratio limited by the form diameters:
@@ -272,7 +295,7 @@ def rate(z1, z2, alpha_deg, beta_deg=0.0, face=10.0):
         g = r["gear"][i]
         if "iso.Y_F" not in g or g.get("tool.factor") is None:
             continue
-        args = (z, m_n, alpha_n, beta, 0.0, g["d_a"], g["h_fP"], g["rho_fP"], eps)
+        args = (z, m_n, alpha_n, beta, 0.0, d_a[i], h_fP, rho_fP, eps)
         # On the tool's own virtual gear, z/cos³β, the construction must agree.
         yf_t, ys_t, _, _ = method_b(*args, z / math.cos(beta) ** 3)
         assert abs(yf_t - g["iso.Y_F"]) < AGREE and abs(ys_t - g["iso.Y_S"]) < AGREE, (

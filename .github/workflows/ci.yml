@@ -68,6 +68,22 @@ jobs:
       - name: The figure checker fails on planted faults
         run: nix develop --command tools/check_figures.py --self-test
 
+      # Derivations that share no code with the crate, each held to what the
+      # harness recorded in tools/golden/ (which check_golden.sh holds to the
+      # harness): the train's speeds from rigid-body motion, the hula ratio
+      # from the no-slip condition, the flow's efficiencies from the
+      # carrier-frame closed form, and the crossed pair's zone off its
+      # surfaces. A defect in the crate reaches the corpus and fails here.
+      - name: Independent derivations agree with the recorded crate
+        run: |
+          nix develop --command bash -c '
+            set -euo pipefail
+            python3 tools/train_kinematics.py
+            python3 tools/hula_kinematics.py
+            python3 tools/breakaway.py
+            python3 tools/crossed_path.py
+          '
+
       # Everything CI needs to check: build, clippy --deny warnings, fmt, tests.
       - run: nix flake check -L
 

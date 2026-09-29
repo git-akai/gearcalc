@@ -8,36 +8,60 @@ tangent to both base cylinders. That is docs/reference.md#crossed-axes, and it s
 with what this script does.
 
 Here the two flanks are built as parametric surfaces from their own definition --
-a straight line under screw motion -- and everything is read off them by
-numerical differentiation. Nothing about gears enters the derivation, and the
-crate is never consulted. What the crate's construction must reproduce is
-whatever this reports.
+an involute helicoid, the surface a straight line sweeps under screw motion --
+and their normals are taken by numerical differentiation. The line of action
+is still *constructed* (the common tangent to both base cylinders in the one
+direction the two normals share); what the surfaces decide is whether the
+construction is right, and where on the line the teeth actually touch.
 
-Five checks, each answering a question the construction depends on:
+Checks, each answering a question the construction depends on, each asserted:
 
   1. Is the normal's angle to the axis really fixed?  n . a_hat = sin beta_b
   2. Is the normal line really tangent to the base cylinder, at r_b?
-  3. Four common tangent lines exist. Is exactly one of them the line of action?
-     (the one through the pitch point -- the other three are off by tens of mm)
+  3. Eight lines are tangent to both base cylinders in the two directions the
+     normals allow. Exactly two pass through the pitch point: the drive and
+     coast flanks' lines of action, mirror images.
   4. At a point of that line, are the two surfaces actually tangent -- do their
      own normals agree with each other and with the constructed direction?
   5. Does conjugate action fall out?  omega2/omega1 = -z1/z2, and the same at
      every point of the line, which is what makes the path a path.
-
-And one limit, which is the gate the crate's own test mirrors: as the shaft
-angle goes to zero the contact ratio must converge on the parallel pair's
-classical transverse value, computed here from the textbook formula.
+  6. As the shafts straighten, does the contact ratio close on the parallel
+     pair's classical value?
+  7. **The zone of action, off the surfaces.** A point of the line is on the
+     path where each flank reaches it: inside the tip cylinder, and on the
+     helicoid's own sheet, `u >= 0` -- the sheet placed through the point has
+     its normal along the line. The involute's other branch, `u < 0`, is not
+     a flank, so the zone is one-sided about each base tangency: the two-sided
+     band, `t -/+ rho` about it, counts involute that does not exist (on 9/37
+     with tall teeth, 3.161 against 1.829).
+  8. **The crate**: every row of `tools/golden/crossed_17_23_90.txt`, the
+     corpus `check_golden.sh` holds to what `gear-cli crossed 17 23 90`
+     prints, rebuilt at its running centre and its contact ratio measured as
+     in 7.
 
 Numerical differentiation is fine here and would not be fine in the crate: a
 step size is a tuning parameter, and DESIGN 5 does not ship those.
 
 Usage:
-    crossed_path.py            # every check, with its residual
+    crossed_path.py            # every check, with its residual; exits 1 on a failure
 """
+
+import re
+import sys
+from pathlib import Path
 
 import numpy as np
 
 AXIS_1 = np.array([0.0, 0.0, 1.0])
+RECORD = Path(__file__).resolve().parent / "golden" / "crossed_17_23_90.txt"
+FAILURES = []
+
+
+def expect(ok, what):
+    """Record a failed check; the script exits non-zero if any did."""
+    if not ok:
+        FAILURES.append(what)
+        print(f"     FAIL: {what}")
 
 
 # ------------------------------------------------------------------ the flank
@@ -179,6 +203,9 @@ def check_normal_law():
         f"     worst: {worst_axial:.1e} and {worst_tangent:.1e} mm "
         "-- the direction is fixed, and the line is tangent\n"
     )
+    # The central difference's own error at h = 1e-7 is about 1e-9.
+    expect(worst_axial < 1e-7, f"normal angle to the axis off by {worst_axial:.1e}")
+    expect(worst_tangent < 1e-6, f"normal line off the base cylinder by {worst_tangent:.1e} mm")
 
 
 def check_branch(g1, g2, sigma):
@@ -190,6 +217,10 @@ def check_branch(g1, g2, sigma):
             f"     sign2 {r['sign2']:+.0f}  s1 {r['s1']:+.0f}  s2 {r['s2']:+.0f}: "
             f"pitch point is {r['off']:9.5f} mm off{mark}"
         )
+    through = [r for r in lines_of_action(g1, g2, sigma) if r["off"] < 1e-9]
+    others = [r["off"] for r in lines_of_action(g1, g2, sigma) if r["off"] >= 1e-9]
+    expect(len(through) == 2, f"{len(through)} lines through the pitch point, not 2")
+    expect(min(others) > 1e-3, f"a third line passes within {min(others):.1e} mm")
     print("     -- the two that pass are mirror images: drive flank and coast\n")
 
 
@@ -257,6 +288,7 @@ def check_tangency(g1, g2, sigma):
             f"       gear 1 ({side(best1)}) is {best1[3]:.2e} deg off the normal\n"
             f"       gear 2 ({side(best2)}) is {best2[3]:.2e} deg off the normal"
         )
+        expect(max(best1[3], best2[3]) < 1e-5, f"{tag}: a flank is off the normal")
     print("     -- both surfaces share the constructed normal, so they touch\n")
 
     # the roll lengths, measured from the pitch point along the line
@@ -270,6 +302,7 @@ def check_tangency(g1, g2, sigma):
         rho = abs(sp - t)
         classical = g["r"] * np.sin(g["at"]) / np.cos(g["bb"])
         print(f"       {rho:.9f}  vs  {classical:.9f}   ({abs(rho-classical):.1e})")
+        expect(abs(rho - classical) < 1e-9, f"roll length {rho} against {classical}")
     print()
 
 
@@ -290,6 +323,7 @@ def check_conjugate(g1, g2, sigma):
         worst = max(worst, abs(ratio - exact))
         print(f"     s {s:+5.1f} mm along the line: omega2/omega1 = {ratio:+.12f}")
     print(f"     -z1/z2 = {exact:+.12f}; worst deviation {worst:.1e}")
+    expect(worst < 1e-9, f"speed ratio off -z1/z2 by {worst:.1e} along the line")
     print("     -- constant along the line, which is what makes it a path\n")
 
 
@@ -310,6 +344,165 @@ def contact_ratio(g1, g2, sigma, mn, alpha_n, addendum=1.0):
     if hi <= lo:
         return None
     return (hi - lo) / (np.pi * mn * np.cos(alpha_n))
+
+
+def surface_zone(g1, g2, sigma, mn, alpha_n, addendum=1.0, a=None):
+    """The contact ratio off the surfaces: where on the line of action each
+    flank's own sheet reaches, inside its tip cylinder.
+
+    Each gear's flank is oriented (hand, and which of a tooth's two faces) by
+    the surface whose own normal lies along the line at the operating pitch
+    point. A point X of the line then lies on that flank's sheet where its
+    roll parameter is `u >= 0`: the helicoid `S(u, z)` unwinds from its base
+    point `F` along `-e_theta(F)` (`S - F = r_b u (sin a, -cos a, .)`), so
+    `u` at X is the transverse part of `X - F` along that direction, over
+    `r_b`, with F the line's tangency to the base cylinder. Past F the sheet
+    that reaches X is the involute's other branch, which is not a flank. The
+    sign is read rather than a normal compared, because both branches' normals
+    close on the line as X nears F and a threshold on the angle there would
+    set the end of the zone.
+
+    `a` is the running centre distance, the nominal one if not given."""
+    a_nom = g1["r"] + g2["r"]
+    a = a_nom if a is None else a
+    pitch = np.array([a * g1["r"] / a_nom, 0.0, 0.0])
+    lines = []
+    for sign2 in (-1.0, +1.0):
+        n = normal_direction(sigma, g1["bb"], g2["bb"], sign2)
+        if n is None:
+            continue
+        for s1 in (+1.0, -1.0):
+            for s2 in (+1.0, -1.0):
+                P = tangent_line(sigma, a, g1["rb"], g2["rb"], n, s1, s2)
+                v = pitch - P
+                lines.append((np.linalg.norm(v - np.dot(v, n) * n), n, P))
+    _, n, P = min(lines, key=lambda x: x[0])
+    c, sn = np.cos(sigma), np.sin(sigma)
+    R = np.array([[1, 0, 0], [0, c, -sn], [0, sn, c]])
+    MIRROR = np.diag([1.0, -1.0, 1.0])
+    frames = [
+        (g1, lambda X: X, lambda v: v),
+        (g2, lambda X: R.T @ (X - np.array([a, 0.0, 0.0])), lambda v: R.T @ v),
+    ]
+
+    def misfit(g, hand, mirror, X_local, n_local):
+        """Angle in degrees between the flank's normal at X and the line, or
+        None where X is below the base cylinder."""
+        M = MIRROR if mirror else np.eye(3)
+        target = M @ X_local
+        if np.hypot(target[0], target[1]) < g["rb"]:
+            return None
+        u, z, phi = place_on(g["rb"], g["bb"], target, hand)
+        _, N = helicoid(g["rb"], g["bb"], hand, phi)
+        return np.degrees(np.arccos(min(1.0, abs(np.dot(M @ N(u, z), n_local)))))
+
+    s0 = np.dot(pitch - P, n)
+    orient = []
+    for g, to_local, dir_local in frames:
+        X0 = to_local(P + s0 * n)
+        best = min(
+            ((h, m) for h in (+1, -1) for m in (False, True)),
+            key=lambda hm: misfit(g, hm[0], hm[1], X0, dir_local(n)),
+        )
+        orient.append(best)
+
+    axes = [(np.zeros(3), AXIS_1), (np.array([a, 0.0, 0.0]), axis_2(sigma))]
+    feet = [to_local(P + foot(P, n, *axis) * n) for (_, to_local, _), axis in zip(frames, axes)]
+
+    def roll(g, mirror, XL, FL):
+        """The signed roll parameter at X of the flank whose base point is F."""
+        M = MIRROR if mirror else np.eye(3)
+        x, f = M @ XL, M @ FL
+        a_f = np.arctan2(f[1], f[0])
+        return np.dot((x - f)[:2], [np.sin(a_f), -np.cos(a_f)]) / g["rb"]
+
+    def on_both(sv):
+        X = P + sv * n
+        for (g, to_local, _), (_, mirror), FL in zip(frames, orient, feet):
+            XL = to_local(X)
+            if np.hypot(XL[0], XL[1]) > g["r"] + addendum * mn:
+                return False
+            if roll(g, mirror, XL, FL) < 0:
+                return False
+        return True
+
+    # Sample the line about the pitch point, then bisect each end.
+    reach = 4 * addendum * mn / np.cos(alpha_n) + max(g1["rb"], g2["rb"])
+    grid = np.linspace(s0 - reach, s0 + reach, 4001)
+    inside = [on_both(sv) for sv in grid]
+    if not any(inside):
+        return None
+    first = inside.index(True)
+    last = len(inside) - 1 - inside[::-1].index(True)
+    expect(all(inside[first : last + 1]), "the zone is not one interval")
+
+    def edge(out, into):
+        for _ in range(80):
+            mid = 0.5 * (out + into)
+            out, into = (out, mid) if on_both(mid) else (mid, into)
+        return into
+
+    lo = edge(grid[first - 1], grid[first]) if first > 0 else grid[0]
+    hi = edge(grid[last + 1], grid[last]) if last + 1 < len(grid) else grid[-1]
+    return (hi - lo) / (np.pi * mn * np.cos(alpha_n))
+
+
+def check_zone(mn, alpha_n):
+    """7: the zone off the surfaces, against the two-sided band."""
+    print("7. The zone of action, from where each flank's own sheet reaches")
+    for label, z1, z2, b1, sig, add in (
+        ("17/23, 45/45 deg, shafts 90 deg, addendum 1", 17, 23, 45.0, 90.0, 1.0),
+        ("9/37, 20/70 deg, shafts 90 deg, addendum 2", 9, 37, 20.0, 90.0, 2.0),
+    ):
+        sigma = np.radians(sig)
+        g1 = geometry(z1, np.radians(b1), mn, alpha_n)
+        g2 = geometry(z2, sigma - np.radians(b1), mn, alpha_n)
+        two = contact_ratio(g1, g2, sigma, mn, alpha_n, add)
+        one = surface_zone(g1, g2, sigma, mn, alpha_n, add)
+        print(f"     {label}: off the surfaces {one:.9f}, two-sided band {two:.9f}")
+        if z1 == 17:
+            # The figure the crate's construction is held to (screw.rs).
+            expect(abs(one - 1.777921669562) < 1e-9, f"17/23 zone {one}, not 1.777921669562")
+        else:
+            # Tall teeth reach past a base tangency: the band counts the
+            # involute's other branch there, and the sheet does not. The
+            # figure screw.rs's `the_zone_stops_at_the_base_tangency_as_the_surfaces_say`
+            # holds the construction to.
+            expect(abs(one - 1.829147466) < 1e-9, f"9/37 zone {one}, not 1.829147466")
+            expect(one < two - 1.0, f"9/37: the sheet {one} and the band {two} should differ")
+    print()
+
+
+def check_crate(mn, alpha_n):
+    """8: the harness's crossed pair, row by row, at its running centre."""
+    print("8. The crate: `gear-cli crossed 17 23 90`, as the corpus recorded it")
+    text = RECORD.read_text()
+    head = re.search(r"z (\d+)/(\d+)\s+shaft angle (\S+) deg\s+module (\S+)\s+alpha (\S+) deg", text)
+    z1, z2 = int(head.group(1)), int(head.group(2))
+    sigma = np.radians(float(head.group(3)))
+    mn, alpha_n = float(head.group(4)), np.radians(float(head.group(5)))
+    # A stage runs open by the default clearance, the running centre the
+    # harness's own shift table prints beside the nominal one.
+    running = float(re.search(r"least shift that clears undercut\s+\S+\s+\S+\s+(\S+)", text).group(1))
+    even = re.search(r"at the even split \((\S+)/", text).group(1)
+    rows = re.findall(
+        r"^\s+(\d+\.\d)\s+(\d+\.\d)\s+\S+\s+\S+\s+(\S+)\s.*?\s(\d\.\d{9})$", text, re.M
+    )
+    clearance = running - float(next(r[2] for r in rows if r[0] == even))
+    print(f"     running {clearance:.4f} mm open, as the shift table prints it")
+    worst = 0.0
+    for b1, b2, a_nom, eps in rows:
+        g1 = geometry(z1, np.radians(float(b1)), mn, alpha_n)
+        g2 = geometry(z2, np.radians(float(b2)), mn, alpha_n)
+        # The nominal centre from the pitch radii, held to the printed one;
+        # the printed one is only to its fourth decimal.
+        expect(f"{g1['r'] + g2['r']:.4f}" == a_nom, f"beta1 {b1}: nominal centre {a_nom} is not this pair's")
+        one = surface_zone(g1, g2, sigma, mn, alpha_n, 1.0, g1["r"] + g2["r"] + clearance)
+        worst = max(worst, abs(one - float(eps)))
+        print(f"     beta1 {b1:>5}: crate {eps}, off the surfaces {one:.9f}  ({abs(one - float(eps)):.1e})")
+    expect(len(rows) >= 9, f"read {len(rows)} rows of the record")
+    expect(worst < 1e-9, f"the crate's contact ratio is {worst:.1e} off the surfaces'")
+    print()
 
 
 def parallel_transverse_ratio(g1, g2, mn, alpha_n, addendum=1.0):
@@ -384,3 +577,9 @@ if __name__ == "__main__":
     check_tangency(g1, g2, sigma)
     check_conjugate(g1, g2, sigma)
     check_limit(mn, alpha_n, 17, 43, np.radians(20.0))
+    check_zone(mn, alpha_n)
+    check_crate(mn, alpha_n)
+    if FAILURES:
+        print(f"{len(FAILURES)} check(s) failed")
+        sys.exit(1)
+    print("every check holds")

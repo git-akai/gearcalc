@@ -15,7 +15,14 @@ So this reaches the same answers from the other end and shares no expression
 with them. Nothing below divides one tooth count by another, and nothing below
 knows the words sun, ring or planet.
 
-    tools/train_kinematics.py                # every topology
+**Held to the crate's output, not to a copy of its formula.** Every topology
+`gear-cli kinematics` prints is rebuilt here as a layout, and each body's
+exact speed in `tools/golden/kinematics.txt` -- the corpus `check_golden.sh`
+holds to what the harness prints -- must equal the rigid-body one as a
+rational. `crate_rows` below restates the crate's row formula and is a second,
+weaker assertion: it checks the formula, and only the corpus checks the crate.
+
+    tools/train_kinematics.py                # every topology; exits 1 on a disagreement
     tools/train_kinematics.py --verbose      # ...with the speeds printed
 
 # What is derived here
@@ -56,18 +63,24 @@ reactions -- again with no formula from the crate in it.
 
 # What this does not do, and what does
 
-It is instantaneous: it writes the constraint at one position of the crank. The
-hula stage's wobble is the case where that is worth doubting, and
-`tools/hula_kinematics.py` is the answer to it -- that script integrates the
-no-slip condition through a full revolution in 200_000 steps. The two ask
-different questions and neither covers the other.
+It is instantaneous: it writes the constraint at one position of the crank.
+For involute teeth that is the whole answer -- the velocity ratio of an
+involute pair is constant through the engagement, so a relation true at one
+position is true at every one.
+
+Crossed axes (the worm, and the worm in `wormpair` and `mixed`) are not here: a
+planar layout has no line of action for them.
 
 Losses are not here either. Efficiency is not a kinematic quantity, and the
 crate's loss model is checked where it is written.
 """
 
+import re
 import sys
 from fractions import Fraction as F
+from pathlib import Path
+
+GOLDEN = Path(__file__).resolve().parent / "golden" / "kinematics.txt"
 
 # --------------------------------------------------------------- linear algebra
 #
@@ -537,6 +550,265 @@ def ravigneaux(zs1, zs2, zpl, zps, zr):
     return t, dict(sun1=s1, carrier=carrier, sun2=s2, ring=ring)
 
 
+def compound_chain(pairs):
+    """Fixed-axis pairs in series, each pair's driven gear on one shaft with
+    the next pair's driver."""
+    t = Train()
+    shafts = [t.shaft("s0")]
+    at = F(0)
+    for i, (za, zb) in enumerate(pairs):
+        shafts.append(t.shaft(f"s{i + 1}"))
+        a = t.gear(f"a{i}", shafts[i], 0, za, at)
+        at += F(za + zb, 2)
+        b = t.gear(f"b{i}", shafts[i + 1], 0, zb, at)
+        t.mesh(a, b)
+    return t, shafts
+
+
+def pair_then_set(z1, z2, zs, zp, zr):
+    """A pair whose driven shaft is an epicyclic set's sun, the ring held."""
+    t = Train()
+    s1, s2 = t.shaft("s1"), t.shaft("s2")
+    carrier, ring, planet = t.shaft("carrier"), t.shaft("ring"), t.shaft("planet")
+    t.mesh(t.gear("1", s1, 0, z1, 0), t.gear("2", s2, 0, z2, F(z1 + z2, 2)))
+    gs = t.gear("s", s2, carrier, zs, 0)
+    gp = t.gear("p", planet, carrier, zp, F(zs + zp, 2))
+    gr = t.gear("r", ring, carrier, zr, 0)
+    t.mesh(gs, gp)
+    t.mesh(gp, gr)
+    return t, dict(s1=s1, s2=s2, carrier=carrier, ring=ring, planet=planet)
+
+
+def set_then_pair(zs, zp, zr, z1, z2):
+    """An epicyclic set whose ring shaft drives a fixed-axis pair."""
+    t = Train()
+    sun, carrier, ring, planet, out = (
+        t.shaft("sun"), t.shaft("carrier"), t.shaft("ring"), t.shaft("planet"), t.shaft("out"),
+    )
+    gs = t.gear("s", sun, carrier, zs, 0)
+    gp = t.gear("p", planet, carrier, zp, F(zs + zp, 2))
+    gr = t.gear("r", ring, carrier, zr, 0)
+    t.mesh(gs, gp)
+    t.mesh(gp, gr)
+    t.mesh(t.gear("1", ring, 0, z1, 0), t.gear("2", out, 0, z2, F(z1 + z2, 2)))
+    return t, dict(sun=sun, carrier=carrier, ring=ring, planet=planet, out=out)
+
+
+# ------------------------------------------------------- against the crate
+
+# Bodies no planar layout reaches, by section, and why: crossed axes, and a
+# set whose ring's base circle contains its planet's at the carrier radius the
+# sun mesh sets -- the fixture exists because no layout closes it, and the
+# crate's speeds for it come from the tooth counts alone.
+UNREACHED = {
+    "worm": None,  # the whole section: crossed axes
+    "wormpair": None,
+    "mixed": {("second", "part 3")},
+    "unclosed": None,
+    "chain-unclosed": {("carrier", "part 2"), ("ring", "part 2"), ("planet", "part 2")},
+}
+
+
+def golden_speeds():
+    """`{section: {(label, where): speed}}`, exact, from the corpus's
+    `graph` blocks: `b3     ring 2    of part 1  speed 16/3721`."""
+    out, section = {}, None
+    for line in GOLDEN.read_text().splitlines():
+        m = re.match(r"^== (.+) ==$", line)
+        if m:
+            section = m.group(1)
+            out[section] = {}
+            continue
+        if section and re.match(r"^  graph\s+no motion", line):
+            out[section] = None
+            continue
+        m = re.match(
+            r"^\s+b\d+\s+(.+?)\s+of (part \d+|the train)\s+speed (\S+)"
+            r"(?: \+ (\S+) × ω\(b\d+ (.+)\))?$",
+            line,
+        )
+        if m and section:
+            body = (m.group(1), m.group(2))
+            # A family: a speed plus a multiple of a free body's speed.
+            out[section][body] = (F(m.group(3)), F(m.group(4) or 0), m.group(5))
+    return out
+
+
+def crate_cases():
+    """Per section: the layout, which of its shafts each crate body is, and
+    the speeds given -- the case `gear-cli kinematics` states, by body."""
+    P1 = "part 1"
+    cases = {}
+    for name in ("pair", "helical"):
+        t = fixed_pair(17, 43)
+        cases[name] = (t, {("first", P1): 1, ("second", P1): 2}, {("first", P1): 1})
+    t, s = simple_set(12, 30, 72)
+    names = {(k, P1): v for k, v in s.items()}
+    for driven in ("sun", "carrier", "ring"):
+        for held in ("sun", "carrier", "ring"):
+            if driven != held:
+                cases[f"set-{driven}-{held}"] = (t, names, {(driven, P1): 1, (held, P1): 0})
+    t, s = hula([65, 61, 57, 61])
+    cases["hula"] = (
+        t,
+        {("carrier", P1): s["crank"], ("ring 1", P1): s["g1"], ("ring 2", P1): s["g4"],
+         ("planet 1", P1): s["wobble"]},
+        {("carrier", P1): 1, ("ring 1", P1): 0},
+    )
+    t, s = layshaft((17, 43), [(41, 19), (29, 31), (17, 43)], 1)
+    cases["layshaft"] = (
+        t,
+        {("member 1", P1): s["input"], ("member 2", P1): s["lay"], ("member 5", P1): s["output"],
+         ("member 3", P1): t.shafts.index("idler0"), ("member 7", P1): t.shafts.index("idler2")},
+        {("member 1", P1): 1},
+    )
+    t, s = wolfrom(18, 60, 61)
+    cases["wolfrom"] = (
+        t,
+        {("carrier", P1): s["carrier"], ("ring 1", P1): s["ring1"], ("ring 2", P1): s["ring2"],
+         ("planet", P1): s["planet"]},
+        {("carrier", P1): 1, ("ring 1", P1): 0},
+    )
+    t, s = compound_set(24, 18, 60, 17, 59)
+    cases["stepped"] = (
+        t,
+        {("sun", P1): s["sun"], ("ring 1", P1): s["ring1"], ("ring 2", P1): s["ring2"],
+         ("carrier", P1): s["carrier"], ("planet 1", P1): s["planet"]},
+        {("sun", P1): 1, ("ring 1", P1): 0},
+    )
+    t, s = planocentric(30, 33)
+    cases["planocentric"] = (
+        t,
+        {("carrier", P1): s["carrier"], ("ring", P1): s["ring"], ("planet", P1): s["planet"],
+         # The output, joined to the planet by an offset coupling: its speed.
+         ("coupled", P1): s["planet"]},
+        {("carrier", P1): 1, ("ring", P1): 0},
+    )
+    t, s = meshed_planets(24, 18, 18, 96)
+    cases["meshed-planets"] = (
+        t,
+        {("sun", P1): s["sun"], ("carrier", P1): s["carrier"], ("ring", P1): s["ring"],
+         ("planet 1", P1): t.shafts.index("pa"), ("planet 2", P1): t.shafts.index("pb")},
+        {("sun", P1): 1, ("ring", P1): 0},
+    )
+    t, s = ravigneaux(18, 30, 22, 18, 62)
+    names = {("sun 1", P1): s["sun1"], ("carrier", P1): s["carrier"], ("sun 2", P1): s["sun2"],
+             ("ring", P1): s["ring"], ("planet 1", P1): t.shafts.index("long"),
+             ("planet 2", P1): t.shafts.index("short")}
+    for name, given in (
+        ("ravigneaux-small-sun", {("sun 1", P1): 1, ("ring", P1): 0}),
+        ("ravigneaux-large-sun", {("sun 2", P1): 1, ("ring", P1): 0}),
+        ("ravigneaux-ring-free", {("sun 1", P1): 1, ("sun 2", P1): 0}),
+    ):
+        cases[name] = (t, names, given)
+    t, sh = compound_chain([(17, 43), (13, 31)])
+    cases["chain"] = (
+        t,
+        {("first", P1): sh[0], ("second", P1): sh[1], ("second", "part 2"): sh[2]},
+        {("first", P1): 1},
+    )
+    t, s = simple_set(12, 30, 72)
+    names = {(k, P1): v for k, v in s.items()}
+    cases["ring-released"] = (t, names, {("sun", P1): 1})
+    cases["conflict"] = (t, names, {("sun", P1): 1, ("carrier", P1): 0, ("ring", P1): 0})
+    t, sh = compound_chain([(17, 43)])
+    cases["chain-unclosed"] = (t, {("first", P1): sh[0], ("second", P1): sh[1]}, {("first", P1): 1})
+    t, s = pair_then_set(17, 43, 12, 30, 72)
+    cases["pair-then-set"] = (
+        t,
+        {("first", P1): s["s1"], ("second", P1): s["s2"], ("carrier", "part 2"): s["carrier"],
+         ("ring", "part 2"): s["ring"], ("planet", "part 2"): s["planet"]},
+        {("first", P1): 1, ("carrier", "part 2"): 0},
+    )
+    t, s = set_then_pair(12, 30, 72, 17, 43)
+    cases["set-then-pair"] = (
+        t,
+        {("sun", P1): s["sun"], ("carrier", P1): s["carrier"], ("ring", P1): s["ring"],
+         ("planet", P1): s["planet"], ("second", "part 2"): s["out"]},
+        {("sun", P1): 1, ("carrier", P1): 0},
+    )
+    t, s = pair_then_set(17, 43, 12, 30, 72)
+    cases["mixed"] = (
+        t,
+        {("first", P1): s["s1"], ("second", P1): s["s2"], ("carrier", "part 2"): s["carrier"],
+         ("ring", "part 2"): s["ring"], ("planet", "part 2"): s["planet"]},
+        {("first", P1): 1, ("ring", "part 2"): 0},
+    )
+    return cases
+
+
+def against_crate(verbose):
+    """Every body speed the corpus records, against the rigid-body one."""
+    fail = 0
+    recorded = golden_speeds()
+    cases = crate_cases()
+    for section, bodies in recorded.items():
+        if section in UNREACHED and UNREACHED[section] is None:
+            print(f"  {section:<38}{'skip':>9}   no planar layout")
+            continue
+        if section not in cases:
+            print(f"  {section:<38}{'NEW':>9}   the corpus has a section this does not build")
+            fail += 1
+            continue
+        t, names, given = cases[section]
+        conditions = {0: F(0)}
+        for body, value in given.items():
+            conditions[names[body]] = F(value)
+        if bodies is None:
+            # The crate finds no motion; the layout must find the conditions
+            # inconsistent too.
+            try:
+                t.speeds(conditions)
+                wrong, n = ["the crate finds no motion and the layout finds one"], 0
+            except ValueError:
+                wrong, n = [], 0
+            print(f"  {section:<38}{'ok' if not wrong else 'DISAGREE':>9}   no motion either way")
+            for w in wrong:
+                print(f"      {w}")
+            fail += bool(wrong)
+            continue
+        # A free body the crate names is solved at 0 and at 1: the particular
+        # speed and the direction it adds.
+        free = {f for (_, _, f) in bodies.values() if f}
+        at = {}
+        for w in (0, 1):
+            c = dict(conditions)
+            for label in free:
+                c[names[next(b for b in names if b[0] == label)]] = F(w)
+            speeds, basis = t.speeds(c)
+            if basis:
+                break
+            at[w] = speeds
+        if len(at) < 2:
+            print(f"  {section:<38}{'FAIL':>9}   the given speeds leave it free")
+            fail += 1
+            continue
+        wrong = []
+        for body, (speed, per_free, _) in bodies.items():
+            if body in (UNREACHED.get(section) or ()):
+                continue
+            if body not in names:
+                wrong.append(f"{body[0]} ({body[1]}): not in the layout")
+                continue
+            mine = (at[0][names[body]], at[1][names[body]] - at[0][names[body]])
+            if mine != (speed, per_free):
+                wrong.append(
+                    f"{body[0]} ({body[1]}): crate {speed} + {per_free} w, "
+                    f"rigid body {mine[0]} + {mine[1]} w"
+                )
+        ok = not wrong
+        shown = " ".join(f"{b[0]}={v[0]}" for b, v in bodies.items()) if verbose else ""
+        print(f"  {section:<38}{'ok' if ok else 'DISAGREE':>9}   {len(bodies)} bodies {shown}")
+        for w in wrong:
+            print(f"      {w}")
+        fail += not ok
+    for section in cases:
+        if section not in recorded:
+            print(f"  {section:<38}{'GONE':>9}   the corpus no longer has this section")
+            fail += 1
+    return fail
+
+
 # ---------------------------------------------------------------------- cases
 
 
@@ -610,6 +882,9 @@ def power_balance(label, t, applied, conditions, fail):
 def main():
     verbose = "--verbose" in sys.argv
     fail = 0
+
+    print("\nthe crate, as `gear-cli kinematics` recorded it (tools/golden/kinematics.txt)\n")
+    fail += against_crate(verbose)
 
     print("\nfixed-axis pairs -- the mesh kind comes out of the layout\n")
     for (z1, z2, internal) in [(17, 43, False), (9, 37, False), (20, 60, True)]:
@@ -729,7 +1004,8 @@ def main():
     if fail:
         print(f"{fail} disagreement(s) between the two derivations")
         return 1
-    print("every topology: rigid-body velocities and the tooth-count rows agree")
+    print("every topology: the crate's recorded speeds, rigid-body velocities and the "
+          "tooth-count rows agree")
     return 0
 
 
