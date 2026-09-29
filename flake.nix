@@ -132,7 +132,7 @@
           pname = "gears-web";
           version = "0.3.0";
           src = ./web;
-          npmDepsHash = "sha256-vqmkqltn86XZkS8x7XewqvGAurJzCx/pPOJl1SrsCZk=";
+          npmDepsHash = "sha256-kSXBUz5sjjyBBjaRfe0I25S1x3TKFB+albft9UcvSOU=";
 
           # The wasm stage already ran; skip the npm script that would rerun it
           # (cargo cannot reach the network inside the sandbox anyway).

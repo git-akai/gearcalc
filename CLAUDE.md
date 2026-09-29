@@ -166,6 +166,7 @@ Thirteen checks in six different ways. `nix flake check` is **not** all of them.
 | `cargo fmt --check` | | " |
 | `nix build .#web` | **the site — `flake check` does not cover it**, and it carries a fixed-output hash over `web/package-lock.json` that nothing else consults | yes |
 | `cd web && npm run check` | types, which the bundler strips without checking | yes |
+| `cd web && npm test` | **the panels, mounted** — vitest in jsdom against the real wasm core: what a box shows after what a reader types, and what reaches the core | yes |
 | `tools/check_bindings.sh` | `web/src/wire` still matches the Rust it is generated from | yes |
 | `tools/check_doc_links.py` | every pointer into the documents resolves, both from code and between documents | yes |
 | `tools/check_strings.py` | every `ui.` message is used and every use has a message | yes |
