@@ -23,3 +23,5 @@ The audit tasks you cite are in /home/user/gearcalc/audit/workstreams/Tnn-*.md; 
   what failed before / passes after, anything deferred, and any new finding (with evidence).
 - Never symlink anything (e.g. web/node_modules) from /home/user/gearcalc into your worktree: tools like
   `npm ci` delete through the link. Run `npm ci` inside your own worktree's web/ instead.
+- Never leave a server (vite preview/dev) running: anything started under `gc` inherits its slot lock
+  and blocks every other build until killed. Stop what you start before you finish.
