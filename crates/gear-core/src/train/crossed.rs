@@ -1965,4 +1965,47 @@ mod tests {
             previous = e;
         }
     }
+
+    /// **The screw is the pair the members are cut as, or the pair is
+    /// refused** (T07.1). The screw is parametrised by the first member's
+    /// diameter, `z m_n / cos β₁`, which cannot tell `β₁` from `−β₁`, while
+    /// the second member is cut at `Σ − β₁`: an opposite-hand first member
+    /// was modelled as a different pair whose cut gears overlap. Over
+    /// `Σ ∈ {30, 60, 90, 120}°` and `β₁` from −85° to 85°: either the solve
+    /// refuses, or the screw's two helices are the members' and its
+    /// reference distance their pitch radii's sum, to 1e-12. The base fails
+    /// at `Σ = 30°, β₁ = −10°`, whose members' radii sum 23.6433 mm against
+    /// a screw of 20.8692.
+    #[test]
+    fn a_crossed_pair_is_the_pair_its_members_are_cut_as() {
+        let lib = library();
+        let mut solved = 0;
+        for shaft_angle in [30.0_f64, 60.0, 90.0, 120.0] {
+            for i in -17..=17 {
+                if i == 0 {
+                    continue;
+                }
+                let beta = 5.0 * f64::from(i);
+                let shape = arr::crossed([17, 23], shaft_angle).with_first_helix(beta);
+                let Ok(r) = super::super::solve_preset(&shape, 2.0, 1000.0, &lib) else {
+                    continue;
+                };
+                let s = shape.screw(0).expect("a solved crossed pair has a screw");
+                let helix = [r.members[0].helix_angle, r.members[1].helix_angle];
+                let radii = 0.5 * (r.members[0].pitch_diameter + r.members[1].pitch_diameter);
+                assert!(
+                    (s.worm_helix_angle_rad.to_degrees() - helix[0]).abs() < 1e-12
+                        && (s.wheel_helix_angle_rad.to_degrees() - helix[1]).abs() < 1e-12
+                        && (s.reference_distance - radii).abs() < 1e-12 * radii,
+                    "Σ {shaft_angle} β₁ {beta}: screw {:.4}/{:.4}° at {:.4} mm, members \
+                     {helix:?}° at {radii:.4} mm",
+                    s.worm_helix_angle_rad.to_degrees(),
+                    s.wheel_helix_angle_rad.to_degrees(),
+                    s.reference_distance
+                );
+                solved += 1;
+            }
+        }
+        assert!(solved > 40, "only {solved} pairs solved");
+    }
 }

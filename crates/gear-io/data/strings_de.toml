@@ -118,6 +118,7 @@ screw_not_positive = "ein Modul, ein Durchmesser oder eine Zähnezahl ist nicht 
 screw_worm_too_thin = "das erste Glied hat keinen Steigungswinkel; das schrägverzahnte Glied gehört an die erste, das geradverzahnte an die zweite Stelle"
 screw_shaft_angle_impossible = "dieser Achswinkel lässt dem zweiten Glied keinen Steigungswinkel"
 screw_first_member_is_a_disc = "der Schrägungswinkel des ersten Glieds erreicht neunzig Grad, das ist eine Scheibe und kein Zahnrad"
+screw_first_member_opposite_hand = "der Schrägungswinkel des ersten Glieds ist negativ, eine Gegenrichtung, die dieses Modell gekreuzter Achsen noch nicht darstellen kann; den Schrägungswinkel des zweiten Glieds innerhalb des Achswinkels halten"
 screw_axes_are_parallel = "parallele Achsen: eine Schneckenstufe braucht gekreuzte Wellen, ein paralleles Paar ist eine Stirnradstufe"
 train_no_contact = "die Zähne kommen nie in Berührung"
 train_no_common_distance = "keine Profilverschiebung bringt die Eingriffe auf einen Achsabstand; diese Zähnezahlen lassen sich nicht zusammenbauen"

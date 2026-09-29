@@ -1393,6 +1393,7 @@ mod tests {
                 }
             }
             err(gear_core::screw::ScrewError::FirstMemberIsADisc.note());
+            err(gear_core::screw::ScrewError::FirstMemberOppositeHand.note());
 
             // A train: no contact, an unknown material, a tooth with no root
             // section left to rate, and no stages at all.

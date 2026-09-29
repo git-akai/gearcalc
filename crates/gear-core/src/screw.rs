@@ -188,6 +188,13 @@ pub enum ScrewError {
     /// enormous — 2.8e17 mm on a 17-tooth member — and every check downstream
     /// finds it perfectly finite.
     FirstMemberIsADisc,
+    /// The first member's helix is negative: an opposite-hand pair, whose
+    /// second member runs at more than the shaft angle. The screw takes the
+    /// first member as a diameter, `z m_n / cos β₁`, which is the same at
+    /// `±β₁`, so it would model the pair at `|β₁|` while the second member is
+    /// cut at `Σ − β₁` — two different pairs. Refused until the screw carries
+    /// signed helices.
+    FirstMemberOppositeHand,
 }
 
 impl crate::note::Explain for ScrewError {
@@ -200,6 +207,7 @@ impl crate::note::Explain for ScrewError {
             Self::ShaftAngleImpossible => key::ERROR_SCREW_SHAFT_ANGLE_IMPOSSIBLE,
             Self::AxesAreParallel => key::ERROR_SCREW_AXES_ARE_PARALLEL,
             Self::FirstMemberIsADisc => key::ERROR_SCREW_FIRST_MEMBER_IS_A_DISC,
+            Self::FirstMemberOppositeHand => key::ERROR_SCREW_FIRST_MEMBER_OPPOSITE_HAND,
         })
     }
 }

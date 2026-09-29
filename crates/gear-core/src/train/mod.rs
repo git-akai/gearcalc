@@ -1884,6 +1884,11 @@ impl std::fmt::Display for TrainError {
                     "parallel axes: a worm stage needs crossed shafts, and a \
                      parallel pair is a spur stage"
                 ),
+                crate::screw::ScrewError::FirstMemberOppositeHand => write!(
+                    f,
+                    "the first member's helix is negative, an opposite hand the \
+                     crossed-axis model cannot yet represent"
+                ),
             },
             Self::NoContact => write!(f, "the teeth never come into contact"),
             Self::NoCommonDistance => write!(

@@ -119,6 +119,7 @@ screw_not_positive = "um módulo, diâmetro ou número de dentes não é positiv
 screw_worm_too_thin = "o primeiro elemento não tem ângulo de avanço; coloque o elemento helicoidal em primeiro e o de dentes retos em segundo"
 screw_shaft_angle_impossible = "esse ângulo entre eixos não deixa ângulo de avanço ao segundo elemento"
 screw_first_member_is_a_disc = "o ângulo de hélice do primeiro elemento atinge noventa graus, o que é um disco e não uma engrenagem"
+screw_first_member_opposite_hand = "o ângulo de hélice do primeiro elemento é negativo, um sentido oposto que este modelo de eixos cruzados ainda não representa; mantenha a hélice do segundo elemento dentro do ângulo entre eixos"
 screw_axes_are_parallel = "eixos paralelos: um estágio de sem-fim precisa de eixos cruzados, e um par paralelo é um estágio de dentes retos"
 train_no_contact = "os dentes nunca entram em contato"
 train_no_common_distance = "nenhum deslocamento de perfil leva os engrenamentos a uma distância entre eixos comum; estes números de dentes não podem ser montados"

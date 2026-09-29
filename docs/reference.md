@@ -979,6 +979,13 @@ member with no lead at all, and `β₁ = 90°` is a disc rather than a gear — 
 where the helix angle is still known, because `cos 90°` is 6e-17 and a derived
 diameter would come out merely enormous.
 
+A negative first helix is refused too (`error.screw_first_member_opposite_hand`):
+the screw takes the first member as a diameter `z m_n / cos β₁`, which is the
+same at `±β₁`, while the second member is cut at `Σ − β₁`, so it would rate a
+pair other than the one cut. An opposite-hand pair — the second helix above the
+shaft angle — waits for a screw that carries signed helices. Both checks, and
+the second member's own 90°, are asked before either member is cut.
+
 ### The path of contact
 
 Built from two properties of an involute helicoid, both measured from the

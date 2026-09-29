@@ -249,6 +249,9 @@ pub mod key {
     pub const ERROR_SCREW_SHAFT_ANGLE_IMPOSSIBLE: &str = "error.screw_shaft_angle_impossible";
     /// `error.screw_first_member_is_a_disc`
     pub const ERROR_SCREW_FIRST_MEMBER_IS_A_DISC: &str = "error.screw_first_member_is_a_disc";
+    /// `error.screw_first_member_opposite_hand`
+    pub const ERROR_SCREW_FIRST_MEMBER_OPPOSITE_HAND: &str =
+        "error.screw_first_member_opposite_hand";
     /// `error.screw_axes_are_parallel`
     pub const ERROR_SCREW_AXES_ARE_PARALLEL: &str = "error.screw_axes_are_parallel";
     /// `error.train_no_contact`
@@ -370,6 +373,7 @@ pub mod key {
         ERROR_SCREW_WORM_TOO_THIN,
         ERROR_SCREW_SHAFT_ANGLE_IMPOSSIBLE,
         ERROR_SCREW_FIRST_MEMBER_IS_A_DISC,
+        ERROR_SCREW_FIRST_MEMBER_OPPOSITE_HAND,
         ERROR_SCREW_AXES_ARE_PARALLEL,
         ERROR_TRAIN_NO_CONTACT,
         ERROR_TRAIN_NO_COMMON_DISTANCE,

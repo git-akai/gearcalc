@@ -492,21 +492,44 @@ impl Shape {
         self.shaft_angle_of(mesh) != 0.0
     }
 
+    /// **The helices a crossed mesh's screw can represent**, asked before
+    /// either member is cut.
+    ///
+    /// Caught here rather than in `Screw::new`, because by then the first
+    /// helix has become a diameter and the information is gone: `cos 90°` is
+    /// 6e-17, not zero, so the diameter comes out enormous rather than
+    /// infinite and passes every finiteness check downstream; and the
+    /// diameter is the same at `±β₁`, so a negative first helix would be
+    /// modelled at `|β₁|`. A first member at no helix has no lead, and a
+    /// second at 90° or more none either; the screw refuses both too, but
+    /// only after the members had been cut, one of them as a tooth with no
+    /// flank.
+    fn screw_helices(&self, mesh: usize, helix: &[f64]) -> Result<(), TrainError> {
+        use crate::screw::ScrewError;
+        let m = self.meshes[mesh];
+        let refused = if helix[m.a].abs() >= 90.0 {
+            Some(ScrewError::FirstMemberIsADisc)
+        } else if helix[m.a] < 0.0 {
+            Some(ScrewError::FirstMemberOppositeHand)
+        } else if helix[m.a] == 0.0 {
+            // No lead: what the screw says of `z m_n ≥ d₁`, in its order.
+            Some(ScrewError::WormTooThin)
+        } else if helix[m.b].abs() >= 90.0 {
+            Some(ScrewError::ShaftAngleImpossible)
+        } else {
+            None
+        };
+        refused.map_or(Ok(()), |e| Err(TrainError::Screw(e)))
+    }
+
     /// **The screw gearing a crossed mesh is**, at these shifts and helices:
     /// the first member's size read from its helix, the shifts entering as a
     /// rack's do with each member's thickness modification as an equivalent
-    /// shift ([`ScrewParams::profile_shifts`]).
+    /// shift ([`ScrewParams::profile_shifts`]). Helices the screw cannot
+    /// represent are refused first ([`Self::screw_helices`]).
     fn screw_of(&self, mesh: usize, shifts: &[f64], helix: &[f64]) -> Result<Screw, TrainError> {
         let m = self.meshes[mesh];
-        // Caught here rather than in `Screw::new`, because by then the helix
-        // angle has become a diameter and the information is gone: `cos 90°`
-        // is 6e-17, not zero, so the diameter comes out enormous rather than
-        // infinite and passes every finiteness check downstream.
-        if helix[m.a].abs() >= 90.0 {
-            return Err(TrainError::Screw(
-                crate::screw::ScrewError::FirstMemberIsADisc,
-            ));
-        }
+        self.screw_helices(mesh, helix)?;
         let module = self.members[m.a].normal_module();
         // Two gears in mesh share a normal module, on crossed shafts as on
         // parallel ones — where `Mesh::new` asks it of the racks.
@@ -2874,6 +2897,9 @@ impl Shape {
         held: &[Option<f64>],
         cache: Option<&TeethCache>,
     ) -> Result<Built, TrainError> {
+        for k in (0..self.meshes.len()).filter(|&k| self.is_crossed(k)) {
+            self.screw_helices(k, helix)?;
+        }
         let cut = |i: usize| -> std::rc::Rc<BuiltMember> {
             let p = self.params_at(i, x[i], helix);
             std::rc::Rc::new(match &self.members[i].ring {
