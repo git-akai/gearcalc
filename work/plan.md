@@ -224,6 +224,16 @@ caught, test workspace included) and the 130-constant perturbation.
     - a closed-form limit at Σ → 0;
     - tooth stiffness in series, derived from the generated tooth and gated against ISO 6336-1's c′
       and c_γ.
+- 2026-09-30 — owner: the contact model continues. Its role is a separate, on-demand analysis. This
+  opens **two modes** of analysis:
+  - a fast, cheap, flexible mode for real-time setup (today's closed forms at ISO's points);
+  - an expensive mode for a final optimisation run, once the design is constrained and close to its
+    intended result (the field model).
+  Other models once rejected as too expensive may return in the second mode later. For now the focus
+  is on building out and perfecting the contact model.
+  - Next round: edge contact — one edge-curvature rule at every β, with the tip-edge radius r_e as
+    the gear's input. The worm wheel (hobbed and matched, or involute) is still to be decided; both
+    stay in the prototype.
 - 2026-09-29 — owner accepted the recommendations after the second contact verification
   (`review/contact-verify2.md`):
   - Ratings are read at ISO's points by default, with the field maximum reported beside them, until a
