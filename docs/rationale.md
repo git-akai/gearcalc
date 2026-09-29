@@ -1554,8 +1554,10 @@ addition of other standards.
 are different acts: a table of numbers read out of a document is not that
 document, and this project needs the numbers to compute a tolerance while it
 needs nothing from the pages but the reading. So `data/jgma_116_02.csv` ships
-with its three transcription checks — row counts per grade, every value a
-preferred number, monotone in grade within a band — and the copyrighted PDF that
+with the checks that need nothing but the file — row counts per grade, every
+value a preferred number, monotone in grade within a band, total above
+tooth-to-tooth, adjacent bands meeting at one held edge, and the bands against
+the printed labels typed a second time — and the copyrighted PDF that
 was once beside it does not. This is the same line drawn in
 [no ISO/AGMA correction factors](#no-isoagma-correction-factors): what stops
 those being adopted is that the *values* are unavailable, not that the documents

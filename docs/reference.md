@@ -1506,6 +1506,13 @@ JGMA 116-02 fine       grades 0–6,  modules 0.2–1.6
 JGMA 116-02 standard   grades 4–12, modules 1–10
 ```
 
+Each band is read as printed: closed above (以下), and closed (以上) or open
+(をこえ) below as its label says. Only the fine table's m0.2–0.6 block opens
+closed, at m 0.2 and d 1.5, so a gear on a printed edge reads the lower band —
+m 1.0 the (0.6, 1] block, d 12 the (6, 12] band. The standard scale is read the
+same way, as ISO 1328:1975 prints the same scheme; that reading has not been
+checked against the standard's main body.
+
 Default precedence is fine first, then lowest grade, decided on scale and grade
 ordering alone rather than on which entry yields the smaller value.
 

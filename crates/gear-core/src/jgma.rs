@@ -1,4 +1,4 @@
-//! JGMA 116-02 (1983) gear meshing error tolerances.
+//! JGMA 116-02 (1983) double-flank composite tolerances.
 //!
 //! The standard is a **banded lookup table, not a formula**: find the module
 //! band, find the pitch-diameter band, read two numbers in micrometres. Nothing
@@ -30,18 +30,19 @@
 //! # The data lives in a file
 //!
 //! `data/jgma_116_02.csv`, one row per cell, so it can be diffed against the
-//! standard rather than read out of Rust syntax. Three transcription checks run
-//! in the test suite: row counts per grade, every value a preferred number, and
-//! monotonicity in grade within a band. Those catch column misalignment, which
-//! is the realistic failure mode when transcribing a scanned table — and which
-//! the raw text extraction did in fact exhibit before the pages were checked as
-//! images.
+//! standard rather than read out of Rust syntax. Its header names the source
+//! transcribed. Each band is stored as printed, in interval notation: every
+//! band is closed above (以下) and closed (以上) or open (をこえ) below as its
+//! label says, so a gear on a printed edge reads the row that prints it.
+//!
+//! The tests check the file without the source: row counts per grade, every
+//! value a preferred number, monotone in grade within a band, total above
+//! tooth-to-tooth, adjacent bands meeting at one held edge, and the bands
+//! against the printed labels typed a second time.
 //!
 //! **The standard is not in this repository.** It is copyrighted, and shipping
 //! it is a different act from transcribing a table of numbers out of it — the
-//! same distinction `docs/rationale.md` draws about ISO's values. The three
-//! checks above are what keeps this file auditable without it, and they need
-//! nothing but the file itself.
+//! same distinction `docs/rationale.md` draws about ISO's values.
 
 use std::sync::OnceLock;
 
@@ -87,57 +88,97 @@ impl std::fmt::Display for Class {
 /// Allowable composite errors, micrometres.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct CompositeError {
-    /// 一齒嚙合誤差 — single-tooth (tooth-to-tooth) composite error.
+    /// 両歯面1ピッチかみあい誤差 — double-flank single-pitch (tooth-to-tooth)
+    /// composite error.
     pub tooth_to_tooth: f64,
-    /// 全齒嚙合誤差 — total composite error.
+    /// 両歯面全かみあい誤差 — double-flank total composite error.
     pub total: f64,
+}
+
+/// A band as the standard prints it: closed above (以下), and closed below
+/// (以上) or open below (をこえ) as the printed label says.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Band {
+    lo: f64,
+    lo_closed: bool,
+    hi: f64,
+    hi_closed: bool,
+}
+
+impl Band {
+    /// `[lo~hi]`, `(lo~hi]`, `[lo~hi)` or `(lo~hi)`, as the data file writes
+    /// a printed band.
+    fn parse(s: &str) -> Option<Self> {
+        let lo_closed = match s.get(..1)? {
+            "[" => true,
+            "(" => false,
+            _ => return None,
+        };
+        let hi_closed = match s.get(s.len().checked_sub(1)?..)? {
+            "]" => true,
+            ")" => false,
+            _ => return None,
+        };
+        let (lo, hi) = s.get(1..s.len() - 1)?.split_once('~')?;
+        let (lo, hi) = (lo.parse().ok()?, hi.parse().ok()?);
+        (lo < hi).then_some(Self {
+            lo,
+            lo_closed,
+            hi,
+            hi_closed,
+        })
+    }
+
+    fn contains(&self, v: f64) -> bool {
+        (v > self.lo || self.lo_closed && v == self.lo)
+            && (v < self.hi || self.hi_closed && v == self.hi)
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
 struct Row {
     scale: Scale,
     grade: u8,
-    module: (f64, f64),
-    diameter: (f64, f64),
+    module: Band,
+    diameter: Band,
     error: CompositeError,
+}
+
+/// One data line, `scale,grade,module,diameter,tooth_to_tooth,total`, or
+/// `None` if it is not one.
+fn parse_row(line: &str) -> Option<Row> {
+    let f: Vec<&str> = line.split(',').collect();
+    let [scale, grade, module, diameter, t2t, total] = f.as_slice() else {
+        return None;
+    };
+    Some(Row {
+        scale: match *scale {
+            "fine" => Scale::Fine,
+            "standard" => Scale::Standard,
+            _ => return None,
+        },
+        grade: grade.parse().ok()?,
+        module: Band::parse(module)?,
+        diameter: Band::parse(diameter)?,
+        error: CompositeError {
+            tooth_to_tooth: t2t.parse().ok()?,
+            total: total.parse().ok()?,
+        },
+    })
 }
 
 const TABLE_CSV: &str = include_str!("../data/jgma_116_02.csv");
 
-fn table() -> &'static [Row] {
-    static TABLE: OnceLock<Vec<Row>> = OnceLock::new();
-    TABLE.get_or_init(|| {
-        TABLE_CSV
-            .lines()
-            .filter(|l| !l.starts_with('#') && !l.starts_with("scale,") && !l.trim().is_empty())
-            .filter_map(|l| {
-                let f: Vec<&str> = l.split(',').collect();
-                if f.len() != 8 {
-                    return None;
-                }
-                let n = |i: usize| f[i].parse::<f64>().ok();
-                Some(Row {
-                    scale: match f[0] {
-                        "fine" => Scale::Fine,
-                        "standard" => Scale::Standard,
-                        _ => return None,
-                    },
-                    grade: f[1].parse().ok()?,
-                    module: (n(2)?, n(3)?),
-                    diameter: (n(4)?, n(5)?),
-                    error: CompositeError {
-                        tooth_to_tooth: n(6)?,
-                        total: n(7)?,
-                    },
-                })
-            })
-            .collect()
-    })
+/// The data lines: every line but comments, the header and blanks.
+fn data_lines() -> impl Iterator<Item = &'static str> {
+    TABLE_CSV
+        .lines()
+        .filter(|l| !l.starts_with('#') && !l.starts_with("scale,") && !l.trim().is_empty())
 }
 
-/// Bands are half-open: `[lo, hi)`.
-fn in_band(v: f64, (lo, hi): (f64, f64)) -> bool {
-    v >= lo && v < hi
+fn table() -> &'static [Row] {
+    static TABLE: OnceLock<Vec<Row>> = OnceLock::new();
+    TABLE.get_or_init(|| data_lines().filter_map(parse_row).collect())
 }
 
 /// Allowable composite errors for a class at a given module and pitch diameter.
@@ -153,8 +194,8 @@ pub fn lookup(class: Class, module: f64, pitch_diameter: f64) -> Option<Composit
         .find(|r| {
             r.scale == class.scale
                 && r.grade == class.grade
-                && in_band(module, r.module)
-                && in_band(pitch_diameter, r.diameter)
+                && r.module.contains(module)
+                && r.diameter.contains(pitch_diameter)
         })
         .map(|r| r.error)
 }
@@ -168,7 +209,7 @@ pub fn lookup(class: Class, module: f64, pitch_diameter: f64) -> Option<Composit
 pub fn available_classes(module: f64, pitch_diameter: f64) -> Vec<Class> {
     let mut v: Vec<Class> = table()
         .iter()
-        .filter(|r| in_band(module, r.module) && in_band(pitch_diameter, r.diameter))
+        .filter(|r| r.module.contains(module) && r.diameter.contains(pitch_diameter))
         .map(|r| Class {
             scale: r.scale,
             grade: r.grade,
@@ -402,60 +443,41 @@ mod tests {
         assert_eq!(default_class(50.0, 5000.0), None);
     }
 
+    /// **Adjacent bands meet at one edge, which exactly one of them holds.**
+    /// A gap leaves a gear with no tolerance (a 12.00 mm gear once had none);
+    /// an overlap gives it two.
     #[test]
-    fn module_bands_are_half_open() {
-        // A module exactly on a boundary belongs to the upper band.
-        let low = lookup(
-            Class {
-                scale: Scale::Fine,
-                grade: 0,
-            },
-            0.599,
-            5.0,
-        )
-        .unwrap();
-        let high = lookup(
-            Class {
-                scale: Scale::Fine,
-                grade: 0,
-            },
-            0.6,
-            5.0,
-        )
-        .unwrap();
-        assert_ne!(low, high, "0.6 must fall in the 0.6-1.0 band, not 0.2-0.6");
-    }
-
-    /// Caught a real defect. The fine table prints inclusive diameter bands that
-    /// step by 0.01 -- "6.01~12.00" then "12.01~25.00" -- so stored half-open as
-    /// printed, a gear of exactly 12.00 mm falls in the gap between two rows and
-    /// gets no tolerance at all. Bands are stored contiguously instead.
-    #[test]
-    fn coverage_is_contiguous_within_every_scale() {
+    fn adjacent_bands_share_an_edge_that_one_of_them_holds() {
+        let meet = |what: &str, bands: &mut Vec<Band>| {
+            bands.sort_by(|a, b| a.lo.total_cmp(&b.lo));
+            bands.dedup();
+            for w in bands.windows(2) {
+                assert!(
+                    w[1].lo == w[0].hi && w[0].hi_closed != w[1].lo_closed,
+                    "{what}: {:?} then {:?}",
+                    w[0],
+                    w[1]
+                );
+            }
+        };
         for scale in [Scale::Fine, Scale::Standard] {
             for grade in 0..=12u8 {
-                let mut bands: Vec<(f64, f64)> = table()
+                let rows: Vec<&Row> = table()
                     .iter()
                     .filter(|r| r.scale == scale && r.grade == grade)
-                    .map(|r| r.diameter)
                     .collect();
-                if bands.is_empty() {
-                    continue;
-                }
-                bands.sort_by(|a, b| a.partial_cmp(b).unwrap());
-                bands.dedup();
-                for w in bands.windows(2) {
-                    assert!(
-                        (w[1].0 - w[0].1).abs() < 1e-9,
-                        "{scale:?} grade {grade}: gap between diameter bands \
-                         ending {} and starting {}",
-                        w[0].1,
-                        w[1].0
-                    );
+                let mut modules: Vec<Band> = rows.iter().map(|r| r.module).collect();
+                meet(&format!("{scale:?} {grade} modules"), &mut modules);
+                for m in modules {
+                    let mut diameters: Vec<Band> = rows
+                        .iter()
+                        .filter(|r| r.module == m)
+                        .map(|r| r.diameter)
+                        .collect();
+                    meet(&format!("{scale:?} {grade} {m:?}"), &mut diameters);
                 }
             }
         }
-        // and the specific value that exposed it
         for scale in [Scale::Fine, Scale::Standard] {
             let g = if scale == Scale::Fine { 0 } else { 4 };
             assert!(
@@ -463,6 +485,246 @@ mod tests {
                 "{scale:?}: a 12.00 mm gear must have a tolerance"
             );
         }
+    }
+
+    /// **The data file's bands, against the labels as printed, typed a second
+    /// time.** 以上 is closed below, をこえ open below, 以下 closed above. The
+    /// fine table's labels are the Japanese reproduction's; the standard
+    /// scale's follow ISO 1328:1975's printing of the same scheme. A band
+    /// edge or its closure mistyped in either copy fails here.
+    #[test]
+    fn the_bands_are_the_printed_labels() {
+        fn label(s: &str) -> Band {
+            let (lo, lo_closed, rest) = if let Some((lo, rest)) = s.split_once("以上") {
+                (lo.parse().unwrap(), true, rest)
+            } else if let Some((lo, rest)) = s.split_once("をこえ") {
+                (lo.parse().unwrap(), false, rest)
+            } else {
+                (0.0, true, s)
+            };
+            let hi = rest.strip_suffix("以下").unwrap().parse().unwrap();
+            Band {
+                lo,
+                lo_closed,
+                hi,
+                hi_closed: true,
+            }
+        }
+        const FINE_D: [&str; 8] = [
+            "1.5以上3以下",
+            "3をこえ6以下",
+            "6をこえ12以下",
+            "12をこえ25以下",
+            "25をこえ50以下",
+            "50をこえ100以下",
+            "100をこえ200以下",
+            "200をこえ400以下",
+        ];
+        const STANDARD_D: [&str; 6] = [
+            "125以下",
+            "125をこえ400以下",
+            "400をこえ800以下",
+            "800をこえ1600以下",
+            "1600をこえ2500以下",
+            "2500をこえ4000以下",
+        ];
+        let printed: &[(Scale, &str, &[&str])] = &[
+            (Scale::Fine, "0.2以上0.6以下", &FINE_D),
+            (Scale::Fine, "0.6をこえ1以下", &FINE_D[1..]),
+            (Scale::Fine, "1をこえ1.6以下", &FINE_D[2..]),
+            (Scale::Standard, "1以上3.5以下", &STANDARD_D),
+            (Scale::Standard, "3.5をこえ6.3以下", &STANDARD_D),
+            (Scale::Standard, "6.3をこえ10以下", &STANDARD_D),
+        ];
+        let mut want: Vec<(Scale, Band, Band)> = Vec::new();
+        for &(scale, m, ds) in printed {
+            for d in ds {
+                want.push((scale, label(m), label(d)));
+            }
+        }
+        let grades = |scale| match scale {
+            Scale::Fine => 0..=6u8,
+            Scale::Standard => 4..=12u8,
+        };
+        for scale in [Scale::Fine, Scale::Standard] {
+            for grade in grades(scale) {
+                let mut got: Vec<(Scale, Band, Band)> = table()
+                    .iter()
+                    .filter(|r| r.scale == scale && r.grade == grade)
+                    .map(|r| (r.scale, r.module, r.diameter))
+                    .collect();
+                let mut want: Vec<(Scale, Band, Band)> =
+                    want.iter().filter(|w| w.0 == scale).copied().collect();
+                let key = |x: &(Scale, Band, Band)| (x.1.lo, x.2.lo);
+                got.sort_by(|a, b| key(a).partial_cmp(&key(b)).unwrap());
+                want.sort_by(|a, b| key(a).partial_cmp(&key(b)).unwrap());
+                assert_eq!(got, want, "{scale:?} grade {grade}");
+            }
+        }
+    }
+
+    /// **Some on the closed hull of what is printed, None just outside it**, for
+    /// every class: at each band's edges and middle, a hair inside a held
+    /// edge reads the row and a hair past an edge no neighbour holds reads none.
+    #[test]
+    fn a_lookup_is_some_exactly_where_a_band_is_printed() {
+        let hair = 1e-9;
+        let held = |scale: Scale, grade: u8, m: f64, d: f64| {
+            table()
+                .iter()
+                .filter(|r| {
+                    r.scale == scale
+                        && r.grade == grade
+                        && r.module.contains(m)
+                        && r.diameter.contains(d)
+                })
+                .count()
+        };
+        for r in table() {
+            let class = Class {
+                scale: r.scale,
+                grade: r.grade,
+            };
+            let mid = |b: &Band| 0.5 * (b.lo + b.hi);
+            let (m, d) = (mid(&r.module), mid(&r.diameter));
+            assert_eq!(lookup(class, m, d), Some(r.error), "{class} {r:?}");
+            // Every point is held by at most one row.
+            for (mm, dd) in [
+                (r.module.hi, d),
+                (r.module.lo, d),
+                (m, r.diameter.hi),
+                (m, r.diameter.lo),
+            ] {
+                assert!(held(r.scale, r.grade, mm, dd) <= 1, "{class} m={mm} d={dd}");
+            }
+            // An edge the row holds reads the row; one it does not reads
+            // whatever holds it, and a hair inward reads the row.
+            for (mm, dd, holds) in [
+                (r.module.hi, d, r.module.hi_closed),
+                (r.module.lo, d, r.module.lo_closed),
+                (m, r.diameter.hi, r.diameter.hi_closed),
+                (m, r.diameter.lo, r.diameter.lo_closed),
+            ] {
+                if holds {
+                    assert_eq!(
+                        lookup(class, mm, dd),
+                        Some(r.error),
+                        "{class} m={mm} d={dd}"
+                    );
+                }
+            }
+            assert_eq!(lookup(class, r.module.lo + hair, d), Some(r.error));
+            assert_eq!(lookup(class, m, r.diameter.lo + hair), Some(r.error));
+            // Past an edge: some row of this class holds it, or none does and
+            // the lookup is None.
+            for (mm, dd) in [
+                (r.module.hi + hair, d),
+                (r.module.lo - hair, d),
+                (m, r.diameter.hi + hair),
+                (m, r.diameter.lo - hair),
+            ] {
+                assert_eq!(
+                    lookup(class, mm, dd).is_some(),
+                    held(r.scale, r.grade, mm, dd) == 1,
+                    "{class} m={mm} d={dd}"
+                );
+            }
+        }
+        // The hull's corners, as printed.
+        let fine0 = Class {
+            scale: Scale::Fine,
+            grade: 0,
+        };
+        let std4 = Class {
+            scale: Scale::Standard,
+            grade: 4,
+        };
+        assert!(lookup(fine0, 0.2, 1.5).is_some() && lookup(fine0, 1.6, 400.0).is_some());
+        assert!(lookup(fine0, 0.2 - hair, 1.5).is_none());
+        assert!(lookup(fine0, 0.2, 1.5 - hair).is_none());
+        assert!(lookup(fine0, 1.6 + hair, 400.0).is_none());
+        assert!(lookup(fine0, 1.6, 400.0 + hair).is_none());
+        assert!(lookup(std4, 1.0, 1.0).is_some() && lookup(std4, 10.0, 4000.0).is_some());
+        assert!(lookup(std4, 1.0 - hair, 100.0).is_none());
+        assert!(lookup(std4, 10.0 + hair, 100.0).is_none());
+        assert!(lookup(std4, 10.0, 4000.0 + hair).is_none());
+    }
+
+    /// A line the parser cannot read would be dropped from the table without
+    /// a word; this names it.
+    #[test]
+    fn every_data_line_parses() {
+        for (i, line) in data_lines().enumerate() {
+            assert!(parse_row(line).is_some(), "data line {i}: {line:?}");
+        }
+    }
+
+    /// **A printed edge belongs to the band that prints it closed.** The fine
+    /// table's blocks read `m0.2以上0.6以下`, `m0.6をこえ1以下`, `m1をこえ1.6以下`
+    /// and its diameter bands `1.5以上3以下`, `3をこえ6以下`, …: every band is
+    /// closed above, and only the m0.2–0.6 block's first band is closed below.
+    #[test]
+    fn every_printed_edge_reads_the_row_that_prints_it() {
+        let fine = |g| Class {
+            scale: Scale::Fine,
+            grade: g,
+        };
+        let standard = |g| Class {
+            scale: Scale::Standard,
+            grade: g,
+        };
+        let e = |a, b| {
+            Some(CompositeError {
+                tooth_to_tooth: a,
+                total: b,
+            })
+        };
+        let cases: &[(Class, f64, f64, Option<CompositeError>)] = &[
+            // m = 1 is the (0.6, 1] block, not (1, 1.6]
+            (fine(0), 1.0, 9.0, e(6.0, 18.0)),
+            (fine(0), 1.0, 20.0, e(6.7, 18.0)),
+            // m = 0.6 is the [0.2, 0.6] block
+            (fine(0), 0.6, 20.0, e(6.3, 18.0)),
+            // m = 1.6 closes the (1, 1.6] block
+            (fine(0), 1.6, 20.0, e(7.1, 20.0)),
+            (fine(0), 1.600_001, 20.0, None),
+            (fine(0), 0.2, 2.0, e(5.0, 13.0)),
+            (fine(0), 0.199_999, 2.0, None),
+            // d = 1.5 opens the first band closed; d = 3 closes it
+            (fine(0), 0.3, 1.5, e(5.0, 13.0)),
+            (fine(0), 0.3, 1.499_999, None),
+            (fine(0), 0.3, 3.0, e(5.0, 13.0)),
+            (fine(0), 0.3, 3.005, e(5.3, 16.0)),
+            (fine(0), 0.3, 6.005, e(5.6, 16.0)),
+            (fine(0), 0.3, 400.0, e(8.0, 24.0)),
+            (fine(0), 0.3, 400.005, None),
+            // the (0.6, 1] block opens at 3, not at or below it
+            (fine(0), 0.8, 3.0, None),
+            (fine(0), 0.8, 3.000_001, e(5.6, 16.0)),
+            (fine(0), 1.2, 6.0, None),
+            (fine(0), 1.2, 6.000_001, e(6.3, 18.0)),
+            // the standard scale, read (lo, hi] as ISO 1328:1975 prints it
+            (standard(4), 10.0, 100.0, e(10.0, 28.0)),
+            (standard(4), 10.000_001, 100.0, None),
+            (standard(4), 1.0, 100.0, e(7.0, 20.0)),
+            (standard(4), 0.999_999, 100.0, None),
+            (standard(4), 3.5, 100.0, e(7.0, 20.0)),
+            (standard(4), 6.3, 100.0, e(9.0, 25.0)),
+            (standard(4), 2.0, 125.0, e(7.0, 20.0)),
+            (standard(4), 2.0, 125.000_001, e(8.0, 22.0)),
+            (standard(4), 2.0, 4000.0, e(13.0, 36.0)),
+            (standard(4), 2.0, 4_000.000_001, None),
+        ];
+        let mut wrong = Vec::new();
+        for &(class, m, d, want) in cases {
+            let got = lookup(class, m, d);
+            if got != want {
+                wrong.push(format!("{class} m={m} d={d}: {got:?}, printed {want:?}"));
+            }
+        }
+        assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+        assert_eq!(default_class(10.0, 400.0), Some(standard(4)));
+        assert!(available_classes(1.6, 30.0).contains(&fine(0)));
     }
 
     // ---- transcription checks on the data file ---------------------- //
@@ -521,7 +783,7 @@ mod tests {
                 let mut b: Vec<(f64, f64)> = table()
                     .iter()
                     .filter(|r| r.scale == scale)
-                    .map(|r| (r.module.0, r.diameter.0))
+                    .map(|r| (r.module.lo, r.diameter.lo))
                     .collect();
                 b.sort_by(|a, b| a.partial_cmp(b).unwrap());
                 b.dedup();
@@ -530,11 +792,7 @@ mod tests {
             for (m, d) in bands {
                 let mut rows: Vec<&Row> = table()
                     .iter()
-                    .filter(|r| {
-                        r.scale == scale
-                            && (r.module.0 - m).abs() < 1e-12
-                            && (r.diameter.0 - d).abs() < 1e-12
-                    })
+                    .filter(|r| r.scale == scale && r.module.lo == m && r.diameter.lo == d)
                     .collect();
                 rows.sort_by_key(|r| r.grade);
                 for w in rows.windows(2) {
