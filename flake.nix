@@ -132,7 +132,12 @@
           pname = "gears-web";
           version = "0.3.0";
           src = ./web;
-          npmDepsHash = "sha256-W6AdF/o0PVk73zbMnrVfNroK8iohs/fPpZPmVbRwYls=";
+          # The dependencies are read from `web/package-lock.json` itself, each
+          # fetched by the integrity hash the lock already records, so the lock
+          # is the one statement of them: a version bump needs no second hash
+          # here to agree with it.
+          npmDeps = pkgs.importNpmLock { npmRoot = ./web; };
+          npmConfigHook = pkgs.importNpmLock.npmConfigHook;
 
           # The wasm stage already ran; skip the npm script that would rerun it
           # (cargo cannot reach the network inside the sandbox anyway).
