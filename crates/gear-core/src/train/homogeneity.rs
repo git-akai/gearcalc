@@ -17,7 +17,7 @@
 //! millimetre figures; the law scales them with the module, so it tests the
 //! model's homogeneity and not what the defaults should be.
 
-use super::arrangements::{hula, ravigneaux, worm_and_pair, Preset};
+use super::arrangements::Preset;
 use super::{solve_train, test_library, Duty, LoadCase, Train};
 use crate::params::Auto;
 
@@ -385,13 +385,7 @@ const PLANET_GAP_MM: f64 = 10.0;
 /// Each preset, and the arrangements no preset lays out, asked alone under
 /// the three cases above.
 fn trains() -> Vec<(String, Train)> {
-    let mut shapes: Vec<(String, super::Shape)> = Preset::ALL
-        .into_iter()
-        .map(|p| (format!("{p:?}"), p.build()))
-        .collect();
-    shapes.push(("worm and pair".into(), worm_and_pair((1, 40), (17, 43))));
-    shapes.push(("ravigneaux".into(), ravigneaux([18, 30], [22, 18], 62, 3)));
-    shapes.push(("hula".into(), hula([65, 61, 57, 61], [1.0, 1.0])));
+    let mut shapes = super::testing::arrangements();
     // Three inputs no preset reads at its defaults, given so the law reaches
     // them: a running distance, a thin rim, and a planet gap.
     let mut given = Preset::Spur.build();

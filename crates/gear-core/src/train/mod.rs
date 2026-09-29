@@ -47,6 +47,8 @@ use crate::params::{Auto, GearParams};
 use crate::tooth::Tooth;
 
 pub mod arrangements;
+#[cfg(test)]
+mod case_laws;
 mod conditions;
 pub mod crossed;
 mod edits;
@@ -62,6 +64,8 @@ mod preview;
 #[cfg(test)]
 mod rating_laws;
 pub mod shape;
+#[cfg(test)]
+mod testing;
 mod wiring;
 
 pub use conditions::{
@@ -2017,18 +2021,6 @@ impl std::fmt::Display for TrainError {
 }
 
 impl std::error::Error for TrainError {}
-
-/// **A preset asked alone**, as the tests ask one: a train of one, loaded at
-/// its conventional input and reacted at its output ([`Train::alone`]).
-#[cfg(test)]
-pub(super) fn solve_preset(
-    shape: &Shape,
-    torque: f64,
-    speed: f64,
-    lib: &MaterialLibrary,
-) -> Result<Alone, TrainError> {
-    solve_alone(&Train::alone(shape, torque, speed), lib)
-}
 
 /// A self-contained material library for tests, so `gear-core` keeps no
 /// dependency on `gear-io`. Shared by every preset's tests.
@@ -5021,6 +5013,7 @@ fn solve_parts(
 mod tests {
     use super::arrangements as arr;
     use super::*;
+    use crate::train::testing::{shapes, try_alone, try_alone_at};
 
     fn library() -> MaterialLibrary {
         super::test_library()
@@ -5610,7 +5603,6 @@ mod tests {
     #[test]
     fn the_search_beats_a_scan_of_the_same_interval() {
         use crate::auto::{Bounds, Pinned, Search};
-        let lib = library();
         let mut worst = 0.0_f64;
         for teeth in [[9_u32, 37], [12, 29]] {
             let stage = {
@@ -5653,7 +5645,7 @@ mod tests {
                     s.set_search(false);
                     s
                 };
-                solve_preset(&fixed, 2.0, 0.0, &lib)
+                try_alone(&fixed)
                     .ok()
                     .map(|r| r.meshes[0].efficiency.forward)
             };
@@ -5831,7 +5823,6 @@ mod tests {
     /// them and not the other it cost a second entry in `docs/corrections.md`.
     #[test]
     fn a_search_chooses_only_parts_its_tool_leaves_alone() {
-        let lib = library();
         let mut checked = 0u32;
         for sun in [11_u32, 13, 17, 19, 24, 31] {
             for planet in [14_u32, 17, 18, 21, 25] {
@@ -5839,7 +5830,7 @@ mod tests {
                 set.set_search(true);
                 set.members[0].gear.profile_shift = Auto::automatic(0.0);
                 set.members[2].gear.profile_shift = Auto::automatic(0.0);
-                let Ok(r) = solve_preset(&set, 2.0, 0.0, &lib) else {
+                let Ok(r) = try_alone(&set) else {
                     continue;
                 };
                 checked += 1;
@@ -5888,27 +5879,20 @@ mod tests {
     /// (`auto::searchable_shift`), so the sweep spans the answer by construction.
     #[test]
     fn a_given_distance_gets_the_gears_the_free_search_would_choose() {
-        let lib = library();
         for teeth in [[9_u32, 37], [17, 43], [12, 29], [23, 61]] {
             let stage = {
                 let mut s = arr::pair(teeth);
                 s.set_search(true);
                 s
             };
-            let free = solve_preset(&stage, 2.0, 0.0, &lib)
-                .expect("the pair solves with the distance free");
+            let free = try_alone(&stage).expect("the pair solves with the distance free");
 
             let at = |a: f64| {
-                solve_preset(
-                    &{
-                        let mut s = stage.clone();
-                        s.distances[0].distance = Auto::fixed(a);
-                        s
-                    },
-                    2.0,
-                    0.0,
-                    &lib,
-                )
+                try_alone(&{
+                    let mut s = stage.clone();
+                    s.distances[0].distance = Auto::fixed(a);
+                    s
+                })
                 .expect("...and with it given")
             };
 
@@ -5964,7 +5948,7 @@ mod tests {
                         s.members[0].gear.profile_shift =
                             Auto::fixed(-1.0 + 2.5 * f64::from(k) / 400.0);
                         s.set_search(false);
-                        let r = solve_preset(&s, 2.0, 0.0, &lib).ok()?;
+                        let r = try_alone(&s).ok()?;
                         let m = &r.meshes[0];
                         let kept = m.teeth_clear()
                             && m.line?.contact_ratios.transverse >= s.meshes[0].min_contact_ratio
@@ -6035,7 +6019,6 @@ mod tests {
     #[test]
     fn the_search_is_converged_not_budgeted() {
         use crate::auto::Search;
-        let lib = library();
         // Fourteen times the work: a sweep of 18 a side, four starts, nine times
         // the walk and a third of the stopping distance.
         let hard = Search::refined(3);
@@ -6093,7 +6076,7 @@ mod tests {
                     s.set_search(false);
                     s
                 };
-                solve_preset(&fixed, 2.0, 0.0, &lib).map(|r| r.meshes[0].efficiency.forward)
+                try_alone(&fixed).map(|r| r.meshes[0].efficiency.forward)
             };
             let (Ok(shipped), Ok(refined)) = (
                 at(&stage.shifts_at(&Search::SHIPPED)),
@@ -6431,9 +6414,8 @@ mod tests {
     /// absent from it.
     #[test]
     fn a_pair_that_transmits_nothing_still_has_its_flanks_pressed() {
-        let lib = library();
         let locked = arr::worm(17, 23).with_first_helix(9.0);
-        let r = solve_preset(&locked, 2.0, 0.0, &lib).expect("a locked pair is still a pair");
+        let r = try_alone(&locked).expect("a locked pair is still a pair");
         let r_point = &r.meshes[0];
         assert_eq!(
             r_point.efficiency.forward, 0.0,
@@ -6448,7 +6430,7 @@ mod tests {
         // presses about as hard, because the flank load comes from the input
         // torque either way and the geometry has not changed much.
         let driving = locked.clone().with_first_helix(18.0);
-        let d = solve_preset(&driving, 2.0, 0.0, &lib).expect("and this one");
+        let d = try_alone(&driving).expect("and this one");
         let d_point = &d.meshes[0];
         let ratio = r_point.cases[0].contact.max_pressure / d_point.cases[0].contact.max_pressure;
         assert!(
@@ -6552,7 +6534,6 @@ mod tests {
     /// ([`MeshReport::contact_ratio`]).
     #[test]
     fn the_two_contacts_report_one_patch_at_the_limit() {
-        let lib = library();
         // The table's rows: (μ, how near) at the pitch point, relative at
         // μ = 0 and in percent at μ = 0.08; and the peak, in percent.
         let ((_, pitch_free), (mu, pitch_friction_percent), peak_percent) =
@@ -6568,7 +6549,7 @@ mod tests {
             s.with_additional_helix(20.0)
         };
         let mesh = |sigma: f64, mu: f64| {
-            solve_preset(&stage(sigma, mu), 2.0, 0.0, &lib)
+            try_alone(&stage(sigma, mu))
                 .expect("a pair either way")
                 .meshes[0]
                 .clone()
@@ -6703,12 +6684,11 @@ mod tests {
     #[test]
     fn a_pair_rates_continuously_through_the_onset_of_interference() {
         use crate::contact::LoadSharing;
-        let lib = library();
         for sharing in [LoadSharing::None, LoadSharing::LinearRamp] {
             let figures: Vec<(f64, [f64; 5])> = (0..=600)
                 .map(|i| {
                     let x1 = -0.6 + 0.002 * f64::from(i);
-                    let r = solve_preset(&fixed_9_37(x1, sharing), 2.0, 1000.0, &lib)
+                    let r = try_alone_at(&fixed_9_37(x1, sharing), 2.0, 1000.0)
                         .unwrap_or_else(|e| panic!("x1={x1:.3} {sharing:?}: refused: {e}"));
                     let mesh = &r.meshes[0];
                     let bending = |i: usize| {
@@ -6754,15 +6734,13 @@ mod tests {
     /// note naming the member and how far, and a mesh that does not, none.
     #[test]
     fn flank_interference_is_said_by_the_mesh() {
-        let lib = library();
         let mut seen = 0;
         for i in 0..=60 {
             let x1 = -0.6 + 0.02 * f64::from(i);
-            let r = solve_preset(
+            let r = try_alone_at(
                 &fixed_9_37(x1, crate::contact::LoadSharing::None),
                 2.0,
                 1000.0,
-                &lib,
             )
             .unwrap_or_else(|e| panic!("x1={x1:.2}: refused: {e}"));
             let mesh = &r.meshes[0];
@@ -6791,7 +6769,6 @@ mod tests {
     /// (`contact::tests::the_path_starts_and_ends_on_usable_flank`).
     #[test]
     fn the_presets_whose_rings_are_held_are_the_ones_named() {
-        let lib = library();
         let as_typed = |p: arr::Preset| {
             let mut s = p.build();
             for m in &mut s.members {
@@ -6802,7 +6779,7 @@ mod tests {
         let held: Vec<arr::Preset> = arr::Preset::ALL
             .into_iter()
             .filter(|p| {
-                let r = solve_preset(&p.build(), 2.0, 1000.0, &lib).expect("a preset solves");
+                let r = try_alone_at(&p.build(), 2.0, 1000.0).expect("a preset solves");
                 r.members.iter().any(|m| {
                     m.notes
                         .iter()
@@ -6813,7 +6790,7 @@ mod tests {
         let interfering: Vec<arr::Preset> = arr::Preset::ALL
             .into_iter()
             .filter(|&p| {
-                let r = solve_preset(&as_typed(p), 2.0, 1000.0, &lib).expect("a preset solves");
+                let r = try_alone_at(&as_typed(p), 2.0, 1000.0).expect("a preset solves");
                 r.meshes
                     .iter()
                     .any(|m| m.flank_interference.contains(&true))
@@ -6843,12 +6820,11 @@ mod tests {
     /// gives is the same, and only the ring's own tooth is shorter.
     #[test]
     fn a_full_depth_ring_interferes_as_typed_and_is_held_to_the_form_circle() {
-        let lib = library();
         let solved = |held: bool| {
             let mut set = arr::planetary(12, 30, 72, 3);
             set.members[2].gear.addendum = 1.0;
             set.members[2].gear.no_tip_past_mate_flank = held;
-            solve_preset(&set, 2.0, 0.0, &lib).expect("the shipped set solves")
+            try_alone(&set).expect("the shipped set solves")
         };
         let typed = solved(false);
         let full_mesh = typed.meshes[1].clone();
@@ -6896,11 +6872,10 @@ mod tests {
     /// has, the held addendum is that ring's to the bit.
     #[test]
     fn a_held_ring_tip_is_the_lesser_of_typed_and_bound() {
-        let lib = library();
         let at = |typed: f64| {
             let mut set = arr::planetary(12, 30, 72, 3);
             set.members[2].gear.addendum = typed;
-            let r = solve_preset(&set, 2.0, 0.0, &lib).expect("the set solves");
+            let r = try_alone(&set).expect("the set solves");
             let held = r.members[2]
                 .notes
                 .iter()
@@ -6993,36 +6968,6 @@ mod tests {
             checked >= 2,
             "only {checked} parallel stages carried the load"
         );
-    }
-
-    /// **Every preset the menu offers, and the hula** — the core's own list
-    /// (`Preset::ALL`), so a preset added there is under every law
-    /// here by being on it, and the arrangement a designer reaches by edits
-    /// rather than a button. The hula's grounded ring is left automatic so
-    /// the relief laws have a shift to turn on it.
-    fn every_preset() -> Vec<Shape> {
-        let mut hula = hula_shape([65, 61, 57, 61]);
-        hula.members[2].gear.profile_shift = Auto::automatic(0.0);
-        Preset::ALL
-            .into_iter()
-            .map(super::arrangements::Preset::build)
-            .chain([hula])
-            .collect()
-    }
-
-    /// The presets and every arrangement the shape reaches with no button
-    /// of its own — for a law about every stage a document can write, which
-    /// the relief laws are: a Ravigneaux has three distances and relief has
-    /// to find each of them.
-    fn every_arrangement() -> Vec<Shape> {
-        use arrangements as arr;
-        let shape = |s| s;
-        let mut out = every_preset();
-        out.extend([
-            shape(arr::ravigneaux([18, 30], [22, 18], 62, 3)),
-            shape(arr::worm_and_pair((1, 40), (17, 43))),
-        ]);
-        out
     }
 
     /// **Every kind, at a spread of tooth counts and every arrangement** — the
@@ -7130,7 +7075,8 @@ mod tests {
                 "{name}: graph {graph} vs stage {want}"
             );
 
-            // --- every member's speed, and its speed against its own frame.
+            // --- every member's speed, and its speed against its own frame,
+            // signed.
             //
             // Solved at unit input speed, so the graph's speeds *are* the
             // stage's — which is the strongest form of this check: not a
@@ -7140,14 +7086,14 @@ mod tests {
                 let case = &g.cases[0];
                 let speed = m.values[shaft].to_f64();
                 assert!(
-                    (speed.abs() - case.speed.abs()).abs() < 1e-9 * case.speed.abs().max(1.0),
+                    (speed - case.speed).abs() < 1e-9 * case.speed.abs().max(1.0),
                     "{name}: member {i} graph {speed} vs stage {}",
                     case.speed
                 );
                 let frame = m.values[w.mounts[i].axis_fixed_in].to_f64();
                 let against = speed - frame;
                 assert!(
-                    (against.abs() - case.speed_against_carrier.abs()).abs()
+                    (against - case.speed_against_carrier).abs()
                         < 1e-9 * case.speed_against_carrier.abs().max(1.0),
                     "{name}: member {i} against its frame, graph {against} vs stage {}",
                     case.speed_against_carrier
@@ -8434,7 +8380,7 @@ mod tests {
     /// **A member's result carries the tooth it was cut with**, agreeing with
     /// every figure the result quotes beside it — so a gear tab that adopts
     /// the member shows the tooth the stage rated, and not a rebuild from the
-    /// inputs that could drift from it. On every preset, every member: the
+    /// inputs that could drift from it. On every arrangement, every member: the
     /// shift, the addendum and the helix in `params` are the ones in force,
     /// the count and module are the stage's, and a rack-cut member rebuilt
     /// from `params` alone is the reported pitch diameter; a ring is the
@@ -8443,11 +8389,11 @@ mod tests {
     fn a_members_result_carries_the_tooth_it_was_cut_with() {
         let lib = library();
         let mut checked = 0u32;
-        for stage in every_preset() {
+        for stage in shapes() {
             let t = train_of(vec![stage.clone()]);
             let r = solve_train(&t, &lib).expect("every preset solves");
             let inputs = stage.gears();
-            for (i, g) in r.by_part[0].members.iter().enumerate() {
+            for (i, g) in r.members.iter().enumerate() {
                 assert_eq!(
                     g.params.profile_shift, g.profile_shift,
                     "{stage:?} member {i}"
@@ -8485,7 +8431,7 @@ mod tests {
                 "which members {stage:?} cuts with a pinion cutter"
             );
         }
-        let members: usize = every_preset().iter().map(|s| s.gears().len()).sum();
+        let members: usize = shapes().iter().map(|s| s.gears().len()).sum();
         assert_eq!(checked, u32::try_from(members).unwrap());
     }
 
@@ -8500,7 +8446,7 @@ mod tests {
     /// group bites.
     #[test]
     fn every_declared_freedom_names_an_input_the_shape_has() {
-        for stage in every_arrangement() {
+        for stage in shapes() {
             let has: Vec<Freedom> = stage.toggles().into_iter().map(|(f, _)| f).collect();
             for g in &stage.freedoms() {
                 assert!(
@@ -8539,7 +8485,7 @@ mod tests {
     /// everything pinned, everything freed, and each single toggle turned.
     #[test]
     fn relief_is_idempotent_from_any_start() {
-        for stage in every_arrangement() {
+        for stage in shapes() {
             let all = stage.toggles();
             let mut starts = vec![stage.clone()];
             for auto in [false, true] {
@@ -8599,6 +8545,75 @@ mod tests {
         }
     }
 
+    /// **A given input moved by a step the solve can follow**, each kind by
+    /// its own: small beside the preset's value, large beside a solve's
+    /// resolution.
+    fn nudge(f: Freedom, a: &mut Auto<f64>) {
+        match f {
+            Freedom::Distance(_) => a.manual += 0.2,
+            Freedom::Clearance(_) => a.manual += 0.01,
+            Freedom::Overlap(_) => a.manual += 0.1,
+            Freedom::Member(_, MemberFreedom::PitchDiameter) => a.manual *= 1.05,
+            Freedom::Member(_, MemberFreedom::Shift) => a.manual += 0.05,
+            Freedom::Member(_, MemberFreedom::Helix) => a.manual += 2.0,
+            Freedom::Member(_, MemberFreedom::FaceWidth) => a.manual += 1.0,
+            Freedom::Member(_, MemberFreedom::ThicknessMod) => a.manual += 0.1,
+            // Small: a layshaft's pairs share one distance, and a module
+            // moved a tenth is further than the others' shifts can follow.
+            Freedom::Member(_, MemberFreedom::Module) => a.manual *= 1.002,
+            Freedom::Member(_, MemberFreedom::PressureAngle) => a.manual += 0.2,
+        }
+    }
+
+    /// Every kind of freedom, by name: what a sweep over freedoms reports
+    /// it reached.
+    const FREEDOM_KINDS: [&str; 10] = [
+        "Distance",
+        "Clearance",
+        "Overlap",
+        "Shift",
+        "Helix",
+        "PitchDiameter",
+        "FaceWidth",
+        "ThicknessMod",
+        "Module",
+        "PressureAngle",
+    ];
+
+    fn kind_of(f: Freedom) -> &'static str {
+        match f {
+            Freedom::Distance(_) => "Distance",
+            Freedom::Clearance(_) => "Clearance",
+            Freedom::Overlap(_) => "Overlap",
+            Freedom::Member(_, m) => match m {
+                MemberFreedom::Shift => "Shift",
+                MemberFreedom::Helix => "Helix",
+                MemberFreedom::PitchDiameter => "PitchDiameter",
+                MemberFreedom::FaceWidth => "FaceWidth",
+                MemberFreedom::ThicknessMod => "ThicknessMod",
+                MemberFreedom::Module => "Module",
+                MemberFreedom::PressureAngle => "PressureAngle",
+            },
+        }
+    }
+
+    /// `stage` with every input pinned at what the stage solved to, as the
+    /// panel seeds a box a designer pins — so pinning everything pins the
+    /// design the stage already was, not a distance of nought.
+    fn pinned_as_solved(stage: &Shape, lib: &MaterialLibrary) -> Shape {
+        let solved =
+            solve_train(&train_of(vec![stage.clone()]), lib).expect("every arrangement solves");
+        let mut pinned = stage.clone();
+        for (f, _) in stage.toggles() {
+            let a = pinned.input_mut(f).expect("its own input");
+            if let Some(v) = solved.figure(f) {
+                a.manual = v;
+            }
+            a.auto = false;
+        }
+        pinned
+    }
+
     /// **After relief, every given input in a relation is read** — the
     /// property the machinery exists for, asked of the solve rather than of
     /// the declaration. Everything is pinned, relief decides what may stand,
@@ -8623,22 +8638,9 @@ mod tests {
                 .chain(r.members.iter().map(|g| g.pitch_diameter))
                 .collect()
         };
-        let nudge = |f: Freedom, a: &mut Auto<f64>| match f {
-            Freedom::Distance(_) => a.manual += 0.2,
-            Freedom::Clearance(_) => a.manual += 0.01,
-            Freedom::Overlap(_) => a.manual += 0.1,
-            Freedom::Member(_, MemberFreedom::PitchDiameter) => a.manual *= 1.05,
-            Freedom::Member(_, MemberFreedom::Shift) => a.manual += 0.05,
-            Freedom::Member(_, MemberFreedom::Helix) => a.manual += 2.0,
-            Freedom::Member(_, MemberFreedom::FaceWidth) => a.manual += 1.0,
-            Freedom::Member(_, MemberFreedom::ThicknessMod) => a.manual += 0.1,
-            // Small: a layshaft's pairs share one distance, and a module
-            // moved a tenth is further than the others' shifts can follow.
-            Freedom::Member(_, MemberFreedom::Module) => a.manual *= 1.002,
-            Freedom::Member(_, MemberFreedom::PressureAngle) => a.manual += 0.2,
-        };
         let mut checked = 0u32;
-        for stage in every_preset() {
+        let mut unread: Vec<String> = Vec::new();
+        for (name, stage) in crate::train::testing::arrangements() {
             // Every box seeded with what the preset came to, as the panel
             // seeds a box a designer pins — so pinning everything pins the
             // design the preset already was, not a distance of nought.
@@ -8666,7 +8668,9 @@ mod tests {
             let tips_hold = |stage: &Shape, d: usize| {
                 let t = train_of(vec![stage.clone()]);
                 let r = solve_train(&t, &lib).expect("the nudged preset solves");
-                r.by_part[0].distances[d].sized_by.is_some()
+                r.distances[d]
+                    .as_ref()
+                    .is_some_and(|x| x.sized_by.is_some())
             };
             for f in mentioned(&settled) {
                 let mut moved = settled.clone();
@@ -8681,14 +8685,162 @@ mod tests {
                     }
                 }
                 let after = signature(&moved);
-                assert!(
-                    base.iter().zip(&after).any(|(x, y)| (x - y).abs() > 1e-9),
-                    "{f:?} stands given on {settled:?} and the solve does not read it"
-                );
+                let named = format!("{name} {f:?}");
+                if !base.iter().zip(&after).any(|(x, y)| (x - y).abs() > 1e-9)
+                    && !unread.contains(&named)
+                {
+                    unread.push(named);
+                }
                 checked += 1;
             }
         }
         assert!(checked >= 12, "only {checked} given inputs were checked");
+        // Given inputs relief leaves standing beside a closure that already
+        // spends what would read them — a planet–planet clearance beside the
+        // shift the sun's distance takes, a worm's shift beside its pinned
+        // distance: T10.9's, and [`UNHONOURED`] lists them too.
+        assert_eq!(
+            unread,
+            ["Ravigneaux Clearance(2)", "WormAndPair Member(0, Shift)"],
+            "stand given and are not read"
+        );
+    }
+
+    /// **Whether note `n` names both `asked` and `reached`**: two of its
+    /// values read, at the digits each is printed to, as the two figures.
+    fn names_both(n: &Note, asked: f64, reached: f64) -> bool {
+        let reads = |v: &str, x: f64| {
+            let digits = v.split_once('.').map_or(0, |(_, d)| d.len());
+            v.parse::<f64>().is_ok() && format!("{x:.digits$}") == v
+        };
+        let values: Vec<&String> = n.values.values().collect();
+        values.iter().any(|a| reads(a, asked)) && values.iter().any(|r| reads(r, reached))
+    }
+
+    /// Where a given input the relief law nudges is neither the figure the
+    /// solve reached nor named by a note beside the figure it reached:
+    /// arrangement and freedom, each with the task that clears it. The law
+    /// fails on an entry that passes as well as on one missing, so the list
+    /// only shrinks.
+    const UNHONOURED: &[(&str, &str, &str)] = &[
+        // A second mesh's overlap ratio, given where a first sets the helix:
+        // the note names the ratio asked and not the one reached.
+        ("Idler", "Overlap(1)", "T10.11"),
+        ("Planetary", "Overlap(1)", "T10.11"),
+        ("Wolfrom", "Overlap(1)", "T10.11"),
+        ("Compound", "Overlap(1)", "T10.11"),
+        ("MeshedPlanets", "Overlap(1)", "T10.11"),
+        ("MeshedPlanets", "Overlap(2)", "T10.11"),
+        ("Ravigneaux", "Overlap(1)", "T10.11"),
+        ("Ravigneaux", "Overlap(2)", "T10.11"),
+        ("Ravigneaux", "Overlap(3)", "T10.11"),
+        // A given shift or distance relief leaves standing where the solve
+        // spends it on a closure, or refuses the shape it leaves.
+        ("Worm", "Distance(0)", "T10.9"),
+        ("Worm", "Member(0, Shift)", "T10.9"),
+        ("WormAndPair", "Distance(0)", "T10.9"),
+        ("WormAndPair", "Member(0, Shift)", "T10.9"),
+        ("Wolfrom", "Member(2, Shift)", "T10.9"),
+        ("MeshedPlanets", "Distance(1)", "T10.9"),
+        ("Ravigneaux", "Clearance(2)", "T10.9"),
+        ("MeshedPlanets", "Member(0, ThicknessMod)", "T10.4"),
+        // A clearance the tips hold open, said by `sized_by` and no note.
+        ("Planocentric", "Clearance(0)", "T10.10"),
+        ("Hula", "Clearance(0)", "T10.10"),
+    ];
+
+    /// **A given input is honoured** — the stronger half of the relief law
+    /// ([`every_input_relief_leaves_given_is_honoured_by_the_solve`] is the
+    /// structural one). Every input pinned at what the arrangement solved
+    /// to, one freedom `f` nudged, and relief asked with `just = f`, which
+    /// keeps `f` given: the solve then reaches `f`'s typed value, or a note
+    /// names both the value asked and the value reached — a note alone is
+    /// physics, not a failure, where the model cannot reach what was asked
+    /// and says so. On every arrangement of the grid, every input it has.
+    ///
+    /// Reached means within [`HONOURED`], the distance a solve for a given
+    /// figure lands on it (`distance_notes`' `REACHED`), relative to the
+    /// figure where it exceeds one.
+    #[test]
+    fn a_given_input_is_honoured() {
+        const HONOURED: f64 = 1e-6;
+        let lib = library();
+        let mut kinds: Vec<&str> = Vec::new();
+        let mut unhonoured: Vec<(String, String, String)> = Vec::new();
+        let (mut checked, mut freed) = (0u32, 0u32);
+        for (name, stage) in crate::train::testing::arrangements() {
+            let pinned = pinned_as_solved(&stage, &lib);
+            for (f, _) in stage.toggles() {
+                let mut moved = pinned.clone();
+                nudge(f, moved.input_mut(f).expect("its own input"));
+                let asked = moved.input_mut(f).expect("its own input").manual;
+                let mut relieved = moved.relieved(Some(f));
+                // An input the shape cannot read at all is freed whatever
+                // relief is asked to keep — a crossed pair's ratio — and
+                // stands given nowhere to be honoured.
+                if relieved.input_mut(f).expect("its own input").auto {
+                    freed += 1;
+                    continue;
+                }
+                let t = train_of(vec![relieved]);
+                let solved = solve_train(&t, &lib);
+                let detail = match &solved {
+                    Ok(r) => format!(
+                        "asked {asked} reached {:?} notes {:?}",
+                        r.figure(f),
+                        r.parts
+                            .iter()
+                            .flat_map(|p| &p.notes)
+                            .map(|n| (&n.key, &n.values))
+                            .collect::<Vec<_>>()
+                    ),
+                    Err(e) => format!("asked {asked}: {e:?}"),
+                };
+                let honoured = match solved {
+                    Ok(r) => {
+                        let Some(reached) = r.figure(f) else {
+                            panic!("{name}: {f:?} has no figure");
+                        };
+                        let close = (reached - asked).abs() <= HONOURED * asked.abs().max(1.0);
+                        close
+                            || r.parts
+                                .iter()
+                                .flat_map(|p| &p.notes)
+                                .any(|n| names_both(n, asked, reached))
+                    }
+                    // A refusal names no figure reached.
+                    Err(_) => false,
+                };
+                if !honoured {
+                    unhonoured.push((name.clone(), format!("{f:?}"), detail));
+                }
+                if !kinds.contains(&kind_of(f)) {
+                    kinds.push(kind_of(f));
+                }
+                checked += 1;
+            }
+        }
+        // Every kind of freedom is reached.
+        for k in FREEDOM_KINDS {
+            assert!(kinds.contains(&k), "no arrangement nudged a {k}: {kinds:?}");
+        }
+        let listed = |a: &str, f: &str| UNHONOURED.iter().any(|(x, g, _)| (*x, *g) == (a, f));
+        let new: Vec<_> = unhonoured
+            .iter()
+            .filter(|(a, f, _)| !listed(a, f))
+            .collect();
+        let cleared: Vec<_> = UNHONOURED
+            .iter()
+            .filter(|(x, g, _)| {
+                !unhonoured
+                    .iter()
+                    .any(|(a, f, _)| (a.as_str(), f.as_str()) == (*x, *g))
+            })
+            .collect();
+        assert!(
+            new.is_empty() && cleared.is_empty(),
+            "of {checked} given inputs ({freed} freed), not honoured and not listed: {new:?}; listed and now honoured: {cleared:?}"
+        );
     }
 
     /// **The reading relief leaves standing is the reading the solve reads.**
@@ -8894,7 +9046,7 @@ mod tests {
     /// undo a design that was never over-determined.
     #[test]
     fn an_over_determined_shape_relieves_to_its_limit_and_keeps_what_was_just_pinned() {
-        for stage in every_arrangement() {
+        for stage in shapes() {
             let mut over = stage.clone();
             for f in mentioned(&stage) {
                 if let Some(a) = over.input_mut(f) {
@@ -8970,7 +9122,7 @@ mod tests {
             let x = stage.shifts();
             // What the solve reports of the teeth it built at those shifts —
             // a tip held off its mate's flank reaches past nothing.
-            let Ok(r) = solve_preset(&stage, 2.0, 0.0, &library()) else {
+            let Ok(r) = try_alone(&stage) else {
                 continue;
             };
             checked += 1;
@@ -9106,18 +9258,6 @@ mod tests {
                     "{automatic} left automatic, at most {} allowed: {group:?}",
                     group.automatic_at_most
                 );
-                // `just` is spared **wherever sparing it leaves an answer**.
-                // A group whose only input is the one being touched has none,
-                // and the planetary's clearance is exactly that: with no
-                // distance to derive it from, asking for it to be derived has
-                // no answer and the toggle snapping back is the tool saying so.
-                let could_spare = group.order.len() > group.automatic_at_most + 1;
-                if could_spare {
-                    assert!(
-                        fixed.input_mut(*just).is_some_and(|a| a.auto),
-                        "{just:?} was just set automatic and something else could have given"
-                    );
-                }
                 checked += 1;
             }
         }
@@ -9809,7 +9949,6 @@ mod tests {
     /// exactly.
     #[test]
     fn an_automatic_profile_shift_follows_the_dedendum() {
-        let lib = library();
         let shift_of = |dedendum: f64, working: Auto<f64>| {
             let stage = {
                 let mut s = arr::pair([15, 43]);
@@ -9820,10 +9959,7 @@ mod tests {
                 s.members[0].gear.profile_shift = Auto::automatic(0.0);
                 s
             };
-            solve_preset(&stage, 2.0, 0.0, &lib)
-                .expect("a solvable stage")
-                .members[0]
-                .profile_shift
+            try_alone(&stage).expect("a solvable stage").members[0].profile_shift
         };
 
         // Deeper teeth, more shift. A law: undercut is a question about how far
@@ -9881,7 +10017,6 @@ mod tests {
     /// division is gated in `mesh.rs`.
     #[test]
     fn a_parallel_pair_is_rated_at_the_centre_distance_it_runs_at() {
-        let lib = library();
         let stage = |clearance: f64| {
             let mut s = arr::pair([17, 43]);
             s.distances[0].clearance = Auto::fixed(clearance);
@@ -9889,7 +10024,7 @@ mod tests {
         };
         let mut previous: Option<(f64, f64)> = None;
         for clearance in [0.0_f64, 0.02, 0.1, 0.3] {
-            let r = solve_preset(&stage(clearance), 2.0, 0.0, &lib).unwrap();
+            let r = try_alone(&stage(clearance)).unwrap();
             let eps = r.meshes[0].line.unwrap().contact_ratios.transverse;
             let bending = r.members[0].cases[0]
                 .bending_stress
@@ -9912,8 +10047,7 @@ mod tests {
 
     #[test]
     fn a_spur_pair_has_exactly_zero_overlap_and_a_helical_one_does_not() {
-        let lib = library();
-        let spur = solve_preset(&arr::pair([17, 43]), 2.0, 0.0, &lib).unwrap();
+        let spur = try_alone(&arr::pair([17, 43])).unwrap();
         assert_eq!(
             spur.meshes[0].line.unwrap().contact_ratios.overlap,
             0.0,
@@ -9929,13 +10063,7 @@ mod tests {
             .contact_ratios
             .has_full_axial_overlap());
 
-        let helical = solve_preset(
-            &arr::pair([17, 43]).with_additional_helix(20.0),
-            2.0,
-            0.0,
-            &lib,
-        )
-        .unwrap();
+        let helical = try_alone(&arr::pair([17, 43]).with_additional_helix(20.0)).unwrap();
         assert!(helical.meshes[0].line.unwrap().contact_ratios.overlap > 0.0);
         assert!(
             helical.meshes[0].line.unwrap().contact_ratios.total
@@ -9995,7 +10123,6 @@ mod tests {
 
     #[test]
     fn the_automatic_face_width_is_the_larger_of_the_enabled_checks() {
-        let lib = library();
         let off = ByKind {
             ultimate: false,
             fatigue: false,
@@ -10006,7 +10133,7 @@ mod tests {
                 g.face_width = Auto::automatic(0.0);
                 g.face_sources = sources;
             }
-            solve_preset(&s, 2.0, 0.0, &lib).unwrap().members[0].face_width
+            try_alone(&s).unwrap().members[0].face_width
         };
         // One source at a time, then every combination of them: the width is the
         // largest of whatever is enabled, and that is the whole rule.
@@ -10347,7 +10474,7 @@ mod tests {
                     // The tip width alone is the bound under study.
                     g.no_tip_past_mate_flank = false;
                 }
-                let r = solve_preset(&stage, 2.0, 0.0, &library()).unwrap();
+                let r = try_alone(&stage).unwrap();
 
                 for i in 0..2 {
                     let built = Tooth::new(stage.params_of(i, stage.shifts()[i]));
@@ -10430,8 +10557,8 @@ mod tests {
             };
         }
 
-        let spur_r = solve_preset(&spur, 2.0, 0.0, &lib).unwrap();
-        let set_r = solve_preset(&set, 2.0, 0.0, &lib).unwrap();
+        let spur_r = try_alone(&spur).unwrap();
+        let set_r = try_alone(&set).unwrap();
         let hula_r = solve_hula(&hula, 2.0, 0.0, &lib).unwrap();
 
         let members: Vec<&GearResult> = spur_r
@@ -10497,7 +10624,6 @@ mod tests {
     #[test]
     fn the_sharing_model_reaches_every_member_that_bends() {
         use crate::contact::LoadSharing;
-        let lib = library();
         // Tall enough that every mesh is above `ε_n = 2` **where it runs**,
         // on counts large enough that the tall tips stay on usable flank: a
         // path cut by interference falls back below the band.
@@ -10532,8 +10658,8 @@ mod tests {
             // flank keeps them below the band, where the ramp is the unshared
             // rating by construction. Its members bend through the same
             // `Bending::of` as the set's planet and ring.
-            let s = solve_preset(&spur, 2.0, 0.0, &lib).unwrap();
-            let p = solve_preset(&set, 2.0, 0.0, &lib).unwrap();
+            let s = try_alone(&spur).unwrap();
+            let p = try_alone(&set).unwrap();
             let mut out: Vec<(String, Option<f64>)> = Vec::new();
             for (i, g) in s.members.iter().enumerate() {
                 out.push((format!("spur {i}"), g.cases[0].bending_stress));
@@ -10697,8 +10823,8 @@ mod tests {
         each(
             "pair's",
             (1_967, 1_968, 4_912, 0),
-            &|| drop(solve_preset(&on, 2.0, 0.0, &lib).unwrap()),
-            &|| drop(solve_preset(&off, 2.0, 0.0, &lib).unwrap()),
+            &|| drop(try_alone(&on).unwrap()),
+            &|| drop(try_alone(&off).unwrap()),
         );
 
         let set = |search: bool| {
@@ -10712,8 +10838,8 @@ mod tests {
         each(
             "epicyclic set's",
             (2_710, 2_711, 7_525, 3_983),
-            &|| drop(solve_preset(&on, 2.0, 0.0, &lib).unwrap()),
-            &|| drop(solve_preset(&off, 2.0, 0.0, &lib).unwrap()),
+            &|| drop(try_alone(&on).unwrap()),
+            &|| drop(try_alone(&off).unwrap()),
         );
 
         let drive = |search: bool| {
@@ -10762,7 +10888,7 @@ mod tests {
             s
         };
         each("pair's", 80, &|| {
-            solve_preset(&pair, 2.0, 0.0, &lib).unwrap();
+            try_alone(&pair).unwrap();
         });
 
         let mut set = arr::planetary(12, 30, 72, 3);
@@ -10770,7 +10896,7 @@ mod tests {
         set.members[0].gear.profile_shift = Auto::automatic(0.0);
         set.members[2].gear.profile_shift = Auto::automatic(0.0);
         each("epicyclic set's", 400, &|| {
-            solve_preset(&set, 2.0, 0.0, &lib).unwrap();
+            try_alone(&set).unwrap();
         });
 
         let mut drive = hula_shape([65, 61, 57, 61]);
@@ -10810,7 +10936,10 @@ mod tests {
         };
         let mut last = f64::INFINITY;
         let mut fell = false;
-        for k in 0..=8 {
+        let mut uncuttable = 0;
+        // Up to ρ = 0.5: on 9/37 a round from 0.45 cannot be cut at any
+        // shift, so both branches below are taken.
+        for k in 0..=10 {
             let rho = f64::from(k) * 0.05;
             let s = stage(rho);
             let x = s.shifts();
@@ -10827,6 +10956,7 @@ mod tests {
                     plain.set_search(false);
                     plain.shifts()
                 });
+                uncuttable += 1;
                 continue;
             }
             // **To the search's own stopping distance**, not to the bit. The
@@ -10843,6 +10973,10 @@ mod tests {
             last = sum;
         }
         assert!(fell, "the round never bound the shift at all");
+        assert!(
+            uncuttable > 0,
+            "no round was out of reach: the fallback went unasked"
+        );
     }
 
     /// The efficiency toggle is **additive**: a stage that never asked for it
@@ -10862,12 +10996,7 @@ mod tests {
             "the toggle should move the pair off its undercut floor, {tuned:?} from {plain:?}"
         );
         // ...and where it moves it, the pair loses less than it did.
-        let lib = library();
-        let loss = |on: bool| {
-            1.0 - solve_preset(&stage(on), 2.0, 0.0, &lib).unwrap().meshes[0]
-                .efficiency
-                .forward
-        };
+        let loss = |on: bool| 1.0 - try_alone(&stage(on)).unwrap().meshes[0].efficiency.forward;
         assert!(
             loss(true) < loss(false),
             "optimised loss {:.5} should beat the undercut minimum {:.5}",
@@ -10951,8 +11080,7 @@ mod tests {
     /// the play they asked for.
     #[test]
     fn the_clearance_is_taken_by_whatever_is_free_to_absorb_it() {
-        let lib = library();
-        let free = solve_preset(&arr::pair([17, 43]), 2.0, 0.0, &lib).unwrap();
+        let free = try_alone(&arr::pair([17, 43])).unwrap();
         // A housing the pair can actually meet: a clearance inside it is the
         // distance the automatic solve already closes to.
         let asked = free.distances[0].nominal[0] + 0.05;
@@ -10974,7 +11102,7 @@ mod tests {
         // 0.05: a centre distance is the true distance and a clearance is what
         // portion of it is clearance, so the pair cannot run 0.05 mm wide of its
         // own nominal and report none.
-        let pinned = solve_preset(&at(false), 2.0, 0.0, &lib).unwrap();
+        let pinned = try_alone(&at(false)).unwrap();
         assert!(
             (pinned.distances[0].clearance
                 - (pinned.distances[0].running - pinned.distances[0].nominal[0]))
@@ -10991,7 +11119,7 @@ mod tests {
         );
 
         // The shifts free: they take it, and the backlash is the one asked for.
-        let chosen = solve_preset(&at(true), 2.0, 0.0, &lib).unwrap();
+        let chosen = try_alone(&at(true)).unwrap();
         assert!((chosen.distances[0].clearance - 0.05).abs() < 1e-12);
         assert!(
             (chosen.distances[0].running - asked).abs() < 1e-9,
@@ -11006,17 +11134,12 @@ mod tests {
 
         // And with the distance automatic it is read either way, as it always was.
         for on in [false, true] {
-            let r = solve_preset(
-                &{
-                    let mut s = arr::pair([17, 43]);
-                    s.set_search(on);
-                    s.distances[0].clearance = Auto::fixed(0.05);
-                    s
-                },
-                2.0,
-                0.0,
-                &lib,
-            )
+            let r = try_alone(&{
+                let mut s = arr::pair([17, 43]);
+                s.set_search(on);
+                s.distances[0].clearance = Auto::fixed(0.05);
+                s
+            })
             .unwrap();
             assert!((r.distances[0].clearance - 0.05).abs() < 1e-12);
         }
@@ -11027,8 +11150,7 @@ mod tests {
     /// up to the housing it was given, and only their split is free.
     #[test]
     fn a_given_centre_distance_still_sets_the_distance() {
-        let lib = library();
-        let free = solve_preset(&arr::pair([17, 43]), 2.0, 0.0, &lib).unwrap();
+        let free = try_alone(&arr::pair([17, 43])).unwrap();
         let asked = free.distances[0].nominal[0] + 0.4;
         let stage = {
             let mut s = arr::pair([17, 43]);
@@ -11036,7 +11158,7 @@ mod tests {
             s.distances[0].distance = Auto::fixed(asked);
             s
         };
-        let r = solve_preset(&stage, 2.0, 0.0, &lib).unwrap();
+        let r = try_alone(&stage).unwrap();
         assert!(
             (r.distances[0].running - asked).abs() < 1e-9,
             "asked for {asked}, ran at {}",
@@ -11138,21 +11260,15 @@ mod tests {
     /// which is what the specification requires and what changes the backlash.
     #[test]
     fn a_manual_centre_distance_ignores_the_clearance() {
-        let lib = library();
-        let auto = solve_preset(&arr::pair([17, 43]), 2.0, 0.0, &lib).unwrap();
+        let auto = try_alone(&arr::pair([17, 43])).unwrap();
 
         // The same distance, set by hand, with a clearance that must be ignored.
-        let manual = solve_preset(
-            &{
-                let mut s = arr::pair([17, 43]);
-                s.distances[0].distance = Auto::fixed(auto.distances[0].nominal[0]);
-                s.distances[0].clearance = Auto::fixed(0.5);
-                s
-            },
-            2.0,
-            0.0,
-            &lib,
-        )
+        let manual = try_alone(&{
+            let mut s = arr::pair([17, 43]);
+            s.distances[0].distance = Auto::fixed(auto.distances[0].nominal[0]);
+            s.distances[0].clearance = Auto::fixed(0.5);
+            s
+        })
         .unwrap();
 
         assert!((manual.distances[0].running - auto.distances[0].nominal[0]).abs() < 1e-12);
@@ -11172,7 +11288,6 @@ mod tests {
     /// one of the two widths and leaves the other alone.
     #[test]
     fn a_material_override_changes_the_answer() {
-        let lib = library();
         let off = ByKind {
             ultimate: false,
             fatigue: false,
@@ -11184,7 +11299,7 @@ mod tests {
                 g.face_sources = sources;
                 g.material_overrides = o;
             }
-            solve_preset(&s, 2.0, 0.0, &lib).unwrap()
+            try_alone(&s).unwrap()
         };
         let contact_only = |kind: CaseKind| FaceSources {
             bending: off,
@@ -11256,7 +11371,6 @@ mod tests {
     /// Overriding the modulus moves contact stress, and by the right law.
     #[test]
     fn overriding_the_modulus_moves_contact_stress_as_the_square_root() {
-        let lib = library();
         let at = |e: Option<f64>| {
             let mut s = arr::pair([17, 43]);
             for g in s.members.iter_mut().map(|m| &mut m.gear) {
@@ -11265,7 +11379,7 @@ mod tests {
                     ..Default::default()
                 };
             }
-            solve_preset(&s, 2.0, 0.0, &lib).unwrap().meshes[0].cases[0]
+            try_alone(&s).unwrap().meshes[0].cases[0]
                 .contact
                 .at_pitch_point
         };
@@ -11281,7 +11395,7 @@ mod tests {
     fn an_unknown_material_is_named_rather_than_swallowed() {
         let mut s = arr::pair([17, 43]);
         s.members[0].gear.material = "unobtainium".into();
-        let e = solve_preset(&s, 2.0, 0.0, &library()).unwrap_err();
+        let e = try_alone(&s).unwrap_err();
         assert!(matches!(e, TrainError::UnknownMaterial(ref n) if n == "unobtainium"));
         assert!(e.to_string().contains("unobtainium"));
     }
@@ -11439,12 +11553,12 @@ mod tests {
     /// do, and it is false in both directions if either gear is sized alone.
     #[test]
     fn an_automatic_face_width_satisfies_every_enabled_rating_of_both_gears() {
-        let lib = library();
         let weak = |x: f64| Overrides {
             ultimate_allowable: Some(x),
             fatigue_allowable: Some(x),
             ..Default::default()
         };
+        let mut asked = 0;
         // A matched pair, then each gear in turn made much weaker than the
         // other, so whichever gear governs the mesh is the one that changes.
         for over in [
@@ -11456,33 +11570,42 @@ mod tests {
             for (g, o) in stage.members.iter_mut().map(|m| &mut m.gear).zip(over) {
                 g.face_width = Auto::automatic(0.0);
                 g.material_overrides = o;
+                // Every rating sizes the width, so every one is asked below:
+                // contact sizes none by default.
+                g.face_sources = FaceSources {
+                    bending: ByKind {
+                        ultimate: true,
+                        fatigue: true,
+                    },
+                    contact: ByKind {
+                        ultimate: true,
+                        fatigue: true,
+                    },
+                };
             }
-            let r = solve_preset(&stage, 2.0, 0.0, &lib).unwrap();
+            let r = try_alone(&stage).unwrap();
             let effective = r.members[0].face_width.min(r.members[1].face_width);
             assert!(effective > 0.0);
 
             for (i, g) in r.members.iter().enumerate() {
-                let sources = &stage.members[i].gear.face_sources;
                 // Every case, whatever its kind: the width answers to all of them.
                 for (case, kind) in g.cases.iter().zip(CaseKind::BOTH) {
                     let asks = case.min_face_width;
-                    if *sources.contact.get(kind) {
-                        if let Some(c) = asks.contact {
-                            assert!(
-                                effective >= c * (1.0 - 1e-9),
-                                "gear {i} {kind:?} contact needs {c} mm, mesh carries {effective}"
-                            );
-                        }
-                    }
-                    if let (true, Some(b)) = (*sources.bending.get(kind), asks.bending) {
+                    for (source, needs) in [("contact", asks.contact), ("bending", asks.bending)] {
+                        let needs = needs.unwrap_or_else(|| {
+                            panic!("gear {i} {kind:?}: {source} asks for no width")
+                        });
                         assert!(
-                            effective >= b * (1.0 - 1e-9),
-                            "gear {i} {kind:?} bending needs {b} mm, mesh carries {effective}"
+                            effective >= needs * (1.0 - 1e-9),
+                            "gear {i} {kind:?} {source} needs {needs} mm, mesh carries {effective}"
                         );
+                        asked += 1;
                     }
                 }
             }
         }
+        // Three pairs, two gears, two cases, two ratings each.
+        assert_eq!(asked, 3 * 2 * 2 * 2);
     }
 
     /// **The two gears of a mesh are rated at different *points*, not at
@@ -11502,7 +11625,6 @@ mod tests {
     /// own end of the path, and an allowable moves a width and never a stress.
     #[test]
     fn the_two_gears_of_a_mesh_are_rated_at_different_points() {
-        let lib = library();
         // At a **fixed** width: an automatic one is inverted from the stress, so
         // it lands the stress on the allowable and hides the material.
         let solved = |auto: bool, over: [Overrides; 2]| {
@@ -11515,7 +11637,7 @@ mod tests {
                 };
                 g.material_overrides = o;
             }
-            solve_preset(&s, 2.0, 0.0, &lib).unwrap()
+            try_alone(&s).unwrap()
         };
         let modulus = |e: f64| Overrides {
             elastic_modulus: Some(e),
@@ -12459,30 +12581,32 @@ mod a_path_is_what_it_crosses {
         }
     }
 
-    /// **A path holds at rest where no mesh of it does.** A hula at the
-    /// reductions its studies run at circulates enough power that its whole
-    /// flow cannot break away backwards, though neither of its meshes locks.
-    /// The path says so exactly — nought, not a rounding's width above it,
-    /// which is what it said before breaking away was asked of the whole
-    /// flow — and `tools/breakaway.py` derives the same with the sign kept.
+    /// **A path holds at rest where no mesh of it does.** The Wolfrom
+    /// preset, every mesh sliding at μ = 0.05: at a static μ of 0.05 it
+    /// back-drives, well clear of nought; at a static μ of 0.10 its whole
+    /// flow cannot break away backwards — nought exactly — while each mesh
+    /// alone still back-drives, so the hold is the whole flow's.
+    /// `tools/breakaway.py` derives the same with the sign kept.
     #[test]
     fn a_path_holds_at_rest_where_no_mesh_does() {
-        let lib = test_library();
-        let mut held = 0;
-        for n in [12_u32, 18, 30, 50] {
-            let hula = super::arrangements::hula([n + 1, n, n - 1, n], [1.0, 1.0]);
-            let r =
-                solve_alone(&Train::alone(&hula, 2.0, 3000.0).arranged(&[2], 1, 3), &lib).unwrap();
-            let e = r.efficiency.unwrap();
-            if e.locked().backward {
-                assert_eq!(e.backward, 0.0, "z {n}: locked is nought, exactly");
-                assert!(
-                    r.meshes.iter().all(|m| !m.efficiency.locked().backward),
-                    "z {n}: a mesh locks, so this is not the whole flow's doing"
-                );
-                held += 1;
+        const SLIDING: f64 = 0.05;
+        let at_rest = |statik: f64| {
+            let mut s = super::arrangements::Preset::Wolfrom.build();
+            for m in &mut s.meshes {
+                m.sliding_friction = SLIDING;
+                m.static_friction = statik;
             }
-        }
-        assert!(held > 0, "no study holds at rest: the law is vacuous");
+            crate::train::testing::alone(&s)
+        };
+        let free = at_rest(SLIDING);
+        let e = free.efficiency.unwrap();
+        assert!(e.backward > 0.1, "at μ_s = μ it back-drives: {e:?}");
+        let held = at_rest(2.0 * SLIDING);
+        let e = held.efficiency.unwrap();
+        assert_eq!(e.backward, 0.0, "the whole flow holds, nought exactly");
+        assert!(
+            held.meshes.iter().all(|m| m.efficiency.backward > 0.0),
+            "no mesh of it locks alone"
+        );
     }
 }

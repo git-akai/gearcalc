@@ -309,19 +309,12 @@ fn a_pointed_tooth_under_load_sharing_is_a_number() {
     }
 }
 
-/// The presets, the hula and the arrangements no button reaches.
+/// The grid's arrangements ([`super::testing::shapes`]), and a
+/// planocentric at a wider tooth difference.
 fn every_arrangement() -> Vec<super::Shape> {
-    use super::arrangements as arr;
-    Preset::ALL
-        .into_iter()
-        .map(Preset::build)
-        .chain([
-            arr::hula([65, 61, 57, 61], [1.0, 1.0]),
-            arr::ravigneaux([18, 30], [22, 18], 62, 3),
-            arr::worm_and_pair((1, 40), (17, 43)),
-            arr::planocentric(52, 56),
-        ])
-        .collect()
+    let mut out = super::testing::shapes();
+    out.push(super::arrangements::planocentric(52, 56));
+    out
 }
 
 /// **Every bending figure is absent or positive**, on every preset and

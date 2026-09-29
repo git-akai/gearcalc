@@ -171,6 +171,8 @@ mod tests {
     //! it changes nothing; and the headline path kept, lost or found.
 
     use super::super::arrangements::Preset;
+    use super::super::offers::Target;
+    use super::super::testing::{grid, Context};
     use super::super::{test_library, Edit, LoadCase, Piece, Place};
     use super::*;
 
@@ -274,5 +276,82 @@ mod tests {
         let p = preview(&t, Ok(&u), &lib);
         assert_eq!(keys(&p.paths), [key::PREVIEW_PATH_NEW]);
         assert_eq!(keys(&p.changes), [key::PREVIEW_HOLDS]);
+    }
+
+    /// **A preview says what its edit does, on every train of the grid**
+    /// alone and after a pair (a layshaft after it adds pieces and no new
+    /// kind of edit): the first offer of each kind of edit at every piece, previewed
+    /// against the edit made independently — the refusal alone where it is
+    /// refused; otherwise a count note for exactly the kinds of piece whose
+    /// count moves, "nothing" exactly where the train is unchanged, and
+    /// "unsolved" exactly where the edited train does not solve.
+    #[test]
+    fn a_preview_says_what_its_edit_does_on_every_train() {
+        let lib = test_library();
+        let (mut refused, mut made) = (0, 0);
+        let trains: Vec<(String, Train)> = grid()
+            .into_iter()
+            .filter(|e| e.context != Context::BeforeLayshaft)
+            .map(|e| (e.name.clone(), e.train()))
+            .collect();
+        for (name, t) in trains.iter() {
+            let s = &t.shape;
+            let targets = std::iter::once(Target::Train)
+                .chain((0..s.members.len()).map(Target::Member))
+                .chain((0..s.meshes.len()).map(Target::Mesh))
+                .chain(s.bodies.iter().map(|b| Target::Body(b.body)))
+                .chain((0..s.axes.len()).map(Target::Axis))
+                .chain((0..s.distances.len()).map(Target::Distance))
+                .chain((0..s.couplings.len()).map(Target::Coupling));
+            let mut seen: Vec<std::mem::Discriminant<Edit>> = Vec::new();
+            for at in targets {
+                for offer in t.offers(at) {
+                    let kind = std::mem::discriminant(&offer.edit);
+                    if seen.contains(&kind) {
+                        continue;
+                    }
+                    seen.push(kind);
+                    let mut u = t.clone();
+                    let edited = u.edit(offer.edit.clone());
+                    let context = format!("{name}: {:?}", offer.edit);
+                    let p = preview(t, edited.map(|()| &u), &lib);
+                    if let Err(why) = edited {
+                        assert_eq!(p.refused, Some(Note::new(why.key())), "{context}");
+                        assert!(
+                            p.changes.is_empty() && p.paths.is_empty() && p.unsolved.is_none(),
+                            "{context}: {p:?}"
+                        );
+                        refused += 1;
+                        continue;
+                    }
+                    let moved: Vec<&str> = KINDS
+                        .iter()
+                        .zip(counts(t).into_iter().zip(counts(&u)))
+                        .filter(|(_, (was, now))| was != now)
+                        .map(|(k, _)| *k)
+                        .collect();
+                    let said: Vec<&str> = keys(&p.changes)
+                        .into_iter()
+                        .filter(|k| *k != key::PREVIEW_NOTHING)
+                        .collect();
+                    assert_eq!(said, moved, "{context}");
+                    assert_eq!(
+                        keys(&p.changes).contains(&key::PREVIEW_NOTHING),
+                        unchanged(t, &u),
+                        "{context}"
+                    );
+                    assert_eq!(
+                        p.unsolved.is_some(),
+                        solve_train(&u, &lib).is_err(),
+                        "{context}"
+                    );
+                    made += 1;
+                }
+            }
+        }
+        assert!(
+            refused > 0 && made > trains.len(),
+            "{refused} refused, {made} made"
+        );
     }
 }

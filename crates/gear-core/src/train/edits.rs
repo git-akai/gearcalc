@@ -1078,13 +1078,9 @@ mod tests {
     //! it refuses whole, and what it renumbers the train follows.
 
     use super::super::arrangements::{self as arr, Preset};
+    use super::super::testing::{alone, grid};
     use super::super::{solve_train, test_library as library, LoadCase, LoadRole, Shape, Train};
     use super::*;
-
-    fn conventionally(shape: &Shape) -> crate::train::Alone {
-        crate::train::solve_alone(&Train::alone(shape, 2.0, 3000.0), &library())
-            .unwrap_or_else(|e| panic!("{e}: {shape:?}"))
-    }
 
     /// The shape asked with `held` held, loaded at `input` and reacted at
     /// `output` — its slots, as a train of one numbers them.
@@ -1190,7 +1186,7 @@ mod tests {
                 let mut shape = base.clone();
                 self::edit(&mut shape, edit.clone())
                     .unwrap_or_else(|e| panic!("{preset:?} {edit:?}: {e}"));
-                let r = conventionally(&shape);
+                let r = alone(&shape);
                 assert!(
                     r.ratio.is_some_and(f64::is_finite),
                     "{preset:?} after {edit:?}: {:?}",
@@ -1742,21 +1738,12 @@ mod tests {
 
     // ------------------------------------------------ the graph's edits ---
 
-    /// Every preset alone, and as a train's second part — whose members,
-    /// meshes, distances and axes are not the graph's by the same index.
+    /// Every train of the grid, uncased: these laws are about the graph.
     fn trains() -> Vec<(String, Train)> {
-        let mut out = Vec::new();
-        for p in Preset::ALL {
-            out.push((
-                format!("{p:?}"),
-                Train::chained(vec![p.build()], |_| Vec::new()),
-            ));
-            out.push((
-                format!("spur then {p:?}"),
-                Train::chained(vec![Preset::Spur.build(), p.build()], |_| Vec::new()),
-            ));
-        }
-        out
+        grid()
+            .into_iter()
+            .map(|e| (e.name.clone(), e.uncased()))
+            .collect()
     }
 
     fn debug(t: &Train) -> String {
@@ -1764,7 +1751,7 @@ mod tests {
     }
 
     /// **Every gear the graph admits is refused whole, or undoes.** On
-    /// every preset alone and as a second part, a gear meshing every
+    /// every train of the grid, a gear meshing every
     /// member, on a new axis, a new body of every axis and every body, as
     /// a ring and not: refused, the train is as it was; made, the graph
     /// has nothing hanging, the train solves or says why, and the gear
@@ -1871,8 +1858,8 @@ mod tests {
     }
 
     /// **A removal takes what goes with it and leaves nothing hanging**:
-    /// every member, mesh, axis, body and coupling of every preset alone
-    /// and as a second part, taken out — refused, the train as it was;
+    /// every member, mesh, axis, body and coupling of every train of the
+    /// grid, taken out — refused, the train as it was;
     /// made, something gone and nothing left hanging, the train solving
     /// or saying why.
     #[test]

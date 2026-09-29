@@ -450,29 +450,13 @@ mod tests {
     //! of it said once — as a step, an idle branch, or inside a junction.
 
     use super::super::arrangements::Preset;
-    use super::super::{solve_train, test_library, LoadCase, Shape};
+    use super::super::testing::trains;
+    use super::super::{solve_train, test_library, LoadCase};
     use super::*;
-
-    fn trains() -> Vec<(String, Train)> {
-        let mut out = Vec::new();
-        for a in Preset::ALL {
-            for b in [None, Some(Preset::Spur), Some(Preset::Layshaft)] {
-                let presets: Vec<Shape> = std::iter::once(a.build())
-                    .chain(b.map(Preset::build))
-                    .collect();
-                let t = Train::chained(presets, |t| {
-                    t.chain_ends()
-                        .map(|(x, y)| vec![LoadCase::ultimate(x, y, 1.0, 1000.0)])
-                        .unwrap_or_default()
-                });
-                out.push((format!("{a:?} then {b:?}"), t));
-            }
-        }
-        out
-    }
 
     #[test]
     fn every_mesh_is_at_one_centre_and_every_body_on_one_axis() {
+        let mut checked = 0;
         for (name, t) in trains() {
             let g = t.groupings();
             let mut meshes: Vec<usize> = g.centres.iter().flat_map(|c| c.meshes.clone()).collect();
@@ -491,7 +475,9 @@ mod tests {
             let mut all: Vec<usize> = t.shape.bodies.iter().map(|b| b.body).collect();
             all.sort_unstable();
             assert_eq!(bodies, all, "{name}");
+            checked += 1;
         }
+        assert_eq!(checked, trains().len());
     }
 
     /// **A case that does not solve calls no mesh idle.** A layshaft's
@@ -520,16 +506,18 @@ mod tests {
     }
 
     /// **A case's flow says every body once and every mesh once**
-    /// ([`says_everything_once`]) on every preset alone and chained on.
+    /// ([`says_everything_once`]) on every train of the grid, each of which
+    /// solves.
     #[test]
     fn a_flow_says_every_body_and_every_mesh_once() {
         let lib = test_library();
+        let mut checked = 0;
         for (name, t) in trains() {
-            let Ok(r) = solve_train(&t, &lib) else {
-                continue;
-            };
+            let r = solve_train(&t, &lib).unwrap_or_else(|e| panic!("{name}: {e}"));
             says_everything_once(&t, &r).unwrap_or_else(|e| panic!("{name}: {e}"));
+            checked += r.cases.len();
         }
+        assert_eq!(checked, 2 * trains().len());
     }
 
     /// **A part whose ends are all held is still said** — the hunter's

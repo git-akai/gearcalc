@@ -218,7 +218,8 @@ In rough order of what has actually caught things.
 3. **Prefer a law to a threshold.** A bound taken from a measurement records
    where the sweep stopped, not a fact about the thing.
 4. **Turn every axis, in every context it reaches.** `tests/common/mod.rs` is one
-   grid with every input nameable. A control turned on a lone gear and left at
+   grid with every input nameable, and `train/testing.rs` is the train's:
+   every arrangement alone, after a pair and before a layshaft. A control turned on a lone gear and left at
    its default wherever it meets a mate is untested.
 5. **Before trusting a new gate, run it against the broken code.**
    `git worktree add` a detached HEAD, copy the test in, watch it fail. A gate

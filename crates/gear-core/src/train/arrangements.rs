@@ -960,6 +960,7 @@ mod tests {
     use super::super::shape::ShapeResult;
     use super::super::test_library as library;
     use super::*;
+    use crate::train::testing::alone;
 
     /// The arrangement asked with `held` held, loaded at `input` and
     /// reacted at `output` — its slots, as a train of one numbers them.
@@ -969,14 +970,6 @@ mod tests {
             &library(),
         )
         .unwrap()
-    }
-
-    /// The arrangement as its list reads: the first ring held, the first
-    /// body not held driven, the next the output — what a preset does with
-    /// nothing stated, which is the claim each list's doc makes.
-    fn conventionally(shape: &Shape) -> crate::train::Alone {
-        crate::train::solve_alone(&crate::train::Train::alone(shape, 2.0, 3000.0), &library())
-            .unwrap()
     }
 
     /// Every mesh on every distance runs at that distance, opened by the
@@ -1084,7 +1077,7 @@ mod tests {
             vec![17, 20, 25, 43],
             vec![31, 19, 23, 29, 13],
         ] {
-            let r = conventionally(&line(&teeth));
+            let r = alone(&line(&teeth));
             let n = teeth.len();
             let sense = if n % 2 == 0 { -1.0 } else { 1.0 };
             let want = sense * f64::from(teeth[n - 1]) / f64::from(teeth[0]);
@@ -1132,7 +1125,7 @@ mod tests {
     fn a_wolfrom_set_reduces_by_the_ring_difference() {
         // Carrier in, first ring held, second ring out: i = z_r2 / (z_r2 − z_r1).
         let shape = wolfrom(18, [60, 61], 3);
-        let r = conventionally(&shape);
+        let r = alone(&shape);
         assert!(
             (r.ratio.unwrap() - 61.0).abs() < 1e-12,
             "{}",
@@ -1148,7 +1141,7 @@ mod tests {
         // planet: ω_r2 − ω_c = (ω_s − ω_c) · (−z_s/z_p1) · (z_p2/z_r2).
         let (zs, zp1, zr1, zp2, zr2) = (24, 18, 60, 17, 59);
         let shape = stepped(zs, [zp1, zp2], [zr1, zr2], 3);
-        let r = conventionally(&shape);
+        let r = alone(&shape);
         let e1 = -f64::from(zs) / f64::from(zp1) * f64::from(zp1) / f64::from(zr1);
         let e2 = -f64::from(zs) / f64::from(zp1) * f64::from(zp2) / f64::from(zr2);
         // With ring 1 held, ω_c/ω_s = e1/(e1 − 1); then ω_r2 = ω_c + e2(ω_s − ω_c).
@@ -1168,7 +1161,7 @@ mod tests {
         // Carrier in, ring held, the planet's own turn out.
         for (zp, zr) in [(30, 33), (40, 42)] {
             let shape = planocentric(zp, zr);
-            let r = conventionally(&shape);
+            let r = alone(&shape);
             let want = -f64::from(zr - zp) / f64::from(zp);
             assert!(
                 (1.0 / r.ratio.unwrap() - want).abs() < 1e-12,
@@ -1272,7 +1265,7 @@ mod tests {
         // Sun in, ring held, carrier out: 1 − z_r/z_s, negative.
         let (zs, zr) = (24, 96);
         let shape = meshed_planets(zs, [18, 18], zr, 3);
-        let r = conventionally(&shape);
+        let r = alone(&shape);
         assert!(
             (r.ratio.unwrap() - (1.0 - f64::from(zr) / f64::from(zs))).abs() < 1e-12,
             "{}",
@@ -1329,7 +1322,7 @@ mod tests {
         for preset in Preset::ALL {
             let shape = preset.build();
             assert_eq!(shape.family(), preset.family(), "{preset:?}");
-            let r = conventionally(&shape);
+            let r = alone(&shape);
             assert!(
                 r.ratio.is_some_and(|x| x.is_finite() && x != 0.0),
                 "{preset:?}"

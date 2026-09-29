@@ -233,59 +233,31 @@ impl Train {
 #[allow(clippy::unwrap_used)]
 mod tests {
     //! **An offer is its edit, and every edit is offered.** Sound: on every
-    //! piece of every preset alone and after a pair, an offer is refused
+    //! piece of every train of the grid, an offer is refused
     //! exactly where its edit is, and made it changes the train and leaves
     //! nothing hanging. Complete: every edit a brute-force sweep finds the
     //! train makes — every gear at every mate and place, every move, join,
     //! hold, removal, ratio, step, coupling and stage at every index — is
     //! offered at the piece it names.
 
-    use super::super::{
-        solve_train, test_library, CaseKind, LoadCase, LoadRole, Shape, TrainError,
-    };
+    use super::super::testing::{cased, grid, Context, SPEED_RPM as SPEED, TORQUE_NM as TORQUE};
+    use super::super::{solve_train, test_library, CaseKind, LoadRole, TrainError};
     use super::*;
     use std::panic::{catch_unwind, AssertUnwindSafe};
 
-    /// The figures of the panel's fresh case: a load small enough that
-    /// every preset's teeth carry it, at a speed that counts cycles.
-    const TORQUE: f64 = 0.1;
-    const SPEED: f64 = 30_000.0;
-
-    /// **A train as the panel starts it**: its presets chained, an
-    /// ultimate and a fatigue case between the chain's two ends.
-    fn cased(stages: Vec<Shape>) -> Train {
-        Train::chained(stages, |t| {
-            t.chain_ends()
-                .map(|(a, b)| {
-                    vec![
-                        LoadCase::ultimate(a, b, TORQUE, SPEED),
-                        LoadCase::fatigue(a, b, TORQUE, SPEED),
-                    ]
-                })
-                .unwrap_or_default()
-        })
-    }
-
-    /// Every preset alone and after a pair, spur and with its first gear's
-    /// helix given, each with its conventional cases.
+    /// Every train of the grid ([`super::super::testing`]), and alone and
+    /// after a pair each with its first gear's helix given.
     fn trains() -> Vec<(String, Train)> {
         let mut out = Vec::new();
-        for p in Preset::ALL {
-            for before in [None, Some(Preset::Spur)] {
-                for helix in [None, Some(20.0)] {
-                    let last = p.build();
-                    let last = helix.map_or(last.clone(), |b| last.with_first_helix(b));
-                    let stages: Vec<Shape> = before
-                        .map(Preset::build)
-                        .into_iter()
-                        .chain(std::iter::once(last))
-                        .collect();
-                    out.push((
-                        format!("{p:?} after {before:?}, helix {helix:?}"),
-                        cased(stages),
-                    ));
-                }
+        for e in grid() {
+            out.push((e.name.clone(), e.train()));
+            if e.context == Context::BeforeLayshaft {
+                continue;
             }
+            out.push((
+                format!("{}, helix 20", e.name),
+                e.train_of(e.shape.clone().with_first_helix(20.0)),
+            ));
         }
         out
     }

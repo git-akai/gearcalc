@@ -4702,6 +4702,7 @@ mod tests {
     use crate::planetary::{Arrangement, PlanetaryShaft};
     use crate::train::arrangements as arr;
     use crate::train::test_library;
+    use crate::train::testing::{try_alone, try_alone_at};
 
     /// How far a set's two meshes disagree about the one distance, from the
     /// zero-backlash distances it reports, each opened by the clearance its
@@ -4709,16 +4710,6 @@ mod tests {
     fn residual(r: &ShapeResult) -> f64 {
         let d = &r.distances[0];
         ((d.nominal[0] + d.clearance) - (d.nominal[1] - d.clearance)).abs()
-    }
-
-    /// A set through the shape, under its convention or a boundary.
-    fn solve_set(
-        set: &Shape,
-        torque: f64,
-        speed: f64,
-        lib: &MaterialLibrary,
-    ) -> Result<crate::train::Alone, TrainError> {
-        crate::train::solve_alone(&crate::train::Train::alone(set, torque, speed), lib)
     }
 
     /// **A crossed distance is built as the point-contact model**, and the
@@ -4731,7 +4722,7 @@ mod tests {
             s
         }] {
             assert!(shape.is_crossed(0) && shape.screw(0).is_ok());
-            let r = solve_set(&shape, 2.0, 3000.0, &test_library()).unwrap();
+            let r = try_alone_at(&shape, 2.0, 3000.0).unwrap();
             assert!(r.meshes[0].point.is_some());
             assert_eq!(r.members.len(), 2);
             assert!(
@@ -4840,9 +4831,8 @@ mod tests {
     /// planet's count moves the ratio not at all.
     #[test]
     fn one_more_tooth_moves_the_ratio_as_the_graph_says() {
-        let lib = test_library();
         let pair = arr::pair([17, 43]);
-        let r = solve_set(&pair, 2.0, 3000.0, &lib).unwrap();
+        let r = try_alone_at(&pair, 2.0, 3000.0).unwrap();
         let per = |i: usize| r.ratio_per_tooth.as_ref().unwrap()[i].unwrap();
         assert!((per(1) + 44.0 / 17.0).abs() < 1e-12);
         assert!((per(0) + 43.0 / 18.0).abs() < 1e-12);
@@ -4851,7 +4841,7 @@ mod tests {
             "a pair passes it all once"
         );
         let set = arr::planetary(12, 30, 72, 3);
-        let r = solve_set(&set, 2.0, 3000.0, &lib).unwrap();
+        let r = try_alone_at(&set, 2.0, 3000.0).unwrap();
         assert!((r.ratio.unwrap() - 7.0).abs() < 1e-12);
         let per = |i: usize| r.ratio_per_tooth.as_ref().unwrap()[i].unwrap();
         assert!(
@@ -4868,11 +4858,10 @@ mod tests {
         );
         // A tooth that locks the stage is no figure: a Wolfrom's held ring
         // brought level with its output ring stops the output.
-        let wolfrom = solve_set(
+        let wolfrom = try_alone_at(
             &super::super::arrangements::wolfrom(18, [60, 61], 3),
             2.0,
             3000.0,
-            &lib,
         )
         .unwrap();
         // Members: the planet, ring 1, ring 2.
@@ -5232,8 +5221,7 @@ mod tests {
                 }
                 s
             };
-            let r =
-                solve_set(&stage, 2.0, 0.0, &lib).unwrap_or_else(|e| panic!("face {face}: {e}"));
+            let r = try_alone(&stage).unwrap_or_else(|e| panic!("face {face}: {e}"));
             let b = stage
                 .build_at(
                     &r.members
@@ -5293,7 +5281,6 @@ mod tests {
     /// looking at one mesh, which is exactly what the first draft of this did.
     #[test]
     fn a_planets_root_answers_to_both_of_its_meshes() {
-        let lib = test_library();
         let mut sun_won = false;
         let mut ring_won = false;
         for ring_face in [10.0_f64, 3.0] {
@@ -5302,8 +5289,7 @@ mod tests {
                 s.members[2].gear.face_width = Auto::fixed(ring_face);
                 s
             };
-            let r = solve_set(&stage, 2.0, 0.0, &lib)
-                .unwrap_or_else(|e| panic!("ring face {ring_face}: {e}"));
+            let r = try_alone(&stage).unwrap_or_else(|e| panic!("ring face {ring_face}: {e}"));
             let got = r.members[1].cases[0]
                 .bending_stress
                 .expect("a planet has a root section");
@@ -5385,7 +5371,6 @@ mod tests {
     /// here is.
     #[test]
     fn a_ring_with_no_notch_costs_its_bending_rather_than_the_set() {
-        let lib = test_library();
         for k in [1.3_f64, 1.4, 1.5, 1.7] {
             let stage = {
                 let mut s = arr::planetary(12, 30, 72, 3);
@@ -5395,7 +5380,7 @@ mod tests {
                 }
                 s
             };
-            let r = solve_set(&stage, 2.0, 0.0, &lib)
+            let r = try_alone(&stage)
                 .unwrap_or_else(|e| panic!("k={k}: the set should still solve, got {e}"));
 
             assert!(
@@ -5432,13 +5417,7 @@ mod tests {
     }
 
     fn solved(sun: u32, planet: u32, ring: u32) -> crate::train::Alone {
-        solve_set(
-            &set_of(sun, planet, ring, 0.0),
-            2.0,
-            3000.0,
-            &test_library(),
-        )
-        .unwrap()
+        try_alone_at(&set_of(sun, planet, ring, 0.0), 2.0, 3000.0).unwrap()
     }
 
     /// **With a distance given, only one shift is free** — asserted against what
@@ -5457,16 +5436,15 @@ mod tests {
     /// -wired to the wrong number.
     #[test]
     fn a_given_distance_leaves_a_set_one_free_shift() {
-        let lib = super::super::test_library();
         let base = arr::planetary(12, 30, 72, 3);
-        let free = solve_set(&base, 2.0, 0.0, &lib).expect("the shipped set solves");
+        let free = try_alone(&base).expect("the shipped set solves");
         let asked = free.distances[0].running + 0.1;
 
         // One shift given — the ring's, as the shipped set has it — and every
         // given number stands.
         let mut one = base.clone();
         one.distances[0].distance = Auto::fixed(asked);
-        let r = solve_set(&one, 2.0, 0.0, &lib).expect("one free shift is enough");
+        let r = try_alone(&one).expect("one free shift is enough");
         assert!((r.distances[0].running - asked).abs() < 1e-9);
         assert!(
             (r.members[2].profile_shift - one.members[2].gear.profile_shift.manual).abs() < 1e-12
@@ -5481,8 +5459,7 @@ mod tests {
         // and the planet both decided.
         let mut two = one.clone();
         two.members[0].gear.profile_shift = Auto::fixed(r.members[0].profile_shift + 0.25);
-        let over = solve_set(&two, 2.0, 0.0, &lib)
-            .expect("it still builds; it just cannot honour everything");
+        let over = try_alone(&two).expect("it still builds; it just cannot honour everything");
         assert!((over.distances[0].running - asked).abs() < 1e-9);
         assert!(
             (over.members[0].profile_shift - two.members[0].gear.profile_shift.manual).abs() < 1e-9
@@ -5547,16 +5524,15 @@ mod tests {
     /// untouched, since with one freedom left it is the freedom.
     #[test]
     fn a_set_runs_at_the_centre_distance_it_was_given() {
-        let lib = super::super::test_library();
         let base = arr::planetary(12, 30, 72, 3);
-        let free = solve_set(&base, 2.0, 0.0, &lib).expect("the shipped set solves");
+        let free = try_alone(&base).expect("the shipped set solves");
 
         let mut checked = 0u32;
         for step in -2..=4 {
             let asked = free.distances[0].running + 0.2 * f64::from(step);
             let mut stage = base.clone();
             stage.distances[0].distance = Auto::fixed(asked);
-            let Ok(r) = solve_set(&stage, 2.0, 0.0, &lib) else {
+            let Ok(r) = try_alone(&stage) else {
                 // A distance no set can reach is refused, not answered — which
                 // is the honest end of the range rather than a gap in it.
                 continue;
@@ -5624,14 +5600,13 @@ mod tests {
         // where they always were, which is why the running distance stays at
         // the ideal 21 to well under a micron while the two zero-backlash
         // distances part by twice the clearance.
-        let lib = test_library();
         let mut exact = set_of(24, 18, 60, 0.0);
         exact.distances[0].clearance = Auto::fixed(0.0);
         // The closure alone, here and below: this ring's flank falls short
         // of its tip at x 0, and asked for no undercut it would be shifted
         // out to reach it.
         exact.members[2].gear.no_undercut = false;
-        let exact = solve_set(&exact, 2.0, 0.0, &lib).unwrap();
+        let exact = try_alone(&exact).unwrap();
         assert!(exact.members[1].profile_shift.abs() < 1e-12);
         assert!(exact.distances[0]
             .nominal
@@ -5641,7 +5616,7 @@ mod tests {
         let ideal = {
             let mut set = set_of(24, 18, 60, 0.0);
             set.members[2].gear.no_undercut = false;
-            solve_set(&set, 2.0, 3000.0, &lib).unwrap()
+            try_alone_at(&set, 2.0, 3000.0).unwrap()
         };
         let c = ideal.distances[0].clearance;
         assert!(c > 0.0, "the shipped set has a running clearance");
@@ -5668,7 +5643,6 @@ mod tests {
     /// designer gave is not the solve's to move.
     #[test]
     fn whichever_shift_is_left_automatic_is_the_one_that_closes_the_set() {
-        let lib = test_library();
         let base = arr::planetary(12, 30, 72, 3);
         // The shifts the default set settles at, so each variant below asks for
         // values a set of these counts can actually be built at.
@@ -5690,7 +5664,7 @@ mod tests {
                 Role::Absorbs(0),
                 "the member left automatic should be the one that absorbs"
             );
-            let r = solve_set(&s, 2.0, 0.0, &lib)
+            let r = try_alone(&s)
                 .unwrap_or_else(|e| panic!("{absorber:?} could not close the set: {e:?}"));
 
             // The equality actually closed...
@@ -5740,10 +5714,7 @@ mod tests {
         // panel relieves it as it is created, and a document that reaches
         // this state is refused with the distances' own reason.
         assert!(role_of(&s).iter().all(|r| *r == Role::Given));
-        assert_eq!(
-            solve_set(&s, 2.0, 0.0, &test_library()).err(),
-            Some(TrainError::NoCommonDistance)
-        );
+        assert_eq!(try_alone(&s).err(), Some(TrainError::NoCommonDistance));
         s.members[2].gear.profile_shift = Auto::automatic(0.0);
         assert_eq!(
             role_of(&s)[2],
@@ -5906,9 +5877,8 @@ mod tests {
     /// came from — so it needs saying separately.
     #[test]
     fn both_meshes_contribute_to_the_output_backlash() {
-        let lib = test_library();
         let base = set_of(24, 18, 60, 0.0);
-        let tight = solve_set(&base, 2.0, 0.0, &lib).unwrap();
+        let tight = try_alone(&base).unwrap();
 
         // More clearance opens both meshes, so the output must loosen.
         let loose = {
@@ -5916,7 +5886,7 @@ mod tests {
             s.distances[0].clearance = Auto::fixed(base.distances[0].clearance.manual + 0.05);
             s
         };
-        let loose = solve_set(&loose, 2.0, 0.0, &lib).unwrap();
+        let loose = try_alone(&loose).unwrap();
         assert!(
             loose.backlash.unwrap().forward.nominal > tight.backlash.unwrap().forward.nominal,
             "{} should exceed {}",
@@ -5934,7 +5904,7 @@ mod tests {
         let b = &tight.backlash.unwrap().forward;
         assert!(b.minimum <= b.nominal && b.nominal <= b.maximum);
         let off = set_of(24, 18, 61, 0.0);
-        let off = solve_set(&off, 2.0, 0.0, &lib).unwrap();
+        let off = try_alone(&off).unwrap();
         let b = &off.backlash.unwrap().forward;
         assert!(
             b.minimum < b.nominal && b.nominal < b.maximum,
@@ -5952,7 +5922,7 @@ mod tests {
             s.distances[0].tolerance_minus = 0.0;
             s
         };
-        let exact = solve_set(&exact, 2.0, 0.0, &lib).unwrap();
+        let exact = try_alone(&exact).unwrap();
         assert!(
             exact.backlash.unwrap().forward.nominal < 1e-12,
             "zero clearance must give zero play, got {}",
@@ -6106,7 +6076,7 @@ mod tests {
             s.axes[1].count = 1;
             s
         };
-        let r = solve_set(&one, 2.0, 0.0, &test_library()).unwrap();
+        let r = try_alone(&one).unwrap();
         assert!(r.layouts.is_empty(), "one planet has no layout to check");
     }
 
@@ -6117,8 +6087,7 @@ mod tests {
     fn a_helical_set_reports_everything_a_spur_one_does() {
         for helix in [10.0, 20.0, 30.0] {
             let stage = set_of(24, 18, 60, helix);
-            let r = solve_set(&stage, 2.0, 0.0, &test_library())
-                .unwrap_or_else(|e| panic!("helix={helix}: {e}"));
+            let r = try_alone(&stage).unwrap_or_else(|e| panic!("helix={helix}: {e}"));
             assert!(
                 r.members[0].cases[0].bending_stress.is_some(),
                 "helix={helix}: sun"
@@ -6144,7 +6113,7 @@ mod tests {
     /// case rather than an exceptional one.
     #[test]
     fn an_impossible_set_is_refused() {
-        assert!(solve_set(&set_of(24, 18, 200, 0.0), 2.0, 0.0, &test_library()).is_err());
+        assert!(try_alone(&set_of(24, 18, 200, 0.0)).is_err());
     }
 
     /// The thickness invariants differ between the two meshes and both hold from
@@ -6174,7 +6143,7 @@ mod tests {
                 assert!((ks[given] - k).abs() < 1e-15, "the given one is the given");
             }
             // ...and it still solves.
-            assert!(solve_set(&shape, 2.0, 0.0, &test_library()).is_ok());
+            assert!(try_alone(&shape).is_ok());
         }
     }
     /// **The set's shifts follow the same rule as a pair's**: off, the sun sits
@@ -6186,7 +6155,6 @@ mod tests {
     /// being checked rather than assumed.
     #[test]
     fn choosing_the_shifts_for_efficiency_leaves_the_set_more_of_its_power() {
-        let lib = test_library();
         // Both free: a shift given by hand is a constraint, and a set with two
         // of them has nothing left to search.
         let free = || {
@@ -6196,16 +6164,11 @@ mod tests {
             s
         };
         let solve = |on: bool| {
-            solve_set(
-                &{
-                    let mut s = free();
-                    s.set_search(on);
-                    s
-                },
-                2.0,
-                0.0,
-                &lib,
-            )
+            try_alone(&{
+                let mut s = free();
+                s.set_search(on);
+                s
+            })
             .expect("the set solves")
         };
         let plain = solve(false);
@@ -6249,7 +6212,7 @@ mod tests {
         stage.set_search(true);
         stage.members[0].gear.profile_shift = Auto::automatic(0.0);
         stage.members[2].gear.profile_shift = Auto::fixed(0.25);
-        let r = solve_set(&stage, 2.0, 0.0, &test_library()).expect("solves");
+        let r = try_alone(&stage).expect("solves");
         assert!((r.members[2].profile_shift - 0.25).abs() < 1e-9);
     }
 }
@@ -6810,14 +6773,7 @@ mod the_pieces_own {
     use super::super::arrangements::{self as arr, Builder};
     use super::super::test_library;
     use super::*;
-
-    fn conventionally(shape: &Shape) -> crate::train::Alone {
-        crate::train::solve_alone(
-            &crate::train::Train::alone(shape, 2.0, 3000.0),
-            &test_library(),
-        )
-        .unwrap()
-    }
+    use crate::train::testing::alone;
 
     fn shifts(members: &[GearResult]) -> Vec<f64> {
         members.iter().map(|g| g.profile_shift).collect()
@@ -6882,7 +6838,7 @@ mod the_pieces_own {
             s.members[2].gear.profile_shift = Auto::automatic(0.0);
             s.meshes[0].search = ask[0];
             s.meshes[1].search = ask[1];
-            shifts(&conventionally(&s).members)
+            shifts(&alone(&s).members)
         };
         let (none, both, one) = (solve([false; 2]), solve([true; 2]), solve([true, false]));
         assert!(
@@ -6916,7 +6872,7 @@ mod the_pieces_own {
                     LoadSharing::None
                 };
             }
-            conventionally(&s)
+            alone(&s)
                 .members
                 .iter()
                 .map(|g| g.cases[0].bending_stress.unwrap())
@@ -6956,11 +6912,11 @@ mod the_pieces_own {
     #[test]
     fn a_planet_axis_keeps_its_own_gap() {
         let mut s = arr::meshed_planets(18, [13, 13], 68, 3);
-        let before = conventionally(&s);
+        let before = alone(&s);
         assert!(before.layouts.len() == 2 && before.layouts.iter().all(|l| l.clearance_ok));
         let first = before.layouts[0].axis;
         s.axes[first].min_planet_clearance = 1e3;
-        let after = conventionally(&s);
+        let after = alone(&s);
         for l in &after.layouts {
             assert_eq!(l.clearance_ok, l.axis != first, "{:?}", after.layouts);
         }

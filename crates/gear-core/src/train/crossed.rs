@@ -149,6 +149,7 @@ mod tests {
     use crate::note::key;
     use crate::params::Auto;
     use crate::screw::{Screw, ZoneLimit};
+    use crate::train::testing::{alone, try_alone, try_alone_at};
 
     fn library() -> MaterialLibrary {
         super::super::test_library()
@@ -156,27 +157,17 @@ mod tests {
 
     /// The old worm entry point, as the tests were written against it: the
     /// pair as a worm drive, whatever its own distance says.
-    fn solve_worm(
-        stage: &Shape,
-        torque: f64,
-        speed: f64,
-        lib: &MaterialLibrary,
-    ) -> Result<crate::train::Alone, TrainError> {
+    fn solve_worm(stage: &Shape) -> Result<crate::train::Alone, TrainError> {
         let mut s = stage.clone();
         s.distances[0].worm = true;
-        super::super::solve_preset(&s, torque, speed, lib)
+        try_alone(&s)
     }
 
     /// The old crossed-gear entry point, likewise: the pair as two gears.
-    fn solve_crossed(
-        stage: &Shape,
-        torque: f64,
-        speed: f64,
-        lib: &MaterialLibrary,
-    ) -> Result<crate::train::Alone, TrainError> {
+    fn solve_crossed(stage: &Shape) -> Result<crate::train::Alone, TrainError> {
         let mut s = stage.clone();
         s.distances[0].worm = false;
-        super::super::solve_preset(&s, torque, speed, lib)
+        try_alone(&s)
     }
 
     /// A stage with one member's inputs edited.
@@ -195,10 +186,6 @@ mod tests {
         &r.meshes[0]
     }
 
-    fn solved(stage: &Shape) -> crate::train::Alone {
-        super::super::solve_preset(stage, 2.0, 0.0, &library()).unwrap()
-    }
-
     /// **The same teeth with their bodies brought parallel**, as an efficiency
     /// — the best the pair can be, which a crossed figure is measured against
     /// here and nowhere else. The stage can describe it exactly, since a
@@ -213,7 +200,7 @@ mod tests {
             s.set_search(false);
             s.with_additional_helix(stage.helix_angles()[0])
         };
-        super::super::solve_preset(&flat, 2.0, 0.0, &library())
+        try_alone(&flat)
             .expect("the parallel counterpart is buildable")
             .meshes[0]
             .efficiency
@@ -365,7 +352,7 @@ mod tests {
             ("the worm canary", worm, false),
         ] {
             let s = stage.screw(0).unwrap();
-            let r = solve_worm(&stage, 2.0, 0.0, &lib).unwrap();
+            let r = solve_worm(&stage).unwrap();
 
             // The same questions the stage asked, from the widths it actually
             // resolved: the load on the wheel, the line the teeth provide, and
@@ -440,7 +427,7 @@ mod tests {
             s.distances[0].tolerance_plus = 0.0;
             s.distances[0].tolerance_minus = 0.0;
             let stage = s.with_first_diameter(d1);
-            let r = solved(&stage);
+            let r = alone(&stage);
             let s = stage.screw(0).unwrap();
 
             let wheel = 0.04 / (s.wheel_pitch_diameter / 2.0);
@@ -486,7 +473,7 @@ mod tests {
             s.distances[0].tolerance_minus = 0.05;
             s
         };
-        let r = solved(&stage);
+        let r = alone(&stage);
         assert_eq!(
             r.meshes[0].backlash_by_drive().forward.nominal,
             0.0,
@@ -506,7 +493,7 @@ mod tests {
     /// The stage's headline numbers, and the one it deliberately does not have.
     #[test]
     fn a_worm_stage_reports_contact_and_two_efficiencies_and_no_bending() {
-        let r = solved(&arr::worm(1, 40));
+        let r = alone(&arr::worm(1, 40));
         // Negative: a worm is an external mesh, its wheel turns the other way,
         // and a ratio is signed now — it is the graph's rather than `z₂/z₁`.
         assert!((r.ratio.unwrap() + 40.0).abs() < 1e-12);
@@ -560,10 +547,10 @@ mod tests {
     /// *narrower* gear. The next test is that one.
     #[test]
     fn contact_pressure_does_not_depend_on_the_face_width() {
-        let narrow = solved(&member(arr::worm(1, 40), 1, |g| {
+        let narrow = alone(&member(arr::worm(1, 40), 1, |g| {
             g.face_width = Auto::fixed(4.0);
         }));
-        let wide = solved(&member(arr::worm(1, 40), 1, |g| {
+        let wide = alone(&member(arr::worm(1, 40), 1, |g| {
             g.face_width = Auto::fixed(40.0);
         }));
         assert_eq!(
@@ -633,7 +620,7 @@ mod tests {
     /// two can be read against each other.
     #[test]
     fn automatic_takes_the_recommendation_and_manual_is_left_alone() {
-        let auto = solved(&arr::worm(1, 40));
+        let auto = alone(&arr::worm(1, 40));
         assert_eq!(
             Some(auto.members[0].face_width),
             auto.members[0].recommended_face_width,
@@ -645,7 +632,7 @@ mod tests {
             "an automatic wheel face width is the recommendation"
         );
 
-        let manual = solved(&member(arr::worm(1, 40), 0, |g| {
+        let manual = alone(&member(arr::worm(1, 40), 0, |g| {
             g.face_width = Auto::fixed(3.5);
         }));
         assert!((manual.members[0].face_width - 3.5).abs() < 1e-12);
@@ -669,9 +656,8 @@ mod tests {
     fn a_crossed_gear_pair_is_not_given_a_worms_proportions() {
         let s = arr::worm(17, 23);
         let stage = s.with_first_helix(45.0);
-        let lib = library();
-        let as_gears = solve_crossed(&stage, 2.0, 0.0, &lib).unwrap();
-        let as_worm = solve_worm(&stage, 2.0, 0.0, &lib).unwrap();
+        let as_gears = solve_crossed(&stage).unwrap();
+        let as_worm = solve_worm(&stage).unwrap();
         assert!(as_gears.members[0].recommended_face_width.is_none());
         assert!(as_gears.members[1].recommended_face_width.is_none());
         assert!(as_worm.members[0].recommended_face_width.is_some());
@@ -712,7 +698,6 @@ mod tests {
         use crate::params::Auto;
         use crate::train::MemberGear;
 
-        let lib = super::super::test_library();
         let gear = |teeth: u32, face: Auto<f64>| MemberGear {
             teeth,
             face_width: face,
@@ -727,7 +712,7 @@ mod tests {
         };
 
         // The width reported for ε = 1, given back: the ratio comes back as 1.
-        let wide = solve_crossed(&stage(Auto::fixed(60.0)), 2.0, 0.0, &lib).unwrap();
+        let wide = solve_crossed(&stage(Auto::fixed(60.0))).unwrap();
         let sized = point(&wide)
             .point
             .expect("a crossed pair has a path of contact")
@@ -740,7 +725,7 @@ mod tests {
             s.members[1].gear = gear(23, Auto::fixed(faces[1]));
             s
         };
-        let auto = solve_crossed(&stage_at(sized), 2.0, 0.0, &lib).unwrap();
+        let auto = solve_crossed(&stage_at(sized)).unwrap();
         let m = point(&auto);
         assert!(
             (m.contact_ratio - 1.0).abs() < 1e-9,
@@ -755,7 +740,7 @@ mod tests {
         // nominal centre distance *plus the clearance* and that slides the
         // contact along the bodies (docs/reference.md#axis-distance-and-backlash). Trimming a face symmetrically about
         // an asymmetric contact loses a little more than half.
-        let narrow = solve_crossed(&stage(Auto::fixed(sized[0] / 2.0)), 2.0, 0.0, &lib).unwrap();
+        let narrow = solve_crossed(&stage(Auto::fixed(sized[0] / 2.0))).unwrap();
         let n = point(&narrow);
         assert!(
             n.contact_ratio < 0.5 && n.contact_ratio > 0.45,
@@ -770,13 +755,13 @@ mod tests {
             s.distances[0].clearance = Auto::fixed(0.0);
             s
         };
-        let centred = solve_crossed(&tight(Auto::fixed(60.0)), 2.0, 0.0, &lib).unwrap();
+        let centred = solve_crossed(&tight(Auto::fixed(60.0))).unwrap();
         let width = point(&centred)
             .point
             .expect("a path")
             .face_width_for_continuity
             .expect("a width for continuity");
-        let halved = solve_crossed(&tight(Auto::fixed(width[0] / 2.0)), 2.0, 0.0, &lib).unwrap();
+        let halved = solve_crossed(&tight(Auto::fixed(width[0] / 2.0))).unwrap();
         assert!(
             (point(&halved).contact_ratio - 0.5).abs() < 1e-9,
             "with the contact centred, half the face is exactly half the contact"
@@ -791,11 +776,11 @@ mod tests {
         );
 
         // Generous, and the teeth are what end it — a wider face buys nothing.
-        let wide = solve_crossed(&stage(Auto::fixed(60.0)), 2.0, 0.0, &lib).unwrap();
+        let wide = solve_crossed(&stage(Auto::fixed(60.0))).unwrap();
         let w = point(&wide);
         assert_eq!(w.point.unwrap().limited_by, ZoneLimit::Tips);
         assert!(w.contact_ratio > m.contact_ratio);
-        let wider = solve_crossed(&stage(Auto::fixed(120.0)), 2.0, 0.0, &lib).unwrap();
+        let wider = solve_crossed(&stage(Auto::fixed(120.0))).unwrap();
         assert!((point(&wider).contact_ratio - w.contact_ratio).abs() < 1e-12);
     }
 
@@ -814,7 +799,7 @@ mod tests {
     /// Both numbers are reported, each labelled with what it is.
     #[test]
     fn a_worm_drive_reports_the_path_from_its_own_teeth_and_keeps_its_proportions() {
-        let r = solved(&arr::worm(1, 40));
+        let r = alone(&arr::worm(1, 40));
         let m = point(&r);
         assert!(m.contact_ratio > 0.0);
         // The proportions still size the face; continuity is reported beside
@@ -823,7 +808,7 @@ mod tests {
         assert!(m.point.unwrap().face_width_for_continuity.is_some());
 
         // The tips are the teeth's: a taller worm thread lengthens the zone.
-        let taller = solved(&member(arr::worm(1, 40), 0, |g| g.addendum = 1.2));
+        let taller = alone(&member(arr::worm(1, 40), 0, |g| g.addendum = 1.2));
         assert!(
             point(&taller).contact_ratio > m.contact_ratio,
             "a taller addendum must reach further: {} against {}",
@@ -848,7 +833,6 @@ mod tests {
         use crate::params::Auto;
         use crate::train::MemberGear;
 
-        let lib = super::super::test_library();
         let crossed = |face: f64| {
             let mut s = arr::pair([17, 43]);
             s.distances[0].angle = 90.0;
@@ -867,7 +851,7 @@ mod tests {
 
         // Generous face: the teeth end the zone, the pair shares load, and the
         // rating sits just above the pitch-point figure.
-        let wide = solve_crossed(&crossed(20.0), 2.0, 0.0, &lib).unwrap();
+        let wide = solve_crossed(&crossed(20.0)).unwrap();
         assert!(
             point(&wide).cases[0].contact.max_pressure
                 >= point(&wide).cases[0].contact.at_pitch_point,
@@ -877,7 +861,7 @@ mod tests {
 
         // Squeeze it: ε falls below 1, load sharing goes, and the same mesh at
         // the same torque rates higher.
-        let narrow = solve_crossed(&crossed(0.8), 2.0, 0.0, &lib).unwrap();
+        let narrow = solve_crossed(&crossed(0.8)).unwrap();
         assert!(point(&narrow).contact_ratio < 1.0);
         assert!(
             point(&narrow).cases[0].contact.max_pressure
@@ -928,13 +912,11 @@ mod tests {
         use crate::params::Auto;
         use crate::train::MemberGear;
 
-        let lib = super::super::test_library();
-
         for stage in [
             arr::worm(1, 40),
             ({ arr::worm(2, 40) }).with_first_diameter(12.0),
         ] {
-            let r = solve_worm(&stage, 2.0, 0.0, &lib).unwrap();
+            let r = solve_worm(&stage).unwrap();
             let classical = point(&r).point.map(|_| ()).map(|()| {
                 let s = stage.screw(0).unwrap();
                 Directional::of(|d| s.efficiency(stage.meshes[0].sliding_friction, d))
@@ -978,7 +960,7 @@ mod tests {
             };
             s
         };
-        let r = solve_crossed(&crossed, 2.0, 0.0, &lib).unwrap();
+        let r = solve_crossed(&crossed).unwrap();
         point(&r).point.expect("a path");
         assert!(
             r.meshes[0].efficiency.forward < parallel_counterpart(&crossed),
@@ -1000,7 +982,6 @@ mod tests {
         use crate::params::Auto;
         use crate::train::MemberGear;
 
-        let lib = super::super::test_library();
         let stage = |sigma: f64| {
             ({
                 let mut s = arr::pair([17, 43]);
@@ -1022,7 +1003,7 @@ mod tests {
 
         let mut previous = 1.0;
         for sigma in [0.5f64, 2.0, 10.0, 45.0, 90.0] {
-            let r = solve_crossed(&stage(sigma), 2.0, 0.0, &lib).unwrap();
+            let r = solve_crossed(&stage(sigma)).unwrap();
             let mesh = point(&r).point.expect("a path");
             assert_eq!(
                 mesh.limited_by,
@@ -1050,7 +1031,7 @@ mod tests {
         // A worm has one too now — it is a helical gear with one start — and
         // the same ordering holds against it: crossing the bodies to a right
         // angle costs a single-start worm most of what it had.
-        let worm = solved(&arr::worm(1, 40));
+        let worm = alone(&arr::worm(1, 40));
         let parallel = parallel_counterpart(&arr::worm(1, 40));
         assert!(
             worm.meshes[0].efficiency.forward < parallel,
@@ -1063,7 +1044,7 @@ mod tests {
     /// and leaving the reader to notice.
     #[test]
     fn self_locking_is_said_out_loud() {
-        let r = solved(
+        let r = alone(
             &({
                 let mut s = arr::worm(1, 40);
                 s.meshes[0].sliding_friction = 0.06;
@@ -1084,21 +1065,12 @@ mod tests {
 
     #[test]
     fn a_pair_that_cannot_exist_says_which_way_it_failed() {
-        let err = solve_worm(
-            &({ arr::worm(9, 40) }).with_first_diameter(8.0),
-            2.0,
-            0.0,
-            &library(),
-        )
-        .unwrap_err();
+        let err = solve_worm(&({ arr::worm(9, 40) }).with_first_diameter(8.0)).unwrap_err();
         assert!(format!("{err}").contains("too thin"), "{err}");
 
-        let err = solve_worm(
-            &member(arr::worm(1, 40), 1, |g| g.material = "Unobtainium".into()),
-            2.0,
-            0.0,
-            &library(),
-        )
+        let err = solve_worm(&member(arr::worm(1, 40), 1, |g| {
+            g.material = "Unobtainium".into()
+        }))
         .unwrap_err();
         assert!(matches!(err, TrainError::UnknownMaterial(_)), "{err}");
     }
@@ -1233,7 +1205,6 @@ mod tests {
         use crate::params::Auto;
         use crate::train::MemberGear;
 
-        let lib = super::super::test_library();
         let gear = |teeth: u32| MemberGear {
             teeth,
             face_width: Auto::fixed(8.0),
@@ -1253,8 +1224,8 @@ mod tests {
         s.members[1].gear = gear(23);
         let as_screw = s.with_first_helix(45.0);
 
-        let a = solve_crossed(&spur, 2.0, 0.0, &lib).unwrap();
-        let b = solve_worm(&as_screw, 2.0, 0.0, &lib).unwrap();
+        let a = solve_crossed(&spur).unwrap();
+        let b = solve_worm(&as_screw).unwrap();
         for (name, x, y) in [
             ("ratio", a.ratio.unwrap(), b.ratio.unwrap()),
             (
@@ -1339,7 +1310,6 @@ mod tests {
 
         use crate::train::MemberGear;
 
-        let lib = super::super::test_library();
         let stage = |sigma: f64, clearance: f64| {
             ({
                 let mut s = arr::pair([17, 43]);
@@ -1362,7 +1332,7 @@ mod tests {
 
         let mut last = f64::INFINITY;
         for clearance in [0.08_f64, 0.04, 0.02, 0.01, 0.005] {
-            let parallel = super::super::solve_preset(&stage(0.0, clearance), 2.0, 0.0, &lib)
+            let parallel = try_alone(&stage(0.0, clearance))
                 .expect("a parallel pair")
                 .meshes[0]
                 .backlash_by_drive()
@@ -1370,7 +1340,7 @@ mod tests {
                 .nominal;
             // As close to parallel as the screw model will go. The pair is still
             // crossed, so it is still the crossed law answering.
-            let crossed = solve_crossed(&stage(0.001, clearance), 2.0, 0.0, &lib)
+            let crossed = solve_crossed(&stage(0.001, clearance))
                 .expect("a crossed pair")
                 .meshes[0]
                 .backlash_by_drive()
@@ -1417,14 +1387,10 @@ mod tests {
             s.distances[0].tolerance_minus = 0.0;
             s
         };
-        let parallel = super::super::solve_preset(&float(0.0), 2.0, 0.0, &lib)
-            .expect("a parallel pair")
-            .meshes[0]
-            .backlash_by_drive();
-        let crossed = solve_crossed(&float(0.001), 2.0, 0.0, &lib)
-            .expect("a crossed pair")
-            .meshes[0]
-            .backlash_by_drive();
+        let parallel =
+            try_alone(&float(0.0)).expect("a parallel pair").meshes[0].backlash_by_drive();
+        let crossed =
+            solve_crossed(&float(0.001)).expect("a crossed pair").meshes[0].backlash_by_drive();
         for (name, p, c) in [
             ("forward", parallel.forward.nominal, crossed.forward.nominal),
             (
@@ -1448,9 +1414,7 @@ mod tests {
         }
         // ...and on a spur gear the term is nothing, since `β_b = 0`.
         let spur = float(0.0).with_additional_helix(0.0);
-        let play = super::super::solve_preset(&spur, 2.0, 0.0, &lib)
-            .expect("a spur pair")
-            .meshes[0]
+        let play = try_alone(&spur).expect("a spur pair").meshes[0]
             .backlash_by_drive()
             .forward
             .nominal;
@@ -1486,7 +1450,6 @@ mod tests {
     fn the_optimiser_reaches_a_crossed_pair_by_its_own_mesh() {
         use super::super::Searched;
         use crate::auto::Search;
-        let lib = library();
         let optimised = |mut st: Shape| {
             st.set_search(true);
             st
@@ -1495,7 +1458,7 @@ mod tests {
 
         // The shipped worm: the floor is the answer, and the search says so
         // by choosing rather than by finding nothing.
-        let worm = solve_worm(&optimised(arr::worm(1, 40)), 2.0, 0.0, &lib).unwrap();
+        let worm = solve_worm(&optimised(arr::worm(1, 40))).unwrap();
         assert_eq!(
             shifts(&worm),
             [0.0, 0.0],
@@ -1523,8 +1486,8 @@ mod tests {
             })
             .with_additional_helix(20.0)
         };
-        let floor = solve_crossed(&crossed(5.0), 2.0, 0.0, &lib).unwrap();
-        let best = solve_crossed(&optimised(crossed(5.0)), 2.0, 0.0, &lib).unwrap();
+        let floor = solve_crossed(&crossed(5.0)).unwrap();
+        let best = solve_crossed(&optimised(crossed(5.0))).unwrap();
         assert_eq!(best.meshes[0].flank_interference, [false, false]);
         assert!(
             best.meshes[0].contact_ratio >= super::super::DEFAULT_MIN_CONTACT_RATIO - 1e-9,
@@ -1544,9 +1507,7 @@ mod tests {
             for (m, shift) in fixed.members.iter_mut().zip(x) {
                 m.gear.profile_shift = Auto::fixed(*shift);
             }
-            solve_crossed(&fixed, 2.0, 0.0, &lib).unwrap().meshes[0]
-                .efficiency
-                .forward
+            solve_crossed(&fixed).unwrap().meshes[0].efficiency.forward
         };
         let stage = optimised(crossed(5.0));
         let shipped = at(&stage.shifts_at(&Search::SHIPPED));
@@ -1558,9 +1519,8 @@ mod tests {
         );
 
         // The parallel limit: near, and not on, for the reason above.
-        let parallel =
-            super::super::solve_preset(&optimised(crossed(0.0)), 2.0, 0.0, &lib).unwrap();
-        let near = solve_crossed(&optimised(crossed(0.01)), 2.0, 0.0, &lib).unwrap();
+        let parallel = try_alone(&optimised(crossed(0.0))).unwrap();
+        let near = solve_crossed(&optimised(crossed(0.01))).unwrap();
         for i in 0..2 {
             assert!(
                 (shifts(&near)[i] - shifts(&parallel)[i]).abs() < 0.15,
@@ -1583,13 +1543,13 @@ mod tests {
     /// where the worm's flank ends, and the result says so on the worm.
     #[test]
     fn a_crossed_pair_reports_the_member_whose_flank_is_fouled() {
-        let clear = solved(&arr::worm(1, 40));
+        let clear = alone(&arr::worm(1, 40));
         assert_eq!(
             point(&clear).flank_interference,
             [false, false],
             "the shipped worm clears"
         );
-        let tall = solved(&member(arr::worm(1, 40), 1, |g| {
+        let tall = alone(&member(arr::worm(1, 40), 1, |g| {
             g.addendum = 3.0;
             g.no_sharp_tip = false;
             // As typed: the interference is what is reported.
@@ -1615,7 +1575,6 @@ mod tests {
 
         use crate::train::MemberGear;
 
-        let lib = super::super::test_library();
         let stage = |sigma: f64, clearance: f64| {
             ({
                 let mut s = arr::pair([17, 43]);
@@ -1636,13 +1595,13 @@ mod tests {
             .with_additional_helix(20.0)
         };
         let shortfall = |clearance: f64| {
-            let parallel = super::super::solve_preset(&stage(0.0, clearance), 2.0, 0.0, &lib)
+            let parallel = try_alone(&stage(0.0, clearance))
                 .expect("a parallel pair")
                 .meshes[0]
                 .backlash_by_drive()
                 .forward
                 .nominal;
-            let crossed = solve_crossed(&stage(0.001, clearance), 2.0, 0.0, &lib)
+            let crossed = solve_crossed(&stage(0.001, clearance))
                 .expect("a crossed pair")
                 .meshes[0]
                 .backlash_by_drive()
@@ -1678,39 +1637,39 @@ mod tests {
             s.meshes[0].static_friction = statik;
             s
         };
-        let threshold = point(&solved(&stage(0.06, 0.06))).locking_friction.backward;
+        let threshold = point(&alone(&stage(0.06, 0.06))).locking_friction.backward;
         assert!(threshold > 0.0 && threshold < 0.3, "{threshold}");
 
         // 1. Both coefficients below it: back-drives, and the figure is the
         //    sliding one — the static coefficient changes nothing but the sign
         //    it was consulted for.
-        let free = solved(&stage(0.06, threshold * 0.5));
+        let free = alone(&stage(0.06, threshold * 0.5));
         assert!(free.meshes[0].efficiency.backward > 0.0);
-        let alone = solved(&stage(0.06, 0.06));
+        let plain = alone(&stage(0.06, 0.06));
         assert!(
-            (free.meshes[0].efficiency.backward - alone.meshes[0].efficiency.backward).abs()
+            (free.meshes[0].efficiency.backward - plain.meshes[0].efficiency.backward).abs()
                 < 1e-12,
             "the static coefficient must not leak into the number: {} against {}",
             free.meshes[0].efficiency.backward,
-            alone.meshes[0].efficiency.backward
+            plain.meshes[0].efficiency.backward
         );
 
         // 2. Static above it, sliding below: it never starts, so **zero** — not
         //    the sliding figure, which describes a motion that does not happen.
-        let stuck = solved(&stage(0.06, threshold * 1.2));
+        let stuck = alone(&stage(0.06, threshold * 1.2));
         assert_eq!(stuck.meshes[0].efficiency.backward, 0.0);
         assert!(
             stuck.meshes[0].efficiency.forward > 0.0,
             "forward is unaffected: it is not the direction near the threshold"
         );
         assert!(
-            (stuck.meshes[0].efficiency.forward - alone.meshes[0].efficiency.forward).abs() < 1e-12,
+            (stuck.meshes[0].efficiency.forward - plain.meshes[0].efficiency.forward).abs() < 1e-12,
             "and forward runs on the sliding coefficient like anything else"
         );
 
         // 3. Both above: still zero, and by the same route.
         assert_eq!(
-            solved(&stage(threshold * 1.2, threshold * 1.2)).meshes[0]
+            alone(&stage(threshold * 1.2, threshold * 1.2)).meshes[0]
                 .efficiency
                 .backward,
             0.0
@@ -1739,19 +1698,14 @@ mod tests {
     /// dry steel on steel.
     #[test]
     fn a_parallel_pair_passes_the_breakaway_rule_untouched() {
-        let lib = super::super::test_library();
-        let reference =
-            super::super::solve_preset(&arr::pair([17, 43]), 2.0, 0.0, &lib).expect("a stage");
+        let reference = try_alone(&arr::pair([17, 43])).expect("a stage");
         for statik in [0.0_f64, 0.06, 0.16, 0.5, 0.9] {
-            let r = super::super::solve_preset(
+            let r = try_alone(
                 &({
                     let mut s = arr::pair([17, 43]);
                     s.meshes[0].static_friction = statik;
                     s
                 }),
-                2.0,
-                0.0,
-                &lib,
             )
             .expect("a stage");
             assert_eq!(
@@ -1793,7 +1747,7 @@ mod tests {
         };
         let mut previous: Option<(f64, f64)> = None;
         for clearance in [0.0_f64, 0.02, 0.1, 0.3] {
-            let r = solved(&stage(clearance));
+            let r = alone(&stage(clearance));
             let eps = point(&r).contact_ratio;
             let eta = r.meshes[0].efficiency.forward;
             if let Some((was_eps, was_eta)) = previous {
@@ -1831,7 +1785,6 @@ mod tests {
         use crate::params::Auto;
         use crate::train::MemberGear;
 
-        let lib = super::super::test_library();
         let stage = |sigma: f64, clearance: f64| {
             ({
                 let mut s = arr::pair([17, 43]);
@@ -1852,7 +1805,7 @@ mod tests {
             .with_additional_helix(20.0)
         };
         let mesh = |sigma: f64, clearance: f64| {
-            solve_crossed(&stage(sigma, clearance), 2.0, 0.0, &lib)
+            solve_crossed(&stage(sigma, clearance))
                 .expect("a crossed pair")
                 .meshes[0]
                 .clone()
@@ -1906,7 +1859,7 @@ mod tests {
     #[test]
     fn a_crossed_gear_pair_solves_end_to_end() {
         let stage = arr::worm(17, 23).with_first_helix(45.0);
-        let r = solve_worm(&stage, 2.0, 0.0, &super::super::test_library()).unwrap();
+        let r = solve_worm(&stage).unwrap();
         // Negative for the same reason a worm's is: an external mesh reverses.
         assert!((r.ratio.unwrap() + 23.0 / 17.0).abs() < 1e-12);
         assert!(r.meshes[0].efficiency.forward > 0.0 && r.meshes[0].efficiency.forward < 1.0);
@@ -1925,9 +1878,6 @@ mod tests {
                 s
             })
             .with_first_diameter(7.0),
-            2.0,
-            0.0,
-            &super::super::test_library(),
         )
         .unwrap();
         assert!(
@@ -1952,9 +1902,6 @@ mod tests {
                     s
                 })
                 .with_first_helix(sigma / 2.0),
-                2.0,
-                0.0,
-                &super::super::test_library(),
             )
             .unwrap()
             .meshes[0]
@@ -1980,7 +1927,6 @@ mod tests {
     /// a screw of 20.8692.
     #[test]
     fn a_crossed_pair_is_the_pair_its_members_are_cut_as() {
-        let lib = library();
         let mut solved = 0;
         for shaft_angle in [30.0_f64, 60.0, 90.0, 120.0] {
             for i in -17..=17 {
@@ -1989,7 +1935,7 @@ mod tests {
                 }
                 let beta = 5.0 * f64::from(i);
                 let shape = arr::crossed([17, 23], shaft_angle).with_first_helix(beta);
-                let Ok(r) = super::super::solve_preset(&shape, 2.0, 1000.0, &lib) else {
+                let Ok(r) = try_alone_at(&shape, 2.0, 1000.0) else {
                     continue;
                 };
                 let s = shape.screw(0).expect("a solved crossed pair has a screw");
@@ -2027,7 +1973,6 @@ mod tests {
     /// and 1.644 again on every face from 10 mm to 0.5 mm, which holds 0.53.
     #[test]
     fn a_crossed_pairs_contact_never_exceeds_what_its_faces_carry() {
-        let lib = library();
         let faces = [
             60.0, 30.0, 16.0, 12.0, 10.0, 8.0, 6.0, 4.7, 4.0, 2.0, 1.0, 0.5,
         ];
@@ -2047,8 +1992,7 @@ mod tests {
                                     m.gear.face_width = Auto::fixed(60.0);
                                 }
                                 s.members[narrowed].gear.face_width = Auto::fixed(b);
-                                let Ok(r) = super::super::solve_preset(&s, 2.0, 1000.0, &lib)
-                                else {
+                                let Ok(r) = try_alone_at(&s, 2.0, 1000.0) else {
                                     continue;
                                 };
                                 let m = point(&r);
