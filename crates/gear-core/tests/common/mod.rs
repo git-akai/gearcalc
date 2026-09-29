@@ -296,3 +296,202 @@ pub fn crossings(points: &[[f64; 2]]) -> usize {
     }
     count
 }
+
+// --------------------------------------------------------------------- //
+//  the involute helicoid, read as a surface
+// --------------------------------------------------------------------- //
+
+/// An involute helicoid: the transverse involute of the base circle whose
+/// origin is at base angle `theta0` and which unwinds toward `w` (`+1`
+/// counter-clockwise, `−1` clockwise), turned about the axis in proportion to
+/// height by the base lead. The flank as a surface in `(u, h)` — roll and
+/// height — with its two partial derivatives, all analytic. Nothing here
+/// knows a measurement: it is the oracle the metrology laws are held to.
+#[derive(Clone, Copy, Debug)]
+pub struct Helicoid {
+    /// Base radius, mm.
+    pub rb: f64,
+    /// Base helix angle, radians.
+    pub beta_b: f64,
+    /// Where the transverse involute starts on the base circle, radians.
+    pub theta0: f64,
+    /// Which way it unwinds: `+1` counter-clockwise, `−1` clockwise.
+    pub w: f64,
+}
+
+impl Helicoid {
+    fn angle(&self, u: f64, h: f64) -> f64 {
+        self.theta0 + self.w * u + h * self.beta_b.tan() / self.rb
+    }
+
+    pub fn at(&self, u: f64, h: f64) -> [f64; 3] {
+        let a = self.angle(u, h);
+        [
+            self.rb * (a.cos() + self.w * u * a.sin()),
+            self.rb * (a.sin() - self.w * u * a.cos()),
+            h,
+        ]
+    }
+
+    fn d_u(&self, u: f64, h: f64) -> [f64; 3] {
+        let a = self.angle(u, h);
+        [self.rb * u * a.cos(), self.rb * u * a.sin(), 0.0]
+    }
+
+    fn d_h(&self, u: f64, h: f64) -> [f64; 3] {
+        let a = self.angle(u, h);
+        let k = self.beta_b.tan();
+        [
+            k * (-a.sin() + self.w * u * a.cos()),
+            k * (a.cos() + self.w * u * a.sin()),
+            1.0,
+        ]
+    }
+
+    /// The point of the surface nearest `c`, as `(distance, radius)`, by
+    /// Newton on the distance's gradient seeded at the centre's own roll —
+    /// which keeps it on the sheet a ball in the space touches.
+    pub fn nearest(&self, c: [f64; 3]) -> (f64, f64) {
+        let u0 = (f64::hypot(c[0], c[1]).powi(2) - self.rb * self.rb)
+            .max(0.0)
+            .sqrt()
+            / self.rb;
+        let x = newton(
+            |v| {
+                let e = sub(self.at(v[0], v[1]), c);
+                vec![dot(e, self.d_u(v[0], v[1])), dot(e, self.d_h(v[0], v[1]))]
+            },
+            vec![u0, 0.0],
+        );
+        let p = self.at(x[0], x[1]);
+        let e = sub(p, c);
+        (dot(e, e).sqrt(), self.rb * f64::hypot(1.0, x[0]))
+    }
+
+    /// Two parallel planes, this surface and its half turn about the radial
+    /// line at angle `mid` — which is the other outer flank of a span, since a
+    /// helical gear is symmetric under that half turn — and the common normal
+    /// between them placed on that line's symmetry. Returns `(span, contact
+    /// radius, tilt)`: the plane separation, the radius where the common normal
+    /// meets the flank, and the planes' normal's angle from the transverse
+    /// plane, which is solved for rather than assumed.
+    pub fn anvils(&self, mid: f64, seed_roll: f64) -> (f64, f64, f64) {
+        let et = [-mid.sin(), mid.cos(), 0.0];
+        let ez = [0.0, 0.0, 1.0];
+        let n_of = |t: f64| -> [f64; 3] {
+            [
+                t.cos() * et[0] + t.sin() * ez[0],
+                t.cos() * et[1] + t.sin() * ez[1],
+                t.cos() * et[2] + t.sin() * ez[2],
+            ]
+        };
+        let x = newton(
+            |v| {
+                let (u, h, t) = (v[0], v[1], v[2]);
+                let n = n_of(t);
+                let p = self.at(u, h);
+                // Tangent: the normal is normal to the surface. The half turn
+                // carries this contact to the other flank's, so the segment
+                // joining them is this contact's part off `er`, and must lie
+                // along the normal.
+                vec![
+                    dot(n, self.d_u(u, h)),
+                    dot(n, self.d_h(u, h)),
+                    dot(p, et) * t.sin() - dot(p, ez) * t.cos(),
+                ]
+            },
+            vec![seed_roll, 0.0, self.tilt_at(seed_roll, 0.0, et)],
+        );
+        let p = self.at(x[0], x[1]);
+        (
+            2.0 * f64::hypot(dot(p, et), dot(p, ez)),
+            self.rb * f64::hypot(1.0, x[0]),
+            x[2],
+        )
+    }
+}
+
+impl Helicoid {
+    /// The surface normal's angle out of the transverse plane at `(u, h)`,
+    /// read with the normal turned toward `et`: the seed for the anvils' tilt.
+    fn tilt_at(&self, u: f64, h: f64, et: [f64; 3]) -> f64 {
+        let (a, b) = (self.d_u(u, h), self.d_h(u, h));
+        let n = [
+            a[1] * b[2] - a[2] * b[1],
+            a[2] * b[0] - a[0] * b[2],
+            a[0] * b[1] - a[1] * b[0],
+        ];
+        let s = if dot(n, et) < 0.0 { -1.0 } else { 1.0 };
+        (s * n[2]).atan2(s * dot(n, et))
+    }
+}
+
+fn dot(a: [f64; 3], b: [f64; 3]) -> f64 {
+    a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+}
+
+fn sub(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
+    [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
+}
+
+/// Newton's method on a small square system, the Jacobian by central
+/// differences. The residual is analytic, so the root is exact to rounding;
+/// the difference Jacobian sets only how fast it is reached.
+fn newton(f: impl Fn(&[f64]) -> Vec<f64>, mut x: Vec<f64>) -> Vec<f64> {
+    let n = x.len();
+    for _ in 0..60 {
+        let r = f(&x);
+        if r.iter().all(|v| v.abs() < 1e-15) {
+            break;
+        }
+        // The augmented matrix, one row per equation: `[J | −r]`.
+        let mut a: Vec<Vec<f64>> = r
+            .iter()
+            .map(|ri| {
+                let mut row = vec![0.0; n + 1];
+                row[n] = -ri;
+                row
+            })
+            .collect();
+        for j in 0..n {
+            let step = 1e-7 * x[j].abs().max(1.0);
+            let (mut hi, mut lo) = (x.clone(), x.clone());
+            hi[j] += step;
+            lo[j] -= step;
+            let (fh, fl) = (f(&hi), f(&lo));
+            for (row, (h, l)) in a.iter_mut().zip(fh.iter().zip(&fl)) {
+                row[j] = (h - l) / (2.0 * step);
+            }
+        }
+        // Gaussian elimination with partial pivoting.
+        for c in 0..n {
+            let p = (c..n)
+                .max_by(|&i, &j| a[i][c].abs().total_cmp(&a[j][c].abs()))
+                .unwrap_or(c);
+            a.swap(c, p);
+            let pivot = a[c].clone();
+            for row in &mut a[c + 1..] {
+                let m = row[c] / pivot[c];
+                for (v, q) in row[c..].iter_mut().zip(&pivot[c..]) {
+                    *v -= m * q;
+                }
+            }
+        }
+        let mut dx = vec![0.0; n];
+        for i in (0..n).rev() {
+            let s: f64 = (i + 1..n).map(|j| a[i][j] * dx[j]).sum();
+            dx[i] = (a[i][n] - s) / a[i][i];
+        }
+        for (v, d) in x.iter_mut().zip(&dx) {
+            *v += d;
+        }
+        if dx
+            .iter()
+            .zip(&x)
+            .all(|(d, v)| d.abs() <= 1e-15 * v.abs().max(1.0))
+        {
+            break;
+        }
+    }
+    x
+}

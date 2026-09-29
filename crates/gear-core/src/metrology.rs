@@ -207,6 +207,17 @@ pub fn pin_diameter_range(space: &Space) -> Option<(f64, f64)> {
         .then_some((smallest, largest))
 }
 
+/// **A length along the flank's normal, as a roll in the transverse plane.**
+///
+/// A helical flank is an involute helicoid, and its normal lies in the base
+/// tangent plane leaning `β_b` out of the transverse plane. A length a ball's
+/// radius or a span's anvils measure along that normal therefore moves the
+/// contact `cos β_b` of it along the transverse involute normal — the base
+/// tangent — which is where a contact radius is read. Spur is `cos 0 = 1`.
+fn transverse_roll(along_normal: f64, beta_b: f64) -> f64 {
+    along_normal * beta_b.cos()
+}
+
 /// Span over `k` teeth ("base tangent length"), mm.
 #[derive(Clone, Copy, Debug)]
 pub struct Span {
@@ -250,10 +261,11 @@ pub fn span_over_teeth(g: &Tooth, k: u32) -> Option<Span> {
     let nominal = bb.cos()
         * g.rb
         * (2.0 * std::f64::consts::PI * f64::from(k - 1) / z + g.st / g.r + 2.0 * inv(g.alpha_t));
-    // The configuration is symmetric about the radius through the middle of the
-    // spanned group, so each measuring face touches half a span from the base
-    // tangent point.
-    let half = nominal / (2.0 * bb.cos());
+    // The anvils touch where their common normal meets the flanks, symmetric
+    // about the radius through the middle of the spanned group: each contact
+    // half the span's transverse roll from the base tangent point, so
+    // `d_M = √(d_b² + (W cos β_b)²)`.
+    let half = transverse_roll(nominal, bb) / 2.0;
     let contact_radius = f64::hypot(g.rb, half);
     (nominal.is_finite() && nominal > 0.0 && (g.r_j..=g.ra).contains(&contact_radius)).then_some(
         Span {
@@ -351,10 +363,11 @@ pub fn span_over_teeth_at(gear: &crate::gear::Gear, j: usize, k: u32) -> Option<
         return None;
     }
 
-    // The two unwrapped lengths sum to the span; each contact radius rises with
-    // its own. So the placements that keep a contact on usable flank are an
-    // interval in that length, and both must hold at once.
-    let total = sweep;
+    // The two unwrapped lengths, in units of `r_b`, sum to the span's
+    // transverse roll; each contact radius rises with its own. So the
+    // placements that keep a contact on usable flank are an interval in that
+    // length, and both must hold at once.
+    let total = transverse_roll(sweep * bb.cos(), bb);
     let roll_at = |radius: f64| crate::involute::roll_at_radius(radius, mean.rb);
     let usable = |t: &Tooth| (roll_at(t.r_j), roll_at(t.ra));
     let (a_lo, a_hi) = usable(gear.tooth(j).0);
@@ -446,8 +459,14 @@ pub fn pin_geometry(g: &Tooth, pin_diameter: f64) -> Result<(f64, f64), Measurem
 ///
 /// ```text
 /// inv φ_M = σ ( ψ_b + d_p / (2 r_b cos β_b) − π/z )
-/// u_c     = tan φ_M − σ d_p / (2 r_b)
+/// u_c     = tan φ_M − σ d_p cos β_b / (2 r_b)
 /// ```
+///
+/// The distance from a point to a helical flank is its transverse distance
+/// times `cos β_b`, which is the first line's `cos β_b`; the contact lies along
+/// the flank's normal, which leans `β_b` out of the transverse plane, so the
+/// pin's radius rolls back only `cos β_b` of itself along the base tangent —
+/// the second's ([`transverse_roll`]).
 ///
 /// The signs say something physical. An external gear's space narrows *inward*,
 /// so a larger pin rides higher and touches **below** its own centre. A ring's
@@ -483,15 +502,16 @@ fn pin_seat(
     })?;
     let r_m = rb / phi.cos();
 
-    // The contact point lies on the involute normal through the pin centre, at
-    // the pin's radius from it: unwrapped length r_b·tan φ, less the pin.
+    // The contact point lies on the flank normal through the pin centre, at the
+    // pin's radius from it: unwrapped length r_b·tan φ, less the pin's radius
+    // rolled into the transverse plane.
     // The contact point inside the base circle is the same failure as the
     // centre there, and reads the same way: a pin too small for an external
     // gear's space, which it has sunk into, and — were it reachable — too large
     // for a ring's. It was reported as too large on both, which sent an
     // external gear's designer the wrong way over the first few microns above
     // the smallest pin that reaches the base circle.
-    let u_contact = phi.tan() - sigma * pin_diameter / (2.0 * rb);
+    let u_contact = phi.tan() - sigma * transverse_roll(pin_diameter / 2.0, beta_b) / rb;
     if u_contact <= 0.0 {
         return Err(if sigma > 0.0 {
             MeasurementError::PinTooSmall

@@ -189,6 +189,7 @@ the membership:
 python3 tools/validate_dxf.py <file.dxf> ...   # an export's structure, then its geometry
 python3 tools/worm_flank_curvature.py          # worm flank curvature from the surface itself
 python3 tools/crossed_path.py                  # a crossed pair's path of contact, from the surfaces
+python3 tools/helical_measurement.py           # a helical ball's and span's contact, from the flank surface
 python3 tools/hula_kinematics.py               # a hula stage's ratio, from the rolling circles
 python3 tools/train_kinematics.py              # any topology's speeds and torques, from rigid-body velocities
 python3 tools/iso_6336_3_stack.py              # where this tool stands against ISO 6336-3, factor by factor

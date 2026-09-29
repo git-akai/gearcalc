@@ -39,7 +39,8 @@ fn grid() -> Vec<GearParams> {
 // --------------------------------------------------------------------- //
 
 /// The general derivation must reproduce the standard formula
-/// `W_k = m cos αₙ [π(k−0.5) + z inv α_t] + 2 x m sin αₙ` exactly.
+/// `W_k = m_n cos αₙ [π(k−0.5) + z inv α_t] + 2 x m_n sin αₙ` exactly, helical
+/// gears included (ISO 21771).
 ///
 /// # ...and `x` there is the **thickness** shift, which is a stronger claim
 ///
@@ -60,15 +61,11 @@ fn span_reduces_to_the_textbook_formula() {
         let an = p.pressure_angle.to_radians();
         let x_thick = p.profile_shift + p.thickness_shift();
         for k in 2..=5u32 {
-            // A span whose faces miss the flank is not a measurement.
+            // A span whose faces miss the flank is not a measurement. The form
+            // holds for a helical gear as written, in the normal module.
             let Some(got) = span_over_teeth(&g, k).map(|s| s.nominal) else {
                 continue;
             };
-            // The textbook form is stated for spur gears; the helical case is
-            // covered by `consecutive_spans_differ_by_one_base_pitch` instead.
-            if p.helix_angle != 0.0 {
-                continue;
-            }
             let want = p.module
                 * an.cos()
                 * (std::f64::consts::PI * (f64::from(k) - 0.5) + z * inv(g.alpha_t))
@@ -131,6 +128,211 @@ fn best_span_lands_on_the_usable_flank() {
             Err(e) => assert_eq!(e, MeasurementError::NoValidSpan),
         }
     }
+}
+
+// --------------------------------------------------------------------- //
+//  helical contact, against the flank as a surface
+// --------------------------------------------------------------------- //
+
+/// Helix angles for the helical contact laws: spur, the two ordinary ones, and
+/// a steep left hand.
+const HELICAL: &[f64] = &[0.0, 15.0, 30.0, -40.0];
+
+fn helical_grid() -> Vec<GearParams> {
+    Grid::new()
+        .teeth(&[9, 12, 17, 20, 31, 44, 63])
+        .shifts(&[-0.3, 0.0, 0.5])
+        .pressure_angle(PRESSURE_ANGLES)
+        .helix_angle(HELICAL)
+        .module(&[MODULES[0], MODULES[3]])
+        .build()
+}
+
+/// **A ball touches the helicoid where the seat says, at the distance its
+/// radius says.** The ball's centre from [`Space::seat`], and the nearest
+/// point of the flank to it found on the surface itself
+/// ([`common::Helicoid::nearest`]): the distance is half the ball and the
+/// contact radius is the one reported. The helicoid's normal leans at `β_b`
+/// out of the transverse plane, so the contact rolls back `D cos β_b / 2`
+/// along the transverse normal, not `D / 2`. External gears and rings, each
+/// at the middle of its pin range.
+#[test]
+fn a_ball_touches_the_helicoid_where_the_seat_says() {
+    use gear_core::metrology::{pin_diameter_range, Space};
+    use gear_core::ring::{Cutter, Ring};
+    let mut spaces: Vec<(String, Space)> = Vec::new();
+    for p in helical_grid() {
+        let g = Tooth::new(p);
+        if !g.severed {
+            let what = format!(
+                "z={} x={} a={} b={} m={}",
+                p.teeth, p.profile_shift, p.pressure_angle, p.helix_angle, p.module
+            );
+            spaces.push((what, Space::of(&g)));
+        }
+    }
+    for teeth in [40u32, 60, 72] {
+        for &helix_angle in HELICAL {
+            let ring = Ring::cut_by(
+                &GearParams {
+                    teeth,
+                    helix_angle,
+                    ..Default::default()
+                },
+                &Cutter::default(),
+            );
+            spaces.push((
+                format!("ring z={teeth} b={helix_angle}"),
+                Space::of_ring(&ring),
+            ));
+        }
+    }
+    let mut checked = 0;
+    let mut worst = 0.0_f64;
+    for (what, space) in &spaces {
+        let Some((lo, hi)) = pin_diameter_range(space) else {
+            continue;
+        };
+        let d = 0.5 * (lo + hi);
+        let (r_m, contact) = space.seat(d).unwrap();
+        let flank = common::Helicoid {
+            rb: space.rb,
+            beta_b: space.beta_b,
+            theta0: -space.half_space,
+            w: -space.sign,
+        };
+        let (dist, radius) = flank.nearest([r_m, 0.0, 0.0]);
+        worst = worst.max((radius - contact).abs());
+        assert!(
+            (dist - d / 2.0).abs() < 1e-9,
+            "{what} d={d}: the nearest flank point is {dist} from the centre, not {}",
+            d / 2.0
+        );
+        assert!(
+            (radius - contact).abs() < 1e-9,
+            "{what} d={d}: contact reported at {contact}, the surface's at {radius}"
+        );
+        checked += 1;
+    }
+    assert!(checked > 400, "{checked} balls checked");
+    println!("{checked} balls; worst contact radius disagreement {worst:.2e} mm");
+}
+
+/// **The span's anvils touch the helicoid where the span says.** Two parallel
+/// planes tangent to the outer flanks, their tilt solved for, and the common
+/// normal between them placed symmetrically ([`common::Helicoid::anvils`]):
+/// the separation is the span and the contact radius the one reported, and a
+/// span is `Some` exactly when that contact lies on the usable flank. The
+/// contacts on the common normal are `W cos β_b` apart in the transverse
+/// plane, so each sits at `√(r_b² + (W cos β_b / 2)²)`.
+#[test]
+fn the_span_anvils_touch_the_helicoid_where_the_span_says() {
+    use gear_core::gear::Gear;
+    use gear_core::metrology::span_over_teeth_at;
+    let hair = 1e-9;
+    let (mut spans, mut none) = (0, 0);
+    for p in helical_grid() {
+        let g = Tooth::new(p);
+        if g.severed {
+            continue;
+        }
+        let gear = Gear::new(p);
+        let z = f64::from(p.teeth);
+        let flank = common::Helicoid {
+            rb: g.rb,
+            beta_b: g.base_helix_angle(),
+            theta0: -g.psi_b,
+            w: 1.0,
+        };
+        for k in 1..=p.teeth {
+            let sweep = std::f64::consts::TAU * f64::from(k - 1) / z + 2.0 * g.psi_b;
+            let (w, radius, tilt) =
+                flank.anvils(std::f64::consts::PI * f64::from(k - 1) / z, sweep / 2.0);
+            let what = format!(
+                "z={} x={} a={} b={} m={} k={k}",
+                p.teeth, p.profile_shift, p.pressure_angle, p.helix_angle, p.module
+            );
+            // The sign is which way the lead runs, and neither contact reads it.
+            assert!(
+                (tilt.abs() - g.base_helix_angle().abs()).abs() < 1e-12,
+                "{what}: the oracle's planes tilt {tilt}, not beta_b"
+            );
+            let on_flank = (g.r_j..=g.ra).contains(&radius);
+            let near_an_end = (radius - g.r_j).abs() < hair || (radius - g.ra).abs() < hair;
+            for (source, got) in [
+                ("tooth", span_over_teeth(&g, k)),
+                ("gear", span_over_teeth_at(&gear, 0, k)),
+            ] {
+                if !near_an_end {
+                    assert_eq!(
+                        got.is_some(),
+                        on_flank,
+                        "{what} ({source}): the anvils touch at {radius}, usable flank [{}, {}]",
+                        g.r_j,
+                        g.ra
+                    );
+                }
+                if let Some(s) = got {
+                    assert!(
+                        (s.nominal - w).abs() < 1e-12 * w,
+                        "{what} ({source}): span {} against the anvils' {w}",
+                        s.nominal
+                    );
+                    assert!(
+                        (s.contact_radius - radius).abs() < 1e-9,
+                        "{what} ({source}): contact {} against the anvils' {radius}",
+                        s.contact_radius
+                    );
+                }
+            }
+            if on_flank {
+                spans += 1;
+            } else {
+                none += 1;
+            }
+        }
+    }
+    assert!(
+        spans > 1000 && none > 1000,
+        "{spans} spans, {none} off the flank"
+    );
+    println!("{spans} spans on the flank and {none} off it, each as the anvils say");
+}
+
+/// The cases the finding was made on, with the figures
+/// `tools/helical_measurement.py` computes from the surface alone.
+#[test]
+fn helical_contact_at_the_recorded_cases() {
+    let gear = |teeth, helix_angle| {
+        Tooth::new(GearParams {
+            teeth,
+            helix_angle,
+            ..Default::default()
+        })
+    };
+    // z20 β30: a 1.8 mm ball touches at 11.636143490; a 3.1487 mm ball
+    // touches above the tip and does not measure.
+    let g = gear(20, 30.0);
+    let (_, contact) = pin_geometry(&g, 1.8).unwrap();
+    assert!((contact - 11.636_143_490).abs() < 1e-8, "{contact}");
+    assert_eq!(
+        over_pins(&g, 3.1487, PinCount::Two).err(),
+        Some(MeasurementError::PinTooLarge)
+    );
+    // z60 β35: over 8 teeth the anvils touch at 34.915095037, below the form
+    // circle; over 12 at 36.643345412, on the flank, and 12 is the span
+    // nearest the pitch circle.
+    let g = gear(60, 35.0);
+    assert!(g.r_j > 34.915_095_037, "form {}", g.r_j);
+    assert!(span_over_teeth(&g, 8).is_none());
+    let s = span_over_teeth(&g, 12).unwrap();
+    assert!(
+        (s.contact_radius - 36.643_345_412).abs() < 1e-8,
+        "{}",
+        s.contact_radius
+    );
+    assert!((s.nominal - 35.426_737_508).abs() < 1e-8, "{}", s.nominal);
+    assert_eq!(best_span(&g).unwrap().teeth_spanned, 12);
 }
 
 // --------------------------------------------------------------------- //

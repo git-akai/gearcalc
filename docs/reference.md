@@ -1407,8 +1407,27 @@ Derived rather than quoted: the span is a chord along the base tangent, so it is
 W_k = cos β_b · r_b [ 2π(k−1)/z + s_t/r + 2 inv α_t ]
 ```
 
-which reduces exactly to `W_k = m cos α_n [π(k−0.5) + z inv α_t] + 2 x_thick m sin α_n`
-for the standard rack — note `x_thick`, since a span is a thickness measurement.
+which reduces exactly to `W_k = m_n cos α_n [π(k−0.5) + z inv α_t] + 2 x_thick m_n sin α_n`
+for the standard rack, helical gears included — note `x_thick`, since a span is
+a thickness measurement.
+
+**Where the anvils touch.** A helical flank is an involute helicoid: its normal
+lies in the base tangent plane, leaning `β_b` out of the transverse plane. The
+anvils are two parallel planes with that normal, and `W` is measured along their
+common normal. That normal's two ends are `W cos β_b` apart in the transverse
+plane, symmetric about the radius through the middle of the spanned group, so
+each contact is half that from the base tangent point:
+
+```text
+d_M = √( d_b² + (W_k cos β_b)² )
+```
+
+Spur is `cos 0 = 1`. Dividing by `cos β_b` instead — reading `W` as if it lay in
+the transverse plane — puts the contact too high by `1/cos² β_b` in roll.
+`tools/helical_measurement.py` finds the same contact from the flank surface
+alone, and `tests/metrology.rs` holds the crate to a surface oracle over the
+shared grid.
+
 `k` is chosen from the exact admissible range (both contact points between form
 and tip radius), picking the one nearest the pitch circle; it reports "no valid
 span" rather than an unmeasurable number.
@@ -1419,10 +1438,15 @@ One relation at two signs. `σ = +1` external, `−1` internal:
 
 ```text
 inv φ_M = σ ( ψ_b + d_p / (2 r_b cos β_b) − π/z )
-u_c     = tan φ_M − σ d_p / (2 r_b)
+u_c     = tan φ_M − σ d_p cos β_b / (2 r_b)
 r_M     = r_b / cos φ_M
 M       = across − σ d_p        across = 2 r_M, or 2 r_M cos(π/2z) if z is odd
 ```
+
+Both `cos β_b` are the helicoid's normal leaning `β_b` out of the transverse
+plane: a point's distance to the flank is its transverse distance times
+`cos β_b`, and the ball's radius, laid along that normal, moves the contact only
+`cos β_b` of itself along the base tangent.
 
 Every sign says something physical: an external gear's space narrows outward so a
 larger pin rides higher, a ring's narrows inward so a larger pin sits deeper; the
