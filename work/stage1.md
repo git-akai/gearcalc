@@ -45,3 +45,8 @@ Carried from the P5 check (after P4 lands):
   0.33–0.38 mm along the line of action past the planet's form circle, so they warn of flank
   interference by default. Size the ring tip automatically to the mate's form circle, a computed
   value rather than a fixed addendum.
+
+Carried from P1 (into Stage 3 redesign C / R3, the search):
+- With search on, Layshaft evaluates 46,251 candidates and cuts 98,966 teeth, about 1.4 s per solve.
+- Breakaway cannot see a "minimum among positive efficiencies" tie-break, because the recorded
+  presets have only one positive branch. Add a fixture with two.
