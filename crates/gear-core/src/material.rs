@@ -187,6 +187,92 @@ pub enum Specimen {
     GearRoot,
 }
 
+/// **ISO 6336-5's material quality grade**: how far a producer's control of
+/// the material and its treatment is demonstrated. The same hardness buys a
+/// higher allowable at a better grade.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
+pub enum QualityGrade {
+    /// Modest demands on the material and its treatment.
+    Ml,
+    /// Requirements an experienced producer meets at moderate cost.
+    #[default]
+    Mq,
+    /// Requirements that must be realised when a high allowable is wanted.
+    Me,
+}
+
+/// **A line of ISO 6336-5:2016 Table 1**, `σ_Hlim = A·HV + B` over a band of
+/// hardness, for one kind of material. One is carried: the one the library's
+/// steels are.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
+pub enum HardnessLine {
+    /// Through-hardened wrought alloy steel, contact (Table 1, rows 24–26).
+    ThroughHardenedAlloySteel,
+}
+
+impl HardnessLine {
+    /// `(A, B, the hardness the line stops at in HV)` for a grade, as the
+    /// table prints them.
+    #[must_use]
+    pub fn coefficients(self, grade: QualityGrade) -> (f64, f64, f64) {
+        match (self, grade) {
+            (Self::ThroughHardenedAlloySteel, QualityGrade::Ml) => (1.313, 188.0, 360.0),
+            (Self::ThroughHardenedAlloySteel, QualityGrade::Mq) => (1.313, 373.0, 360.0),
+            (Self::ThroughHardenedAlloySteel, QualityGrade::Me) => (2.213, 260.0, 390.0),
+        }
+    }
+}
+
+/// **A flank's pitting endurance estimated from hardness**: a line of ISO
+/// 6336-5, the material's hardness, and the quality grade it is read at —
+/// the grade a designer's choice, the estimate Rust's.
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+pub struct HardnessEstimate {
+    pub line: HardnessLine,
+    /// Vickers hardness, HV, with where it came from.
+    pub hardness: Value,
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub grade: QualityGrade,
+}
+
+impl HardnessEstimate {
+    /// `σ_Hlim`, MPa: the line at the hardness, **held at the line's end**
+    /// where the hardness is past it — the table gives nothing there, and its
+    /// last figure is the one it does give.
+    #[must_use]
+    pub fn value(&self) -> f64 {
+        let (a, b, cap) = self.line.coefficients(self.grade);
+        a * self.hardness.value.min(cap) + b
+    }
+
+    /// Whether the hardness lies past where the line stops.
+    #[must_use]
+    pub fn past_the_line(&self) -> bool {
+        self.hardness.value > self.line.coefficients(self.grade).2
+    }
+}
+
 /// **The fraction of a one-way (`R = 0`) gear-root endurance a fully reversed
 /// root keeps**: ISO 6336-3 Annex B's `Y_M` for an idler, 0.7.
 ///
@@ -301,6 +387,13 @@ pub struct Material {
         serde(default, skip_serializing_if = "Option::is_none")
     )]
     pub contact_fatigue_allowable: Option<Value>,
+    /// Where no figure is published, the estimate from hardness a flank
+    /// allowable is derived from ([`Self::flank_endurance`]).
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Option::is_none")
+    )]
+    pub contact_estimate: Option<HardnessEstimate>,
 }
 
 impl Material {
@@ -319,9 +412,23 @@ impl Material {
             self.fatigue_allowable.basis,
         ]
         .into_iter()
-        .chain(self.contact_fatigue_allowable.as_ref().map(|v| v.basis))
+        .chain(self.flank_endurance().map(|v| v.basis))
         .max()
         .unwrap_or(Basis::Estimated)
+    }
+
+    /// **The flank's pitting endurance**: a published figure where there is
+    /// one, else the estimate from hardness at its grade, basis `Estimated`;
+    /// `None` where neither exists.
+    #[must_use]
+    pub fn flank_endurance(&self) -> Option<Value> {
+        self.contact_fatigue_allowable.clone().or_else(|| {
+            self.contact_estimate.as_ref().map(|e| Value {
+                value: e.value(),
+                basis: Basis::Estimated,
+                note: None,
+            })
+        })
     }
 
     /// **What part of the fatigue figure a fully reversed root is judged
@@ -391,6 +498,10 @@ pub struct Overrides {
     /// it has none.
     #[cfg_attr(feature = "serde", serde(default))]
     pub contact_fatigue_allowable: Option<f64>,
+    /// The quality grade a hardness estimate is read at, in place of the
+    /// library's.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub contact_grade: Option<QualityGrade>,
 }
 
 impl Overrides {
@@ -409,6 +520,7 @@ impl Overrides {
             || self.fatigue_load_ratio.is_some()
             || self.fatigue_specimen.is_some()
             || self.contact_fatigue_allowable.is_some()
+            || self.contact_grade.is_some()
     }
 }
 
@@ -437,6 +549,14 @@ impl Material {
             }
         }
         let replaced = o.fatigue_allowable.is_some();
+        let contact_estimate = self.contact_estimate.clone().map(|e| HardnessEstimate {
+            grade: o.contact_grade.unwrap_or(e.grade),
+            ..e
+        });
+        let graded = Self {
+            contact_estimate,
+            ..self.clone()
+        };
         Self {
             density: swap(&self.density, o.density),
             elastic_modulus: swap(&self.elastic_modulus, o.elastic_modulus),
@@ -445,15 +565,17 @@ impl Material {
             fatigue_allowable: swap(&self.fatigue_allowable, o.fatigue_allowable),
             fatigue_load_ratio: keep(replaced, self.fatigue_load_ratio, o.fatigue_load_ratio),
             fatigue_specimen: keep(replaced, self.fatigue_specimen, o.fatigue_specimen),
+            // **The flank figure as used**: the override, else what the
+            // library publishes or its estimate derives at the grade asked.
             contact_fatigue_allowable: match o.contact_fatigue_allowable {
                 Some(x) => Some(Value {
                     value: x,
                     basis: Basis::Overridden,
                     note: None,
                 }),
-                None => self.contact_fatigue_allowable.clone(),
+                None => graded.flank_endurance(),
             },
-            ..self.clone()
+            ..graded
         }
     }
 }
@@ -524,6 +646,7 @@ mod tests {
             fatigue_load_ratio: Some(LoadRatio::Reversed),
             fatigue_specimen: Some(Specimen::Coupon),
             contact_fatigue_allowable: None,
+            contact_estimate: None,
         }
     }
 

@@ -1950,10 +1950,15 @@ pub(super) fn test_library() -> MaterialLibrary {
         },
         fatigue_load_ratio: Some(crate::material::LoadRatio::Reversed),
         fatigue_specimen: Some(crate::material::Specimen::Coupon),
-        contact_fatigue_allowable: Some(Value {
-            value: 845.68,
-            basis: Basis::Estimated,
-            note: Some("test".into()),
+        contact_fatigue_allowable: None,
+        contact_estimate: Some(crate::material::HardnessEstimate {
+            line: crate::material::HardnessLine::ThroughHardenedAlloySteel,
+            hardness: Value {
+                value: 458.0,
+                basis: Basis::Derived,
+                note: Some("test".into()),
+            },
+            grade: crate::material::QualityGrade::Mq,
         }),
     };
     let bronze = Material {
@@ -1968,6 +1973,7 @@ pub(super) fn test_library() -> MaterialLibrary {
             note: Some("test".into()),
         },
         contact_fatigue_allowable: None,
+        contact_estimate: None,
         ..steel.clone()
     };
     MaterialLibrary {
@@ -2881,9 +2887,7 @@ pub enum Rating {
 pub fn allowable(material: &Material, rating: Rating, kind: CaseKind) -> Option<f64> {
     match (rating, kind) {
         (Rating::Bending, kind) => Some(root_allowable(material, kind)),
-        (Rating::Contact { .. }, CaseKind::Fatigue) => {
-            material.contact_fatigue_allowable.as_ref().map(|v| v.value)
-        }
+        (Rating::Contact { .. }, CaseKind::Fatigue) => material.flank_endurance().map(|v| v.value),
         (Rating::Contact { aspect }, CaseKind::Ultimate) => (material.ultimate_measure
             == crate::material::Measure::Yield)
             .then(|| crate::hertz::first_yield_factor(aspect, material.poissons_ratio.value))

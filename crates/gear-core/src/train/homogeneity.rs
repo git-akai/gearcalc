@@ -134,6 +134,8 @@ const CLASSES: &[(&str, Class)] = &[
     ("cycles/*", Class::Power(0)),
     // The material's constants, which no length enters.
     ("material/*/value", Class::Power(0)),
+    // ...and the hardness a flank estimate is read from.
+    ("material/contact_estimate/hardness/value", Class::Power(0)),
     // Indices and counts: must not move at all.
     ("case", Class::Power(0)),
     ("bodies/at", Class::Power(0)),

@@ -21,6 +21,9 @@
     outside,
     type Auto,
     type Overrides,
+    type LoadRatio,
+    type Specimen,
+    type QualityGrade,
     type MemberGear,
     type Shape,
     type Member,
@@ -1036,10 +1039,35 @@
      The number shown is Rust's — it has already chosen between the dry and
      conditioned states, which is an engineering decision and not this side's to
      make. -->
+<!-- **One of a few named values**, blank for the library's: the first entry
+     says what the library holds, or that it states nothing. -->
+{#snippet choice(
+  label: string,
+  asked: string | null,
+  used: string | null,
+  options: [string, string][],
+  set: (v: string | null) => void,
+)}
+  <label class="prop">
+    <span>{label}</span>
+    <select
+      value={asked ?? ""}
+      onchange={(e) => set(e.currentTarget.value === "" ? null : e.currentTarget.value)}
+    >
+      <option value="">
+        {t("ui.train_as_library")}: {options.find(([k]) => k === used)?.[1] ?? t("ui.train_unstated")}
+      </option>
+      {#each options as [k, name] (k)}
+        <option value={k}>{name}</option>
+      {/each}
+    </select>
+  </label>
+{/snippet}
+
 {#snippet property(
   label: string,
   gear: MemberGear,
-  key: Exclude<keyof Overrides, "fatigue_load_ratio" | "fatigue_specimen">,
+  key: Exclude<keyof Overrides, "fatigue_load_ratio" | "fatigue_specimen" | "contact_grade">,
   used: Value | undefined,
   step: number,
   unit: string,
@@ -1671,6 +1699,31 @@
     {@render property(t("ui.train_ultimate_allowable"), gear, "ultimate_allowable", g?.material.ultimate_allowable ?? mat?.ultimate_allowable, 10, t("ui.train_mpa"))}
     {@render property(t("ui.train_fatigue_allowable"), gear, "fatigue_allowable", g?.material.fatigue_allowable ?? mat?.fatigue_allowable, 10, t("ui.train_mpa"))}
     {@render property(t("ui.train_contact_fatigue_allowable"), gear, "contact_fatigue_allowable", g?.material.contact_fatigue_allowable ?? mat?.contact_fatigue_allowable ?? undefined, 10, t("ui.train_mpa"))}
+    <!-- What a fatigue figure was measured at and on, and the grade a flank
+         estimate is read at: choices, each blank for the library's own. -->
+    {@render choice(
+      t("ui.train_fatigue_load_ratio"),
+      gear.material_overrides.fatigue_load_ratio,
+      g?.material.fatigue_load_ratio ?? mat?.fatigue_load_ratio ?? null,
+      [["reversed", t("ui.train_ratio_reversed")], ["pulsating", t("ui.train_ratio_pulsating")]],
+      (v) => (gear.material_overrides.fatigue_load_ratio = v as LoadRatio | null),
+    )}
+    {@render choice(
+      t("ui.train_fatigue_specimen"),
+      gear.material_overrides.fatigue_specimen,
+      g?.material.fatigue_specimen ?? mat?.fatigue_specimen ?? null,
+      [["coupon", t("ui.train_specimen_coupon")], ["gear_root", t("ui.train_specimen_gear_root")]],
+      (v) => (gear.material_overrides.fatigue_specimen = v as Specimen | null),
+    )}
+    {#if g?.material.contact_estimate ?? mat?.contact_estimate}
+      {@render choice(
+        t("ui.train_contact_grade"),
+        gear.material_overrides.contact_grade,
+        (g?.material.contact_estimate ?? mat?.contact_estimate)?.grade ?? null,
+        [["ml", "ML"], ["mq", "MQ"], ["me", "ME"]],
+        (v) => (gear.material_overrides.contact_grade = v as QualityGrade | null),
+      )}
+    {/if}
   </div>
   <!-- **What every load case does to this gear**, one row per enabled case:
        the torque it puts on it and the speed it turns at, how often it is

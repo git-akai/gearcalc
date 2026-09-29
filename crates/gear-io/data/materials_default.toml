@@ -35,10 +35,12 @@
 # state neither, and a reversed root reads such a figure one way (R = 0), the
 # lower allowable, and says so. A file that omits both keys reads the same way.
 #
-# `contact_fatigue_allowable` is a flank's pitting endurance, a different
-# figure from the root's `fatigue_allowable`. The two steels carry an estimate
-# from hardness by ISO 6336-5's through-hardened alloy steel line at quality
-# grade MQ, the grade and the other grades' figures named in each note. No
+# A flank's pitting endurance is a different figure from the root's
+# `fatigue_allowable`: `contact_fatigue_allowable` where one is published,
+# else `contact_estimate`, from which it is derived — a line of ISO 6336-5:2016
+# Table 1, the hardness, and the quality grade (ML, MQ, ME) it is read at, which
+# a design can change. The two steels carry estimates on the through-hardened
+# alloy steel line at grade MQ; no steel here has a published figure. No
 # published contact endurance was found for the brass, POM or any polyamide
 # (nothing quotable from VDI 2736 or a datasheet), so they carry none, and
 # contact fatigue on them is not judged: the rating says so rather than
@@ -68,7 +70,7 @@ ultimate_measure = "yield"
 fatigue_allowable = { value = 330.0, basis = "datasheet", note = "Published fatigue strength; the source does not state the cycle count." }
 fatigue_load_ratio = "reversed"
 fatigue_specimen = "coupon"
-contact_fatigue_allowable = { value = 675.0, basis = "estimated", note = "Pitting endurance estimated from hardness by ISO 6336-5:2016 Table 1, through-hardened wrought alloy steel, contact, quality grade MQ: σ_Hlim = 1.313 HV + 373, at 230 HV (the source's 220 HB, converted by ASTM E140). Grade ML gives 490 MPa and ME 769; MQ is the grade ISO describes as met by experienced manufacturers at moderate cost. Override with your own figure for another grade. No published contact endurance for this steel in this condition was found." }
+contact_estimate = { line = "through_hardened_alloy_steel", grade = "mq", hardness = { value = 230.0, basis = "derived", note = "The source's 220 HB, converted by ASTM E140. The flank allowable is ISO 6336-5:2016 Table 1's through-hardened alloy steel line at this hardness and the grade asked: 490 / 675 / 769 MPa at ML / MQ / ME." } }
 
 [[material]]
 name = "4340 Hardened Steel"
@@ -84,7 +86,7 @@ ultimate_measure = "yield"
 fatigue_allowable = { value = 750.0, basis = "estimated", note = "0.5 × UTS, the classical steel endurance ratio, which reproduces the annealed entry's published 330 MPa to within 5 %. No published fatigue figure was found at THIS temper. Treat as optimistic: the endurance ratio is known to fall away above roughly 1400 MPa UTS rather than track 0.5 indefinitely, so the true figure is plausibly nearer 700 MPa. The first number here worth replacing with your own data." }
 fatigue_load_ratio = "reversed"
 fatigue_specimen = "coupon"
-contact_fatigue_allowable = { value = 845.7, basis = "estimated", note = "Pitting endurance estimated from hardness by ISO 6336-5:2016 Table 1, through-hardened wrought alloy steel, contact, quality grade MQ: σ_Hlim = 1.313 HV + 373, taken at the table's 360 HV cap. 46 HRC is about 458 HV (ASTM E140), past the cap, and the table gives nothing there; the capped figure is the table's highest. Grade ML gives 660.7 MPa and ME 1123.1 (at its 390 HV cap); MQ is the grade ISO describes as met by experienced manufacturers at moderate cost. Override with your own figure for another grade. No published contact endurance for this steel at this temper was found." }
+contact_estimate = { line = "through_hardened_alloy_steel", grade = "mq", hardness = { value = 458.0, basis = "derived", note = "46 HRC, the condition's, converted by ASTM E140. Past the end of ISO 6336-5:2016 Table 1's through-hardened alloy steel line (360 HV at ML and MQ, 390 at ME), where the table gives nothing, so the flank allowable is held at the line's end: 660.7 / 845.7 / 1123.1 MPa at ML / MQ / ME." } }
 
 # The 425 °C temper is chosen deliberately. Tempering 4340 lower gives more
 # strength (1860 MPa yield at 205 °C) but takes the hardness to 53 HRC, past

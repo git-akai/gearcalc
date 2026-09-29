@@ -245,7 +245,8 @@
           "fatigue_allowable": null,
           "fatigue_load_ratio": null,
           "fatigue_specimen": null,
-          "contact_fatigue_allowable": null
+          "contact_fatigue_allowable": null,
+          "contact_grade": null
          }
         },
         "module": {
@@ -312,7 +313,8 @@
           "fatigue_allowable": null,
           "fatigue_load_ratio": null,
           "fatigue_specimen": null,
-          "contact_fatigue_allowable": null
+          "contact_fatigue_allowable": null,
+          "contact_grade": null
          }
         },
         "module": {
@@ -450,7 +452,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -517,7 +520,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -662,7 +666,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -729,7 +734,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -796,7 +802,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -973,7 +980,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -1040,7 +1048,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -1107,7 +1116,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -1174,7 +1184,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -1241,7 +1252,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -1308,7 +1320,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -1470,7 +1483,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -1537,7 +1551,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -1673,7 +1688,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -1740,7 +1756,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -1884,7 +1901,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -1951,7 +1969,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -2018,7 +2037,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -2179,7 +2199,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -2246,7 +2267,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -2317,7 +2339,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -2482,7 +2505,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -2549,7 +2573,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -2620,7 +2645,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -2691,7 +2717,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -2758,7 +2785,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -2928,7 +2956,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -2995,7 +3024,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -3157,7 +3187,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -3224,7 +3255,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -3291,7 +3323,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -3358,7 +3391,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -3550,23 +3584,23 @@
    "ok": [
     [
      "en",
-     544
+     553
     ],
     [
      "de",
-     544
+     553
     ],
     [
      "pt",
-     544
+     553
     ],
     [
      "zh-Hans",
-     544
+     553
     ],
     [
      "zh-Hant",
-     544
+     553
     ]
    ]
   },
@@ -3604,10 +3638,14 @@
       },
       "fatigue_load_ratio": "reversed",
       "fatigue_specimen": "coupon",
-      "contact_fatigue_allowable": {
-       "value": 675,
-       "basis": "estimated",
-       "note": "Pitting endurance estimated from hardness by ISO 6336-5:2016 Table 1, through-hardened wrought alloy steel, contact, quality grade MQ: σ_Hlim = 1.313 HV + 373, at 230 HV (the source's 220 HB, converted by ASTM E140). Grade ML gives 490 MPa and ME 769; MQ is the grade ISO describes as met by experienced manufacturers at moderate cost. Override with your own figure for another grade. No published contact endurance for this steel in this condition was found."
+      "contact_estimate": {
+       "line": "through_hardened_alloy_steel",
+       "hardness": {
+        "value": 230,
+        "basis": "derived",
+        "note": "The source's 220 HB, converted by ASTM E140. The flank allowable is ISO 6336-5:2016 Table 1's through-hardened alloy steel line at this hardness and the grade asked: 490 / 675 / 769 MPa at ML / MQ / ME."
+       },
+       "grade": "mq"
       }
      },
      {
@@ -3641,10 +3679,14 @@
       },
       "fatigue_load_ratio": "reversed",
       "fatigue_specimen": "coupon",
-      "contact_fatigue_allowable": {
-       "value": "845.70000000000005",
-       "basis": "estimated",
-       "note": "Pitting endurance estimated from hardness by ISO 6336-5:2016 Table 1, through-hardened wrought alloy steel, contact, quality grade MQ: σ_Hlim = 1.313 HV + 373, taken at the table's 360 HV cap. 46 HRC is about 458 HV (ASTM E140), past the cap, and the table gives nothing there; the capped figure is the table's highest. Grade ML gives 660.7 MPa and ME 1123.1 (at its 390 HV cap); MQ is the grade ISO describes as met by experienced manufacturers at moderate cost. Override with your own figure for another grade. No published contact endurance for this steel at this temper was found."
+      "contact_estimate": {
+       "line": "through_hardened_alloy_steel",
+       "hardness": {
+        "value": 458,
+        "basis": "derived",
+        "note": "46 HRC, the condition's, converted by ASTM E140. Past the end of ISO 6336-5:2016 Table 1's through-hardened alloy steel line (360 HV at ML and MQ, 390 at ME), where the table gives nothing, so the flank allowable is held at the line's end: 660.7 / 845.7 / 1123.1 MPa at ML / MQ / ME."
+       },
+       "grade": "mq"
       }
      },
      {
@@ -7907,7 +7949,8 @@
           "fatigue_allowable": null,
           "fatigue_load_ratio": null,
           "fatigue_specimen": null,
-          "contact_fatigue_allowable": null
+          "contact_fatigue_allowable": null,
+          "contact_grade": null
          }
         },
         "module": {
@@ -7974,7 +8017,8 @@
           "fatigue_allowable": null,
           "fatigue_load_ratio": null,
           "fatigue_specimen": null,
-          "contact_fatigue_allowable": null
+          "contact_fatigue_allowable": null,
+          "contact_grade": null
          }
         },
         "module": {
@@ -8117,7 +8161,8 @@
           "fatigue_allowable": null,
           "fatigue_load_ratio": null,
           "fatigue_specimen": null,
-          "contact_fatigue_allowable": null
+          "contact_fatigue_allowable": null,
+          "contact_grade": null
          }
         },
         "module": {
@@ -8184,7 +8229,8 @@
           "fatigue_allowable": null,
           "fatigue_load_ratio": null,
           "fatigue_specimen": null,
-          "contact_fatigue_allowable": null
+          "contact_fatigue_allowable": null,
+          "contact_grade": null
          }
         },
         "module": {
@@ -8251,7 +8297,8 @@
           "fatigue_allowable": null,
           "fatigue_load_ratio": null,
           "fatigue_specimen": null,
-          "contact_fatigue_allowable": null
+          "contact_fatigue_allowable": null,
+          "contact_grade": null
          }
         },
         "module": {
@@ -8426,7 +8473,8 @@
           "fatigue_allowable": null,
           "fatigue_load_ratio": null,
           "fatigue_specimen": null,
-          "contact_fatigue_allowable": null
+          "contact_fatigue_allowable": null,
+          "contact_grade": null
          }
         },
         "module": {
@@ -8493,7 +8541,8 @@
           "fatigue_allowable": null,
           "fatigue_load_ratio": null,
           "fatigue_specimen": null,
-          "contact_fatigue_allowable": null
+          "contact_fatigue_allowable": null,
+          "contact_grade": null
          }
         },
         "module": {
@@ -8560,7 +8609,8 @@
           "fatigue_allowable": null,
           "fatigue_load_ratio": null,
           "fatigue_specimen": null,
-          "contact_fatigue_allowable": null
+          "contact_fatigue_allowable": null,
+          "contact_grade": null
          }
         },
         "module": {
@@ -8627,7 +8677,8 @@
           "fatigue_allowable": null,
           "fatigue_load_ratio": null,
           "fatigue_specimen": null,
-          "contact_fatigue_allowable": null
+          "contact_fatigue_allowable": null,
+          "contact_grade": null
          }
         },
         "module": {
@@ -8694,7 +8745,8 @@
           "fatigue_allowable": null,
           "fatigue_load_ratio": null,
           "fatigue_specimen": null,
-          "contact_fatigue_allowable": null
+          "contact_fatigue_allowable": null,
+          "contact_grade": null
          }
         },
         "module": {
@@ -8761,7 +8813,8 @@
           "fatigue_allowable": null,
           "fatigue_load_ratio": null,
           "fatigue_specimen": null,
-          "contact_fatigue_allowable": null
+          "contact_fatigue_allowable": null,
+          "contact_grade": null
          }
         },
         "module": {
@@ -8921,7 +8974,8 @@
           "fatigue_allowable": null,
           "fatigue_load_ratio": null,
           "fatigue_specimen": null,
-          "contact_fatigue_allowable": null
+          "contact_fatigue_allowable": null,
+          "contact_grade": null
          }
         },
         "module": {
@@ -8988,7 +9042,8 @@
           "fatigue_allowable": null,
           "fatigue_load_ratio": null,
           "fatigue_specimen": null,
-          "contact_fatigue_allowable": null
+          "contact_fatigue_allowable": null,
+          "contact_grade": null
          }
         },
         "module": {
@@ -9122,7 +9177,8 @@
           "fatigue_allowable": null,
           "fatigue_load_ratio": null,
           "fatigue_specimen": null,
-          "contact_fatigue_allowable": null
+          "contact_fatigue_allowable": null,
+          "contact_grade": null
          }
         },
         "module": {
@@ -9189,7 +9245,8 @@
           "fatigue_allowable": null,
           "fatigue_load_ratio": null,
           "fatigue_specimen": null,
-          "contact_fatigue_allowable": null
+          "contact_fatigue_allowable": null,
+          "contact_grade": null
          }
         },
         "module": {
@@ -9331,7 +9388,8 @@
           "fatigue_allowable": null,
           "fatigue_load_ratio": null,
           "fatigue_specimen": null,
-          "contact_fatigue_allowable": null
+          "contact_fatigue_allowable": null,
+          "contact_grade": null
          }
         },
         "module": {
@@ -9398,7 +9456,8 @@
           "fatigue_allowable": null,
           "fatigue_load_ratio": null,
           "fatigue_specimen": null,
-          "contact_fatigue_allowable": null
+          "contact_fatigue_allowable": null,
+          "contact_grade": null
          }
         },
         "module": {
@@ -9465,7 +9524,8 @@
           "fatigue_allowable": null,
           "fatigue_load_ratio": null,
           "fatigue_specimen": null,
-          "contact_fatigue_allowable": null
+          "contact_fatigue_allowable": null,
+          "contact_grade": null
          }
         },
         "module": {
@@ -9624,7 +9684,8 @@
           "fatigue_allowable": null,
           "fatigue_load_ratio": null,
           "fatigue_specimen": null,
-          "contact_fatigue_allowable": null
+          "contact_fatigue_allowable": null,
+          "contact_grade": null
          }
         },
         "module": {
@@ -9691,7 +9752,8 @@
           "fatigue_allowable": null,
           "fatigue_load_ratio": null,
           "fatigue_specimen": null,
-          "contact_fatigue_allowable": null
+          "contact_fatigue_allowable": null,
+          "contact_grade": null
          }
         },
         "module": {
@@ -9762,7 +9824,8 @@
           "fatigue_allowable": null,
           "fatigue_load_ratio": null,
           "fatigue_specimen": null,
-          "contact_fatigue_allowable": null
+          "contact_fatigue_allowable": null,
+          "contact_grade": null
          }
         },
         "module": {
@@ -9925,7 +9988,8 @@
           "fatigue_allowable": null,
           "fatigue_load_ratio": null,
           "fatigue_specimen": null,
-          "contact_fatigue_allowable": null
+          "contact_fatigue_allowable": null,
+          "contact_grade": null
          }
         },
         "module": {
@@ -9992,7 +10056,8 @@
           "fatigue_allowable": null,
           "fatigue_load_ratio": null,
           "fatigue_specimen": null,
-          "contact_fatigue_allowable": null
+          "contact_fatigue_allowable": null,
+          "contact_grade": null
          }
         },
         "module": {
@@ -10063,7 +10128,8 @@
           "fatigue_allowable": null,
           "fatigue_load_ratio": null,
           "fatigue_specimen": null,
-          "contact_fatigue_allowable": null
+          "contact_fatigue_allowable": null,
+          "contact_grade": null
          }
         },
         "module": {
@@ -10134,7 +10200,8 @@
           "fatigue_allowable": null,
           "fatigue_load_ratio": null,
           "fatigue_specimen": null,
-          "contact_fatigue_allowable": null
+          "contact_fatigue_allowable": null,
+          "contact_grade": null
          }
         },
         "module": {
@@ -10201,7 +10268,8 @@
           "fatigue_allowable": null,
           "fatigue_load_ratio": null,
           "fatigue_specimen": null,
-          "contact_fatigue_allowable": null
+          "contact_fatigue_allowable": null,
+          "contact_grade": null
          }
         },
         "module": {
@@ -10369,7 +10437,8 @@
           "fatigue_allowable": null,
           "fatigue_load_ratio": null,
           "fatigue_specimen": null,
-          "contact_fatigue_allowable": null
+          "contact_fatigue_allowable": null,
+          "contact_grade": null
          }
         },
         "module": {
@@ -10436,7 +10505,8 @@
           "fatigue_allowable": null,
           "fatigue_load_ratio": null,
           "fatigue_specimen": null,
-          "contact_fatigue_allowable": null
+          "contact_fatigue_allowable": null,
+          "contact_grade": null
          }
         },
         "module": {
@@ -10596,7 +10666,8 @@
           "fatigue_allowable": null,
           "fatigue_load_ratio": null,
           "fatigue_specimen": null,
-          "contact_fatigue_allowable": null
+          "contact_fatigue_allowable": null,
+          "contact_grade": null
          }
         },
         "module": {
@@ -10663,7 +10734,8 @@
           "fatigue_allowable": null,
           "fatigue_load_ratio": null,
           "fatigue_specimen": null,
-          "contact_fatigue_allowable": null
+          "contact_fatigue_allowable": null,
+          "contact_grade": null
          }
         },
         "module": {
@@ -10730,7 +10802,8 @@
           "fatigue_allowable": null,
           "fatigue_load_ratio": null,
           "fatigue_specimen": null,
-          "contact_fatigue_allowable": null
+          "contact_fatigue_allowable": null,
+          "contact_grade": null
          }
         },
         "module": {
@@ -10797,7 +10870,8 @@
           "fatigue_allowable": null,
           "fatigue_load_ratio": null,
           "fatigue_specimen": null,
-          "contact_fatigue_allowable": null
+          "contact_fatigue_allowable": null,
+          "contact_grade": null
          }
         },
         "module": {
@@ -11243,7 +11317,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -11310,7 +11385,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -11377,7 +11453,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -11444,7 +11521,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -11511,7 +11589,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -11837,7 +11916,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -11904,7 +11984,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -11971,7 +12052,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -12038,7 +12120,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -12105,7 +12188,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -12429,7 +12513,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -12496,7 +12581,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -12563,7 +12649,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -12630,7 +12717,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -12697,7 +12785,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -13023,7 +13112,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -13090,7 +13180,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -13157,7 +13248,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -13224,7 +13316,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -13291,7 +13384,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -13617,7 +13711,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -13684,7 +13779,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -13751,7 +13847,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -13818,7 +13915,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -13885,7 +13983,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -14289,7 +14388,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -14356,7 +14456,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -14423,7 +14524,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -14490,7 +14592,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -14557,7 +14660,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -14958,7 +15062,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -15025,7 +15130,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -15092,7 +15198,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -15159,7 +15266,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -15226,7 +15334,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -15631,7 +15740,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -15698,7 +15808,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -15765,7 +15876,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -15832,7 +15944,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -15899,7 +16012,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -15966,7 +16080,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -16037,7 +16152,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -16475,7 +16591,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -16542,7 +16659,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -16609,7 +16727,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -16676,7 +16795,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -16743,7 +16863,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -16810,7 +16931,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -16881,7 +17003,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -16948,7 +17071,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -17015,7 +17139,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -17082,7 +17207,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -17149,7 +17275,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -17216,7 +17343,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -17283,7 +17411,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -17350,7 +17479,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -17871,7 +18001,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -17938,7 +18069,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -18005,7 +18137,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -18072,7 +18205,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -18139,7 +18273,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -18206,7 +18341,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -18277,7 +18413,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -18344,7 +18481,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -18411,7 +18549,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -18478,7 +18617,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -18545,7 +18685,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -18612,7 +18753,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -18679,7 +18821,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -19120,7 +19263,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -19187,7 +19331,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -19254,7 +19399,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -19321,7 +19467,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -19388,7 +19535,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -19455,7 +19603,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -19526,7 +19675,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -19593,7 +19743,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -19660,7 +19811,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -19727,7 +19879,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -19794,7 +19947,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -19861,7 +20015,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -19928,7 +20083,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -19995,7 +20151,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -20062,7 +20219,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -20546,7 +20704,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -20613,7 +20772,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -20680,7 +20840,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -20747,7 +20908,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -20814,7 +20976,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -20881,7 +21044,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -20952,7 +21116,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -21019,7 +21184,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -21086,7 +21252,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -21153,7 +21320,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -21220,7 +21388,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -21287,7 +21456,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -21354,7 +21524,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -21421,7 +21592,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -21488,7 +21660,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -21986,7 +22159,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -22053,7 +22227,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -22120,7 +22295,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -22187,7 +22363,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -22254,7 +22431,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -22321,7 +22499,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -22392,7 +22571,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -22459,7 +22639,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -22526,7 +22707,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -22593,7 +22775,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -22660,7 +22843,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -22727,7 +22911,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -22794,7 +22979,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -22861,7 +23047,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -22928,7 +23115,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -22999,7 +23187,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -23517,7 +23706,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -23584,7 +23774,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -23651,7 +23842,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -23718,7 +23910,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -23785,7 +23978,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -23852,7 +24046,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -23923,7 +24118,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -23990,7 +24186,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -24057,7 +24254,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -24124,7 +24322,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -24191,7 +24390,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -24258,7 +24458,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -24325,7 +24526,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -24392,7 +24594,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -24459,7 +24662,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -24952,7 +25156,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -25019,7 +25224,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -25086,7 +25292,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -25153,7 +25360,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -25220,7 +25428,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -25287,7 +25496,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -25358,7 +25568,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -25425,7 +25636,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -25492,7 +25704,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -25559,7 +25772,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -25626,7 +25840,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -25693,7 +25908,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -25760,7 +25976,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -25827,7 +26044,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -25894,7 +26112,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -25965,7 +26184,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -26032,7 +26252,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -26551,7 +26772,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -26618,7 +26840,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -26685,7 +26908,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -26752,7 +26976,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -26819,7 +27044,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -26886,7 +27112,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -26957,7 +27184,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -27024,7 +27252,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -27091,7 +27320,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -27158,7 +27388,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -27225,7 +27456,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -27292,7 +27524,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -27359,7 +27592,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -27426,7 +27660,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -27493,7 +27728,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -27564,7 +27800,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -27631,7 +27868,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -27698,7 +27936,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -27765,7 +28004,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -27832,7 +28072,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -28923,7 +29164,7 @@
            "contact_stress": "404.43656612069890",
            "min_face_width": {
             "bending": "0.0089530416457613803",
-            "contact": "0.066717399335040561"
+            "contact": "0.066720555052960109"
            }
           }
          ],
@@ -28970,9 +29211,17 @@
           "fatigue_load_ratio": "reversed",
           "fatigue_specimen": "coupon",
           "contact_fatigue_allowable": {
-           "value": "845.70000000000005",
-           "basis": "estimated",
-           "note": "Pitting endurance estimated from hardness by ISO 6336-5:2016 Table 1, through-hardened wrought alloy steel, contact, quality grade MQ: σ_Hlim = 1.313 HV + 373, taken at the table's 360 HV cap. 46 HRC is about 458 HV (ASTM E140), past the cap, and the table gives nothing there; the capped figure is the table's highest. Grade ML gives 660.7 MPa and ME 1123.1 (at its 390 HV cap); MQ is the grade ISO describes as met by experienced manufacturers at moderate cost. Override with your own figure for another grade. No published contact endurance for this steel at this temper was found."
+           "value": "845.68000000000006",
+           "basis": "estimated"
+          },
+          "contact_estimate": {
+           "line": "through_hardened_alloy_steel",
+           "hardness": {
+            "value": 458,
+            "basis": "derived",
+            "note": "46 HRC, the condition's, converted by ASTM E140. Past the end of ISO 6336-5:2016 Table 1's through-hardened alloy steel line (360 HV at ML and MQ, 390 at ME), where the table gives nothing, so the flank allowable is held at the line's end: 660.7 / 845.7 / 1123.1 MPa at ML / MQ / ME."
+           },
+           "grade": "mq"
           }
          },
          "ranges": {
@@ -29109,7 +29358,7 @@
            "contact_stress": "367.46806672413578",
            "min_face_width": {
             "bending": "0.0075797251791344744",
-            "contact": "0.055077914732303293"
+            "contact": "0.055080519905230052"
            }
           }
          ],
@@ -29156,9 +29405,17 @@
           "fatigue_load_ratio": "reversed",
           "fatigue_specimen": "coupon",
           "contact_fatigue_allowable": {
-           "value": "845.70000000000005",
-           "basis": "estimated",
-           "note": "Pitting endurance estimated from hardness by ISO 6336-5:2016 Table 1, through-hardened wrought alloy steel, contact, quality grade MQ: σ_Hlim = 1.313 HV + 373, taken at the table's 360 HV cap. 46 HRC is about 458 HV (ASTM E140), past the cap, and the table gives nothing there; the capped figure is the table's highest. Grade ML gives 660.7 MPa and ME 1123.1 (at its 390 HV cap); MQ is the grade ISO describes as met by experienced manufacturers at moderate cost. Override with your own figure for another grade. No published contact endurance for this steel at this temper was found."
+           "value": "845.68000000000006",
+           "basis": "estimated"
+          },
+          "contact_estimate": {
+           "line": "through_hardened_alloy_steel",
+           "hardness": {
+            "value": 458,
+            "basis": "derived",
+            "note": "46 HRC, the condition's, converted by ASTM E140. Past the end of ISO 6336-5:2016 Table 1's through-hardened alloy steel line (360 HV at ML and MQ, 390 at ME), where the table gives nothing, so the flank allowable is held at the line's end: 660.7 / 845.7 / 1123.1 MPa at ML / MQ / ME."
+           },
+           "grade": "mq"
           }
          },
          "ranges": {
@@ -29533,7 +29790,8 @@
              "fatigue_allowable": null,
              "fatigue_load_ratio": null,
              "fatigue_specimen": null,
-             "contact_fatigue_allowable": null
+             "contact_fatigue_allowable": null,
+             "contact_grade": null
             }
            },
            "module": {
@@ -29600,7 +29858,8 @@
              "fatigue_allowable": null,
              "fatigue_load_ratio": null,
              "fatigue_specimen": null,
-             "contact_fatigue_allowable": null
+             "contact_fatigue_allowable": null,
+             "contact_grade": null
             }
            },
            "module": {
@@ -30086,7 +30345,7 @@
            "contact_stress": "1082.7110597770195",
            "min_face_width": {
             "bending": "0.0089530416457613768",
-            "contact": "0.066717399335040534"
+            "contact": "0.066720555052960109"
            }
           }
          ],
@@ -30133,9 +30392,17 @@
           "fatigue_load_ratio": "reversed",
           "fatigue_specimen": "coupon",
           "contact_fatigue_allowable": {
-           "value": "845.70000000000005",
-           "basis": "estimated",
-           "note": "Pitting endurance estimated from hardness by ISO 6336-5:2016 Table 1, through-hardened wrought alloy steel, contact, quality grade MQ: σ_Hlim = 1.313 HV + 373, taken at the table's 360 HV cap. 46 HRC is about 458 HV (ASTM E140), past the cap, and the table gives nothing there; the capped figure is the table's highest. Grade ML gives 660.7 MPa and ME 1123.1 (at its 390 HV cap); MQ is the grade ISO describes as met by experienced manufacturers at moderate cost. Override with your own figure for another grade. No published contact endurance for this steel at this temper was found."
+           "value": "845.68000000000006",
+           "basis": "estimated"
+          },
+          "contact_estimate": {
+           "line": "through_hardened_alloy_steel",
+           "hardness": {
+            "value": 458,
+            "basis": "derived",
+            "note": "46 HRC, the condition's, converted by ASTM E140. Past the end of ISO 6336-5:2016 Table 1's through-hardened alloy steel line (360 HV at ML and MQ, 390 at ME), where the table gives nothing, so the flank allowable is held at the line's end: 660.7 / 845.7 / 1123.1 MPa at ML / MQ / ME."
+           },
+           "grade": "mq"
           }
          },
          "ranges": {
@@ -30272,7 +30539,7 @@
            "contact_stress": "983.74324501203682",
            "min_face_width": {
             "bending": "0.0075797251791344718",
-            "contact": "0.055077914732303258"
+            "contact": "0.055080519905230031"
            }
           }
          ],
@@ -30319,9 +30586,17 @@
           "fatigue_load_ratio": "reversed",
           "fatigue_specimen": "coupon",
           "contact_fatigue_allowable": {
-           "value": "845.70000000000005",
-           "basis": "estimated",
-           "note": "Pitting endurance estimated from hardness by ISO 6336-5:2016 Table 1, through-hardened wrought alloy steel, contact, quality grade MQ: σ_Hlim = 1.313 HV + 373, taken at the table's 360 HV cap. 46 HRC is about 458 HV (ASTM E140), past the cap, and the table gives nothing there; the capped figure is the table's highest. Grade ML gives 660.7 MPa and ME 1123.1 (at its 390 HV cap); MQ is the grade ISO describes as met by experienced manufacturers at moderate cost. Override with your own figure for another grade. No published contact endurance for this steel at this temper was found."
+           "value": "845.68000000000006",
+           "basis": "estimated"
+          },
+          "contact_estimate": {
+           "line": "through_hardened_alloy_steel",
+           "hardness": {
+            "value": 458,
+            "basis": "derived",
+            "note": "46 HRC, the condition's, converted by ASTM E140. Past the end of ISO 6336-5:2016 Table 1's through-hardened alloy steel line (360 HV at ML and MQ, 390 at ME), where the table gives nothing, so the flank allowable is held at the line's end: 660.7 / 845.7 / 1123.1 MPa at ML / MQ / ME."
+           },
+           "grade": "mq"
           }
          },
          "ranges": {
@@ -30458,7 +30733,7 @@
            "contact_stress": "1182.3797512784975",
            "min_face_width": {
             "bending": "0.0096589539537404612",
-            "contact": "0.10368986450240658"
+            "contact": "0.10369476900957783"
            }
           }
          ],
@@ -30505,9 +30780,17 @@
           "fatigue_load_ratio": "reversed",
           "fatigue_specimen": "coupon",
           "contact_fatigue_allowable": {
-           "value": "845.70000000000005",
-           "basis": "estimated",
-           "note": "Pitting endurance estimated from hardness by ISO 6336-5:2016 Table 1, through-hardened wrought alloy steel, contact, quality grade MQ: σ_Hlim = 1.313 HV + 373, taken at the table's 360 HV cap. 46 HRC is about 458 HV (ASTM E140), past the cap, and the table gives nothing there; the capped figure is the table's highest. Grade ML gives 660.7 MPa and ME 1123.1 (at its 390 HV cap); MQ is the grade ISO describes as met by experienced manufacturers at moderate cost. Override with your own figure for another grade. No published contact endurance for this steel at this temper was found."
+           "value": "845.68000000000006",
+           "basis": "estimated"
+          },
+          "contact_estimate": {
+           "line": "through_hardened_alloy_steel",
+           "hardness": {
+            "value": 458,
+            "basis": "derived",
+            "note": "46 HRC, the condition's, converted by ASTM E140. Past the end of ISO 6336-5:2016 Table 1's through-hardened alloy steel line (360 HV at ML and MQ, 390 at ME), where the table gives nothing, so the flank allowable is held at the line's end: 660.7 / 845.7 / 1123.1 MPa at ML / MQ / ME."
+           },
+           "grade": "mq"
           }
          },
          "ranges": {
@@ -30644,7 +30927,7 @@
            "contact_stress": "1086.6564801320944",
            "min_face_width": {
             "bending": "0.011226407660367640",
-            "contact": "0.087580392676727667"
+            "contact": "0.087584535209520101"
            }
           }
          ],
@@ -30691,9 +30974,17 @@
           "fatigue_load_ratio": "reversed",
           "fatigue_specimen": "coupon",
           "contact_fatigue_allowable": {
-           "value": "845.70000000000005",
-           "basis": "estimated",
-           "note": "Pitting endurance estimated from hardness by ISO 6336-5:2016 Table 1, through-hardened wrought alloy steel, contact, quality grade MQ: σ_Hlim = 1.313 HV + 373, taken at the table's 360 HV cap. 46 HRC is about 458 HV (ASTM E140), past the cap, and the table gives nothing there; the capped figure is the table's highest. Grade ML gives 660.7 MPa and ME 1123.1 (at its 390 HV cap); MQ is the grade ISO describes as met by experienced manufacturers at moderate cost. Override with your own figure for another grade. No published contact endurance for this steel at this temper was found."
+           "value": "845.68000000000006",
+           "basis": "estimated"
+          },
+          "contact_estimate": {
+           "line": "through_hardened_alloy_steel",
+           "hardness": {
+            "value": 458,
+            "basis": "derived",
+            "note": "46 HRC, the condition's, converted by ASTM E140. Past the end of ISO 6336-5:2016 Table 1's through-hardened alloy steel line (360 HV at ML and MQ, 390 at ME), where the table gives nothing, so the flank allowable is held at the line's end: 660.7 / 845.7 / 1123.1 MPa at ML / MQ / ME."
+           },
+           "grade": "mq"
           }
          },
          "ranges": {
@@ -30830,7 +31121,7 @@
            "contact_stress": "513.02850220458538",
            "min_face_width": {
             "bending": "0.0063116041890262826",
-            "contact": "0.019521146792682371"
+            "contact": "0.019522070138516558"
            }
           }
          ],
@@ -30868,9 +31159,17 @@
           "fatigue_load_ratio": "reversed",
           "fatigue_specimen": "coupon",
           "contact_fatigue_allowable": {
-           "value": "845.70000000000005",
-           "basis": "estimated",
-           "note": "Pitting endurance estimated from hardness by ISO 6336-5:2016 Table 1, through-hardened wrought alloy steel, contact, quality grade MQ: σ_Hlim = 1.313 HV + 373, taken at the table's 360 HV cap. 46 HRC is about 458 HV (ASTM E140), past the cap, and the table gives nothing there; the capped figure is the table's highest. Grade ML gives 660.7 MPa and ME 1123.1 (at its 390 HV cap); MQ is the grade ISO describes as met by experienced manufacturers at moderate cost. Override with your own figure for another grade. No published contact endurance for this steel at this temper was found."
+           "value": "845.68000000000006",
+           "basis": "estimated"
+          },
+          "contact_estimate": {
+           "line": "through_hardened_alloy_steel",
+           "hardness": {
+            "value": 458,
+            "basis": "derived",
+            "note": "46 HRC, the condition's, converted by ASTM E140. Past the end of ISO 6336-5:2016 Table 1's through-hardened alloy steel line (360 HV at ML and MQ, 390 at ME), where the table gives nothing, so the flank allowable is held at the line's end: 660.7 / 845.7 / 1123.1 MPa at ML / MQ / ME."
+           },
+           "grade": "mq"
           }
          },
          "ranges": {
@@ -31603,7 +31902,8 @@
              "fatigue_allowable": null,
              "fatigue_load_ratio": null,
              "fatigue_specimen": null,
-             "contact_fatigue_allowable": null
+             "contact_fatigue_allowable": null,
+             "contact_grade": null
             }
            },
            "module": {
@@ -31670,7 +31970,8 @@
              "fatigue_allowable": null,
              "fatigue_load_ratio": null,
              "fatigue_specimen": null,
-             "contact_fatigue_allowable": null
+             "contact_fatigue_allowable": null,
+             "contact_grade": null
             }
            },
            "module": {
@@ -31826,7 +32127,8 @@
              "fatigue_allowable": null,
              "fatigue_load_ratio": null,
              "fatigue_specimen": null,
-             "contact_fatigue_allowable": null
+             "contact_fatigue_allowable": null,
+             "contact_grade": null
             }
            },
            "module": {
@@ -31893,7 +32195,8 @@
              "fatigue_allowable": null,
              "fatigue_load_ratio": null,
              "fatigue_specimen": null,
-             "contact_fatigue_allowable": null
+             "contact_fatigue_allowable": null,
+             "contact_grade": null
             }
            },
            "module": {
@@ -31960,7 +32263,8 @@
              "fatigue_allowable": null,
              "fatigue_load_ratio": null,
              "fatigue_specimen": null,
-             "contact_fatigue_allowable": null
+             "contact_fatigue_allowable": null,
+             "contact_grade": null
             }
            },
            "module": {
@@ -32548,7 +32852,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -32615,7 +32920,8 @@
            "fatigue_allowable": null,
            "fatigue_load_ratio": null,
            "fatigue_specimen": null,
-           "contact_fatigue_allowable": null
+           "contact_fatigue_allowable": null,
+           "contact_grade": null
           }
          },
          "module": {
@@ -32699,7 +33005,7 @@
    }
   },
   "export_materials": {
-   "ok": "[[material]]\nname = \"4340 Steel\"\nclass = \"steel\"\ngrade = \"AISI 4340 (UNS G43400)\"\ncondition = \"annealed\"\nsource = \"MakeItFrom, Annealed 4340 Ni-Cr-Mo Steel; density cross-checked against AZoM UNS G43400. Retrieved 2026-08-15.\"\nultimate_measure = \"yield\"\nfatigue_load_ratio = \"reversed\"\nfatigue_specimen = \"coupon\"\n\n[material.density]\nvalue = 7850.0\nbasis = \"datasheet\"\n\n[material.elastic_modulus]\nvalue = 190000.0\nbasis = \"datasheet\"\n\n[material.poissons_ratio]\nvalue = 0.29\nbasis = \"datasheet\"\n\n[material.ultimate_allowable]\nvalue = 470.0\nbasis = \"datasheet\"\nnote = \"Tensile yield strength. UTS is 690 MPa.\"\n\n[material.fatigue_allowable]\nvalue = 330.0\nbasis = \"datasheet\"\nnote = \"Published fatigue strength; the source does not state the cycle count.\"\n\n[material.contact_fatigue_allowable]\nvalue = 675.0\nbasis = \"estimated\"\nnote = \"Pitting endurance estimated from hardness by ISO 6336-5:2016 Table 1, through-hardened wrought alloy steel, contact, quality grade MQ: σ_Hlim = 1.313 HV + 373, at 230 HV (the source's 220 HB, converted by ASTM E140). Grade ML gives 490 MPa and ME 769; MQ is the grade ISO describes as met by experienced manufacturers at moderate cost. Override with your own figure for another grade. No published contact endurance for this steel in this condition was found.\"\n\n[[material]]\nname = \"4340 Hardened Steel\"\nclass = \"steel\"\ngrade = \"AISI 4340 (UNS G43400)\"\ncondition = \"oil quenched from 845 °C, tempered at 425 °C — 46 HRC\"\nsource = \"ASM Desk Edition tempering table for oil-quenched 4340, as reproduced by theworldmaterial.com. Retrieved 2026-08-15.\"\nultimate_measure = \"yield\"\nfatigue_load_ratio = \"reversed\"\nfatigue_specimen = \"coupon\"\n\n[material.density]\nvalue = 7850.0\nbasis = \"datasheet\"\n\n[material.elastic_modulus]\nvalue = 190000.0\nbasis = \"datasheet\"\n\n[material.poissons_ratio]\nvalue = 0.29\nbasis = \"datasheet\"\n\n[material.ultimate_allowable]\nvalue = 1365.0\nbasis = \"datasheet\"\nnote = \"Tensile yield strength at this temper. UTS is 1500 MPa.\"\n\n[material.fatigue_allowable]\nvalue = 750.0\nbasis = \"estimated\"\nnote = \"0.5 × UTS, the classical steel endurance ratio, which reproduces the annealed entry's published 330 MPa to within 5 %. No published fatigue figure was found at THIS temper. Treat as optimistic: the endurance ratio is known to fall away above roughly 1400 MPa UTS rather than track 0.5 indefinitely, so the true figure is plausibly nearer 700 MPa. The first number here worth replacing with your own data.\"\n\n[material.contact_fatigue_allowable]\nvalue = 845.7\nbasis = \"estimated\"\nnote = \"Pitting endurance estimated from hardness by ISO 6336-5:2016 Table 1, through-hardened wrought alloy steel, contact, quality grade MQ: σ_Hlim = 1.313 HV + 373, taken at the table's 360 HV cap. 46 HRC is about 458 HV (ASTM E140), past the cap, and the table gives nothing there; the capped figure is the table's highest. Grade ML gives 660.7 MPa and ME 1123.1 (at its 390 HV cap); MQ is the grade ISO describes as met by experienced manufacturers at moderate cost. Override with your own figure for another grade. No published contact endurance for this steel at this temper was found.\"\n\n[[material]]\nname = \"Brass C360\"\nclass = \"brass\"\ngrade = \"UNS C36000 free-cutting brass\"\ncondition = \"H02 half hard — the temper free-cutting brass is normally supplied in\"\nsource = \"Copper Development Association alloy data for C36000, as published by National Bronze. Retrieved 2026-08-15.\"\nultimate_measure = \"yield\"\nfatigue_load_ratio = \"reversed\"\nfatigue_specimen = \"coupon\"\n\n[material.density]\nvalue = 8500.0\nbasis = \"datasheet\"\nnote = \"0.307 lb/in³. Some secondary sources give 8.2 g/cm³, which is wrong.\"\n\n[material.elastic_modulus]\nvalue = 96500.0\nbasis = \"datasheet\"\nnote = \"14 000 ksi.\"\n\n[material.poissons_ratio]\nvalue = 0.32\nbasis = \"derived\"\nnote = \"ν = E/2G − 1, from the published E = 14 000 ksi and G = 5 300 ksi. Not an estimate: both moduli are measured.\"\n\n[material.ultimate_allowable]\nvalue = 310.0\nbasis = \"datasheet\"\nnote = \"Typical H02 yield, 45 ksi. UTS is 386 MPa. Yield is strongly temper-dependent — the published range across tempers is 124–310 MPa.\"\n\n[material.fatigue_allowable]\nvalue = 115.0\nbasis = \"estimated\"\nnote = \"0.30 × UTS, the usual endurance ratio for wrought copper alloys. No fatigue figure for C36000 was found in the CDA data.\"\n\n[[material]]\nname = \"POM Delrin 100P\"\nclass = \"pom\"\ngrade = \"DuPont Delrin 100P NC010, acetal homopolymer\"\ncondition = \"23 °C, as moulded\"\nsource = \"DuPont Delrin 100P product datasheet (ISO test methods). Fatigue from the DuPont Delrin design guide, figure 6.14. Retrieved 2026-08-15.\"\nultimate_measure = \"yield\"\nfatigue_load_ratio = \"reversed\"\nfatigue_specimen = \"coupon\"\n\n[material.density]\nvalue = 1420.0\nbasis = \"datasheet\"\n\n[material.elastic_modulus]\nvalue = 3000.0\nbasis = \"datasheet\"\nnote = \"ISO 527-1/-2. Flexural modulus is 2800 MPa.\"\n\n[material.poissons_ratio]\nvalue = 0.37\nbasis = \"datasheet\"\nnote = \"ISO 527-1/-2. Published, unusually for a polymer.\"\n\n[material.ultimate_allowable]\nvalue = 71.0\nbasis = \"datasheet\"\nnote = \"Yield stress, ISO 527-1/-2, at 22 % yield strain.\"\n\n[material.fatigue_allowable]\nvalue = 35.0\nbasis = \"chart\"\nnote = \"Read off DuPont figure 6.14, flexural fatigue of Delrin 100 at 10⁷ cycles — ASTM D671, 23 °C, 50 % RH, fully reversed, 30 Hz. The curve is published for Delrin 100, not 100P. Roughly half the yield stress, which is high for a thermoplastic and characteristic of acetal.\"\n\n[[material]]\nname = \"PA6\"\nclass = \"polyamide\"\ngrade = \"EMS-GRIVORY Grilon BS\"\ncondition = \"conditioned, 23 °C / 50 % RH\"\nsource = \"EMS-GRIVORY Grilon BS CAMPUS datasheet, ISO 10350. Retrieved 2026-08-15.\"\nultimate_measure = \"yield\"\n\n[material.density]\nvalue = 1130.0\nbasis = \"datasheet\"\n\n[material.elastic_modulus]\nvalue = 1000.0\nbasis = \"datasheet\"\nnote = \"ISO 527-1/-2. Moisture costs two thirds of the stiffness. Dry as moulded: 3000.0.\"\n\n[material.poissons_ratio]\nvalue = 0.39\nbasis = \"estimated\"\nnote = \"No polyamide datasheet publishes ν. Class value for unfilled PA. The whole plausible range 0.33–0.44 moves Hertzian contact stress by only ±2.5 %, so this is a low-consequence estimate.\"\n\n[material.ultimate_allowable]\nvalue = 40.0\nbasis = \"datasheet\"\nnote = \"Yield stress, ISO 527-1/-2. Dry as moulded: 80.0.\"\n\n[material.fatigue_allowable]\nvalue = 12.0\nbasis = \"estimated\"\nnote = \"0.30 × ultimate. No S-N data exists for this grade in any published form. Dry as moulded: 24.0.\"\n\n[[material]]\nname = \"PA6 GF30\"\nclass = \"polyamide\"\ngrade = \"EMS-GRIVORY Grilon BG-30 S\"\ncondition = \"conditioned, 23 °C / 50 % RH\"\nsource = \"EMS-GRIVORY Grilon BG-30 S CAMPUS datasheet, ISO 10350. Retrieved 2026-08-15.\"\nultimate_measure = \"break\"\n\n[material.density]\nvalue = 1350.0\nbasis = \"datasheet\"\n\n[material.elastic_modulus]\nvalue = 6000.0\nbasis = \"datasheet\"\nnote = \"Dry as moulded: 9500.0.\"\n\n[material.poissons_ratio]\nvalue = 0.36\nbasis = \"estimated\"\nnote = \"0.39 less 0.001 per % glass; see the file header.\"\n\n[material.ultimate_allowable]\nvalue = 125.0\nbasis = \"datasheet\"\nnote = \"Stress at break — glass-filled polyamide has no yield point. Dry as moulded: 185.0.\"\n\n[material.fatigue_allowable]\nvalue = 37.5\nbasis = \"estimated\"\nnote = \"0.30 × ultimate. No S-N data exists for this grade. Dry as moulded: 55.5.\"\n\n[[material]]\nname = \"PA GF50\"\nclass = \"polyamide\"\ngrade = \"EMS-GRIVORY Grilon BG-50 S\"\ncondition = \"conditioned, 23 °C / 50 % RH\"\nsource = \"EMS-GRIVORY Grilon BG-50 S CAMPUS datasheet, ISO 10350. Retrieved 2026-08-15.\"\nultimate_measure = \"break\"\n\n[material.density]\nvalue = 1580.0\nbasis = \"datasheet\"\n\n[material.elastic_modulus]\nvalue = 11500.0\nbasis = \"datasheet\"\nnote = \"Dry as moulded: 17500.0.\"\n\n[material.poissons_ratio]\nvalue = 0.34\nbasis = \"estimated\"\nnote = \"0.39 less 0.001 per % glass; see the file header.\"\n\n[material.ultimate_allowable]\nvalue = 165.0\nbasis = \"datasheet\"\nnote = \"Stress at break. Dry as moulded: 245.0.\"\n\n[material.fatigue_allowable]\nvalue = 49.5\nbasis = \"estimated\"\nnote = \"0.30 × ultimate. No S-N data exists for this grade. Dry as moulded: 73.5.\"\n\n[[material]]\nname = \"PA GF70\"\nclass = \"polyamide\"\ngrade = \"EMS-GRIVORY Grivory GVX-7H\"\ncondition = \"conditioned, 23 °C / 50 % RH\"\nsource = \"EMS-GRIVORY Grivory GVX-7H CAMPUS datasheet, ISO 10350. Retrieved 2026-08-15.\"\nultimate_measure = \"break\"\n\n[material.density]\nvalue = 1850.0\nbasis = \"datasheet\"\n\n[material.elastic_modulus]\nvalue = 27500.0\nbasis = \"datasheet\"\nnote = \"At 70 % glass the moisture effect nearly vanishes. Dry as moulded: 28000.0.\"\n\n[material.poissons_ratio]\nvalue = 0.32\nbasis = \"estimated\"\nnote = \"0.39 less 0.001 per % glass; see the file header.\"\n\n[material.ultimate_allowable]\nvalue = 260.0\nbasis = \"datasheet\"\nnote = \"Stress at break, at 1.5 % strain — this material is stiff and brittle. Dry as moulded: 290.0.\"\n\n[material.fatigue_allowable]\nvalue = 78.0\nbasis = \"estimated\"\nnote = \"0.30 × ultimate. No S-N data exists for this grade. Dry as moulded: 87.0.\"\n"
+   "ok": "[[material]]\nname = \"4340 Steel\"\nclass = \"steel\"\ngrade = \"AISI 4340 (UNS G43400)\"\ncondition = \"annealed\"\nsource = \"MakeItFrom, Annealed 4340 Ni-Cr-Mo Steel; density cross-checked against AZoM UNS G43400. Retrieved 2026-08-15.\"\nultimate_measure = \"yield\"\nfatigue_load_ratio = \"reversed\"\nfatigue_specimen = \"coupon\"\n\n[material.density]\nvalue = 7850.0\nbasis = \"datasheet\"\n\n[material.elastic_modulus]\nvalue = 190000.0\nbasis = \"datasheet\"\n\n[material.poissons_ratio]\nvalue = 0.29\nbasis = \"datasheet\"\n\n[material.ultimate_allowable]\nvalue = 470.0\nbasis = \"datasheet\"\nnote = \"Tensile yield strength. UTS is 690 MPa.\"\n\n[material.fatigue_allowable]\nvalue = 330.0\nbasis = \"datasheet\"\nnote = \"Published fatigue strength; the source does not state the cycle count.\"\n\n[material.contact_estimate]\nline = \"through_hardened_alloy_steel\"\ngrade = \"mq\"\n\n[material.contact_estimate.hardness]\nvalue = 230.0\nbasis = \"derived\"\nnote = \"The source's 220 HB, converted by ASTM E140. The flank allowable is ISO 6336-5:2016 Table 1's through-hardened alloy steel line at this hardness and the grade asked: 490 / 675 / 769 MPa at ML / MQ / ME.\"\n\n[[material]]\nname = \"4340 Hardened Steel\"\nclass = \"steel\"\ngrade = \"AISI 4340 (UNS G43400)\"\ncondition = \"oil quenched from 845 °C, tempered at 425 °C — 46 HRC\"\nsource = \"ASM Desk Edition tempering table for oil-quenched 4340, as reproduced by theworldmaterial.com. Retrieved 2026-08-15.\"\nultimate_measure = \"yield\"\nfatigue_load_ratio = \"reversed\"\nfatigue_specimen = \"coupon\"\n\n[material.density]\nvalue = 7850.0\nbasis = \"datasheet\"\n\n[material.elastic_modulus]\nvalue = 190000.0\nbasis = \"datasheet\"\n\n[material.poissons_ratio]\nvalue = 0.29\nbasis = \"datasheet\"\n\n[material.ultimate_allowable]\nvalue = 1365.0\nbasis = \"datasheet\"\nnote = \"Tensile yield strength at this temper. UTS is 1500 MPa.\"\n\n[material.fatigue_allowable]\nvalue = 750.0\nbasis = \"estimated\"\nnote = \"0.5 × UTS, the classical steel endurance ratio, which reproduces the annealed entry's published 330 MPa to within 5 %. No published fatigue figure was found at THIS temper. Treat as optimistic: the endurance ratio is known to fall away above roughly 1400 MPa UTS rather than track 0.5 indefinitely, so the true figure is plausibly nearer 700 MPa. The first number here worth replacing with your own data.\"\n\n[material.contact_estimate]\nline = \"through_hardened_alloy_steel\"\ngrade = \"mq\"\n\n[material.contact_estimate.hardness]\nvalue = 458.0\nbasis = \"derived\"\nnote = \"46 HRC, the condition's, converted by ASTM E140. Past the end of ISO 6336-5:2016 Table 1's through-hardened alloy steel line (360 HV at ML and MQ, 390 at ME), where the table gives nothing, so the flank allowable is held at the line's end: 660.7 / 845.7 / 1123.1 MPa at ML / MQ / ME.\"\n\n[[material]]\nname = \"Brass C360\"\nclass = \"brass\"\ngrade = \"UNS C36000 free-cutting brass\"\ncondition = \"H02 half hard — the temper free-cutting brass is normally supplied in\"\nsource = \"Copper Development Association alloy data for C36000, as published by National Bronze. Retrieved 2026-08-15.\"\nultimate_measure = \"yield\"\nfatigue_load_ratio = \"reversed\"\nfatigue_specimen = \"coupon\"\n\n[material.density]\nvalue = 8500.0\nbasis = \"datasheet\"\nnote = \"0.307 lb/in³. Some secondary sources give 8.2 g/cm³, which is wrong.\"\n\n[material.elastic_modulus]\nvalue = 96500.0\nbasis = \"datasheet\"\nnote = \"14 000 ksi.\"\n\n[material.poissons_ratio]\nvalue = 0.32\nbasis = \"derived\"\nnote = \"ν = E/2G − 1, from the published E = 14 000 ksi and G = 5 300 ksi. Not an estimate: both moduli are measured.\"\n\n[material.ultimate_allowable]\nvalue = 310.0\nbasis = \"datasheet\"\nnote = \"Typical H02 yield, 45 ksi. UTS is 386 MPa. Yield is strongly temper-dependent — the published range across tempers is 124–310 MPa.\"\n\n[material.fatigue_allowable]\nvalue = 115.0\nbasis = \"estimated\"\nnote = \"0.30 × UTS, the usual endurance ratio for wrought copper alloys. No fatigue figure for C36000 was found in the CDA data.\"\n\n[[material]]\nname = \"POM Delrin 100P\"\nclass = \"pom\"\ngrade = \"DuPont Delrin 100P NC010, acetal homopolymer\"\ncondition = \"23 °C, as moulded\"\nsource = \"DuPont Delrin 100P product datasheet (ISO test methods). Fatigue from the DuPont Delrin design guide, figure 6.14. Retrieved 2026-08-15.\"\nultimate_measure = \"yield\"\nfatigue_load_ratio = \"reversed\"\nfatigue_specimen = \"coupon\"\n\n[material.density]\nvalue = 1420.0\nbasis = \"datasheet\"\n\n[material.elastic_modulus]\nvalue = 3000.0\nbasis = \"datasheet\"\nnote = \"ISO 527-1/-2. Flexural modulus is 2800 MPa.\"\n\n[material.poissons_ratio]\nvalue = 0.37\nbasis = \"datasheet\"\nnote = \"ISO 527-1/-2. Published, unusually for a polymer.\"\n\n[material.ultimate_allowable]\nvalue = 71.0\nbasis = \"datasheet\"\nnote = \"Yield stress, ISO 527-1/-2, at 22 % yield strain.\"\n\n[material.fatigue_allowable]\nvalue = 35.0\nbasis = \"chart\"\nnote = \"Read off DuPont figure 6.14, flexural fatigue of Delrin 100 at 10⁷ cycles — ASTM D671, 23 °C, 50 % RH, fully reversed, 30 Hz. The curve is published for Delrin 100, not 100P. Roughly half the yield stress, which is high for a thermoplastic and characteristic of acetal.\"\n\n[[material]]\nname = \"PA6\"\nclass = \"polyamide\"\ngrade = \"EMS-GRIVORY Grilon BS\"\ncondition = \"conditioned, 23 °C / 50 % RH\"\nsource = \"EMS-GRIVORY Grilon BS CAMPUS datasheet, ISO 10350. Retrieved 2026-08-15.\"\nultimate_measure = \"yield\"\n\n[material.density]\nvalue = 1130.0\nbasis = \"datasheet\"\n\n[material.elastic_modulus]\nvalue = 1000.0\nbasis = \"datasheet\"\nnote = \"ISO 527-1/-2. Moisture costs two thirds of the stiffness. Dry as moulded: 3000.0.\"\n\n[material.poissons_ratio]\nvalue = 0.39\nbasis = \"estimated\"\nnote = \"No polyamide datasheet publishes ν. Class value for unfilled PA. The whole plausible range 0.33–0.44 moves Hertzian contact stress by only ±2.5 %, so this is a low-consequence estimate.\"\n\n[material.ultimate_allowable]\nvalue = 40.0\nbasis = \"datasheet\"\nnote = \"Yield stress, ISO 527-1/-2. Dry as moulded: 80.0.\"\n\n[material.fatigue_allowable]\nvalue = 12.0\nbasis = \"estimated\"\nnote = \"0.30 × ultimate. No S-N data exists for this grade in any published form. Dry as moulded: 24.0.\"\n\n[[material]]\nname = \"PA6 GF30\"\nclass = \"polyamide\"\ngrade = \"EMS-GRIVORY Grilon BG-30 S\"\ncondition = \"conditioned, 23 °C / 50 % RH\"\nsource = \"EMS-GRIVORY Grilon BG-30 S CAMPUS datasheet, ISO 10350. Retrieved 2026-08-15.\"\nultimate_measure = \"break\"\n\n[material.density]\nvalue = 1350.0\nbasis = \"datasheet\"\n\n[material.elastic_modulus]\nvalue = 6000.0\nbasis = \"datasheet\"\nnote = \"Dry as moulded: 9500.0.\"\n\n[material.poissons_ratio]\nvalue = 0.36\nbasis = \"estimated\"\nnote = \"0.39 less 0.001 per % glass; see the file header.\"\n\n[material.ultimate_allowable]\nvalue = 125.0\nbasis = \"datasheet\"\nnote = \"Stress at break — glass-filled polyamide has no yield point. Dry as moulded: 185.0.\"\n\n[material.fatigue_allowable]\nvalue = 37.5\nbasis = \"estimated\"\nnote = \"0.30 × ultimate. No S-N data exists for this grade. Dry as moulded: 55.5.\"\n\n[[material]]\nname = \"PA GF50\"\nclass = \"polyamide\"\ngrade = \"EMS-GRIVORY Grilon BG-50 S\"\ncondition = \"conditioned, 23 °C / 50 % RH\"\nsource = \"EMS-GRIVORY Grilon BG-50 S CAMPUS datasheet, ISO 10350. Retrieved 2026-08-15.\"\nultimate_measure = \"break\"\n\n[material.density]\nvalue = 1580.0\nbasis = \"datasheet\"\n\n[material.elastic_modulus]\nvalue = 11500.0\nbasis = \"datasheet\"\nnote = \"Dry as moulded: 17500.0.\"\n\n[material.poissons_ratio]\nvalue = 0.34\nbasis = \"estimated\"\nnote = \"0.39 less 0.001 per % glass; see the file header.\"\n\n[material.ultimate_allowable]\nvalue = 165.0\nbasis = \"datasheet\"\nnote = \"Stress at break. Dry as moulded: 245.0.\"\n\n[material.fatigue_allowable]\nvalue = 49.5\nbasis = \"estimated\"\nnote = \"0.30 × ultimate. No S-N data exists for this grade. Dry as moulded: 73.5.\"\n\n[[material]]\nname = \"PA GF70\"\nclass = \"polyamide\"\ngrade = \"EMS-GRIVORY Grivory GVX-7H\"\ncondition = \"conditioned, 23 °C / 50 % RH\"\nsource = \"EMS-GRIVORY Grivory GVX-7H CAMPUS datasheet, ISO 10350. Retrieved 2026-08-15.\"\nultimate_measure = \"break\"\n\n[material.density]\nvalue = 1850.0\nbasis = \"datasheet\"\n\n[material.elastic_modulus]\nvalue = 27500.0\nbasis = \"datasheet\"\nnote = \"At 70 % glass the moisture effect nearly vanishes. Dry as moulded: 28000.0.\"\n\n[material.poissons_ratio]\nvalue = 0.32\nbasis = \"estimated\"\nnote = \"0.39 less 0.001 per % glass; see the file header.\"\n\n[material.ultimate_allowable]\nvalue = 260.0\nbasis = \"datasheet\"\nnote = \"Stress at break, at 1.5 % strain — this material is stiff and brittle. Dry as moulded: 290.0.\"\n\n[material.fatigue_allowable]\nvalue = 78.0\nbasis = \"estimated\"\nnote = \"0.30 × ultimate. No S-N data exists for this grade. Dry as moulded: 87.0.\"\n"
   },
   "import_materials": {
    "ok": {
@@ -32735,10 +33041,14 @@
       },
       "fatigue_load_ratio": "reversed",
       "fatigue_specimen": "coupon",
-      "contact_fatigue_allowable": {
-       "value": 675,
-       "basis": "estimated",
-       "note": "Pitting endurance estimated from hardness by ISO 6336-5:2016 Table 1, through-hardened wrought alloy steel, contact, quality grade MQ: σ_Hlim = 1.313 HV + 373, at 230 HV (the source's 220 HB, converted by ASTM E140). Grade ML gives 490 MPa and ME 769; MQ is the grade ISO describes as met by experienced manufacturers at moderate cost. Override with your own figure for another grade. No published contact endurance for this steel in this condition was found."
+      "contact_estimate": {
+       "line": "through_hardened_alloy_steel",
+       "hardness": {
+        "value": 230,
+        "basis": "derived",
+        "note": "The source's 220 HB, converted by ASTM E140. The flank allowable is ISO 6336-5:2016 Table 1's through-hardened alloy steel line at this hardness and the grade asked: 490 / 675 / 769 MPa at ML / MQ / ME."
+       },
+       "grade": "mq"
       }
      },
      {
@@ -32772,10 +33082,14 @@
       },
       "fatigue_load_ratio": "reversed",
       "fatigue_specimen": "coupon",
-      "contact_fatigue_allowable": {
-       "value": "845.70000000000005",
-       "basis": "estimated",
-       "note": "Pitting endurance estimated from hardness by ISO 6336-5:2016 Table 1, through-hardened wrought alloy steel, contact, quality grade MQ: σ_Hlim = 1.313 HV + 373, taken at the table's 360 HV cap. 46 HRC is about 458 HV (ASTM E140), past the cap, and the table gives nothing there; the capped figure is the table's highest. Grade ML gives 660.7 MPa and ME 1123.1 (at its 390 HV cap); MQ is the grade ISO describes as met by experienced manufacturers at moderate cost. Override with your own figure for another grade. No published contact endurance for this steel at this temper was found."
+      "contact_estimate": {
+       "line": "through_hardened_alloy_steel",
+       "hardness": {
+        "value": 458,
+        "basis": "derived",
+        "note": "46 HRC, the condition's, converted by ASTM E140. Past the end of ISO 6336-5:2016 Table 1's through-hardened alloy steel line (360 HV at ML and MQ, 390 at ME), where the table gives nothing, so the flank allowable is held at the line's end: 660.7 / 845.7 / 1123.1 MPa at ML / MQ / ME."
+       },
+       "grade": "mq"
       }
      },
      {

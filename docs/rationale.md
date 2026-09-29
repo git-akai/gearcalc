@@ -1326,8 +1326,9 @@ when it was not, and the peak case against `ultimate_allowable`, a tensile yield
 Now each has its own (`train::allowable`, keyed by rating and kind):
 
 - **Fatigue**: `contact_fatigue_allowable`, a pitting endurance. The steels carry
-  an estimate from hardness by ISO 6336-5's through-hardened alloy line at
-  quality grade MQ, the grade and the other two grades' figures in the note;
+  an estimate derived from their hardness by ISO 6336-5's through-hardened
+  alloy line, at a quality grade (ML, MQ, ME) the design selects — MQ unless
+  it says otherwise (`HardnessEstimate`, `Overrides::contact_grade`);
   nothing publishes one for the brass, POM or the polyamides, so they carry
   none, and contact fatigue on them is **not judged** and says so
   (`gear.contact_fatigue_unjudged`) rather than borrowing a number.

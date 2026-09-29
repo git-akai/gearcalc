@@ -90,6 +90,9 @@ import type {
 export type { CaseKind, LoadCase };
 export type {
   Duty,
+  LoadRatio,
+  Specimen,
+  QualityGrade,
   GearCase,
   MeshCase,
   TrainCase,

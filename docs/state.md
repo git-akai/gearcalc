@@ -536,10 +536,7 @@ default**: both are computed and shown, but a fresh gear is sized from bending
 alone, so its face width will not satisfy contact until a designer says which
 rating should decide it — the figures are on screen, the minimum face width
 each rating asks for is beside them, and a member above its flank allowable
-says so. **The size of that default**: the canary train's bending-sized
-widths run its flanks at 2.1–2.6 GPa, 2.5–3.1× the 845.7 MPa flank estimate
-for its steel; on the strength canary contact asks 6.71 mm where bending asks
-0.89. The two gears of a mesh are rated at different points on the path
+says so; the size of that default is given below. The two gears of a mesh are rated at different points on the path
 — each where its own dedendum is loaded alone — so they carry different contact
 stresses, each on its own card; the one patch they share — its pitch-point
 figure, its size and where on the path it is worst — is the harness's, and
@@ -558,6 +555,13 @@ case, and each gear that one reaches says so beside its own numbers —
 corrected against the reduced allowable only where the switch asks for it. No member of a hula stage is reversed structurally: its wobble body
 carries two gears rather than one, and each of them meshes once. A notch
 parameter outside the band the `Y_S` fit is stated for says so on the gear too.
+
+<!-- figures: gear-cli train -->
+<!-- figures: gear-cli strength 17 43 2.0 -->
+**The size of that default.** The canary train's bending-sized widths run its
+flanks at 2097.6 to 2618.4 MPa, against a flank estimate of 845.7 MPa for its
+steel — two and a half to three times over; on the strength canary contact
+asks 6.708 mm of the pinion where bending asks 0.891.
 
 **Tooth cycles follow one rule for every arrangement**: a member is engaged once
 per revolution *relative to the carrier of its mesh*, once for each parallel
@@ -698,6 +702,13 @@ whose size is unmeasured is a debt still owed, and is marked as one.
   teeth, by up to half; the spur band above is the same comparison at the
   single-pair point, against ISO's own closed form.
 
+- **Hardened 4340's flank estimate is held at the end of ISO's line.** Its
+  46 HRC is about 458 HV, past the 360 HV where the through-hardened alloy
+  line stops at grades ML and MQ (390 at ME), and the table gives nothing
+  there; the estimate is the line's last figure. At grade MQ that is
+  845.7 MPa against 974.4 MPa were the line carried on to 458 HV: **low by
+  13 %** — conservative, if the line held there, which the standard does not
+  claim. Annealed 4340, at 230 HV, is on the line.
 - **A root loaded one way on a fully reversed figure is judged at that
   figure.** Every figure the library states a ratio for is `R = −1` on a
   coupon, and a one-way root endures more: under Goodman the `R = 0` peak is
