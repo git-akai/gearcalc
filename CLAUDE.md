@@ -161,10 +161,12 @@ The checks, by what each catches. `nix flake check` is **not** all of them.
 
 | Run | Catches | In CI |
 |---|---|---|
+| `tools/check_all.sh --list` | a CI step `check_all.sh` has not classified, so it cannot run fewer checks than CI | yes |
+| `cargo build --release --workspace` | the workspace builds | via `nix flake check` |
 | `cargo nextest run` | The suite: laws, independent verifications, invariants, canaries, negative fixtures. **No count is quoted here** — a number that dates belongs in `docs/state.md`, and this file had one stale within an hour of being written | via `nix flake check` |
 | `cargo clippy --all-targets -- --deny warnings` | `unwrap` in production is a warning, and warnings are denied | " |
 | `cargo fmt --check` | | " |
-| `nix build .#web` | **the site — `flake check` does not cover it**, and it carries a fixed-output hash over `web/package-lock.json` that nothing else consults | yes |
+| `nix build .#web` | **the site — `flake check` does not cover it** | yes |
 | `cd web && npm run check` | types, which the bundler strips without checking | yes |
 | `cd web && npm test` | **the panels, mounted** — vitest in jsdom against the real wasm core: what a box shows after what a reader types, and what reaches the core | yes |
 | `tools/check_bindings.sh` | `web/src/wire` still matches the Rust it is generated from | yes |

@@ -58,7 +58,7 @@
           name = "source";
           filter = path: type:
             (craneLib.filterCargoSources path type)
-            || (builtins.match ".*/data/[^/]*\\.csv$" path != null)
+            || (builtins.match ".*/data/.*" path != null)
             # The wasm build recipe, shared with the npm script and the payload
             # check so there is one of it. Without this the derivation cannot
             # see the file it is told to run.

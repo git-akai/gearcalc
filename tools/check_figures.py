@@ -108,8 +108,8 @@ def _bin():
     """The harness, **built** -- release if that is what is there, else debug.
 
     The two print the same bytes, measured rather than assumed, and
-    `tools/check_golden.sh` says so at more length. It matters because CI builds
-    debug and a documented figure is not worth a second toolchain pass to check.
+    `tools/check_golden.sh` says so at more length. It matters because a working
+    tree may hold only a debug build, and a documented figure is not worth a second toolchain pass to check.
 
     It is *built* rather than merely found, which it was not: a command added to
     the harness was invisible here until something else forced a rebuild, so a

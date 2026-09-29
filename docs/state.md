@@ -31,32 +31,15 @@ and that is what this says instead.
 ```bash
 nix develop                       # or `direnv allow` once
 cargo nextest run                 # the suite
-nix flake check                   # build, clippy --deny warnings, fmt, tests
-nix build .#web                   # ...and the site, which flake check does NOT cover
+tools/check_all.sh                # every check CI runs, the cheap ones first
 cd web && npm run dev             # the application
 ```
 
-**`nix flake check` is not all of what CI runs**, and reading it as though it
-were has cost one red build. The workflow also runs `nix build .#web` and the
-front end's own `npm run check`, and the site build carries a **fixed-output
-hash over `web/package-lock.json`** (`npmDepsHash` in `flake.nix`) that nothing
-else consults — so any change to that lockfile, a version bump included, breaks
-the site build alone and passes everything a developer usually runs. Before
-pushing, run all four.
-
-And the checks that live outside the Rust suite:
-
-```bash
-tools/check_bindings.sh           # the generated TypeScript matches the Rust
-tools/check_bindings.sh --write   # ...or regenerate it
-tools/check_doc_links.py          # every pointer into the documents resolves, from code and from each other
-tools/check_strings.py            # every ui message is used, and every use has a message
-tools/check_golden.sh             # every number the harness prints, against what it printed before
-tools/check_golden.sh --write     # ...or accept what it prints now
-tools/check_figures.py            # every figure these documents quote is one the code still prints
-tools/check_figures.py --list     # ...and which tables nothing yet generates
-cd web && npm run check           # typecheck the front end
-```
+**`nix flake check` is not all of what CI runs.** CI is the `tests` job of
+`.github/workflows/ci.yml`; `tools/check_all.sh` runs each of its steps and
+refuses one it has not classified, and CLAUDE.md's
+[table of checks](../CLAUDE.md#which-check-catches-what) says what each
+catches, held to the workflow by `tools/check_doc_links.py`.
 
 `check_golden.sh` is a **change detector, not a correctness gate**: a diff is a
 question — did you mean to move that? — and the answer is often yes. It exists

@@ -7,7 +7,7 @@ every key the core can emit against `Note::key::ALL`, in both directions. The
 -- so nothing in Rust can see whether a label is still on screen. This does that
 half, by reading the catalogue and the Svelte sources together.
 
-Run by hand, like the other tools here; it needs no toolchain beyond Python.
+CI runs it; it needs no toolchain beyond Python.
 
     tools/check_strings.py            # exits non-zero and says what is wrong
 """
@@ -16,17 +16,20 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import sources  # noqa: E402
+
 ROOT = Path(__file__).resolve().parent.parent
 CATALOGUE = ROOT / "crates/gear-io/data/strings_en.toml"
 # The front end, and the Rust that hands it keys. `Maybe::Unavailable` carries a
 # reason across the boundary, and where that reason has a message it is written
 # as a `ui.…` key rather than a sentence — so gear-wasm is a place `ui.` keys are
 # used, and scanning only `web/src` reported a live one as an orphan.
-SOURCES = (
-    sorted((ROOT / "web/src").glob("*.svelte"))
-    + sorted((ROOT / "web/src").glob("*.ts"))
-    + sorted((ROOT / "crates").rglob("*.rs"))
-)
+#
+# The files are `tools/sources.py`'s list, which `check_doc_links.py` reads too:
+# every tracked file less the generated bindings, so a directory added under
+# `web/src` is read without a glob here to widen.
+SOURCES = sources.tracked({".svelte", ".ts", ".rs"})
 
 
 def catalogue_ui_keys(text):

@@ -3565,7 +3565,7 @@ behalf.
 eccentricity can be entered as the angular-shift amplitude `Δx` or as the
 **centre-distance throw** — the half-amplitude of the commanded centre distance's
 best-fit sinusoid, what a simple eccentric or crank delivers. The second is the
-first read backwards: [`amplitude_for_throw`](../crates/gear-core/src/eccentric.rs)
+first read backwards: [`amplitude_for_throw`](../../crates/gear-core/src/gear.rs)
 solves the `Δx` whose `centre_profile` has that throw — the throw is zero at
 `Δx = 0` and rises monotonically until the mesh runs out of involute, so it is one
 bracketed inversion, not a new model. `Δx` stays the single field everything is

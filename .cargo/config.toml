@@ -22,13 +22,8 @@ lint-fix = "clippy --all-targets --fix --allow-dirty"
 fmt-check = "fmt -- --check"
 
 [build]
-# Use all available cores for parallel compilation
+# All cores but one: a negative count is subtracted from the logical CPUs.
 jobs = -1
-
-[term]
-# Show warnings during compilation (not just errors)
-verbose = false
-color = "auto"
 
 # Progress bar configuration
 [term.progress]

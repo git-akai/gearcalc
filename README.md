@@ -70,7 +70,8 @@ cargo nextest run        # the full test suite, ~26 s
 cargo clippy --all-targets -- --deny warnings
 cargo fmt
 
-nix flake check          # everything CI checks: build, clippy, fmt, tests
+nix flake check          # build, clippy, fmt, tests, rustdoc
+tools/check_all.sh       # all of CI, the cheap checks first
 ```
 
 ### Driving the mathematics without a browser
