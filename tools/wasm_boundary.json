@@ -92,7 +92,8 @@
          "actuations": 1000,
          "reversing": false
         }
-       }
+       },
+       "application_factor": 1
       },
       {
        "kind": "ultimate",
@@ -130,7 +131,8 @@
          "actuations": 1000,
          "reversing": false
         }
-       }
+       },
+       "application_factor": 1
       },
       {
        "kind": "fatigue",
@@ -168,7 +170,8 @@
          "actuations": 1000,
          "reversing": false
         }
-       }
+       },
+       "application_factor": 1
       }
      ],
      "reversed_bending": false,
@@ -10854,7 +10857,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "ultimate",
@@ -10892,7 +10896,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "fatigue",
@@ -10930,7 +10935,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        }
       ],
       "reversed_bending": false,
@@ -11430,7 +11436,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "ultimate",
@@ -11468,7 +11475,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "fatigue",
@@ -11506,7 +11514,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        }
       ],
       "reversed_bending": false,
@@ -12004,7 +12013,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "ultimate",
@@ -12042,7 +12052,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "fatigue",
@@ -12080,7 +12091,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        }
       ],
       "reversed_bending": false,
@@ -12580,7 +12592,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "ultimate",
@@ -12618,7 +12631,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "fatigue",
@@ -12656,7 +12670,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        }
       ],
       "reversed_bending": false,
@@ -13156,7 +13171,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "ultimate",
@@ -13194,7 +13210,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "fatigue",
@@ -13232,7 +13249,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        }
       ],
       "reversed_bending": false,
@@ -13732,7 +13750,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "ultimate",
@@ -13770,7 +13789,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "fatigue",
@@ -13808,7 +13828,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "ultimate",
@@ -13846,7 +13867,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "fatigue",
@@ -13884,7 +13906,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        }
       ],
       "reversed_bending": false,
@@ -14384,7 +14407,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "ultimate",
@@ -14422,7 +14446,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "fatigue",
@@ -14460,7 +14485,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "ultimate",
@@ -14498,7 +14524,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "fatigue",
@@ -14533,7 +14560,8 @@
          "continuous": {
           "runtime_hours": 1000
          }
-        }
+        },
+        "application_factor": 1
        }
       ],
       "reversed_bending": false,
@@ -15033,7 +15061,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "ultimate",
@@ -15071,7 +15100,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "fatigue",
@@ -15109,7 +15139,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "ultimate",
@@ -15147,7 +15178,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "fatigue",
@@ -15182,7 +15214,8 @@
          "continuous": {
           "runtime_hours": 1000
          }
-        }
+        },
+        "application_factor": 1
        }
       ],
       "reversed_bending": false,
@@ -15825,7 +15858,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "ultimate",
@@ -15863,7 +15897,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "fatigue",
@@ -15901,7 +15936,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "ultimate",
@@ -15939,7 +15975,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "fatigue",
@@ -15974,7 +16011,8 @@
          "continuous": {
           "runtime_hours": 1000
          }
-        }
+        },
+        "application_factor": 1
        }
       ],
       "reversed_bending": false,
@@ -17183,7 +17221,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "ultimate",
@@ -17221,7 +17260,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "fatigue",
@@ -17259,7 +17299,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "ultimate",
@@ -17297,7 +17338,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "fatigue",
@@ -17332,7 +17374,8 @@
          "continuous": {
           "runtime_hours": 1000
          }
-        }
+        },
+        "application_factor": 1
        }
       ],
       "reversed_bending": false,
@@ -18423,7 +18466,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "ultimate",
@@ -18449,7 +18493,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "fatigue",
@@ -18475,7 +18520,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "ultimate",
@@ -18501,7 +18547,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "fatigue",
@@ -18524,7 +18571,8 @@
          "continuous": {
           "runtime_hours": 1000
          }
-        }
+        },
+        "application_factor": 1
        }
       ],
       "reversed_bending": false,
@@ -19795,7 +19843,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "ultimate",
@@ -19821,7 +19870,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "fatigue",
@@ -19847,7 +19897,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "ultimate",
@@ -19873,7 +19924,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "fatigue",
@@ -19896,7 +19948,8 @@
          "continuous": {
           "runtime_hours": 1000
          }
-        }
+        },
+        "application_factor": 1
        }
       ],
       "reversed_bending": false,
@@ -21176,7 +21229,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "ultimate",
@@ -21202,7 +21256,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "fatigue",
@@ -21228,7 +21283,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "ultimate",
@@ -21254,7 +21310,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "fatigue",
@@ -21277,7 +21334,8 @@
          "continuous": {
           "runtime_hours": 1000
          }
-        }
+        },
+        "application_factor": 1
        }
       ],
       "reversed_bending": false,
@@ -22663,7 +22721,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "ultimate",
@@ -22689,7 +22748,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "fatigue",
@@ -22715,7 +22775,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "ultimate",
@@ -22741,7 +22802,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "fatigue",
@@ -22764,7 +22826,8 @@
          "continuous": {
           "runtime_hours": 1000
          }
-        }
+        },
+        "application_factor": 1
        }
       ],
       "reversed_bending": false,
@@ -24044,7 +24107,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "ultimate",
@@ -24070,7 +24134,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "fatigue",
@@ -24096,7 +24161,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "ultimate",
@@ -24122,7 +24188,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "fatigue",
@@ -24145,7 +24212,8 @@
          "continuous": {
           "runtime_hours": 1000
          }
-        }
+        },
+        "application_factor": 1
        }
       ],
       "reversed_bending": false,
@@ -25570,7 +25638,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "ultimate",
@@ -25596,7 +25665,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "fatigue",
@@ -25622,7 +25692,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "ultimate",
@@ -25648,7 +25719,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "fatigue",
@@ -25671,7 +25743,8 @@
          "continuous": {
           "runtime_hours": 1000
          }
-        }
+        },
+        "application_factor": 1
        }
       ],
       "reversed_bending": false,
@@ -27993,7 +28066,14 @@
           }
          ],
          "solved": true,
-         "notes": []
+         "notes": [
+          {
+           "key": "train.stresses_nominal",
+           "values": {
+            "factor": "1.00"
+           }
+          }
+         ]
         },
         {
          "case": 1,
@@ -28018,7 +28098,14 @@
           }
          ],
          "solved": true,
-         "notes": []
+         "notes": [
+          {
+           "key": "train.stresses_nominal",
+           "values": {
+            "factor": "1.00"
+           }
+          }
+         ]
         },
         {
          "case": 2,
@@ -28043,7 +28130,14 @@
           }
          ],
          "solved": true,
-         "notes": []
+         "notes": [
+          {
+           "key": "train.stresses_nominal",
+           "values": {
+            "factor": "1.00"
+           }
+          }
+         ]
         }
        ],
        "members": [
@@ -29061,7 +29155,14 @@
           }
          ],
          "solved": true,
-         "notes": []
+         "notes": [
+          {
+           "key": "train.stresses_nominal",
+           "values": {
+            "factor": "1.00"
+           }
+          }
+         ]
         },
         {
          "case": 1,
@@ -29104,7 +29205,14 @@
           }
          ],
          "solved": true,
-         "notes": []
+         "notes": [
+          {
+           "key": "train.stresses_nominal",
+           "values": {
+            "factor": "1.00"
+           }
+          }
+         ]
         },
         {
          "case": 2,
@@ -29147,7 +29255,14 @@
           }
          ],
          "solved": true,
-         "notes": []
+         "notes": [
+          {
+           "key": "train.stresses_nominal",
+           "values": {
+            "factor": "1.00"
+           }
+          }
+         ]
         }
        ],
        "members": [
@@ -31395,11 +31510,12 @@
       "actuations": 1000,
       "reversing": false
      }
-    }
+    },
+    "application_factor": 1
    }
   },
   "export_train": {
-   "ok": "# Geartrain.\n#\n# Inputs only — every ratio, stress, efficiency and backlash is recomputed from\n# these, so nothing here can go stale. Units: mm, degrees, rpm, N·m.\n#\n# Materials are named; the library that defines them is a separate document.\n# Editing this file by hand is expected.\n\nname = \"probe\"\n\n[train]\nreversed_bending = false\nheld = []\n\n[[train.load_cases]]\nkind = \"ultimate\"\nenabled = true\n\n[[train.load_cases.loads]]\nat = 1\nrole = \"load\"\n\n[train.load_cases.loads.torque]\nauto = false\nmanual = 0.1\n\n[train.load_cases.loads.speed]\nauto = false\nmanual = 30000.0\n\n[[train.load_cases.loads]]\nat = 2\nrole = \"reacted\"\n\n[train.load_cases.loads.torque]\nauto = true\nmanual = 0.0\n\n[train.load_cases.loads.speed]\nauto = true\nmanual = 0.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nat = 2\nactuations = 1000\nreversing = false\n\n[[train.load_cases]]\nkind = \"ultimate\"\nenabled = true\n\n[[train.load_cases.loads]]\nat = 2\nrole = \"load\"\n\n[train.load_cases.loads.torque]\nauto = false\nmanual = 3.0\n\n[train.load_cases.loads.speed]\nauto = false\nmanual = 0.0\n\n[[train.load_cases.loads]]\nat = 1\nrole = \"reacted\"\n\n[train.load_cases.loads.torque]\nauto = true\nmanual = 0.0\n\n[train.load_cases.loads.speed]\nauto = true\nmanual = 0.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nat = 2\nactuations = 1000\nreversing = false\n\n[[train.load_cases]]\nkind = \"fatigue\"\nenabled = true\n\n[[train.load_cases.loads]]\nat = 1\nrole = \"load\"\n\n[train.load_cases.loads.torque]\nauto = false\nmanual = 0.02\n\n[train.load_cases.loads.speed]\nauto = false\nmanual = 30000.0\n\n[[train.load_cases.loads]]\nat = 2\nrole = \"reacted\"\n\n[train.load_cases.loads.torque]\nauto = true\nmanual = 0.0\n\n[train.load_cases.loads.speed]\nauto = true\nmanual = 0.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nat = 2\nactuations = 1000\nreversing = false\n\n[train.shape]\ncouplings = []\n\n[[train.shape.axes]]\ncarried_by = 0\ncount = 1\nmin_planet_clearance = 0.3\n\n[[train.shape.axes]]\ncarried_by = 0\ncount = 1\nmin_planet_clearance = 0.3\n\n[[train.shape.bodies]]\nbody = 1\naxis = 0\n\n[[train.shape.bodies]]\nbody = 2\naxis = 1\n\n[[train.shape.members]]\nbody = 1\n\n[train.shape.members.gear]\nteeth = 17\nno_undercut = true\naddendum = 1.0\nno_sharp_tip = true\nmin_tip_width = 0.1\ndedendum = 1.25\nroot_radius = 0.38\nmaterial = \"4340 Hardened Steel\"\n\n[train.shape.members.gear.profile_shift]\nauto = true\nmanual = 0.0\n\n[train.shape.members.gear.working_depth]\nauto = true\nmanual = 1.0\n\n[train.shape.members.gear.helix_angle]\nauto = true\nmanual = 0.0\n\n[train.shape.members.gear.face_width]\nauto = true\nmanual = 5.0\n\n[train.shape.members.gear.face_sources.bending]\nultimate = true\nfatigue = true\n\n[train.shape.members.gear.face_sources.contact]\nultimate = false\nfatigue = false\n\n[train.shape.members.gear.material_overrides]\n\n[train.shape.members.module]\nauto = false\nmanual = 1.0\n\n[train.shape.members.pressure_angle]\nauto = false\nmanual = 20.0\n\n[train.shape.members.thickness_mod]\nauto = false\nmanual = 1.0\n\n[train.shape.members.pitch_diameter]\nauto = true\nmanual = 17.0\n\n[[train.shape.members]]\nbody = 2\n\n[train.shape.members.gear]\nteeth = 43\nno_undercut = true\naddendum = 1.0\nno_sharp_tip = true\nmin_tip_width = 0.1\ndedendum = 1.25\nroot_radius = 0.38\nmaterial = \"4340 Hardened Steel\"\n\n[train.shape.members.gear.profile_shift]\nauto = true\nmanual = 0.0\n\n[train.shape.members.gear.working_depth]\nauto = true\nmanual = 1.0\n\n[train.shape.members.gear.helix_angle]\nauto = true\nmanual = 0.0\n\n[train.shape.members.gear.face_width]\nauto = true\nmanual = 5.0\n\n[train.shape.members.gear.face_sources.bending]\nultimate = true\nfatigue = true\n\n[train.shape.members.gear.face_sources.contact]\nultimate = false\nfatigue = false\n\n[train.shape.members.gear.material_overrides]\n\n[train.shape.members.module]\nauto = true\nmanual = 1.0\n\n[train.shape.members.pressure_angle]\nauto = true\nmanual = 20.0\n\n[train.shape.members.thickness_mod]\nauto = true\nmanual = 1.0\n\n[train.shape.members.pitch_diameter]\nauto = true\nmanual = 0.0\n\n[[train.shape.meshes]]\na = 0\nb = 1\nsliding_friction = 0.08\nstatic_friction = 0.16\nmin_contact_ratio = 1.2\nload_sharing = \"none\"\nsearch = false\n\n[train.shape.meshes.overlap]\nauto = true\nmanual = 1.0\n\n[[train.shape.distances]]\naxes = [\n    0,\n    1,\n]\nangle = 0.0\nworm = false\ntip_clearance = 0.0\ntolerance_plus = 0.02\ntolerance_minus = 0.02\naxial_clearance = 0.0\n\n[train.shape.distances.distance]\nauto = true\nmanual = 0.0\n\n[train.shape.distances.clearance]\nauto = false\nmanual = 0.02\n"
+   "ok": "# Geartrain.\n#\n# Inputs only — every ratio, stress, efficiency and backlash is recomputed from\n# these, so nothing here can go stale. Units: mm, degrees, rpm, N·m.\n#\n# Materials are named; the library that defines them is a separate document.\n# Editing this file by hand is expected.\n\nname = \"probe\"\n\n[train]\nreversed_bending = false\nheld = []\n\n[[train.load_cases]]\nkind = \"ultimate\"\nenabled = true\napplication_factor = 1.0\n\n[[train.load_cases.loads]]\nat = 1\nrole = \"load\"\n\n[train.load_cases.loads.torque]\nauto = false\nmanual = 0.1\n\n[train.load_cases.loads.speed]\nauto = false\nmanual = 30000.0\n\n[[train.load_cases.loads]]\nat = 2\nrole = \"reacted\"\n\n[train.load_cases.loads.torque]\nauto = true\nmanual = 0.0\n\n[train.load_cases.loads.speed]\nauto = true\nmanual = 0.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nat = 2\nactuations = 1000\nreversing = false\n\n[[train.load_cases]]\nkind = \"ultimate\"\nenabled = true\napplication_factor = 1.0\n\n[[train.load_cases.loads]]\nat = 2\nrole = \"load\"\n\n[train.load_cases.loads.torque]\nauto = false\nmanual = 3.0\n\n[train.load_cases.loads.speed]\nauto = false\nmanual = 0.0\n\n[[train.load_cases.loads]]\nat = 1\nrole = \"reacted\"\n\n[train.load_cases.loads.torque]\nauto = true\nmanual = 0.0\n\n[train.load_cases.loads.speed]\nauto = true\nmanual = 0.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nat = 2\nactuations = 1000\nreversing = false\n\n[[train.load_cases]]\nkind = \"fatigue\"\nenabled = true\napplication_factor = 1.0\n\n[[train.load_cases.loads]]\nat = 1\nrole = \"load\"\n\n[train.load_cases.loads.torque]\nauto = false\nmanual = 0.02\n\n[train.load_cases.loads.speed]\nauto = false\nmanual = 30000.0\n\n[[train.load_cases.loads]]\nat = 2\nrole = \"reacted\"\n\n[train.load_cases.loads.torque]\nauto = true\nmanual = 0.0\n\n[train.load_cases.loads.speed]\nauto = true\nmanual = 0.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nat = 2\nactuations = 1000\nreversing = false\n\n[train.shape]\ncouplings = []\n\n[[train.shape.axes]]\ncarried_by = 0\ncount = 1\nmin_planet_clearance = 0.3\n\n[[train.shape.axes]]\ncarried_by = 0\ncount = 1\nmin_planet_clearance = 0.3\n\n[[train.shape.bodies]]\nbody = 1\naxis = 0\n\n[[train.shape.bodies]]\nbody = 2\naxis = 1\n\n[[train.shape.members]]\nbody = 1\n\n[train.shape.members.gear]\nteeth = 17\nno_undercut = true\naddendum = 1.0\nno_sharp_tip = true\nmin_tip_width = 0.1\ndedendum = 1.25\nroot_radius = 0.38\nmaterial = \"4340 Hardened Steel\"\n\n[train.shape.members.gear.profile_shift]\nauto = true\nmanual = 0.0\n\n[train.shape.members.gear.working_depth]\nauto = true\nmanual = 1.0\n\n[train.shape.members.gear.helix_angle]\nauto = true\nmanual = 0.0\n\n[train.shape.members.gear.face_width]\nauto = true\nmanual = 5.0\n\n[train.shape.members.gear.face_sources.bending]\nultimate = true\nfatigue = true\n\n[train.shape.members.gear.face_sources.contact]\nultimate = false\nfatigue = false\n\n[train.shape.members.gear.material_overrides]\n\n[train.shape.members.module]\nauto = false\nmanual = 1.0\n\n[train.shape.members.pressure_angle]\nauto = false\nmanual = 20.0\n\n[train.shape.members.thickness_mod]\nauto = false\nmanual = 1.0\n\n[train.shape.members.pitch_diameter]\nauto = true\nmanual = 17.0\n\n[[train.shape.members]]\nbody = 2\n\n[train.shape.members.gear]\nteeth = 43\nno_undercut = true\naddendum = 1.0\nno_sharp_tip = true\nmin_tip_width = 0.1\ndedendum = 1.25\nroot_radius = 0.38\nmaterial = \"4340 Hardened Steel\"\n\n[train.shape.members.gear.profile_shift]\nauto = true\nmanual = 0.0\n\n[train.shape.members.gear.working_depth]\nauto = true\nmanual = 1.0\n\n[train.shape.members.gear.helix_angle]\nauto = true\nmanual = 0.0\n\n[train.shape.members.gear.face_width]\nauto = true\nmanual = 5.0\n\n[train.shape.members.gear.face_sources.bending]\nultimate = true\nfatigue = true\n\n[train.shape.members.gear.face_sources.contact]\nultimate = false\nfatigue = false\n\n[train.shape.members.gear.material_overrides]\n\n[train.shape.members.module]\nauto = true\nmanual = 1.0\n\n[train.shape.members.pressure_angle]\nauto = true\nmanual = 20.0\n\n[train.shape.members.thickness_mod]\nauto = true\nmanual = 1.0\n\n[train.shape.members.pitch_diameter]\nauto = true\nmanual = 0.0\n\n[[train.shape.meshes]]\na = 0\nb = 1\nsliding_friction = 0.08\nstatic_friction = 0.16\nmin_contact_ratio = 1.2\nload_sharing = \"none\"\nsearch = false\n\n[train.shape.meshes.overlap]\nauto = true\nmanual = 1.0\n\n[[train.shape.distances]]\naxes = [\n    0,\n    1,\n]\nangle = 0.0\nworm = false\ntip_clearance = 0.0\ntolerance_plus = 0.02\ntolerance_minus = 0.02\naxial_clearance = 0.0\n\n[train.shape.distances.distance]\nauto = true\nmanual = 0.0\n\n[train.shape.distances.clearance]\nauto = false\nmanual = 0.02\n"
   },
   "import_train": {
    "ok": {
@@ -31443,7 +31559,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "ultimate",
@@ -31481,7 +31598,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        },
        {
         "kind": "fatigue",
@@ -31519,7 +31637,8 @@
           "actuations": 1000,
           "reversing": false
          }
-        }
+        },
+        "application_factor": 1
        }
       ],
       "reversed_bending": false,
