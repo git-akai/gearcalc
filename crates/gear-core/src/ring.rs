@@ -216,6 +216,8 @@ impl Ring {
         z: f64,
         cutter_teeth: f64,
     ) -> Self {
+        #[cfg(test)]
+        crate::testing::work::ring();
         let mut clamps = Vec::new();
         let beta = params.helix_angle.to_radians();
         // Guarded as `Tooth` guards it: at or below the floor the base circle

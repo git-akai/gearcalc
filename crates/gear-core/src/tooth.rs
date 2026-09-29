@@ -416,6 +416,8 @@ impl Tooth {
         z: f64,
         tool: Option<Rack>,
     ) -> Self {
+        #[cfg(test)]
+        crate::testing::work::tooth();
         let mut clamps = Clamps::default();
         let m = params.module;
         let x = params.profile_shift;

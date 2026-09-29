@@ -65,6 +65,13 @@ jobs:
       # Everything CI needs to check: build, clippy --deny warnings, fmt, tests.
       - run: nix flake check -L
 
+      # The timing canaries, alone and one at a time. The suite's gates count
+      # work (teeth cut, candidates evaluated), which no machine changes; these
+      # say the order of magnitude a count cannot, and wall-clock in a parallel
+      # suite measured the machine as much as the code.
+      - name: Timing canaries, serially
+        run: nix develop --command cargo nextest run --run-ignored only --test-threads 1
+
       # The deployable browser build. Separate from `flake check` because it
       # pulls the Node toolchain, and a failure here is a packaging problem
       # rather than a code one.

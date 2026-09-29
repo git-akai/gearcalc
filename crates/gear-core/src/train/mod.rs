@@ -10429,6 +10429,103 @@ mod tests {
         }
     }
 
+    /// **Every search costs like an input**, counted rather than timed.
+    ///
+    /// Two claims per search, both in work no machine changes:
+    ///
+    /// - **A candidate costs at most a whole solve.** The teeth and rings a
+    ///   searched solve cuts are at most `evaluations + 1` times what the
+    ///   unsearched solve of the same shape cuts. Every regression recorded
+    ///   against this gate (800 ms, 100 ms, 68 ms) was a candidate building
+    ///   something nothing then read.
+    /// - **The search evaluates no more candidates than it did.** A ceiling 5 %
+    ///   over the measured count — pair 1 967, epicyclic set 3 846, hula stage
+    ///   524 — so a search asked to work harder fails here and says by how
+    ///   much: doubling `Search::SHIPPED.starts` takes them to 2 249, 4 120 and
+    ///   712. The count is deterministic; the margin is for a change to the
+    ///   efficiency model moving a walk's path, which moves the count a little
+    ///   and on purpose.
+    ///
+    /// A Layshaft is not here, and is the case this count exists to see: with
+    /// its search on it evaluates about 46 000 candidates and cuts about
+    /// 99 000 teeth per solve, about 1.4 s native (the audit's lens-performance#3).
+    #[test]
+    fn every_search_costs_like_an_input() {
+        use crate::testing::work::{self, Work};
+        let lib = library();
+        let cuts = |w: Work| w.teeth + w.rings;
+        let each = |name: &str, ceiling: u64, searched: &dyn Fn(), plain: &dyn Fn()| {
+            let (one, ()) = work::of(plain);
+            let (w, ()) = work::of(searched);
+            assert!(
+                w.evaluations <= ceiling,
+                "the {name} search evaluated {} candidates, over its {ceiling}",
+                w.evaluations
+            );
+            assert!(
+                cuts(w) <= (w.evaluations + 1) * cuts(one),
+                "the {name} search cut {} teeth and rings over {} candidates, more than \
+                 the {} a whole solve cuts, per candidate",
+                cuts(w),
+                w.evaluations,
+                cuts(one)
+            );
+        };
+
+        let pair = |search: bool| {
+            let mut s = arr::pair([17, 43]);
+            s.set_search(search);
+            s
+        };
+        let (on, off) = (pair(true), pair(false));
+        each(
+            "pair's",
+            2_065,
+            &|| {
+                solve_preset(&on, 2.0, 0.0, &lib).unwrap();
+            },
+            &|| {
+                solve_preset(&off, 2.0, 0.0, &lib).unwrap();
+            },
+        );
+
+        let set = |search: bool| {
+            let mut s = arr::planetary(12, 30, 72, 3);
+            s.set_search(search);
+            s.members[0].gear.profile_shift = Auto::automatic(0.0);
+            s.members[2].gear.profile_shift = Auto::automatic(0.0);
+            s
+        };
+        let (on, off) = (set(true), set(false));
+        each(
+            "epicyclic set's",
+            4_038,
+            &|| {
+                solve_preset(&on, 2.0, 0.0, &lib).unwrap();
+            },
+            &|| {
+                solve_preset(&off, 2.0, 0.0, &lib).unwrap();
+            },
+        );
+
+        let drive = |search: bool| {
+            let mut s = hula_shape([65, 61, 57, 61]);
+            s.set_search(search);
+            s
+        };
+        let (on, off) = (drive(true), drive(false));
+        each(
+            "hula stage's",
+            550,
+            &|| {
+                solve_hula(&on, 2.0, 0.0, &lib).unwrap();
+            },
+            &|| {
+                solve_hula(&off, 2.0, 0.0, &lib).unwrap();
+            },
+        );
+    }
+
     /// **Every search runs on every keystroke**, so each has to cost like an
     /// input and not like a build.
     ///
@@ -10464,7 +10561,15 @@ mod tests {
     /// five so the gate did not go slack while the measurement grew. The
     /// optimiser is off by default, so nothing pays this unless it was asked
     /// for.
+    ///
+    /// # Ignored in the suite
+    ///
+    /// A timing canary: wall-clock measures the machine as much as the code,
+    /// and this failed 21 of 40 runs under load alone.
+    /// `every_search_costs_like_an_input` is the gate; CI runs this one on its
+    /// own, serially.
     #[test]
+    #[ignore = "timing canary: run serially (cargo nextest run --run-ignored only)"]
     fn every_search_is_quick_enough_to_type_over() {
         let lib = library();
         let each = |name: &str, ceiling: u64, f: &dyn Fn()| {

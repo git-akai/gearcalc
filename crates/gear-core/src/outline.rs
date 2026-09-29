@@ -936,32 +936,31 @@ mod tests {
         }
     }
 
-    /// An unreachably tight tolerance must not explode the vertex count. Before
-    /// the floor was added this case took 45 seconds and would have hung the UI.
+    /// An unreachably tight tolerance must not explode the vertex count: every
+    /// span subdivides to the floor and stops there.
     ///
-    /// **And the floor is where it says it is.** This asserted only that the
-    /// case *terminated*, which is a claim about the stop existing and not about
-    /// where it sits: `MAX_SUBDIVISION_DEPTH` could be cut from 14 to 4 and this
-    /// would still pass in a fraction of the time, on a visibly coarse drawing.
-    /// Measured, the depth moved from 14 to 10 with all 558 tests and all 27
-    /// golden files silent. So the count is pinned too — a canary, since a
-    /// safety stop is a chosen number and not a derived one, and its only
-    /// property is that nothing changes it by accident.
-    ///
-    /// Every span drives to the stop here, so the count is `spans × 2^depth`
-    /// and a depth one lower halves it. The band is wide because the span count
-    /// is the tooth's business; what it catches is a factor of two.
+    /// **And the floor is where it says it is.** The count here is
+    /// `spans × 2^depth` (measured: 278 579, 557 107, 1 113 925, 2 223 583 at
+    /// depths 12 to 15), so it is held to depth 14 within a factor of `√2`
+    /// either side, half-way to the neighbouring depths: a stop moved one
+    /// level either way fails it. The depth is written here, not read from
+    /// `MAX_SUBDIVISION_DEPTH` — a safety stop is a chosen number, and this is
+    /// what notices it being changed by accident. `SPANS` is the default gear's
+    /// span count, the tooth's business. A count, not a clock, so the test
+    /// fails on the depth and not on a busy machine.
     #[test]
     fn an_unreachable_tolerance_stays_bounded() {
+        const SPANS: f64 = 68.0;
+        const DEPTH: u32 = 14;
         let g = Tooth::new(GearParams::default());
-        let t0 = std::time::Instant::now();
         let n = crate::gear::Gear::new(g.params).outline(1e-18).len();
-        let elapsed = t0.elapsed();
-        assert!(elapsed.as_secs() < 2, "took {elapsed:?} for {n} vertices");
+        let expected = SPANS * f64::from(1u32 << DEPTH);
+        #[allow(clippy::cast_precision_loss)]
+        let ratio = n as f64 / expected;
         assert!(
-            (400_000..1_200_000).contains(&n),
-            "{n} vertices at the subdivision floor: the stop has moved off \
-             depth {MAX_SUBDIVISION_DEPTH}"
+            (std::f64::consts::FRAC_1_SQRT_2..std::f64::consts::SQRT_2).contains(&ratio),
+            "{n} vertices at the subdivision floor, {ratio:.3} of {SPANS} spans x 2^{DEPTH}: \
+             the stop has moved off depth {DEPTH} (MAX_SUBDIVISION_DEPTH is {MAX_SUBDIVISION_DEPTH})"
         );
     }
 }

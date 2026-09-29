@@ -168,6 +168,7 @@ The checks, by what each catches. `nix flake check` is **not** all of them.
 | `cargo fmt --check` | | " |
 | `env RUSTDOCFLAGS='-D warnings -A rustdoc::private_intra_doc_links' cargo doc --workspace --no-deps --document-private-items` | **an intra-doc link that no longer resolves** — a renamed or retired item leaves the sentence about it wrong, and this is what notices. Private items are documented, so a link from a public item to a private one resolves and is checked | " |
 | `cargo test --doc` | the examples in doc comments, which `nextest` does not run | " |
+| `cargo nextest run --run-ignored only --test-threads 1` | **the timing canaries**, `#[ignore]`d in the suite and run alone: the suite gates on counted work, and these give the order of magnitude a count cannot | yes |
 | `nix build .#web` | **the site — `flake check` does not cover it** | yes |
 | `cd web && npm run check` | types, which the bundler strips without checking | yes |
 | `cd web && npm test` | **the panels, mounted** — vitest in jsdom against the real wasm core: what a box shows after what a reader types, and what reaches the core | yes |

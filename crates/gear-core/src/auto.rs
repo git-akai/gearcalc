@@ -1805,6 +1805,11 @@ impl Search {
             first_step,
         } = *self;
         let dof = box_.len();
+        #[cfg(test)]
+        let objective = &|x: &[f64]| {
+            crate::testing::work::evaluation();
+            objective(x)
+        };
 
         // **Every direction, not one axis at a time.** These surfaces have flat
         // ridges and their optima sit against constraints, and at such a corner no

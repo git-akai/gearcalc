@@ -1387,13 +1387,39 @@ mod tests {
     }
 
     /// **Solving an amplitude costs like an input**, on a panel that re-solves
-    /// as a designer types.
+    /// as a designer types: it cuts one tooth, the mean, however many trials
+    /// the root takes.
     ///
-    /// The bound is loose because wall-clock in a parallel suite measures the
-    /// machine as much as the code; what it is for is the order of magnitude.
-    /// This was 102 ms, and the whole of it was building gears whose teeth
-    /// nothing read.
+    /// Each trial is the closed form over [`shift_at`]; a trial that built a
+    /// gear is what once made this 102 ms, all of it teeth nothing read. Counted
+    /// rather than timed, so the test fails on the work and not on the machine.
     #[test]
+    fn solving_an_amplitude_cuts_one_tooth() {
+        let base = GearParams {
+            teeth: 41,
+            angular_shift: 0.12,
+            ..GearParams::default()
+        };
+        let mate = Tooth::new(GearParams {
+            teeth: 40,
+            ..GearParams::default()
+        });
+        let (work, found) = crate::testing::work::of(|| {
+            amplitude_for_throw(base, &mate, MeshKind::External, MeshSide::First, 0.05)
+        });
+        found.expect("reachable");
+        assert_eq!(
+            work.teeth, 1,
+            "solving an amplitude cut {} teeth; the mean tooth is the only one",
+            work.teeth
+        );
+    }
+
+    /// The same solve against the clock, for the order of magnitude a count
+    /// cannot give. Ignored in the suite, where wall-clock measures the machine
+    /// as much as the code; CI runs the timing canaries one at a time.
+    #[test]
+    #[ignore = "timing canary: run serially (cargo nextest run --run-ignored only)"]
     fn solving_an_amplitude_is_quick_enough_to_type_over() {
         let base = GearParams {
             teeth: 41,

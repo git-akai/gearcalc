@@ -48,3 +48,69 @@ pub fn improper_sqrt<F: Fn(f64) -> f64>(g: F) -> f64 {
     });
     near + tail
 }
+
+/// **Work counted where it is done**, so a test can say what a solve cost in
+/// units no machine changes: teeth cut, rings cut, and a search's objective
+/// evaluations.
+///
+/// Wall-clock in a suite that runs tests in parallel measures the machine as
+/// much as the code; a count measures the code alone, and the regressions it
+/// is for — a candidate building teeth nothing then read — are regressions in
+/// the count. Per thread, because a test runs on one and the counters are read
+/// around a call that does not spawn.
+pub mod work {
+    use std::cell::Cell;
+
+    thread_local! {
+        static TEETH: Cell<u64> = const { Cell::new(0) };
+        static RINGS: Cell<u64> = const { Cell::new(0) };
+        static EVALUATIONS: Cell<u64> = const { Cell::new(0) };
+    }
+
+    /// What was counted on this thread.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub struct Work {
+        /// External teeth cut (`Tooth` construction).
+        pub teeth: u64,
+        /// Rings cut (`Ring` construction).
+        pub rings: u64,
+        /// Objective evaluations by `auto::Search::maximise`.
+        pub evaluations: u64,
+    }
+
+    fn bump(c: &'static std::thread::LocalKey<Cell<u64>>) {
+        c.with(|n| n.set(n.get() + 1));
+    }
+
+    pub fn tooth() {
+        bump(&TEETH);
+    }
+
+    pub fn ring() {
+        bump(&RINGS);
+    }
+
+    pub fn evaluation() {
+        bump(&EVALUATIONS);
+    }
+
+    /// The work `f` does on this thread, and what it returns.
+    pub fn of<T>(f: impl FnOnce() -> T) -> (Work, T) {
+        let read = || Work {
+            teeth: TEETH.with(Cell::get),
+            rings: RINGS.with(Cell::get),
+            evaluations: EVALUATIONS.with(Cell::get),
+        };
+        let before = read();
+        let out = f();
+        let after = read();
+        (
+            Work {
+                teeth: after.teeth - before.teeth,
+                rings: after.rings - before.rings,
+                evaluations: after.evaluations - before.evaluations,
+            },
+            out,
+        )
+    }
+}
