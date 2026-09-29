@@ -38,7 +38,7 @@
 //!   writes; a pair that does not is a thicker or thinner mesh, carried into
 //!   the shift sum as an equivalent shift and not refused.
 
-use crate::auto::{addendum_for_tip_width, Ranges};
+use crate::auto::{addendum_for_tip_width, Bound, Ranges};
 use crate::contact::{Directional, Drive};
 use crate::material::{Material, MaterialLibrary, Overrides};
 use crate::mesh::MeshError;
@@ -4231,6 +4231,10 @@ pub struct TrainResult {
 pub struct AxisReport {
     /// The layout, its `axis` the graph's number for it.
     pub layout: Option<shape::LayoutReport>,
+    /// **The counts the axis may be replicated to** ([`shape::Axis::count`]): at
+    /// least once, since `N = 0` is no axis. Sent so the panel holds the box
+    /// to the core's bound rather than one written beside it.
+    pub count: Bound,
 }
 
 /// **What is a part's own** — what its search and its closures came to, and
@@ -4278,7 +4282,10 @@ impl TrainResult {
         let mut meshes: Vec<Option<MeshReport>> = vec![None; shape.meshes.len()];
         let mut distances: Vec<Option<shape::DistanceReport>> = vec![None; shape.distances.len()];
         let mut axes: Vec<AxisReport> = (0..shape.axes.len())
-            .map(|_| AxisReport { layout: None })
+            .map(|_| AxisReport {
+                layout: None,
+                count: Bound::between(Some(1.0), None),
+            })
             .collect();
         let mut own = Vec::with_capacity(parts.len());
         for (part, r) in parts.iter().zip(results) {

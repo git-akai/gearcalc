@@ -239,6 +239,17 @@ input[type="number"] {
   color: var(--fg);
 }
 
+/* `NumberBox`'s two states, on either tab: a figure the reader did not choose
+   is greyed, and a box whose text is refused is outlined in the warning
+   colour. */
+input[type="number"].computed {
+  color: var(--muted);
+  font-style: italic;
+}
+input[type="number"].invalid {
+  border-color: var(--warn);
+}
+
 /* **The notes at the foot of a section**, on either tab: what a solve says
    of the thing above it, in the warning colour, a little under the size of
    the rows it follows. */

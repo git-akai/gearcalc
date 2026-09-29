@@ -5,10 +5,8 @@
     defaults,
     dxf,
     isUnavailable,
-    outside,
     profile,
     solve,
-    validate,
     boundFor,
     ringDxf,
     ringProfile,
@@ -26,18 +24,12 @@
   import { developer, setKind, trains, workspace, type GearTab as Tab } from "./state.svelte";
   import { memberRefs } from "./members";
   import FieldNote from "./FieldNote.svelte";
+  import NumberBox from "./NumberBox.svelte";
   import Switch from "./Switch.svelte";
   import { notes } from "./notes";
   import Viewport from "./Viewport.svelte";
 
   let { tab }: { tab: Tab } = $props();
-
-  // Raw text per field, so a half-typed "-" or "1e" never reaches the solver.
-  // The last valid value stays in `tab.params`, which is what Rust sees.
-  let raw = $state<Record<string, string>>(
-    Object.fromEntries(FIELDS.map((f) => [f.key, String(tab.params[f.key])])),
-  );
-  let errors = $state<Record<string, string | null>>({});
 
   /** The bound, phrased for the field it belongs to.
    *
@@ -79,21 +71,17 @@
     }
   }
 
-  /** **Which** sentences a field has to offer — its bound, or the reason behind
-   *  it, and its complaint when what is typed is outside that bound.
-   *
-   *  How they are shown is `notes`/`FieldNote`'s: stacked in one cell so the
-   *  slot is as tall as the tallest and nothing moves when the visible one
-   *  changes, sized by the browser rather than by a line count written down
-   *  here. This picks; that draws. */
-  function notesFor(f: FieldSpec) {
-    return notes(
-      f.key === "profile_shift" && "ok" in result
-        ? shiftNote(result.ok.ranges.profile_shift)
-        : (boundNote(f.key) ?? (internal && f.ringNote ? t(f.ringNote) : (f.note ? t(f.note) : null))),
-      errors[f.key],
-    );
+  /** **Which** sentence a field has to offer — its bound, or the reason
+   *  behind it. Its complaint about what is typed is the box's own
+   *  (`NumberBox`), drawn in the same slot. */
+  function noteFor(f: FieldSpec): string | null {
+    return f.key === "profile_shift" && "ok" in result
+      ? shiftNote(result.ok.ranges.profile_shift)
+      : (boundNote(f.key) ?? (internal && f.ringNote ? t(f.ringNote) : f.note ? t(f.note) : null));
   }
+
+  /** The core's bound on a field, where the gear solved. */
+  const boundOf = (f: FieldSpec) => ("ok" in result ? boundFor(f.key, result.ok.ranges) : null);
 
   /** The profile shift's three bounds, as one line of text. For an eccentric
    *  gear these are the window the *nominal* shift x̄ can sit in so that every
@@ -125,16 +113,6 @@
     return swept(parts.join(" · "));
   }
 
-  function onInput(key: string, text: string) {
-    raw[key] = text;
-    const f = FIELDS.find((f) => f.key === key)!;
-    const v = Number(text);
-    const b = "ok" in result ? boundFor(f.key, result.ok.ranges) : null;
-    const err = text.trim() === "" ? t("ui.validation_required") : validate(f, v, b);
-    errors[key] = err;
-    if (!err) tab.params[f.key] = v;
-  }
-
   const n = (v: number) => v.toFixed(3);
   /** "lo to hi" — one shape, so the word between two numbers is written once. */
   const range = (lo: string, hi: string) => t("ui.range", { lo, hi });
@@ -158,8 +136,7 @@
     // which the generated type states as an optional field.
     mate: tab.kind === "eccentric" ? tab.mate : undefined,
     // When set, Rust solves `angular_shift` from it — see `resolved_params`.
-    eccentric_throw:
-      tab.kind === "eccentric" && tab.eccentricThrow !== null ? tab.eccentricThrow : undefined,
+    eccentric_throw: tab.kind === "eccentric" && tab.throwIsInput ? tab.eccentricThrow : undefined,
   });
 
   const result = $derived(solve(request));
@@ -181,22 +158,19 @@
   /** Which of the amplitude and the centre-distance offset is the input.
    *
    *  They are one number read two ways, so exactly one is given and the other
-   *  is solved: `eccentricThrow` being set *is* "the offset is the input", and
-   *  the two toggles are two views of that one piece of state rather than two
-   *  pieces that could disagree. Turning one on seeds it from the geometry the
-   *  other produced, so the gear on screen does not jump. */
+   *  is solved: `throwIsInput` says which, and the two toggles are two views
+   *  of that one flag rather than two pieces that could disagree. Turning one
+   *  on seeds it with the full value the other produced, so the gear on
+   *  screen does not jump. */
   function sizeByThrow(on: boolean) {
     if (on) {
       const cp = "ok" in result ? result.ok.centre_profile : null;
       tab.eccentricThrow =
         cp && !isUnavailable(cp) ? cp.sinusoid.amplitude : defaults().gear.eccentric_throw;
-    } else {
-      if ("ok" in result) {
-        tab.params = { ...tab.params, angular_shift: result.ok.angular_shift };
-        raw.angular_shift = String(result.ok.angular_shift);
-      }
-      tab.eccentricThrow = null;
+    } else if ("ok" in result) {
+      tab.params = { ...tab.params, angular_shift: result.ok.angular_shift };
     }
+    tab.throwIsInput = on;
   }
 
   const eccentric = $derived(tab.kind === "eccentric");
@@ -374,12 +348,22 @@
         {#if f.key === "angular_shift"}
           <label>
             <span>{t("ui.gear_mate_teeth")}</span>
-            <input type="number" step="1" min="1" bind:value={tab.mate.teeth} />
-            <FieldNote notes={notes(t("ui.gear_mate_shares_module_angle_helix"), null)} />
+            <NumberBox
+              value={tab.mate.teeth}
+              set={(v) => (tab.mate.teeth = v)}
+              step="1"
+              integer
+              note={t("ui.gear_mate_shares_module_angle_helix")}
+            />
+            <em></em>
           </label>
           <label>
             <span>{t("ui.gear_mate_profile_shift")}</span>
-            <input type="number" step="0.05" bind:value={tab.mate.profile_shift} />
+            <NumberBox
+              value={tab.mate.profile_shift}
+              set={(v) => (tab.mate.profile_shift = v)}
+              step="0.05"
+            />
             <em>{t("ui.gear_m")}</em>
           </label>
           <label class="switchrow">
@@ -404,12 +388,11 @@
                said the same thing in two controls and reported the solved
                amplitude a third time further down. Switching seeds the input
                being turned on from the geometry, so nothing jumps. -->
-          {@const byThrow = tab.eccentricThrow !== null}
+          {@const byThrow = tab.throwIsInput}
           {@const solved = "ok" in result ? result.ok : null}
           {@const throwOf = (r: typeof solved) =>
             r && !isUnavailable(r.centre_profile) ? r.centre_profile.sinusoid.amplitude : null}
-          {@const amplitudeNotes = notesFor(f)}
-          <label class="auto" class:invalid={errors.angular_shift}>
+          <label class="auto">
             <span>{t("ui.gear_field_angular_shift")}</span>
             <Switch
               small
@@ -419,22 +402,17 @@
               set={(v) => sizeByThrow(v)}
             />
             {#if byThrow}
-              <input
-                type="number"
-                value={solved ? Number(solved.angular_shift.toFixed(4)) : ""}
-                disabled
-                class="computed"
-              />
+              <NumberBox auto value={solved ? solved.angular_shift : null} note={noteFor(f)} />
             {:else}
-              <input
-                type="number"
-                step="0.05"
-                value={raw.angular_shift}
-                oninput={(e) => onInput("angular_shift", e.currentTarget.value)}
+              <NumberBox
+                value={tab.params.angular_shift}
+                set={(v) => (tab.params.angular_shift = v)}
+                step={f.step}
+                bound={boundOf(f)}
+                note={noteFor(f)}
               />
             {/if}
             <em>{t("ui.gear_m")}</em>
-            <FieldNote notes={amplitudeNotes} />
           </label>
           <label class="auto" class:invalid={byThrow && "error" in result}>
             <span>{t("ui.gear_axis_distance_throw")}</span>
@@ -446,31 +424,30 @@
               set={(v) => sizeByThrow(!v)}
             />
             {#if byThrow}
-              <input type="number" step="0.05" bind:value={tab.eccentricThrow} />
-            {:else}
-              <input
-                type="number"
-                value={throwOf(solved) === null ? "" : Number(throwOf(solved)!.toFixed(4))}
-                disabled
-                class="computed"
+              <NumberBox
+                value={tab.eccentricThrow}
+                set={(v) => (tab.eccentricThrow = v)}
+                step="0.05"
+                warn={"error" in result ? result.error : null}
               />
+            {:else}
+              <NumberBox auto value={throwOf(solved)} warn={null} />
             {/if}
             <em>{t("ui.gear_mm")}</em>
-            <FieldNote notes={notes(null, byThrow && "error" in result ? result.error : null)} />
           </label>
         {/if}
         {#if f.key !== "angular_shift"}
-          {@const notes = notesFor(f)}
-          <label class:invalid={errors[f.key]}>
+          <label>
             <span>{t(f.label)}</span>
-            <input
-              type="number"
+            <NumberBox
+              value={tab.params[f.key]}
+              set={(v) => (tab.params[f.key] = v)}
               step={f.step}
-              value={raw[f.key]}
-              oninput={(e) => onInput(f.key, e.currentTarget.value)}
+              integer={f.integer}
+              bound={boundOf(f)}
+              note={noteFor(f)}
             />
             <em>{f.unit ? t(f.unit) : ""}</em>
-            <FieldNote notes={notes} />
           </label>
         {/if}
       {/each}
@@ -486,18 +463,23 @@
       <div class="grid">
         <label>
           <span>{t("ui.gear_cutter_teeth")}</span>
-          <input type="number" step="1" min="1" bind:value={tab.cutter.teeth} />
+          <NumberBox
+            value={tab.cutter.teeth}
+            set={(v) => (tab.cutter.teeth = v)}
+            step="1"
+            integer
+            note={t("ui.gear_note_cutter_teeth")}
+          />
           <em></em>
-          <FieldNote notes={notes(t("ui.gear_note_cutter_teeth"), null)} />
         </label>
         <label>
           <span>{t("ui.gear_cutter_addendum")}</span>
-          <input type="number" step="0.05" bind:value={tab.cutter.addendum} />
+          <NumberBox value={tab.cutter.addendum} set={(v) => (tab.cutter.addendum = v)} step="0.05" />
           <em>{t("ui.gear_m")}</em>
         </label>
         <label>
           <span>{t("ui.gear_cutter_tip_round")}</span>
-          <input type="number" step="0.02" bind:value={tab.cutter.tip_round} />
+          <NumberBox value={tab.cutter.tip_round} set={(v) => (tab.cutter.tip_round = v)} step="0.02" />
           <em>{t("ui.gear_m")}</em>
         </label>
       </div>
@@ -509,16 +491,16 @@
            at every position, read off the same map the measurement is, so a
            pin the box refuses is refused with its range rather than a
            verdict. One box serves both kinds and so does the hint. -->
-      <label class:invalid={pinBound !== null && outside(tab.pinDiameter, pinBound) !== null}>
+      <label>
         <span>{t("ui.gear_pin_ball_diameter")}</span>
-        <input type="number" step="0.05" bind:value={tab.pinDiameter} />
+        <NumberBox
+          value={tab.pinDiameter}
+          set={(v) => (tab.pinDiameter = v)}
+          step="0.05"
+          bound={pinBound}
+          note={pins ? t("ui.bound_pin_diameter", { min: n(pins[0]), max: n(pins[1]) }) : null}
+        />
         <em>{t("ui.gear_mm")}</em>
-        <FieldNote notes={
-          notes(
-            pins ? t("ui.bound_pin_diameter", { min: n(pins[0]), max: n(pins[1]) }) : null,
-            pinBound ? outside(tab.pinDiameter, pinBound) : null,
-          )
-        } />
       </label>
       {#if "ok" in result}
         <label>
@@ -552,9 +534,13 @@
     <div class="grid">
       <label>
         <span>{t("ui.gear_chord_tolerance")}</span>
-        <input type="number" step="0.0005" min="0" bind:value={tab.chordTolerance} />
+        <NumberBox
+          value={tab.chordTolerance}
+          set={(v) => (tab.chordTolerance = v)}
+          step="0.0005"
+          note={t("ui.gear_maximum_deviation_exported_outline_from_true")}
+        />
         <em>{t("ui.gear_mm")}</em>
-        <FieldNote notes={notes(t("ui.gear_maximum_deviation_exported_outline_from_true"), null)} />
       </label>
       <!-- Left, with the export button below it: this one belongs to that
            action rather than to the column of fields above, and lining it up
@@ -965,7 +951,7 @@
     background: var(--bg);
     color: var(--fg);
   }
-  label.invalid input {
+  label.invalid :global(input) {
     border-color: var(--warn);
   }
   em {

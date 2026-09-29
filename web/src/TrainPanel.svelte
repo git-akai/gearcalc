@@ -18,8 +18,8 @@
     type LoadRole,
     type GearCase,
     type MeshCase,
-    outside,
     type Auto,
+    type Bound,
     type Overrides,
     type LoadRatio,
     type Specimen,
@@ -41,6 +41,7 @@
   import { trains, library, type TrainTab, type Selection, type Grouping } from "./state.svelte";
   import { exportTrain, relieveCase, relieveTrain, editTrain, type Freedom } from "./core";
   import FieldNote from "./FieldNote.svelte";
+  import NumberBox from "./NumberBox.svelte";
   import Switch from "./Switch.svelte";
   import { notes, type Notes } from "./notes";
   import { axisOfBody, bodyName, carried, gearLabel } from "./members";
@@ -404,9 +405,6 @@
    *  deleting the case. The box may stand blank while the designer types;
    *  the train keeps its last number until a new one is there. Not a
    *  default: no number is written here that was not already in the box. */
-  const finite = (set: (v: number) => void) => (v: number | null) => {
-    if (v !== null && Number.isFinite(v)) set(v);
-  };
   const num = (v: number | null | undefined, digits: number) =>
     v == null ? BLANK : v.toFixed(digits);
   const count = (v: number | null | undefined) => (v == null ? BLANK : v.toLocaleString());
@@ -744,14 +742,14 @@
   <div class="grid shared">
     <label>
       <span>{t("ui.train_axis_angle")}</span>
-      <input
-        type="number"
+      <NumberBox
+        value={dist.angle}
+        set={(v) => (dist.angle = v)}
         step="5"
-        bind:value={() => dist.angle, finite((v) => (dist.angle = v))}
         onchange={() => relieve(null)}
+        note={dist.angle === 0 ? t("ui.train_note_axes_parallel") : t("ui.train_note_axes_crossed")}
       />
       <em>°</em>
-      <FieldNote notes={notes(dist.angle === 0 ? t("ui.train_note_axes_parallel") : t("ui.train_note_axes_crossed"), null)} />
     </label>
     {#if dist.angle !== 0}
       {@render switchField("ui.train_size_as_worm", dist.worm, (v) => (dist.worm = v), t("ui.train_note_size_as_worm"))}
@@ -834,7 +832,13 @@
     <div class="grid shared">
       <label>
         <span>{t("ui.train_planets")}</span>
-        <input type="number" step="1" min="1" bind:value={() => axis.count, finite((v) => (axis.count = v))} />
+        <NumberBox
+          value={axis.count}
+          set={(v) => (axis.count = v)}
+          step="1"
+          integer
+          bound={solved?.axes[a]?.count ?? null}
+        />
         <em></em>
       </label>
       {#if axis.count > 1}
@@ -897,7 +901,7 @@
           {@const act = c.duty.intermittent}
           <label>
             <span>{t("ui.train_actuation_range")}</span>
-            <input type="number" step="1" bind:value={() => act.range_degrees, finite((v) => (act.range_degrees = v))} />
+            <NumberBox value={act.range_degrees} set={(v) => (act.range_degrees = v)} step="1" />
             <em>°</em>
           </label>
           <label>
@@ -909,7 +913,7 @@
             </select>
             <em></em>
           </label>
-          {@render numberField("ui.train_actuation_count", () => act.actuations, (v) => (act.actuations = v), 100, "")}
+          {@render numberField("ui.train_actuation_count", () => act.actuations, (v) => (act.actuations = v), 100, "", undefined, undefined, true)}
           <!-- It changes nothing but the cycle count and which roots are
                loaded both ways, and the note says how — whether or not
                it is on. -->
@@ -1074,16 +1078,14 @@
 )}
   <label class="prop">
     <span>{label}</span>
-    <input
-      type="number"
+    <!-- The override where there is one, else the library's figure greyed,
+         else an empty box: nothing is known, and nothing is made up. An
+         empty box keeps the override; × is how it goes. -->
+    <NumberBox
+      value={gear.material_overrides[key] ?? used?.value ?? null}
+      set={(v) => (gear.material_overrides[key] = v)}
       {step}
-      value={gear.material_overrides[key] ?? used?.value ?? ""}
-      class:computed={gear.material_overrides[key] === null}
-      oninput={(e) => {
-        const raw = e.currentTarget.value;
-        const v = raw === "" ? NaN : Number(raw);
-        gear.material_overrides[key] = Number.isFinite(v) ? v : null;
-      }}
+      inherited={gear.material_overrides[key] === null}
     />
     <em>{unit}</em>
     {#if gear.material_overrides[key] !== null}
@@ -1385,17 +1387,29 @@
     <h4 class="section-heading">{t("ui.train_ring_cutter")}</h4>
     <label>
       <span>{t("ui.train_cutter_teeth")}</span>
-      <input type="number" step="1" min="1" bind:value={() => cut.teeth, finite((v) => (cut.teeth = v))} />
+      <NumberBox
+        value={cut.teeth}
+        set={(v) => (cut.teeth = v)}
+        step="1"
+        integer
+        note={t("ui.gear_note_cutter_teeth")}
+      />
       <em></em>
-      <FieldNote notes={notes(t("ui.gear_note_cutter_teeth"), null)} />
     </label>
     {@render numberField("ui.train_cutter_addendum", () => cut.addendum, (v) => (cut.addendum = v), 0.05, "ui.train_m")}
     {@render numberField("ui.train_cutter_tip_round", () => cut.tip_round, (v) => (cut.tip_round = v), 0.02, "ui.train_m")}
   {/if}
   <h4 class="section-heading" class:later={opts.cutter !== undefined}>{title}</h4>
-  <label class:invalid={g && outside(gear.teeth, g.ranges.teeth)}>
+  <label>
     <span>{t(opts.teethLabel ?? "ui.train_tooth_count")}</span>
-    <input type="number" step="1" bind:value={() => gear.teeth, finite((v) => (gear.teeth = v))} />
+    <NumberBox
+      value={gear.teeth}
+      set={(v) => (gear.teeth = v)}
+      step="1"
+      integer
+      bound={g?.ranges.teeth ?? null}
+    />
+    <em></em>
   </label>
   <!-- **The module and the pressure angle, stated on one gear of a mesh
        group and followed by the rest** — the helix's rule with the
@@ -1489,41 +1503,38 @@
   {#if gear.no_sharp_tip}
     <label class="sub">
       <span>{t("ui.train_minimum_tip_width")}</span>
-      <input type="number" step="0.02" bind:value={() => gear.min_tip_width, finite((v) => (gear.min_tip_width = v))} />
+      <NumberBox value={gear.min_tip_width} set={(v) => (gear.min_tip_width = v)} step="0.02" />
       <em>{t("ui.train_mm")}</em>
     </label>
   {/if}
   {#if !shaper}
-    <label class:invalid={g && outside(gear.dedendum, g.ranges.dedendum)}>
+    <!-- The bounds are the gear tab's sentences, from the catalogue. -->
+    <label>
       <span>{t("ui.train_dedendum")}</span>
-      <input type="number" step="0.05" bind:value={() => gear.dedendum, finite((v) => (gear.dedendum = v))} />
+      <NumberBox
+        value={gear.dedendum}
+        set={(v) => (gear.dedendum = v)}
+        step="0.05"
+        bound={g?.ranges.dedendum ?? null}
+        note={g
+          ? t("ui.bound_dedendum", {
+              min: n(g.ranges.dedendum.min ?? 0),
+              max: n(g.ranges.dedendum.max ?? 0),
+            })
+          : null}
+      />
       <em>{t("ui.train_m")}</em>
-      <!-- The same sentences the gear tab shows. They used to be written out
-           here as well, and drifted: this one lost its reason altogether and
-           the fillet bound below was abbreviated past the point of saying
-           anything. -->
-      <FieldNote notes={
-        notes(
-          g
-            ? t("ui.bound_dedendum", {
-                min: n(g.ranges.dedendum.min ?? 0),
-                max: n(g.ranges.dedendum.max ?? 0),
-              })
-            : null,
-          g ? outside(gear.dedendum, g.ranges.dedendum) : null,
-        )
-      } />
     </label>
-    <label class:invalid={g && outside(gear.root_radius, g.ranges.root_radius)}>
+    <label>
       <span>{t("ui.train_root_radius")}</span>
-      <input type="number" step="0.01" bind:value={() => gear.root_radius, finite((v) => (gear.root_radius = v))} />
+      <NumberBox
+        value={gear.root_radius}
+        set={(v) => (gear.root_radius = v)}
+        step="0.01"
+        bound={g?.ranges.root_radius ?? null}
+        note={g ? t("ui.bound_root_radius", { max: n(g.ranges.root_radius.max ?? 0) }) : null}
+      />
       <em>{t("ui.train_m")}</em>
-      <FieldNote notes={
-        notes(
-          g ? t("ui.bound_root_radius", { max: n(g.ranges.root_radius.max ?? 0) }) : null,
-          g ? outside(gear.root_radius, g.ranges.root_radius) : null,
-        )
-      } />
     </label>
   {/if}
   <!-- A ring is asked its own reading of undercut: its flank generated all
@@ -1543,6 +1554,8 @@
       set: (v) => (gear.no_undercut = v),
     },
     clampNote(own, FIELD_NOTES.profile_shift),
+    undefined,
+    shaper ? null : (g?.ranges.profile_shift.bound ?? null),
   )}
   <!-- The depth the undercut question is asked at, so it is offered exactly
        while that question is being asked — which is now the constraint's
@@ -1571,7 +1584,8 @@
       <!-- A shaper-cut ring's bounds are not the rack's shown here — its own
            base circle, its cutter's reach and the generation limit are what
            limit it (docs/reference.md#internal-gears) — and the core does not report those for a
-           train's member yet. It shows no bound rather than the wrong one. -->
+           train's member yet. It shows no bound rather than the wrong one.
+           A complaint about the shift typed is the box's own, above. -->
       <FieldNote notes={
         notes(
           shaper
@@ -1593,7 +1607,7 @@
                       ]),
                 ].join(" · ")
               : null,
-          r ? outside(gear.profile_shift.manual, r.bound) : null,
+          null,
         )
       } />
     </p>
@@ -1775,14 +1789,13 @@
   note?: string | null,
   /** What the label's key names, where it names something. */
   args?: Record<string, string>,
+  /** A count, which crosses as a whole number. */
+  integer?: boolean,
 )}
   <label>
     <span>{t(key, args)}</span>
-    <input type="number" {step} bind:value={get, finite(set)} />
+    <NumberBox value={get()} {set} {step} {integer} {note} />
     <em>{unit === "°" ? "°" : unit ? t(unit) : ""}</em>
-    {#if note !== undefined}
-      <FieldNote notes={notes(note ?? null, null)} />
-    {/if}
   </label>
 {/snippet}
 
@@ -1815,12 +1828,7 @@
        keeps a ring's addendum lined up with the boxes above and below it. -->
   <label class="auto">
     <span class="name">{t(key)}</span>
-    <input
-      type="number"
-      {step}
-      value={get()}
-      oninput={(e) => set(e.currentTarget.valueAsNumber)}
-    />
+    <NumberBox value={get()} {set} {step} {note} {warn} />
     {#if constraint}
       <span class="sw auto">
         <Switch
@@ -1833,9 +1841,6 @@
       </span>
     {/if}
     <em>{unit ? t(unit) : ""}</em>
-    {#if note !== undefined || warn !== undefined}
-      <FieldNote notes={notes(note ?? null, warn ?? null)} />
-    {/if}
   </label>
 {/snippet}
 
@@ -1867,8 +1872,10 @@
   warn?: string | null,
   /** Indented under the row above it, as a load's figures sit under its port. */
   sub?: boolean,
+  /** The core's bound on the number, where it has one. */
+  bound?: Bound | null,
 )}
-  {@const shown = computed === undefined ? a.manual : computed === null ? null : Number(computed.toFixed(4))}
+  {@const shown = computed === undefined ? a.manual : computed}
   <label class="auto" class:constrained={constraint !== undefined} class:sub>
     <span class="name">{t(key)}</span>
     <!-- **The box comes first so the label is the box's.** A label activates
@@ -1880,9 +1887,9 @@
          the columns were going to have to be named anyway once a row could
          carry two switches. -->
     {#if a.auto}
-      <input type="number" {step} value={shown ?? ""} disabled class="computed" />
+      <NumberBox auto value={shown} {step} {note} {warn} />
     {:else}
-      <input type="number" {step} bind:value={() => a.manual, finite((v) => (a.manual = v))} />
+      <NumberBox value={a.manual} set={(v) => (a.manual = v)} {step} {bound} {note} {warn} />
     {/if}
     <!-- **Left of the number it qualifies**, because that is what it qualifies.
          On the right it took the cell every other row prints its unit in, so an
@@ -1895,14 +1902,14 @@
         on={a.auto}
         title={t("ui.train_automatic")}
         set={(v) => {
-          // **Turning automatic off keeps the number the box was showing.**
+          // **Turning automatic off keeps the number the core came to.**
           // `manual` is held while `auto` is on so the field has something
           // to fall back to, and `params::Auto` says seeding it from the
           // solved value is the front end's job — which it was not doing, so
           // a centre distance turned manual dropped to the stale zero it was
-          // created with and the solve fell over. Seeded to the digits shown
-          // rather than the full value, so what the reader saw is what they
-          // now hold; the gear tab's throw and amplitude do the same.
+          // created with and the solve fell over. Seeded with the full value,
+          // not the rounded figure the locked box shows: rounding it moved a
+          // small figure — a 0.1 N·m torque — by more than its own size.
           if (!v && a.auto && shown !== null) a.manual = shown;
           a.auto = v;
           after?.();
@@ -1921,13 +1928,6 @@
       </span>
     {/if}
     <em>{unit ? t(unit) : ""}</em>
-    <!-- Inside the label, because that is where a note is laid out: `.note`
-         spans this row's own columns and is right-aligned against them. Placed
-         beside the field instead it spans whatever grid it lands in, which is
-         the outer one, and lines up with nothing. -->
-    {#if note !== undefined || warn !== undefined}
-      <FieldNote notes={notes(note ?? null, warn ?? null)} />
-    {/if}
   </label>
 {/snippet}
 
@@ -2327,7 +2327,7 @@
      — which put the toggle and the unit a line below the box they belong to. */
   label.auto > .name,
   label.auto > .sw,
-  label.auto > input,
+  label.auto > :global(input),
   label.auto > em {
     grid-row: 1;
   }
@@ -2337,7 +2337,7 @@
   label.auto > .sw.auto {
     grid-column: 2;
   }
-  label.auto > input {
+  label.auto > :global(input) {
     grid-column: 3;
   }
   label.auto > em {
@@ -2346,7 +2346,7 @@
   label.auto.constrained > .sw.bound {
     grid-column: 3;
   }
-  label.auto.constrained > input {
+  label.auto.constrained > :global(input) {
     grid-column: 4;
   }
   label.auto.constrained > em {
@@ -2379,7 +2379,7 @@
      which put an input and its readout at the same weight. */
   /* A number box is `app.css`'s, as on the gear tab; a select is drawn to
      match it. Both fill the column the row gives them. */
-  input[type="number"] {
+  label > :global(input[type="number"]) {
     width: 100%;
   }
   select {
@@ -2399,12 +2399,6 @@
      right all along because they name a background; these now do too. */
   select {
     background: var(--bg);
-  }
-  /* A computed value is shown greyed, so a default is never mistaken for a
-     considered choice. */
-  input.computed {
-    color: var(--muted);
-    font-style: italic;
   }
   em {
     color: var(--muted);
@@ -2685,7 +2679,8 @@
   .prop > .clear {
     grid-column: 2;
   }
-  .prop > input {
+  .prop > :global(input) {
+    grid-row: 1;
     grid-column: 3;
   }
   .prop > em:not(.basis) {
@@ -2716,9 +2711,6 @@
     font-size: var(--text-s);
     color: var(--muted);
     text-align: right;
-  }
-  label.invalid input {
-    border-color: var(--warn);
   }
   .gear label {
     grid-template-columns: 1fr var(--field-box) var(--unit-cell);

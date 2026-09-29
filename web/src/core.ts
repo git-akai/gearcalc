@@ -432,19 +432,18 @@ export const FIELDS: FieldSpec[] = [
   },
 ];
 
-/** Why a value is not acceptable, given the bound Rust returned. */
-export function validate(
-  f: FieldSpec,
-  v: number,
-  b: Bound | null,
-): string | null {
-  if (f.integer && !Number.isInteger(v))
-    return t("ui.validation_not_a_whole_number");
-  return b === null
-    ? Number.isFinite(v)
-      ? null
-      : t("ui.validation_not_a_number")
-    : outside(v, b);
+/** **A request as it crosses**: JSON, refusing a number that is not finite.
+ *
+ *  `JSON.stringify` writes NaN and ±∞ as `null`, which serde then refuses as
+ *  the wrong type for the whole request — and a train that fails that way
+ *  loses its lists, ports and names with it. No box commits such a number
+ *  (`NumberBox`); this is the guard behind that, which names the field
+ *  rather than letting serde name a type. */
+function wire(v: unknown): string {
+  return JSON.stringify(v, (key, x) => {
+    if (typeof x === "number" && !Number.isFinite(x)) throw new Error(`${key}: ${x}`);
+    return x;
+  });
 }
 
 // --------------------------------------------------------------------- //
@@ -522,7 +521,7 @@ export function solve(
   req: GearRequest,
 ): { ok: GearSummary } | { error: string } {
   try {
-    return { ok: JSON.parse(solve_gear(JSON.stringify(req))) as GearSummary };
+    return { ok: JSON.parse(solve_gear(wire(req))) as GearSummary };
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) };
   }
@@ -533,7 +532,7 @@ export function profile(
   pointsPerTooth: number,
 ): Float64Array | null {
   try {
-    return gear_profile(JSON.stringify(req), pointsPerTooth);
+    return gear_profile(wire(req), pointsPerTooth);
   } catch {
     return null;
   }
@@ -541,7 +540,7 @@ export function profile(
 
 export function dxf(req: GearRequest): { ok: string } | { error: string } {
   try {
-    return { ok: export_dxf(JSON.stringify(req)) };
+    return { ok: export_dxf(wire(req)) };
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) };
   }
@@ -551,7 +550,7 @@ export function solveRing(
   req: RingRequest,
 ): { ok: RingSummary } | { error: string } {
   try {
-    return { ok: JSON.parse(solve_ring(JSON.stringify(req))) as RingSummary };
+    return { ok: JSON.parse(solve_ring(wire(req))) as RingSummary };
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) };
   }
@@ -562,7 +561,7 @@ export function ringProfile(
   pointsPerTooth: number,
 ): Float64Array | null {
   try {
-    return ring_profile(JSON.stringify(req), pointsPerTooth);
+    return ring_profile(wire(req), pointsPerTooth);
   } catch {
     return null;
   }
@@ -570,7 +569,7 @@ export function ringProfile(
 
 export function ringDxf(req: RingRequest): { ok: string } | { error: string } {
   try {
-    return { ok: export_ring_dxf(JSON.stringify(req)) };
+    return { ok: export_ring_dxf(wire(req)) };
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) };
   }
@@ -609,7 +608,7 @@ export function exportTrain(
   doc: TrainDocument,
 ): { ok: string } | { error: string } {
   try {
-    return { ok: export_train(JSON.stringify(doc)) };
+    return { ok: export_train(wire(doc)) };
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) };
   }
@@ -639,7 +638,7 @@ export function exportLibrary(
   lib: MaterialLibrary,
 ): { ok: string } | { error: string } {
   try {
-    return { ok: export_materials(JSON.stringify(lib)) };
+    return { ok: export_materials(wire(lib)) };
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) };
   }
@@ -680,7 +679,7 @@ export function exportLibrary(
 export function relieveTrain(train: Train, just: Freedom | null, figures: Figure[] = []): void {
   let corrected: Shape;
   try {
-    corrected = JSON.parse(relieve(JSON.stringify({ shape: train.shape, just, figures }))) as Shape;
+    corrected = JSON.parse(relieve(wire({ shape: train.shape, just, figures }))) as Shape;
   } catch {
     return;
   }
@@ -711,7 +710,7 @@ export function relieveCase(
   let corrected: LoadCase;
   try {
     const library = materials ?? defaultLibrary();
-    corrected = JSON.parse(relieve_case(JSON.stringify({ train, library, case: index, just }))) as LoadCase;
+    corrected = JSON.parse(relieve_case(wire({ train, library, case: index, just }))) as LoadCase;
   } catch {
     return;
   }
@@ -747,7 +746,7 @@ export function adoptMember(
   materials?: MaterialLibrary,
 ): AdoptOutcome | { error: string } {
   try {
-    const body = JSON.stringify({ train, materials: materials ?? null, member });
+    const body = wire({ train, materials: materials ?? null, member });
     return JSON.parse(adopt_member(body)) as AdoptOutcome;
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) };
@@ -771,7 +770,7 @@ export function defaultTrain(): Train {
 export function solveTrain(train: Train, materials?: MaterialLibrary): TrainOutcome {
   try {
     const req: TrainRequest = { train, materials };
-    return JSON.parse(solve_train(JSON.stringify(req))) as TrainOutcome;
+    return JSON.parse(solve_train(wire(req))) as TrainOutcome;
   } catch (e) {
     return {
       result: null,
@@ -820,7 +819,7 @@ export type TrainEdit =
 export function editTrain(train: Train, edit: TrainEdit): string | null {
   let edited: Train;
   try {
-    edited = JSON.parse(edit_train(JSON.stringify({ train, edit }))) as Train;
+    edited = JSON.parse(edit_train(wire({ train, edit }))) as Train;
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     return message.startsWith("ui.") ? message : null;
@@ -839,7 +838,7 @@ export function editTrain(train: Train, edit: TrainEdit): string | null {
 export function previewEdit(train: Train, edit: TrainEdit, materials?: MaterialLibrary): Preview | null {
   try {
     return JSON.parse(
-      preview_edit(JSON.stringify({ train, materials: materials ?? null, edit })),
+      preview_edit(wire({ train, materials: materials ?? null, edit })),
     ) as Preview;
   } catch {
     return null;
@@ -853,7 +852,7 @@ export function previewEdit(train: Train, edit: TrainEdit, materials?: MaterialL
  *  list where the boundary failed, which is a defect on this side of it. */
 export function offersAt(train: Train, at: Target): Offer[] {
   try {
-    return JSON.parse(wasm_offers(JSON.stringify({ train, at }))) as Offer[];
+    return JSON.parse(wasm_offers(wire({ train, at }))) as Offer[];
   } catch {
     return [];
   }

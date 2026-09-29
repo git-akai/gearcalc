@@ -29559,10 +29559,22 @@
        ],
        "axes": [
         {
-         "layout": null
+         "layout": null,
+         "count": {
+          "min": 1,
+          "max": null,
+          "exclusive_min": false,
+          "exclusive_max": false
+         }
         },
         {
-         "layout": null
+         "layout": null,
+         "count": {
+          "min": 1,
+          "max": null,
+          "exclusive_min": false,
+          "exclusive_max": false
+         }
         }
        ],
        "parts": [
@@ -31438,10 +31450,22 @@
        ],
        "axes": [
         {
-         "layout": null
+         "layout": null,
+         "count": {
+          "min": 1,
+          "max": null,
+          "exclusive_min": false,
+          "exclusive_max": false
+         }
         },
         {
-         "layout": null
+         "layout": null,
+         "count": {
+          "min": 1,
+          "max": null,
+          "exclusive_min": false,
+          "exclusive_max": false
+         }
         },
         {
          "layout": {
@@ -31451,6 +31475,12 @@
           "simultaneous_meshing": true,
           "clearance": "4.9648143099324713",
           "clearance_ok": true
+         },
+         "count": {
+          "min": 1,
+          "max": null,
+          "exclusive_min": false,
+          "exclusive_max": false
          }
         }
        ],

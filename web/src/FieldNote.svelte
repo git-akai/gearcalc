@@ -25,8 +25,11 @@
 </span>
 
 <style>
+  /* The row under the field's own, named so a note drawn between the box and
+     the unit (as `NumberBox` draws it) does not push the unit down a row. */
   .note {
     grid-column: 1 / -1;
+    grid-row: 2;
     display: grid;
     text-align: right;
   }

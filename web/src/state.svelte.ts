@@ -68,10 +68,13 @@ export interface GearTab {
   /** What an eccentric gear runs against, for its commanded centre distance.
    *  Carried for every tab so switching kinds does not lose it. */
   mate: MateRef;
-  /** When set, the eccentricity is sized by this centre-distance throw (signed,
-   *  mm) and `params.angular_shift` becomes the value Rust solves for. `null`
-   *  leaves the amplitude as the direct input. */
-  eccentricThrow: number | null;
+  /** The centre-distance throw (signed, mm) the eccentricity is sized by,
+   *  while `throwIsInput` says it is the input. */
+  eccentricThrow: number;
+  /** Which of the amplitude and the throw is the input. Its own flag, so what
+   *  is typed in the throw box can never switch the mode. When set,
+   *  `params.angular_shift` is the value Rust solves for. */
+  throwIsInput: boolean;
 }
 
 export interface TrainTab {
@@ -145,7 +148,8 @@ function freshTab(name = t("ui.gear_default_name")): GearTab {
     kind: "external",
     cutter: d.cutter,
     mate: { teeth: 43, profile_shift: 0, internal: false },
-    eccentricThrow: null,
+    eccentricThrow: d.eccentric_throw,
+    throwIsInput: false,
   };
 }
 
@@ -273,7 +277,7 @@ export function setKind(tab: GearTab, kind: GearKind) {
   }
   // The throw sizing is a mode on `angular_shift`, so it goes back with it —
   // a gear that is no longer eccentric is sized by nothing.
-  if (kind !== "eccentric") tab.eccentricThrow = null;
+  if (kind !== "eccentric") tab.throwIsInput = false;
   tab.kind = kind;
 }
 
