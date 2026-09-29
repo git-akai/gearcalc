@@ -26,7 +26,7 @@ profile_shift: Auto<number>,
  * reached from a centre distance or a crank offset, and a shift the
  * efficiency search chose, all in the same words.
  *
- * The bound is the **true** minimum from [`minimum_profile_shift`], which
+ * The bound is the **true** minimum from [`crate::auto::minimum_profile_shift`], which
  * on a comfortable tooth count is negative — so a deliberate negative
  * shift is left alone and only a genuinely undercut one is raised. That is
  * deliberate: negative shift is a decision about centre distance or

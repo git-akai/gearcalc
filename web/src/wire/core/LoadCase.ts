@@ -17,7 +17,7 @@ import type { Load } from "./Load";
  * and a back-driving one at the output — were the first two entries of this
  * list with their ports and directions written into the field names. A case
  * applied at the far end is not a sign on one applied at the near end; it is
- * the same kind of thing entering elsewhere, and [`Port`] is what says where.
+ * the same kind of thing entering elsewhere, and [`PortBody`] is what says where.
  */
 export type LoadCase = { kind: CaseKind, 
 /**

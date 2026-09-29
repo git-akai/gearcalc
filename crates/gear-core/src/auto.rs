@@ -1730,7 +1730,7 @@ pub struct Search {
     /// Because a pool sized for the kind that needs the most is spent by the
     /// kinds that do not: at ten times the pool a pair's search cost **24×** what
     /// it had, which is what a keystroke does not have
-    /// (`every_search_is_quick_enough_to_type_over`). A guard per walk costs each
+    /// (`every_search_costs_like_an_input`). A guard per walk costs each
     /// kind what its own walks cost and nothing more.
     ///
     /// **Gated rather than tuned.** `the_search_is_converged_not_budgeted`

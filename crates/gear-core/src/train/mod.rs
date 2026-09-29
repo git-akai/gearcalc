@@ -10603,18 +10603,14 @@ mod tests {
             solve_preset(&set, 2.0, 0.0, &lib).unwrap();
         });
 
-        // **Raised from 20 to 60 ms when the hula's own solver retired**, and
-        // the reason: that solver searched each mesh's division alone at a crank it
-        // solved once a round, in closed form; the shape sizes the crank by
-        // a bracketed root over built teeth, then searches each mesh apart
-        // (`search_components`), with the teeth it has cut kept between
-        // trials. Some 25 ms in the suite against the old solver's 2.6, and the
-        // ceiling is a little over twice that rather than five times: the
-        // multiplier is for a loaded machine, and twice is what this stage
-        // has needed on one.
+        // **250 ms, a decade over the measurement** (some 25 ms; the shape
+        // sizes the crank by a bracketed root over built teeth, then searches
+        // each mesh apart). This is an order-of-magnitude canary, not the gate
+        // (`every_search_costs_like_an_input` is): at 60 ms it failed alone
+        // and serially, at 64.6 ms, on a machine another build was loading.
         let mut drive = hula_shape([65, 61, 57, 61]);
         drive.set_search(true);
-        each("hula stage's", 60, &|| {
+        each("hula stage's", 250, &|| {
             solve_hula(&drive, 2.0, 0.0, &lib).unwrap();
         });
     }
