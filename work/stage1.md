@@ -34,3 +34,8 @@ Carried from the P3 check:
 - P4 (ring): `ring.rs:218` does not guard α.
 - P1: validate_dxf models only the unclamped cut. Eccentric z40 x1 Δx0.5 fails, on the safe side,
   and no CI case reaches it.
+
+Carried from the P6 re-check:
+- The Lewis section, held at the highest point of single-pair contact under load sharing, reads up to
+  21 % low (unconservative) against a fresh search. Revisit when the unified contact model sets the
+  load positions: a continuous section search that survives the pointed limit.
