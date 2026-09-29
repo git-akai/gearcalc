@@ -10647,7 +10647,12 @@ mod tests {
     ///   corpus records a figure: a move is a question to answer and re-record,
     ///   not evidence of a fault.
     ///   Doubling `Search::SHIPPED.starts` takes the evaluations to 2 249,
-    ///   4 120 and 712.
+    ///   4 120 and 712 (measured before tips were held off their mates'
+    ///   flanks, which moved the set's own count from 3 846 to 2 710).
+    ///   Holding them re-cuts every held member once per candidate, which is
+    ///   what moved the teeth and rings: the pair 1 822 → 4 912 teeth, the
+    ///   set 4 930 → 7 525 teeth and 961 → 3 983 rings, the hula 1 361 →
+    ///   2 135 teeth and 8 388 → 9 130 rings.
     ///
     /// A Layshaft is not here, and is the case this count exists to see: with
     /// its search on it evaluates about 46 000 candidates and cuts about
@@ -10691,7 +10696,7 @@ mod tests {
         let (on, off) = (pair(true), pair(false));
         each(
             "pair's",
-            (1_967, 1_968, 1_822, 0),
+            (1_967, 1_968, 4_912, 0),
             &|| drop(solve_preset(&on, 2.0, 0.0, &lib).unwrap()),
             &|| drop(solve_preset(&off, 2.0, 0.0, &lib).unwrap()),
         );
@@ -10706,7 +10711,7 @@ mod tests {
         let (on, off) = (set(true), set(false));
         each(
             "epicyclic set's",
-            (3_846, 3_847, 4_930, 961),
+            (2_710, 2_711, 7_525, 3_983),
             &|| drop(solve_preset(&on, 2.0, 0.0, &lib).unwrap()),
             &|| drop(solve_preset(&off, 2.0, 0.0, &lib).unwrap()),
         );
@@ -10719,7 +10724,7 @@ mod tests {
         let (on, off) = (drive(true), drive(false));
         each(
             "hula stage's",
-            (524, 525, 1_361, 8_388),
+            (524, 525, 2_135, 9_130),
             &|| drop(solve_hula(&on, 2.0, 0.0, &lib).unwrap()),
             &|| drop(solve_hula(&off, 2.0, 0.0, &lib).unwrap()),
         );
