@@ -688,10 +688,11 @@ net helical adjustment the standard actually applies:
 | 1,0 (β = 30°) | 0,687 | 1,155 | **0,794** |
 
 At **full axial overlap — what a helical gear is proportioned for** — ISO 2019
-*lowers* a root stress by about 21–27 %. So this tool, applying neither, sits
-1,26–1,36× a published ISO 2019 rating: conservative, by close to the "~25 %"
-the documentation had claimed all along for a reason that turned out to be the
-2006 formula.
+*lowers* a root stress by about 21–27 %. So on the helix pair alone this tool,
+applying neither, sits 1,26–1,36× a published ISO 2019 rating — the "~25 %" the
+documentation had claimed all along, for a reason that turned out to be the
+2006 formula. **The pair alone is not the whole comparison**: the two geometry
+factors differ as well, and measured whole the answer moves (below).
 
 **Applying `Y_β` alone was tried and reverted.** It looked like a correction —
 the factor exceeds 1 over most of its own figure, so omitting it *reads* as
@@ -708,14 +709,20 @@ name of getting closer to it. Three mixings, not one:
    `z_n = z/cos³β`; ISO 2019 uses `z_n = z/(cos²β_b · cos β)`, a 3,9 % different
    tooth count at β = 30°.
 
-**Where this leaves the numbers, measured rather than asserted.** Against ISO
-6336-3:2019, at `ε_α ≈ 1,65`:
+**Where this leaves the numbers, measured rather than asserted.**
+`tools/iso_6336_3_stack.py` computes ISO 6336-3 Method B's `Y_F·Y_S` on its own,
+reproduces the tool's ISO set with it on every pair before printing a ratio, and
+multiplies in the helix pair. Against ISO 6336-3:2019, on 17/43 and 25/70 at
+20° and β 10–30°
+([state](state.md#known-approximate-documented-at-the-call-site)):
 
-- **`ε_β ≥ 1`**: this tool reads 1,26–1,36× ISO. Conservative, and that is the
-  designed-for case.
-- **`ε_β ≤ 0,3` with `β ≥ 20°`**: 0,78–0,94×. **Below** ISO — the one regime
-  where the derived model is unconservative against the standard. It is already
-  flagged: a helical mesh without full axial overlap raises
+- **`ε_β ≥ 1`**: this tool reads 0,92–1,25× ISO — the helix pair's 1,13–1,37
+  on a spur base of 0,80–0,94. Mostly conservative in the designed-for case, but
+  not everywhere.
+- **`ε_β ≤ 0,3`**: 0,54–0,98×. **Below** ISO, by up to 46 % — and the spur base
+  is below it too, 0,78–0,99 at 20° and lower at 25°, so helical low overlap is
+  not the only regime where the model is unconservative against the standard.
+  Low overlap is already flagged: a helical mesh without full axial overlap raises
   `mesh.overlap_below_one`, for a reason arrived at independently (a gear
   helical in form that still transfers load like a spur gear). That note is now
   also the marker for this.

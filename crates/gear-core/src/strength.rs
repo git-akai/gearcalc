@@ -1496,6 +1496,8 @@ struct LoadPoint<'a, T: ToothOutline + ?Sized> {
     /// `-1` for a tooth, `+1` for a ring's space — one fact,
     /// [`ToothOutline::tip_at_high_roll`], not a second construction.
     sense: f64,
+    /// The construction the section is found by.
+    method: CriticalSection,
     // The flank the roll must land on is read from `v` rather than stored: it is
     // `flank_bracket`, and it is the same question for both kinds of member.
 }
@@ -1514,7 +1516,7 @@ impl<T: ToothOutline + ?Sized> LoadPoint<'_, T> {
         if roll < lo.min(hi) || roll > lo.max(hi) {
             return None;
         }
-        root_section(self.v, roll)
+        root_section_with(self.v, roll, self.method)
     }
 }
 
@@ -1689,11 +1691,20 @@ pub fn bending_section_shared_with<T: ToothOutline>(
     model: LoadSharing,
     samples: usize,
 ) -> Option<(RootSection, f64)> {
-    if !transverse_contact_ratio.is_finite() {
-        return None;
-    }
     let v = g.virtual_spur();
-    if !v.is_usable() {
+    let (at, eps_n) = load_point(g, &v, transverse_contact_ratio, CriticalSection::default())?;
+    worst_over_cycle(&at, eps_n, model, samples)
+}
+
+/// Where the load sits on `v`, the virtual spur member of `g`, and the
+/// virtual contact ratio `ε_αn` the cycle is counted in.
+fn load_point<'a, T: ToothOutline>(
+    g: &T,
+    v: &'a T,
+    transverse_contact_ratio: f64,
+    method: CriticalSection,
+) -> Option<(LoadPoint<'a, T>, f64)> {
+    if !transverse_contact_ratio.is_finite() || !v.is_usable() {
         return None;
     }
     // The whole cycle in the plane the tooth actually bends in. `d` counts
@@ -1709,8 +1720,8 @@ pub fn bending_section_shared_with<T: ToothOutline>(
     } else {
         (lo, 1.0)
     };
-    worst_over_cycle(
-        &LoadPoint {
+    Some((
+        LoadPoint {
             base_pitch: crate::plane::base_pitch(
                 v.transverse_module(),
                 v.transverse_pressure_angle(),
@@ -1718,12 +1729,28 @@ pub fn bending_section_shared_with<T: ToothOutline>(
             u_tip,
             rb: v.base_radius(),
             sense,
-            v: &v,
+            method,
+            v,
         },
         eps_n,
-        model,
-        samples,
-    )
+    ))
+}
+
+/// **The section at the highest point of single-pair contact, by a chosen
+/// construction**, with no sharing and no model's domain applied.
+///
+/// The instrument's reading: `gear-cli iso` takes ISO's 30°/60° tangent here
+/// to hold the tool's ISO set against ISO 6336-3 Method B, which loads the
+/// same point. The rating takes [`bending_section_shared`].
+#[must_use]
+pub fn bending_section_by<T: ToothOutline>(
+    g: &T,
+    transverse_contact_ratio: f64,
+    method: CriticalSection,
+) -> Option<RootSection> {
+    let v = g.virtual_spur();
+    let (at, eps_n) = load_point(g, &v, transverse_contact_ratio, method)?;
+    at.at(highest_single_pair(eps_n))
 }
 
 /// The lengthwise relative curvature of a parallel-axis, uncrowned mesh:

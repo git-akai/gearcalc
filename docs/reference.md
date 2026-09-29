@@ -1301,9 +1301,11 @@ per gear.
 modified `Y_β` and `Y_F` together; `f_ε` lives inside that `Y_F`, is `≤ 1`, and
 cancels most of the `1/cos³β` that makes `Y_β` exceed 1. Their product is
 0,73–0,79 at full axial overlap, so applying `Y_β` alone reports a *higher*
-stress than the standard it was taken from. Against ISO 2019 this tool reads
-1,26–1,36× at full overlap and 0,78–0,94× below `ε_β = 0,3` at high helix —
-`tools/iso_6336_3_stack.py`, and
+stress than the standard it was taken from. Measured whole — this tool's
+`(Y_F − axial)·K_f` against Method B's `Y_F·Y_S` and the helix pair — it reads
+0,92–1,25× ISO 2019 at full overlap and 0,54–0,98× at `ε_β` 0,3 and below
+([state](state.md#known-approximate-documented-at-the-call-site),
+`tools/iso_6336_3_stack.py`), and
 [rationale](rationale.md#the-helix-factors-are-a-pair-and-this-tool-can-take-neither).
 
 **`Y_B`**, where a rim thickness `s_R` was given, is `a·ln(c/ratio)` never below

@@ -416,6 +416,23 @@ const COMMANDS: &[Command] = &[
         slow: false
     },
     Command {
+        name: "iso",
+        args: "[z1] [z2] [alpha] [helix] [x1] [x2] [face] [torque]",
+        summary: "one pair's figures at full precision, for `tools/iso_6336_3_stack.py` (17, 43, 20°, 0°, 0, 0, 10 mm, 2 N·m)",
+        run: |a| {
+            iso_report(
+                [arg(a, 1, 17), arg(a, 2, 43)],
+                arg(a, 3, 20.0),
+                arg(a, 4, 0.0),
+                [arg(a, 5, 0.0), arg(a, 6, 0.0)],
+                arg(a, 7, 10.0),
+                arg(a, 8, 2.0),
+            );
+        },
+        record: Record::Cases(&["iso 17 43", "iso 17 43 20 20"]),
+        slow: false
+    },
+    Command {
         name: "bending",
         args: "",
         summary: "the bending construction drawn tooth by tooth — the body of docs/bending-check.html",
@@ -2379,6 +2396,120 @@ fn strength_report(
         println!(
             "  mu {mu:.2}   {:.3} %",
             100.0 * efficiency(&path, &mesh, &g1, mu, Drive::Forward)
+        );
+    }
+}
+
+/// **One external pair's figures, at full precision**, for the ISO
+/// comparison in `tools/iso_6336_3_stack.py`, which computes ISO 6336-2 and
+/// 6336-3 Method B from the inputs printed here and shares no code with this.
+///
+/// Per gear: the inputs Method B needs (the tip as cut, the rack's
+/// dedendum and tip radius); the tool's ISO set at the highest point of
+/// single-pair contact (30° tangent, `Y_F`, `Y_S`), which Method B must
+/// reproduce; and its default rating (`(Y_F − axial)·K_f`). Per mesh: the
+/// contact ratios and the contact stresses at the stated face and torque, on
+/// 4340 Hardened Steel both sides.
+fn iso_report(z: [u32; 2], alpha: f64, helix: f64, x: [f64; 2], face: f64, torque: f64) {
+    use gear_core::contact::ContactPath;
+    use gear_core::material::contact_modulus;
+    use gear_core::mesh::{Mesh, MeshKind};
+    use gear_core::strength::{
+        bending_section, bending_section_by, contact_stress, CriticalSection, Load,
+        RootStressModel, PARALLEL_AXES,
+    };
+
+    let lib = gear_io::default_library();
+    let Some(mat) = lib.get("4340 Hardened Steel") else {
+        return;
+    };
+    let gear = |i: usize, hand: f64| {
+        Tooth::new(GearParams {
+            teeth: z[i],
+            pressure_angle: alpha,
+            helix_angle: hand * helix,
+            profile_shift: x[i],
+            ..Default::default()
+        })
+    };
+    let g = [gear(0, 1.0), gear(1, -1.0)];
+    let (Ok(mesh), Ok(back)) = (
+        Mesh::new(&g[0], &g[1], MeshKind::External),
+        Mesh::new(&g[1], &g[0], MeshKind::External),
+    ) else {
+        println!("z={}/{} cannot mesh", z[0], z[1]);
+        return;
+    };
+    let (Some(path), Some(path_back)) = (
+        ContactPath::new(&g[0], g[1].ra, &mesh),
+        ContactPath::new(&g[1], g[0].ra, &back),
+    ) else {
+        println!("z={}/{} has no usable path of contact", z[0], z[1]);
+        return;
+    };
+    let eps_beta =
+        face * helix.to_radians().sin().abs() / (std::f64::consts::PI * g[0].params.module);
+    println!(
+        "pair z {}/{} alpha_n {alpha} beta {helix} x {:+}/{:+} module {} face {face} torque {torque}",
+        z[0], z[1], x[0], x[1], g[0].params.module
+    );
+    println!(
+        "mesh a_w {:.12} alpha_wt {:.12}",
+        mesh.a_w,
+        mesh.alpha_w.to_degrees()
+    );
+    println!(
+        "mesh eps_alpha {:.12} eps_beta {eps_beta:.12}",
+        path.contact_ratio
+    );
+    for (i, (t, p)) in g.iter().zip([&path, &path_back]).enumerate() {
+        let n = i + 1;
+        // The rack in the normal plane: the virtual spur member's own.
+        let v = t.virtual_spur();
+        println!(
+            "gear {n} d_a {:.12} d_b {:.12} h_fP {:.12} rho_fP {:.12}",
+            2.0 * t.ra,
+            2.0 * t.rb,
+            v.bd + v.params.module * v.params.profile_shift,
+            v.rho
+        );
+        match bending_section_by(t, p.contact_ratio, CriticalSection::TangentAngle) {
+            Some(s) => println!(
+                "gear {n} iso Y_F {:.12} Y_S {:.12} q_s {:.12}",
+                s.form_factor,
+                s.stress_correction(RootStressModel::Iso6336)
+                    .unwrap_or(f64::NAN),
+                s.notch_parameter
+            ),
+            None => println!("gear {n} iso none"),
+        }
+        match bending_section(t, p.contact_ratio) {
+            Some(s) => println!(
+                "gear {n} tool Y_F {:.12} axial {:.12} K_f {:.12} factor {}",
+                s.form_factor,
+                s.axial_compression,
+                s.stress_correction(RootStressModel::DolanBroghamer)
+                    .unwrap_or(f64::NAN),
+                s.bending_factor(RootStressModel::DolanBroghamer)
+                    .map_or_else(|| "none".to_string(), |f| format!("{f:.12}"))
+            ),
+            None => println!("gear {n} tool none"),
+        }
+    }
+    let load = Load::new(torque, face);
+    let e_star = contact_modulus(mat, mat);
+    println!(
+        "load F_t {:.12} E_star {e_star:.12} E {} nu {}",
+        load.tangential(&g[0]),
+        mat.elastic_modulus.value,
+        mat.poissons_ratio.value
+    );
+    if let Some(cs) = contact_stress(&path, &mesh, &g[0], PARALLEL_AXES, &load, e_star) {
+        println!(
+            "contact pitch {:.12} rated_1 {:.12} rated_2 {:.12}",
+            cs.at_pitch_point,
+            cs.governing(0),
+            cs.governing(1)
         );
     }
 }

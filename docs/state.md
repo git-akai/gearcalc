@@ -666,12 +666,30 @@ whose size is unmeasured is a debt still owed, and is marked as one.
 - **A pointed tooth is rated on its fillet alone** (`gear.bending_on_fillet_pointed`),
   a step at the pointed limit: one hair short of pointed, the flank is still
   searched and the thin tip's own section can govern. Size unmeasured.
-- **Helical bending is conservative against ISO 6336-3:2019 by 26–36 %** at
-  full axial overlap, and **below it by up to 22 %** at an overlap ratio under
-  0.3 with a helix over 20° — the one regime where this model runs under the
-  standard, and one `mesh.overlap_below_one` already flags. Measured with
-  `tools/iso_6336_3_stack.py`, not asserted; the figure the documentation used
-  to quote was right by accident.
+
+<!-- figures: tools/iso_6336_3_stack.py -->
+- **Against ISO, measured by the stack script the marker names**, which computes ISO
+  6336-3 Method B and 6336-2 on its own and reproduces the tool's ISO set on
+  every pair before it prints a ratio. Tool over ISO, unshifted pairs, both
+  members, every `K` at 1:
+  - **spur bending** at the outer point of single-pair contact: 0.889–1.139 at
+    14.5°, 0.781–0.985 at 20°, 0.656–0.845 at 25°. **Low** over most of the
+    grid — unconservative, the more so the higher the pressure angle;
+  - **helical bending** at 20°: 0.920–1.246 at `ε_β` 1.0 and above,
+    0.599–0.975 at 0.3, 0.542–0.919 at 0.1. Low overlap is low, and a mesh
+    there says `mesh.overlap_below_one`;
+  - **contact** on the pinion: 692.7 against 616.8 MPa on the 17/43 spur
+    (+12.3 %, ISO's `Z_ε`), 630.6 against 475.2 MPa at 20° helix and full
+    overlap (+32.7 %). **High** — conservative by `1/Z_ε`, which ISO's
+    `σ_Hlim` is calibrated with. The allowables' own bias is a separate entry.
+
+<!-- figures: gear-cli matrix -->
+- **The ISO set against the default, at the tip**: `gear-cli matrix` study 5's
+  `Y_F·K_f / Y_F·Y_S` reads 0.510 – 1.128, mean 0.827, over the external
+  population. The default is **lower** than the ISO construction on most
+  teeth, by up to half; the spur band above is the same comparison at the
+  single-pair point, against ISO's own closed form.
+
 - **`K_f`'s calibration contained no undercut teeth.** Dolan and Broghamer's
   photoelastic specimens "contained various standard gear teeth but did not
   include any undercut gears", and this tool rates undercut teeth. Size

@@ -25,6 +25,12 @@ An HTML comment above the block, naming the command that produces it:
     |---|---|
     | `sigma_F` | 66.8 / 56.0 MPa |
 
+A script in `tools/` that holds the harness against a derivation of its own
+can be named instead of `gear-cli`, and is handed the same binary through
+`GEAR_CLI`:
+
+    <!-- figures: tools/iso_6336_3_stack.py -->
+
 The block runs from the marker to the next blank line -- a Markdown table, a
 list, a paragraph -- or to the closing fence of a code block. Every number in it
 must appear in what the command prints, **at the document's own precision**: a
@@ -279,15 +285,23 @@ def run(command, cache):
     if command in cache:
         return cache[command]
     argv = command.split()
+    env = dict(os.environ)
     if argv[0] == "gear-cli":
         argv = [str(BIN)] + argv[1:]
+    elif re.fullmatch(r"tools/[a-z0-9_]+\.py", argv[0]) and (ROOT / argv[0]).exists():
+        # A script that compares the harness with a derivation of its own,
+        # handed the same binary.
+        argv = [sys.executable, str(ROOT / argv[0])] + argv[1:]
+        env["GEAR_CLI"] = str(BIN)
     else:
-        raise SystemExit(f"only `gear-cli ...` commands can be tagged: {command}")
+        raise SystemExit(
+            f"only `gear-cli ...` or `tools/<script>.py` commands can be tagged: {command}"
+        )
     if not BIN.exists():
         raise SystemExit(
             f"{BIN} is not built. `cargo build --release --bin gear-cli` first."
         )
-    result = subprocess.run(argv, capture_output=True, text=True)
+    result = subprocess.run(argv, capture_output=True, text=True, env=env)
     cache[command] = result.stdout + result.stderr
     return cache[command]
 
