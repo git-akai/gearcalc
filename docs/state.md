@@ -859,6 +859,14 @@ whose size is unmeasured is a debt still owed, and is marked as one.
 - **A planet's net body torque is reported as zero**, which is what it is —
   a free idler's two meshes balance — and what the set's own solver never printed.
   The torque its teeth carry is on its gear card, per mesh, as every member's is.
+- **The shift search is budget-bound on one set, 11/17 (ring 45).** A ring
+  asking for no undercut is held where its flank reaches its tip (U1), a second
+  wall beside the closure's curve, and the pattern walk spends its budget
+  sliding along it: four times the budget moves `η₀` by **1.75e-7** (higher),
+  against no movement at all on the other 29 sets of
+  `the_search_is_converged_not_budgeted`, which pins the bound so it can only
+  shrink. The size is below the last digit printed; the cure is the structural
+  search (redesign C), not a larger budget.
 
 ---
 
