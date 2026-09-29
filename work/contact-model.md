@@ -88,3 +88,9 @@ To answer when work resumes:
 3. **Validation.** ZI keeps today's closed forms as its check.
    `tools/worm_flank_curvature.py`'s ZN/ZA curvatures (ZN 1–15 % below ZI in contact stress) are
    the independent oracle for the others.
+
+**Owner's ruling (2026-09-28): worm types stay at evaluation level.**
+- A matched set is worth adding only if it needs no additional branch or solve. That means a ZN or
+  ZA worm with a wheel cut by a hob of the same type.
+- Otherwise the worm types are implemented but not exposed. This avoids a contact-analysis engine
+  for now.
