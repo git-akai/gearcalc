@@ -28,7 +28,8 @@ chord is off the axis and fails, however well its end vertices sit.
 Usage:
     validate_dxf.py <file.dxf> --teeth Z [--module M] [--shift X]
         [--pressure-angle A] [--angular-shift DX]      external or eccentric
-    validate_dxf.py <file.dxf> --ring --teeth Z [--module M] [--pressure-angle A]
+    validate_dxf.py <file.dxf> --ring --teeth Z [--module M] [--shift X]
+        [--pressure-angle A]                             a ring, cut by the default shaper
 """
 
 import argparse
@@ -47,6 +48,11 @@ TOL = 1e-6  # mm; the exporter writes 12 decimal places
 ADDENDUM = 1.0
 DEDENDUM = 1.25
 TIP_ROUND = 0.38
+
+# The shaper cutter the harness cuts a ring with: its tooth count and addendum
+# (modules), unshifted.
+CUTTER_TEETH = 20
+CUTTER_ADDENDUM = 1.25
 
 
 def inv(a):
@@ -98,14 +104,62 @@ class External:
     def root(self, x):
         return self.r - self.m * (DEDENDUM - x)
 
-    def root_half_angle(self, x):
-        """Where the rack's tip round leaves the root circle, from the tooth's
-        centreline: its corner's lateral place over the pitch radius."""
+    def root_arc_half_angle(self, x):
+        """Half the root arc's angle: the flat the rack's tooth has at its tip,
+        less the two rounds' insets, rolled onto the pitch circle.
+
+        The rack's tooth fills the space the gear's tooth leaves at the pitch
+        line, pi m - s, and narrows by tan(alpha) per unit depth on each side, so
+        its tip flat is w = pi m - s - 2 m (h_f - x) tan(alpha). A round of
+        radius rho tangent to a flank and the tip line leaves that flat
+        rho (1 - sin alpha) / cos(alpha) in from the corner. What remains of the
+        flat is the root arc, carried round the rolling (pitch) circle.
+        """
         s = self.m * (math.pi / 2.0 + 2.0 * x * math.tan(self.alpha))
         rho = TIP_ROUND * self.m
-        b_c = self.m * (DEDENDUM - x) - rho
-        a_c = s / 2.0 + b_c * math.tan(self.alpha) + rho / math.cos(self.alpha)
-        return a_c / self.r
+        w = math.pi * self.m - s - 2.0 * self.m * (DEDENDUM - x) * math.tan(self.alpha)
+        inset = rho * (1.0 - math.sin(self.alpha)) / math.cos(self.alpha)
+        return (w / 2.0 - inset) / self.r
+
+
+def inv_inverse(target):
+    """alpha with inv(alpha) = target, by bisection on (0, pi/2)."""
+    lo, hi = 0.0, math.pi / 2.0 - 1e-12
+    for _ in range(200):
+        mid = 0.5 * (lo + hi)
+        if inv(mid) < target:
+            lo = mid
+        else:
+            hi = mid
+    return 0.5 * (lo + hi)
+
+
+class Ring:
+    """An internal spur gear cut by an unshifted pinion shaper, from its inputs
+    alone. Its tip is r - m(h_a - x). Its root is where the cutter's tip reaches
+    at the generating centre distance: the cutter (z0) and the ring (z) mesh with
+    shift x on the ring, so inv(alpha_w) = inv(alpha) + 2 x tan(alpha)/(z - z0),
+    a_w = m (z - z0)/2 cos(alpha)/cos(alpha_w), and r_f = a_w + m(z0/2 + h_a0).
+    Its space is an external tooth of the same shift: s = m(pi/2 + 2 x tan alpha)
+    wide at the pitch circle."""
+
+    def __init__(self, z, m, x, alpha_deg):
+        self.z, self.m, self.x = z, m, x
+        self.alpha = math.radians(alpha_deg)
+        self.r = m * z / 2.0
+        self.rb = self.r * math.cos(self.alpha)
+        self.tip = self.r - m * (ADDENDUM - x)
+        z0 = CUTTER_TEETH
+        alpha_w = inv_inverse(inv(self.alpha) + 2.0 * x * math.tan(self.alpha) / (z - z0))
+        a_w = m * (z - z0) / 2.0 * math.cos(self.alpha) / math.cos(alpha_w)
+        self.root = a_w + m * (z0 / 2.0 + CUTTER_ADDENDUM)
+
+    def tip_land_half_angle(self):
+        """Half a tooth's tip land: half the pitch less the space's half-angle
+        at the tip circle, psi_b - inv(alpha at the tip)."""
+        s = self.m * (math.pi / 2.0 + 2.0 * self.x * math.tan(self.alpha))
+        psi_b = s / (2.0 * self.r) + inv(self.alpha)
+        return math.pi / self.z - (psi_b - inv(math.acos(self.rb / self.tip)))
 
 
 def raw_tags(path):
@@ -278,7 +332,7 @@ def external(a, check, arcs, circles, envelopes, inner, outer, area, r, rb):
     check(abs(tip_sum - tip_want) < 1e-9, f"tip arcs sweep {tip_sum:.9f} rad, the teeth leave {tip_want:.9f}")
     if concentric:
         root_sum = sum(arc[3] for arc in roots)
-        root_want = z * 2.0 * (math.pi / z - g.root_half_angle(g.x))
+        root_want = z * 2.0 * g.root_arc_half_angle(g.x)
         check(abs(root_sum - root_want) < 1e-9, f"root arcs sweep {root_sum:.9f} rad, the spaces leave {root_want:.9f}")
 
     lo = min(g.root(g.shift(k)) for k in range(z)) if concentric else g.root(g.x - abs(g.dx))
@@ -323,31 +377,37 @@ def external(a, check, arcs, circles, envelopes, inner, outer, area, r, rb):
 
 def ring(a, check, arcs, circles, inner, outer, area, r, rb):
     z = a.teeth
+    g = Ring(z, a.module, a.shift, a.pressure_angle)
     # A ring's tooth points inward: its tip is the bore's innermost circle and
-    # its root the outermost, and each arc is one of the two.
-    tips = [arc for arc in arcs if abs(arc[1] - inner) < TOL]
-    roots = [arc for arc in arcs if abs(arc[1] - outer) < TOL]
+    # its root the outermost -- each derived from the inputs, and each arc at
+    # one of the two.
+    check(abs(inner - g.tip) < TOL, f"the tip is reached and not passed ({inner:.6f} vs {g.tip:.6f})")
+    check(abs(outer - g.root) < TOL, f"the root is reached and not passed ({outer:.6f} vs {g.root:.6f})")
+    tips = [arc for arc in arcs if abs(arc[1] - g.tip) < TOL]
+    roots = [arc for arc in arcs if abs(arc[1] - g.root) < TOL]
     stray = len(arcs) - len(tips) - len(roots)
     check(stray == 0, f"every arc is at the tip or the root ({stray} are at neither)")
     check(len(tips) == z, f"{len(tips)} tip arcs, one per tooth = {z}")
+    tip_sum = sum(arc[3] for arc in tips)
+    tip_want = z * 2.0 * g.tip_land_half_angle()
+    check(abs(tip_sum - tip_want) < 1e-9, f"tip arcs sweep {tip_sum:.9f} rad, the spaces leave {tip_want:.9f}")
     # Two halves of a root arc per space, or none where the fillets meet.
     check(len(roots) in (0, 2 * z), f"{len(roots)} root arcs, two per space or none")
-    check(inner < r < outer, f"tip {inner:.6f} inside the pitch circle {r:.6f} inside the root {outer:.6f}")
 
     # The bore is wound as the external outline is, counter-clockwise, and
     # encloses more than the tip circle and less than the root circle.
     check(area > 0, f"the bore is wound counter-clockwise (signed area {area:.3f} mm^2)")
     check(
-        math.pi * inner**2 < area < math.pi * outer**2,
-        f"area {area:.3f} lies between the tip and root ({math.pi * inner ** 2:.3f}..{math.pi * outer ** 2:.3f})",
+        math.pi * g.tip**2 < area < math.pi * g.root**2,
+        f"area {area:.3f} lies between the tip and root ({math.pi * g.tip ** 2:.3f}..{math.pi * g.root ** 2:.3f})",
     )
 
     # Pitch, base, tip and root, and the rim outside them all, as construction.
     got = sorted(c.dxf.radius for c in circles)
     check(len(got) == 5, f"five reference circles (got {len(got)})")
-    for name, want in (("pitch", r), ("base", rb), ("tip", inner), ("root", outer)):
+    for name, want in (("pitch", r), ("base", rb), ("tip", g.tip), ("root", g.root)):
         check(any(abs(g - want) < TOL for g in got), f"a {name} circle at {want:.6f}")
-    check(bool(got) and got[-1] > outer + TOL, f"the rim ({got[-1] if got else 0:.6f}) lies outside the root")
+    check(bool(got) and got[-1] > g.root + TOL, f"the rim ({got[-1] if got else 0:.6f}) lies outside the root")
     check(all(c.dxf.layer == "GEAR_REFERENCE" for c in circles), "reference circles on the construction layer")
 
 
