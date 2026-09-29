@@ -702,8 +702,7 @@ fn ranges_at_shift(p: &GearParams, working_depth: f64) -> Ranges {
     let st = p.module * (PI / 2.0 + 2.0 * (x + p.thickness_shift()) * an.tan()) / beta.cos();
     let rho_fit = Rack::settle(st, bd, alpha_t, mt).rho_fit;
     let rho_min = guard::MIN_FILLET_MODULES * p.module;
-    let tool_closes =
-        x + Rack::deepest(st, rho_min / guard::FILLET_FRACTION_OF_MAX, alpha_t, mt) / p.module;
+    let tool_closes = x + Rack::deepest(st, rho_min, alpha_t, mt) / p.module;
     let rho_max = guard::FILLET_FRACTION_OF_MAX * bd.min(rho_fit);
 
     Ranges {

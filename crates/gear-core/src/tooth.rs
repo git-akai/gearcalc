@@ -98,6 +98,12 @@ pub struct Rack {
     /// Tip corner round, mm, in the **transverse** plane — where the trochoid
     /// is swept, so no conversion happens after this point.
     pub tip_round: f64,
+    /// Held at the depth where its round fills the space the tooth leaves
+    /// (`clamp.space_closed`). The two fillets then meet on the space's
+    /// centreline at the root, and there is no root arc: the tooth takes
+    /// `θ0 = π/z` by construction, as a pointed tip takes `θ_a = 0`, rather
+    /// than a root arc a rounding long and of either sign.
+    pub closes: bool,
 }
 
 /// What a rack leaves at its tip, from [`Rack::settle`]. Millimetres, transverse.
@@ -536,19 +542,32 @@ impl Tooth {
             u_j: 0.0,
             s_j: 0.0,
             r_j: 0.0,
-            theta0: ac / r,
+            theta0: if tool.closes {
+                std::f64::consts::PI / z
+            } else {
+                ac / r
+            },
             half_pitch: std::f64::consts::PI / z,
             z,
             severed: false,
         };
 
-        match g.solve_junction() {
-            Junction::Crossing { u, s } => {
+        let junction = g.solve_junction();
+        // Unreachable for finite inputs (see `solve_junction`), and every test
+        // build asks; were it reached, the tooth is read as having no flank and
+        // no fillet, which no rating uses, rather than a guessed junction.
+        debug_assert!(junction.is_some(), "unsolved flank junction: {params:?}");
+        match junction {
+            None => {
+                g.u_j = g.u_tip;
+                g.r_j = g.ra;
+            }
+            Some(Junction::Crossing { u, s }) => {
                 g.u_j = u;
                 g.s_j = s;
                 g.r_j = rb * f64::hypot(1.0, u);
             }
-            Junction::AtTip { s } => {
+            Some(Junction::AtTip { s }) => {
                 // No crossing below the tip: the fillet has consumed the flank
                 // (or the tip is under the form circle, or under the base
                 // circle, where there is no involute at all). The tooth is its
@@ -617,20 +636,20 @@ impl Tooth {
 
     // ---------------------------------------------------------------- //
 
-    /// The fillet's rack travel at a radius at or above the root.
+    /// The fillet's rack travel at a radius at or above the root, `None`
+    /// below it.
     ///
-    /// `r(s) ≥ |s|` and `r(0) = r_f`, and the radius falls monotonically as `s`
-    /// rises to zero (for a corner below the rolling line, `b_c > 0`), so
-    /// `[−radius, 0]` brackets the one root. At the root itself the two ends
-    /// agree to rounding and the answer is the root, `s = 0`.
-    fn fillet_travel_at(&self, radius: f64) -> f64 {
-        brent(
-            |s| self.trochoid_at(s).0 - radius,
-            -radius,
-            0.0,
-            Tol::default(),
-        )
-        .unwrap_or(0.0)
+    /// `r(s) ≥ |s|`, and the radius falls monotonically as `s` rises to the
+    /// fillet's foot at `s = 0` (for a corner below the rolling line,
+    /// `b_c > 0`), so `[−radius, 0]` brackets the one root wherever the radius
+    /// is above the foot. The foot is the root circle to rounding: a radius
+    /// between the two (a tip at the root) is at the foot, `s = 0`.
+    fn fillet_travel_at(&self, radius: f64) -> Option<f64> {
+        let over = |s: f64| self.trochoid_at(s).0 - radius;
+        if over(0.0) >= 0.0 {
+            return (radius >= self.rf).then_some(0.0);
+        }
+        brent(over, -radius, 0.0, Tol::default())
     }
 
     /// Where the involute flank meets the trochoid fillet, or that it does not
@@ -652,15 +671,25 @@ impl Tooth {
     /// tip on its fillet — one rule for the undercut band on the shift axis, a
     /// stub addendum on a tooth that is not undercut, and a tip below the base
     /// circle.
-    fn solve_junction(&self) -> Junction {
+    ///
+    /// **At the base circle**: an undercut tooth whose fillet is already on the
+    /// flank there (the edge of undercut, to rounding) meets it at the flank's
+    /// foot, `u = 0`.
+    ///
+    /// Every solve is over a bracket its signs have been checked on, and the
+    /// tip and base circle are above the root (`r_a ≥ r_f` by construction;
+    /// undercut needs `b_d > r sin²α_t ≥ r(1 − cos α_t)`), so `None` is a solver
+    /// that did not converge on a finite bracket — not a geometry.
+    fn solve_junction(&self) -> Option<Junction> {
         let s_tan = -self.bc / self.alpha_t.tan();
-        let at_tip = || Junction::AtTip {
-            s: self.fillet_travel_at(self.ra),
+        let at_tip = || {
+            self.fillet_travel_at(self.ra)
+                .map(|s| Junction::AtTip { s })
         };
         if !self.undercut {
             let u = self.l / self.rb;
             return if self.rb * f64::hypot(1.0, u) <= self.ra {
-                Junction::Crossing { u, s: s_tan }
+                Some(Junction::Crossing { u, s: s_tan })
             } else {
                 at_tip()
             };
@@ -675,16 +704,18 @@ impl Tooth {
             let (r, th) = self.trochoid_at(s);
             th - (self.psi_b - inv_from_roll(crate::involute::roll_at_radius(r, self.rb)))
         };
-        let s_base = self.fillet_travel_at(self.rb);
-        let s_tip = self.fillet_travel_at(self.ra);
+        let s_base = self.fillet_travel_at(self.rb)?;
+        let s_tip = self.fillet_travel_at(self.ra)?;
         if gap(s_tip) <= 0.0 {
-            return at_tip();
+            return Some(Junction::AtTip { s: s_tip });
         }
-        let s = brent(gap, s_tip, s_base, Tol::default()).unwrap_or(s_base);
-        Junction::Crossing {
+        if gap(s_base) >= 0.0 {
+            return Some(Junction::Crossing { u: 0.0, s: s_base });
+        }
+        brent(gap, s_tip, s_base, Tol::default()).map(|s| Junction::Crossing {
             u: crate::involute::roll_at_radius(self.trochoid_at(s).0, self.rb),
             s,
-        }
+        })
     }
 
     /// Detect a tooth cut away entirely by undercut.
@@ -713,9 +744,11 @@ impl Tooth {
         // that could bring them together: `Rack::wanted_by` caps its tip round
         // at [`guard::FILLET_FRACTION_OF_MAX`] of the round that would exactly
         // fill the space between the flanks. So the fillets are held apart by
-        // however much that fraction is short of one, and the only way the
-        // trochoid reaches the centreline is if the *flank* has been consumed —
-        // which is what undercut is.
+        // however much that fraction is short of one — or, where the depth is
+        // held at the rack's closing, meet only at the root, which is the space
+        // closing and not the tooth — and the only way the trochoid reaches the
+        // centreline above the root is if the *flank* has been consumed, which
+        // is what undercut is.
         //
         // That also says how the margin behaves, which a sweep alone would only
         // guess at: it is a *fraction of the space*, so it narrows with the
@@ -992,13 +1025,14 @@ impl Rack {
         }
         // The rack's tooth narrows toward its tip, and deeper than `deepest` it
         // has come to a point before the depth asked: the smallest round no
-        // longer fits, and the tool reaches no further. Held where the smallest
-        // round is the fraction of what fits that every round is held to, so a
-        // root arc remains; the depth itself takes no margin, and the root
-        // radius stops moving rather than jumping.
+        // longer fits, and the tool reaches no further. Held exactly there,
+        // where the smallest round fills the space, so the root radius stops
+        // moving rather than jumping; the tool says so (`closes`) and the tooth
+        // leaves no root arc.
         let rho_min = guard::MIN_FILLET_MODULES * m;
-        let deepest = Self::deepest(st, rho_min / guard::FILLET_FRACTION_OF_MAX, alpha_t, mt);
-        if bd > deepest {
+        let deepest = Self::deepest(st, rho_min, alpha_t, mt);
+        let closes = bd >= deepest;
+        if closes {
             bd = deepest;
             notes.push(Note::new(key::CLAMP_SPACE_CLOSED).number("radius", r - bd, 4));
         }
@@ -1020,6 +1054,7 @@ impl Rack {
             Self {
                 depth: bd + m * x,
                 tip_round: rho,
+                closes,
             },
             notes,
         )

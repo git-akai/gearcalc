@@ -167,6 +167,11 @@ impl Tooth {
             let a = base + th;
             (r * a.cos(), r * a.sin())
         };
+        // A space the tool closed has no root arc: the fillets meet on its
+        // centreline, and an empty section adds no vertex.
+        if self.tool.closes {
+            return;
+        }
         if displace.is_none() {
             if side < 0.0 {
                 // One bulged vertex and the arc's own end: the fillet's walk
@@ -770,6 +775,8 @@ mod tests {
                 p.profile_shift = -0.3;
                 p.angular_shift = 1.0;
             })),
+            // the space closed by the rack's tooth
+            external(closed_space()),
         ];
         for teeth in [43u32, 90] {
             let ring = Ring::cut_by(
@@ -786,6 +793,53 @@ mod tests {
             ));
         }
         cases
+    }
+
+    /// A gear whose rack's tooth comes to a point before the depth asked:
+    /// z20 at 30° with a sharp corner closes at `h_f = π/(4 tan 30°)` = 1.360.
+    fn closed_space() -> GearParams {
+        GearParams {
+            teeth: 20,
+            pressure_angle: 30.0,
+            dedendum: 1.6,
+            root_radius: 0.0,
+            ..GearParams::default()
+        }
+    }
+
+    /// **A space the rack's tooth closed has no root arc.** Its fillets meet on
+    /// the space's centreline at the root, so the outline goes from one to the
+    /// next with no arc at the root radius between them. Held at 95 % of the
+    /// round that fits, the tool left a root arc 2.6e-11 mm long in every space
+    /// — a span CAD refuses — and exactly at the fit, one a rounding long and
+    /// of either sign.
+    #[test]
+    fn a_closed_space_has_no_root_arc() {
+        for p in [
+            closed_space(),
+            GearParams {
+                helix_angle: 25.0,
+                ..closed_space()
+            },
+            GearParams {
+                angular_shift: 0.1,
+                ..closed_space()
+            },
+        ] {
+            let gear = crate::Gear::new(p);
+            assert!(gear.mean().tool.closes, "{p:?}: the space did not close");
+            let v = gear.outline(1e-3);
+            let root = gear.distinct().map(|t| t.rf).fold(f64::MAX, f64::min);
+            for (i, a) in v.iter().enumerate() {
+                assert!(
+                    a.bulge == 0.0 || (a.x.hypot(a.y) - root).abs() > 1e-9 * root,
+                    "{p:?}: span {i} is a root arc"
+                );
+            }
+            for t in gear.distinct() {
+                assert!(t.theta0 == t.half_pitch, "{p:?}: θ0 {} ≠ π/z", t.theta0);
+            }
+        }
     }
 
     /// **Every arc is a tip or root arc about the axis.** Each bulged span is

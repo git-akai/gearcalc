@@ -102,7 +102,12 @@ impl GearParams {
     /// modification.
     #[must_use]
     pub fn thickness_shift(&self) -> f64 {
-        let an = self.pressure_angle.to_radians();
+        // The guarded angle every other reader takes: at 0° the raw one made
+        // this `0 · ∞`, and the whole tooth NaN.
+        let an = self
+            .pressure_angle
+            .to_radians()
+            .max(guard::MIN_PRESSURE_ANGLE_DEG.to_radians());
         std::f64::consts::PI * (self.thickness_mod - 1.0) / (4.0 * an.tan())
     }
 

@@ -116,14 +116,20 @@ fn involute_tooth_thickness_law_holds_on_the_flank() {
 
 /// The fillet fit cap is algebraically equivalent to `ac/R <= pi/z`, so
 /// satisfying it *guarantees* a non-negative root arc. If the cap is ever
-/// rewritten, this is what catches getting it wrong.
+/// rewritten, this is what catches getting it wrong. Where the depth is held
+/// at the rack's closing the arc is empty by construction, `θ0 = π/z`
+/// exactly; everywhere else it has length.
 #[test]
 fn fillet_cap_guarantees_a_nonnegative_root_arc() {
     for p in grid() {
         let g = Tooth::new(p);
         let corner = g.theta0;
         assert!(
-            corner < g.half_pitch,
+            if g.tool.closes {
+                corner == g.half_pitch
+            } else {
+                corner < g.half_pitch
+            },
             "root arc is negative ({corner} > {}) at z={} x={} rho={} hf={} k={}",
             g.half_pitch,
             p.teeth,
@@ -348,6 +354,12 @@ fn degenerate_input_is_clamped_and_reported() {
         ..Default::default()
     });
     assert!(g.clamps.any() && g.rb > 0.0);
+    assert!(
+        g.st.is_finite() && g.theta_a.is_finite() && g.theta0.is_finite(),
+        "a clamped pressure angle builds a finite tooth: s_t {}, θ_a {}",
+        g.st,
+        g.theta_a
+    );
 
     // dedendum deeper than the pitch radius
     let g = Tooth::new(GearParams {
@@ -685,8 +697,10 @@ fn every_length_scales_with_the_module_and_every_angle_is_invariant() {
 /// meeting across the tooth space, and `Rack::wanted_by` caps the tool's tip
 /// round at `FILLET_FRACTION_OF_MAX` — 95 % — of the round that would exactly
 /// fill that space. The fillets are therefore held apart by the five per cent
-/// the cap is short of one, and the only way the trochoid reaches the
-/// centreline is if the flank has been consumed, which is undercut.
+/// the cap is short of one (or, at the depth where the rack's tooth closes,
+/// meet at the root and nowhere above it), and the only way the trochoid
+/// reaches the centreline above the root is if the flank has been consumed,
+/// which is undercut.
 ///
 /// What matters is that the margin is a *fraction of the space*: it narrows
 /// with the tooth without ever closing. So this sweeps toward the corner where
@@ -1082,6 +1096,12 @@ fn the_outline_is_a_simple_closed_curve() {
 /// further, and the root is held at that depth with `clamp.space_closed`. The
 /// root radius is continuous through the cap — it stops moving rather than
 /// jumping — and the note fires on one side of it only.
+///
+/// So is the root arc: short of the cap it has length, shrinking with the
+/// depth still to go, and past it there is none, `θ0 = π/z` exactly. Its
+/// length changes with the depth at `tan α_t` for the corner's travel and at
+/// most as much again for a round that follows the fit
+/// (`FILLET_FRACTION_OF_MAX` < 1), which bounds the step.
 #[test]
 fn the_depth_stops_where_the_racks_tooth_closes() {
     use gear_core::note::key;
@@ -1092,6 +1112,7 @@ fn the_depth_stops_where_the_racks_tooth_closes() {
         .pressure_angle(&[14.5, 20.0, 25.0, 40.0])
         .helix_angle(&[0.0, 25.0])
         .thickness_mod(THICKNESS_MODS)
+        .root_radius(&[0.0, 0.38])
         .build()
     {
         let an = p.pressure_angle.to_radians();
@@ -1134,6 +1155,20 @@ fn the_depth_stops_where_the_racks_tooth_closes() {
         assert!(
             (deeper.rf - past.rf).abs() < 1e-12 * p.module,
             "the root moves past the cap at {tag}"
+        );
+        assert!(
+            past.tool.closes
+                && past.theta0 == past.half_pitch
+                && deeper.theta0 == deeper.half_pitch,
+            "a root arc is left past the cap at {tag}: θ0 {} of π/z {}",
+            past.theta0,
+            past.half_pitch
+        );
+        let arc = short.rf * (short.half_pitch - short.theta0);
+        let most = 2.0 * short.alpha_t.tan() * step * p.module;
+        assert!(
+            !short.tool.closes && arc > 0.0 && arc <= most,
+            "the root arc short of the cap is {arc:.3e} mm (at most {most:.3e}) at {tag}"
         );
     }
     assert!(reached > 0, "no case reached the cap");

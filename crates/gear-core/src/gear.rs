@@ -174,9 +174,12 @@ impl Gear {
             .map(|&x| Tooth::tool_wanted_by(&at(x)))
             .collect();
 
+        let depth = wanted.iter().fold(f64::MIN, |d, (r, _)| d.max(r.depth));
         let mut tool = Rack {
-            depth: wanted.iter().fold(f64::MIN, |d, (r, _)| d.max(r.depth)),
+            depth,
             tip_round: wanted.iter().fold(f64::MAX, |t, (r, _)| t.min(r.tip_round)),
+            // Closed where the tooth whose depth it took closed its space.
+            closes: wanted.iter().any(|(r, _)| r.depth == depth && r.closes),
         };
 
         // The one thing the most-demanding rule cannot settle by itself: a tool
@@ -189,9 +192,15 @@ impl Gear {
         let r = params.module / params.helix_angle.to_radians().cos()
             * f64::from(params.teeth.max(1))
             / 2.0;
-        tool.depth = tool
-            .depth
-            .min(crate::params::guard::MAX_CUTTER_DEPTH_FRACTION_OF_R * r + params.module * x_lo);
+        let reach = crate::params::guard::MAX_CUTTER_DEPTH_FRACTION_OF_R * r + params.module * x_lo;
+        if reach < tool.depth {
+            // Drawn back from where it closed, so its space is open again.
+            tool = Rack {
+                depth: reach,
+                closes: false,
+                ..tool
+            };
+        }
 
         let teeth: Vec<Tooth> = shifts.iter().map(|&x| Tooth::cut_by(at(x), tool)).collect();
 
