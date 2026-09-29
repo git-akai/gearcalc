@@ -45,16 +45,21 @@ FLOAT = re.compile(r"\bf(?:64|32)\b")
 def field_type(rest: str):
     """A field's type: the text up to the comma that ends it at bracket depth
     zero, so `(f64, f64)` and `HashMap<String, f64>` are one type, not cut at
-    their first comma. None where the line does not end the field."""
+    their first comma. None where the text does not end the field (a type
+    split over lines is read on, by the caller, until it does)."""
     depth = 0
     for i, c in enumerate(rest):
         depth += (c in "<([") - (c in ">)]")
         if c == "," and depth == 0:
-            return rest[:i] if not rest[i + 1 :].strip() else None
+            return rest[:i]
     return None
+
+
 # The opening line of a struct with named fields, where FIELD is read; a
 # function's parameters look the same and carry no doc to read.
 STRUCT = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?struct \w+[^;(]*\{\s*$")
+# ...and of an enum, whose struct variants' fields sit one level deeper.
+ENUM = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?enum \w+[^;(]*\{\s*$")
 UNIT = re.compile(r"\bradians\b|degrees|°")
 
 # Names that read as angles and are not. Each is a real quantity in some other
@@ -100,18 +105,34 @@ def doc_above(lines: list[str], i: int) -> str:
 
 
 def fields(lines: list[str]):
-    """(line index, name) of every float field inside a struct body."""
-    depth = None
+    """(line index, name) of every float field inside a struct body, or in a
+    struct variant of an enum; a type split over lines is read to its end."""
+    depth, at = None, None
     for i, line in enumerate(lines):
         if depth is None:
             if STRUCT.match(line):
-                depth = 0
+                depth, at = 0, 1
+            elif ENUM.match(line):
+                depth, at = 0, 2
             else:
                 continue
+        before = depth
         depth += line.count("{") - line.count("}")
+        # A struct variant opened on this line: `Variant { alpha: f64 },`.
+        if at == 2 and before == 1 and "{" in line:
+            inner = line[line.index("{") + 1 : line.rindex("}") if "}" in line else len(line)]
+            for part in re.split(r",(?![^<(\[]*[>)\]])", inner):
+                fm = re.match(r"^\s*([a-z_0-9]+):\s*(.+?)\s*$", part)
+                if fm and FLOAT.search(fm.group(2)):
+                    yield i, fm.group(1)
         m = FIELD.match(line)
-        if m and depth == 1:
-            ty = field_type(m.group(2))
+        if m and before == at and depth == at:
+            text, j = m.group(2), i
+            ty = field_type(text)
+            while ty is None and j + 1 < len(lines) and j - i < 20:
+                j += 1
+                text += " " + lines[j].split("//")[0].strip()
+                ty = field_type(text)
             if ty is not None and FLOAT.search(ty):
                 yield i, m.group(1)
         if depth <= 0:

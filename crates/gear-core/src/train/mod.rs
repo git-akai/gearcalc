@@ -6449,9 +6449,10 @@ mod tests {
     #[test]
     fn the_two_contacts_report_one_patch_at_the_limit() {
         let lib = library();
-        // The table's figures: the pitch point at no friction (relative), and
-        // at μ = 0.08 and the peak, in percent.
-        let (pitch_free, pitch_friction_percent, peak_percent) = (1e-5, 1.5, 5.0);
+        // The table's rows: (μ, how near) at the pitch point, relative at
+        // μ = 0 and in percent at μ = 0.08; and the peak, in percent.
+        let ((_, pitch_free), (mu, pitch_friction_percent), peak_percent) =
+            ((0.0, 1e-5), (0.08, 1.5), 5.0);
         let stage = |sigma: f64, mu: f64| {
             let mut s = arr::crossed([17, 43], sigma);
             s.meshes[0].sliding_friction = mu;
@@ -6523,7 +6524,7 @@ mod tests {
         assert!(line.contact_ratio > 1.0 && point.contact_ratio > 1.0);
 
         // With friction, the flank load is the seam: 1.5 % at the pitch point.
-        let (line, point) = (mesh(0.0, 0.08), mesh(0.01, 0.08));
+        let (line, point) = (mesh(0.0, mu), mesh(0.01, mu));
         let gap = (line.cases[0].contact.at_pitch_point - point.cases[0].contact.at_pitch_point)
             / line.cases[0].contact.at_pitch_point;
         assert!(
@@ -10452,13 +10453,14 @@ mod tests {
     ///   one-part search scores its answer at most twice after it: at the
     ///   latest plan, then at the round's), so an objective that solves a
     ///   candidate twice fails.
-    /// - **The totals are the recorded ones, exactly.** How many rounds a walk
-    ///   takes, and how many teeth and rings a candidate cuts (the shape keeps
-    ///   the teeth it has cut; the hula sizes its crank by a root over built
-    ///   teeth, a data-dependent number of trials), follow from the loss
-    ///   surface, not from any bound the search's definition gives; they are
-    ///   deterministic, so they are held exactly, as the corpus holds a figure.
-    ///   A change to them is a question, the answer to which is this list.
+    /// - **A snapshot of the totals**, a change detector and not a law. How
+    ///   many rounds a walk takes, and how many teeth and rings a candidate
+    ///   cuts (the shape keeps the teeth it has cut; the hula sizes its crank by
+    ///   a root over built teeth, a data-dependent number of trials), follow
+    ///   from the loss surface, not from any bound the search's definition
+    ///   gives. They are deterministic, so they are recorded exactly, as the
+    ///   corpus records a figure: a move is a question to answer and re-record,
+    ///   not evidence of a fault.
     ///   Doubling `Search::SHIPPED.starts` takes the evaluations to 2 249,
     ///   4 120 and 712.
     ///

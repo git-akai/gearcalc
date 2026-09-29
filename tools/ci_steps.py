@@ -162,12 +162,16 @@ def read_flake(flake=FLAKE):
 
 
 def read_jobs(ci=CI):
+    return read_jobs_text(ci.read_text())
+
+
+def read_jobs_text(text):
     """The workflow's top-level keys and each job's keys, as indented text:
     `{"": {key: text}, job: {key: text}}`, a key's text being its value and
     every line nested under it, stripped and joined by newlines."""
     out = {"": {}}
     top = job = key = None
-    for line in ci.read_text().split("\n"):
+    for line in text.split("\n"):
         text = line.strip()
         if not text or text.startswith("#"):
             continue
@@ -189,16 +193,20 @@ def read_jobs(ci=CI):
     return out
 
 
+DEPLOY_GRANTS = {"contents": "read", "pages": "write", "id-token": "write"}
+
+
 def policy(ci=CI):
     """What the workflow may do, beyond which steps it runs. Errors, if any.
 
     - The workflow grants nothing at the top level; the `tests` job, which
       runs project code, reads the repository and nothing else.
-    - Only `deploy` holds a write permission, and it runs on `main` alone.
+    - Only `deploy` holds a write permission, exactly `DEPLOY_GRANTS` (what
+      `deploy-pages` needs), and it runs on `main` alone, after `tests`.
     - Runs are grouped per ref (`${{ github.ref }}`), cancelling a running one
       on pull requests only; the deploy has a group of its own that never
       cancels a running deploy."""
-    jobs = read_jobs(ci)
+    jobs = read_jobs(ci) if isinstance(ci, Path) else read_jobs_text(ci)
     top = jobs.pop("")
     errors = []
     if "permissions" in top:
@@ -217,6 +225,10 @@ def policy(ci=CI):
         if name != "deploy" and writes:
             errors.append(f"ci.yml: job {name} writes {writes}; only deploy may write")
         if name == "deploy":
+            if perms.strip() in ("write-all", "read-all") or grants != DEPLOY_GRANTS:
+                errors.append(f"ci.yml: deploy holds {perms.strip() or grants}, not {DEPLOY_GRANTS}")
+            if job.get("needs", "").strip() != "tests":
+                errors.append("ci.yml: deploy does not need tests")
             if job.get("if", "").strip() != "github.ref == 'refs/heads/main'":
                 errors.append("ci.yml: deploy does not run on main alone")
             c = job.get("concurrency", "")
@@ -225,6 +237,35 @@ def policy(ci=CI):
         if "permissions" not in job:
             errors.append(f"ci.yml: job {name} states no permissions")
     return errors
+
+
+# Faults planted in ci.yml, each of which `policy` must refuse.
+PLANTED = [
+    ("tests mints an OIDC token", "      contents: read\n    steps:", "      contents: read\n      id-token: write\n    steps:"),
+    ("the group is not per ref", "group: ci-${{ github.ref }}", "group: ci"),
+    ("deploy runs on every ref", "    if: github.ref == 'refs/heads/main'\n    runs-on", "    if: always()\n    runs-on"),
+    ("deploy cancels a running deploy", "      cancel-in-progress: false", "      cancel-in-progress: true"),
+    ("deploy may write actions", "      pages: write\n", "      pages: write\n      actions: write\n"),
+    ("deploy holds write-all", "      contents: read\n      pages: write\n      id-token: write\n", " write-all\n"),
+    ("deploy runs without the tests", "    needs: tests\n", ""),
+]
+
+
+def self_test():
+    """ci.yml passes the policy, and each planted fault fails it."""
+    text = CI.read_text()
+    bad = 0 if not policy(text) else 1
+    for name, old, new in PLANTED:
+        assert old in text, name
+        planted = text.replace(old, new, 1)
+        if name == "deploy holds write-all":
+            planted = text.replace("    permissions:\n" + old, "    permissions:" + new, 1)
+            assert planted != text, name
+        caught = bool(policy(planted))
+        print(f"{'caught' if caught else 'MISSED'}  {name}")
+        bad += not caught
+    print("every planted fault fails" if not bad else f"{bad} problem(s)")
+    return 1 if bad else 0
 
 
 def key(step):
@@ -238,6 +279,8 @@ def key(step):
 
 
 def main():
+    if sys.argv[1:] == ["--self-test"]:
+        return self_test()
     steps_out, flake_out, *excluded = sys.argv[1:]
     steps, errors = read_steps(excluded)
     standins, more = read_flake()

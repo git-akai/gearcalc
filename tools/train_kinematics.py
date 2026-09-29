@@ -68,8 +68,10 @@ For involute teeth that is the whole answer -- the velocity ratio of an
 involute pair is constant through the engagement, so a relation true at one
 position is true at every one.
 
-Crossed axes (the worm, and the worm in `wormpair` and `mixed`) are not here: a
-planar layout has no line of action for them.
+A crossed mesh (the worm, and the worm in `wormpair` and `mixed`) has no
+planar line of action; its row is `w_b = r w_a` with `r` from the contact
+condition on the flanks' common normal (`crossed_ratio`), its sign carried
+from the parallel pair.
 
 Losses are not here either. Efficiency is not a kinematic quantity, and the
 crate's loss model is checked where it is written.
@@ -171,6 +173,7 @@ class Train:
         self.shafts = ["ground"]
         self.gears = []          # (name, shaft, frame, teeth, offset)
         self.meshes = []         # (gear a, gear b)
+        self.crossings = []      # (shaft a, shaft b, w_b / w_a), fixed axes
 
     def shaft(self, name):
         self.shafts.append(name)
@@ -187,6 +190,11 @@ class Train:
 
     def mesh(self, a, b):
         self.meshes.append((a, b))
+
+    def crossed(self, a, b, ratio):
+        """A crossed-axis mesh between two fixed shafts, `w_b = ratio w_a`,
+        the ratio from `crossed_ratio`."""
+        self.crossings.append((a, b, ratio))
 
     # -- geometry, which is where a mesh's kind comes from ------------------
 
@@ -266,6 +274,11 @@ class Train:
             row[sb] -= on_b
             row[fa] += frame
             out.append(exact(row, on_a))
+        for a, b, ratio in self.crossings:
+            row = [F(0)] * (len(self.shafts) + 1)
+            row[a] = ratio
+            row[b] = F(-1)
+            out.append(row)
         return out
 
     def speeds(self, conditions):
@@ -378,9 +391,61 @@ def chain(z):
     return t, gears
 
 
-def simple_set(zs, zp, zr):
+def crossed_ratio(z1, z2, sigma_deg):
+    """`w2 / w1` for a crossed pair of `z1` and `z2` teeth (a worm's starts
+    and its wheel's teeth) on shafts at `sigma_deg`, exact, from the contact
+    condition on the flanks' common normal: the two material points at the
+    pitch point move alike along it, `w1 (a1 x X).n = w2 (a2 x (X - A)).n`.
+    The normal and the point come from `crossed_path.py`'s construction off
+    the involute helicoids, the helices of one hand splitting the shaft angle.
+
+    **The sign is carried from the parallel pair.** At a shaft angle near
+    nought the pair is an external parallel pair and turns against itself;
+    the shaft angle is then opened in small steps to the one asked, each step
+    taking whichever of the two lines through the pitch point (drive and
+    coast flank) continues the last step's ratio, so the answer is the
+    parallel pair's sense carried continuously, not a convention written
+    here. Only the magnitude is read at the end, as a small rational."""
+    import math
+
+    import numpy as np
+
+    import crossed_path as cp
+
+    alpha = math.radians(PRESSURE_ANGLE_DEG)
+
+    def ratios(sigma):
+        g1, g2 = cp.geometry(z1, sigma / 2, 1.0, alpha), cp.geometry(z2, sigma / 2, 1.0, alpha)
+        a = g1["r"] + g2["r"]
+        out = []
+        for line in cp.lines_of_action(g1, g2, sigma):
+            if line["off"] > 1e-9:
+                continue
+            n, p = line["n"], line["P"]
+            x = p + (np.dot(np.array([g1["r"], 0.0, 0.0]) - p, n)) * n
+            num = np.dot(np.cross(cp.AXIS_1, x), n)
+            den = np.dot(np.cross(cp.axis_2(sigma), x - np.array([a, 0.0, 0.0])), n)
+            out.append(num / den)
+        return out
+
+    target = math.radians(sigma_deg)
+    first = math.radians(0.01)
+    last = -z1 / z2  # the parallel external pair, which turns against itself
+    last = min(ratios(first), key=lambda r: abs(r - last))
+    for k in range(1, 201):
+        sigma = first + (target - first) * k / 200
+        last = min(ratios(sigma), key=lambda r: abs(r - last))
+    q = F(float(last)).limit_denominator(10**6)
+    if abs(float(q) - last) > 1e-9:
+        raise ValueError(f"crossed ratio {last} is not a small rational")
+    return q
+
+
+def simple_set(zs, zp, zr, e=None):
     """Sun, planet, ring, carrier. `z_r = z_s + 2 z_p` is not assumed: the
-    carrier radius is taken from the sun mesh and the ring mesh has to agree."""
+    carrier radius is taken from the sun mesh, or given, and the other mesh
+    runs at it; nothing has to close, only each pair of base circles admit
+    its tangent."""
     t = Train()
     sun, carrier, ring, planet = (
         t.shaft("sun"),
@@ -388,7 +453,7 @@ def simple_set(zs, zp, zr):
         t.shaft("ring"),
         t.shaft("planet"),
     )
-    e = F(zs + zp, 2)
+    e = F(zs + zp, 2) if e is None else e
     gs = t.gear("s", sun, carrier, zs, 0)
     gp = t.gear("p", planet, carrier, zp, e)
     gr = t.gear("r", ring, carrier, zr, 0)
@@ -565,14 +630,14 @@ def compound_chain(pairs):
     return t, shafts
 
 
-def pair_then_set(z1, z2, zs, zp, zr):
+def pair_then_set(z1, z2, zs, zp, zr, e=None):
     """A pair whose driven shaft is an epicyclic set's sun, the ring held."""
     t = Train()
     s1, s2 = t.shaft("s1"), t.shaft("s2")
     carrier, ring, planet = t.shaft("carrier"), t.shaft("ring"), t.shaft("planet")
     t.mesh(t.gear("1", s1, 0, z1, 0), t.gear("2", s2, 0, z2, F(z1 + z2, 2)))
     gs = t.gear("s", s2, carrier, zs, 0)
-    gp = t.gear("p", planet, carrier, zp, F(zs + zp, 2))
+    gp = t.gear("p", planet, carrier, zp, F(zs + zp, 2) if e is None else e)
     gr = t.gear("r", ring, carrier, zr, 0)
     t.mesh(gs, gp)
     t.mesh(gp, gr)
@@ -596,26 +661,18 @@ def set_then_pair(zs, zp, zr, z1, z2):
 
 # ------------------------------------------------------- against the crate
 
-# Bodies no planar layout reaches, by section, and why: crossed axes, and a
-# set whose ring's base circle contains its planet's at the carrier radius the
-# sun mesh sets -- the fixture exists because no layout closes it, and the
-# crate's speeds for it come from the tooth counts alone.
-UNREACHED = {
-    "worm": None,  # the whole section: crossed axes
-    "wormpair": None,
-    "mixed": {("second", "part 3")},
-    "unclosed": None,
-    "chain-unclosed": {("carrier", "part 2"), ("ring", "part 2"), ("planet", "part 2")},
-}
+# Sections this does not derive, by name, with the reason. None today; the
+# count is held, so one added fails until it is derived or listed here.
+UNDERIVED = {}
 
 
-def golden_speeds():
+def golden_speeds(text=None):
     """`{section: {(label, where): speed}}`, exact, from the corpus's
     `graph` blocks: `b3     ring 2    of part 1  speed 16/3721`; and
     `{section: (from, to, total)}`: the headline path's end bodies (its first
     `path` line) and the `total ratio` the graph prints."""
     out, ratios, section, numbered = {}, {}, None, {}
-    for line in GOLDEN.read_text().splitlines():
+    for line in (GOLDEN.read_text() if text is None else text).splitlines():
         m = re.match(r"^== (.+) ==$", line)
         if m:
             section = m.group(1)
@@ -721,8 +778,30 @@ def crate_cases():
     names = {(k, P1): v for k, v in s.items()}
     cases["ring-released"] = (t, names, {("sun", P1): 1})
     cases["conflict"] = (t, names, {("sun", P1): 1, ("carrier", P1): 0, ("ring", P1): 0})
-    t, sh = compound_chain([(17, 43)])
-    cases["chain-unclosed"] = (t, {("first", P1): sh[0], ("second", P1): sh[1]}, {("first", P1): 1})
+    # The set no planet shift closes (17/17/80): the carrier radius is the
+    # ring mesh's, and the sun mesh runs there -- the base circles admit both
+    # tangents, which is all the involute asks.
+    t, s = simple_set(17, 17, 80, e=F(80 - 17, 2))
+    cases["unclosed"] = (t, {(k, P1): v for k, v in s.items()}, {("sun", P1): 1, ("ring", P1): 0})
+    t, s = pair_then_set(17, 43, 17, 17, 80, e=F(80 - 17, 2))
+    cases["chain-unclosed"] = (
+        t,
+        {("first", P1): s["s1"], ("second", P1): s["s2"], ("carrier", "part 2"): s["carrier"],
+         ("ring", "part 2"): s["ring"], ("planet", "part 2"): s["planet"]},
+        {("first", P1): 1, ("ring", "part 2"): 0},
+    )
+    worm = crossed_ratio(1, 40, 90.0)
+    t = Train()
+    a, b = t.shaft("first"), t.shaft("second")
+    t.crossed(a, b, worm)
+    cases["worm"] = (t, {("first", P1): a, ("second", P1): b}, {("first", P1): 1})
+    t = Train()
+    a, w, o = t.shaft("first"), t.shaft("wheel"), t.shaft("out")
+    t.crossed(a, w, worm)
+    t.mesh(t.gear("1", w, 0, 17, 0), t.gear("2", o, 0, 43, F(17 + 43, 2)))
+    cases["wormpair"] = (
+        t, {("first", P1): a, ("second", P1): w, ("second", "part 2"): o}, {("first", P1): 1}
+    )
     t, s = pair_then_set(17, 43, 12, 30, 72)
     cases["pair-then-set"] = (
         t,
@@ -738,23 +817,61 @@ def crate_cases():
         {("sun", P1): 1, ("carrier", P1): 0},
     )
     t, s = pair_then_set(17, 43, 12, 30, 72)
+    out = t.shaft("worm wheel")
+    t.crossed(s["carrier"], out, worm)
     cases["mixed"] = (
         t,
         {("first", P1): s["s1"], ("second", P1): s["s2"], ("carrier", "part 2"): s["carrier"],
-         ("ring", "part 2"): s["ring"], ("planet", "part 2"): s["planet"]},
+         ("ring", "part 2"): s["ring"], ("planet", "part 2"): s["planet"],
+         ("second", "part 3"): out},
         {("first", P1): 1, ("ring", "part 2"): 0},
     )
     return cases
 
 
-def against_crate(verbose):
+# Each section's headline path, input body to output body: the case's
+# driven end and the end it is loaded at. Held to the corpus's first `path`
+# line where it prints one, and the total ratio read along it where not.
+P1, P2, P3 = "part 1", "part 2", "part 3"
+SET_OUT = {"sun": {"carrier": "ring", "ring": "carrier"},
+           "carrier": {"sun": "ring", "ring": "sun"},
+           "ring": {"sun": "carrier", "carrier": "sun"}}
+ENDS = {
+    "pair": (("first", P1), ("second", P1)),
+    "helical": (("first", P1), ("second", P1)),
+    "worm": (("first", P1), ("second", P1)),
+    **{f"set-{d}-{h}": ((d, P1), (o, P1)) for d, hs in SET_OUT.items() for h, o in hs.items()},
+    "hula": (("carrier", P1), ("ring 2", P1)),
+    "layshaft": (("member 1", P1), ("member 5", P1)),
+    "wormpair": (("first", P1), ("second", P2)),
+    "wolfrom": (("carrier", P1), ("ring 2", P1)),
+    "stepped": (("sun", P1), ("ring 2", P1)),
+    "planocentric": (("carrier", P1), ("coupled", P1)),
+    "meshed-planets": (("sun", P1), ("carrier", P1)),
+    "ravigneaux-small-sun": (("sun 1", P1), ("carrier", P1)),
+    "ravigneaux-large-sun": (("sun 2", P1), ("carrier", P1)),
+    "ravigneaux-ring-free": (("sun 1", P1), ("carrier", P1)),
+    "chain": (("first", P1), ("second", P2)),
+    "mixed": (("first", P1), ("second", P3)),
+    "set-then-pair": (("sun", P1), ("second", P2)),
+    "pair-then-set": (("first", P1), ("ring", P2)),
+    "unclosed": (("sun", P1), ("carrier", P1)),
+    "chain-unclosed": (("first", P1), ("carrier", P2)),
+    "ring-released": None,
+    "conflict": None,
+}
+
+
+def against_crate(verbose, text=None):
     """Every body speed the corpus records, against the rigid-body one."""
     fail = 0
-    recorded, ratios = golden_speeds()
+    recorded, ratios = golden_speeds(text)
     cases = crate_cases()
+    underived = 0
     for section, bodies in recorded.items():
-        if section in UNREACHED and UNREACHED[section] is None:
-            print(f"  {section:<38}{'skip':>9}   no planar layout")
+        if section in UNDERIVED:
+            print(f"  {section:<38}{'NOT':>9}   derived: {UNDERIVED[section]}")
+            underived += 1
             continue
         if section not in cases:
             print(f"  {section:<38}{'NEW':>9}   the corpus has a section this does not build")
@@ -795,8 +912,6 @@ def against_crate(verbose):
             continue
         wrong = []
         for body, (speed, per_free, _) in bodies.items():
-            if body in (UNREACHED.get(section) or ()):
-                continue
             if body not in names:
                 wrong.append(f"{body[0]} ({body[1]}): not in the layout")
                 continue
@@ -806,20 +921,26 @@ def against_crate(verbose):
                     f"{body[0]} ({body[1]}): crate {speed} + {per_free} w, "
                     f"rigid body {mine[0]} + {mine[1]} w"
                 )
-        # The headline ratio, the input's speed over the output's.
+        # The headline ratio, the input's speed over the output's, along the
+        # ends this file states and the corpus's first path, where it prints
+        # one, names too.
         start, end, total, numbered = ratios.get(section, [None, None, None, {}])
-        if total is None:
+        ends = ENDS.get(section, "missing")
+        if ends == "missing":
+            wrong.append("no ends stated for this section")
+        elif total is None:
             wrong.append("the corpus prints no total ratio")
         elif total == "a family":
-            if not free:
-                wrong.append("the corpus calls the ratio a family and nothing is free")
-        elif start is not None and not (
-            {numbered.get(start), numbered.get(end)} & set(UNREACHED.get(section) or ())
-        ):
-            a, b = names.get(numbered.get(start)), names.get(numbered.get(end))
-            if a is None or b is None:
-                wrong.append(f"total ratio: {start} or {end} is not in the layout")
-            elif at[0][b] == 0 or at[0][a] / at[0][b] != F(total):
+            if not free or ends is not None:
+                wrong.append("the corpus calls the ratio a family where this finds one")
+        elif ends is None:
+            wrong.append(f"the corpus prints a total ratio {total} where this states no ends")
+        else:
+            if start is not None and (numbered.get(start), numbered.get(end)) != ends:
+                wrong.append(f"the corpus's path is {numbered.get(start)} -> {numbered.get(end)}, "
+                             f"not {ends[0]} -> {ends[1]}")
+            a, b = names[ends[0]], names[ends[1]]
+            if at[0][b] == 0 or at[0][a] / at[0][b] != F(total):
                 got = "locked" if at[0][b] == 0 else at[0][a] / at[0][b]
                 wrong.append(f"total ratio: crate {total}, rigid body {got}")
         ok = not wrong
@@ -832,6 +953,7 @@ def against_crate(verbose):
         if section not in recorded:
             print(f"  {section:<38}{'GONE':>9}   the corpus no longer has this section")
             fail += 1
+    print(f"\n  {underived} section(s) not derived, of {len(UNDERIVED)} listed with a reason")
     return fail
 
 
@@ -905,7 +1027,41 @@ def power_balance(label, t, applied, conditions, fail):
     return fail + (not ok)
 
 
+# Faults planted in the recorded corpus, each of which must fail.
+PLANTED = [
+    ("a total ratio with no path line", "total ratio -4171/289", "total ratio -4171/290"),
+    ("a worm's total ratio", "total ratio -40\n", "total ratio -41\n"),
+    ("a worm wheel's sense", "second    of part 1  speed -1/40\n", "second    of part 1  speed 1/40\n"),
+    ("an unclosed set's ratio", "total ratio 97/17", "total ratio 97/18"),
+    ("a planet's speed", "planet    of part 1  speed -2/5\n", "planet    of part 1  speed 2/5\n"),
+]
+
+
+def self_test():
+    """The recorded corpus passes, and each planted fault fails."""
+    import contextlib
+    import io
+
+    text = GOLDEN.read_text()
+    bad = 0
+    with contextlib.redirect_stdout(io.StringIO()):
+        clean = against_crate(False, text)
+    if clean:
+        print("the recorded corpus fails")
+        bad += 1
+    for name, old, new in PLANTED:
+        assert old in text, name
+        with contextlib.redirect_stdout(io.StringIO()):
+            caught = against_crate(False, text.replace(old, new, 1))
+        print(f"{'caught' if caught else 'MISSED'}  {name}")
+        bad += not caught
+    print("every planted fault fails" if not bad else f"{bad} problem(s)")
+    return 1 if bad else 0
+
+
 def main():
+    if "--self-test" in sys.argv:
+        return self_test()
     verbose = "--verbose" in sys.argv
     fail = 0
 

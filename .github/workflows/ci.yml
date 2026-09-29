@@ -47,6 +47,12 @@ jobs:
       - name: check_all.sh runs what this job runs
         run: nix develop --command tools/check_all.sh --list
 
+      # The CI policy's own rules: ci.yml passes them and each planted fault
+      # (a write grant, a group not per ref, deploy off main or without the
+      # tests, ...) fails.
+      - name: The CI policy fails on planted faults
+        run: nix develop --command tools/ci_steps.py --self-test
+
       # Every pointer from the code and the documents resolves: the file it
       # names exists and so does the heading. These went unchecked until the
       # documents were restructured, when every one of them would have broken
@@ -83,6 +89,7 @@ jobs:
           nix develop --command bash -c '
             set -euo pipefail
             python3 tools/train_kinematics.py
+            python3 tools/train_kinematics.py --self-test
             python3 tools/hula_kinematics.py
             python3 tools/breakaway.py
             python3 tools/crossed_path.py

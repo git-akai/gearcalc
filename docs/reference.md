@@ -1201,8 +1201,8 @@ enough that the line governs:
 <!-- figures-by-test: the_two_contacts_report_one_patch_at_the_limit -->
 | field | meets by | why not exactly |
 |---|---|---|
-| pressure at the pitch point, `μ = 0` | to 1e-5 | — |
-| pressure at the pitch point, `μ = 0.08` | 1.5 % | the flank load: the crossed balance presses with `μ F_n` along a sliding direction that stays finite as the speed vanishes; the line rating uses the transverse projection alone, as ISO does |
+| pressure at the pitch point, μ = 0 | to 1e-5 | — |
+| pressure at the pitch point, μ = 0.08 | 1.5 % | the flank load: the crossed balance presses with `μ F_n` along a sliding direction that stays finite as the speed vanishes; the line rating uses the transverse projection alone, as ISO does |
 | peak pressure | 5 % | *one pair carries everything* is a different point: a transverse base pitch in from the path's ends on a line, a normal base pitch in along the line of action on a point, `cos² β_b` apart |
 | curvature across, patch width | a tenth | they travel with that point |
 | sliding at the pitch point | to zero | — |
@@ -2543,10 +2543,10 @@ carrier turning against the sun) and a Ravigneaux (two suns, long and short
 planets, one ring, the planet–planet mesh a distance between two carried
 axes), and a worm feeding a spur pair (a point contact and a line contact
 on two distances, the train locking backward where the worm does). Each
-has a `gear-cli kinematics` fixture and each but the worm pair — whose
-crossed mesh the plane script does not lay out — a row in
+has a `gear-cli kinematics` fixture and a row in
 `tools/train_kinematics.py`, which derives the rows from velocities along
-each mesh's line of action, the common tangent to the two base circles:
+each mesh's line of action, the common tangent to the two base circles (a
+crossed mesh's from the contact condition on its flanks' common normal):
 profile shift does not move a base circle, so a Wolfrom whose rings sit a
 tooth apart at one radius has a row without anything closing, and the mesh
 sense is which tangent exists rather than a sign. The shafts are numbered so that the shape's own convention — first

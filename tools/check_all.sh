@@ -27,6 +27,7 @@ ci="$root/.github/workflows/ci.yml"
 
 CHEAP=(
   "check_all.sh runs what this job runs"
+  "The CI policy fails on planted faults"
   "Documentation pointers resolve"
   "The string catalogue is complete"
   "Angular units are unambiguous"

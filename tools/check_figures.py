@@ -181,7 +181,7 @@ BOLD = re.compile(r"\*\*(.+?)\*\*", re.S)
 # `1.723`, `-0.5`, `1,486`, `5.7e-4`, `2.5e+3`. Thousands separators are stripped
 # before comparison; a bare `,` as a decimal point is *not* read as one, because
 # where the documents use that form they are quoting ISO rather than this tool.
-NUMBER = re.compile(r"-?\d[\d,]*(?:\.\d+)?(?:[eE][-+]?\d+)?")
+NUMBER = re.compile(r"[-−]?\d[\d,]*(?:\.\d+)?(?:[eE][-+]?\d+)?")
 
 # Figures that would match almost anything, and say nothing when they do. Tooth
 # counts and moduli belong to the *inputs* a table names and are matched anyway
@@ -202,8 +202,9 @@ class _Tests:
     def __init__(self, text=None):
         self.text = text
 
-    def body(self, name):
-        """`#[test] fn name`'s body, strings and comments blanked, or None."""
+    def body(self, name, keep_strings=False):
+        """`#[test] fn name`'s body, comments blanked and strings too unless
+        kept, or None."""
         if self.text is None:
             self.text = "".join(
                 p.read_text() for p in sorted((ROOT / "crates").rglob("*.rs"))
@@ -216,20 +217,29 @@ class _Tests:
             depth += (self.text[i] == "{") - (self.text[i] == "}")
             i += 1
         body = self.text[m.end() : i - 1]
-        body = re.sub(r'"(?:\\.|[^"\\])*"', " ", body, flags=re.S)
-        return re.sub(r"//[^\n]*", " ", body)
+        strings = []
+
+        def hold(m):
+            strings.append(m.group(0))
+            return f"\x00{len(strings) - 1}\x00"
+
+        body = re.sub(r'"(?:\\.|[^"\\])*"', hold, body, flags=re.S)
+        body = re.sub(r"//[^\n]*", " ", body)
+        return re.sub(r"\x00(\d+)\x00", lambda m: strings[int(m.group(1))] if keep_strings else " ", body)
 
     def literals(self, name):
-        """The numeric literals in the test's body, in order, or None."""
+        """The numeric literals in the test's body, in order, signed where a
+        `-` stands before one after `(`, `[`, `,`, `=` or the line's start, or
+        None."""
         body = self.body(name)
-        return None if body is None else [float(x.replace("_", "")) for x in LITERAL.findall(body)]
+        return None if body is None else signed_literals(body)
 
     def tuples(self, name):
         """The test's literal tuples: each parenthesised group made of numeric
-        literals, `true`/`false`, blanked strings and nested `[...]`/`(...)`
-        alone -- a row of the table the test holds -- as its literals in order.
-        Or None where there is no such test."""
-        body = self.body(name)
+        literals, `true`/`false`, strings and nested `[...]`/`(...)` alone --
+        a row of the table the test holds -- as `(literals in order, signed;
+        its strings)`. Or None where there is no such test."""
+        body = self.body(name, keep_strings=True)
         if body is None:
             return None
         out = []
@@ -241,10 +251,26 @@ class _Tests:
                     break
                 j += 1
             inner = body[open_at + 1 : j]
-            rest = re.sub(r"\b(?:true|false)\b", " ", LITERAL.sub(" ", inner))
-            if set(rest) <= set(" \t\n,[]()-") and LITERAL.search(inner):
-                out.append([float(x.replace("_", "")) for x in LITERAL.findall(inner)])
+            texts = [t[1:-1] for t in re.findall(r'"(?:\\.|[^"\\])*"', inner)]
+            bare = re.sub(r'"(?:\\.|[^"\\])*"', " ", inner)
+            rest = re.sub(r"\b(?:true|false)\b", " ", LITERAL.sub(" ", bare))
+            if set(rest) <= set(" \t\n,[]()-") and LITERAL.search(bare):
+                out.append((signed_literals(bare), texts))
         return out
+
+
+def signed_literals(code):
+    """Numeric literals in Rust source, in order, with the sign a `-` gives
+    one where it can only be a sign (after `(`, `[`, `,`, `=` or a line's
+    start), so `-0.19_f64` is negative and `a - 1.0` is not."""
+    out = []
+    for m in LITERAL.finditer(code):
+        before = code[: m.start()].rstrip()
+        sign = 1.0
+        if before.endswith("-") and re.search(r"(?:^|[(\[,=])\s*-$", before[-40:] if len(before) > 40 else before, re.M):
+            sign = -1.0
+        out.append(sign * float(m.group(1).replace("_", "")))
+    return out
 
 
 TESTS = _Tests()
@@ -257,7 +283,8 @@ def numbers(text):
         raw = m.group(0)
         # A comma inside a number is a thousands separator here; a trailing one
         # is punctuation and is not part of it.
-        cleaned = raw.replace(",", "")
+        # A typographic minus is a minus: `−0.19` is negative.
+        cleaned = raw.replace(",", "").replace("−", "-")
         if not cleaned or cleaned in ("-", "."):
             continue
         try:
@@ -448,11 +475,10 @@ def same(value, decimals, other):
 
 
 def within(value, decimals, literal):
-    """A test's literal reads as the document's figure: the same magnitude to
-    half a unit of the document's last digit (a test writes `93.25` for a
-    figure a document rounds either way, and `−323` is a typographic minus,
-    which is no sign to this reader)."""
-    return abs(abs(literal) - abs(value)) <= 0.5 * 10**-decimals * (1 + 1e-9)
+    """A test's literal reads as the document's figure: the same signed value
+    to half a unit of the document's last digit (a test writes `93.25` for a
+    figure a document rounds either way)."""
+    return abs(literal - value) <= 0.5 * 10**-decimals * (1 + 1e-9)
 
 
 def in_order(want, have, match=None):
@@ -465,13 +491,29 @@ def in_order(want, have, match=None):
     return j == len(want)
 
 
+# A code span; one holding a letter is a name (`z 9/37`, `N+1/N/N−1/N`,
+# `μ F_n`), where a code span of digits alone is a figure.
+SPAN = re.compile(r"`([^`]*)`")
+
+
+def is_name(span):
+    return re.search(r"[^\W\d_]", span) is not None
+
+
 def row_numbers(line, claimed):
-    """A table row's numbers, less its labels: a `gear-cli` command it quotes,
-    and a code span holding a letter (`N+1/N/N−1/N`, `h_a`) -- a name, where a
-    code span of digits alone is a figure."""
-    line = LABEL.sub(" ", line)
-    line = re.sub(r"`[^`]*[A-Za-z][^`]*`", " ", line)
+    """A table row's numbers, less its names: a `gear-cli` command it quotes
+    and any code span holding a letter."""
+    line = SPAN.sub(lambda m: " " if is_name(m.group(1)) else m.group(0), line)
     return numbers(claimed(line))
+
+
+def row_labels(line):
+    """(the commands a row quotes, the names in its first cell): what the row
+    is about, which the figures after it must belong to."""
+    commands = [c[1:-1] for c in LABEL.findall(line)]
+    first = line.strip().strip("|").split("|")[0]
+    names = [n for n in SPAN.findall(first) if is_name(n) and not n.startswith("gear-cli ")]
+    return commands, names
 
 
 def check_block(verb, commands, text, output_of, tests=TESTS):
@@ -493,10 +535,19 @@ def check_block(verb, commands, text, output_of, tests=TESTS):
                 continue
             if ROW.match(line):
                 row = row_numbers(line, lambda f: f)
-                have = [[(l, 0, "") for l in t] for t in tuples]
+                _, names = row_labels(line)
+                # A row's name is one of its tuple's strings: the row the test
+                # holds for that name, not any row with the same figures.
+                have = [
+                    [(l, 0, "") for l in lits]
+                    for lits, texts in tuples
+                    if all(n in texts for n in names)
+                ]
                 if row and not any(in_order(row, t, within) for t in have):
                     failures.append(
-                        f"`{commands[0]}` holds no tuple reading, in order: "
+                        f"`{commands[0]}` holds no tuple"
+                        + (f" named {names}" if names else "")
+                        + " reading, in order: "
                         + ", ".join(raw for _, _, raw in row[:10])
                     )
             else:
@@ -511,8 +562,11 @@ def check_block(verb, commands, text, output_of, tests=TESTS):
     outputs = [numbers(output_of(c)) for c in commands]
     union = [n for o in outputs for n in o]
     # A row is matched against one printed line: two rows' figures, or a
-    # figure from a later line, do not make a row.
-    printed_lines = [numbers(l) for c in commands for l in output_of(c).splitlines()]
+    # figure from a later line, do not make a row. The line must be printed by
+    # the command a row quotes, if it quotes one, and a row's named code span
+    # must read, in order, in that command's first line: its heading, which
+    # names what the command was asked (`pair z 9/37`).
+    printed = {c: output_of(c).splitlines() for c in commands}
     failures, strong, weak = [], 0, 0
 
     def claimed(fragment):
@@ -528,7 +582,17 @@ def check_block(verb, commands, text, output_of, tests=TESTS):
         row = row_numbers(line, claimed)
         strong += sum(d >= STRONG_DECIMALS for _, d, _ in row)
         weak += sum(d < STRONG_DECIMALS for _, d, _ in row)
-        if row and not any(in_order(row, o) for o in printed_lines):
+        quoted, names = row_labels(line)
+        label = numbers(" ".join(names))
+
+        def fits(c):
+            lines = printed[c]
+            heading = numbers(lines[0]) if lines else []
+            return (not quoted or c in quoted) and (not label or in_order(label, heading))
+
+        if row and not any(
+            in_order(row, numbers(l)) for c in commands if fits(c) for l in printed[c]
+        ):
             failures.append(
                 f"{named} prints no row reading, in order: "
                 + ", ".join(raw for _, _, raw in row[:10])
@@ -661,6 +725,7 @@ _FIXTURE_TEST = """
     #[test]
     fn the_fixture_table_is_the_one_this_code_prints() {
         for (reduction, meshes, keeps) in [(144.0, 98.85, 37.9), (324.0, 99.18, 27.4), (-323.0, 99.18, 27.2)] {
+            for (name, shifts) in [("N+1/N", [-0.19_f64, 0.37]), ("N/N+1", [-0.11, 0.11])] {}
             // 12.34 in a comment is not a literal
             assert!(check(reduction, meshes, keeps), "not 56.78 either");
         }
@@ -680,7 +745,8 @@ _FIXTURE_BLOCKS = [
     ("", ["gear-cli strength 17 43 2.0"], "Contact is 692.7 MPa and the loss 98.741 %."),
     ("-by-test", ["the_fixture_table_is_the_one_this_code_prints"],
      "| reduction | meshes | the stage |\n|---|---|---|\n"
-     "| 144 | 98.85 % | 37.9 % |\n| 324 | 99.18 % | 27.4 % |\n| −323 | 99.18 % | 27.2 % |"),
+     "| 144 | 98.85 % | 37.9 % |\n| 324 | 99.18 % | 27.4 % |\n| −323 | 99.18 % | 27.2 % |\n"
+     "| `N+1/N` | −0.19, +0.37 |\n| `N/N+1` | −0.11, +0.11 |"),
     ("", ["gear-cli hulaband 18"],
      "| d | z | module | backlash out |\n|---|---|---|---|\n"
      "| 1 | 18 | 1.000 | 0.371° |\n| 9 | 162 | 0.111 | 0.014° |"),
@@ -699,6 +765,12 @@ _FIXTURE_FAULTS = [
     ("F8 a row's figure taken from a later printed line", 4, "| 1.000 | 0.371° |", "| 1.000 | 0.014° |"),
     ("F9 a figure from another row of the test", 3, "| 144 | 98.85 % | 37.9 % |", "| 144 | 98.85 % | 27.4 % |"),
     ("F10 a figure from another tuple of the test", 3, "| 324 | 99.18 % | 27.4 % |", "| 324 | 99.18 % | 27.2 % |"),
+    ("F11 a row's figures swapped with another pair's", 0,
+     "| `z 9/37`, least loss | 1.4078 | 1.2929 | **97.678 %** |",
+     "| `z 9/37`, least loss | 1.2566 | 1.4626 | **98.488 %** |"),
+    ("F12 a figure's sign flipped", 3, "| `N+1/N` | −0.19,", "| `N+1/N` | +0.19,"),
+    ("F13 two figures' signs swapped", 3, "| −0.11, +0.11 |", "| +0.11, −0.11 |"),
+    ("F14 a row under another row's name", 3, "| `N/N+1` | −0.11, +0.11 |", "| `N+1/N` | −0.11, +0.11 |"),
 ]
 
 
