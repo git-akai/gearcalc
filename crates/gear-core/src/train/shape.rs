@@ -2534,6 +2534,10 @@ pub(crate) struct BuiltMesh {
     /// Per side: the tip held to its mate's junction on this mesh
     /// ([`Shape::tip_holds`]), so it reaches past nothing.
     pub(crate) held: [bool; 2],
+    /// Per side: the radius a held tip landed on, as the hold read it
+    /// off the mate as first cut. Read by the laws that hold the tip to it.
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) held_at: [Option<f64>; 2],
 }
 
 /// **What the teeth of a mesh do to each other**: a line of contact on
@@ -2977,7 +2981,13 @@ impl Shape {
         }
         let mut meshes = Vec::with_capacity(self.meshes.len());
         for (k, (m, (kind, at, zero))) in self.meshes.iter().zip(placed).enumerate() {
-            let tagged = hold.tagged[k];
+            // Tagged only where the cut put the tip on its bound: a cut that
+            // clamps the tip elsewhere (pointed, at the base or the root
+            // circle) leaves the path to end at the tip it has.
+            let held_at = [0, 1].map(|s| {
+                hold.at[k][s].filter(|&r| lands_on(members[[m.a, m.b][s]].tip_radius(), r))
+            });
+            let tagged = held_at.map(|r| r.is_some());
             let ends = [members[m.a].flank_ends(), members[m.b].flank_ends()];
             let contact = match zero {
                 Placed::Line(design, operating) => {
@@ -3025,6 +3035,7 @@ impl Shape {
                 running: at,
                 contact,
                 held: tagged,
+                held_at,
             });
         }
         Ok(Built {
@@ -3136,10 +3147,12 @@ impl Shape {
     /// mate's junction reads a tip, so one pass finds every bound and a
     /// held member is cut once more.
     ///
-    /// **Exact by construction.** The cut lands the tip on that radius only
-    /// to a rounding either side, so each mesh side whose bound is the one
-    /// the member was held to is tagged, and the path takes that end from
-    /// the mate's junction ([`ContactPath::held`]): it reaches past nothing.
+    /// **Exact by construction.** Each mesh side whose bound is the one the
+    /// member was held to carries that bound's radius ([`Holds::at`]); where
+    /// the cut puts the tip on it ([`lands_on`]) the side is tagged and the
+    /// path takes that end from the mate's junction ([`ContactPath::held`]),
+    /// so the tangent lengths' own rounding cannot reach past it. A tip the
+    /// cut clamped elsewhere is not tagged, and its path ends at its tip.
     ///
     /// **No tip length clears** where the conjugate falls inside the
     /// member's base circle (`None`: every tip it could have touches the
@@ -3153,7 +3166,7 @@ impl Shape {
         placed: &[(MeshKind, f64, Placed)],
     ) -> Holds {
         let n = self.members.len();
-        let mut per_side: Vec<[Option<f64>; 2]> = vec![[None, None]; placed.len()];
+        let mut per_side: Vec<[Option<(f64, f64)>; 2]> = vec![[None, None]; placed.len()];
         let mut lowest: Vec<Option<f64>> = vec![None; n];
         let mut unholdable = vec![false; n];
         for (k, (_, _, p)) in placed.iter().enumerate() {
@@ -3181,7 +3194,7 @@ impl Shape {
                     unholdable[i] = true;
                     continue;
                 };
-                per_side[k][s] = Some(c);
+                per_side[k][s] = Some((c, radius.unwrap_or(f64::NAN)));
                 lowest[i] = Some(lowest[i].map_or(c, |o: f64| o.min(c)));
             }
         }
@@ -3190,29 +3203,47 @@ impl Shape {
         let bound: Vec<Option<f64>> = (0..n)
             .map(|i| lowest[i].filter(|&c| c < members[i].params().addendum))
             .collect();
-        let tagged = per_side
+        // Each side whose bound is the one its member is held to, with the
+        // radius that bound puts the tip at.
+        let at = per_side
             .iter()
             .enumerate()
             .map(|(k, sides)| {
                 let m = self.meshes[k];
-                [0, 1].map(|s| sides[s].is_some() && sides[s] == bound[[m.a, m.b][s]])
+                [0, 1].map(|s| {
+                    sides[s]
+                        .filter(|&(c, _)| Some(c) == bound[[m.a, m.b][s]])
+                        .map(|(_, r)| r)
+                })
             })
             .collect();
         Holds {
             bound,
-            tagged,
+            at,
             unholdable,
         }
     }
+}
+
+/// **Whether a tip cut to a bound landed on it**, exactly. The cut turns
+/// the bound's radius into an addendum and back, `r_a = r + m(σ h_a + x)`,
+/// and on every train the suite builds that returns the radius to the bit
+/// (282,656 landings, none off). A tip it does not return exactly is left
+/// untagged, so the path ends at the tip the member has and any rounding
+/// past the junction is reported as what it is; a cut that clamps the tip
+/// elsewhere — pointed, at the base or the root circle — is off by a length
+/// of the tooth and untagged for the same reason.
+fn lands_on(tip: f64, bound: f64) -> bool {
+    tip.to_bits() == bound.to_bits()
 }
 
 /// What [`Shape::tip_holds`] found.
 struct Holds {
     /// Per member: the addendum its meshes hold its tip to, where it binds.
     bound: Vec<Option<f64>>,
-    /// Per mesh, per side: whether that side's tip is held to its mate's
-    /// junction on this mesh.
-    tagged: Vec<[bool; 2]>,
+    /// Per mesh, per side: the radius the side's tip is held to, where
+    /// that is its member's binding bound.
+    at: Vec<[Option<f64>; 2]>,
     /// Per member: asked to be held, and no tip length clears some mate.
     unholdable: Vec<bool>,
 }
@@ -7359,5 +7390,196 @@ mod tip_sizing {
             }
         }
         assert!(sized >= 3, "{sized} sized distances");
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+pub(super) mod tip_hold {
+    use super::*;
+    use crate::train::arrangements::pair;
+
+    /// **What a hold owes, read off the built teeth.** For every mesh side
+    /// whose member asks the hold and has a tip length that clears: its tip
+    /// reaches no further than the conjugate of its mate's junction —
+    /// [`Mesh::contact_radius_at`], or the crossed path's — **exactly**, not
+    /// to a tolerance, since the cut returns the bound to the bit
+    /// ([`lands_on`]). A tagged side's tip is that radius to the bit, and a
+    /// mesh with no tagged side has the path its tips give.
+    pub(in crate::train) fn tips_check(shape: &Shape, b: &Built) -> Vec<String> {
+        let mut out = Vec::new();
+        for (k, bm) in b.meshes.iter().enumerate() {
+            let m = shape.meshes[k];
+            for (s, side, i, j) in [
+                (0, MeshSide::First, m.a, m.b),
+                (1, MeshSide::Second, m.b, m.a),
+            ] {
+                if !shape.members[i].gear.no_tip_past_mate_flank || b.unholdable[i] {
+                    continue;
+                }
+                let junction = b.members[j].flank_ends().junction;
+                let bound = match &bm.contact {
+                    BuiltContact::Line(l) => l.operating.contact_radius_at(side, junction),
+                    BuiltContact::Point(p) => p.path.contact_radius_at(&p.screw, side, junction),
+                };
+                let Some(r) = bound else {
+                    continue;
+                };
+                let tip = b.members[i].tip_radius();
+                // A rack-cut tip is the upper end of its flank, a ring's the
+                // lower: reaching further is up for one and down for the other.
+                let sigma = match &*b.members[i] {
+                    BuiltMember::Rack { .. } => 1.0,
+                    BuiltMember::Ring { .. } => -1.0,
+                };
+                // A tagged tip is the radius its hold read, to the bit.
+                if let Some(at) = bm.held_at[s] {
+                    if tip.to_bits() != at.to_bits() {
+                        out.push(format!("mesh {k}: member {i} tagged at {tip}, bound {at}"));
+                    }
+                }
+                // Past the conjugate of the mate's junction as built only
+                // where the hold read that junction off a mate since cut
+                // again: its junction is a Brent root bracketed by its own
+                // tip (`Tooth::solve_junction`, 1e-15 mm in fillet travel),
+                // so it moves by that solve's resolution — at most 3.2e-14 mm
+                // over these shapes and the edit walk. Anywhere else, not by
+                // a bit.
+                let drift = bm.held_at[s].is_some() && b.mate[j].is_some();
+                if sigma * (tip - r) > 0.0 && !drift {
+                    out.push(format!("mesh {k}: member {i}'s tip {tip} passes {r}"));
+                }
+            }
+            if bm.held == [false, false] {
+                if let BuiltContact::Line(l) = &bm.contact {
+                    let ends = [b.members[m.a].flank_ends(), b.members[m.b].flank_ends()];
+                    let plain = ContactPath::new(b.members[m.a].as_gear(), ends[1], &l.operating);
+                    if plain.map(|p| p.contact_ratio.to_bits())
+                        != Some(l.path.contact_ratio.to_bits())
+                    {
+                        out.push(format!("mesh {k}: untagged, yet not its tips' path"));
+                    }
+                }
+            }
+        }
+        out
+    }
+
+    /// Every default train, as shipped and searched, the hold asked of
+    /// every member, and the pair grid of
+    /// `only_flank_interference_leaves_a_member_unrated` — where a 5-tooth
+    /// pinion at x −0.8 has its tip clamped well short of any bound.
+    fn shapes() -> Vec<(String, Shape)> {
+        let mut out: Vec<(String, Shape)> = Vec::new();
+        for (name, t) in crate::train::rating_laws::default_trains() {
+            for search in [false, true] {
+                let mut s = t.shape.clone();
+                s.set_search(search);
+                for m in &mut s.members {
+                    m.gear.no_tip_past_mate_flank = true;
+                }
+                out.push((format!("{name} search {search}"), s));
+            }
+        }
+        for (z0, z1) in [(5_u32, 40_u32), (7, 300), (9, 100), (12, 300), (20, 40)] {
+            for addendum in [1.0, 1.6, 2.2] {
+                for x in [-0.8, 0.0, 1.0] {
+                    for sharp in [true, false] {
+                        let mut s = pair([z0, z1]);
+                        s.members[0].gear.addendum = addendum;
+                        s.members[1].gear.dedendum = addendum + 0.25;
+                        s.members[0].gear.profile_shift = Auto::fixed(x);
+                        s.members[1].gear.profile_shift = Auto::fixed(0.0);
+                        for m in &mut s.members {
+                            m.gear.no_sharp_tip = sharp;
+                            m.gear.no_undercut = false;
+                        }
+                        out.push((format!("{z0}/{z1} h_a {addendum} x {x} {sharp}"), s));
+                    }
+                }
+            }
+        }
+        out
+    }
+
+    /// **A held tip passes no bound, exactly, and a tip the cut clamped
+    /// short is not tagged.** On every shape above, [`tips_check`] finds
+    /// nothing; the grid reaches a member held but clamped short of its
+    /// bound, and a held one that landed.
+    #[test]
+    fn a_held_tip_passes_no_bound_and_a_clamped_one_is_not_tagged() {
+        let (mut landed, mut clamped) = (0, 0);
+        for (name, shape) in shapes() {
+            let x = shape.shifts();
+            let Ok(b) = shape.build_at(&x) else {
+                continue;
+            };
+            let found = tips_check(&shape, &b);
+            assert!(found.is_empty(), "{name}: {found:#?}");
+            for (k, bm) in b.meshes.iter().enumerate() {
+                let m = shape.meshes[k];
+                for s in 0..2 {
+                    let i = [m.a, m.b][s];
+                    if b.mate[i].is_some() {
+                        if bm.held[s] {
+                            landed += 1;
+                        } else {
+                            // Held, and the cut clamped the tip elsewhere.
+                            clamped += usize::from(!b.members[i].clamps().is_empty());
+                        }
+                    }
+                }
+            }
+        }
+        assert!(
+            landed > 0 && clamped > 0,
+            "landed {landed}, clamped {clamped}"
+        );
+    }
+
+    /// **The check fails on a tip one ulp past its bound.** A held member's
+    /// tip moved one unit in the last place outward, on each shape where
+    /// one is held: [`tips_check`] names it every time.
+    #[test]
+    fn a_tip_one_ulp_past_its_bound_is_caught() {
+        let mut planted = 0;
+        for (name, shape) in shapes() {
+            let x = shape.shifts();
+            let Ok(mut b) = shape.build_at(&x) else {
+                continue;
+            };
+            let Some((k, s)) = b
+                .meshes
+                .iter()
+                .enumerate()
+                .find_map(|(k, bm)| (0..2).find(|&s| bm.held[s]).map(|s| (k, s)))
+            else {
+                continue;
+            };
+            let m = shape.meshes[k];
+            let i = [m.a, m.b][s];
+            let moved = match &*b.members[i] {
+                BuiltMember::Rack { tooth } => {
+                    let mut t = tooth.clone();
+                    t.ra = t.ra.next_up();
+                    BuiltMember::Rack { tooth: t }
+                }
+                BuiltMember::Ring { ring, as_gear } => {
+                    let mut r = ring.clone();
+                    r.ra = r.ra.next_down();
+                    BuiltMember::Ring {
+                        ring: r,
+                        as_gear: as_gear.clone(),
+                    }
+                }
+            };
+            b.members[i] = std::rc::Rc::new(moved);
+            assert!(
+                !tips_check(&shape, &b).is_empty(),
+                "{name}: a tip one ulp past its bound went unseen"
+            );
+            planted += 1;
+        }
+        assert!(planted > 0, "nothing held to plant on");
     }
 }

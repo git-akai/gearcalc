@@ -13,7 +13,8 @@
 //!   `train/arrangements.rs` builds): the whole `TrainResult` with all its
 //!   load cases, the motion report, the groupings and each case's flow, and
 //!   each case relieved to the train's mobility;
-//! - each preset and one-part fixture asked alone (`solve_alone`);
+//! - each preset and one-part fixture asked alone (`solve_alone`), and two
+//!   external pairs whose tips are held off their mates' flanks;
 //! - **the graph's edits**: every offer at every piece of every preset and of
 //!   a few multi-part trains (`EDITED_CHAINS`), where the join, the insert and
 //!   the hold act across parts, and there every split of a body two parts
@@ -117,7 +118,8 @@ fn alone(lib: &MaterialLibrary) {
                     // hold; its shape asked alone is what a preset laid in answers.
                     (t.parts().len() == 1).then(|| (n, t.shape.clone()))
                 }),
-        );
+        )
+        .chain(held_externals());
     for (name, shape) in shapes {
         println!("== alone {name}");
         guarded(&name, || {
@@ -127,6 +129,25 @@ fn alone(lib: &MaterialLibrary) {
             );
         });
     }
+}
+
+/// **External pairs whose tips are held off their mates' flanks**
+/// (`MemberGear::no_tip_past_mate_flank`), which no preset reaches at its
+/// defaults: a small-pinion pair searched, where the search tops the tips
+/// to buy efficiency, and a pair typed at a long addendum.
+fn held_externals() -> Vec<(String, gear_core::train::Shape)> {
+    use gear_core::train::arrangements::pair;
+    let mut searched = pair([9, 37]);
+    searched.set_search(true);
+    let mut long = pair([12, 29]);
+    for m in &mut long.members {
+        m.gear.addendum = 1.6;
+        m.gear.no_sharp_tip = false;
+    }
+    vec![
+        ("pair 9/37 searched".to_string(), searched),
+        ("pair 12/29 at 1.6 m of addendum".to_string(), long),
+    ]
 }
 
 /// Every piece of a train an offer can be asked at, ground among the bodies.

@@ -5942,18 +5942,39 @@ mod tests {
             }
 
             // ...and on the way there, every distance is answered rather than
-            // refused, with an efficiency no lower than the unsearched answer
-            // at the same distance — the floor a search that dropped out
-            // collapses to.
+            // refused, with the efficiency a **scan** of the division finds
+            // there: the pinion's shift at 401 points across two and a half
+            // modules, the wheel's closing the distance, each kept where the
+            // search would keep it (teeth clear, contact ratio at its floor or
+            // over, nothing clamped). The search is no worse than the scan's
+            // best by more than it is converged to, and no scan point beats it
+            // by more.
             //
             // **Not climbing**, which is what this asked until tips were held
             // off their mates' flanks. At 12/29 the answer at a given distance
             // peaks at 21.447 mm (0.979670), falls to 0.979617 at 21.684 and
             // rises again to 0.979847 at 21.802, where the wheel's tip starts
-            // to be held: two regions, and between them a dip. A scan of the
-            // pinion's shift at 401 points agrees with the search at each of
-            // those distances to 5e-9, so the dip is the model's, not a walk
-            // that stopped.
+            // to be held: two regions, and between them a dip the scan finds
+            // too — the model's, not a walk that stopped.
+            let scan = |a: f64| -> f64 {
+                (0..=400)
+                    .filter_map(|k| {
+                        let mut s = stage.clone();
+                        s.distances[0].distance = Auto::fixed(a);
+                        s.members[0].gear.profile_shift =
+                            Auto::fixed(-1.0 + 2.5 * f64::from(k) / 400.0);
+                        s.set_search(false);
+                        let r = solve_preset(&s, 2.0, 0.0, &lib).ok()?;
+                        let m = &r.meshes[0];
+                        let kept = m.teeth_clear()
+                            && m.line?.contact_ratios.transverse >= s.meshes[0].min_contact_ratio
+                            && r.members
+                                .iter()
+                                .all(|g| g.notes.iter().all(|n| !n.key.starts_with("clamp.")));
+                        kept.then_some(m.efficiency.forward)
+                    })
+                    .fold(f64::NEG_INFINITY, f64::max)
+            };
             let mut last = 0.0;
             let steps = 12;
             for k in 1..=steps {
@@ -5963,25 +5984,11 @@ mod tests {
                         * f64::from(steps - k)
                         / f64::from(steps);
                 let here = at(a).meshes[0].efficiency.forward;
-                let floor = solve_preset(
-                    &{
-                        let mut s = stage.clone();
-                        s.distances[0].distance = Auto::fixed(a);
-                        s.set_search(false);
-                        s
-                    },
-                    2.0,
-                    0.0,
-                    &lib,
-                )
-                .expect("...and unsearched")
-                .meshes[0]
-                    .efficiency
-                    .forward;
+                let best = scan(a);
                 assert!(
-                    here >= floor - 1e-12,
-                    "{teeth:?}: {a:.4} mm gives {here}, below the {floor} it has \
-                     unsearched — the search dropped out"
+                    (here - best).abs() < CONVERGED_EFFICIENCY,
+                    "{teeth:?}: {a:.4} mm gives {here} where a scan of the division \
+                     finds {best}"
                 );
                 last = here;
             }

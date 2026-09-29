@@ -571,10 +571,11 @@ pair at full depth interferes as a matter of course, and on an external pair it
 tops a tip that a search or a designer has pushed past its mate's flank, where
 the search had held the shifts off that wall instead. The path of
 contact is unchanged by holding, since it was already cut at that junction:
-only the ring's tooth is shorter. The cut lands the tip on that radius only to a
-rounding either side, so the mesh side that holds it is tagged and the path takes
-that end from the mate's junction itself: a held tip reaches past nothing, by
-construction. Where no tip length clears — the conjugate falls inside the
+only the ring's tooth is shorter. Where the cut lands the tip on that radius to
+the bit, the mesh side is tagged and the path takes that end from the mate's
+junction itself, so the tangent lengths' own rounding cannot reach past it; where
+the cut clamps the tip elsewhere (pointed, at the base or the root circle) the
+path ends at the tip the gear has. Where no tip length clears — the conjugate falls inside the
 member's base circle, or the addendum it needs is not positive — the tip stands
 as typed and the gear says so (`gear.tip_cannot_clear_mate_flank`). A crossed
 mesh holds a tip the same way through its own conjugate relation

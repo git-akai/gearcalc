@@ -485,35 +485,28 @@ fn the_canary_says_its_flank_is_past_its_allowable() {
 }
 
 /// **A tip asked to be held reaches past nothing, exactly, and is never cut
-/// into a negative tooth.** For every member whose
-/// [`super::MemberGear::no_tip_past_mate_flank`] is on: either no mesh
-/// reports its mate's flank reached (the path's `past_usable_flank` is
-/// exactly zero there, which is what the flag reads), or the member says no
-/// tip length clears (`gear.tip_cannot_clear_mate_flank`); and a held
-/// member builds at a positive addendum.
+/// into a negative tooth**: the train's graph built at the shifts it
+/// settles on, each held tip compared with the conjugate of its mate's
+/// junction directly (`shape::tip_hold::tips_check`), and every member held
+/// by its mates at a positive addendum.
 pub(super) fn held_tips_reach_past_nothing(
     t: &Train,
     r: &super::TrainResult,
 ) -> Result<(), String> {
-    use crate::note::key;
-    let says = |i: usize, k: &str| r.members[i].notes.iter().any(|n| n.is(k));
-    for (k, mesh) in r.meshes.iter().enumerate() {
-        let m = t.shape.meshes[k];
-        for (s, i) in [m.a, m.b].into_iter().enumerate() {
-            if !t.shape.members[i].gear.no_tip_past_mate_flank
-                || says(i, key::GEAR_TIP_CANNOT_CLEAR_MATE_FLANK)
-            {
-                continue;
-            }
-            if mesh.flank_interference[1 - s] {
-                return Err(format!(
-                    "mesh {k}: member {i}'s tip is held and reaches past its mate"
-                ));
-            }
-        }
+    let shape = &t.shape;
+    let built = shape
+        .build_at(&shape.shifts())
+        .map_err(|e| format!("solved, but its graph does not build: {e}"))?;
+    let found = super::shape::tip_hold::tips_check(shape, &built);
+    if !found.is_empty() {
+        return Err(found.join("; "));
     }
     for (i, g) in r.members.iter().enumerate() {
-        if says(i, key::GEAR_ADDENDUM_HELD_TO_MATE_FLANK) && g.addendum <= 0.0 {
+        let held = g
+            .notes
+            .iter()
+            .any(|n| n.is(crate::note::key::GEAR_ADDENDUM_HELD_TO_MATE_FLANK));
+        if held && g.addendum <= 0.0 {
             return Err(format!("member {i} held to an addendum of {}", g.addendum));
         }
     }
@@ -568,7 +561,7 @@ fn every_tip_held_reaches_past_nothing() {
 
 /// Every preset, every arrangement of a set, a Ravigneaux, the hula and a
 /// worm beside a pair, each alone as shipped.
-fn default_trains() -> Vec<(String, Train)> {
+pub(super) fn default_trains() -> Vec<(String, Train)> {
     use super::arrangements::{hula, planetary, ravigneaux, worm_and_pair};
     use crate::planetary::{Arrangement, PlanetaryShaft};
     let mut trains: Vec<(String, Train)> = Preset::ALL
