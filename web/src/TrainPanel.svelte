@@ -1465,12 +1465,8 @@
        addendum had an `auto` toggle whose only answer was the tallest tooth the
        tip width allows — a bound wearing a source's clothes, and one that went
        unread on every addendum a designer typed. It is the bound now, and the
-       number is always the designer's.
-
-       **A ring is not asked about its tip width**, for the reason it is not
-       asked about undercut a few fields below: the bound reads the tooth a
-       *rack* would leave, and a ring's form is its shaper's. Its own tip has a
-       guard of its own, on the part rather than on this input. -->
+       number is always the designer's. A ring is asked it too: the core reads
+       the tip width on the tooth its shaper leaves. -->
   {@render boundedNumber(
     "ui.train_addendum",
     () => gear.addendum,
@@ -1478,21 +1474,19 @@
     0.05,
     "ui.train_m",
     undefined,
-    shaper
-      ? undefined
-      : {
-          label: "ui.train_no_sharp_tip",
-          title: "ui.train_note_no_sharp_tip",
-          on: gear.no_sharp_tip,
-          set: (v) => (gear.no_sharp_tip = v),
-        },
+    {
+      label: "ui.train_no_sharp_tip",
+      title: "ui.train_note_no_sharp_tip",
+      on: gear.no_sharp_tip,
+      set: (v) => (gear.no_sharp_tip = v),
+    },
     // What the bound came to, where it had something to say. A hint that names
     // an input belongs under that input rather than in a list at the foot of
     // the card — and in the warning colour, because the number in the box is
     // not the number the gear has.
     clampNote(own, FIELD_NOTES.addendum),
   )}
-  {#if gear.no_sharp_tip && !shaper}
+  {#if gear.no_sharp_tip}
     <label class="sub">
       <span>{t("ui.train_minimum_tip_width")}</span>
       <input type="number" step="0.02" bind:value={() => gear.min_tip_width, finite((v) => (gear.min_tip_width = v))} />
@@ -1532,9 +1526,8 @@
       } />
     </label>
   {/if}
-  <!-- **A ring is not asked about undercut.** Its flank is its shaper's
-       rather than a rack's, so the constraint has nothing to bound and the
-       searches never ask it (`auto::member_is_buildable`). -->
+  <!-- A ring is asked its own reading of undercut: its flank generated all
+       the way to its tip, which the core finds from its shaper. -->
   {@render autoNumber(
     "ui.train_profile_shift",
     gear.profile_shift,
@@ -1543,14 +1536,12 @@
     () => relieve({ member: [opts.relief, "shift"] }),
     undefined,
     "ui.train_m",
-    shaper
-      ? undefined
-      : {
-          label: "ui.train_no_undercut",
-          title: "ui.train_note_no_undercut",
-          on: gear.no_undercut,
-          set: (v) => (gear.no_undercut = v),
-        },
+    {
+      label: "ui.train_no_undercut",
+      title: "ui.train_note_no_undercut",
+      on: gear.no_undercut,
+      set: (v) => (gear.no_undercut = v),
+    },
     clampNote(own, FIELD_NOTES.profile_shift),
   )}
   <!-- The depth the undercut question is asked at, so it is offered exactly
@@ -1806,10 +1797,9 @@
   step: number,
   unit: string | undefined,
   note: string | null | undefined,
-  /** **Absent where the bound has nothing to bound.** A ring's form is its
-   *  shaper's, so neither of the questions a rack asks — undercut at the root,
-   *  a tip that keeps its width — is one a ring can be asked; `autoNumber`
-   *  takes the same option for the same reason, on the other end of the tooth. */
+  /** **Absent where the bound has nothing to bound.** Every member's tip
+   *  width and undercut are bounds now, a ring's read on the tooth its
+   *  shaper leaves; `autoNumber` takes the same option. */
   constraint: { label: string; title: string; on: boolean; set: (v: boolean) => void } | undefined,
   /** **A bound that actually moved this number.** Rendered in the warning
    *  colour and in front of the remark, because it is the same kind of finding

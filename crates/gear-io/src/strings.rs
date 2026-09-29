@@ -1080,6 +1080,9 @@ mod tests {
                 let mut s = arr::planetary(sun, planet, sun + 2 * planet, 3);
                 s.members[2].gear.addendum = addendum;
                 s.members[2].gear.profile_shift = gear_core::params::Auto::fixed(shift);
+                // Asking no undercut floor, so the shift stands where it is
+                // typed rather than rising to where the flank reaches the tip.
+                s.members[2].gear.no_undercut = false;
                 s
             };
             match gear_core::train::solve_alone(

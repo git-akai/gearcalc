@@ -838,11 +838,23 @@ pub fn root_radius_fits(p: &GearParams, working_depth: f64) -> bool {
 /// cannot — the same shape [`shifts_for_efficiency`] takes its pair in.
 #[must_use]
 pub fn searchable_shift(at: &dyn Fn(f64) -> GearParams, floor: Option<f64>) -> Option<(f64, f64)> {
-    let round_fits = |x: f64| {
+    searchable_shift_where(at, floor, &|x: f64| {
         let p = at(x);
         let m = admissible_ranges(&p, p.dedendum).root_radius.max?;
         Some(m - p.root_radius)
-    };
+    })
+}
+
+/// [`searchable_shift`], with whether the tool's round still fits at a shift
+/// given by the caller: `round_fits(x)` is non-negative where it does. A rack's
+/// is [`admissible_ranges`]' root radius; a ring's is its shaper's tip round,
+/// which the cut caps where the cutter's tip will not hold it.
+#[must_use]
+pub fn searchable_shift_where(
+    at: &dyn Fn(f64) -> GearParams,
+    floor: Option<f64>,
+    round_fits: &dyn Fn(f64) -> Option<f64>,
+) -> Option<(f64, f64)> {
     let base = at(0.0);
     let bound = admissible_ranges(&base, base.dedendum).profile_shift.bound;
     let lo = bound.min?.max(floor.unwrap_or(f64::NEG_INFINITY));

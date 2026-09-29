@@ -38,7 +38,7 @@
 //!   writes; a pair that does not is a thicker or thinner mesh, carried into
 //!   the shift sum as an equivalent shift and not refused.
 
-use crate::auto::{addendum_for_tip_width, automatic_profile_shift, Ranges};
+use crate::auto::{addendum_for_tip_width, Ranges};
 use crate::contact::{Directional, Drive};
 use crate::material::{Material, MaterialLibrary, Overrides};
 use crate::mesh::MeshError;
@@ -681,8 +681,8 @@ impl MeshReport {
 /// bound at all — a hula pinion whose ring was pinned, an epicyclic absorber —
 /// so the control can be on, the tooth undercut, and the two never meet.
 ///
-/// Nothing for a ring: its flank is its shaper's, and undercut is not a question
-/// that can be asked of it.
+/// Nothing for a ring: its reading of undercut, a flank short of its tip, is
+/// the ring's own `clamp.ring_flank_ungenerated`.
 pub(crate) fn undercut_note(tooth: &crate::tooth::Tooth) -> Option<Note> {
     (tooth.undercut && !tooth.severed).then(|| Note::new(key::CLAMP_TOOTH_UNDERCUT))
 }
@@ -1179,15 +1179,16 @@ pub struct MemberGear {
     /// deliberate: negative shift is a decision about centre distance or
     /// balance, and this is a question about undercut. Where the *solve* is
     /// choosing and nothing else decides, the answer is instead
-    /// [`automatic_profile_shift`] — the same bound taken no lower than zero,
+    /// [`crate::auto::automatic_profile_shift`] — the same bound taken no lower than zero,
     /// because a shift chosen for no reason should not thin a tooth that needed
     /// no help.
     ///
     /// Off, the gear may undercut, and the searches stop asking
     /// ([`crate::auto::member_is_buildable`]).
     ///
-    /// **Meaningless on a ring**, whose flank is its shaper's rather than a
-    /// rack's, and which is never asked — see `member_is_buildable`.
+    /// **On a ring it asks the ring's reading**: its flank generated all the
+    /// way to its tip ([`crate::ring::minimum_profile_shift`]), the edge its
+    /// shaper leaves where a rack leaves undercut.
     #[cfg_attr(feature = "serde", serde(default = "yes"))]
     pub no_undercut: bool,
     /// Depth, in modules, at which the undercut question is asked.
@@ -1292,7 +1293,15 @@ impl MemberGear {
     /// admissible addendum at all ([`addendum_for_tip_width`] returns `None`);
     /// there is nothing to clamp to, so the number stands and the tooth's own
     /// `pointed` reporting is what says it is wrong.
-    pub(crate) fn addendum_asked(&self, at_shift: &crate::params::GearParams) -> AddendumAsked {
+    ///
+    /// `cutter` is the tool of a ring, whose tooth is thinnest at its tip
+    /// because it narrows inward ([`crate::ring::addendum_for_tip_width`]):
+    /// the same bound, read on the tooth that tool cuts.
+    pub(crate) fn addendum_asked(
+        &self,
+        at_shift: &crate::params::GearParams,
+        cutter: Option<&crate::ring::Cutter>,
+    ) -> AddendumAsked {
         let asked = self.addendum;
         if !self.no_sharp_tip {
             return AddendumAsked {
@@ -1300,13 +1309,17 @@ impl MemberGear {
                 clamped: false,
             };
         }
-        let ceiling = addendum_for_tip_width(
-            &Tooth::new(GearParams {
-                addendum: asked,
-                ..*at_shift
-            }),
-            self.min_tip_width,
-        );
+        let at = GearParams {
+            addendum: asked,
+            ..*at_shift
+        };
+        let ceiling = match cutter {
+            None => addendum_for_tip_width(&Tooth::new(at), self.min_tip_width),
+            Some(c) => crate::ring::addendum_for_tip_width(
+                &crate::ring::Ring::cut_by(&at, c),
+                self.min_tip_width,
+            ),
+        };
         let used = ceiling.map_or(asked, |c| asked.min(c));
         AddendumAsked {
             used,
@@ -1314,8 +1327,14 @@ impl MemberGear {
         }
     }
 
-    /// [`ShiftAsked`], for this gear at its own working depth.
-    pub(crate) fn shift_asked(&self, base: &crate::params::GearParams) -> ShiftAsked {
+    /// [`ShiftAsked`], for this gear at its own working depth — or, for a
+    /// ring, cut by `cutter`, whose edge of undercut is where its flank is
+    /// generated to its tip ([`crate::ring::minimum_profile_shift`]).
+    pub(crate) fn shift_asked(
+        &self,
+        base: &crate::params::GearParams,
+        cutter: Option<&crate::ring::Cutter>,
+    ) -> ShiftAsked {
         let depth = self.working_depth.resolve(self.dedendum);
         if !self.no_undercut {
             // Nothing asked of the shift. Given, it is taken as typed; left to
@@ -1329,12 +1348,27 @@ impl MemberGear {
                 raised: false,
             };
         }
+        let x_min = match cutter {
+            None => crate::auto::minimum_profile_shift(base, depth).with_cutter_radius,
+            Some(c) => crate::ring::minimum_profile_shift(base, c),
+        };
         if self.profile_shift.auto {
-            let floor = automatic_profile_shift(base, depth);
+            // `automatic_profile_shift`'s rule, for either tool: at the edge,
+            // and not moved where the edge asks nothing.
+            let settled = x_min.map_or(0.0, |x| x.max(0.0));
+            // A search is held at the edge — and, on an external tooth, no
+            // lower than zero, since a negative shift thins it. A negative
+            // shift thickens a ring's tooth, so a ring's search is held at
+            // its edge alone.
+            let search_floor = if cutter.is_some() {
+                x_min
+            } else {
+                Some(settled)
+            };
             return ShiftAsked {
-                search_floor: Some(floor),
+                search_floor,
                 given: None,
-                settled: floor,
+                settled,
                 raised: false,
             };
         }
@@ -1342,9 +1376,7 @@ impl MemberGear {
         // negative shift somebody meant is not an undercut one. Nothing is
         // choosing it, so it carries no search bound.
         let typed = self.profile_shift.manual;
-        let used = crate::auto::minimum_profile_shift(base, depth)
-            .with_cutter_radius
-            .map_or(typed, |x_min| typed.max(x_min));
+        let used = x_min.map_or(typed, |x_min| typed.max(x_min));
         ShiftAsked {
             search_floor: None,
             given: Some(used),
@@ -5509,7 +5541,11 @@ mod tests {
                 s.set_search(true);
                 s
             };
-            let asked = [0, 1].map(|i| stage.members[i].gear.shift_asked(&stage.base_params_of(i)));
+            let asked = [0, 1].map(|i| {
+                stage.members[i]
+                    .gear
+                    .shift_asked(&stage.base_params_of(i), stage.members[i].ring.as_ref())
+            });
             let bounds = Bounds {
                 floor: asked.map(|a| a.search_floor),
                 min_contact_ratio: stage.meshes[0].min_contact_ratio,
@@ -5996,6 +6032,11 @@ mod tests {
                 set.set_search(true);
                 set.members[0].gear.profile_shift = Auto::automatic(0.0);
                 set.members[2].gear.profile_shift = Auto::automatic(0.0);
+                // The closure's curve, not the ring's floor: with it, 11/17's
+                // ring is held where its flank reaches its tip, a second wall
+                // the walk resolves to its step (4× the budget moves η₀ by
+                // 1.8e-7) — F50 again, recorded in the commit, not hidden here.
+                set.members[2].gear.no_undercut = false;
                 let shape = set.clone();
                 let eta0 = |x: Vec<f64>| {
                     let b = shape.build_at(&x).ok()?;
@@ -10120,6 +10161,10 @@ mod tests {
             for m in &mut set.members {
                 m.gear = tall(&m.gear);
             }
+            // Tall as asked on the ring too, whose tip a sharp-tip bound
+            // would otherwise hold lower, and at its shift as typed.
+            set.members[2].gear.no_sharp_tip = false;
+            set.members[2].gear.no_undercut = false;
             set.members[0].gear.teeth = 24;
             set.members[1].gear.teeth = 18;
             set.members[2].gear.teeth = 60;

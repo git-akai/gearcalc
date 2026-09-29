@@ -856,6 +856,65 @@ impl Ring {
     }
 }
 
+/// The largest addendum, in modules, at which a ring's tooth is at least
+/// `min_tip_width` wide at its tip: [`crate::auto::addendum_for_tip_width`]
+/// read on a ring, whose tooth narrows inward, so that its tip is where it is
+/// thinnest.
+///
+/// `None` where the width bounds nothing: the tooth is thinner than that even
+/// at its root, so no tip is wide enough, or it is that wide at the lowest tip
+/// the ring can have — the base circle, or where the tooth comes to a point —
+/// so every tip is. Either way the addendum asked stands, and the ring's own
+/// clamps say what else it meets.
+#[must_use]
+pub fn addendum_for_tip_width(ring: &Ring, min_tip_width: f64) -> Option<f64> {
+    let width = |u: f64| 2.0 * ring.rb * f64::hypot(1.0, u) * (ring.psi_b + inv_from_roll(u));
+    let u_root = crate::involute::roll_at_radius(ring.rf, ring.rb);
+    let u_low = if ring.psi_b < 0.0 {
+        crate::involute::inv_inverse(-ring.psi_b)?.tan()
+    } else {
+        0.0
+    };
+    if width(u_root) < min_tip_width || width(u_low) >= min_tip_width {
+        return None;
+    }
+    let u = brent(|u| width(u) - min_tip_width, u_low, u_root, Tol::default())?;
+    let ra = ring.rb * f64::hypot(1.0, u);
+    Some((ring.r - ra) / ring.params.module + ring.params.profile_shift)
+}
+
+/// The least profile shift at which a ring's flank is generated all the way
+/// to its tip ([`Ring::fully_generated`]): a ring's edge of undercut. Below it
+/// the cutter's involute runs out before the ring's tip and the tip end of the
+/// flank is not an involute, as a rack's tip cuts into an external tooth's
+/// flank below its edge.
+///
+/// Searched between the tip on the base circle, where the flank is never
+/// generated to the tip, and the tip on the pitch circle. `None` where the
+/// flank is short of its tip at both ends alike, as
+/// [`crate::auto::MinimumShift::with_cutter_radius`] is where no shift is on
+/// the edge.
+#[must_use]
+pub fn minimum_profile_shift(params: &GearParams, cutter: &Cutter) -> Option<f64> {
+    let short = |x: f64| {
+        let g = Ring::cut_by(
+            &GearParams {
+                profile_shift: x,
+                ..*params
+            },
+            cutter,
+        );
+        g.ra - g.generation_limit()
+    };
+    let g = Ring::cut_by(params, cutter);
+    let m = params.module;
+    let (lo, hi) = (params.addendum - (g.r - g.rb) / m, params.addendum);
+    if short(hi) < 0.0 {
+        return None;
+    }
+    brent(short, lo, hi, Tol::default())
+}
+
 // -------------------------------------------------------------------------- //
 //  meshing a ring with a pinion
 // -------------------------------------------------------------------------- //

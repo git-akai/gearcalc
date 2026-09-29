@@ -32,15 +32,16 @@ profile_shift: Auto<number>,
  * deliberate: negative shift is a decision about centre distance or
  * balance, and this is a question about undercut. Where the *solve* is
  * choosing and nothing else decides, the answer is instead
- * [`automatic_profile_shift`] — the same bound taken no lower than zero,
+ * [`crate::auto::automatic_profile_shift`] — the same bound taken no lower than zero,
  * because a shift chosen for no reason should not thin a tooth that needed
  * no help.
  *
  * Off, the gear may undercut, and the searches stop asking
  * ([`crate::auto::member_is_buildable`]).
  *
- * **Meaningless on a ring**, whose flank is its shaper's rather than a
- * rack's, and which is never asked — see `member_is_buildable`.
+ * **On a ring it asks the ring's reading**: its flank generated all the
+ * way to its tip ([`crate::ring::minimum_profile_shift`]), the edge its
+ * shaper leaves where a rack leaves undercut.
  */
 no_undercut: boolean, 
 /**

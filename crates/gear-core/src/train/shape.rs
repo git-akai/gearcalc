@@ -1163,32 +1163,37 @@ impl Shape {
             profile_shift: x,
             ..self.base_params(i, helix)
         };
-        if self.members[i].ring.is_some() {
-            return with_shift;
-        }
         GearParams {
-            addendum: self.members[i].gear.addendum_asked(&with_shift).used,
+            addendum: self.members[i]
+                .gear
+                .addendum_asked(&with_shift, self.members[i].ring.as_ref())
+                .used,
             ..with_shift
         }
     }
 
-    /// What each member's shift asks, before anything constrains it: a ring
-    /// is not asked about undercut and stands where it is put.
+    /// The shifts a search may try on member `i`: what it can be cut at, no
+    /// lower than `floor`, and no further than its tool's round still fits —
+    /// a ring's being its shaper's, which the cut caps rather than refuses.
+    fn search_interval(&self, i: usize, floor: Option<f64>, helix: &[f64]) -> Option<(f64, f64)> {
+        let at = |x| self.params_at(i, x, helix);
+        match &self.members[i].ring {
+            None => crate::auto::searchable_shift(&at, floor),
+            Some(cutter) => crate::auto::searchable_shift_where(&at, floor, &|x| {
+                let p = at(x);
+                Some(Ring::cut_by(&p, cutter).cut.tip_round - p.module * cutter.tip_round)
+            }),
+        }
+    }
+
+    /// What each member's shift asks, before anything constrains it: the
+    /// edge of undercut of whichever tool cuts it.
     fn asked(&self, helix: &[f64]) -> Vec<super::pair::ShiftAsked> {
         (0..self.members.len())
             .map(|i| {
                 let m = &self.members[i];
-                if m.ring.is_some() {
-                    let given = (!m.gear.profile_shift.auto).then_some(m.gear.profile_shift.manual);
-                    super::pair::ShiftAsked {
-                        search_floor: None,
-                        given,
-                        settled: given.unwrap_or(0.0),
-                        raised: false,
-                    }
-                } else {
-                    m.gear.shift_asked(&self.base_params(i, helix))
-                }
+                m.gear
+                    .shift_asked(&self.base_params(i, helix), m.ring.as_ref())
             })
             .collect()
     }
@@ -1810,21 +1815,7 @@ impl Shape {
         // Each free member's own interval.
         let Some(intervals) = free
             .iter()
-            .map(|&i| {
-                let p = self.params_at(i, 0.0, helix);
-                if self.members[i].ring.is_some() {
-                    let b = crate::auto::admissible_ranges(&p, p.dedendum)
-                        .profile_shift
-                        .bound;
-                    let (lo, hi) = (b.min?, b.max?);
-                    (lo < hi).then_some((lo, hi))
-                } else {
-                    crate::auto::searchable_shift(
-                        &|x| self.params_at(i, x, helix),
-                        plan.asked[i].search_floor,
-                    )
-                }
-            })
+            .map(|&i| self.search_interval(i, plan.asked[i].search_floor, helix))
             .collect::<Option<Vec<_>>>()
         else {
             return fallback(&plan, &bound_by, super::Searched::FoundNothing);
@@ -3857,16 +3848,18 @@ pub fn rate(
             &materials[i],
         ));
         let g = &shape.members[i].gear;
-        if shape.members[i].ring.is_none() {
-            out.extend(g.shift_asked(&shape.base_params(i, helix)).note());
-            out.extend(
-                g.addendum_asked(&GearParams {
+        let cutter = shape.members[i].ring.as_ref();
+        out.extend(g.shift_asked(&shape.base_params(i, helix), cutter).note());
+        out.extend(
+            g.addendum_asked(
+                &GearParams {
                     profile_shift: x[i],
                     ..shape.base_params(i, helix)
-                })
-                .note(),
-            );
-        }
+                },
+                cutter,
+            )
+            .note(),
+        );
         out.extend(g.face_width_note());
         out.extend(as_entered(i).then(|| Note::new(key::GEAR_FACE_WIDTH_AS_ENTERED)));
         // ...and each mesh whose load point leaves this member no section
@@ -5339,6 +5332,10 @@ mod tests {
         let lib = test_library();
         let mut exact = set_of(24, 18, 60, 0.0);
         exact.distances[0].clearance = Auto::fixed(0.0);
+        // The closure alone, here and below: this ring's flank falls short
+        // of its tip at x 0, and asked for no undercut it would be shifted
+        // out to reach it.
+        exact.members[2].gear.no_undercut = false;
         let exact = solve_set(&exact, 2.0, 0.0, &lib).unwrap();
         assert!(exact.members[1].profile_shift.abs() < 1e-12);
         assert!(exact.distances[0]
@@ -5346,7 +5343,11 @@ mod tests {
             .iter()
             .all(|a| (a - 21.0).abs() < 1e-12));
 
-        let ideal = solved(24, 18, 60);
+        let ideal = {
+            let mut set = set_of(24, 18, 60, 0.0);
+            set.members[2].gear.no_undercut = false;
+            solve_set(&set, 2.0, 3000.0, &lib).unwrap()
+        };
         let c = ideal.distances[0].clearance;
         assert!(c > 0.0, "the shipped set has a running clearance");
         assert!(
@@ -6897,5 +6898,139 @@ mod one_size_per_group {
                 .map(|m| m.helix_angle)
                 .collect::<Vec<_>>())
         );
+    }
+}
+
+/// **A ring is a member like any other** (U1): the options a member carries
+/// reach it whichever tool cuts it.
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod rings_as_members {
+    use super::super::arrangements::Preset;
+    use super::*;
+
+    /// A tooth's width at its tip, mm: `2 r_a (ψ_b ∓ inv α_a)`, less for an
+    /// external tooth (narrowing outward) and more for a ring's.
+    fn tip_width(rb: f64, psi_b: f64, ra: f64, ring: bool) -> f64 {
+        let inv = crate::involute::inv((rb / ra).min(1.0).acos());
+        2.0 * ra * if ring { psi_b + inv } else { psi_b - inv }
+    }
+
+    /// **A ticked "no sharp tip" holds on every member, a ring's too**: each
+    /// member as the solve builds it is its minimum tip width wide at its
+    /// tip, wherever a tip that wide exists on it. A ring returned early and
+    /// kept the addendum it was given.
+    #[test]
+    fn no_sharp_tip_holds_on_a_ring_as_on_every_member() {
+        let min = 0.7;
+        let mut rings = 0;
+        for preset in Preset::ALL {
+            let mut shape = preset.build();
+            for m in &mut shape.members {
+                m.gear.no_sharp_tip = true;
+                m.gear.min_tip_width = min;
+                m.gear.addendum = 1.4;
+            }
+            let helix = shape.helix_angles();
+            for i in 0..shape.members.len() {
+                for x in [-0.3, 0.0, 0.5] {
+                    let p = shape.params_at(i, x, &helix);
+                    let (width, widest) = match shape.members[i].ring {
+                        None => {
+                            let t = Tooth::new(p);
+                            (tip_width(t.rb, t.psi_b, t.ra, false), 2.0 * t.rb * t.psi_b)
+                        }
+                        Some(cutter) => {
+                            let r = Ring::cut_by(&p, &cutter);
+                            (r.tooth_thickness_at(r.ra), r.tooth_thickness_at(r.rf))
+                        }
+                    };
+                    if widest < min {
+                        continue;
+                    }
+                    rings += usize::from(shape.members[i].ring.is_some());
+                    assert!(
+                        width >= min - 1e-9,
+                        "{preset:?} member {i} at x {x}: tip {width} mm wide against {min}"
+                    );
+                }
+            }
+        }
+        assert!(rings > 10, "{rings} rings checked");
+    }
+
+    /// **A ring asking for no undercut is generated to its tip**: where some
+    /// shift gives a ring's flank an involute all the way to its tip, the
+    /// shift the solve settles on for it is one of them — the ring's reading
+    /// of the undercut floor an external member has.
+    #[test]
+    fn a_ring_asking_for_no_undercut_is_generated_to_its_tip() {
+        let mut short_at_zero = 0;
+        for preset in Preset::ALL {
+            let shape = preset.build();
+            let helix = shape.helix_angles();
+            let asked = shape.asked(&helix);
+            for (i, (member, a)) in shape.members.iter().zip(&asked).enumerate() {
+                let (Some(cutter), true, true) = (
+                    member.ring,
+                    member.gear.no_undercut,
+                    member.gear.profile_shift.auto,
+                ) else {
+                    continue;
+                };
+                let at = |x: f64| {
+                    Ring::cut_by(
+                        &GearParams {
+                            profile_shift: x,
+                            ..shape.base_params(i, &helix)
+                        },
+                        &cutter,
+                    )
+                };
+                // The tip on the pitch circle is as far out as a ring's
+                // tip goes; generated nowhere short of that, it asks nothing.
+                if !at(member.gear.addendum).fully_generated() {
+                    continue;
+                }
+                short_at_zero += usize::from(!at(0.0).fully_generated());
+                let settled = a.settled;
+                assert!(
+                    at(settled).fully_generated(),
+                    "{preset:?} ring {i} settles at x {settled}, short of its tip: {:?}",
+                    at(settled).clamps
+                );
+            }
+        }
+        assert!(
+            short_at_zero > 0,
+            "no preset's ring is short of its tip at x 0"
+        );
+    }
+
+    /// **A search is held to a ring's floor as to any member's**: the
+    /// interval a search tries on a member starts no lower than the floor its
+    /// shift asks, whichever tool cuts it.
+    #[test]
+    fn a_search_starts_at_every_members_floor() {
+        let mut rings = 0;
+        for preset in Preset::ALL {
+            let shape = preset.build();
+            let helix = shape.helix_angles();
+            let asked = shape.asked(&helix);
+            for (i, a) in asked.iter().enumerate() {
+                let Some(floor) = a.search_floor else {
+                    continue;
+                };
+                let Some((lo, _)) = shape.search_interval(i, Some(floor), &helix) else {
+                    continue;
+                };
+                rings += usize::from(shape.members[i].ring.is_some());
+                assert!(
+                    lo >= floor - 1e-12,
+                    "{preset:?} member {i}: the search starts at {lo}, under its floor {floor}"
+                );
+            }
+        }
+        assert!(rings > 0, "no ring's interval was asked");
     }
 }
