@@ -3166,6 +3166,7 @@ pub struct ShapeResult {
 pub struct Cut {
     /// Every member at its group's module and pressure angle.
     shape: Shape,
+    /// Every member's helix angle, degrees ([`Shape::helix_angles`]).
     helix: Vec<f64>,
     wiring: Wiring,
     chosen: Chosen,

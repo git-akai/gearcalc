@@ -15,13 +15,16 @@ keeps that true.
 
 **The rule, in two halves:**
 
-1. **Every angular field states its unit** in its doc comment — the word
-   `radians`, or `degrees` / `°`.
+1. **Every angular field states its unit**: a `_rad` or `_deg` suffix, or
+   in its doc comment the word `radians`, or `degrees` / `°` — the first of
+   them, where a doc names both to relate them.
 2. **No angular name is used in both units.** Where one otherwise would be, the
    radian one takes a `_rad` suffix (and a degree one may take `_deg`), so a
    mismatched call site reads wrong instead of reading fine.
 
-Greek names — `alpha_*`, `beta`, `gamma`, `sigma` — are radians by mathematical
+Every struct field of any visibility and any float container is read. Greek
+names — `alpha_*`, `beta`, `gamma`, `sigma`, `theta`, `psi`, `phi`, `delta` —
+are radians by mathematical
 convention and still have to say so, because a reader who does not know that
 convention is exactly the reader this is for.
 
@@ -31,16 +34,19 @@ import re
 import sys
 from pathlib import Path
 
-# An angle held as an `Auto` or an `Option` is an angle all the same: the
-# pattern matched a bare `f64` alone, so every automatic angle — the helix
-# first among them — went unchecked, and a pressure angle that became one
-# dropped out of the count without anything saying so.
-FIELD = re.compile(r"^\s*pub ([a-z_0-9]+): (\[?f64[^,]*|(?:Auto|Option)<f64>),")
-RADIANS = re.compile(r"\bradians\b")
-DEGREES = re.compile(r"degrees|°")
+# A struct field of any visibility, holding a float in any container: a bare
+# `f64` or `f32`, an `Auto`/`Option`, a `Vec`, an array or a tuple. The pattern
+# once matched `pub` fields of bare `f64` alone, so every automatic angle, every
+# `pub(crate)` or private one and every list of angles went unchecked.
+FIELD = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?([a-z_0-9]+): ([^,]*\bf(?:64|32)\b[^,]*),\s*(?://.*)?$")
+# The opening line of a struct with named fields, where FIELD is read; a
+# function's parameters look the same and carry no doc to read.
+STRUCT = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?struct \w+[^;(]*\{\s*$")
+UNIT = re.compile(r"\bradians\b|degrees|°")
 
 # Names that read as angles and are not. Each is a real quantity in some other
 # unit, so demanding an angular unit of it would be demanding a wrong answer.
+# `lead` is not a pattern at all: it is a length throughout the crate.
 NOT_ANGLES = {
     # An amplitude in modules, despite the name: `x(θ) = shift + a·cos θ`.
     "angular_shift",
@@ -54,7 +60,21 @@ NOT_ANGLES = {
 def looks_angular(name: str) -> bool:
     if name in NOT_ANGLES:
         return False
-    return "angle" in name or re.match(r"(alpha|beta|gamma|sigma)(_|$)", name) is not None
+    return "angle" in name or re.match(
+        r"(alpha|beta|gamma|sigma|theta|psi|phi|delta|helix)(\d|_|$)", name
+    ) is not None
+
+
+def stated_unit(name: str, doc: str):
+    """The unit a field states: its suffix, else the first unit word of its doc."""
+    if name.endswith("_rad"):
+        return "radians"
+    if name.endswith("_deg"):
+        return "degrees"
+    m = UNIT.search(doc)
+    if not m:
+        return None
+    return "radians" if m.group(0) == "radians" else "degrees"
 
 
 def doc_above(lines: list[str], i: int) -> str:
@@ -66,6 +86,23 @@ def doc_above(lines: list[str], i: int) -> str:
     return " ".join(reversed(out))
 
 
+def fields(lines: list[str]):
+    """(line index, name) of every float field inside a struct body."""
+    depth = None
+    for i, line in enumerate(lines):
+        if depth is None:
+            if STRUCT.match(line):
+                depth = 0
+            else:
+                continue
+        depth += line.count("{") - line.count("}")
+        m = FIELD.match(line)
+        if m and depth == 1:
+            yield i, m.group(1)
+        if depth <= 0:
+            depth = None
+
+
 def main() -> int:
     root = Path(__file__).resolve().parent.parent
     silent: list[str] = []
@@ -75,19 +112,13 @@ def main() -> int:
 
     for path in sorted(root.glob("crates/**/*.rs")):
         lines = path.read_text().split("\n")
-        for i, line in enumerate(lines):
-            m = FIELD.match(line)
-            if not m or not looks_angular(m.group(1)):
+        for i, name in fields(lines):
+            if not looks_angular(name):
                 continue
-            name = m.group(1)
             total += 1
-            blob = doc_above(lines, i)
             at = f"{path.relative_to(root)}:{i + 1}"
-            if RADIANS.search(blob):
-                unit = "radians"
-            elif DEGREES.search(blob):
-                unit = "degrees"
-            else:
+            unit = stated_unit(name, doc_above(lines, i))
+            if unit is None:
                 silent.append(f"{at}  {name}")
                 continue
             units.setdefault(name, set()).add(unit)

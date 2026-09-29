@@ -109,6 +109,7 @@ pub struct ShaperCut {
 /// angle, and its first two derivatives in that angle.
 #[derive(Clone, Copy, Debug)]
 struct Touch {
+    /// The cutter's turn, radians.
     psi: f64,
     dpsi: f64,
     ddpsi: f64,

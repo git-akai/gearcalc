@@ -160,9 +160,9 @@ pub struct Tooth {
     pub rf: f64,
     /// Transverse tooth thickness at the pitch circle.
     pub st: f64,
-    /// Half tooth angle at the pitch circle.
+    /// Half tooth angle at the pitch circle, radians.
     pub psi_p: f64,
-    /// Half tooth angle at the base circle.
+    /// Half tooth angle at the base circle, radians.
     pub psi_b: f64,
 
     /// Cutter tip radius (transverse).
@@ -176,7 +176,7 @@ pub struct Tooth {
     pub ra: f64,
     /// Involute roll parameter at the tip. NaN if severed.
     pub u_tip: f64,
-    /// Half angular width of the tip arc.
+    /// Half angular width of the tip arc, radians.
     pub theta_a: f64,
 
     /// Signed distance from the base tangent point to where the rack's straight
@@ -203,7 +203,7 @@ pub struct Tooth {
     pub s_j: f64,
     /// Radius at the junction.
     pub r_j: f64,
-    /// Angle where the fillet meets the root circle.
+    /// Angle where the fillet meets the root circle, radians.
     pub theta0: f64,
     /// Half the angular pitch, `π/z`.
     pub half_pitch: f64,

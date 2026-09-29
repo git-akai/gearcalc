@@ -45,6 +45,7 @@ use crate::tooth::{Rack, Tooth};
 /// the root that tool could not reach as deviation, rather than refusing.
 #[derive(Clone, Copy, Debug)]
 pub struct BasicRack {
+    /// Transverse pressure angle, radians.
     alpha_t: f64,
     /// Circular pitch, transverse.
     pitch: f64,

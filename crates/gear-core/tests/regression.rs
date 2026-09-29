@@ -27,7 +27,9 @@ struct Fixture {
     rho: f64,
     l: f64,
     r_j: f64,
+    /// Where the fillet meets the root circle, radians.
     theta0: f64,
+    /// Half the tip arc, radians.
     theta_a: f64,
     undercut: bool,
     severed: bool,

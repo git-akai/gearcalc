@@ -40,7 +40,9 @@ pub struct Grid {
     module: Vec<f64>,
     teeth: Vec<u32>,
     profile_shift: Vec<f64>,
+    /// Normal pressure angles, degrees.
     pressure_angle: Vec<f64>,
+    /// Helix angles, degrees.
     helix_angle: Vec<f64>,
     addendum: Vec<f64>,
     dedendum: Vec<f64>,
