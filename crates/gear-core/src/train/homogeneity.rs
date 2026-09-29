@@ -38,7 +38,10 @@ const SCALES: [f64; 2] = [0.1, 10.0];
 ///
 /// with `κ` the train's condition figure — its largest length over its
 /// smallest millimetre input, how far a relative error in the one can be
-/// magnified in a difference down to the other — and `O_k` the scale of the
+/// magnified in a difference down to the other. `κ` is a heuristic, not a
+/// derived condition number: no error analysis of the solve bounds it, and
+/// a figure whose amplification exceeds that ratio would breach the
+/// allowance without being wrong. `O_k` is the scale of the
 /// figure's operands ([`operand_scale`]). `ROUNDINGS` counts the roundings
 /// one figure passes through between an input and the output: a root solve
 /// to `2ε` ([`crate::solve`]), a trigonometric evaluation, a difference, each
