@@ -224,6 +224,9 @@ caught, test workspace included) and the 130-constant perturbation.
     - a closed-form limit at Σ → 0;
     - tooth stiffness in series, derived from the generated tooth and gated against ISO 6336-1's c′
       and c_γ.
+- 2026-09-30 — owner: the bound that holds a tip off its mate's usable flank (sized by the mesh) is on
+  by default for every gear, external and ring alike. One rule: every default design is free of
+  interference by construction, and searches shorten external tips where they must.
 - 2026-09-30 — owner: the contact model continues. Its role is a separate, on-demand analysis. This
   opens **two modes** of analysis:
   - a fast, cheap, flexible mode for real-time setup (today's closed forms at ISO's points);
