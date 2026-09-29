@@ -829,7 +829,7 @@ fn hula_report(n: u32, clearance: f64, m_outer: f64, m_inner: f64, cutter_teeth:
             mesh.flank_interference[0],
             mesh.flank_interference[1],
             mesh.tips.is_some_and(|t| t.tip_interference),
-            margin_text(mesh.tips.map_or(Some(0.0), |t| t.tip_margin))
+            tips_text(mesh.tips)
         );
         for note in &mesh.notes {
             println!("    ! {}", words().render(note));
@@ -1029,6 +1029,14 @@ impl Boundary {
 /// A tip margin in degrees, or that the tip circles do not cross.
 fn margin_text(margin: Option<f64>) -> String {
     margin.map_or_else(|| "no crossing".to_string(), |m| format!("{m:+.4} deg"))
+}
+
+/// A mesh's tip margin, or that it has no tip record (not an internal mesh).
+fn tips_text(tips: Option<gear_core::train::TipRoom>) -> String {
+    tips.map_or_else(
+        || "no tip record".to_string(),
+        |t| margin_text(t.tip_margin),
+    )
 }
 
 /// Roll an internal pair through one tooth and report where the flanks touch.
@@ -1320,7 +1328,7 @@ fn hula_sweep(n: u32, clearance: f64, mesh_index: usize) {
             m.tips.map_or(f64::NAN, |t| t.far_gap),
             transverse(m).operating_pressure_angle,
             m.tips.is_some_and(|t| t.tip_interference),
-            margin_text(m.tips.map_or(Some(0.0), |t| t.tip_margin))
+            tips_text(m.tips)
         ),
     );
 }
