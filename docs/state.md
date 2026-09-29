@@ -671,13 +671,19 @@ whose size is unmeasured is a debt still owed, and is marked as one.
   stiffness model it is unmeasured. Where Dolan–Broghamer's factor
   there is not positive the member is **unrated** (`gear.bending_unrated`), and
   every such mesh says it is in the band (`mesh.load_sharing_out_of_band`).
-- **Under load sharing the section is the one at the highest point of
-  single-pair contact**, with the load moved across the cycle on it rather
-  than a section searched at every load point. Where the worst shared load
-  point would, searched afresh, find a weaker section of its own, the figure
-  is **low** by the difference; unmeasured in general, and the reason is the
-  alternative's: searched afresh near a pointed apex the section shrinks onto
-  the point and the figure has no bound.
+
+<!-- figures: gear-cli sharingbias -->
+- **Under load sharing the section is held at the highest point of
+  single-pair contact** and the load moved on it, rather than searched afresh
+  at every load point, which near a pointed apex shrinks onto the point with
+  no bound. Measured over 50 equal pairs short of pointed (z 17–100, 14.5° and
+  20°, `h_a` 1.0–1.4): held over afresh 0.810 to 1.000 — **low**, so
+  unconservative, by up to 19.0 %, at z 100, 20°, `h_a` 1.4, ε 2.535, and
+  only past `ε_n = 2`, where the ramp governs away from the single-pair point.
+  **Part of the sharing relief is this bias**: at `ε_n ≥ 2` the held section
+  relieves 4.2 to 35.2 %, where sections searched afresh range from -18.3
+  (an increase) to 35.1 %.
+
 
 <!-- figures: tools/iso_6336_3_stack.py -->
 - **Against ISO, measured by the stack script the marker names**, which computes ISO
@@ -802,7 +808,8 @@ whose size is unmeasured is a debt still owed, and is marked as one.
   direction the model fixes** — measured as a 6–26 % relief across
   high-contact-ratio spur designs, with the section found once and the load
   moved on it (it read a 24 % relief to a 15 % increase while every load
-  point searched a section of its own). Each
+  point searched a section of its own; part of the relief is the held
+  section's own bias, above). Each
   mesh says so where its figure is shown, so a set with one mesh in the band and
   one out names which. **Below the band it changes nothing** — the single-pair
   boundary is in the sweep at a share of exactly 1, so the maximum is the point

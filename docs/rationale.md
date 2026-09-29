@@ -841,8 +841,11 @@ apex, which a sharing sweep samples. Skipping the apex would only trade the
 left a step at the limit — 51,764 one millionth short, 2.157 at it. So the
 section is taken where the unshared rating takes it, at the highest point of
 single-pair contact, and across the cycle only the moment arm and the load's
-angle follow the load (`RootSection::loaded_at`), as ISO holds its tangent
-section and moves `h_Fe`. The arm is bounded by the tooth, so the figure is
+angle follow the load (`RootSection::loaded_at`). By analogy with ISO, which
+moves `h_Fe` on a section that does not depend on the load: ISO's 30° tangent
+is load-independent by construction, where the inscribed parabola is not, so a
+parabola section held at the single-pair point is a hybrid of the two, and
+what it costs is measured in `docs/state.md`. The arm is bounded by the tooth, so the figure is
 bounded as the load reaches the tip, pointed or not, and continuous across the
 pointed limit (`the_rating_is_continuous_across_the_pointed_limit`). The
 unshared rating is the same section it always was, to the bit.

@@ -433,6 +433,14 @@ const COMMANDS: &[Command] = &[
         slow: false
     },
     Command {
+        name: "sharingbias",
+        args: "",
+        summary: "what holding the bending section at the single-pair point costs under load sharing, against a section searched afresh",
+        run: |_| sharing_bias_report(),
+        record: Record::Cases(&["sharingbias"]),
+        slow: false
+    },
+    Command {
         name: "bending",
         args: "",
         summary: "the bending construction drawn tooth by tooth — the body of docs/bending-check.html",
@@ -2534,6 +2542,94 @@ fn iso_report(z: [u32; 2], alpha: f64, helix: f64, x: [f64; 2], face: f64, torqu
             cs.governing(1)
         );
     }
+}
+
+/// **What holding the section costs**: under the load-sharing ramp, the
+/// rating's section (found once at the highest point of single-pair contact,
+/// the load moved on it) against a section searched afresh at every load
+/// point, over a grid of equal pairs short of pointed. Each figure is the
+/// swept maximum of `(Y_F − axial)·K_f · share`; below 1 the held section
+/// reads low.
+fn sharing_bias_report() {
+    use gear_core::contact::{ContactPath, LoadSharing};
+    use gear_core::mesh::{Mesh, MeshKind};
+    use gear_core::strength::{
+        bending_section, bending_section_searched_afresh, bending_section_shared, RootStressModel,
+    };
+    let factor = |s: &gear_core::strength::RootSection, share: f64| {
+        s.bending_factor(RootStressModel::DolanBroghamer)
+            .map(|f| f * share)
+    };
+    println!(
+        "{:>4} {:>5} {:>4} {:>6} {:>8} {:>8} {:>8} {:>8}",
+        "z", "alpha", "h_a", "eps_n", "held", "afresh", "ratio", "alone"
+    );
+    let (mut worst, mut best) = ((f64::INFINITY, String::new()), f64::NEG_INFINITY);
+    let (mut cases, mut relief_held, mut relief_fresh) = (0, Vec::new(), Vec::new());
+    for teeth in [17_u32, 25, 40, 60, 100] {
+        for alpha in [14.5_f64, 20.0] {
+            for addendum in [1.0_f64, 1.1, 1.2, 1.3, 1.4] {
+                let g = Tooth::new(GearParams {
+                    teeth,
+                    pressure_angle: alpha,
+                    addendum,
+                    ..Default::default()
+                });
+                if g.clamps
+                    .fired(gear_core::note::key::CLAMP_TIP_CAPPED_POINTED)
+                {
+                    continue;
+                }
+                let Some(eps) = Mesh::new(&g, &g, MeshKind::External)
+                    .ok()
+                    .and_then(|m| ContactPath::new(&g, g.ra, &m))
+                    .map(|p| p.contact_ratio)
+                else {
+                    continue;
+                };
+                let held = bending_section_shared(&g, eps, LoadSharing::LinearRamp)
+                    .and_then(|(s, f)| factor(&s, f));
+                let fresh = bending_section_searched_afresh(&g, eps, LoadSharing::LinearRamp, 200)
+                    .and_then(|(s, f)| factor(&s, f));
+                let alone = bending_section(&g, eps).and_then(|s| factor(&s, 1.0));
+                let (Some(held), Some(fresh), Some(alone)) = (held, fresh, alone) else {
+                    continue;
+                };
+                let ratio = held / fresh;
+                cases += 1;
+                println!(
+                    "{teeth:>4} {alpha:>5} {addendum:>4} {eps:>6.3} {held:>8.4} {fresh:>8.4} {ratio:>8.4} {alone:>8.4}"
+                );
+                if ratio < worst.0 {
+                    worst = (
+                        ratio,
+                        format!("z {teeth}, {alpha} deg, h_a {addendum}, eps {eps:.3}"),
+                    );
+                }
+                best = best.max(ratio);
+                if eps >= 2.0 {
+                    relief_held.push(1.0 - held / alone);
+                    relief_fresh.push(1.0 - fresh / alone);
+                }
+            }
+        }
+    }
+    let band = |v: &[f64]| {
+        (
+            100.0 * v.iter().copied().fold(f64::INFINITY, f64::min),
+            100.0 * v.iter().copied().fold(f64::NEG_INFINITY, f64::max),
+        )
+    };
+    println!(
+        "\n{cases} pairs short of pointed: held / afresh {:.3} to {best:.3}",
+        worst.0
+    );
+    println!("worst {:.1} % low, at {}", 100.0 * (1.0 - worst.0), worst.1);
+    let (a, b) = band(&relief_held);
+    let (c, d) = band(&relief_fresh);
+    println!(
+        "sharing relief at eps_n >= 2: held {a:.1} to {b:.1} %, searched afresh {c:.1} to {d:.1} %"
+    );
 }
 
 /// The shipped material library, with each value's provenance.

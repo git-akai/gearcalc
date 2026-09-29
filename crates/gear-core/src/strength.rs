@@ -857,8 +857,10 @@ impl RootSection {
     /// chord, the notch and where they are stay; the moment arm, the load's
     /// angle and what they make of `Y_F` and the axial term follow the load.
     ///
-    /// How a section found once is read over a mesh cycle, as ISO reads its
-    /// tangent section: the arm is bounded by the tooth, so the figure stays
+    /// How a section found once is read over a mesh cycle — by analogy with
+    /// ISO's tangent section, which is load-independent by construction; a
+    /// parabola section held at one load point is a hybrid, and its cost is
+    /// `gear-cli sharingbias`'s. The arm is bounded by the tooth, so the figure stays
     /// bounded wherever the load is — the tip of a pointed tooth included,
     /// where a section searched afresh would shrink onto the apex.
     #[must_use]
@@ -1555,6 +1557,7 @@ fn worst_over_cycle<T: ToothOutline + ?Sized>(
     eps_n: f64,
     model: LoadSharing,
     samples_wanted: usize,
+    afresh: bool,
 ) -> Option<(RootSection, f64)> {
     // **The section is found once**, at the highest point of single-pair
     // contact, and the sweep moves only the load on it
@@ -1571,7 +1574,13 @@ fn worst_over_cycle<T: ToothOutline + ?Sized>(
     }
     let rated = |d: f64| {
         at.roll(d)
-            .and_then(|roll| section.loaded_at(at.v, roll))
+            .and_then(|roll| {
+                if afresh {
+                    root_section_with(at.v, roll, at.method)
+                } else {
+                    section.loaded_at(at.v, roll)
+                }
+            })
             .and_then(|s| {
                 s.bending_factor(RootStressModel::DolanBroghamer)
                     .map(|f| (s, f))
@@ -1725,7 +1734,23 @@ pub fn bending_section_shared_with<T: ToothOutline>(
 ) -> Option<(RootSection, f64)> {
     let v = g.virtual_spur();
     let (at, eps_n) = load_point(g, &v, transverse_contact_ratio, CriticalSection::default())?;
-    worst_over_cycle(&at, eps_n, model, samples)
+    worst_over_cycle(&at, eps_n, model, samples, false)
+}
+
+/// **The sweep as it was: a section searched afresh at every load point.**
+/// The instrument that measures what holding the section costs
+/// (`gear-cli sharingbias`); unbounded near a pointed apex, so not the
+/// rating.
+#[must_use]
+pub fn bending_section_searched_afresh<T: ToothOutline>(
+    g: &T,
+    transverse_contact_ratio: f64,
+    model: LoadSharing,
+    samples: usize,
+) -> Option<(RootSection, f64)> {
+    let v = g.virtual_spur();
+    let (at, eps_n) = load_point(g, &v, transverse_contact_ratio, CriticalSection::default())?;
+    worst_over_cycle(&at, eps_n, model, samples, true)
 }
 
 /// Where the load sits on `v`, the virtual spur member of `g`, and the
@@ -2085,14 +2110,19 @@ mod tests {
     }
 
     /// **Continuous across the pointed limit, and independent of the sweep.**
-    /// A tooth one hair short of pointed and one at the limit are the same
-    /// tooth to within the hair, so their ratings may differ by no more than
-    /// the hair moves them; and a rating is a maximum over the mesh cycle,
-    /// not over where a sweep happened to sample. Before the section was
-    /// found once per tooth, z25 x0.5 28° under the ramp read 86.9 at 1e-3
-    /// short, 51,764 at 1e-6 short, 11.6 or 140 at the limit by sample count,
-    /// and 2.157 once pointed; z40 x0.8 25° unshared read 4.45 short and
-    /// nothing at the limit.
+    /// A rating is a maximum over the mesh cycle, not over where a sweep
+    /// happened to sample: 200 and 3200 samples agree to 1e-4. And as the
+    /// addendum approaches the pointed limit the figure has a one-sided
+    /// derivative there: the difference quotients against the limit at 1e-3
+    /// and 1e-6 of the addendum short agree. A step at the limit makes the
+    /// quotient grow like the inverse of the hair, and the old divergence like
+    /// its square; a smooth approach leaves it moving by the curvature times
+    /// the hair, 1e-3 of it at most, so they must agree to 1e-2 of their size
+    /// (they agree to 0.8 % at worst, z40 ε1.1, and to three figures elsewhere). Before the section was found once per
+    /// tooth, z25 x0.5 28° under the ramp read 86.9 at 1e-3 short, 51,764 at
+    /// 1e-6 short, 11.6 or 140 at the limit by sample count, and 2.157 once
+    /// pointed; z40 x0.8 25° unshared read 4.45 short and nothing at the
+    /// limit.
     #[test]
     fn the_rating_is_continuous_across_the_pointed_limit() {
         for (teeth, profile_shift, pressure_angle) in [
@@ -2118,43 +2148,38 @@ mod tests {
             let limit = (capped.ra - capped.r) / m - profile_shift;
             for eps in [1.1_f64, 1.4] {
                 for model in [LoadSharing::None, LoadSharing::LinearRamp] {
-                    let rate = |g: &Tooth, n: usize| {
-                        bending_section_shared_with(g, eps, model, n).and_then(|(s, f)| {
-                            s.bending_factor(RootStressModel::DolanBroghamer)
-                                .map(|b| b * f)
-                        })
-                    };
                     let label =
                         format!("z{teeth} x{profile_shift} {pressure_angle}° ε{eps} {model:?}");
-                    let mut last: Option<f64> = None;
-                    let mut rated = Vec::new();
-                    for short in [1e-2_f64, 1e-3, 1e-6, 0.0] {
+                    let rate = |short: f64| {
                         let g = if short == 0.0 {
                             capped.clone()
                         } else {
                             build(limit * (1.0 - short))
                         };
-                        let (coarse, fine) =
-                            (rate(&g, SHARING_SAMPLES), rate(&g, 16 * SHARING_SAMPLES));
-                        let (Some(coarse), Some(fine)) = (coarse, fine) else {
-                            panic!("{label}, {short} short: unrated ({coarse:?}, {fine:?})");
+                        let at = |n: usize| {
+                            bending_section_shared_with(&g, eps, model, n).and_then(|(s, f)| {
+                                s.bending_factor(RootStressModel::DolanBroghamer)
+                                    .map(|b| b * f)
+                            })
+                        };
+                        let (Some(coarse), Some(fine)) =
+                            (at(SHARING_SAMPLES), at(16 * SHARING_SAMPLES))
+                        else {
+                            panic!("{label}, {short} short: unrated");
                         };
                         assert!(
                             (fine - coarse).abs() / coarse < 1e-4,
                             "{label}, {short} short: {coarse} at {SHARING_SAMPLES} samples, {fine} at 16x"
                         );
-                        rated.push((short, coarse));
-                        last = Some(coarse);
-                    }
-                    // Against the limit, each hair moves the figure by no more
-                    // than a fixed multiple of itself: a slope, not a step.
-                    let limit_value = last.unwrap_or(f64::NAN);
-                    for (short, v) in rated {
-                        assert!(
-                            (v - limit_value).abs() / limit_value <= 20.0 * short + 1e-9,
-                            "{label}: {v} at {short} short against {limit_value} at the limit"
-                        );
-                    }
+                        coarse
+                    };
+                    let at_limit = rate(0.0);
+                    let quotient = |short: f64| (at_limit - rate(short)) / (limit * short);
+                    let (q3, q6) = (quotient(1e-3), quotient(1e-6));
+                    assert!(
+                        (q3 - q6).abs() <= 1e-2 * q3.abs().max(q6.abs()),
+                        "{label}: difference quotients {q3} at 1e-3 and {q6} at 1e-6 short"
+                    );
                 }
             }
         }
