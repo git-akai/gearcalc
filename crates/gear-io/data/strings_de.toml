@@ -29,6 +29,7 @@ tip_capped_pointed = "Kopf bei {radius} mm begrenzt: dort läuft der Zahn spitz 
 tip_below_form = "Kopfkreis bei Radius {radius} mm liegt unterhalb des Flankenbeginns: der Zahn besteht nur aus seinen Fußrundungen, ohne Evolventenflanke"
 tooth_severed = "Zahn durch Unterschnitt abgetrennt"
 tooth_undercut = "Unterschnitt: das Werkzeug hat einen Teil der Flanke am Fuß abgetragen"
+flank_unsolved = "Flanke und Fußrundung ließen sich nicht verbinden: der Zahn wird ohne Flanke gezeichnet und nicht bewertet"
 cutter_no_tip_corner = "keine Fußrundung: das Werkzeug hat keine nutzbare Kopfecke"
 ring_space_capped = "Lückenweite begrenzt: Profilverschiebung oder Dickenänderung zu positiv"
 ring_space_raised = "Lückenweite erhöht: Profilverschiebung oder Dickenänderung zu negativ"

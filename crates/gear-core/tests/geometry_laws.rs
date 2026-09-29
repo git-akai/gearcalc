@@ -141,6 +141,56 @@ fn fillet_cap_guarantees_a_nonnegative_root_arc() {
     }
 }
 
+/// **Where the tool closes the space, its fillet reaches the space's
+/// centreline at the root** — the fillet's own angle there, `a_c/r`, is `π/z`,
+/// so the `θ0 = π/z` the tooth takes is the curve's and not a patch over it.
+///
+/// `a_c = s_t/2 + b_c tan α_t + ρ/cos α_t` with `b_c = depth − m x − ρ`: each
+/// term and the subtraction carry at most an ulp, so the allowance is a few
+/// ε times the sum of their magnitudes, over `r`. A cap held at 95 % of the
+/// fit leaves `ρ_min(1/0.95 − 1)(1 − sin α)/(r cos α)` — 3e-12 rad at z20 α30 —
+/// which is orders above it.
+#[test]
+fn a_closing_tool_brings_the_fillet_to_the_centreline() {
+    let mut closed = 0;
+    for p in Grid::new()
+        .teeth(&[5, 9, 20, 40])
+        .shifts(&[-0.3, 0.0, 0.6])
+        .pressure_angle(&[20.0, 30.0, 40.0])
+        .helix_angle(&[0.0, 25.0])
+        .root_radius(&[0.0, 0.38])
+        .dedendum(&[2.0, 3.0])
+        .thickness_mod(THICKNESS_MODS)
+        .build()
+    {
+        let g = Tooth::new(p);
+        if !g.tool.closes {
+            continue;
+        }
+        closed += 1;
+        let (ta, ca) = (g.alpha_t.tan(), g.alpha_t.cos());
+        let terms = g.st / 2.0
+            + (g.tool.depth.abs() + (p.module * p.profile_shift).abs() + g.rho) * ta
+            + g.rho / ca;
+        // Eight operations, each within an ulp of what it rounds.
+        let allowed = 8.0 * f64::EPSILON * terms / g.r;
+        let off = (g.trochoid_at(0.0).1 - g.half_pitch).abs();
+        assert!(
+            off <= allowed,
+            "the fillet stops {off:e} rad short of the centreline (allowed {allowed:e}) at \
+             z={} x={} a={} b={} hf={} k={} rho={}",
+            p.teeth,
+            p.profile_shift,
+            p.pressure_angle,
+            p.helix_angle,
+            p.dedendum,
+            p.thickness_mod,
+            p.root_radius
+        );
+    }
+    assert!(closed > 50, "only {closed} teeth reached the cap");
+}
+
 #[test]
 fn profile_is_closed_and_has_one_period_per_tooth() {
     for p in [

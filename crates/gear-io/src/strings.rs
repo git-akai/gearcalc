@@ -1706,7 +1706,14 @@ mod tests {
     /// and a boundary that left it undetermined — and a stage has had no
     /// motion of its own since its figures became a path's. A note with no
     /// site is not live code, so they went with the sites, not onto this list.
-    const UNFIRED: &[&str] = &["clamp.ring_fully_filleted"];
+    ///
+    /// `clamp.flank_unsolved` is a solver's failure, not a geometry: every
+    /// solve in `Tooth::solve_junction` runs on a bracket whose signs it has
+    /// checked, so only a non-finite input reaches it, and a debug build
+    /// asserts it never does. The whole of `cargo nextest run` builds teeth
+    /// with that assertion on (it found the α = 0° thickness shift, fixed
+    /// 2026-09-29), and none has reached it since.
+    const UNFIRED: &[&str] = &["clamp.ring_fully_filleted", "clamp.flank_unsolved"];
 
     #[test]
     fn a_document_that_is_not_a_catalogue_is_refused() {

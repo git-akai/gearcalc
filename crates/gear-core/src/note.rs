@@ -80,6 +80,8 @@ pub mod key {
     pub const CLAMP_TOOTH_SEVERED: &str = "clamp.tooth_severed";
     /// `clamp.tooth_undercut`
     pub const CLAMP_TOOTH_UNDERCUT: &str = "clamp.tooth_undercut";
+    /// `clamp.flank_unsolved`
+    pub const CLAMP_FLANK_UNSOLVED: &str = "clamp.flank_unsolved";
     /// `clamp.tooth_thickness_capped`
     pub const CLAMP_TOOTH_THICKNESS_CAPPED: &str = "clamp.tooth_thickness_capped";
     /// `clamp.tooth_thickness_raised`
@@ -296,6 +298,7 @@ pub mod key {
         CLAMP_TIP_BELOW_FORM,
         CLAMP_TOOTH_SEVERED,
         CLAMP_TOOTH_UNDERCUT,
+        CLAMP_FLANK_UNSOLVED,
         CLAMP_TOOTH_THICKNESS_CAPPED,
         CLAMP_TOOTH_THICKNESS_RAISED,
         GEAR_FACE_WIDTH_AS_ENTERED,

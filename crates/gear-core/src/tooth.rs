@@ -554,13 +554,14 @@ impl Tooth {
 
         let junction = g.solve_junction();
         // Unreachable for finite inputs (see `solve_junction`), and every test
-        // build asks; were it reached, the tooth is read as having no flank and
-        // no fillet, which no rating uses, rather than a guessed junction.
+        // build asks; were it reached, the tooth is read as having no flank,
+        // which no rating uses, and says so rather than guess a junction.
         debug_assert!(junction.is_some(), "unsolved flank junction: {params:?}");
         match junction {
             None => {
                 g.u_j = g.u_tip;
                 g.r_j = g.ra;
+                g.clamps.push(Note::new(key::CLAMP_FLANK_UNSOLVED));
             }
             Some(Junction::Crossing { u, s }) => {
                 g.u_j = u;

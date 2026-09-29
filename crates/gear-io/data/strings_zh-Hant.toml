@@ -25,6 +25,7 @@ tip_capped_pointed = "齒頂已限制在 {radius} mm：齒在此處已收成尖�
 tip_below_form = "齒頂半徑 {radius} mm 低於齒面起始處：輪齒僅由齒根過渡曲線構成，沒有漸開線齒面"
 tooth_severed = "輪齒被過切切斷"
 tooth_undercut = "過切：刀具已切去齒根附近的一段齒面"
+flank_unsolved = "齒面與齒根過渡曲線無法連接：輪齒按無齒面繪製，且不作強度評定"
 cutter_no_tip_corner = "無齒根圓角：刀具沒有可用的齒頂圓角"
 ring_space_capped = "齒槽寬已限制：變位或齒厚修正過正"
 ring_space_raised = "齒槽寬已增大：變位或齒厚修正過負"
