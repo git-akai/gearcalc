@@ -482,16 +482,16 @@
     b4     planet    of part 1  speed 12/5
 
 == hula ==
-  path b1    -> b3    ratio     232.562500   efficiency  81.919641 / 77.908095  %   backlash   0.065428 / 15.216172  deg
-    power through the teeth 379.296745 / 463.460222   one more tooth: 49.116883 -75.938776 -90.756098 49.116883
-  path b3    -> b1    ratio       0.004300   efficiency  77.908095 / 81.919641  %   backlash  15.216172 / 0.065428   deg
-    power through the teeth 463.460222 / 379.296745   one more tooth: 0.020360 -0.013169 -0.011019 0.020360
+  path b1    -> b3    ratio     232.562500   efficiency  81.919640 / 77.908095  %   backlash   0.065428 / 15.216172  deg
+    power through the teeth 379.296743 / 463.460222   one more tooth: 49.116883 -75.938776 -90.756098 49.116883
+  path b3    -> b1    ratio       0.004300   efficiency  77.908095 / 81.919640  %   backlash  15.216172 / 0.065428   deg
+    power through the teeth 463.460222 / 379.296743   one more tooth: 0.020360 -0.013169 -0.011019 0.020360
   case 1       2.0000 Nm /   3000.00 rpm at b1     +reacted at b3   
     ! train.stresses_nominal
     fixed    ground ground                          -  torque     0.000000
     load     b1  carrier                3000.0000 rpm  torque     2.000000
-    fixed    b2  ring 1                          -  torque   379.028728
-    reacted  b3  ring 2                 12.8998 rpm  torque  -381.028728
+    fixed    b2  ring 1                          -  torque   379.028726
+    reacted  b3  ring 2                 12.8998 rpm  torque  -381.028726
     free     b4  planet 1               -196.7213 rpm  torque     0.000000
   case 2       0.6000 Nm /      0.00 rpm at b3     +reacted at b1   
     ! train.stresses_nominal
@@ -504,38 +504,38 @@
     ! train.stresses_nominal
     fixed    ground ground                          -  torque     0.000000
     load     b1  carrier                2400.0000 rpm  torque     2.000000
-    fixed    b2  ring 1                          -  torque   379.028728
-    reacted  b3  ring 2                 10.3198 rpm  torque  -381.028728
+    fixed    b2  ring 1                          -  torque   379.028726
+    reacted  b3  ring 2                 10.3198 rpm  torque  -381.028726
     free     b4  planet 1               -157.3770 rpm  torque     0.000000
   part 1
     slot carrier   case 1  speed    3000.000000  torque       2.000000
     slot carrier   case 2  speed       0.000000  torque      -0.002010
     slot carrier   case 3  speed    2400.000000  torque       2.000000
-    slot ring 1    case 1  speed       0.000000  torque     379.028728
+    slot ring 1    case 1  speed       0.000000  torque     379.028726
     slot ring 1    case 2  speed       0.000000  torque      -0.597990
-    slot ring 1    case 3  speed       0.000000  torque     379.028728
-    slot ring 2    case 1  speed      12.899758  torque    -381.028728
+    slot ring 1    case 3  speed       0.000000  torque     379.028726
+    slot ring 2    case 1  speed      12.899758  torque    -381.028726
     slot ring 2    case 2  speed       0.000000  torque       0.600000
-    slot ring 2    case 3  speed      10.319807  torque    -381.028728
+    slot ring 2    case 3  speed      10.319807  torque    -381.028726
     slot planet 1  case 1  speed    -196.721311  torque       0.000000
     slot planet 1  case 2  speed       0.000000  torque       0.000000
     slot planet 1  case 3  speed    -157.377049  torque       0.000000
     member 1  z 61  
-      case 1  speed    -196.721311  vs frame   -3196.721311  torque     355.867576  cycles -
+      case 1  speed    -196.721311  vs frame   -3196.721311  torque     355.867574  cycles -
       case 2  speed       0.000000  vs frame       0.000000  torque       0.561191  cycles -
-      case 3  speed    -157.377049  vs frame   -2557.377049  torque     355.867576  cycles 1.534426e8 / 1.534426e8
+      case 3  speed    -157.377049  vs frame   -2557.377049  torque     355.867574  cycles 1.534426e8 / 1.534426e8
     member 2  z 57  
-      case 1  speed    -196.721311  vs frame   -3196.721311  torque     356.043238  cycles -
+      case 1  speed    -196.721311  vs frame   -3196.721311  torque     356.043236  cycles -
       case 2  speed       0.000000  vs frame       0.000000  torque       0.560932  cycles -
-      case 3  speed    -157.377049  vs frame   -2557.377049  torque     356.043238  cycles 1.534426e8 / 1.534426e8
+      case 3  speed    -157.377049  vs frame   -2557.377049  torque     356.043236  cycles 1.534426e8 / 1.534426e8
     member 3  z 65  
-      case 1  speed       0.000000  vs frame   -3000.000000  torque     379.203155  cycles -
+      case 1  speed       0.000000  vs frame   -3000.000000  torque     379.203153  cycles -
       case 2  speed       0.000000  vs frame       0.000000  torque       0.597990  cycles -
-      case 3  speed       0.000000  vs frame   -2400.000000  torque     379.203155  cycles 1.440000e8 / 1.440000e8
+      case 3  speed       0.000000  vs frame   -2400.000000  torque     379.203153  cycles 1.440000e8 / 1.440000e8
     member 4  z 61  
-      case 1  speed      12.899758  vs frame   -2987.100242  torque     381.028728  cycles -
+      case 1  speed      12.899758  vs frame   -2987.100242  torque     381.028726  cycles -
       case 2  speed       0.000000  vs frame       0.000000  torque       0.600296  cycles -
-      case 3  speed      10.319807  vs frame   -2389.680193  torque     381.028728  cycles 1.433808e8 / 1.433808e8
+      case 3  speed      10.319807  vs frame   -2389.680193  torque     381.028726  cycles 1.433808e8 / 1.433808e8
     mesh 1  efficiency  99.954002 / 99.954002  %  contact ratio   1.3488  coprime
     mesh 2  efficiency  99.950663 / 99.950663  %  contact ratio   1.3499  coprime
   graph    mobility 2 degree(s), 2 given   total ratio 3721/16

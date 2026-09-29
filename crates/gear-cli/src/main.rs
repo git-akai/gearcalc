@@ -823,13 +823,13 @@ fn hula_report(n: u32, clearance: f64, m_outer: f64, m_inner: f64, cutter_teeth:
         );
         println!(
             "    backlash {:.5} / {:.5} deg   flank interference: pinion {}  ring {}   \
-             tip {} ({:+.4} deg)",
+             tip {} ({})",
             mesh.backlash[0].nominal,
             mesh.backlash[1].nominal,
             mesh.flank_interference[0],
             mesh.flank_interference[1],
             mesh.tips.is_some_and(|t| t.tip_interference),
-            mesh.tips.map_or(0.0, |t| t.tip_margin)
+            margin_text(mesh.tips.map_or(Some(0.0), |t| t.tip_margin))
         );
         for note in &mesh.notes {
             println!("    ! {}", words().render(note));
@@ -1024,6 +1024,11 @@ impl Boundary {
             -least
         }
     }
+}
+
+/// A tip margin in degrees, or that the tip circles do not cross.
+fn margin_text(margin: Option<f64>) -> String {
+    margin.map_or_else(|| "no crossing".to_string(), |m| format!("{m:+.4} deg"))
 }
 
 /// Roll an internal pair through one tooth and report where the flanks touch.
@@ -1250,13 +1255,13 @@ fn mesh_sweep(z_ring: u32, z_pinion: u32, ring_addendum: f64, pinion_addendum: f
         &pinion,
         m.centre_distance,
         &format!(
-            "control  ring z{z_ring}  pinion z{z_pinion}   contact ratio {:.4}   alpha_w {:.2} deg   troch {} inv {} tip {} ({:+.4} deg)",
+            "control  ring z{z_ring}  pinion z{z_pinion}   contact ratio {:.4}   alpha_w {:.2} deg   troch {} inv {} tip {} ({})",
             m.contact_ratio,
             m.alpha_w.to_degrees(),
             m.trochoid_interference,
             m.involute_interference,
             m.tip_interference,
-            m.tip_margin.to_degrees()
+            margin_text(m.tip_margin.map(f64::to_degrees))
         ),
     );
 }
@@ -1306,7 +1311,7 @@ fn hula_sweep(n: u32, clearance: f64, mesh_index: usize) {
         &pinion,
         result.offset_nominal,
         &format!(
-            "hula mesh {}  ring z{} x{:+.4}  pinion z{} x{:+.4}   gap asked {clearance} got {:.4} mm   alpha_w {:.2} deg   tip {} ({:+.4} deg)",
+            "hula mesh {}  ring z{} x{:+.4}  pinion z{} x{:+.4}   gap asked {clearance} got {:.4} mm   alpha_w {:.2} deg   tip {} ({})",
             mesh_index + 1,
             result.gears[ring_i].0.params.teeth,
             result.gears[ring_i].0.profile_shift,
@@ -1315,7 +1320,7 @@ fn hula_sweep(n: u32, clearance: f64, mesh_index: usize) {
             m.tips.map_or(f64::NAN, |t| t.far_gap),
             transverse(m).operating_pressure_angle,
             m.tips.is_some_and(|t| t.tip_interference),
-            m.tips.map_or(0.0, |t| t.tip_margin)
+            margin_text(m.tips.map_or(Some(0.0), |t| t.tip_margin))
         ),
     );
 }
@@ -3713,8 +3718,9 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
                                 m.flank_interference[0],
                                 m.flank_interference[1],
                                 m.tips.map_or_else(String::new, |t| format!(
-                                    "   tips {} ({:+.4} deg of pinion)",
-                                    t.tip_interference, t.tip_margin
+                                    "   tips {} ({} of pinion)",
+                                    t.tip_interference,
+                                    margin_text(t.tip_margin)
                                 ))
                             );
                         }

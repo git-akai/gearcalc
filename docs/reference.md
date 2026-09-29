@@ -1670,21 +1670,32 @@ itself is perfectly conjugate.
 
 ```text
 cos θ_pinion = (R_a² − r_a² − a²) / (2 a r_a)      the crossing, from each centre,
-cos θ_ring   = (a² + R_a² − r_a²) / (2 a R_a)      measured from the line of centres
+cos θ_ring   = (a² + R_a² − r_a²) / (2 a R_a)      measured from the line of centres, mesh side
 half width   ψ_pinion = ψ_b1 − inv α_a1            a tooth's angular half-thickness
              ψ_ring   = ψ_b2 + inv α_a2            at its own tip
 ```
 
-A pinion's tip has to reach past a ring's for them to engage, so the circles of
-any pair that meshes cross somewhere and the question is always live. What
-decides it is whether a tooth from each is *at* the crossing. The two windows sit
-on different wheels at different angles about different centres, and the rolling
-is what makes them comparable: take the instant a pinion tooth is symmetric about
-the line of centres — the ring space it fills is symmetric about it too, which
-fixes both phases at once — and then as the pinion turns by `δ` its window slides
-by `δ` and the ring's by `δ z_p/z_r`. Written as intervals of `δ` both have the
-same period, one pinion pitch, so one period decides it, and the margin is the
-gap between them: negative is the overlap.
+A pair that meshes need not have tip circles that cross: where the ring's
+encloses the pinion's there is nowhere for the tips to meet, and where the
+pinion's encloses the ring's the pinion's tip stands outside the ring's on the
+far side, which is a foul by itself (the far-side gap `R_a − r_a + a` below
+zero). Between the two, what decides it is whether a tooth from each is *at* the
+crossing. The two windows sit on different wheels at different angles about
+different centres, and the rolling is what makes them comparable: take the
+instant a pinion tooth is symmetric about the line of centres — the ring space it
+fills is symmetric about it too, which fixes both phases at once — and then as
+the pinion turns by `δ` its window slides by `δ` and the ring's by `δ z_p/z_r`.
+The tooth that reaches the crossing is the one that was in that space, and it
+must still be between the same two ring teeth there:
+
+```text
+D = θ_p − (θ_r − π/z_r) z_r/z_p          its offset from the ring tooth behind it
+margin = min(D − H, 2π/z_p − D − H)      H = ψ_pinion + ψ_ring z_r/z_p
+```
+
+negative is the overlap. Folded into one pitch, a tooth that had overtaken a
+ring tooth inside the lens read as sitting in the next space: 48/46 at x 0.9/0.9
+was called clear and rolls 0.51 mm into the ring (T05.1).
 
 It is the condition that decides a one-tooth difference. On a hula stage at
 `z = 18` the tips foul at 134° from the line of centres until the far-side gap

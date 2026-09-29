@@ -1226,6 +1226,47 @@ mod tests {
         assert_eq!(r.distances[0].sized_by, None);
     }
 
+    /// **The verdict on a planocentric's tips is the roll's.** The automatic
+    /// sets at one and two teeth of difference are called clear and roll
+    /// clear; held at a distance that fouls them, one is called fouled — 28/30
+    /// at a stated 1.0304, which rolls 0.46 mm into the ring. A control: the
+    /// fold that T05.1 removed called all three the same way.
+    #[test]
+    fn a_planocentrics_tips_are_called_as_the_roll_finds_them() {
+        let rolled = |shape: &Shape, r: &ShapeResult| {
+            let ring = crate::ring::Ring::cut_by(
+                &r.members[1].params,
+                &shape.members[1].ring.expect("the ring's cutter"),
+            );
+            let pinion = crate::tooth::Tooth::new(r.members[0].params);
+            crate::ring::roll::rolled(&ring, &pinion, r.distances[0].running)
+        };
+        for (planet, ring) in [(28, 30), (29, 30)] {
+            let shape = planocentric(planet, ring);
+            let r = solve(&shape, &[2], 1, 3);
+            let tips = r.meshes[0].tips.expect("an internal mesh");
+            let roll = rolled(&shape, &r.part);
+            assert!(
+                !tips.tip_interference,
+                "{planet}/{ring}: {tips:?}, rolled {roll}"
+            );
+            assert!(
+                roll >= -0.02,
+                "{planet}/{ring}: called clear, rolled {roll}"
+            );
+        }
+        let mut shape = planocentric(28, 30);
+        shape.distances[0].distance = Auto::fixed(1.0304);
+        let r = solve(&shape, &[2], 1, 3);
+        let roll = rolled(&shape, &r.part);
+        assert!(roll < -0.1, "rolled {roll}");
+        assert!(
+            r.meshes[0].tips.is_some_and(|t| t.tip_interference),
+            "rolled {roll}, called {:?}",
+            r.meshes[0].tips
+        );
+    }
+
     #[test]
     fn meshed_planets_reverse_the_simple_set() {
         // Sun in, ring held, carrier out: 1 − z_r/z_s, negative.
@@ -1825,8 +1866,8 @@ mod hula {
         for mesh in &shipped.meshes {
             let tips = mesh.tips.expect("every hula mesh is internal");
             assert!(
-                !tips.tip_interference && tips.tip_margin > 0.1,
-                "margin {}",
+                !tips.tip_interference && tips.tip_margin.is_some_and(|m| m > 0.1),
+                "margin {:?}",
                 tips.tip_margin
             );
         }
@@ -1857,7 +1898,7 @@ mod hula {
         assert!(
             opened.meshes[binding]
                 .tips
-                .is_some_and(|t| t.tip_margin.abs() < 1e-4),
+                .is_some_and(|t| t.tip_margin.is_some_and(|m| m.abs() < 1e-4)),
             "the tips are what held it, so they sit at their limit: {:?}",
             opened.meshes[binding].tips
         );

@@ -1581,14 +1581,14 @@ impl Shape {
                 // side away from contact stands `r_tip − e` from the ring's
                 // centre, and the tips' room where their circles cross opens
                 // as the pinion moves out.
+                // The crossing's room is an angle of pinion turn; as the arc
+                // it sweeps at the pinion's tip it is a length like the far
+                // gap, so the two compare at any module.
                 let room = ring.map_or(f64::INFINITY, |ring| {
                     super::TipRoom::at(&ring, &pinion, running).map_or(f64::NAN, |t| {
-                        let crossing = if t.tip_interference {
-                            -1.0
-                        } else {
-                            t.tip_margin
-                        };
-                        (t.far_gap - asked).min(crossing)
+                        let far = t.far_gap - asked;
+                        t.tip_margin
+                            .map_or(far, |deg| far.min(deg.to_radians() * pinion.ra))
                     })
                 });
                 (room, k)
@@ -1740,13 +1740,13 @@ impl Shape {
             }
             let e = crate::solve::brent(room_at, lo, hi, crate::solve::Tol::default())
                 .ok_or(TrainError::TipsUnclearable { mesh })?;
-            // Lean to the clear side of the root by the solver's own
-            // tolerance, so the parts built at it have the room asked for.
-            let e = if room_at(e) < 0.0 {
-                hi.min(e + 1e-9)
-            } else {
-                e
-            };
+            // Lean to the clear side of the root, so the parts built at it
+            // have the room asked for: by a part in 10⁹ of the distance, far
+            // past the solver's tolerance, and scaled with it so the module
+            // scales the answer and nothing else. Always, rather than where
+            // the root landed a hair short: which side it lands on is the
+            // solver's last step, and it differs from one module to another.
+            let e = hi.min(e * (1.0 + 1e-9));
             held[d] = Some(e);
             bound_by[d] = self
                 .closed(&self.plan_held(helix, held.clone()), free, helix)
@@ -6186,7 +6186,7 @@ mod hula_recorded {
             close(eps, m.contact_ratio, 5e-5, "ε");
             let tips = m.tips.unwrap();
             close(far, tips.far_gap, 5e-5, "far-side gap");
-            close(tip, tips.tip_margin, 5e-5, "tip margin");
+            close(tip, tips.tip_margin.unwrap(), 5e-5, "tip margin");
             assert!(!tips.tip_interference);
         }
         // **Every mesh is pressed with its driver's force** — the stated

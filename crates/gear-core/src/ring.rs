@@ -917,13 +917,20 @@ pub struct RingMesh {
     /// entirely. It is the condition that decides small tooth differences, where
     /// the tip circles cross far from the line of centres — 136° from it on a
     /// one-tooth pair — and the mesh itself is perfectly conjugate.
+    ///
+    /// Set where the tips overlap where their circles cross
+    /// ([`Self::tip_margin`] negative) or the pinion's tip stands outside the
+    /// ring's on the far side ([`Self::far_gap`] negative).
     pub tip_interference: bool,
     /// How much room the tips have where their circles cross, as an angle of
     /// **pinion** rotation, radians. Negative is the overlap.
     ///
-    /// Infinite when the tip circles do not cross at all, which is the ordinary
-    /// case: there is then no place for the tips to meet.
-    pub tip_margin: f64,
+    /// `None` when the ring's tip circle encloses the pinion's, which is the
+    /// ordinary case: there is then no place for the tips to meet.
+    pub tip_margin: Option<f64>,
+    /// The room between the pinion's tip and the ring's on the side away from
+    /// the mesh, mm: `R_a − r_a + a`.
+    pub far_gap: f64,
 }
 
 /// Where two tip circles cross, and whether a tooth from each is there.
@@ -933,10 +940,10 @@ pub struct RingMesh {
 /// cos θ_ring   = (a² + R_a² − r_a²) / (2 a R_a)      from the ring's
 /// ```
 ///
-/// both measured from the line of centres, on the side away from the mesh. A
-/// tooth is present at its own tip circle over its angular half-thickness there,
-/// which the involute gives from the half-thickness at the base circle each
-/// member already carries.
+/// both measured from the line of centres on the **mesh** side. A tooth is
+/// present at its own tip circle over its angular half-thickness there, which
+/// the involute gives from the half-thickness at the base circle each member
+/// already carries.
 ///
 /// # Why the two windows can be compared at all
 ///
@@ -945,17 +952,38 @@ pub struct RingMesh {
 /// tooth is symmetric about the line of centres: the ring space it fills is
 /// symmetric about it too, and that fixes both phases at once. Then as the
 /// pinion turns by δ the pinion window slides by δ and the ring window by
-/// `δ z_p/z_r`, so writing both as intervals of δ makes them comparable — and
-/// both have the same period, one pinion pitch, so one period decides it.
-fn tip_clearance(ring: &Ring, pinion: &Tooth, a: f64) -> f64 {
+/// `δ z_p/z_r`, so writing both as intervals of δ makes them comparable.
+///
+/// # That tooth, not the nearest one
+///
+/// The tooth that reaches the crossing is the one that was in that space at
+/// the mesh, and it has to be between the same two ring teeth when it gets
+/// there. Its offset from the ring tooth behind it, in pinion rotation, is
+///
+/// ```text
+/// D = θ_p − (θ_r − π/z_r) z_r/z_p,      margin = min(D − H, 2π/z_p − D − H)
+/// ```
+///
+/// with `H` the two half-thicknesses. Folded into one pitch instead, a tooth
+/// that had overtaken a ring tooth inside the lens read as sitting in the next
+/// space.
+///
+/// `None` when the ring's tip circle encloses the pinion's, or the two lie
+/// apart: the circles do not cross. Where the pinion's encloses the ring's the
+/// crossing has run round to the far side, and the clamp holds it at `π`,
+/// continuous with the tangency it grew from.
+fn tip_clearance(ring: &Ring, pinion: &Tooth, a: f64) -> Option<f64> {
+    use std::f64::consts::{PI, TAU};
     let (r_a, big_r_a) = (pinion.ra, ring.ra);
-    // The circles have to cross before their tips can meet.
-    if a <= (big_r_a - r_a).abs() || a >= big_r_a + r_a {
-        return f64::INFINITY;
+    if a <= big_r_a - r_a || a >= big_r_a + r_a {
+        return None;
     }
-    let theta_p = ((big_r_a * big_r_a - r_a * r_a - a * a) / (2.0 * a * r_a)).clamp(-1.0, 1.0);
-    let theta_r = ((a * a + big_r_a * big_r_a - r_a * r_a) / (2.0 * a * big_r_a)).clamp(-1.0, 1.0);
-    let (theta_p, theta_r) = (theta_p.acos(), theta_r.acos());
+    let theta_p = ((big_r_a * big_r_a - r_a * r_a - a * a) / (2.0 * a * r_a))
+        .clamp(-1.0, 1.0)
+        .acos();
+    let theta_r = ((a * a + big_r_a * big_r_a - r_a * r_a) / (2.0 * a * big_r_a))
+        .clamp(-1.0, 1.0)
+        .acos();
 
     // Half the angular thickness of each tooth at its own tip, from the
     // half-thickness at the base circle: an external tooth loses angle outward
@@ -963,26 +991,12 @@ fn tip_clearance(ring: &Ring, pinion: &Tooth, a: f64) -> f64 {
     let at_tip = |rb: f64, ra: f64| inv((rb / ra).clamp(-1.0, 1.0).acos());
     let half_p = pinion.psi_b - at_tip(pinion.rb, r_a);
     let half_r = ring.psi_b + at_tip(ring.rb, big_r_a);
-    if half_p <= 0.0 || half_r <= 0.0 {
-        // A tooth with no thickness at its tip cannot foul with it.
-        return f64::INFINITY;
-    }
 
     let (z_p, z_r) = (f64::from(pinion.params.teeth), f64::from(ring.teeth));
-    let (pitch_p, pitch_r) = (std::f64::consts::TAU / z_p, std::f64::consts::TAU / z_r);
-    // Each window as an interval of pinion rotation, centred on the offset of
-    // the nearest tooth from the crossing. The pinion's teeth are centred on the
-    // line of centres and the ring's *spaces* are, so the ring's teeth sit half
-    // a pitch off.
-    let fold = |x: f64, pitch: f64| x - pitch * (x / pitch).round();
-    let centre_p = fold(theta_p, pitch_p);
-    let centre_r = fold(theta_r - pitch_r / 2.0, pitch_r) * z_r / z_p;
-    let half_r_in_pinion = half_r * z_r / z_p;
-
-    // Clear when the intervals miss, the near way round a period of one pinion
-    // pitch. The margin is the gap between them, negative where they overlap.
-    let separation = fold(centre_p - centre_r, pitch_p).abs();
-    separation - (half_p + half_r_in_pinion)
+    let ratio = z_r / z_p;
+    let d = theta_p - (theta_r - PI / z_r) * ratio;
+    let h = half_p + half_r * ratio;
+    Some((d - h).min(TAU / z_p - d - h))
 }
 
 /// Mesh a ring with an external pinion at their zero-backlash centre distance.
@@ -1096,6 +1110,7 @@ fn described_at(ring: &Ring, pinion: &Tooth, a_ref: f64, centre_distance: f64) -
     let trochoid_interference = ring_contact_at_pinion_tip > ring_form;
     let involute_interference = reachable.is_none() || pinion_contact_at_ring_tip < pinion.r_j;
     let tip_margin = tip_clearance(ring, pinion, centre_distance);
+    let far_gap = ring.ra - pinion.ra + centre_distance;
 
     Some(RingMesh {
         centre_distance,
@@ -1105,9 +1120,98 @@ fn described_at(ring: &Ring, pinion: &Tooth, a_ref: f64, centre_distance: f64) -
         pinion_contact_at_ring_tip,
         trochoid_interference,
         involute_interference,
-        tip_interference: tip_margin < 0.0,
+        tip_interference: tip_margin.is_some_and(|m| m < 0.0) || far_gap < 0.0,
         tip_margin,
+        far_gap,
     })
+}
+
+/// **An independent roll of an internal pair**, for the tests: nothing here
+/// shares code with the tip margin it checks.
+#[cfg(test)]
+pub(crate) mod roll {
+    use super::Ring;
+    use crate::tooth::Tooth;
+    use std::f64::consts::{PI, TAU};
+
+    /// The deepest a pinion point sits inside ring material over one pinion
+    /// pitch, negated, mm: zero where the teeth only touch, negative where
+    /// they foul. The pinion sits in the middle of its play at the mesh.
+    ///
+    /// Both members are involute teeth and tip circles, zero backlash where
+    /// the distance is the pair's own. The pinion is its two flanks from
+    /// where they start to its tip and its tip land, every tooth; a point is
+    /// in ring material outside the ring's tip circle and within its tooth's
+    /// half-angle there, and how deep is the lesser of its height above the
+    /// tip circle and its distance from the flank — `r_b` times the angle
+    /// between the two involutes, since involutes of one base circle are
+    /// parallel. Past the ring's junction its fillet only adds material, so
+    /// this reads a foul there as no deeper than it is.
+    pub(crate) fn rolled(ring: &Ring, pinion: &Tooth, a: f64) -> f64 {
+        let (zp, zr) = (f64::from(pinion.params.teeth), f64::from(ring.teeth));
+        let inv_at = |rb: f64, rho: f64| {
+            let al = (rb / rho).min(1.0).acos();
+            al.tan() - al
+        };
+        let lo = pinion.rb.max(pinion.r_j);
+        let mut outline = Vec::new();
+        for i in 0..=40 {
+            let rho = lo + (pinion.ra - lo) * f64::from(i) / 40.0;
+            let h = pinion.psi_b - inv_at(pinion.rb, rho);
+            outline.extend([(rho, h), (rho, -h)]);
+        }
+        let h_tip = pinion.psi_b - inv_at(pinion.rb, pinion.ra);
+        for i in 0..=10 {
+            outline.push((pinion.ra, h_tip * (f64::from(i) / 5.0 - 1.0)));
+        }
+        // Ring teeth centred half a ring pitch off `+y`, where its space is.
+        let depth = |x: f64, y: f64| -> f64 {
+            let rho = x.hypot(y);
+            if rho <= ring.ra {
+                return 0.0;
+            }
+            let pitch = TAU / zr;
+            let th = x.atan2(y) - PI / zr;
+            let off = (th - pitch * (th / pitch).round()).abs();
+            let half = ring.psi_b + inv_at(ring.rb, rho);
+            (rho - ring.ra).min(ring.rb * (half - off)).max(0.0)
+        };
+        // Pinion centre at `(0, a)`, its tooth on `+y` at the mesh; both turn
+        // clockwise, the ring `z_p/z_r` as far, and `phase` more.
+        let deepest = |phase: f64, turn: f64| -> f64 {
+            let ring_turn = turn * zp / zr + phase;
+            let mut worst = 0.0_f64;
+            for k in 0..pinion.params.teeth {
+                let t = turn + TAU * f64::from(k) / zp;
+                let tip = (pinion.ra * t.sin(), a + pinion.ra * t.cos());
+                if tip.0.hypot(tip.1) < ring.ra - 2.0 * ring.mt {
+                    continue;
+                }
+                for &(rho, h) in &outline {
+                    let (x, y) = (rho * (h + t).sin(), a + rho * (h + t).cos());
+                    let (r, th) = (x.hypot(y), x.atan2(y) - ring_turn);
+                    worst = worst.max(depth(r * th.sin(), r * th.cos()));
+                }
+            }
+            worst
+        };
+        // The assembly phase: the middle of the play at the mesh, or where
+        // the teeth sit least deep in each other there if they have none.
+        let phases: Vec<f64> = (-40..=40).map(|j| PI / zr * f64::from(j) / 80.0).collect();
+        let at_mesh: Vec<f64> = phases.iter().map(|&p| deepest(p, 0.0)).collect();
+        let least = at_mesh.iter().copied().fold(f64::INFINITY, f64::min);
+        let free: Vec<f64> = phases
+            .iter()
+            .zip(&at_mesh)
+            .filter(|(_, &d)| d <= least + 1e-12)
+            .map(|(&p, _)| p)
+            .collect();
+        let phase = 0.5 * (free[0] + free[free.len() - 1]);
+        let step = TAU / zp / 120.0;
+        (0..120)
+            .map(|i| -deepest(phase, step * f64::from(i)))
+            .fold(0.0, f64::min)
+    }
 }
 
 #[cfg(test)]
@@ -1906,35 +2010,16 @@ mod tests {
             let m = mesh_with(&ring(r), &pinion(p)).unwrap();
             assert!(
                 !m.tip_interference,
-                "z{r}/z{p} should have room at its tips, margin {}",
-                m.tip_margin.to_degrees()
+                "z{r}/z{p} should have room at its tips, margin {:?}",
+                m.tip_margin
             );
         }
         for (r, p) in [(40, 34), (30, 26)] {
             let m = mesh_with(&ring(r), &pinion(p)).unwrap();
             assert!(
                 m.tip_interference,
-                "z{r}/z{p} tips should foul, margin {}",
-                m.tip_margin.to_degrees()
-            );
-        }
-    }
-
-    /// **The question is always live**, which is worth stating because the
-    /// guard against it looks like it might not be.
-    ///
-    /// A pinion's tip has to reach past a ring's for the two to engage at all,
-    /// so the tip circles of any pair that meshes cross somewhere and the margin
-    /// is a number rather than an infinity. The infinite arm is for a pair that
-    /// is not a mesh — asked, because a guard that cannot be reached from here
-    /// can be reached from somewhere else.
-    #[test]
-    fn any_pair_that_meshes_has_tip_circles_that_cross() {
-        for (r, p) in [(60, 20), (40, 20), (100, 30), (40, 34), (30, 26)] {
-            let m = mesh_with(&ring(r), &pinion(p)).unwrap();
-            assert!(
-                m.tip_margin.is_finite(),
-                "z{r}/z{p} meshes, so its tip circles cross"
+                "z{r}/z{p} tips should foul, margin {:?}",
+                m.tip_margin
             );
         }
     }
@@ -1960,13 +2045,12 @@ mod tests {
                     ..Cutter::default()
                 },
             );
-            let m = mesh_with(&r, &pinion(26)).unwrap();
+            let margin = mesh_with(&r, &pinion(26)).unwrap().tip_margin.unwrap();
             assert!(
-                m.tip_margin > last,
-                "the margin fell from {last} to {} at x {x}",
-                m.tip_margin
+                margin > last,
+                "the margin fell from {last} to {margin} at x {x}"
             );
-            last = m.tip_margin;
+            last = margin;
         }
     }
 
@@ -3059,5 +3143,118 @@ mod tests {
             );
         }
         assert!(curtate_seen >= 4, "{curtate_seen} of the cases are curtate");
+    }
+
+    /// A ring and its pinion, as the tip-room cases state them.
+    fn internal_pair(
+        teeth: [u32; 2],
+        shift: [f64; 2],
+        addendum: [f64; 2],
+        cutter_teeth: u32,
+    ) -> (Ring, Tooth) {
+        (
+            Ring::cut_by(
+                &GearParams {
+                    teeth: teeth[0],
+                    profile_shift: shift[0],
+                    addendum: addendum[0],
+                    ..Default::default()
+                },
+                &Cutter {
+                    teeth: cutter_teeth,
+                    ..Cutter::default()
+                },
+            ),
+            Tooth::new(GearParams {
+                teeth: teeth[1],
+                profile_shift: shift[1],
+                addendum: addendum[1],
+                ..Default::default()
+            }),
+        )
+    }
+
+    /// **The roll is the harness's**: the independent roll reads the three
+    /// fouls the audit measured with `gear-cli`'s outline roll to 0.01 mm.
+    #[test]
+    fn the_independent_roll_reads_what_the_harness_rolled() {
+        for (teeth, shift, addendum, cutter, a, harness) in [
+            ([48, 46], [0.9, 0.9], [1.0, 1.0], 20, Some(1.0), -0.512),
+            ([24, 23], [0.8, 0.2], [1.0, 1.0], 12, None, -0.187),
+            ([43, 42], [0.0, 0.0], [0.7, 0.8], 20, Some(0.5), -0.587),
+        ] {
+            let (ring, pinion) = internal_pair(teeth, shift, addendum, cutter);
+            let a = a.unwrap_or_else(|| mesh_with(&ring, &pinion).unwrap().centre_distance);
+            let rolled = roll::rolled(&ring, &pinion, a);
+            assert!(
+                (rolled - harness).abs() < 0.01,
+                "{teeth:?}: rolled {rolled}, the harness {harness}"
+            );
+        }
+    }
+
+    /// **A pair the roll finds fouled is called fouled** — each a case the
+    /// verdict passed: a tooth that overtook a ring tooth inside the lens
+    /// (48/46), a pinion tip circle enclosing the ring's (24/23), the ring's
+    /// enclosing nothing at a stated distance (43/42, "+∞"), and a far side
+    /// that overlaps (32/30 at 0.96).
+    #[test]
+    fn a_pair_the_roll_finds_fouled_is_called_fouled() {
+        for (teeth, shift, addendum, cutter, a) in [
+            ([48, 46], [0.9, 0.9], [1.0, 1.0], 20, Some(1.0)),
+            ([24, 23], [0.8, 0.2], [1.0, 1.0], 12, None),
+            ([43, 42], [0.0, 0.0], [0.7, 0.8], 20, Some(0.5)),
+            ([32, 30], [0.0, 0.0], [1.0, 1.0], 20, Some(0.96)),
+        ] {
+            let (ring, pinion) = internal_pair(teeth, shift, addendum, cutter);
+            let a = a.unwrap_or_else(|| mesh_with(&ring, &pinion).unwrap().centre_distance);
+            let rolled = roll::rolled(&ring, &pinion, a);
+            assert!(rolled < -0.1, "{teeth:?} at {a}: the roll says {rolled}");
+            let m = mesh_at(&ring, &pinion, a).unwrap();
+            assert!(
+                m.tip_interference,
+                "{teeth:?} at {a}: rolled {rolled}, called clear"
+            );
+        }
+    }
+
+    /// **Clear means clear**: over tooth differences 1–10, shifts and addenda,
+    /// a pair every flag calls clear rolls clear to 0.02 modules.
+    #[test]
+    fn a_pair_called_clear_rolls_clear() {
+        let (mut clear, mut fouled) = (0, 0);
+        for ring_teeth in [30_u32, 48] {
+            for difference in 1..=10 {
+                for shift in [[0.0, 0.0], [0.5, 0.2], [0.9, 0.9]] {
+                    for addendum in [0.7, 1.0] {
+                        let (ring, pinion) = internal_pair(
+                            [ring_teeth, ring_teeth - difference],
+                            shift,
+                            [addendum; 2],
+                            20,
+                        );
+                        let Some(m) = mesh_with(&ring, &pinion) else {
+                            continue;
+                        };
+                        let rolled = roll::rolled(&ring, &pinion, m.centre_distance);
+                        let called_clear = !(m.tip_interference
+                            || m.trochoid_interference
+                            || m.involute_interference);
+                        if called_clear {
+                            clear += 1;
+                            assert!(
+                                rolled >= -0.02 * ring.params.module,
+                                "{ring_teeth}/{} x {shift:?} h_a {addendum}: called clear, \
+                                 rolled {rolled}",
+                                ring_teeth - difference
+                            );
+                        } else {
+                            fouled += 1;
+                        }
+                    }
+                }
+            }
+        }
+        assert!(clear > 20 && fouled > 20, "{clear} clear, {fouled} fouled");
     }
 }

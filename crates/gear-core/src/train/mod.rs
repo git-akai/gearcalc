@@ -578,14 +578,14 @@ pub struct TipRoom {
     /// well, which was the same question answered in two places.
     pub tip_interference: bool,
     /// How much room the tips have where their circles cross, as an angle of
-    /// **pinion** rotation, degrees. Negative is the overlap, and infinite where
+    /// **pinion** rotation, degrees. Negative is the overlap, and `None` where
     /// the tip circles do not cross at all — the ordinary case, where there is
     /// no place for the tips to meet. **Not sent**: the panel reads whether
     /// the tips clear ([`Self::tip_interference`]), and the harness the
     /// margin.
     #[cfg_attr(feature = "serde", serde(skip))]
     #[cfg_attr(feature = "typescript", ts(skip))]
-    pub tip_margin: f64,
+    pub tip_margin: Option<f64>,
     /// **The far-side gap**, mm: the room between the pinion's tip and the
     /// ring's on the side away from contact, `r_tip,ring − r_tip,pinion +
     /// a`. At a few teeth of difference it is what the distance is sized to
@@ -609,8 +609,8 @@ impl TipRoom {
     ) -> Option<Self> {
         crate::ring::mesh_at(ring, pinion, running).map(|m| Self {
             tip_interference: m.tip_interference,
-            tip_margin: m.tip_margin.to_degrees(),
-            far_gap: ring.ra - pinion.ra + running,
+            tip_margin: m.tip_margin.map(f64::to_degrees),
+            far_gap: m.far_gap,
         })
     }
 
