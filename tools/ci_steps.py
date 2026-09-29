@@ -161,6 +161,72 @@ def read_flake(flake=FLAKE):
     return standins, errors
 
 
+def read_jobs(ci=CI):
+    """The workflow's top-level keys and each job's keys, as indented text:
+    `{"": {key: text}, job: {key: text}}`, a key's text being its value and
+    every line nested under it, stripped and joined by newlines."""
+    out = {"": {}}
+    top = job = key = None
+    for line in ci.read_text().split("\n"):
+        text = line.strip()
+        if not text or text.startswith("#"):
+            continue
+        d = len(line) - len(line.lstrip(" "))
+        m = re.match(r"^([A-Za-z_-]+):\s*(.*)$", text)
+        if d == 0 and m:
+            top, job, key = m.group(1), None, None
+            out[""][top] = m.group(2)
+        elif top == "jobs" and d == 2 and m:
+            job, key = m.group(1), None
+            out[job] = {}
+        elif top == "jobs" and d == 4 and m and job:
+            key = m.group(1)
+            out[job][key] = m.group(2)
+        elif top == "jobs" and job and key:
+            out[job][key] += "\n" + text
+        elif top != "jobs":
+            out[""][top] += "\n" + text
+    return out
+
+
+def policy(ci=CI):
+    """What the workflow may do, beyond which steps it runs. Errors, if any.
+
+    - The workflow grants nothing at the top level; the `tests` job, which
+      runs project code, reads the repository and nothing else.
+    - Only `deploy` holds a write permission, and it runs on `main` alone.
+    - Runs are grouped per ref (`${{ github.ref }}`), cancelling a running one
+      on pull requests only; the deploy has a group of its own that never
+      cancels a running deploy."""
+    jobs = read_jobs(ci)
+    top = jobs.pop("")
+    errors = []
+    if "permissions" in top:
+        errors.append("ci.yml: permissions granted at the top level; grant them per job")
+    conc = top.get("concurrency", "")
+    if "${{ github.ref }}" not in conc:
+        errors.append("ci.yml: the workflow's concurrency group is not per ref")
+    if "cancel-in-progress: ${{ github.event_name == 'pull_request' }}" not in conc:
+        errors.append("ci.yml: cancel-in-progress is not on pull requests alone")
+    for name, job in jobs.items():
+        perms = job.get("permissions", "")
+        grants = dict(re.findall(r"^([a-z-]+):\s*(\S+)$", perms, re.M))
+        writes = sorted(k for k, v in grants.items() if v == "write")
+        if name == "tests" and grants != {"contents": "read"}:
+            errors.append(f"ci.yml: job tests holds {grants}; it may read contents and nothing else")
+        if name != "deploy" and writes:
+            errors.append(f"ci.yml: job {name} writes {writes}; only deploy may write")
+        if name == "deploy":
+            if job.get("if", "").strip() != "github.ref == 'refs/heads/main'":
+                errors.append("ci.yml: deploy does not run on main alone")
+            c = job.get("concurrency", "")
+            if "group: pages" not in c or "cancel-in-progress: false" not in c:
+                errors.append("ci.yml: deploy is not serialised on its own group without cancelling")
+        if "permissions" not in job:
+            errors.append(f"ci.yml: job {name} states no permissions")
+    return errors
+
+
 def key(step):
     """What a step is known by: its name, or else its command, or its action
     without the version, so a version bump is not a new step."""
@@ -175,7 +241,7 @@ def main():
     steps_out, flake_out, *excluded = sys.argv[1:]
     steps, errors = read_steps(excluded)
     standins, more = read_flake()
-    errors += more
+    errors += more + policy()
     if errors:
         print("\n".join(errors), file=sys.stderr)
         return 1

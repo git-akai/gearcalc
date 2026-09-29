@@ -5,9 +5,13 @@ on:
   push:
   workflow_dispatch:
 
-# One run per ref: a newer push to a pull request cancels the older run, which
-# is checking a commit nobody will merge; on a branch every pushed commit is
-# checked to the end. The deploy serialises on its own group, below.
+# One run per ref at a time. GitHub keeps at most one running and one pending
+# run in a group, and a newer run always replaces a pending one; on a pull
+# request it also cancels the running one (a commit nobody will merge), and on
+# a branch a running check finishes, so the newest push is always checked but
+# a push that lands while two others queue behind a running one is skipped.
+# The deploy serialises on its own group, below. `tools/ci_steps.py` holds
+# this, the jobs' permissions and deploy-on-main-only as a policy.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -195,9 +199,8 @@ jobs:
   # `needs: tests` is the point of merging the two workflows: the site cannot
   # move unless every step of the tests job has passed on that commit.
   #
-  # One deploy at a time, and a queued one waits rather than cancelling: the
-  # published site should end up at the newest commit that passed, not at
-  # whichever job happened to survive a race.
+  # One deploy at a time: a running deploy finishes, and a newer one replaces
+  # any still queued, so the site ends up at the newest commit that passed.
   deploy:
     needs: tests
     if: github.ref == 'refs/heads/main'
