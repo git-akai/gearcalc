@@ -2,17 +2,15 @@
 
 Authors: contact-proto (2026-09-26/29), contact-proto-2 (round two), contact-proto-3 (round three),
 contact-proto-4 (2026-09-29, round four, this revision). Read-only on the repo; pure Python, no numpy.
-- **Scripts and outputs:** `~/.cache/gearcalc-work/contact-proto/` (README there). Round four's are
-  `trace.py`, `b4.py`, `phase4.py`, `t_det4.py`, `t_cont4.py`, `t_sweep4.py`, `t_end4*.py`, `t_c2d.py`,
-  `t_iso4.py`, `t_cost4.py`, the FE tooth in `fe/` and the matched wheel in `mw_*.py`. Round three's text
-  is kept beside them as `contact-model.round3.md` (round two's as `contact-model.round2.md`).
+- **Scripts and outputs:** `~/.cache/gearcalc-work/contact-proto/` (README lists them). Round three's text
+  is kept there as `contact-model.round3.md`, and round two's as `contact-model.round2.md`.
 - **Built on:** `work/plan.md` §5 (2026-09-30: the field model is the on-demand expensive mode) and
   `review/contact-verify4.md` (with `contact-verify3.md`).
 
-**Status: ROUND 4 IN PROGRESS** (paused 2026-09-29 12:30 at the coordinator's request). Settled with
-numbers: §1, §2.1 continuity, §2.2, §2.3, §2.4 and the x and edge sweeps (§2.5). Remaining: §3.
+**Status: complete for round four.** Every table was run under the final code (`trace.py`); every
+process was capped at 1.8 GB.
 
-**Verdict of this round (so far).**
+**Verdict of this round.**
 1. **Each pair's line is now a continuous function of every input** (§1.1, §2.1). The verifier's
    case (β20, r_e 0.1, 2 N·m, a change of 2.8e-10 mm) gives the same state to 8 digits, and D moves by
    exactly the rigid 0.34 × Δa. Every input (a, x, b, one face, β, Σ) at δ = 1e-9 … 1e-3 moves the
@@ -29,6 +27,15 @@ numbers: §1, §2.1 continuity, §2.2, §2.3, §2.4 and the x and edge sweeps (�
    strain FE of the whole gear puts the derived tooth 7–13 % too compliant and the verifier's
    PE + Sainsot tooth 1.46–1.72× too compliant; c′ is 17.06 (FE), 15.60 (derived), 13.65 (Sainsot),
    11.61 (verifier), against ISO's c′_th 16.03.
+5. **The sharp edge (r_e unset) is refused in the expensive mode** (§2.5). Its β → 0 limit is
+   continuous, but it is steep (+14 % by 0.1°) and it is a convention, not the r_e → 0 limit. Only C¹
+   forms are rated.
+6. **Σ, x and face-width sweeps are smooth** (§2.5). Σ 0 → 0.01° at a_par is +0.08 % (2019.7 → 2021.4).
+7. **The matched worm wheel as a surface needs no new solve** (§2.6). A closest-point projection gives
+   exact play (j = s_h/(cos α_n cos γ)) and the edge rule; the edge peaks are 31–33 % below the
+   involute wheel's.
+8. **Cost, measured:** 2–16 min of Python per mesh per load. The Rust estimate is 5–24 s, or 2–8 s with
+   round three's b-independent kernel (§2.7).
 
 ## 1. What changed in the model (`trace.py`)
 
@@ -198,49 +205,40 @@ r_e unset, 20 phases, the pinion b 10, the wheel b₂:
 
 ### 2.4 Tooth stiffness (`fe/fe_tooth.py` → `fe/fe_tooth.txt`, contact-proto-4-fe)
 
-**An independent reference.**
-- Plane-strain FE of the generated tooth: 9-node quads, the whole gear as a periodic ring, bore
-  r_f/1.4 clamped.
-- Checks:
-  - element check: a Timoshenko cantilever within 0.5 %;
-  - three meshes agree within 0.06 %;
-  - a point load and a Hertz ellipse differ by ≤ 0.08 %;
-  - the whole-gear value is bracketed by clamped and free sectors.
-- It measures what `stiff.py` calls the tooth: the displacement along the load line of the load line's
-  centreline crossing, per unit line load.
+**The reference.**
+- An independent plane-strain FE of the generated tooth: 9-node quads, the whole gear as a periodic
+  ring, bore r_f/1.4 clamped.
+- Checks: three meshes within 0.06 %; point load against a Hertz ellipse ≤ 0.08 %; a Timoshenko
+  cantilever within 0.5 %.
+- It measures what `stiff.py` calls the tooth: the displacement along the load line of its centreline
+  crossing.
 
-| r (mm) | FE | derived (prototype) | Sainsot | verifier (PE + Sainsot) |
+| µm per N/mm | FE | derived (prototype) | Sainsot | verifier (PE + Sainsot) |
 |---|---|---|---|---|
-| z17 8.0023 | 0.01626 | 0.01741 (+7 %) | 0.02218 | 0.02720 (+67 %) |
-| z17 pitch 8.5 | 0.02226 | 0.02512 (+13 %) | 0.03033 | 0.03828 (+72 %) |
-| z43 pitch 21.5 | 0.02085 | 0.02346 (+13 %) | 0.02741 | 0.03230 (+55 %) |
-| z43 22.4434 | 0.05411 | 0.05776 (+7 %) | 0.06406 | 0.07891 (+46 %) |
+| z17 at 8.0023 / pitch 8.5 | 0.01626 / 0.02226 | +7 % / +13 % | +36 % / +36 % | +67 % / +72 % |
+| z43 at pitch 21.5 / 22.4434 | 0.02085 / 0.05411 | +13 % / +7 % | +31 % / +18 % | +55 % / +46 % |
 
-(µm per N/mm.) Single-pair c′ at the pitch point, with the same Weber contact term: **FE 17.06**,
-derived 15.60, Sainsot 13.65, verifier 11.61. ISO's c′_th is 16.03 and its c′ (C_M 0.8) is 12.50.
+Single-pair c′ at the pitch point: **FE 17.06**, derived 15.60, Sainsot 13.65, verifier 11.61. ISO's c′_th is
+16.03 and its c′ (C_M 0.8) is 12.50.
 
-**Why.**
-- **The verifier's 1.41–1.47× is all foundation.** At the pitch point it is 1.19 × 1.22:
+**Why the models differ.**
+- **The verifier's 1.41–1.47× is all foundation**, 1.19 × 1.22:
   - 1.19 is Sainsot's fit against the half-plane;
-  - 1.22 is the idealised root, which feeds Sainsot θ_f 0.118 instead of 0.177. That shrinks S_f and
-    raises the foundation 1.29–1.51×.
-- The straight root section itself adds 3 %; the shear coefficient 1–2 %.
-- The derived model's own residual:
-  - its beam part is 1.24–1.60× the FE, about half from integrating past the load line's centreline
-    crossing, which the Weber term already covers;
-  - its foundation is 3–9 % too stiff;
-  - the net is +7…+13 %.
-- ISO's c′_th is the solid-disc theory: the FE is 1.06× it at h_f 1.4 and 0.91× at h_f 2.0, so the
-  body's size is worth ±10 %. C_M 0.8 is measured over theory, compliance outside any tooth model.
-  Where it acts on every pair alike (a body's wind-up, 1e-5 here) it moves no load between pairs.
+  - 1.22 is its idealised root, which feeds Sainsot θ_f 0.118 instead of 0.177.
+- Its straight root section adds 3 %, the shear coefficient 1–2 %.
+- The derived tooth is +7…+13 %:
+  - its beam part is 1.24–1.60× the FE, half of that from integrating past the centreline crossing,
+    which the Weber term already covers;
+  - its foundation is 3–9 % too stiff.
+- ISO's c′_th is solid-disc theory: the FE is 1.06× it at h_f 1.4 and 0.91× at 2.0. C_M 0.8 is
+  measured over theory, compliance outside any tooth model.
 
 **Verdict.**
-- The prototype's derived tooth is the right one, 7–13 % too compliant (sign known).
-- The verifier's PE + Sainsot tooth is not: its −9 % for C_a 5 µm understates relief.
-- The relief figure with the tooth scaled to the FE (`t_sweep4.py stiff`) is not run yet.
-- **For Rust:** keep the derived foundation. Stop the beam integral at the load line's centreline
-  crossing, the one change the FE supports. Gate the tooth against this FE (a law, as `stiff.txt` gates
-  ISO), not against c′_th alone.
+- The prototype's derived tooth is right to +7…+13 % (too compliant).
+- The verifier's tooth is 1.46–1.72× too compliant, so its −9 % for C_a 5 µm understates relief. The
+  prototype's −14 % stands, to within the derived tooth's +7…+13 %.
+- For Rust: keep the derived foundation, stop the beam integral at the centreline crossing, and gate
+  against the FE table.
 
 ### 2.5 Sweeps on the traced field (`sweep4_x.txt`, `sweep4_edge.txt`; analyse4, N 24, images, 2-D across)
 
@@ -254,10 +252,17 @@ derived 15.60, Sainsot 13.65, verifier 11.61. ISO's c′_th is 16.03 and its c�
 
 - With r_e stated, β 0 → 0.1° is +0.4…+0.5 % (round three: ≤ 0.03 %). The β 0.1° maximum sits on the
   face-end station.
-- **Open defect: the sharp-edge convention (r_e unset) jumps +14 % (20 N·m) and +5 % (60 N·m) at
-  β 0 → 0.1°**, also at the face-end station ('flank face'). Round three had +0.4 %.
-  - Suspected: images or the face clip where the valley runs on the C⁰ kink.
-  - Not yet isolated. It is one more reason to require a C¹ form (§2.2).
+- **The sharp edge's β jump is continuous, but steep and linear in β** (`t_bj4*.py` → `bj4*.txt`).
+  - Field max at β 0 / 0.001 / 0.01 / 0.1°: r_e unset 3202.7 / 3207.8 / 3253.0 / 3650.7; r_e 0.1 5956.9 /
+    5957.2 / 5959.6 / 5984.9.
+  - The mechanism: the sharp tip edge sweeps across the face, and a partly engaged edge line loads its
+    face end (q 128 against 99 N/mm) for ±1e-3 p.
+  - A kinked edge's gap rises linearly in s·β; a round's rises at second order. Round three's +0.4 %
+    missed this narrow peak.
+- **So r_e unset is refused in the expensive mode.**
+  - Its figure is the flank convention's, not the r_e → 0 limit (which diverges, §2.2).
+  - It moves 140 % per degree of helix.
+  - The fast mode keeps ISO's points.
 - The edge figures fall against round three by the step correction: r_e 0.1 is 5957 (was 6585); 0.2 is
   4613 (was 4989); 60 N·m r_e 0.1 is 10044 (was 11350). Edge share is 7–12 %.
 
@@ -268,31 +273,128 @@ derived 15.60, Sainsot 13.65, verifier 11.61. ISO's c′_th is 16.03 and its c�
 - Flank max at r_e 0.1: 4441 / 2183 / 1700 / 1503. No fallback, non-convergence, lost valley or
   negative coupling in any run.
 
-## 3. ROUND 4 IN PROGRESS: what remains, exactly
+**Face width through ε_β = 1** (β20, 20 N·m, r_e 0.1), b 8 / 9 / 9.185 / 9.5 / 10 / 12:
+- field max 6674 / 6244 / 6174 / 6084 / 5981 / 5594 (round three: 7748 / 7238 / 7150 / 7026 / 6859 / 6765);
+- flank max 2434 / 2273 / 2247 / 2222 / 2183 / 2035.
+- The curve is smooth and monotone through ε_β = 1, with nothing at 9.185.
 
-1. **Isolate the r_e-unset β jump** (§2.5).
-   - Rerun `t_det4`-style at β 0 and 1e-3° with images off and on, at the face-end station.
-   - Compare P['faces'] and the stations' ends.
-2. **Σ at a_par** (`python3 t_sweep4.py sigma 3`, ~50 min; killed unfinished) and **face**
-   (`t_sweep4.py face 3`, killed unfinished).
-   - Report the Σ 0 / 1e-4 / 1e-3 / 3e-3 / 0.01° series against the verifier's 2426.7 at 0.01°, with the
-     201-phase grid beside analyse4.
-3. **Remaining sets:** `conv` (panels, helical and crossed), `stiff` (relief with ct × 1/1.1: the FE's
-   verdict on C_a 5 µm), `relief`, `ring`, `worm`; `python3 t_iso4.py 3`; `python3 t_cost4.py` (cost
-   measured: CPU s and counts at the converged N, with a Rust estimate labelled as one).
-4. **Matched worm** (priority 5, contact-proto-4-worm; `mw_report.txt`, `mw_*.py`).
-   - The hobbed wheel is a surface: the hob's envelope, reached by a closest-point projection (a capped
-     2-D Newton), with the closed-form rank-one curvature. The checks hold to about 1e-13.
-   - **No new kind of solve.**
-   - Tips clipped as matched.py does: ZI 1.982 lines / η 67.341 / 1754.5 MPa; ZN 2.046 / 67.287 / 1852.1.
-     Both are within 0.7 % of matched.txt.
-   - Play:
-     - hob thinning gives j = s_h/(cos α_n cos γ) exactly;
-     - Δa +0.1 mm gives 0.043 mm against 0.0735 at the pitch point (not understood yet);
-     - the ZN and remaining Δa rows were not run.
-   - Edge, with rounds on both gears, **not rerun after the helper's last fix**: r_e 0.2 gives 6392
-     (wheel's round) against the involute wheel's 8839; r_e 0.1 gives 8694 (worm's round) against 12169.
-   - Cost: 240–285 s of Python per analysis, 750–920 s with rounds. Rust +1.7…6 s is an estimate.
-   - Next: rerun the edge rows and the Δa rows under the final code.
-5. Then fold the round-three sections still valid (oracle, ε, rings, ISO, worm table, Rust plan) back
-   in from `contact-model.round3.md`, updated. Keep the doc ≤ 400 lines.
+**Σ at a_par** (β20, 2 N·m, r_e 0.1; analyse4, with the 201-phase grid beside it):
+
+| Σ (deg) | 0 | 1e-4 | 1e-3 | 3e-3 | 0.01 | 0.1 | 1 | 10 |
+|---|---|---|---|---|---|---|---|---|
+| field max | 2019.7 | 2019.7 | 2019.9 | 2020.2 | 2021.4 | 2034.2 | 2291.0 | 6092.1 |
+| grid 201 | 2013.3 | 2013.2 | 2012.7 | 2011.3 | 2008.7 | 2034.2 | 2280.1 | 6091.5 |
+| flank max | 724.8 | 724.8 | 724.7 | 724.5 | 723.8 | 716.2 | 733.9 | 1509.6 |
+| η % | 98.869 | 98.869 | 98.870 | 98.870 | 98.870 | 98.878 | 98.936 | 98.469 |
+
+- The series is smooth. Round three's 2309 / 2303 / 2318 / 2415 / 2484 and the verifier's 2426.7 at 0.01°
+  were the seeding noise, not steepness in Σ: 0 → 0.01° is now +0.08 %.
+- The step correction brings the Σ 0 value to 2020 (round three: 2309).
+- analyse4 is at or above the grid everywhere (by at most 0.6 %).
+
+### 2.6 Matched worm wheel as a surface (contact-proto-4-worm: `mw_surface.py`, `mw_field.py`, `mw_report.txt`, `mw_play.txt`)
+
+**The wheel.**
+- The hobbed wheel's flank is the hob's envelope W(v, φ_h), with the meshing root a closed-form
+  quadratic.
+- A gap to it is a closest-point projection: a safeguarded Newton capped at 30, with 2.1–2.5 iterations.
+- Its curvature is the rank-one update at the foot: FD agrees to 5e-13 and wormtypes.conjugate to 1e-14.
+- **No new kind of solve.** The projection is a bounded minimisation like the anchor search. The hob-tip
+  boundary is a clip.
+
+**Reproduction** (tips as hard clips, as matched.py; the rigid gap on conjugate lines ≤ 7e-15 mm):
+- ZI 1.982 lines, η 67.341 %, 1754.5 MPa (matched.txt 1.9875 / 67.343 / 1766.2);
+- ZN 2.046, 67.287, 1852.1 (2.045 / 67.290 / 1842.3).
+
+**Play now exists** (j_t2 at the wheel pitch circle, 8 phases):
+- **Hob thinning:** j = s_h/(cos α_n cos γ).
+  - Exact for ZI (1.000000): n·(z × X) = r_b cos β_b on the whole involute helicoid.
+  - 0.995–1.009 for ZN.
+- **Axial thinning:** j = s_x, exact.
+- **Centre distance:** +Δa gives 0.54× the pitch-point 2Δa tan α_x, and −Δa 1.07–1.12×. The gap closes
+  where n·x is least: a hobbed set localises.
+
+**The edge rule now applies** (r_e on both gears, wheel 54.953 N·m, final code, pointwise Hertz as in
+round three's involute rows):
+- r_e 0.2: 6075 MPa on the worm's round, against the involute wheel's 8839 (−31 %);
+- r_e 0.1: 8120, against 12169 (−33 %);
+- η 67.36 / 67.33 %.
+- The rows run on round three's valley (VField). The step correction will lower both wheels.
+
+**Cost:** 240–285 s of Python tip-clipped, 614–635 s with rounds, against 540–880 s for the involute
+valley field.
+
+**Recommendation:** rate the worm on the matched wheel when a hob is stated (the wheel's tool input:
+type, thinning, addendum), and on the involute wheel otherwise. Both take one field and one edge rule; a
+worm is special only in how its wheel's flank is found.
+
+### 2.7 Cost, measured (`t_cost4.py` → `cost4.txt`; Python CPU seconds, one analysis at 2 N·m)
+
+| Mesh | CPU s | States | ms/state | Distance evals | Section minima | 2-D across | G | Depth nodes | Σn³ | Rust estimate |
+|---|---|---|---|---|---|---|---|---|---|---|
+| spur r_e 0.1, N 24 | 268 | 360 | 743 | 4.5 M | 0.14 M | 0.16 M | 62 M | 74 M | 83 M | ≈ 5 s |
+| spur r_e 0.1, N 48 | 698 | 360 | 1938 | 5.7 M | 0.18 M | 0.32 M | 249 M | 294 M | 664 M | ≈ 19 s |
+| helical β20 r_e 0.1 | 966 | 500 | 1933 | 63 M | 0.91 M | 0.36 M | 143 M | 177 M | 218 M | ≈ 14 s |
+| crossed Σ10 r_e 0.1 | 766 | 552 | 1387 | 61 M | 0.83 M | 0.24 M | 97 M | 109 M | 85 M | ≈ 10 s |
+| ring β15 r_e 0.1 | 609 | 428 | 1422 | 43 M | 0.49 M | 0.26 M | 101 M | 124 M | 145 M | ≈ 9 s |
+| worm 1/40 r_e 0.1 | 986 | 544 | 1812 | 82 M | 1.21 M | 0.56 M | 187 M | 348 M | 319 M | ≈ 24 s |
+
+- **Measured:** 2–16 min of Python CPU per mesh per load, at the panel counts §2.3 shows converged
+  (24 with images).
+  - One run with 0 non-converged, 0 refused and 0 lost, except the ring: 2 valleys lost beyond the field.
+  - Round three's r_e-unset spur took 1.6 s estimated; this round's sharp spur is 124 s of Python.
+- **Rust is an estimate** (no compiler may be run here): these counts × round three's unit costs
+  (distance 35 ns, G 15 ns, a depth node 50 ns, LU n³/3 at 1 ns, contact2d ≈ 2 µs).
+  - It is 5–24 s per mesh.
+  - The depth-referenced kernel is 60–75 % of it: images triple it, and it is rebuilt at every b
+    iterate.
+  - Round three's b-independent kernel (two-term Taylor depth term, far-field G) cuts that part about
+    10×, to about 2–8 s.
+- **The step correction and the trace are cheap.** 2-D across solves are < 0.6 M per analysis, and
+  section minima about 1 M.
+- **Verdict (unchanged in kind):** the expensive mode, once per mesh per load case at the final solve,
+  not in the search.
+
+## 3. Carried from round three
+
+- **Oracle and ε:** ISO 21771 j_n reproduced; a₀ 10/10; ε_γ 2.58060 against 2.580562; the interfering
+  17/−43 x0 ring flagged. The rings' √ law carries.
+- **ISO 6336-2 points** (`iso3.txt`) were not rerun (`t_iso4.py` is ready, about 2 h).
+  - Their stations sit mid-line, where §1.1 and §1.4 change nothing.
+  - §1.3 changes a reading only where a tangency lies within a Hertz width of B, C or D: the
+    interfering ring at D (+26 % in round three).
+- The width quadrature is exact to 1e-10 up to b/h ≈ 5.5; its cap never fired.
+
+## 4. Open issues (size and sign)
+
+- **Tooth plate coupling along the face** is not modelled. It lowers every end and edge peak.
+- **The tooth is 7–13 % too compliant** (§2.4).
+- **Images leave the face plane's normal stress.** An aligned end is high by ≤ 4.6 %.
+- **Unaligned faces** need graded panels or a stated end relief (§2.3).
+- **The expensive mode requires a C¹ tip form on every gear**, with no hidden default (§2.2, §2.5).
+- **The matched worm rows** still use round three's valley field (§2.6).
+
+## 5. Rust migration plan (changes from round three in bold)
+
+1. `tools/contact_oracle.py` is the independent instrument. **Add `contact2d`'s discretised check
+   (`t_c2d.py`) and the FE tooth (`fe/`) as instruments.**
+2. `elliptic.rs`: aspect, hertz_shape, strip, Bernstein-ellipse width rule.
+3. **`form.rs`: C¹ tip form (relief, round, land) and an end relief. A form that is not C¹ is refused.**
+4. **`gap.rs`: the gap with forms; sections X·d = kΔζ with d one per mesh; the intrinsic section minimum
+   (a fixed point, ≤ 8 rounds); the trace; margin roots on valley points; face crossings.** The worm's
+   matched wheel is an optional second flank, a projection.
+5. `tooth_compliance.rs`: the derived foundation, **with the beam integral stopped at the centreline
+   crossing, and gated against the FE table.**
+6. **`contact2d`: the closed-form across contact (I₀ = 0, q = (E*/2)cI₁, p by logarithms); Hertz when
+   no step lies inside.**
+7. `field.rs`: coupled lines, **span in one shot (D < Dmax asserted), images at each body's faces,
+   cosine-graded panels where a line ends on one body's face**, Δ closed form, means and maxima.
+8. **Rating:** ISO's points by default. `MeshReport` gains field, flank and edge maxima, each with where
+   and on what, and the forms that produced them.
+9. **Laws:**
+   - continuity in a, x, b, b₂, β, Σ at δ 1e-9 (the §2.1 table as a law);
+   - the verifier's case reproduced to 1e-8;
+   - images converged in N (24/48 within 1e-6);
+   - contact2d equals Hertz off a step, and the discretised solve within 0.2 % on one;
+   - the step correction against the verifier's 2-D model;
+   - matched wheel play: j = s_h/(cos α_n cos γ) for ZI exactly.
