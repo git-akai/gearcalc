@@ -690,6 +690,19 @@ whose size is unmeasured is a debt still owed, and is marked as one.
   teeth, by up to half; the spur band above is the same comparison at the
   single-pair point, against ISO's own closed form.
 
+- **A root loaded one way on a fully reversed figure is judged at that
+  figure.** Every figure the library states a ratio for is `R = −1` on a
+  coupon, and a one-way root endures more: under Goodman the `R = 0` peak is
+  `2/(1 + S_e/S_u)` of it, 1.33–1.54× across the library. So one-way bending
+  is **conservative** by that factor, before the coupon's missing notch,
+  surface, size and reliability reductions, which run the other way.
+- **The steels' fatigue figures against ISO 6336-5's `σ_FE`** (the gear-root,
+  `R = 0` endurance ISO's `σ_F` is judged against): 4340 Hardened's 750 MPa
+  sits inside the through-hardened band at its hardness, 513–790, so its net
+  bias has no fixed sign; annealed 4340's 330 MPa is 1.2–1.9× **below** it —
+  conservative. The two are not the same kind of figure (a coupon at `R = −1`
+  against a gear root at `R = 0`), which is why they are compared here and not
+  converted.
 - **`K_f`'s calibration contained no undercut teeth.** Dolan and Broghamer's
   photoelastic specimens "contained various standard gear teeth but did not
   include any undercut gears", and this tool rates undercut teeth. Size
@@ -1108,10 +1121,13 @@ and a cycle count, all of which this tool has.
 
 ### Annex B, `Y_M`, and the reversed-bending fraction this tool does use
 
-This tool derates a fully reversed root to **0.7** of its one-directional
-allowable, a Goodman/Haigh statement rather than a rating factor. ISO 6336-5
-uses the same 0.7. Annex B offers a finer method and is recorded in case it is
-ever wanted:
+This tool derates a fully reversed root to **0.7** of a fatigue figure measured
+**one way** (`R = 0`) — ISO's own flat convention for its own `R = 0` gear
+data, and not the Goodman/Haigh statement it was once described as (Goodman's
+fraction, `(1 + S_e/S_u)/2`, is 0.65–0.75 across this library). A figure
+measured fully reversed (`R = −1`) — every steel, the brass and POM here — is
+already the reversed case and is judged as it stands. Annex B offers a finer
+method and is recorded in case it is ever wanted:
 
 ```text
 Y_M = 1 / (1 − R · (1−M)/(1+M))        R = −1.2 for equal loads both flanks

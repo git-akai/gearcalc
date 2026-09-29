@@ -58,7 +58,6 @@
     case 2  T 0.234095  n 0.0000  vs frame 0.0000  sF 8.090  sH 251.187  cycles -  widths 0.059268 / 0.338633
     case 3  T 2.000000  n 2400.0000  vs frame 2400.0000  sF 69.118  sH 734.202  cycles 1.440000e8 / 1.440000e8  widths 0.921570 / 9.583165
   member 2  z 25  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 25.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 2.941176  n -2040.0000  vs frame -2040.0000  sF 63.192  sH 687.621  cycles -  widths 0.462947 / 2.537660
     case 2  T 0.348837  n 0.0000  vs frame 0.0000  sF 7.397  sH 235.251  cycles -  widths 0.054187 / 0.297027
     case 3  T 2.941176  n -1632.0000  vs frame -1632.0000  sF 63.192  sH 687.621  cycles 9.792000e7 / 9.792000e7  widths 0.842563 / 8.405745
@@ -227,7 +226,6 @@
     case 2  T 0.028523  n 0.0000  vs frame 0.0000  sF 1.246  sH 112.939  cycles -  widths 0.009128 / 0.068457
     case 3  T 0.666667  n 2400.0000  vs frame 2057.1429  sF 29.122  sH 546.008  cycles 3.702857e8 / 3.702857e8  widths 0.388292 / 5.299986
   member 2  z 30  m 1  alpha 20  x -0.170059  b 10.000000  beta 0.000000  d 30.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 1.666667  n -600.0000  vs frame -1028.5714  sF 33.848  sH 501.804  cycles -  widths 0.247969 / 1.351458
     case 2  T 0.071706  n 0.0000  vs frame 0.0000  sF 1.448  sH 103.795  cycles -  widths 0.010609 / 0.057822
     case 3  T 1.666667  n -480.0000  vs frame -822.8571  sF 33.848  sH 501.804  cycles 4.937143e7 / 4.937143e7  widths 0.451304 / 4.476569
@@ -268,7 +266,6 @@
     b3   reacted  speed        39.3443  torque -55.334545
     b4   free     speed     -5600.0000  torque 0.000000
   member 1  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 5.442742  n -7000.0000  vs frame -10000.0000  sF 146.726  sH 812.877  cycles -  widths 1.074919 / 3.546374
     case 2  T 0.060226  n 0.0000  vs frame 0.0000  sF 1.641  sH 85.959  cycles -  widths 0.012020 / 0.039657
     case 3  T 5.442742  n -5600.0000  vs frame -8000.0000  sF 146.726  sH 812.877  cycles 4.800000e8 / 4.800000e8  widths 1.956352 / 11.747011
@@ -333,7 +330,6 @@
     case 2  T 0.202146  n 0.0000  vs frame 0.0000  sF 1.299  sH 86.983  cycles -  widths 0.009519 / 0.040607
     case 3  T 38.673595  n 27.1186  vs frame -658.5956  sF 248.578  sH 1203.122  cycles 1.185472e8 / 1.185472e8  widths 3.314369 / 25.733365
   member 4  z 18  m 1  alpha 20  x -0.019999  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 11.515450  n -2000.0000  vs frame -2857.1429  sF 319.804  sH 1201.682  cycles -  widths 2.342887 / 7.750216
     case 2  T 0.059671  n 0.0000  vs frame 0.0000  sF 1.657  sH 86.503  cycles -  widths 0.012140 / 0.040160
     case 3  T 11.515450  n -1600.0000  vs frame -2285.7143  sF 319.804  sH 1201.682  cycles 1.371429e8 / 1.371429e8  widths 4.264055 / 25.671815
@@ -422,12 +418,10 @@
     case 2  T 0.063511  n 0.0000  vs frame 0.0000  sF 1.428  sH 102.405  cycles -  widths 0.010464 / 0.056283
     case 3  T 0.666667  n 2400.0000  vs frame 3200.0000  sF 14.993  sH 331.781  cycles 5.760000e8 / 5.760000e8  widths 0.199906 / 1.956950
   member 2  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 0.500000  n -6333.3333  vs frame -5333.3333  sF 16.074  sH 361.001  cycles -  widths 0.117761 / 0.699440
     case 2  T 0.048659  n 0.0000  vs frame 0.0000  sF 1.594  sH 113.697  cycles -  widths 0.011681 / 0.069380
     case 3  T 0.500000  n -5066.6667  vs frame -4266.6667  sF 16.074  sH 361.001  cycles 2.560000e8 / 2.560000e8  widths 0.214324 / 2.316827
   member 3  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 0.490551  n 4333.3333  vs frame 5333.3333  sF 16.074  sH 361.001  cycles -  widths 0.117759 / 0.699440
     case 2  T 0.049183  n 0.0000  vs frame 0.0000  sF 1.594  sH 113.697  cycles -  widths 0.011681 / 0.069380
     case 3  T 0.490551  n 3466.6667  vs frame 4266.6667  sF 16.074  sH 361.001  cycles 2.560000e8 / 2.560000e8  widths 0.214321 / 2.316827
@@ -533,7 +527,6 @@
     case 2  T 0.234095  n 0.0000  vs frame 0.0000  sF 8.090  sH 251.187  cycles -  widths 0.059268 / 0.338633
     case 3  T 4.975099  n -948.8372  vs frame -948.8372  sF 171.934  sH 1157.981  cycles 5.693023e7 / 5.693023e7  widths 2.292452 / 23.838595
   member 4  z 25  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 25.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 7.316322  n 806.5116  vs frame 806.5116  sF 157.194  sH 1084.514  cycles -  widths 1.151603 / 6.312555
     case 2  T 0.348837  n 0.0000  vs frame 0.0000  sF 7.397  sH 235.251  cycles -  widths 0.054187 / 0.297027
     case 3  T 7.316322  n 645.2093  vs frame 645.2093  sF 157.194  sH 1084.514  cycles 3.871256e7 / 3.871256e7  widths 2.095918 / 20.909706
@@ -758,7 +751,6 @@
     case 2  T 0.028523  n 0.0000  vs frame 0.0000  sF 1.246  sH 112.939  cycles -  widths 0.009128 / 0.068457
     case 3  T 1.658366  n -948.8372  vs frame -813.2890  sF 72.442  sH 861.161  cycles 1.463920e8 / 1.463920e8  widths 0.965895 / 13.183977
   member 4  z 30  m 1  alpha 20  x -0.170059  b 10.000000  beta 0.000000  d 30.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 4.145916  n 237.2093  vs frame 406.6445  sF 84.198  sH 791.443  cycles -  widths 0.616836 / 3.361818
     case 2  T 0.071706  n 0.0000  vs frame 0.0000  sF 1.448  sH 103.795  cycles -  widths 0.010609 / 0.057822
     case 3  T 4.145916  n 189.7674  vs frame 325.3156  sF 84.198  sH 791.443  cycles 1.951894e7 / 1.951894e7  widths 1.122641 / 11.135687
@@ -813,7 +805,6 @@
     power through, by case: 1.000000 / 0.189180 / 1.000000
   distance 1  running 30.025653  clearance 0.020000
   member 3  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 13.539090  n 2767.4419  vs frame 3953.4884  sF 364.989  sH 1282.067  cycles -  widths 2.673913 / 8.821782
     case 2  T 0.060226  n 0.0000  vs frame 0.0000  sF 1.641  sH 85.959  cycles -  widths 0.012020 / 0.039657
     case 3  T 13.539090  n 2213.9535  vs frame 3162.7907  sF 364.989  sH 1282.067  cycles 1.897674e8 / 1.897674e8  widths 4.866522 / 29.221269
@@ -892,7 +883,6 @@
     case 2  T 0.202146  n 0.0000  vs frame 0.0000  sF 1.299  sH 86.983  cycles -  widths 0.009519 / 0.040607
     case 3  T 96.202478  n -10.7213  vs frame 260.3750  sF 618.349  sH 1897.560  cycles 4.686750e7 / 4.686750e7  widths 8.244658 / 64.013016
   member 6  z 18  m 1  alpha 20  x -0.019999  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 28.645250  n 790.6977  vs frame 1129.5681  sF 795.529  sH 1895.289  cycles -  widths 5.828048 / 19.279045
     case 2  T 0.059671  n 0.0000  vs frame 0.0000  sF 1.657  sH 86.503  cycles -  widths 0.012140 / 0.040160
     case 3  T 28.645250  n 632.5581  vs frame 903.6545  sF 795.529  sH 1895.289  cycles 5.421927e7 / 5.421927e7  widths 10.607048 / 63.859909
@@ -1009,12 +999,10 @@
     case 2  T 0.063511  n 0.0000  vs frame 0.0000  sF 1.428  sH 102.405  cycles -  widths 0.010464 / 0.056283
     case 3  T 1.658366  n -948.8372  vs frame -1265.1163  sF 37.296  sH 523.283  cycles 2.277209e8 / 2.277209e8  widths 0.497276 / 4.868009
   member 4  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 1.243775  n 2503.8760  vs frame 2108.5271  sF 39.986  sH 569.369  cycles -  widths 0.292935 / 1.739893
     case 2  T 0.048659  n 0.0000  vs frame 0.0000  sF 1.594  sH 113.697  cycles -  widths 0.011681 / 0.069380
     case 3  T 1.243775  n 2003.1008  vs frame 1686.8217  sF 39.986  sH 569.369  cycles 1.012093e8 / 1.012093e8  widths 0.533142 / 5.763221
   member 5  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 1.220270  n -1713.1783  vs frame -2108.5271  sF 39.985  sH 569.369  cycles -  widths 0.292931 / 1.739893
     case 2  T 0.049183  n 0.0000  vs frame 0.0000  sF 1.594  sH 113.697  cycles -  widths 0.011681 / 0.069380
     case 3  T 1.220270  n -1370.5426  vs frame -1686.8217  sF 39.985  sH 569.369  cycles 1.012093e8 / 1.012093e8  widths 0.533135 / 5.763221
@@ -1063,7 +1051,6 @@
     case 2  T 0.091018  n 0.0000  vs frame 0.0000  sF 3.145  sH 156.626  cycles -  widths 0.023044 / 0.131662
     case 3  T 2.000000  n 2400.0000  vs frame 2400.0000  sF 69.118  sH 734.202  cycles 1.440000e8 / 1.440000e8  widths 0.921570 / 9.583165
   member 2  z 25  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 25.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 2.941176  n -2040.0000  vs frame -2040.0000  sF 63.192  sH 687.621  cycles -  widths 0.462947 / 2.537660
     case 2  T 0.135630  n 0.0000  vs frame 0.0000  sF 2.876  sH 146.689  cycles -  widths 0.021068 / 0.115486
     case 3  T 2.941176  n -1632.0000  vs frame -1632.0000  sF 63.192  sH 687.621  cycles 9.792000e7 / 9.792000e7  widths 0.842563 / 8.405745
@@ -1123,7 +1110,6 @@
     case 2  T 0.089585  n 0.0000  vs frame 0.0000  sF 3.096  sH 155.388  cycles -  widths 0.022681 / 0.129590
     case 3  T 2.000000  n 2400.0000  vs frame 2400.0000  sF 69.118  sH 734.202  cycles 1.440000e8 / 1.440000e8  widths 0.921570 / 9.583165
   member 2  z 25  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 25.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 2.941176  n -2040.0000  vs frame -2040.0000  sF 63.192  sH 687.621  cycles -  widths 0.462947 / 2.537660
     case 2  T 0.133495  n 0.0000  vs frame 0.0000  sF 2.831  sH 145.530  cycles -  widths 0.020737 / 0.113668
     case 3  T 2.941176  n -1632.0000  vs frame -1632.0000  sF 63.192  sH 687.621  cycles 9.792000e7 / 9.792000e7  widths 0.842563 / 8.405745
@@ -1142,7 +1128,6 @@
     case 2  T 0.234095  n 0.0000  vs frame 0.0000  sF 8.090  sH 251.187  cycles -  widths 0.059268 / 0.338633
     case 3  T 4.896782  n 948.8372  vs frame 948.8372  sF 169.227  sH 1148.831  cycles 5.693023e7 / 5.693023e7  widths 2.256365 / 23.463332
   member 5  z 25  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 25.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 7.201150  n -806.5116  vs frame -806.5116  sF 154.719  sH 1075.944  cycles -  widths 1.133475 / 6.213184
     case 2  T 0.348837  n 0.0000  vs frame 0.0000  sF 7.397  sH 235.251  cycles -  widths 0.054187 / 0.297027
     case 3  T 7.201150  n -645.2093  vs frame -645.2093  sF 154.719  sH 1075.944  cycles 3.871256e7 / 3.871256e7  widths 2.062924 / 20.580549
@@ -1194,7 +1179,6 @@
     case 2  T 0.095963  n 0.0000  vs frame 0.0000  sF 3.316  sH 160.825  cycles -  widths 0.024296 / 0.138816
     case 3  T 2.000000  n 2400.0000  vs frame 2400.0000  sF 69.118  sH 734.202  cycles 1.440000e8 / 1.440000e8  widths 0.921570 / 9.583165
   member 2  z 25  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 25.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 2.941176  n -2040.0000  vs frame -2040.0000  sF 63.192  sH 687.621  cycles -  widths 0.462947 / 2.537660
     case 2  T 0.142999  n 0.0000  vs frame 0.0000  sF 3.032  sH 150.621  cycles -  widths 0.022213 / 0.121761
     case 3  T 2.941176  n -1632.0000  vs frame -1632.0000  sF 63.192  sH 687.621  cycles 9.792000e7 / 9.792000e7  widths 0.842563 / 8.405745
@@ -1271,7 +1255,6 @@
     case 2  T 0.000000  n 0.0000  vs frame 0.0000  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
     case 3  T 2.000000  n 2400.0000  vs frame 2400.0000  sF 69.118  sH 734.202  cycles 1.440000e8 / 1.440000e8  widths 0.921570 / 9.583165
   member 2  z 25  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 25.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 2.941176  n -2040.0000  vs frame -2040.0000  sF 63.192  sH 687.621  cycles -  widths 0.462947 / 2.537660
     case 2  T 0.000000  n 0.0000  vs frame 0.0000  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
     case 3  T 2.941176  n -1632.0000  vs frame -1632.0000  sF 63.192  sH 687.621  cycles 9.792000e7 / 9.792000e7  widths 0.842563 / 8.405745
@@ -1329,7 +1312,6 @@
     case 2  T 0.077976  n 0.0000  vs frame 0.0000  sF 2.695  sH 144.971  cycles -  widths 0.019742 / 0.112797
     case 3  T 2.000000  n 2400.0000  vs frame 2400.0000  sF 69.118  sH 734.202  cycles 1.440000e8 / 1.440000e8  widths 0.921570 / 9.583165
   member 2  z 25  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 25.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 2.941176  n -2040.0000  vs frame -2040.0000  sF 63.192  sH 687.621  cycles -  widths 0.462947 / 2.537660
     case 2  T 0.116196  n 0.0000  vs frame 0.0000  sF 2.464  sH 135.774  cycles -  widths 0.018049 / 0.098938
     case 3  T 2.941176  n -1632.0000  vs frame -1632.0000  sF 63.192  sH 687.621  cycles 9.792000e7 / 9.792000e7  widths 0.842563 / 8.405745
@@ -1392,7 +1374,6 @@
     case 2  T 0.032664  n 0.0000  vs frame 0.0000  sF 1.129  sH 93.829  cycles -  widths 0.008270 / 0.047250
     case 3  T 2.000000  n 2400.0000  vs frame 2400.0000  sF 69.118  sH 734.202  cycles 1.440000e8 / 1.440000e8  widths 0.921570 / 9.583165
   member 2  z 25  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 25.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 2.941176  n -2040.0000  vs frame -2040.0000  sF 63.192  sH 687.621  cycles -  widths 0.462947 / 2.537660
     case 2  T 0.048674  n 0.0000  vs frame 0.0000  sF 1.032  sH 87.876  cycles -  widths 0.007561 / 0.041445
     case 3  T 2.941176  n -1632.0000  vs frame -1632.0000  sF 63.192  sH 687.621  cycles 9.792000e7 / 9.792000e7  widths 0.842563 / 8.405745
@@ -1411,7 +1392,6 @@
     case 2  T 0.028523  n 0.0000  vs frame 0.0000  sF 1.246  sH 112.939  cycles -  widths 0.009128 / 0.068457
     case 3  T 1.632261  n 948.8372  vs frame 813.2890  sF 71.302  sH 854.356  cycles 1.463920e8 / 1.463920e8  widths 0.950690 / 12.976437
   member 5  z 30  m 1  alpha 20  x -0.170059  b 10.000000  beta 0.000000  d 30.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 4.080651  n -237.2093  vs frame -406.6445  sF 82.873  sH 785.189  cycles -  widths 0.607125 / 3.308897
     case 2  T 0.071706  n 0.0000  vs frame 0.0000  sF 1.448  sH 103.795  cycles -  widths 0.010609 / 0.057822
     case 3  T 4.080651  n -189.7674  vs frame -325.3156  sF 82.873  sH 785.189  cycles 1.951894e7 / 1.951894e7  widths 1.104968 / 10.960391
@@ -1462,7 +1442,6 @@
     case 2  T 0.000922  n 0.0000  vs frame 0.0000  sF 0.032  sH 15.762  cycles -  widths 0.000233 / 0.001333
     case 3  T 2.000000  n 2400.0000  vs frame 2400.0000  sF 69.118  sH 734.202  cycles 1.440000e8 / 1.440000e8  widths 0.921570 / 9.583165
   member 2  z 25  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 25.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 2.941176  n -2040.0000  vs frame -2040.0000  sF 63.192  sH 687.621  cycles -  widths 0.462947 / 2.537660
     case 2  T 0.001356  n 0.0000  vs frame 0.0000  sF 0.029  sH 14.762  cycles -  widths 0.000213 / 0.001170
     case 3  T 2.941176  n -1632.0000  vs frame -1632.0000  sF 63.192  sH 687.621  cycles 9.792000e7 / 9.792000e7  widths 0.842563 / 8.405745
@@ -1477,7 +1456,6 @@
   distance 1  running 21.025651  clearance 0.020000
   distance 2  running 34.020000  clearance 0.020000
   member 4  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 13.325960  n -2767.4419  vs frame -3953.4884  sF 359.244  sH 1271.936  cycles -  widths 2.631821 / 8.682911
     case 2  T 0.060226  n 0.0000  vs frame 0.0000  sF 1.641  sH 85.959  cycles -  widths 0.012020 / 0.039657
     case 3  T 13.325960  n -2213.9535  vs frame -3162.7907  sF 359.244  sH 1271.936  cycles 1.897674e8 / 1.897674e8  widths 4.789914 / 28.761273
@@ -1538,7 +1516,6 @@
     case 2  T 0.001283  n 0.0000  vs frame 0.0000  sF 0.044  sH 18.598  cycles -  widths 0.000325 / 0.001856
     case 3  T 2.000000  n 2400.0000  vs frame 2400.0000  sF 69.118  sH 734.202  cycles 1.440000e8 / 1.440000e8  widths 0.921570 / 9.583165
   member 2  z 25  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 25.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 2.941176  n -2040.0000  vs frame -2040.0000  sF 63.192  sH 687.621  cycles -  widths 0.462947 / 2.537660
     case 2  T 0.001912  n 0.0000  vs frame 0.0000  sF 0.041  sH 17.418  cycles -  widths 0.000297 / 0.001628
     case 3  T 2.941176  n -1632.0000  vs frame -1632.0000  sF 63.192  sH 687.621  cycles 9.792000e7 / 9.792000e7  widths 0.842563 / 8.405745
@@ -1567,7 +1544,6 @@
     case 2  T 0.202146  n 0.0000  vs frame 0.0000  sF 1.299  sH 86.983  cycles -  widths 0.009519 / 0.040607
     case 3  T 94.688076  n 10.7213  vs frame -260.3750  sF 608.615  sH 1882.565  cycles 4.686750e7 / 4.686750e7  widths 8.114872 / 63.005334
   member 7  z 18  m 1  alpha 20  x -0.019999  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 28.194321  n -790.6977  vs frame -1129.5681  sF 783.005  sH 1880.312  cycles -  widths 5.736304 / 18.975558
     case 2  T 0.059671  n 0.0000  vs frame 0.0000  sF 1.657  sH 86.503  cycles -  widths 0.012140 / 0.040160
     case 3  T 28.194321  n -632.5581  vs frame -903.6545  sF 783.005  sH 1880.312  cycles 5.421927e7 / 5.421927e7  widths 10.440073 / 62.854637
@@ -1621,7 +1597,6 @@
     case 2  T 0.022726  n 0.0000  vs frame 0.0000  sF 0.785  sH 78.264  cycles -  widths 0.005754 / 0.032875
     case 3  T 2.000000  n 2400.0000  vs frame 2400.0000  sF 69.118  sH 734.202  cycles 1.440000e8 / 1.440000e8  widths 0.921570 / 9.583165
   member 2  z 25  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 25.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 2.941176  n -2040.0000  vs frame -2040.0000  sF 63.192  sH 687.621  cycles -  widths 0.462947 / 2.537660
     case 2  T 0.033865  n 0.0000  vs frame 0.0000  sF 0.718  sH 73.299  cycles -  widths 0.005260 / 0.028836
     case 3  T 2.941176  n -1632.0000  vs frame -1632.0000  sF 63.192  sH 687.621  cycles 9.792000e7 / 9.792000e7  widths 0.842563 / 8.405745
@@ -1687,7 +1662,6 @@
     case 2  T 0.072934  n 0.0000  vs frame 0.0000  sF 2.521  sH 140.205  cycles -  widths 0.018465 / 0.105503
     case 3  T 2.000000  n 2400.0000  vs frame 2400.0000  sF 69.118  sH 734.202  cycles 1.440000e8 / 1.440000e8  widths 0.921570 / 9.583165
   member 2  z 25  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 25.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 2.941176  n -2040.0000  vs frame -2040.0000  sF 63.192  sH 687.621  cycles -  widths 0.462947 / 2.537660
     case 2  T 0.108682  n 0.0000  vs frame 0.0000  sF 2.304  sH 131.310  cycles -  widths 0.016882 / 0.092540
     case 3  T 2.941176  n -1632.0000  vs frame -1632.0000  sF 63.192  sH 687.621  cycles 9.792000e7 / 9.792000e7  widths 0.842563 / 8.405745
@@ -1706,12 +1680,10 @@
     case 2  T 0.063511  n 0.0000  vs frame 0.0000  sF 1.428  sH 102.405  cycles -  widths 0.010464 / 0.056283
     case 3  T 1.632261  n 948.8372  vs frame 1265.1163  sF 36.709  sH 519.148  cycles 2.277209e8 / 2.277209e8  widths 0.489448 / 4.791378
   member 5  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 1.224195  n -2503.8760  vs frame -2108.5271  sF 39.356  sH 564.870  cycles -  widths 0.288324 / 1.712504
     case 2  T 0.048659  n 0.0000  vs frame 0.0000  sF 1.594  sH 113.697  cycles -  widths 0.011681 / 0.069380
     case 3  T 1.224195  n -2003.1008  vs frame -1686.8217  sF 39.356  sH 564.870  cycles 1.012093e8 / 1.012093e8  widths 0.524750 / 5.672497
   member 6  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 1.201061  n 1713.1783  vs frame 2108.5271  sF 39.356  sH 564.870  cycles -  widths 0.288320 / 1.712504
     case 2  T 0.049183  n 0.0000  vs frame 0.0000  sF 1.594  sH 113.697  cycles -  widths 0.011681 / 0.069380
     case 3  T 1.201061  n 1370.5426  vs frame 1686.8217  sF 39.356  sH 564.870  cycles 1.012093e8 / 1.012093e8  widths 0.524742 / 5.672497
@@ -1869,7 +1841,6 @@
     case 2  T 0.234095  n 0.0000  vs frame 0.0000  sF 8.090  sH 251.187  cycles -  widths 0.059268 / 0.338633
     case 3  T 4.590420  n 1014.2743  vs frame 1014.2743  sF 158.640  sH 1112.313  cycles 6.085646e7 / 6.085646e7  widths 2.115198 / 21.995376
   member 8  z 25  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 25.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 6.750618  n -862.1331  vs frame -862.1331  sF 145.039  sH 1041.743  cycles -  widths 1.062560 / 5.824463
     case 2  T 0.348837  n 0.0000  vs frame 0.0000  sF 7.397  sH 235.251  cycles -  widths 0.054187 / 0.297027
     case 3  T 6.750618  n -689.7065  vs frame -689.7065  sF 145.039  sH 1041.743  cycles 4.138239e7 / 4.138239e7  widths 1.933860 / 19.292951
@@ -2198,7 +2169,6 @@
     case 2  T 0.028523  n 0.0000  vs frame 0.0000  sF 1.246  sH 112.939  cycles -  widths 0.009128 / 0.068457
     case 3  T 1.530140  n 1014.2743  vs frame 869.3779  sF 66.841  sH 827.199  cycles 1.564880e8 / 1.564880e8  widths 0.891212 / 12.164582
   member 8  z 30  m 1  alpha 20  x -0.170059  b 10.000000  beta 0.000000  d 30.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 3.825350  n -253.5686  vs frame -434.6890  sF 77.688  sH 760.230  cycles -  widths 0.569141 / 3.101880
     case 2  T 0.071706  n 0.0000  vs frame 0.0000  sF 1.448  sH 103.795  cycles -  widths 0.010609 / 0.057822
     case 3  T 3.825350  n -202.8549  vs frame -347.7512  sF 77.688  sH 760.230  cycles 2.086507e7 / 2.086507e7  widths 1.035837 / 10.274667
@@ -2279,7 +2249,6 @@
     power through, by case: 0.983450 / 0.188137 / 0.983450
   distance 1  running 30.025653  clearance 0.020000
   member 7  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 12.492237  n -2958.2999  vs frame -4226.1427  sF 336.768  sH 1231.505  cycles -  widths 2.467164 / 8.139675
     case 2  T 0.060226  n 0.0000  vs frame 0.0000  sF 1.641  sH 85.959  cycles -  widths 0.012020 / 0.039657
     case 3  T 12.492237  n -2366.6399  vs frame -3380.9142  sF 336.768  sH 1231.505  cycles 2.028549e8 / 2.028549e8  widths 4.490239 / 26.961858
@@ -2384,7 +2353,6 @@
     case 2  T 0.202146  n 0.0000  vs frame 0.0000  sF 1.299  sH 86.983  cycles -  widths 0.009519 / 0.040607
     case 3  T 88.764027  n 11.4607  vs frame -278.3319  sF 570.538  sH 1822.723  cycles 5.009975e7 / 5.009975e7  widths 7.607174 / 59.063479
   member 10  z 18  m 1  alpha 20  x -0.019999  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 26.430377  n -845.2285  vs frame -1207.4694  sF 734.018  sH 1820.542  cycles -  widths 5.377419 / 17.788374
     case 2  T 0.059671  n 0.0000  vs frame 0.0000  sF 1.657  sH 86.503  cycles -  widths 0.012140 / 0.040160
     case 3  T 26.430377  n -676.1828  vs frame -965.9755  sF 734.018  sH 1820.542  cycles 5.795853e7 / 5.795853e7  widths 9.786902 / 58.922211
@@ -2553,12 +2521,10 @@
     case 2  T 0.063511  n 0.0000  vs frame 0.0000  sF 1.428  sH 102.405  cycles -  widths 0.010464 / 0.056283
     case 3  T 1.530140  n 1014.2743  vs frame 1352.3657  sF 34.412  sH 502.646  cycles 2.434258e8 / 2.434258e8  widths 0.458827 / 4.491611
   member 8  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 1.147605  n -2676.5571  vs frame -2253.9428  sF 36.894  sH 546.914  cycles -  widths 0.270285 / 1.605363
     case 2  T 0.048659  n 0.0000  vs frame 0.0000  sF 1.594  sH 113.697  cycles -  widths 0.011681 / 0.069380
     case 3  T 1.147605  n -2141.2457  vs frame -1803.1542  sF 36.894  sH 546.914  cycles 1.081893e8 / 1.081893e8  widths 0.491919 / 5.317604
   member 9  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 1.125918  n 1831.3285  vs frame 2253.9428  sF 36.893  sH 546.914  cycles -  widths 0.270282 / 1.605363
     case 2  T 0.049183  n 0.0000  vs frame 0.0000  sF 1.594  sH 113.697  cycles -  widths 0.011681 / 0.069380
     case 3  T 1.125918  n 1465.0628  vs frame 1803.1542  sF 36.893  sH 546.914  cycles 1.081893e8 / 1.081893e8  widths 0.491913 / 5.317604
@@ -2666,7 +2632,6 @@
     case 2  T 0.234095  n 0.0000  vs frame 0.0000  sF 8.090  sH 251.187  cycles -  widths 0.059268 / 0.338633
     case 3  T 49.443687  n -60.0000  vs frame -60.0000  sF 1708.719  sH 3650.532  cycles 3.600000e6 / 3.600000e6  widths 22.782919 / 236.913494
   member 4  z 25  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 25.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 72.711304  n 51.0000  vs frame 51.0000  sF 1562.229  sH 3418.927  cycles -  widths 11.444898 / 62.735634
     case 2  T 0.348837  n 0.0000  vs frame 0.0000  sF 7.397  sH 235.251  cycles -  widths 0.054187 / 0.297027
     case 3  T 72.711304  n 40.8000  vs frame 40.8000  sF 1562.229  sH 3418.927  cycles 2.448001e6 / 2.448001e6  widths 20.829715 / 207.805514
@@ -2895,7 +2860,6 @@
     case 2  T 0.028523  n 0.0000  vs frame 0.0000  sF 1.246  sH 112.939  cycles -  widths 0.009128 / 0.068457
     case 3  T 16.481229  n -60.0000  vs frame -51.4286  sF 719.947  sH 2714.808  cycles 9.257143e6 / 9.257143e6  widths 9.599293 / 131.025425
   member 4  z 30  m 1  alpha 20  x -0.170059  b 10.000000  beta 0.000000  d 30.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 41.203072  n 15.0000  vs frame 25.7143  sF 836.780  sH 2495.022  cycles -  widths 6.130255 / 33.410531
     case 2  T 0.071706  n 0.0000  vs frame 0.0000  sF 1.448  sH 103.795  cycles -  widths 0.010609 / 0.057822
     case 3  T 41.203072  n 12.0000  vs frame 20.5714  sF 836.780  sH 2495.022  cycles 1.234286e6 / 1.234286e6  widths 11.157065 / 110.669044
@@ -2951,7 +2915,6 @@
     power through, by case: 1.000000 / 0.270746 / 1.000000
   distance 1  running 23.727259  clearance 0.020000
   member 3  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 134.554619  n 175.0000  vs frame 250.0000  sF 3627.347  sH 4041.712  cycles -  widths 26.573969 / 87.672914
     case 2  T 0.060226  n 0.0000  vs frame 0.0000  sF 1.641  sH 85.959  cycles -  widths 0.012020 / 0.039657
     case 3  T 134.554619  n 140.0000  vs frame 200.0000  sF 3627.347  sH 4041.712  cycles 1.200000e7 / 1.200000e7  widths 48.364623 / 290.407759
@@ -3031,7 +2994,6 @@
     case 2  T 0.202146  n 0.0000  vs frame 0.0000  sF 1.299  sH 86.983  cycles -  widths 0.009519 / 0.040607
     case 3  T 956.082560  n -0.6780  vs frame 16.4649  sF 6145.299  sH 5982.049  cycles 2.963681e6 / 2.963681e6  widths 81.937322 / 636.176212
   member 6  z 18  m 1  alpha 20  x -0.019999  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 284.683143  n 50.0000  vs frame 71.4286  sF 7906.148  sH 5974.891  cycles -  widths 57.920495 / 191.599625
     case 2  T 0.059671  n 0.0000  vs frame 0.0000  sF 1.657  sH 86.503  cycles -  widths 0.012140 / 0.040160
     case 3  T 284.683143  n 40.0000  vs frame 57.1429  sF 7906.148  sH 5974.891  cycles 3.428572e6 / 3.428572e6  widths 105.415301 / 634.654598
@@ -3150,12 +3112,10 @@
     case 2  T 0.063511  n 0.0000  vs frame 0.0000  sF 1.428  sH 102.405  cycles -  widths 0.010464 / 0.056283
     case 3  T 16.481229  n -60.0000  vs frame -80.0000  sF 370.654  sH 1649.649  cycles 1.440000e7 / 1.440000e7  widths 4.942048 / 48.379405
   member 4  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 12.360922  n 158.3333  vs frame 133.3333  sF 397.387  sH 1794.934  cycles -  widths 2.911260 / 17.291458
     case 2  T 0.048659  n 0.0000  vs frame 0.0000  sF 1.594  sH 113.697  cycles -  widths 0.011681 / 0.069380
     case 3  T 12.360922  n 126.6667  vs frame 106.6667  sF 397.387  sH 1794.934  cycles 6.400000e6 / 6.400000e6  widths 5.298494 / 57.276226
   member 5  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 12.127327  n -108.3333  vs frame -133.3333  sF 397.381  sH 1794.934  cycles -  widths 2.911219 / 17.291458
     case 2  T 0.049183  n 0.0000  vs frame 0.0000  sF 1.594  sH 113.697  cycles -  widths 0.011681 / 0.069380
     case 3  T 12.127327  n -86.6667  vs frame -106.6667  sF 397.381  sH 1794.934  cycles 6.400000e6 / 6.400000e6  widths 5.298419 / 57.276226
@@ -3261,7 +3221,6 @@
     case 2  T 0.234095  n 0.0000  vs frame 0.0000  sF 8.090  sH 251.187  cycles -  widths 0.059268 / 0.338633
     case 3  T 4.262327  n -948.8372  vs frame -948.8372  sF 147.301  sH 1071.826  cycles 5.693023e7 / 5.693023e7  widths 1.964017 / 20.423290
   member 4  z 25  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 25.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 6.268128  n 806.5116  vs frame 806.5116  sF 134.673  sH 1003.824  cycles -  widths 0.986615 / 5.408168
     case 2  T 0.348837  n 0.0000  vs frame 0.0000  sF 7.397  sH 235.251  cycles -  widths 0.054187 / 0.297027
     case 3  T 6.268128  n 645.2093  vs frame 645.2093  sF 134.673  sH 1003.824  cycles 3.871256e7 / 3.871256e7  widths 1.795640 / 17.914017
@@ -3486,7 +3445,6 @@
     case 2  T 0.028523  n 0.0000  vs frame 0.0000  sF 1.246  sH 112.939  cycles -  widths 0.009128 / 0.068457
     case 3  T 1.420776  n -948.8372  vs frame -813.2890  sF 62.064  sH 797.089  cycles 1.463920e8 / 1.463920e8  widths 0.827514 / 11.295136
   member 4  z 30  m 1  alpha 20  x -0.170059  b 10.000000  beta 0.000000  d 30.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 3.551939  n 237.2093  vs frame 406.6445  sF 72.135  sH 732.558  cycles -  widths 0.528463 / 2.880178
     case 2  T 0.071706  n 0.0000  vs frame 0.0000  sF 1.448  sH 103.795  cycles -  widths 0.010609 / 0.057822
     case 3  T 3.551939  n 189.7674  vs frame 325.3156  sF 72.135  sH 732.558  cycles 1.951894e7 / 1.951894e7  widths 0.961802 / 9.540301
@@ -3541,7 +3499,6 @@
     power through, by case: 1.000000 / 0.214044 / 1.000000
   distance 1  running 42.446407  clearance 0.020000
   member 3  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 11.599373  n 2767.4419  vs frame 3953.4884  sF 312.698  sH 1186.679  cycles -  widths 2.290827 / 7.557904
     case 2  T 0.060226  n 0.0000  vs frame 0.0000  sF 1.641  sH 85.959  cycles -  widths 0.012020 / 0.039657
     case 3  T 11.599373  n 2213.9535  vs frame 3162.7907  sF 312.698  sH 1186.679  cycles 1.897674e8 / 1.897674e8  widths 4.169305 / 25.034800
@@ -3620,7 +3577,6 @@
     case 2  T 0.202146  n 0.0000  vs frame 0.0000  sF 1.299  sH 86.983  cycles -  widths 0.009519 / 0.040607
     case 3  T 82.419751  n -10.7213  vs frame 260.3750  sF 529.760  sH 1756.378  cycles 4.686750e7 / 4.686750e7  widths 7.063463 / 54.842006
   member 6  z 18  m 1  alpha 20  x -0.019999  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 24.541305  n 790.6977  vs frame 1129.5681  sF 681.555  sH 1754.276  cycles -  widths 4.993076 / 16.516977
     case 2  T 0.059671  n 0.0000  vs frame 0.0000  sF 1.657  sH 86.503  cycles -  widths 0.012140 / 0.040160
     case 3  T 24.541305  n 632.5581  vs frame 903.6545  sF 681.555  sH 1754.276  cycles 5.421927e7 / 5.421927e7  widths 9.087398 / 54.710834
@@ -3737,12 +3693,10 @@
     case 2  T 0.063511  n 0.0000  vs frame 0.0000  sF 1.428  sH 102.405  cycles -  widths 0.010464 / 0.056283
     case 3  T 1.420776  n -948.8372  vs frame -1265.1163  sF 31.952  sH 484.350  cycles 2.277209e8 / 2.277209e8  widths 0.426033 / 4.170580
   member 4  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 1.065582  n 2503.8760  vs frame 2108.5271  sF 34.257  sH 527.007  cycles -  widths 0.250967 / 1.490622
     case 2  T 0.048659  n 0.0000  vs frame 0.0000  sF 1.594  sH 113.697  cycles -  widths 0.011681 / 0.069380
     case 3  T 1.065582  n 2003.1008  vs frame 1686.8217  sF 34.257  sH 527.007  cycles 1.012093e8 / 1.012093e8  widths 0.456760 / 4.937536
   member 5  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 1.045444  n -1713.1783  vs frame -2108.5271  sF 34.257  sH 527.007  cycles -  widths 0.250964 / 1.490622
     case 2  T 0.049183  n 0.0000  vs frame 0.0000  sF 1.594  sH 113.697  cycles -  widths 0.011681 / 0.069380
     case 3  T 1.045444  n -1370.5426  vs frame -1686.8217  sF 34.257  sH 527.007  cycles 1.012093e8 / 1.012093e8  widths 0.456754 / 4.937536
@@ -3794,7 +3748,6 @@
     case 2  T 0.011090  n 0.0000  vs frame 0.0000  sF 0.484  sH 70.422  cycles -  widths 0.003549 / 0.026617
     case 3  T 0.666667  n 2400.0000  vs frame 2057.1429  sF 29.122  sH 546.008  cycles 3.702857e8 / 3.702857e8  widths 0.388292 / 5.299986
   member 2  z 30  m 1  alpha 20  x -0.170059  b 10.000000  beta 0.000000  d 30.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 1.666667  n -600.0000  vs frame -1028.5714  sF 33.848  sH 501.804  cycles -  widths 0.247969 / 1.351458
     case 2  T 0.027880  n 0.0000  vs frame 0.0000  sF 0.563  sH 64.721  cycles -  widths 0.004125 / 0.022481
     case 3  T 1.666667  n -480.0000  vs frame -822.8571  sF 33.848  sH 501.804  cycles 4.937143e7 / 4.937143e7  widths 0.451304 / 4.476569
@@ -3856,7 +3809,6 @@
     case 2  T 0.010915  n 0.0000  vs frame 0.0000  sF 0.477  sH 69.866  cycles -  widths 0.003493 / 0.026198
     case 3  T 0.666667  n 2400.0000  vs frame 2057.1429  sF 29.122  sH 546.008  cycles 3.702857e8 / 3.702857e8  widths 0.388292 / 5.299986
   member 2  z 30  m 1  alpha 20  x -0.170059  b 10.000000  beta 0.000000  d 30.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 1.666667  n -600.0000  vs frame -1028.5714  sF 33.848  sH 501.804  cycles -  widths 0.247969 / 1.351458
     case 2  T 0.027441  n 0.0000  vs frame 0.0000  sF 0.554  sH 64.209  cycles -  widths 0.004060 / 0.022127
     case 3  T 1.666667  n -480.0000  vs frame -822.8571  sF 33.848  sH 501.804  cycles 4.937143e7 / 4.937143e7  widths 0.451304 / 4.476569
@@ -3874,7 +3826,6 @@
     case 2  T 0.234095  n 0.0000  vs frame 0.0000  sF 8.090  sH 251.187  cycles -  widths 0.059268 / 0.338633
     case 3  T 13.675453  n 342.8571  vs frame 342.8571  sF 472.608  sH 1919.869  cycles 2.057143e7 / 2.057143e7  widths 6.301447 / 65.527061
   member 5  z 25  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 25.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 20.110961  n -291.4286  vs frame -291.4286  sF 432.091  sH 1798.064  cycles -  widths 3.165504 / 17.351826
     case 2  T 0.348837  n 0.0000  vs frame 0.0000  sF 7.397  sH 235.251  cycles -  widths 0.054187 / 0.297027
     case 3  T 20.110961  n -233.1429  vs frame -233.1429  sF 432.091  sH 1798.064  cycles 1.398857e7 / 1.398857e7  widths 5.761217 / 57.476188
@@ -3929,7 +3880,6 @@
     case 2  T 0.011692  n 0.0000  vs frame 0.0000  sF 0.511  sH 72.310  cycles -  widths 0.003742 / 0.028063
     case 3  T 0.666667  n 2400.0000  vs frame 2057.1429  sF 29.122  sH 546.008  cycles 3.702857e8 / 3.702857e8  widths 0.388292 / 5.299986
   member 2  z 30  m 1  alpha 20  x -0.170059  b 10.000000  beta 0.000000  d 30.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 1.666667  n -600.0000  vs frame -1028.5714  sF 33.848  sH 501.804  cycles -  widths 0.247969 / 1.351458
     case 2  T 0.029394  n 0.0000  vs frame 0.0000  sF 0.594  sH 66.456  cycles -  widths 0.004349 / 0.023703
     case 3  T 1.666667  n -480.0000  vs frame -822.8571  sF 33.848  sH 501.804  cycles 4.937143e7 / 4.937143e7  widths 0.451304 / 4.476569
@@ -4008,7 +3958,6 @@
     case 2  T 0.000000  n 0.0000  vs frame 0.0000  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
     case 3  T 0.666667  n 2400.0000  vs frame 2057.1429  sF 29.122  sH 546.008  cycles 3.702857e8 / 3.702857e8  widths 0.388292 / 5.299986
   member 2  z 30  m 1  alpha 20  x -0.170059  b 10.000000  beta 0.000000  d 30.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 1.666667  n -600.0000  vs frame -1028.5714  sF 33.848  sH 501.804  cycles -  widths 0.247969 / 1.351458
     case 2  T 0.000000  n 0.0000  vs frame 0.0000  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
     case 3  T 1.666667  n -480.0000  vs frame -822.8571  sF 33.848  sH 501.804  cycles 4.937143e7 / 4.937143e7  widths 0.451304 / 4.476569
@@ -4068,7 +4017,6 @@
     case 2  T 0.009501  n 0.0000  vs frame 0.0000  sF 0.415  sH 65.182  cycles -  widths 0.003040 / 0.022803
     case 3  T 0.666667  n 2400.0000  vs frame 2057.1429  sF 29.122  sH 546.008  cycles 3.702857e8 / 3.702857e8  widths 0.388292 / 5.299986
   member 2  z 30  m 1  alpha 20  x -0.170059  b 10.000000  beta 0.000000  d 30.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 1.666667  n -600.0000  vs frame -1028.5714  sF 33.848  sH 501.804  cycles -  widths 0.247969 / 1.351458
     case 2  T 0.023885  n 0.0000  vs frame 0.0000  sF 0.482  sH 59.905  cycles -  widths 0.003534 / 0.019260
     case 3  T 1.666667  n -480.0000  vs frame -822.8571  sF 33.848  sH 501.804  cycles 4.937143e7 / 4.937143e7  widths 0.451304 / 4.476569
@@ -4133,7 +4081,6 @@
     case 2  T 0.003980  n 0.0000  vs frame 0.0000  sF 0.174  sH 42.187  cycles -  widths 0.001274 / 0.009552
     case 3  T 0.666667  n 2400.0000  vs frame 2057.1429  sF 29.122  sH 546.008  cycles 3.702857e8 / 3.702857e8  widths 0.388292 / 5.299986
   member 2  z 30  m 1  alpha 20  x -0.170059  b 10.000000  beta 0.000000  d 30.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 1.666667  n -600.0000  vs frame -1028.5714  sF 33.848  sH 501.804  cycles -  widths 0.247969 / 1.351458
     case 2  T 0.010005  n 0.0000  vs frame 0.0000  sF 0.202  sH 38.772  cycles -  widths 0.001480 / 0.008068
     case 3  T 1.666667  n -480.0000  vs frame -822.8571  sF 33.848  sH 501.804  cycles 4.937143e7 / 4.937143e7  widths 0.451304 / 4.476569
@@ -4151,7 +4098,6 @@
     case 2  T 0.028523  n 0.0000  vs frame 0.0000  sF 1.246  sH 112.939  cycles -  widths 0.009128 / 0.068457
     case 3  T 4.558484  n 342.8571  vs frame 293.8776  sF 199.128  sH 1427.758  cycles 5.289796e7 / 5.289796e7  widths 2.655034 / 36.239856
   member 5  z 30  m 1  alpha 20  x -0.170059  b 10.000000  beta 0.000000  d 30.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 11.396211  n -85.7143  vs frame -146.9388  sF 231.442  sH 1312.169  cycles -  widths 1.695545 / 9.240900
     case 2  T 0.071706  n 0.0000  vs frame 0.0000  sF 1.448  sH 103.795  cycles -  widths 0.010609 / 0.057822
     case 3  T 11.396211  n -68.5714  vs frame -117.5510  sF 231.442  sH 1312.169  cycles 7.053062e6 / 7.053062e6  widths 3.085893 / 30.609557
@@ -4205,7 +4151,6 @@
     case 2  T 0.000110  n 0.0000  vs frame 0.0000  sF 0.005  sH 7.014  cycles -  widths 0.000035 / 0.000264
     case 3  T 0.666667  n 2400.0000  vs frame 2057.1429  sF 29.122  sH 546.008  cycles 3.702857e8 / 3.702857e8  widths 0.388292 / 5.299986
   member 2  z 30  m 1  alpha 20  x -0.170059  b 10.000000  beta 0.000000  d 30.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 1.666667  n -600.0000  vs frame -1028.5714  sF 33.848  sH 501.804  cycles -  widths 0.247969 / 1.351458
     case 2  T 0.000275  n 0.0000  vs frame 0.0000  sF 0.006  sH 6.447  cycles -  widths 0.000041 / 0.000223
     case 3  T 1.666667  n -480.0000  vs frame -822.8571  sF 33.848  sH 501.804  cycles 4.937143e7 / 4.937143e7  widths 0.451304 / 4.476569
@@ -4219,7 +4164,6 @@
     power through, by case: 0.838615 / 0.159521 / 0.838615
   distance 1  running 21.145279  clearance 0.020000
   member 4  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 37.215983  n -1000.0000  vs frame -1428.5714  sF 1003.275  sH 2125.596  cycles -  widths 7.350000 / 24.249139
     case 2  T 0.060226  n 0.0000  vs frame 0.0000  sF 1.641  sH 85.959  cycles -  widths 0.012020 / 0.039657
     case 3  T 37.215983  n -800.0000  vs frame -1142.8571  sF 1003.275  sH 2125.596  cycles 6.857143e7 / 6.857143e7  widths 13.376999 / 80.322849
@@ -4283,7 +4227,6 @@
     case 2  T 0.000156  n 0.0000  vs frame 0.0000  sF 0.007  sH 8.362  cycles -  widths 0.000050 / 0.000375
     case 3  T 0.666667  n 2400.0000  vs frame 2057.1429  sF 29.122  sH 546.008  cycles 3.702857e8 / 3.702857e8  widths 0.388292 / 5.299986
   member 2  z 30  m 1  alpha 20  x -0.170059  b 10.000000  beta 0.000000  d 30.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 1.666667  n -600.0000  vs frame -1028.5714  sF 33.848  sH 501.804  cycles -  widths 0.247969 / 1.351458
     case 2  T 0.000393  n 0.0000  vs frame 0.0000  sF 0.008  sH 7.685  cycles -  widths 0.000058 / 0.000317
     case 3  T 1.666667  n -480.0000  vs frame -822.8571  sF 33.848  sH 501.804  cycles 4.937143e7 / 4.937143e7  widths 0.451304 / 4.476569
@@ -4311,7 +4254,6 @@
     case 2  T 0.202146  n 0.0000  vs frame 0.0000  sF 1.299  sH 86.983  cycles -  widths 0.009519 / 0.040607
     case 3  T 264.439474  n 3.8741  vs frame -94.0851  sF 1699.706  sH 3146.049  cycles 1.693532e7 / 1.693532e7  widths 22.662753 / 175.957715
   member 7  z 18  m 1  alpha 20  x -0.019999  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 78.739498  n -285.7143  vs frame -408.1633  sF 2186.733  sH 3142.284  cycles -  widths 16.020024 / 52.993859
     case 2  T 0.059671  n 0.0000  vs frame 0.0000  sF 1.657  sH 86.503  cycles -  widths 0.012140 / 0.040160
     case 3  T 78.739498  n -228.5714  vs frame -326.5306  sF 2186.733  sH 3142.284  cycles 1.959184e7 / 1.959184e7  widths 29.156443 / 175.536858
@@ -4368,7 +4310,6 @@
     case 2  T 0.002769  n 0.0000  vs frame 0.0000  sF 0.121  sH 35.189  cycles -  widths 0.000886 / 0.006646
     case 3  T 0.666667  n 2400.0000  vs frame 2057.1429  sF 29.122  sH 546.008  cycles 3.702857e8 / 3.702857e8  widths 0.388292 / 5.299986
   member 2  z 30  m 1  alpha 20  x -0.170059  b 10.000000  beta 0.000000  d 30.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 1.666667  n -600.0000  vs frame -1028.5714  sF 33.848  sH 501.804  cycles -  widths 0.247969 / 1.351458
     case 2  T 0.006961  n 0.0000  vs frame 0.0000  sF 0.141  sH 32.340  cycles -  widths 0.001030 / 0.005613
     case 3  T 1.666667  n -480.0000  vs frame -822.8571  sF 33.848  sH 501.804  cycles 4.937143e7 / 4.937143e7  widths 0.451304 / 4.476569
@@ -4436,7 +4377,6 @@
     case 2  T 0.008887  n 0.0000  vs frame 0.0000  sF 0.388  sH 63.039  cycles -  widths 0.002844 / 0.021328
     case 3  T 0.666667  n 2400.0000  vs frame 2057.1429  sF 29.122  sH 546.008  cycles 3.702857e8 / 3.702857e8  widths 0.388292 / 5.299986
   member 2  z 30  m 1  alpha 20  x -0.170059  b 10.000000  beta 0.000000  d 30.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 1.666667  n -600.0000  vs frame -1028.5714  sF 33.848  sH 501.804  cycles -  widths 0.247969 / 1.351458
     case 2  T 0.022340  n 0.0000  vs frame 0.0000  sF 0.451  sH 57.936  cycles -  widths 0.003305 / 0.018015
     case 3  T 1.666667  n -480.0000  vs frame -822.8571  sF 33.848  sH 501.804  cycles 4.937143e7 / 4.937143e7  widths 0.451304 / 4.476569
@@ -4454,12 +4394,10 @@
     case 2  T 0.063511  n 0.0000  vs frame 0.0000  sF 1.428  sH 102.405  cycles -  widths 0.010464 / 0.056283
     case 3  T 4.558484  n 342.8571  vs frame 457.1429  sF 102.518  sH 867.575  cycles 8.228572e7 / 8.228572e7  widths 1.366904 / 13.381087
   member 5  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 3.418863  n -904.7619  vs frame -761.9048  sF 109.912  sH 943.982  cycles -  widths 0.805215 / 4.782583
     case 2  T 0.048659  n 0.0000  vs frame 0.0000  sF 1.594  sH 113.697  cycles -  widths 0.011681 / 0.069380
     case 3  T 3.418863  n -723.8095  vs frame -609.5238  sF 109.912  sH 943.982  cycles 3.657143e7 / 3.657143e7  widths 1.465492 / 15.841828
   member 6  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 3.354254  n 619.0476  vs frame 761.9048  sF 109.910  sH 943.982  cycles -  widths 0.805204 / 4.782583
     case 2  T 0.049183  n 0.0000  vs frame 0.0000  sF 1.594  sH 113.697  cycles -  widths 0.011681 / 0.069380
     case 3  T 3.354254  n 495.2381  vs frame 609.5238  sF 109.910  sH 943.982  cycles 3.657143e7 / 3.657143e7  widths 1.465471 / 15.841828
@@ -4507,7 +4445,6 @@
     b4   free     speed     -5600.0000  torque 0.000000
     b5   reacted  speed       -15.5547  torque 137.647414
   member 1  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 5.442742  n -7000.0000  vs frame -10000.0000  sF 146.726  sH 812.877  cycles -  widths 1.074919 / 3.546374
     case 2  T 0.023416  n 0.0000  vs frame 0.0000  sF 0.638  sH 53.599  cycles -  widths 0.004674 / 0.015419
     case 3  T 5.442742  n -5600.0000  vs frame -8000.0000  sF 146.726  sH 812.877  cycles 4.800000e8 / 4.800000e8  widths 1.956352 / 11.747011
@@ -4572,7 +4509,6 @@
     b5   reacted  speed        15.5547  torque -135.480593
     b6   free     speed       -26.7541  torque 0.000000
   member 1  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 5.442742  n -7000.0000  vs frame -10000.0000  sF 146.726  sH 812.877  cycles -  widths 1.074919 / 3.546374
     case 2  T 0.023047  n 0.0000  vs frame 0.0000  sF 0.628  sH 53.176  cycles -  widths 0.004600 / 0.015176
     case 3  T 5.442742  n -5600.0000  vs frame -8000.0000  sF 146.726  sH 812.877  cycles 4.800000e8 / 4.800000e8  widths 1.956352 / 11.747011
@@ -4597,7 +4533,6 @@
     case 2  T 0.234095  n 0.0000  vs frame 0.0000  sF 8.090  sH 251.187  cycles -  widths 0.059268 / 0.338633
     case 3  T 55.334545  n 39.3443  vs frame 39.3443  sF 1912.300  sH 3861.881  cycles 2.360656e6 / 2.360656e6  widths 25.497339 / 265.140026
   member 5  z 25  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 25.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 81.374331  n -33.4426  vs frame -33.4426  sF 1748.357  sH 3616.867  cycles -  widths 12.808475 / 70.210132
     case 2  T 0.348837  n 0.0000  vs frame 0.0000  sF 7.397  sH 235.251  cycles -  widths 0.054187 / 0.297027
     case 3  T 81.374331  n -26.7541  vs frame -26.7541  sF 1748.357  sH 3616.867  cycles 1.605246e6 / 1.605246e6  widths 23.311425 / 232.564040
@@ -4648,7 +4583,6 @@
     b6   free     speed       -15.5547  torque 0.000000
     b7   free     speed         7.2083  torque 0.000000
   member 1  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 5.442742  n -7000.0000  vs frame -10000.0000  sF 146.726  sH 812.877  cycles -  widths 1.074919 / 3.546374
     case 2  T 0.024688  n 0.0000  vs frame 0.0000  sF 0.673  sH 55.036  cycles -  widths 0.004927 / 0.016257
     case 3  T 5.442742  n -5600.0000  vs frame -8000.0000  sF 146.726  sH 812.877  cycles 4.800000e8 / 4.800000e8  widths 1.956352 / 11.747011
@@ -4730,7 +4664,6 @@
     b4   free     speed     -5600.0000  torque 0.000000
     b5   reacted  speed        -0.9836  torque 1367.971960
   member 1  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 5.442742  n -7000.0000  vs frame -10000.0000  sF 146.726  sH 812.877  cycles -  widths 1.074919 / 3.546374
     case 2  T 0.000000  n 0.0000  vs frame 0.0000  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
     case 3  T 5.442742  n -5600.0000  vs frame -8000.0000  sF 146.726  sH 812.877  cycles 4.800000e8 / 4.800000e8  widths 1.956352 / 11.747011
@@ -4793,7 +4726,6 @@
     b4   free     speed     -5600.0000  torque 0.000000
     b5   reacted  speed       -15.5547  torque 117.926959
   member 1  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 5.442742  n -7000.0000  vs frame -10000.0000  sF 146.726  sH 812.877  cycles -  widths 1.074919 / 3.546374
     case 2  T 0.020061  n 0.0000  vs frame 0.0000  sF 0.547  sH 49.611  cycles -  widths 0.004004 / 0.013210
     case 3  T 5.442742  n -5600.0000  vs frame -8000.0000  sF 146.726  sH 812.877  cycles 4.800000e8 / 4.800000e8  widths 1.956352 / 11.747011
@@ -4861,7 +4793,6 @@
     b6   fixed    speed              -  torque 323.027953
     b7   free     speed        -7.8689  torque 0.000000
   member 1  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 5.442742  n -7000.0000  vs frame -10000.0000  sF 146.726  sH 812.877  cycles -  widths 1.074919 / 3.546374
     case 2  T 0.008403  n 0.0000  vs frame 0.0000  sF 0.229  sH 32.109  cycles -  widths 0.001677 / 0.005533
     case 3  T 5.442742  n -5600.0000  vs frame -8000.0000  sF 146.726  sH 812.877  cycles 4.800000e8 / 4.800000e8  widths 1.956352 / 11.747011
@@ -4886,7 +4817,6 @@
     case 2  T 0.028523  n 0.0000  vs frame 0.0000  sF 1.246  sH 112.939  cycles -  widths 0.009128 / 0.068457
     case 3  T 18.444848  n 39.3443  vs frame 33.7237  sF 805.723  sH 2871.983  cycles 6.070258e6 / 6.070258e6  widths 10.742979 / 146.636159
   member 5  z 30  m 1  alpha 20  x -0.170059  b 10.000000  beta 0.000000  d 30.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 46.112121  n -9.8361  vs frame -16.8618  sF 936.476  sH 2639.472  cycles -  widths 6.860631 / 37.391155
     case 2  T 0.071706  n 0.0000  vs frame 0.0000  sF 1.448  sH 103.795  cycles -  widths 0.010609 / 0.057822
     case 3  T 46.112121  n -7.8689  vs frame -13.4895  sF 936.476  sH 2639.472  cycles 8.093680e5 / 8.093680e5  widths 12.486348 / 123.854462
@@ -4936,7 +4866,6 @@
     b6   reacted  speed         0.6450  torque -1530.955940
     b7   free     speed       -91.8033  torque 0.000000
   member 1  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 5.442742  n -7000.0000  vs frame -10000.0000  sF 146.726  sH 812.877  cycles -  widths 1.074919 / 3.546374
     case 2  T 0.000222  n 0.0000  vs frame 0.0000  sF 0.006  sH 5.191  cycles -  widths 0.000044 / 0.000145
     case 3  T 5.442742  n -5600.0000  vs frame -8000.0000  sF 146.726  sH 812.877  cycles 4.800000e8 / 4.800000e8  widths 1.956352 / 11.747011
@@ -4957,7 +4886,6 @@
     power through, by case: 27.213711 / 9.142344 / 27.213711
   distance 1  running 20.980000  clearance 0.020000
   member 4  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 150.585830  n -114.7541  vs frame -163.9344  sF 4059.519  sH 4275.709  cycles -  widths 29.740065 / 98.118508
     case 2  T 0.060226  n 0.0000  vs frame 0.0000  sF 1.641  sH 85.959  cycles -  widths 0.012020 / 0.039657
     case 3  T 150.585830  n -91.8033  vs frame -131.1475  sF 4059.519  sH 4275.709  cycles 7.868853e6 / 7.868853e6  widths 54.126919 / 325.007746
@@ -5017,7 +4945,6 @@
     b7   free     speed        11.2412  torque 0.000000
     b8   free     speed       -26.2295  torque 0.000000
   member 1  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 5.442742  n -7000.0000  vs frame -10000.0000  sF 146.726  sH 812.877  cycles -  widths 1.074919 / 3.546374
     case 2  T 0.000330  n 0.0000  vs frame 0.0000  sF 0.009  sH 6.364  cycles -  widths 0.000066 / 0.000217
     case 3  T 5.442742  n -5600.0000  vs frame -8000.0000  sF 146.726  sH 812.877  cycles 4.800000e8 / 4.800000e8  widths 1.956352 / 11.747011
@@ -5052,7 +4979,6 @@
     case 2  T 0.202146  n 0.0000  vs frame 0.0000  sF 1.299  sH 86.983  cycles -  widths 0.009519 / 0.040607
     case 3  T 1069.992893  n 0.4446  vs frame -10.7966  sF 6877.467  sH 6328.383  cycles 1.943397e6 / 1.943397e6  widths 91.699563 / 711.972013
   member 7  z 18  m 1  alpha 20  x -0.019999  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 318.601083  n -32.7869  vs frame -46.8384  sF 8848.108  sH 6320.810  cycles -  widths 64.821304 / 214.427337
     case 2  T 0.059671  n 0.0000  vs frame 0.0000  sF 1.657  sH 86.503  cycles -  widths 0.012140 / 0.040160
     case 3  T 318.601083  n -26.2295  vs frame -37.4707  sF 8848.108  sH 6320.810  cycles 2.248244e6 / 2.248244e6  widths 117.974773 / 710.269110
@@ -5105,7 +5031,6 @@
     b6   reacted  speed        -3.9344  torque 537.607942
     b7   free     speed        -3.9344  torque 0.000000
   member 1  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 5.442742  n -7000.0000  vs frame -10000.0000  sF 146.726  sH 812.877  cycles -  widths 1.074919 / 3.546374
     case 2  T 0.005847  n 0.0000  vs frame 0.0000  sF 0.159  sH 26.783  cycles -  widths 0.001167 / 0.003850
     case 3  T 5.442742  n -5600.0000  vs frame -8000.0000  sF 146.726  sH 812.877  cycles 4.800000e8 / 4.800000e8  widths 1.956352 / 11.747011
@@ -5176,7 +5101,6 @@
     b7   free     speed       -83.0601  torque 0.000000
     b8   free     speed        56.8306  torque 0.000000
   member 1  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 5.442742  n -7000.0000  vs frame -10000.0000  sF 146.726  sH 812.877  cycles -  widths 1.074919 / 3.546374
     case 2  T 0.018764  n 0.0000  vs frame 0.0000  sF 0.511  sH 47.980  cycles -  widths 0.003745 / 0.012355
     case 3  T 5.442742  n -5600.0000  vs frame -8000.0000  sF 146.726  sH 812.877  cycles 4.800000e8 / 4.800000e8  widths 1.956352 / 11.747011
@@ -5201,12 +5125,10 @@
     case 2  T 0.063511  n 0.0000  vs frame 0.0000  sF 1.428  sH 102.405  cycles -  widths 0.010464 / 0.056283
     case 3  T 18.444848  n 39.3443  vs frame 52.4590  sF 414.814  sH 1745.156  cycles 9.442623e6 / 9.442623e6  widths 5.530858 / 54.143461
   member 5  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 13.833636  n -103.8251  vs frame -87.4317  sF 444.733  sH 1898.852  cycles -  widths 3.258116 / 19.351611
     case 2  T 0.048659  n 0.0000  vs frame 0.0000  sF 1.594  sH 113.697  cycles -  widths 0.011681 / 0.069380
     case 3  T 13.833636  n -83.0601  vs frame -69.9454  sF 444.733  sH 1898.852  cycles 4.196722e6 / 4.196722e6  widths 5.929771 / 64.100275
   member 6  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 13.572210  n 71.0383  vs frame 87.4317  sF 444.727  sH 1898.852  cycles -  widths 3.258070 / 19.351611
     case 2  T 0.049183  n 0.0000  vs frame 0.0000  sF 1.594  sH 113.697  cycles -  widths 0.011681 / 0.069380
     case 3  T 13.572210  n 56.8306  vs frame 69.9454  sF 444.727  sH 1898.852  cycles 4.196722e6 / 4.196722e6  widths 5.929688 / 64.100275
@@ -5271,7 +5193,6 @@
     case 2  T 0.078595  n 0.0000  vs frame 0.0000  sF 0.505  sH 54.238  cycles -  widths 0.003701 / 0.015788
     case 3  T 38.673595  n 27.1186  vs frame -658.5956  sF 248.578  sH 1203.122  cycles 1.185472e8 / 1.185472e8  widths 3.314369 / 25.733365
   member 4  z 18  m 1  alpha 20  x -0.019999  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 11.515450  n -2000.0000  vs frame -2857.1429  sF 319.804  sH 1201.682  cycles -  widths 2.342887 / 7.750216
     case 2  T 0.023200  n 0.0000  vs frame 0.0000  sF 0.644  sH 53.938  cycles -  widths 0.004720 / 0.015615
     case 3  T 11.515450  n -1600.0000  vs frame -2285.7143  sF 319.804  sH 1201.682  cycles 1.371429e8 / 1.371429e8  widths 4.264055 / 25.671815
@@ -5349,7 +5270,6 @@
     case 2  T 0.077358  n 0.0000  vs frame 0.0000  sF 0.497  sH 53.809  cycles -  widths 0.003643 / 0.015540
     case 3  T 38.673595  n 27.1186  vs frame -658.5956  sF 248.578  sH 1203.122  cycles 1.185472e8 / 1.185472e8  widths 3.314369 / 25.733365
   member 4  z 18  m 1  alpha 20  x -0.019999  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 11.515450  n -2000.0000  vs frame -2857.1429  sF 319.804  sH 1201.682  cycles -  widths 2.342887 / 7.750216
     case 2  T 0.022835  n 0.0000  vs frame 0.0000  sF 0.634  sH 53.512  cycles -  widths 0.004646 / 0.015369
     case 3  T 11.515450  n -1600.0000  vs frame -2285.7143  sF 319.804  sH 1201.682  cycles 1.371429e8 / 1.371429e8  widths 4.264055 / 25.671815
@@ -5370,7 +5290,6 @@
     case 2  T 0.234095  n 0.0000  vs frame 0.0000  sF 8.090  sH 251.187  cycles -  widths 0.059268 / 0.338633
     case 3  T 116.020785  n 27.1186  vs frame 27.1186  sF 4009.550  sH 5592.019  cycles 1.627119e6 / 1.627119e6  widths 53.460660 / 555.923138
   member 7  z 25  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 25.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 170.618801  n -23.0508  vs frame -23.0508  sF 3665.807  sH 5237.238  cycles -  widths 26.855726 / 147.210654
     case 2  T 0.348837  n 0.0000  vs frame 0.0000  sF 7.397  sH 235.251  cycles -  widths 0.054187 / 0.297027
     case 3  T 170.618801  n -18.4407  vs frame -18.4407  sF 3665.807  sH 5237.238  cycles 1.106441e6 / 1.106441e6  widths 48.877421 / 487.620571
@@ -5438,7 +5357,6 @@
     case 2  T 0.082866  n 0.0000  vs frame 0.0000  sF 0.533  sH 55.692  cycles -  widths 0.003902 / 0.016646
     case 3  T 38.673595  n 27.1186  vs frame -658.5956  sF 248.578  sH 1203.122  cycles 1.185472e8 / 1.185472e8  widths 3.314369 / 25.733365
   member 4  z 18  m 1  alpha 20  x -0.019999  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 11.515450  n -2000.0000  vs frame -2857.1429  sF 319.804  sH 1201.682  cycles -  widths 2.342887 / 7.750216
     case 2  T 0.024461  n 0.0000  vs frame 0.0000  sF 0.679  sH 55.384  cycles -  widths 0.004977 / 0.016463
     case 3  T 11.515450  n -1600.0000  vs frame -2285.7143  sF 319.804  sH 1201.682  cycles 1.371429e8 / 1.371429e8  widths 4.264055 / 25.671815
@@ -5533,7 +5451,6 @@
     case 2  T 0.000000  n 0.0000  vs frame 0.0000  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
     case 3  T 38.673595  n 27.1186  vs frame -658.5956  sF 248.578  sH 1203.122  cycles 1.185472e8 / 1.185472e8  widths 3.314369 / 25.733365
   member 4  z 18  m 1  alpha 20  x -0.019999  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 11.515450  n -2000.0000  vs frame -2857.1429  sF 319.804  sH 1201.682  cycles -  widths 2.342887 / 7.750216
     case 2  T 0.000000  n 0.0000  vs frame 0.0000  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
     case 3  T 11.515450  n -1600.0000  vs frame -2285.7143  sF 319.804  sH 1201.682  cycles 1.371429e8 / 1.371429e8  widths 4.264055 / 25.671815
@@ -5609,7 +5526,6 @@
     case 2  T 0.067334  n 0.0000  vs frame 0.0000  sF 0.433  sH 50.202  cycles -  widths 0.003171 / 0.013526
     case 3  T 38.673595  n 27.1186  vs frame -658.5956  sF 248.578  sH 1203.122  cycles 1.185472e8 / 1.185472e8  widths 3.314369 / 25.733365
   member 4  z 18  m 1  alpha 20  x -0.019999  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 11.515450  n -2000.0000  vs frame -2857.1429  sF 319.804  sH 1201.682  cycles -  widths 2.342887 / 7.750216
     case 2  T 0.019876  n 0.0000  vs frame 0.0000  sF 0.552  sH 49.925  cycles -  widths 0.004044 / 0.013377
     case 3  T 11.515450  n -1600.0000  vs frame -2285.7143  sF 319.804  sH 1201.682  cycles 1.371429e8 / 1.371429e8  widths 4.264055 / 25.671815
@@ -5690,7 +5606,6 @@
     case 2  T 0.028206  n 0.0000  vs frame 0.0000  sF 0.181  sH 32.492  cycles -  widths 0.001328 / 0.005666
     case 3  T 38.673595  n 27.1186  vs frame -658.5956  sF 248.578  sH 1203.122  cycles 1.185472e8 / 1.185472e8  widths 3.314369 / 25.733365
   member 4  z 18  m 1  alpha 20  x -0.019999  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 11.515450  n -2000.0000  vs frame -2857.1429  sF 319.804  sH 1201.682  cycles -  widths 2.342887 / 7.750216
     case 2  T 0.008326  n 0.0000  vs frame 0.0000  sF 0.231  sH 32.312  cycles -  widths 0.001694 / 0.005604
     case 3  T 11.515450  n -1600.0000  vs frame -2285.7143  sF 319.804  sH 1201.682  cycles 1.371429e8 / 1.371429e8  widths 4.264055 / 25.671815
@@ -5711,7 +5626,6 @@
     case 2  T 0.028523  n 0.0000  vs frame 0.0000  sF 1.246  sH 112.939  cycles -  widths 0.009128 / 0.068457
     case 3  T 38.673595  n 27.1186  vs frame 23.2446  sF 1689.373  sH 4158.642  cycles 4.184020e6 / 4.184020e6  widths 22.524968 / 307.454271
   member 7  z 30  m 1  alpha 20  x -0.170059  b 10.000000  beta 0.000000  d 30.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 96.683987  n -6.7797  vs frame -11.6223  sF 1963.524  sH 3821.966  cycles -  widths 14.384789 / 78.398605
     case 2  T 0.071706  n 0.0000  vs frame 0.0000  sF 1.448  sH 103.795  cycles -  widths 0.010609 / 0.057822
     case 3  T 96.683987  n -5.4237  vs frame -9.2978  sF 1963.524  sH 3821.966  cycles 5.578700e5 / 5.578700e5  widths 26.180317 / 259.687540
@@ -5778,7 +5692,6 @@
     case 2  T 0.000752  n 0.0000  vs frame 0.0000  sF 0.005  sH 5.306  cycles -  widths 0.000035 / 0.000151
     case 3  T 38.673595  n 27.1186  vs frame -658.5956  sF 248.578  sH 1203.122  cycles 1.185472e8 / 1.185472e8  widths 3.314369 / 25.733365
   member 4  z 18  m 1  alpha 20  x -0.019999  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 11.515450  n -2000.0000  vs frame -2857.1429  sF 319.804  sH 1201.682  cycles -  widths 2.342887 / 7.750216
     case 2  T 0.000224  n 0.0000  vs frame 0.0000  sF 0.006  sH 5.300  cycles -  widths 0.000046 / 0.000151
     case 3  T 11.515450  n -1600.0000  vs frame -2285.7143  sF 319.804  sH 1201.682  cycles 1.371429e8 / 1.371429e8  widths 4.264055 / 25.671815
@@ -5795,7 +5708,6 @@
     power through, by case: 15.918913 / 4.127636 / 15.918913
   distance 1  running 20.999928  clearance 0.020000
   member 6  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 315.735608  n -79.0960  vs frame -112.9944  sF 8511.655  sH 6191.243  cycles -  widths 62.356449 / 205.726573
     case 2  T 0.060226  n 0.0000  vs frame 0.0000  sF 1.641  sH 85.959  cycles -  widths 0.012020 / 0.039657
     case 3  T 315.735608  n -63.2768  vs frame -90.3955  sF 8511.655  sH 6191.243  cycles 5.423729e6 / 5.423729e6  widths 113.488737 / 681.448701
@@ -5872,7 +5784,6 @@
     case 2  T 0.001108  n 0.0000  vs frame 0.0000  sF 0.007  sH 6.440  cycles -  widths 0.000052 / 0.000223
     case 3  T 38.673595  n 27.1186  vs frame -658.5956  sF 248.578  sH 1203.122  cycles 1.185472e8 / 1.185472e8  widths 3.314369 / 25.733365
   member 4  z 18  m 1  alpha 20  x -0.019999  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 11.515450  n -2000.0000  vs frame -2857.1429  sF 319.804  sH 1201.682  cycles -  widths 2.342887 / 7.750216
     case 2  T 0.000327  n 0.0000  vs frame 0.0000  sF 0.009  sH 6.405  cycles -  widths 0.000067 / 0.000220
     case 3  T 11.515450  n -1600.0000  vs frame -2285.7143  sF 319.804  sH 1201.682  cycles 1.371429e8 / 1.371429e8  widths 4.264055 / 25.671815
@@ -5903,7 +5814,6 @@
     case 2  T 0.202146  n 0.0000  vs frame 0.0000  sF 1.299  sH 86.983  cycles -  widths 0.009519 / 0.040607
     case 3  T 2243.470423  n 0.3064  vs frame -7.4418  sF 14420.090  sH 9163.523  cycles 1.339517e6 / 1.339517e6  widths 192.267872 / 1492.802582
   member 9  z 18  m 1  alpha 20  x -0.019999  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 668.015753  n -22.5989  vs frame -32.2841  sF 18551.963  sH 9152.557  cycles -  widths 135.911816 / 449.593069
     case 2  T 0.059671  n 0.0000  vs frame 0.0000  sF 1.657  sH 86.503  cycles -  widths 0.012140 / 0.040160
     case 3  T 668.015753  n -18.0791  vs frame -25.8273  sF 18551.963  sH 9152.557  cycles 1.549637e6 / 1.549637e6  widths 247.359506 / 1489.232081
@@ -5973,7 +5883,6 @@
     case 2  T 0.019624  n 0.0000  vs frame 0.0000  sF 0.126  sH 27.102  cycles -  widths 0.000924 / 0.003942
     case 3  T 38.673595  n 27.1186  vs frame -658.5956  sF 248.578  sH 1203.122  cycles 1.185472e8 / 1.185472e8  widths 3.314369 / 25.733365
   member 4  z 18  m 1  alpha 20  x -0.019999  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 11.515450  n -2000.0000  vs frame -2857.1429  sF 319.804  sH 1201.682  cycles -  widths 2.342887 / 7.750216
     case 2  T 0.005793  n 0.0000  vs frame 0.0000  sF 0.161  sH 26.952  cycles -  widths 0.001179 / 0.003899
     case 3  T 11.515450  n -1600.0000  vs frame -2285.7143  sF 319.804  sH 1201.682  cycles 1.371429e8 / 1.371429e8  widths 4.264055 / 25.671815
@@ -6057,7 +5966,6 @@
     case 2  T 0.062980  n 0.0000  vs frame 0.0000  sF 0.405  sH 48.551  cycles -  widths 0.002966 / 0.012651
     case 3  T 38.673595  n 27.1186  vs frame -658.5956  sF 248.578  sH 1203.122  cycles 1.185472e8 / 1.185472e8  widths 3.314369 / 25.733365
   member 4  z 18  m 1  alpha 20  x -0.019999  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 11.515450  n -2000.0000  vs frame -2857.1429  sF 319.804  sH 1201.682  cycles -  widths 2.342887 / 7.750216
     case 2  T 0.018591  n 0.0000  vs frame 0.0000  sF 0.516  sH 48.284  cycles -  widths 0.003782 / 0.012512
     case 3  T 11.515450  n -1600.0000  vs frame -2285.7143  sF 319.804  sH 1201.682  cycles 1.371429e8 / 1.371429e8  widths 4.264055 / 25.671815
@@ -6078,12 +5986,10 @@
     case 2  T 0.063511  n 0.0000  vs frame 0.0000  sF 1.428  sH 102.405  cycles -  widths 0.010464 / 0.056283
     case 3  T 38.673595  n 27.1186  vs frame 36.1582  sF 869.748  sH 2526.993  cycles 6.508475e6 / 6.508475e6  widths 11.596634 / 113.523422
   member 7  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 29.005196  n -71.5631  vs frame -60.2637  sF 932.478  sH 2749.546  cycles -  widths 6.831341 / 40.574817
     case 2  T 0.048659  n 0.0000  vs frame 0.0000  sF 1.594  sH 113.697  cycles -  widths 0.011681 / 0.069380
     case 3  T 29.005196  n -57.2505  vs frame -48.2109  sF 932.478  sH 2749.546  cycles 2.892656e6 / 2.892656e6  widths 12.433041 / 134.400024
   member 8  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 28.457060  n 48.9642  vs frame 60.2637  sF 932.465  sH 2749.546  cycles -  widths 6.831245 / 40.574817
     case 2  T 0.049183  n 0.0000  vs frame 0.0000  sF 1.594  sH 113.697  cycles -  widths 0.011681 / 0.069380
     case 3  T 28.457060  n 39.1714  vs frame 48.2109  sF 932.465  sH 2749.546  cycles 2.892656e6 / 2.892656e6  widths 12.432866 / 134.400024
@@ -6201,7 +6107,6 @@
     case 2  T 0.234095  n 0.0000  vs frame 0.0000  sF 8.090  sH 251.187  cycles -  widths 0.059268 / 0.338633
     case 3  T 19.431187  n -240.0000  vs frame -240.0000  sF 671.520  sH 2288.497  cycles 1.440000e7 / 1.440000e7  widths 8.953603 / 93.106131
   member 4  z 25  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 25.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 28.575275  n 204.0000  vs frame 204.0000  sF 613.950  sH 2143.305  cycles -  widths 4.497803 / 24.654873
     case 2  T 0.348837  n 0.0000  vs frame 0.0000  sF 7.397  sH 235.251  cycles -  widths 0.054187 / 0.297027
     case 3  T 28.575275  n 163.2000  vs frame 163.2000  sF 613.950  sH 2143.305  cycles 9.792001e6 / 9.792001e6  widths 8.186001 / 81.666802
@@ -6450,7 +6355,6 @@
     case 2  T 0.028523  n 0.0000  vs frame 0.0000  sF 1.246  sH 112.939  cycles -  widths 0.009128 / 0.068457
     case 3  T 6.477062  n -240.0000  vs frame -205.7143  sF 282.936  sH 1701.897  cycles 3.702857e7 / 3.702857e7  widths 3.772487 / 51.492510
   member 4  z 30  m 1  alpha 20  x -0.170059  b 10.000000  beta 0.000000  d 30.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 16.192656  n 60.0000  vs frame 102.8571  sF 328.851  sH 1564.115  cycles -  widths 2.409168 / 13.130216
     case 2  T 0.071706  n 0.0000  vs frame 0.0000  sF 1.448  sH 103.795  cycles -  widths 0.010609 / 0.057822
     case 3  T 16.192656  n 48.0000  vs frame 82.2857  sF 328.851  sH 1564.115  cycles 4.937143e6 / 4.937143e6  widths 4.384685 / 43.492527
@@ -6511,7 +6415,6 @@
     power through, by case: 10.715593 / 2.047246 / 10.715593
   distance 1  running 1.734179  clearance 0.020000
   member 3  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 52.879470  n 700.0000  vs frame 1000.0000  sF 1425.534  sH 2533.726  cycles -  widths 10.443472 / 34.455132
     case 2  T 0.060226  n 0.0000  vs frame 0.0000  sF 1.641  sH 85.959  cycles -  widths 0.012020 / 0.039657
     case 3  T 52.879470  n 560.0000  vs frame 800.0000  sF 1425.534  sH 2533.726  cycles 4.800000e7 / 4.800000e7  widths 19.007119 / 114.129180
@@ -6596,7 +6499,6 @@
     case 2  T 0.202146  n 0.0000  vs frame 0.0000  sF 1.299  sH 86.983  cycles -  widths 0.009519 / 0.040607
     case 3  T 375.736925  n -2.7119  vs frame 65.8596  sF 2415.080  sH 3750.112  cycles 1.185472e7 / 1.185472e7  widths 32.201066 / 250.014908
   member 6  z 18  m 1  alpha 20  x -0.019999  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 111.879427  n 200.0000  vs frame 285.7143  sF 3107.087  sH 3745.624  cycles -  widths 22.762541 / 75.297947
     case 2  T 0.059671  n 0.0000  vs frame 0.0000  sF 1.657  sH 86.503  cycles -  widths 0.012140 / 0.040160
     case 3  T 111.879427  n 160.0000  vs frame 228.5714  sF 3107.087  sH 3745.624  cycles 1.371429e7 / 1.371429e7  widths 41.427825 / 249.416920
@@ -6725,12 +6627,10 @@
     case 2  T 0.063511  n 0.0000  vs frame 0.0000  sF 1.428  sH 102.405  cycles -  widths 0.010464 / 0.056283
     case 3  T 6.477062  n -240.0000  vs frame -320.0000  sF 145.666  sH 1034.155  cycles 5.760000e7 / 5.760000e7  widths 1.942207 / 19.012928
   member 4  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 4.857797  n 633.3333  vs frame 533.3333  sF 156.172  sH 1125.234  cycles -  widths 1.144115 / 6.795479
     case 2  T 0.048659  n 0.0000  vs frame 0.0000  sF 1.594  sH 113.697  cycles -  widths 0.011681 / 0.069380
     case 3  T 4.857797  n 506.6667  vs frame 426.6667  sF 156.172  sH 1125.234  cycles 2.560000e7 / 2.560000e7  widths 2.082289 / 22.509346
   member 5  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 4.765995  n -433.3333  vs frame -533.3333  sF 156.169  sH 1125.234  cycles -  widths 1.144098 / 6.795479
     case 2  T 0.049183  n 0.0000  vs frame 0.0000  sF 1.594  sH 113.697  cycles -  widths 0.011681 / 0.069380
     case 3  T 4.765995  n -346.6667  vs frame -426.6667  sF 156.169  sH 1125.234  cycles 2.560000e7 / 2.560000e7  widths 2.082259 / 22.509346
@@ -6785,12 +6685,10 @@
     case 2  T 0.024694  n 0.0000  vs frame 0.0000  sF 0.555  sH 63.854  cycles -  widths 0.004068 / 0.021883
     case 3  T 0.666667  n 2400.0000  vs frame 3200.0000  sF 14.993  sH 331.781  cycles 5.760000e8 / 5.760000e8  widths 0.199906 / 1.956950
   member 2  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 0.500000  n -6333.3333  vs frame -5333.3333  sF 16.074  sH 361.001  cycles -  widths 0.117761 / 0.699440
     case 2  T 0.018919  n 0.0000  vs frame 0.0000  sF 0.620  sH 70.895  cycles -  widths 0.004542 / 0.026975
     case 3  T 0.500000  n -5066.6667  vs frame -4266.6667  sF 16.074  sH 361.001  cycles 2.560000e8 / 2.560000e8  widths 0.214324 / 2.316827
   member 3  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 0.490551  n 4333.3333  vs frame 5333.3333  sF 16.074  sH 361.001  cycles -  widths 0.117759 / 0.699440
     case 2  T 0.019123  n 0.0000  vs frame 0.0000  sF 0.620  sH 70.895  cycles -  widths 0.004542 / 0.026975
     case 3  T 0.490551  n 3466.6667  vs frame 4266.6667  sF 16.074  sH 361.001  cycles 2.560000e8 / 2.560000e8  widths 0.214321 / 2.316827
@@ -6859,12 +6757,10 @@
     case 2  T 0.024305  n 0.0000  vs frame 0.0000  sF 0.547  sH 63.350  cycles -  widths 0.004004 / 0.021539
     case 3  T 0.666667  n 2400.0000  vs frame 3200.0000  sF 14.993  sH 331.781  cycles 5.760000e8 / 5.760000e8  widths 0.199906 / 1.956950
   member 2  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 0.500000  n -6333.3333  vs frame -5333.3333  sF 16.074  sH 361.001  cycles -  widths 0.117761 / 0.699440
     case 2  T 0.018621  n 0.0000  vs frame 0.0000  sF 0.610  sH 70.335  cycles -  widths 0.004470 / 0.026551
     case 3  T 0.500000  n -5066.6667  vs frame -4266.6667  sF 16.074  sH 361.001  cycles 2.560000e8 / 2.560000e8  widths 0.214324 / 2.316827
   member 3  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 0.490551  n 4333.3333  vs frame 5333.3333  sF 16.074  sH 361.001  cycles -  widths 0.117759 / 0.699440
     case 2  T 0.018822  n 0.0000  vs frame 0.0000  sF 0.610  sH 70.335  cycles -  widths 0.004470 / 0.026551
     case 3  T 0.490551  n 3466.6667  vs frame 4266.6667  sF 16.074  sH 361.001  cycles 2.560000e8 / 2.560000e8  widths 0.214321 / 2.316827
@@ -6886,7 +6782,6 @@
     case 2  T 0.234095  n 0.0000  vs frame 0.0000  sF 8.090  sH 251.187  cycles -  widths 0.059268 / 0.338633
     case 3  T 5.601491  n -800.0000  vs frame -800.0000  sF 193.581  sH 1228.719  cycles 4.800000e7 / 4.800000e7  widths 2.581084 / 26.840004
   member 6  z 25  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 25.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 8.237486  n 680.0000  vs frame 680.0000  sF 176.985  sH 1150.764  cycles -  widths 1.296596 / 7.107340
     case 2  T 0.348837  n 0.0000  vs frame 0.0000  sF 7.397  sH 235.251  cycles -  widths 0.054187 / 0.297027
     case 3  T 8.237486  n 544.0000  vs frame 544.0000  sF 176.985  sH 1150.764  cycles 3.264000e7 / 3.264000e7  widths 2.359805 / 23.542352
@@ -6944,12 +6839,10 @@
     case 2  T 0.026035  n 0.0000  vs frame 0.0000  sF 0.586  sH 65.566  cycles -  widths 0.004290 / 0.023072
     case 3  T 0.666667  n 2400.0000  vs frame 3200.0000  sF 14.993  sH 331.781  cycles 5.760000e8 / 5.760000e8  widths 0.199906 / 1.956950
   member 2  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 0.500000  n -6333.3333  vs frame -5333.3333  sF 16.074  sH 361.001  cycles -  widths 0.117761 / 0.699440
     case 2  T 0.019947  n 0.0000  vs frame 0.0000  sF 0.654  sH 72.796  cycles -  widths 0.004788 / 0.028441
     case 3  T 0.500000  n -5066.6667  vs frame -4266.6667  sF 16.074  sH 361.001  cycles 2.560000e8 / 2.560000e8  widths 0.214324 / 2.316827
   member 3  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 0.490551  n 4333.3333  vs frame 5333.3333  sF 16.074  sH 361.001  cycles -  widths 0.117759 / 0.699440
     case 2  T 0.020162  n 0.0000  vs frame 0.0000  sF 0.654  sH 72.796  cycles -  widths 0.004788 / 0.028441
     case 3  T 0.490551  n 3466.6667  vs frame 4266.6667  sF 16.074  sH 361.001  cycles 2.560000e8 / 2.560000e8  widths 0.214321 / 2.316827
@@ -7035,12 +6928,10 @@
     case 2  T 0.000000  n 0.0000  vs frame 0.0000  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
     case 3  T 0.666667  n 2400.0000  vs frame 3200.0000  sF 14.993  sH 331.781  cycles 5.760000e8 / 5.760000e8  widths 0.199906 / 1.956950
   member 2  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 0.500000  n -6333.3333  vs frame -5333.3333  sF 16.074  sH 361.001  cycles -  widths 0.117761 / 0.699440
     case 2  T 0.000000  n 0.0000  vs frame 0.0000  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
     case 3  T 0.500000  n -5066.6667  vs frame -4266.6667  sF 16.074  sH 361.001  cycles 2.560000e8 / 2.560000e8  widths 0.214324 / 2.316827
   member 3  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 0.490551  n 4333.3333  vs frame 5333.3333  sF 16.074  sH 361.001  cycles -  widths 0.117759 / 0.699440
     case 2  T 0.000000  n 0.0000  vs frame 0.0000  sF 0.000  sH 0.000  cycles -  widths 0.000000 / 0.000000
     case 3  T 0.490551  n 3466.6667  vs frame 4266.6667  sF 16.074  sH 361.001  cycles 2.560000e8 / 2.560000e8  widths 0.214321 / 2.316827
@@ -7107,12 +6998,10 @@
     case 2  T 0.021155  n 0.0000  vs frame 0.0000  sF 0.476  sH 59.103  cycles -  widths 0.003486 / 0.018748
     case 3  T 0.666667  n 2400.0000  vs frame 3200.0000  sF 14.993  sH 331.781  cycles 5.760000e8 / 5.760000e8  widths 0.199906 / 1.956950
   member 2  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 0.500000  n -6333.3333  vs frame -5333.3333  sF 16.074  sH 361.001  cycles -  widths 0.117761 / 0.699440
     case 2  T 0.016208  n 0.0000  vs frame 0.0000  sF 0.531  sH 65.620  cycles -  widths 0.003891 / 0.023110
     case 3  T 0.500000  n -5066.6667  vs frame -4266.6667  sF 16.074  sH 361.001  cycles 2.560000e8 / 2.560000e8  widths 0.214324 / 2.316827
   member 3  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 0.490551  n 4333.3333  vs frame 5333.3333  sF 16.074  sH 361.001  cycles -  widths 0.117759 / 0.699440
     case 2  T 0.016383  n 0.0000  vs frame 0.0000  sF 0.531  sH 65.620  cycles -  widths 0.003891 / 0.023110
     case 3  T 0.490551  n 3466.6667  vs frame 4266.6667  sF 16.074  sH 361.001  cycles 2.560000e8 / 2.560000e8  widths 0.214321 / 2.316827
@@ -7184,12 +7073,10 @@
     case 2  T 0.008862  n 0.0000  vs frame 0.0000  sF 0.199  sH 38.253  cycles -  widths 0.001460 / 0.007853
     case 3  T 0.666667  n 2400.0000  vs frame 3200.0000  sF 14.993  sH 331.781  cycles 5.760000e8 / 5.760000e8  widths 0.199906 / 1.956950
   member 2  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 0.500000  n -6333.3333  vs frame -5333.3333  sF 16.074  sH 361.001  cycles -  widths 0.117761 / 0.699440
     case 2  T 0.006790  n 0.0000  vs frame 0.0000  sF 0.222  sH 42.470  cycles -  widths 0.001630 / 0.009681
     case 3  T 0.500000  n -5066.6667  vs frame -4266.6667  sF 16.074  sH 361.001  cycles 2.560000e8 / 2.560000e8  widths 0.214324 / 2.316827
   member 3  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 0.490551  n 4333.3333  vs frame 5333.3333  sF 16.074  sH 361.001  cycles -  widths 0.117759 / 0.699440
     case 2  T 0.006863  n 0.0000  vs frame 0.0000  sF 0.222  sH 42.470  cycles -  widths 0.001630 / 0.009681
     case 3  T 0.490551  n 3466.6667  vs frame 4266.6667  sF 16.074  sH 361.001  cycles 2.560000e8 / 2.560000e8  widths 0.214321 / 2.316827
@@ -7211,7 +7098,6 @@
     case 2  T 0.028523  n 0.0000  vs frame 0.0000  sF 1.246  sH 112.939  cycles -  widths 0.009128 / 0.068457
     case 3  T 1.867164  n -800.0000  vs frame -685.7143  sF 81.563  sH 913.767  cycles 1.234286e8 / 1.234286e8  widths 1.087507 / 14.843911
   member 6  z 30  m 1  alpha 20  x -0.170059  b 10.000000  beta 0.000000  d 30.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 4.667909  n 200.0000  vs frame 342.8571  sF 94.799  sH 839.790  cycles -  widths 0.694499 / 3.785090
     case 2  T 0.071706  n 0.0000  vs frame 0.0000  sF 1.448  sH 103.795  cycles -  widths 0.010609 / 0.057822
     case 3  T 4.667909  n 160.0000  vs frame 274.2857  sF 94.799  sH 839.790  cycles 1.645714e7 / 1.645714e7  widths 1.263987 / 12.537731
@@ -7268,12 +7154,10 @@
     case 2  T 0.000269  n 0.0000  vs frame 0.0000  sF 0.006  sH 6.660  cycles -  widths 0.000044 / 0.000238
     case 3  T 0.666667  n 2400.0000  vs frame 3200.0000  sF 14.993  sH 331.781  cycles 5.760000e8 / 5.760000e8  widths 0.199906 / 1.956950
   member 2  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 0.500000  n -6333.3333  vs frame -5333.3333  sF 16.074  sH 361.001  cycles -  widths 0.117761 / 0.699440
     case 2  T 0.000201  n 0.0000  vs frame 0.0000  sF 0.006  sH 7.246  cycles -  widths 0.000047 / 0.000282
     case 3  T 0.500000  n -5066.6667  vs frame -4266.6667  sF 16.074  sH 361.001  cycles 2.560000e8 / 2.560000e8  widths 0.214324 / 2.316827
   member 3  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 0.490551  n 4333.3333  vs frame 5333.3333  sF 16.074  sH 361.001  cycles -  widths 0.117759 / 0.699440
     case 2  T 0.000198  n 0.0000  vs frame 0.0000  sF 0.006  sH 7.246  cycles -  widths 0.000047 / 0.000282
     case 3  T 0.490551  n 3466.6667  vs frame 4266.6667  sF 16.074  sH 361.001  cycles 2.560000e8 / 2.560000e8  widths 0.214321 / 2.316827
@@ -7291,7 +7175,6 @@
   distance 2  running 38.980000  clearance 0.020000
   distance 3  running 18.020000  clearance 0.020000
   member 5  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 15.243735  n 2333.3333  vs frame 3333.3333  sF 410.943  sH 1360.385  cycles -  widths 3.010573 / 9.932492
     case 2  T 0.060226  n 0.0000  vs frame 0.0000  sF 1.641  sH 85.959  cycles -  widths 0.012020 / 0.039657
     case 3  T 15.243735  n 1866.6667  vs frame 2666.6667  sF 410.943  sH 1360.385  cycles 1.600000e8 / 1.600000e8  widths 5.479243 / 32.900386
@@ -7358,12 +7241,10 @@
     case 2  T 0.000348  n 0.0000  vs frame 0.0000  sF 0.008  sH 7.582  cycles -  widths 0.000057 / 0.000309
     case 3  T 0.666667  n 2400.0000  vs frame 3200.0000  sF 14.993  sH 331.781  cycles 5.760000e8 / 5.760000e8  widths 0.199906 / 1.956950
   member 2  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 0.500000  n -6333.3333  vs frame -5333.3333  sF 16.074  sH 361.001  cycles -  widths 0.117761 / 0.699440
     case 2  T 0.000267  n 0.0000  vs frame 0.0000  sF 0.009  sH 8.418  cycles -  widths 0.000064 / 0.000380
     case 3  T 0.500000  n -5066.6667  vs frame -4266.6667  sF 16.074  sH 361.001  cycles 2.560000e8 / 2.560000e8  widths 0.214324 / 2.316827
   member 3  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 0.490551  n 4333.3333  vs frame 5333.3333  sF 16.074  sH 361.001  cycles -  widths 0.117759 / 0.699440
     case 2  T 0.000270  n 0.0000  vs frame 0.0000  sF 0.009  sH 8.418  cycles -  widths 0.000064 / 0.000380
     case 3  T 0.490551  n 3466.6667  vs frame 4266.6667  sF 16.074  sH 361.001  cycles 2.560000e8 / 2.560000e8  widths 0.214321 / 2.316827
@@ -7395,7 +7276,6 @@
     case 2  T 0.202146  n 0.0000  vs frame 0.0000  sF 1.299  sH 86.983  cycles -  widths 0.009519 / 0.040607
     case 3  T 108.314892  n -9.0395  vs frame 219.5319  sF 696.203  sH 2013.476  cycles 3.951574e7 / 3.951574e7  widths 9.282705 / 72.072602
   member 8  z 18  m 1  alpha 20  x -0.019999  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 32.251842  n 666.6667  vs frame 952.3810  sF 895.690  sH 2011.066  cycles -  widths 6.561831 / 21.706381
     case 2  T 0.059671  n 0.0000  vs frame 0.0000  sF 1.657  sH 86.503  cycles -  widths 0.012140 / 0.040160
     case 3  T 32.251842  n 533.3333  vs frame 761.9048  sF 895.690  sH 2011.066  cycles 4.571429e7 / 4.571429e7  widths 11.942532 / 71.900218
@@ -7455,12 +7335,10 @@
     case 2  T 0.006166  n 0.0000  vs frame 0.0000  sF 0.139  sH 31.907  cycles -  widths 0.001016 / 0.005464
     case 3  T 0.666667  n 2400.0000  vs frame 3200.0000  sF 14.993  sH 331.781  cycles 5.760000e8 / 5.760000e8  widths 0.199906 / 1.956950
   member 2  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 0.500000  n -6333.3333  vs frame -5333.3333  sF 16.074  sH 361.001  cycles -  widths 0.117761 / 0.699440
     case 2  T 0.004724  n 0.0000  vs frame 0.0000  sF 0.155  sH 35.425  cycles -  widths 0.001134 / 0.006735
     case 3  T 0.500000  n -5066.6667  vs frame -4266.6667  sF 16.074  sH 361.001  cycles 2.560000e8 / 2.560000e8  widths 0.214324 / 2.316827
   member 3  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 0.490551  n 4333.3333  vs frame 5333.3333  sF 16.074  sH 361.001  cycles -  widths 0.117759 / 0.699440
     case 2  T 0.004775  n 0.0000  vs frame 0.0000  sF 0.155  sH 35.425  cycles -  widths 0.001134 / 0.006735
     case 3  T 0.490551  n 3466.6667  vs frame 4266.6667  sF 16.074  sH 361.001  cycles 2.560000e8 / 2.560000e8  widths 0.214321 / 2.316827
@@ -7535,12 +7413,10 @@
     case 2  T 0.019787  n 0.0000  vs frame 0.0000  sF 0.445  sH 57.160  cycles -  widths 0.003260 / 0.017535
     case 3  T 0.666667  n 2400.0000  vs frame 3200.0000  sF 14.993  sH 331.781  cycles 5.760000e8 / 5.760000e8  widths 0.199906 / 1.956950
   member 2  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 0.500000  n -6333.3333  vs frame -5333.3333  sF 16.074  sH 361.001  cycles -  widths 0.117761 / 0.699440
     case 2  T 0.015160  n 0.0000  vs frame 0.0000  sF 0.497  sH 63.463  cycles -  widths 0.003639 / 0.021616
     case 3  T 0.500000  n -5066.6667  vs frame -4266.6667  sF 16.074  sH 361.001  cycles 2.560000e8 / 2.560000e8  widths 0.214324 / 2.316827
   member 3  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 0.490551  n 4333.3333  vs frame 5333.3333  sF 16.074  sH 361.001  cycles -  widths 0.117759 / 0.699440
     case 2  T 0.015323  n 0.0000  vs frame 0.0000  sF 0.497  sH 63.463  cycles -  widths 0.003639 / 0.021616
     case 3  T 0.490551  n 3466.6667  vs frame 4266.6667  sF 16.074  sH 361.001  cycles 2.560000e8 / 2.560000e8  widths 0.214321 / 2.316827
@@ -7562,12 +7438,10 @@
     case 2  T 0.063511  n 0.0000  vs frame 0.0000  sF 1.428  sH 102.405  cycles -  widths 0.010464 / 0.056283
     case 3  T 1.867164  n -800.0000  vs frame -1066.6667  sF 41.991  sH 555.249  cycles 1.920000e8 / 1.920000e8  widths 0.559886 / 5.480918
   member 6  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 1.400373  n 2111.1111  vs frame 1777.7778  sF 45.020  sH 604.150  cycles -  widths 0.329818 / 1.958955
     case 2  T 0.048659  n 0.0000  vs frame 0.0000  sF 1.594  sH 113.697  cycles -  widths 0.011681 / 0.069380
     case 3  T 1.400373  n 1688.8889  vs frame 1422.2222  sF 45.020  sH 604.150  cycles 8.533333e7 / 8.533333e7  widths 0.600268 / 6.488842
   member 7  z 18  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 1.373909  n -1444.4444  vs frame -1777.7778  sF 45.019  sH 604.150  cycles -  widths 0.329813 / 1.958955
     case 2  T 0.049183  n 0.0000  vs frame 0.0000  sF 1.594  sH 113.697  cycles -  widths 0.011681 / 0.069380
     case 3  T 1.373909  n -1155.5556  vs frame -1422.2222  sF 45.019  sH 604.150  cycles 8.533333e7 / 8.533333e7  widths 0.600260 / 6.488842
@@ -7683,7 +7557,6 @@
     case 2  T 0.202146  n 0.0000  vs frame 0.0000  sF 1.299  sH 86.983  cycles -  widths 0.009519 / 0.040607
     case 3  T 220.804902  n -4.5310  vs frame 110.0382  sF 1419.242  sH 2874.793  cycles 1.980688e7 / 1.980688e7  widths 18.923222 / 146.923323
   member 12  z 18  m 1  alpha 20  x -0.019999  b 10.000000  beta 0.000000  d 18.000000
-    ! gear.reversed_bending_uncorrected
     case 1  T 65.746868  n 334.1601  vs frame 477.3716  sF 1825.905  sH 2871.353  cycles -  widths 13.376595 / 44.249460
     case 2  T 0.059671  n 0.0000  vs frame 0.0000  sF 1.657  sH 86.503  cycles -  widths 0.012140 / 0.040160
     case 3  T 65.746868  n 267.3281  vs frame 381.8973  sF 1825.905  sH 2871.353  cycles 2.291384e7 / 2.291384e7  widths 24.345403 / 146.571910

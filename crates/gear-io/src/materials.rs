@@ -104,6 +104,59 @@ mod tests {
         );
     }
 
+    /// **A root loaded both ways on fully reversed data is judged at the
+    /// stored figure, bit for bit.** The steels' and the brass's figures are
+    /// rotating-beam endurances and POM's is ASTM D671's, all at `R = −1`:
+    /// already the reversed case, so taking 0.7 of them counts the reversal
+    /// twice. It did: only `gear-cli train toggles` caught a change to the
+    /// fraction, and the suite was silent.
+    #[test]
+    fn a_reversed_root_on_fully_reversed_data_is_judged_at_the_stored_figure() {
+        use gear_core::train::{CaseKind, Reversal};
+        let lib = default_library();
+        let reversed = [
+            "4340 Steel",
+            "4340 Hardened Steel",
+            "Brass C360",
+            "POM Delrin 100P",
+        ];
+        for m in &lib.materials {
+            let is_reversed = reversed.contains(&m.name.as_str());
+            assert_eq!(
+                m.fatigue_load_ratio == Some(gear_core::material::LoadRatio::Reversed),
+                is_reversed,
+                "{}: its fatigue figure's ratio",
+                m.name
+            );
+            let judged = Reversal { correct: true }.bending_allowable(m, CaseKind::Fatigue, true);
+            if is_reversed {
+                assert_eq!(
+                    judged.to_bits(),
+                    m.fatigue_allowable.value.to_bits(),
+                    "{}: judged at {judged} against {}",
+                    m.name,
+                    m.fatigue_allowable.value
+                );
+            } else {
+                // A figure that does not say is read one way: ISO's fraction.
+                assert_eq!(
+                    judged.to_bits(),
+                    (m.fatigue_allowable.value * gear_core::material::REVERSED_BENDING_FRACTION)
+                        .to_bits(),
+                    "{}",
+                    m.name
+                );
+            }
+            // A replaced figure keeps none of the library's ratio.
+            let own = m.overridden(&gear_core::material::Overrides {
+                fatigue_allowable: Some(m.fatigue_allowable.value),
+                ..Default::default()
+            });
+            assert_eq!(own.fatigue_load_ratio, None, "{}", m.name);
+            assert_eq!(own.fatigue_allowable.note, None, "{}", m.name);
+        }
+    }
+
     #[test]
     fn the_default_library_round_trips_through_toml_unchanged() {
         // The property the export/import feature rests on: what we write, we

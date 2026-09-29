@@ -850,19 +850,26 @@ mod tests {
                 record(&r.every_note());
             }
         }
-        // A planet's root is loaded both ways whatever the drive does, so the
-        // correction switched on is what fires the "applied" half of the pair;
-        // switched off — every other case here — fires the disclosure.
-        if let Ok(r) = gear_core::train::solve_alone(
-            &gear_core::train::Train::alone(&arr::planetary(12, 30, 72, 3), 2.0, 0.0)
-                .with_reversal(gear_core::train::Reversal { correct: true }),
-            &lib,
-        ) {
-            record(&r.every_note());
-            // ...and what the members themselves say, which is where a note
-            // about one gear belongs.
-            for g in &r.members {
-                record(&g.notes);
+        // A planet's root is loaded both ways whatever the drive does. On a
+        // figure that does not say it was measured fully reversed — the
+        // polyamides' — the correction switched on fires the "applied" half of
+        // the pair and switched off the disclosure, each with the reading.
+        for correct in [true, false] {
+            let mut set = arr::planetary(12, 30, 72, 3);
+            for m in &mut set.members {
+                m.gear.material = "PA6 GF30".into();
+            }
+            if let Ok(r) = gear_core::train::solve_alone(
+                &gear_core::train::Train::alone(&set, 2.0, 0.0)
+                    .with_reversal(gear_core::train::Reversal { correct }),
+                &lib,
+            ) {
+                record(&r.every_note());
+                // ...and what the members themselves say, which is where a
+                // note about one gear belongs.
+                for g in &r.members {
+                    record(&g.notes);
+                }
             }
         }
         for (planets, clearance) in [(3_u32, 0.5_f64), (4, 9.0), (5, 0.5), (6, 40.0), (7, 0.5)] {

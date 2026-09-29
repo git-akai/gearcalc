@@ -27,6 +27,14 @@
 # reading or a class estimate. The fatigue column is the least trustworthy part
 # of this file and is the first thing to override with your own data.
 #
+# Each fatigue figure says what it was measured at where its source does:
+# `fatigue_load_ratio` ("reversed", R = −1, or "pulsating", R = 0) and
+# `fatigue_specimen` ("coupon", or "gear_root" for a gear's own root, as ISO
+# 6336-5's σ_FE is). The steels and the brass are rotating-beam endurances and
+# POM's is ASTM D671's, all fully reversed on a coupon; the polyamide estimates
+# state neither, and a reversed root reads such a figure one way (R = 0), the
+# lower allowable, and says so. A file that omits both keys reads the same way.
+#
 # Two conventions used for the estimates, applied uniformly so entries stay
 # comparable with each other even where the absolute value is a guess:
 #
@@ -49,6 +57,8 @@ poissons_ratio = { value = 0.29, basis = "datasheet" }
 ultimate_allowable = { value = 470.0, basis = "datasheet", note = "Tensile yield strength. UTS is 690 MPa." }
 ultimate_measure = "yield"
 fatigue_allowable = { value = 330.0, basis = "datasheet", note = "Published fatigue strength; the source does not state the cycle count." }
+fatigue_load_ratio = "reversed"
+fatigue_specimen = "coupon"
 
 [[material]]
 name = "4340 Hardened Steel"
@@ -62,6 +72,8 @@ poissons_ratio = { value = 0.29, basis = "datasheet" }
 ultimate_allowable = { value = 1365.0, basis = "datasheet", note = "Tensile yield strength at this temper. UTS is 1500 MPa." }
 ultimate_measure = "yield"
 fatigue_allowable = { value = 750.0, basis = "estimated", note = "0.5 × UTS, the classical steel endurance ratio, which reproduces the annealed entry's published 330 MPa to within 5 %. No published fatigue figure was found at THIS temper. Treat as optimistic: the endurance ratio is known to fall away above roughly 1400 MPa UTS rather than track 0.5 indefinitely, so the true figure is plausibly nearer 700 MPa. The first number here worth replacing with your own data." }
+fatigue_load_ratio = "reversed"
+fatigue_specimen = "coupon"
 
 # The 425 °C temper is chosen deliberately. Tempering 4340 lower gives more
 # strength (1860 MPa yield at 205 °C) but takes the hardness to 53 HRC, past
@@ -83,6 +95,8 @@ poissons_ratio = { value = 0.32, basis = "derived", note = "ν = E/2G − 1, fro
 ultimate_allowable = { value = 310.0, basis = "datasheet", note = "Typical H02 yield, 45 ksi. UTS is 386 MPa. Yield is strongly temper-dependent — the published range across tempers is 124–310 MPa." }
 ultimate_measure = "yield"
 fatigue_allowable = { value = 115.0, basis = "estimated", note = "0.30 × UTS, the usual endurance ratio for wrought copper alloys. No fatigue figure for C36000 was found in the CDA data." }
+fatigue_load_ratio = "reversed"
+fatigue_specimen = "coupon"
 
 # ------------------------------------------------------------------- POM ----
 
@@ -98,6 +112,8 @@ poissons_ratio = { value = 0.37, basis = "datasheet", note = "ISO 527-1/-2. Publ
 ultimate_allowable = { value = 71.0, basis = "datasheet", note = "Yield stress, ISO 527-1/-2, at 22 % yield strain." }
 ultimate_measure = "yield"
 fatigue_allowable = { value = 35.0, basis = "chart", note = "Read off DuPont figure 6.14, flexural fatigue of Delrin 100 at 10⁷ cycles — ASTM D671, 23 °C, 50 % RH, fully reversed, 30 Hz. The curve is published for Delrin 100, not 100P. Roughly half the yield stress, which is high for a thermoplastic and characteristic of acetal." }
+fatigue_load_ratio = "reversed"
+fatigue_specimen = "coupon"
 
 # No glass-filled POM is included, and that is a finding rather than an
 # omission. The obvious candidate, Delrin 570, is glass *filled* — fibres added

@@ -147,43 +147,60 @@ pub enum Family {
     Polyamide,
 }
 
-/// Fraction of the one-directional bending allowable that survives a **fully
-/// reversed** load.
+/// **The load ratio a fatigue figure was measured at**, `R = σ_min/σ_max`.
 ///
-/// A root is loaded both ways when the drive reverses, and a planet's always is —
-/// driven on one flank by the sun and on the other by the ring, so every tooth
-/// sees a complete stress reversal each turn rather than a released load
-/// (docs/reference.md#trains). Which members that reaches is
-/// [`Reversal`](crate::train::Reversal)'s to say; this is only the fraction.
-/// ISO's convention for an alternating load is about 0.7,
-/// and unlike the `K` and `Z` families this is not a population-calibrated
-/// rating factor balanced against `σ_Flim` values this project does not have —
-/// it is the Goodman/Haigh statement that reversal doubles the stress range, and
-/// it applies to any material.
-///
-/// Named rather than written as a literal, and applied to the **allowable**
-/// rather than folded into the stress, so a reader sees the stress the tooth
-/// actually carries next to the smaller allowable it is judged against.
-pub const REVERSED_BENDING_FRACTION: f64 = 0.7;
-
-/// The bending allowable a fully reversed load leaves, MPa.
-///
-/// Carries its own provenance like every other material figure (docs/reference.md#materials): a derived
-/// value, with a note saying what it was derived from, so it cannot be mistaken
-/// for a datasheet reading.
-#[must_use]
-pub fn reversed_bending_allowable(m: &Material) -> Value {
-    Value {
-        value: m.fatigue_allowable.value * REVERSED_BENDING_FRACTION,
-        basis: Basis::Derived,
-        note: Some(format!(
-            "{REVERSED_BENDING_FRACTION} x the one-directional allowable of \
-             {:.1} MPa: a root loaded on both flanks endures less than one \
-             loaded on a single flank",
-            m.fatigue_allowable.value
-        )),
-    }
+/// A root loaded one way sees `R = 0`; one loaded on both flanks sees about
+/// `R = −1`. A fatigue figure measured at one ratio is not the allowable at the
+/// other, so which one a figure is decides what a reversed root is judged
+/// against ([`Material::reversed_bending_fraction`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
+pub enum LoadRatio {
+    /// `R = −1`: fully reversed, as a rotating-beam or reversed flexural test
+    /// loads its specimen.
+    Reversed,
+    /// `R = 0`: loaded one way and released, as a pulsator loads a gear tooth
+    /// for ISO 6336-5's `σ_FE`.
+    Pulsating,
 }
+
+/// **What a fatigue figure was measured on.**
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
+pub enum Specimen {
+    /// A test coupon — a polished rotating beam, a moulded flexural bar — with
+    /// no notch, surface, size or reliability reduction.
+    Coupon,
+    /// A gear's own tooth root, as ISO 6336-5's `σ_FE` is.
+    GearRoot,
+}
+
+/// **The fraction of a one-way (`R = 0`) gear-root endurance a fully reversed
+/// root keeps**: ISO 6336-3 Annex B's `Y_M` for an idler, 0.7.
+///
+/// ISO's convention for its own `R = 0` gear data. It is not the Goodman
+/// statement it was once described as — under Goodman the fraction is
+/// `(1 + S_e/S_u)/2`, 0.65–0.75 across this library — and it is not
+/// material-independent: it is ISO's figure for steel gear roots, applied
+/// here where a figure does not say it is fully reversed already
+/// ([`Material::reversed_bending_fraction`]).
+///
+/// Applied to the **allowable** rather than folded into the stress, so a reader
+/// sees the stress the tooth carries next to the smaller allowable it is
+/// judged against.
+pub const REVERSED_BENDING_FRACTION: f64 = 0.7;
 
 /// One material property: its value, and how far it can be trusted.
 #[derive(Clone, Debug, PartialEq)]
@@ -259,6 +276,21 @@ pub struct Material {
     pub ultimate_measure: Measure,
     /// MPa. The limit on a **cyclic** load.
     pub fatigue_allowable: Value,
+    /// The load ratio [`Self::fatigue_allowable`] was measured at. `None` where
+    /// the source does not say, which a reversed root reads as `R = 0` —
+    /// the lower allowable — and says so.
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Option::is_none")
+    )]
+    pub fatigue_load_ratio: Option<LoadRatio>,
+    /// What [`Self::fatigue_allowable`] was measured on. `None` where the
+    /// source does not say.
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Option::is_none")
+    )]
+    pub fatigue_specimen: Option<Specimen>,
 }
 
 impl Material {
@@ -279,6 +311,26 @@ impl Material {
         .into_iter()
         .max()
         .unwrap_or(Basis::Estimated)
+    }
+
+    /// **What part of the fatigue figure a fully reversed root is judged
+    /// against**, and whether the figure says so itself.
+    ///
+    /// - Measured fully reversed: 1. The figure is already the reversed case.
+    /// - Measured one way on a gear root: [`REVERSED_BENDING_FRACTION`], ISO's
+    ///   own convention for its own kind of data.
+    /// - Anything else — a ratio or specimen the source does not state, or a
+    ///   one-way coupon: the same fraction, the lower of the two readings, and
+    ///   `stated` is false so the rating can say it read the figure that way.
+    #[must_use]
+    pub fn reversed_bending_fraction(&self) -> (f64, bool) {
+        match (self.fatigue_load_ratio, self.fatigue_specimen) {
+            (Some(LoadRatio::Reversed), _) => (1.0, true),
+            (Some(LoadRatio::Pulsating), Some(Specimen::GearRoot)) => {
+                (REVERSED_BENDING_FRACTION, true)
+            }
+            _ => (REVERSED_BENDING_FRACTION, false),
+        }
     }
 
     /// Plane-strain contact modulus contribution, `(1 − ν²)/E`, in 1/MPa.
@@ -316,6 +368,14 @@ pub struct Overrides {
     pub poissons_ratio: Option<f64>,
     pub ultimate_allowable: Option<f64>,
     pub fatigue_allowable: Option<f64>,
+    /// The load ratio a replaced fatigue figure was measured at. A replaced
+    /// figure does not inherit the library's: `None` here, with the figure
+    /// replaced, is a figure whose ratio nobody stated.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub fatigue_load_ratio: Option<LoadRatio>,
+    /// What a replaced fatigue figure was measured on, likewise.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub fatigue_specimen: Option<Specimen>,
 }
 
 impl Overrides {
@@ -331,6 +391,8 @@ impl Overrides {
         ]
         .iter()
         .any(Option::is_some)
+            || self.fatigue_load_ratio.is_some()
+            || self.fatigue_specimen.is_some()
     }
 }
 
@@ -338,23 +400,35 @@ impl Material {
     /// This material with the given properties replaced.
     ///
     /// A replaced value keeps nothing of the original but its place: its basis
-    /// becomes [`Basis::Overridden`].
+    /// becomes [`Basis::Overridden`], with no note — the basis says it. A
+    /// replaced fatigue figure keeps none of the library's load ratio or
+    /// specimen either, only what the override states.
     #[must_use]
     pub fn overridden(&self, o: &Overrides) -> Self {
         let swap = |v: &Value, new: Option<f64>| match new {
             Some(x) => Value {
                 value: x,
                 basis: Basis::Overridden,
-                note: Some("supplied by the user".into()),
+                note: None,
             },
             None => v.clone(),
         };
+        fn keep<T>(replaced: bool, library: Option<T>, given: Option<T>) -> Option<T> {
+            if replaced {
+                given
+            } else {
+                given.or(library)
+            }
+        }
+        let replaced = o.fatigue_allowable.is_some();
         Self {
             density: swap(&self.density, o.density),
             elastic_modulus: swap(&self.elastic_modulus, o.elastic_modulus),
             poissons_ratio: swap(&self.poissons_ratio, o.poissons_ratio),
             ultimate_allowable: swap(&self.ultimate_allowable, o.ultimate_allowable),
             fatigue_allowable: swap(&self.fatigue_allowable, o.fatigue_allowable),
+            fatigue_load_ratio: keep(replaced, self.fatigue_load_ratio, o.fatigue_load_ratio),
+            fatigue_specimen: keep(replaced, self.fatigue_specimen, o.fatigue_specimen),
             ..self.clone()
         }
     }
@@ -423,6 +497,8 @@ mod tests {
             ultimate_allowable: Value::datasheet(470.0),
             ultimate_measure: Measure::Yield,
             fatigue_allowable: Value::datasheet(330.0),
+            fatigue_load_ratio: Some(LoadRatio::Reversed),
+            fatigue_specimen: Some(Specimen::Coupon),
         }
     }
 

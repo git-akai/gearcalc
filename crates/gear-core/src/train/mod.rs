@@ -1900,6 +1900,8 @@ pub(super) fn test_library() -> MaterialLibrary {
             basis: Basis::Estimated,
             note: Some("test".into()),
         },
+        fatigue_load_ratio: Some(crate::material::LoadRatio::Reversed),
+        fatigue_specimen: Some(crate::material::Specimen::Coupon),
     };
     let bronze = Material {
         name: "Brass C360".into(),
@@ -2654,14 +2656,18 @@ impl FaceSources {
 ///
 /// # Why the correction is asked for rather than applied
 ///
-/// A root loaded on both flanks endures less than one loaded on a single flank,
-/// and the usual allowance is a fraction on the *allowable*
-/// ([`REVERSED_BENDING_FRACTION`](crate::material::REVERSED_BENDING_FRACTION)).
-/// That fraction is a convention: it multiplies a stress a part is sized
-/// against, which is exactly what `docs/rationale.md` refuses to apply on a
-/// designer's behalf. So it is a switch, off by default, and where it is off the
-/// member **says** that reversal is present and uncorrected rather than leaving
-/// the reader to notice.
+/// A root loaded on both flanks endures less than one loaded on a single flank.
+/// **Where the fatigue figure was measured fully reversed** — every figure the
+/// shipped library carries a ratio for — it is already the reversed case, and a
+/// reversed root is judged at it as it stands. Where it was measured one way,
+/// or does not say, the allowance is ISO's fraction on the *allowable*
+/// ([`REVERSED_BENDING_FRACTION`](crate::material::REVERSED_BENDING_FRACTION),
+/// [`Material::reversed_bending_fraction`]). That fraction is a convention: it
+/// multiplies a stress a part is sized against, which is exactly what
+/// `docs/rationale.md` refuses to apply on a designer's behalf. So it is a
+/// switch, off by default, and where it is off the member **says** that
+/// reversal is present and uncorrected rather than leaving the reader to
+/// notice.
 ///
 /// # Which members reverse
 ///
@@ -2692,20 +2698,26 @@ impl Reversal {
     /// member raises it. Asked once per member, of whether *any* case
     /// reverses it: the note is about the root, and the figures beside it say
     /// which cases it is judged in.
+    ///
+    /// Nothing, where the figure was measured fully reversed: nothing is
+    /// uncorrected and nothing is applied. Where the figure does not say how it
+    /// was measured, the note says it was read one way
+    /// ([`Material::reversed_bending_fraction`]).
     #[must_use]
-    pub fn note_for(self, reverses: bool) -> Option<Note> {
-        if !reverses {
-            return None;
+    pub fn note_for(self, reverses: bool, m: &Material) -> Vec<Note> {
+        let (fraction, stated) = m.reversed_bending_fraction();
+        if !reverses || fraction == 1.0 {
+            return Vec::new();
         }
-        Some(if self.correct {
-            Note::new(key::GEAR_REVERSED_BENDING_APPLIED).number(
-                "fraction",
-                crate::material::REVERSED_BENDING_FRACTION,
-                2,
-            )
+        let mut out = vec![if self.correct {
+            Note::new(key::GEAR_REVERSED_BENDING_APPLIED).number("fraction", fraction, 2)
         } else {
             Note::new(key::GEAR_REVERSED_BENDING_UNCORRECTED)
-        })
+        }];
+        if !stated {
+            out.push(Note::new(key::GEAR_FATIGUE_RATIO_UNSTATED));
+        }
+        out
     }
 
     /// The **bending** allowable a member is judged against, MPa.
@@ -2713,11 +2725,13 @@ impl Reversal {
     /// Only a fatigue case can be reduced: an ultimate load is survived once
     /// and has no reversal to endure. And only bending — pitting is compressive
     /// whichever flank carries it, so a contact rating keeps the material's own
-    /// figure.
+    /// figure. A figure measured fully reversed is judged as it stands, bit for
+    /// bit.
     #[must_use]
     pub fn bending_allowable(self, m: &Material, kind: CaseKind, reverses: bool) -> f64 {
-        if self.correct && reverses && kind == CaseKind::Fatigue {
-            crate::material::reversed_bending_allowable(m).value
+        let (fraction, _) = m.reversed_bending_fraction();
+        if self.correct && reverses && kind == CaseKind::Fatigue && fraction != 1.0 {
+            allowable(m, kind) * fraction
         } else {
             allowable(m, kind)
         }

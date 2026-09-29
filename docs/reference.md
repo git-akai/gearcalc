@@ -3049,7 +3049,10 @@ two do not stack: a member reverses if either says so.
 
 ```text
 reversed_bending = false   the reversal is reported, member by member
-reversed_bending = true    fatigue bending allowable × 0.7 for those members
+reversed_bending = true    fatigue bending allowable × 0.7 for those members,
+                           where the figure was measured one way (R = 0) or
+                           does not say; a fully reversed (R = −1) figure is
+                           judged as it stands either way
 ```
 
 Bending only: pitting is compressive on whichever flank carries it, so a contact

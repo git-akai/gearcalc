@@ -63,8 +63,9 @@ bending_on_fillet_pointed = "o dente termina em bico: a flexão é classificada 
 ring_addendum_clamped = "adendo da engrenagem anular limitado na sua circunferência de base: precisa de mais dentes ou de um adendo menor"
 face_width_no_source = "a largura de face automática não tem classificação que a dimensione: todas as fontes estão desligadas; a largura permanece inalterada"
 rim_below_minimum = "a razão de espessura da coroa {ratio} está no mínimo que a ISO 6336-3 avalia ou abaixo dele: a cláusula diz que tal coroa deve ser evitada, e Y_B é indicado além do alcance da norma"
-reversed_bending_uncorrected = "a raiz é carregada por ambos os flancos e é avaliada contra a tensão admissível unidirecional: ative a flexão alternada para a avaliar contra a admissível reduzida"
-reversed_bending_applied = "a raiz é carregada por ambos os flancos e é avaliada contra {fraction} da tensão admissível unidirecional"
+reversed_bending_uncorrected = "a raiz é carregada por ambos os flancos e é avaliada contra um valor de fadiga medido num só sentido: ative a flexão alternada para a avaliar contra a admissível reduzida da ISO"
+reversed_bending_applied = "a raiz é carregada por ambos os flancos e é avaliada contra {fraction} de um valor de fadiga medido num só sentido (ISO 6336-3 Anexo B)"
+fatigue_ratio_unstated = "o valor de fadiga não indica ter sido medido totalmente alternado, nem num só sentido numa raiz de dente: uma raiz alternada lê-o como medido num só sentido, a admissível mais baixa"
 
 # ---------------------------------------------------------------- mesh notes
 

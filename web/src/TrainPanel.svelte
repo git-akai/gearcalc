@@ -1039,7 +1039,7 @@
 {#snippet property(
   label: string,
   gear: MemberGear,
-  key: keyof Overrides,
+  key: Exclude<keyof Overrides, "fatigue_load_ratio" | "fatigue_specimen">,
   used: Value | undefined,
   step: number,
   unit: string,

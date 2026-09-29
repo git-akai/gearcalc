@@ -3842,10 +3842,13 @@ pub fn rate(
         if let BuiltMember::Rack { tooth } = &*built.members[i] {
             out.extend(super::undercut_note(tooth));
         }
-        out.extend(reversal.note_for(reversal.reverses(
-            always_reverses(i),
-            cases.iter().any(super::CaseLoad::reverses),
-        )));
+        out.extend(reversal.note_for(
+            reversal.reverses(
+                always_reverses(i),
+                cases.iter().any(super::CaseLoad::reverses),
+            ),
+            &materials[i],
+        ));
         let g = &shape.members[i].gear;
         if shape.members[i].ring.is_none() {
             out.extend(g.shift_asked(&shape.base_params(i, helix)).note());
@@ -5674,7 +5677,16 @@ mod tests {
     /// nothing while a set nobody had told anything about derated one member.
     #[test]
     fn a_reversed_root_is_corrected_only_when_the_train_asks() {
-        let lib = test_library();
+        // One-way gear-root figures, ISO's kind: the fraction is theirs.
+        let one_way = {
+            let mut l = test_library();
+            for m in &mut l.materials {
+                m.fatigue_load_ratio = Some(crate::material::LoadRatio::Pulsating);
+                m.fatigue_specimen = Some(crate::material::Specimen::GearRoot);
+            }
+            l
+        };
+        let lib = &one_way;
         let stage = arr::planetary(12, 30, 72, 3);
         // A plain case reverses nothing; the reversing duty is the fatigue
         // case's own, so the second solve hands the stage one — a whole turn
@@ -5688,7 +5700,7 @@ mod tests {
                 actuations: 1,
                 reversing,
             };
-            crate::train::solve_alone(&train, &lib).unwrap()
+            crate::train::solve_alone(&train, lib).unwrap()
         };
         // **On the member, not the stage.** Three members raising one note is
         // exactly what a stage-level list could not carry: one key, three
@@ -5748,6 +5760,31 @@ mod tests {
             width(&corrected, &corrected.members[1]).to_bits(),
             "a reversing duty cannot make a planet more reversed than it is"
         );
+
+        // **On fully reversed figures there is nothing to correct**: the
+        // switch moves no width and nothing is said.
+        let reversed = test_library();
+        let solve_on = |reversal: crate::train::Reversal| {
+            let train = crate::train::Train::alone(&stage, 2.0, 0.0).with_reversal(reversal);
+            crate::train::solve_alone(&train, &reversed).unwrap()
+        };
+        let (off, on) = (
+            solve_on(crate::train::Reversal::default()),
+            solve_on(crate::train::Reversal { correct: true }),
+        );
+        for (a, b) in off.members.iter().zip(&on.members) {
+            assert_eq!(
+                width(&off, a).to_bits(),
+                width(&on, b).to_bits(),
+                "a fully reversed figure is judged as it stands"
+            );
+        }
+        for k in [
+            key::GEAR_REVERSED_BENDING_APPLIED,
+            key::GEAR_REVERSED_BENDING_UNCORRECTED,
+        ] {
+            assert_eq!(fired(&off, k) + fired(&on, k), 0, "{k}");
+        }
     }
 
     /// Layout is arithmetic on the tooth counts, and it reaches the result.

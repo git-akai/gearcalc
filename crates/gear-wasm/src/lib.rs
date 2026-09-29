@@ -2542,16 +2542,17 @@ mod tests {
                 "nominal {nominal}, running {running}, clearance {c}"
             );
         }
-        // A planet's root is loaded on both flanks, and with no correction asked
-        // for the stage says so rather than derating it out of sight.
+        // A planet's root is loaded on both flanks; the shipped steel's
+        // fatigue figure is a fully reversed endurance, so there is nothing to
+        // correct and nothing is said.
         let notes = v["members"][1]["notes"]
             .as_array()
             .expect("a gear carries its own notes");
         assert!(
-            notes
-                .iter()
-                .any(|n| n["key"] == "gear.reversed_bending_uncorrected"),
-            "the planet's reversal should be disclosed on the planet: {notes:?}"
+            !notes.iter().any(|n| n["key"]
+                .as_str()
+                .is_some_and(|k| k.starts_with("gear.reversed_bending"))),
+            "a fully reversed figure has no reversal to correct: {notes:?}"
         );
 
         // Two meshes with their own answers, and every member rated.

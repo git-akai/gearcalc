@@ -101,6 +101,8 @@ pub mod key {
     pub const GEAR_SHIFT_RAISED_FOR_UNDERCUT: &str = "gear.shift_raised_for_undercut";
     /// `gear.bending_unrated_in_mesh`
     pub const GEAR_BENDING_UNRATED_IN_MESH: &str = "gear.bending_unrated_in_mesh";
+    /// `gear.fatigue_ratio_unstated`
+    pub const GEAR_FATIGUE_RATIO_UNSTATED: &str = "gear.fatigue_ratio_unstated";
     /// `gear.bending_unrated`
     pub const GEAR_BENDING_UNRATED: &str = "gear.bending_unrated";
     /// `gear.bending_on_fillet_pointed`
@@ -312,6 +314,7 @@ pub mod key {
         GEAR_SHIFT_RAISED_FOR_UNDERCUT,
         GEAR_BENDING_UNRATED_IN_MESH,
         GEAR_BENDING_UNRATED,
+        GEAR_FATIGUE_RATIO_UNSTATED,
         GEAR_BENDING_ON_FILLET_POINTED,
         GEAR_RING_ADDENDUM_CLAMPED,
         GEAR_FACE_WIDTH_NO_SOURCE,

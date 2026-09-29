@@ -58,8 +58,9 @@ bending_on_fillet_pointed = "齒頂變尖：彎曲僅在齒根過渡曲線上評
 ring_addendum_clamped = "內齒輪齒頂高已限制在其基圓處：需要更多齒數或更小的齒頂高"
 face_width_no_source = "自動齒寬沒有可據以確定尺寸的評定：所有來源均已關閉；齒寬保持不變"
 rim_below_minimum = "輪緣支承比 {ratio} 等於或低於 ISO 6336-3 可評定的下限：該條款要求避免這種輪緣，Y_B 的報告值已超出標準適用範圍"
-reversed_bending_uncorrected = "齒根兩側齒面均受載，但按單向許用應力評定：開啟雙向彎曲後將按折減後的許用應力評定"
-reversed_bending_applied = "齒根兩側齒面均受載，按單向許用應力的 {fraction} 倍評定"
+reversed_bending_uncorrected = "齒根兩側齒面均受載，按單向測得的疲勞值評定：開啟雙向彎曲後將按 ISO 折減後的許用應力評定"
+reversed_bending_applied = "齒根兩側齒面均受載，按單向測得的疲勞值的 {fraction} 倍評定（ISO 6336-3 附錄 B）"
+fatigue_ratio_unstated = "該疲勞值未說明是完全對稱循環測得，還是在齒根上單向測得：雙向受載的齒根按單向測得讀取，即較低的許用應力"
 
 # ---------------------------------------------------------------- mesh notes
 

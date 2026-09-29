@@ -1518,13 +1518,32 @@ on a face of no width with a `0/0` to refuse.
 
 ### A reversed root is disclosed, and corrected only on request
 
-A root loaded on **both** flanks endures less than one loaded on a single flank.
-The usual allowance is a fraction on the allowable —
-`REVERSED_BENDING_FRACTION`, 0.7 — and that is a convention which multiplies a
-number a part is sized against, which is exactly what
-[no ISO/AGMA correction factors](#no-isoagma-correction-factors) refuses to
+A root loaded on **both** flanks endures less than one loaded on a single flank
+— **relative to a figure measured one way**. Which way a fatigue figure was
+measured is the material's to say (`fatigue_load_ratio`, `fatigue_specimen`):
+the steels' and the brass's figures are rotating-beam endurances and POM's is
+ASTM D671's, all fully reversed (`R = −1`) on a coupon, so for them the reversed
+case *is* the figure and a reversed root is judged at it as it stands. Taking
+0.7 of them counted the reversal twice, and the code, the strings and this
+section called the same figure "the one-directional allowable".
+
+Where a figure was measured one way on a gear root (`R = 0`, ISO 6336-5's
+kind), ISO's allowance is a fraction on the allowable —
+`REVERSED_BENDING_FRACTION`, 0.7, Annex B's `Y_M` for an idler — and that is a
+convention which multiplies a number a part is sized against, which is exactly
+what [no ISO/AGMA correction factors](#no-isoagma-correction-factors) refuses to
 apply on a designer's behalf. So it is a train-wide switch, **off by default**,
-and where it is off each member the reversal reaches says so.
+and where it is off each member the reversal reaches says so. A figure that does
+not say how it was measured — the polyamide estimates, a user's override — is
+read one way, the lower allowable, and the member says it read it so.
+
+**No `R = 0` allowable is derived from these figures by Goodman.** It would put
+4340 Hardened near 1000 MPa, 1.27–1.68× ISO 6336-5's `σ_FE` band and 2.5–3.3×
+AGMA 2001's `s_at`: a polished coupon's endurance carries no notch, surface,
+size or reliability reduction, and uplifting it moves further from a gear root
+than leaving it. The general-`R` form replaces the switch only once a stored
+figure is a root allowable, and it needs a UTS the library does not carry for
+the steels.
 
 **Two things reverse a root, and they do not stack.** A planet always is loaded
 both ways — the sun drives one flank and the ring the other, whatever the load
