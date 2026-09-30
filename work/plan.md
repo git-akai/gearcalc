@@ -257,7 +257,9 @@ caught, test workspace included) and the 130-constant perturbation.
       (molded, sintered, additive).
     - If realistic inputs give more deviation as the material basis moves, it adds risk when comparing
       dissimilar designs, and then no term with a note is preferred.
-    - Being investigated in `surface-factor.md`.
+    - Settled by that rule (`surface-factor.md`): no surface term, with a note of size and sign. ISO's
+      Y_RrelT misses by 8–56 points off wrought steel and has no class for polymers. A geometry-only
+      roughness term does worse. ISO's pitting Z_R gets the same rule unless the owner says otherwise.
 - 2026-10-02 — orchestrator's call: a tip loaded at its point, as its land vanishes, rates without bound.
   That is the elastic singularity at a sharp tip, the same mechanics as the sharp contact edge. It
   stays continuous divergence with a note, never a cap or a jump. Its cure is the notch research's
