@@ -2,7 +2,7 @@
 
 Track opened in `plan.md` §5 on 2026-10-01; parallel unless it can replace a model outright. **Round 3
 (2026-09-29):** three adversarial reviews of the prototype (§5) are applied, with the editor's checks; open
-issues §6, verdict §8. Read-only on the repo; pure Python, ≤ 1.5 GB; the search budget ran out before round 3.
+issues §6, verdict §8; round 4 (§9) likewise. Read-only on the repo; pure Python, ≤ 1.5 GB; search budget spent.
 - **Scripts:** `~/.cache/gearcalc-work/notch-research/` (`review3/` holds the reviewers' `net.py`, `edge.py`
   and `r2/`); the prototype `~/.cache/gearcalc-work/notch-proto/`, whose `README.md` lists every output.
 - **Marks:** [R] full text read · [A] abstract or snippet · [M] metadata only · [C] recalled, not verified ·
@@ -100,8 +100,8 @@ Rated stress over effective stress (BEM peak / n) − 1; ordinary fillets (ρ_f/
   median (89 % of teeth under, with ISO's support), worst −19 … −26 %, and tight fillets (ρ_f/s_Fn < 0.02) by
   47 % (ISO past its clamp: −18 %); the annealed steel is net conservative by 1–10 %. Surface finish (3.4)
   moves both further the wrong way.
-- The BEM's shoulder canary was never run (§6). Without any BEM, the crate's own ISO/DB ratio on these teeth
-  is 1.25 median (0.94–1.73): one fit is off by about a quarter, and the BEM sides with ISO.
+- **Superseded by the repo's record** (`tools/fillet_bem.py`, `docs/state.md`): its shoulder canary has run (the two
+  solvers agree to 0.06 %, Peterson is 0.5–2 % off both); DB −15.0 %, ISO +6.4 % (85 teeth). This body reads 1.8 % low (§9.2).
 
 **3.4 Two biases not yet counted** (rule-6 items, with sign):
 - **Surface finish.** σ_e is a coupon figure (`fatigue_specimen = "coupon"`) against a hobbed or ground root,
@@ -280,8 +280,8 @@ the across solution, never the round's 1/r_e; r_lim is a field root; on a loaded
 **The instrument** (`bem.py`, `t_bem.txt`, `t_tooth.txt`): plane-strain BEM, independent of `strength.rs`. Kirsch
 K_t 3.00000, interior ≤ 2.4·10⁻⁷; ellipses a/b 3 and 10 within 10⁻³; `tooth.py` = `gear-cli iso` to 2·10⁻¹² on 8
 pairs. Three teeth on a 3m rim, a cos² patch at HPSTC, the peak a least-squares parabola over ±0.15ρ; rim 5m
-−0.30 %, five teeth +0.59 %; mesh convergence median 0.09 %, worst 0.96 %. **The pre-registered Peterson-shoulder
-canary was never run.** The four unsolved teeth are **ε < 1** (0.914–0.971), not singular systems: `tooth.py`
+−0.30 %, five teeth +0.59 %; mesh convergence median 0.09 %, worst 0.96 %. The shoulder canary was not run here
+(the repo has since, §3.3). The four unsolved teeth are **ε < 1** (0.914–0.971), not singular systems: `tooth.py`
 puts the load 0.05–0.15 mm beyond the tip, where the crate clamps (`highest_single_pair`, (ε − 1).max(0)).
 
 **DB and ISO against the BEM** (`t_fillet_grid.txt`): z {12, 17, 30, 60, 150, 1000} × α_n {14.5, 20, 25} ×
@@ -327,7 +327,7 @@ tried; continuity ≤ 9.5·10⁻⁹. **σ_F(ρ_fP) is not monotone** (DB +0.14 %
 
 **Unresolved.**
 - **The prototype's unset-state gap** (4–12 %) has a cause beyond the flank convention (< 1 %), not found.
-- **DB's −15 %** rests on a BEM without its shoulder canary; whether DB's photoelastic K_f used the
+- **DB's −15 %** is now the repo's record, canary run (§3.3); whether DB's photoelastic K_f used the
   bending-only nominal (the 1942 bulletin, unread) decides the axial term.
 - **The tip's limit** is an upper bound derived in session; the wedge-to-half-plane transition is unmodelled,
   and §4's peak-for-peak comparison is rough. Round 2's "5–15 %" elastic wedge estimate is withdrawn.
@@ -338,6 +338,9 @@ tried; continuity ≤ 9.5·10⁻⁹. **σ_F(ρ_fP) is not monotone** (DB +0.14 %
 - **Carried over:** a fictitious edge radius stays dropped (contact is nonlinear: it depends on load); ISO's
   Y_δrelT ∝ √q_s against the true q_s^0.29–0.42 lies outside the crate's q_s < 8 band; EHL, the 3-D face-end
   vertex and dissimilar materials are outside the model; ISO 6336-3 read only through IACS M56.
+- **Round 4 (§9):** the degenerate scale is located on the prototype's body and an annulus only, not the record's bodies
+  or P2's port; hp cannot hold the record's body (one loop: held cuts go non-square; no ring, no shaft); the field near
+  the junction converges in neither solver; C₀ is 20°-only; f32 assembly and graded-mesh stability [C] are unshown.
 
 **Angles not searched** (a fresh search budget is needed):
 1. **Measured notched-specimen data across materials**, the owner's validation set proper (Frost; Siebel–
@@ -365,6 +368,7 @@ ranges; ΔK_eff,th scaled to brass; DB's accuracy per Wilcox & Coleman; Kubo's p
 - Komori, Kubo et al. 2004, https://www.jstage.jst.go.jp/article/kikaic1979/70/700/70_700_3572/_article/-char/en and https://www.jstage.jst.go.jp/article/kikaic1979/70/700/70_700_3581/_article/-char/en · Peterson's constant, https://www.researchgate.net/publication/248524916_On_fatigue_limit_in_the_presence_of_notches_Classical_vs._recent_unified_formulations · Jackson & Green 2005, https://itzhak.green.gatech.edu/rotordynamics/A_Finite_Element_Study_of_Elasto_Plastic_Hemispherical_Contact_Against_a_Rigid_Flat.pdf
 - **[M] metadata only.** Kapoor & Johnson 1992, https://doi.org/10.1016/0020-7403(92)90073-p · Dundurs & Lee 1972, https://link.springer.com/article/10.1007/BF00046059 · Mugadu et al. 2004, https://doi.org/10.1016/j.ijsolstr.2003.09.038 · Hills et al. 2012, https://doi.org/10.1016/j.ijfatigue.2012.02.006 · Askes et al. 2013, https://onlinelibrary.wiley.com/doi/10.1111/j.1460-2695.2012.01687.x
 - **[C] recalled, not verified.** Williams 1952 (reproduced [X]); Gross & Mendelson 1972; Johnson 1985 (Prandtl; 4k reproduced [X]); Hill 1950 (the wedge, derived [X]); Tabor 1951; Neuber 1958; FKM a_G, b_G; Murakami; Hertzberg's E√b; Dolan & Broghamer 1942 (constants in `strength.rs`); Manson's σ_u/σ_y rule and SAE 4340 cyclic data; Marin; Bäumel–Seeger 1990; Roessle–Fatemi 2000; Nix–Gao 1998; Pavlina & Van Tyne 2008, https://doi.org/10.1007/s11665-008-9225-5 (paywalled).
+- **Round 4 (§9).** Babuška, Guo, Stephan 1990, doi:10.1002/mma.1670120506 [A] · Buffa, Sangalli, Schwab 2013, doi:10.1007/978-3-319-01601-6_15 [A] · Stern, Becker, Dunham 1976, doi:10.1007/BF00032831 [M] · Helsing & Ojala 2008 [R §3, §10.4] · Marussig 2015 [A] · fetched by the reviewers: Betcke & Scroggs 2021 (Bempp-cl), doi:10.21105/joss.02879 [R] · WGSL, https://www.w3.org/TR/WGSL/ [R] · Haidar, Tomov, Dongarra, Higham, SC18, https://www.netlib.org/utk/people/JackDongarra/PAPERS/haidar_fp16_sc18.pdf [R] · degenerate scales: Chen, Kuo & Lin 2002, doi:10.1002/nme.476; He et al. 1996, doi:10.1016/0045-7949(95)00343-6; Vodička & Mantič 2004, doi:10.1023/B:ELAS.0000033861.83767.ce [M] · recalled [C]: Hsiao–MacCamy (the augmentation); Filippi, Lazzarin, Tovo 2002; Arnold–Wendland (collocation on uniform meshes); Carpenter 1984; the 1/64 consumer-GPU f64 rate.
 
 ## 8. Verdict and next steps
 
@@ -378,11 +382,11 @@ ranges; ΔK_eff,th scaled to brass; DB's accuracy per Wilcox & Coleman; Kubo's p
   without a length; the only candidate (L₀) is a steel class constant, ≈ 2× loose at a sharp root; the BEM is an
   instrument, as `verify.rs` is for the cut. The largest finding is about the existing model: **the crate's
   default DB rating is net unconservative on the hardened steel (−2 … −11 % median, worst −26 %) before surface
-  finish.** That belongs in `docs/state.md` now; DB or ISO as default is the owner's call once the canary runs.
+  finish.** It is in `docs/state.md` (the repo's record); DB or ISO is the owner's call (`decision-bending-default.md`).
 
 **The next round (P3)**, each gate fixed before it runs:
-1. **BEM shoulder canary** within 0.5 %; clamp the load point for ε < 1 and re-run the four teeth; then settle
-   the axial question and write §3.3–3.4's net records for `docs/state.md`.
+1. **Done in the repo** (`tools/fillet_bem.py`): the shoulder canary (gate held to two solvers), every tooth with
+   ε < 1, the net records in `docs/state.md`. Left: the axial question (the 1942 bulletin).
 2. **ISO past its clamp by the Williams law** on the 37 clamped teeth. Pass: median within ±5 % of the BEM, no
    tooth below −10 %. Then **fillet r_lim** by scan-then-bracket, continuity in every input.
 3. **Find the prototype's unset-state gap**, then build `edge_outer` into it. Pass: unset within 0.5 % of the
@@ -396,3 +400,81 @@ ranges; ΔK_eff,th scaled to brass; DB's accuracy per Wilcox & Coleman; Kubo's p
    gated on `ultimate_measure = "yield"`.
 7. **Cyclic gate** (Manson's rule, the UML) scored against measured K′/n′; then, with a new search budget, the
    measured sets of §6, scored as the validation they are.
+
+## 9. Exact-geometry solvers (round 4, 2026-09-30; three reviews and the editor's checks applied)
+
+**The idea:** a method on the exact curves (IGA, IGA-BEM, MFS, Trefftz/MPS with Williams functions) should converge more
+cleanly than a mesh, isolate a corner's singular coefficient (it *is* K₁N) and suit batched dense algebra. Built [X]:
+IGA-BEM, Trefftz/MFS and an **hp spline-collocation BEM** on the crate's closed forms (`exactgeo-proto/`; knots graded
+toward every non-analytic point; A p 4, C³, ≈ 1050 DOF; B p 5, spans halved; K₁N by bi-orthogonal projection on the dual
+Williams field, Stern–Becker–Dunham 1976 [M]). References: a review's **independent collocation BEM** (Lamé 1e-13; two
+settings within 1.3e-8 on 18 teeth); runs in the scratchpad (`rev1acc/`, `rev2/`, `r3/`, `ed4/`); no search ran.
+
+**9.1 Convergence and accuracy** (error of the peak against the independent limit; DOF in brackets):
+
+| tooth (limit) | hp, C⁰ layers, p 2 … 6 | smooth, p up | smooth p 5, spans cut | earlier instruments |
+|---|---|---|---|---|
+| 17/43 (2.97819187) | −1.8e-4, +4.2e-6, +4.9e-7, −4.1e-8, +5.4e-8 (968–4616) | stall 1e-7 … 9e-7 | 5.7e-6 … +7.4e-8 (944–2052) | quad. BEM +4.7e-4 (700); IGA +3.6e-5; Trefftz +3.3e-5 (κ ≈ 1e16, truncated SVD) |
+| 43/43 (2.49390821) | +4.2e-5, −4.8e-5, +3.6e-7, +3.2e-7, +3.0e-8 (≤ 4646) | +2e-7 … +5e-7 | −5.4e-6 … +1.6e-8 (≤ 2166) | quad. BEM −4.3e-5; IGA +9e-6; Trefftz −1.2e-4 |
+
+**High-order convergence to a ≈ 5e-8 floor, not exponential on the tooth** (round 4's "×10 per degree" was read against
+its own last term; the holes are exponential). Smooth splines stall under p, not h; A and B are smooth. **B is within
+7.3e-7, A 3.9e-5** on 18 teeth (the grid's worst |A − B| is A's); B's grading constants (shared with A) spread 5.5e-6 at
+worst; the rim's corner grading moves 1.1e-6, tooth geometry < 1e-10 (exact against fitted: 3e-6, IGA): the budget is
+spent at the model's artificial boundary, not the tooth. **The 1e-7 is the peak's:** near the trochoid–involute junction
+the field is good to 1e-4 … 1e-3 of the peak, inherited by a section stress, gradient or L₀/2 reading.
+
+**9.2 The model is the error.** On §5.2's body (3 teeth, 3 m rim, cuts free, c_p 0.05) [X, reviews], 3 → 5 teeth moves
+the peak +0.61 % (17/43), +1.39 % (z 60, ρ_fP 0.1), +1.42 % (z 1000, 0.03), +2.4 % (z 150, 25°, 0.01), 7 teeth ≤ 0.3 %
+more; rim 2 / 4 / 6 m, −2.5 … +0.18 %, not monotone (a physical input, not a truncation); c_p ×½ / ×2, ≤ 9e-5 at HPSTC
+but −0.45 / +0.61 % at the start of active profile. **The peak is known to 1–5 %, four orders above the solver.** Nor is
+the body the repo's: on 176 shared teeth B is −1.8 % median (−5.1 … +0.2 %) below `tools/fillet_bem.txt` (5 teeth, 10 m
+rim, cuts held; whole gear at z 12, 17) [X]; the repo's instrument on this body meets B within 3e-4, so the gap is the
+body, mostly its free cuts. Here DB is ≈ −15 %, ISO ≈ +8 % (81 teeth); the record's −15.0 % / +6.4 % govern.
+
+**9.3 Corner and smooth-notch limit** (K₁N in MPa·mm^(1−λ₁) per N/mm; λ₁ 0.5862789 at 20°). **K₁N = 1.49776(4) ± 3e-6,
+five to six digits:** projection 1.4977604 / 1.4977607 (hp p 6 / 7), its own h-sequence extrapolated ≈ 1.4977625, the
+independent pointwise plateau 1.4977646 ± 3e-7, Trefftz 1.497761 (two estimates agreeing, not accuracy); 14.5° / 25°:
+1.838209 / 1.244709; an enriched unknown wandered 2e-4 … 2e-2. Rounded rack, C = σ_peak ρ^(1−λ₁)/K₁N:
+
+| ρ/m | 0.38 | 0.1 | 0.02 | 0.005 | 0.001 | 1e-4 | 1e-5 |
+|---|---|---|---|---|---|---|---|
+| σ_peak (quad. BEM − 1) | 2.67940 (+2.2e-4) | 4.39046 (−1.1e-4) | 8.38002 (−6.0e-4) | 14.8116 (−9.2e-4) | 28.7924 (−1.2e-3) | 74.6229 | 193.454 |
+| slope · C(ρ) · K_ρ (outer intensity) | — · 1.1988 · 1.4353 | −0.3815 · 1.1307 · 1.4845 | −0.4055 · 1.1089 · 1.4958 | −0.4118 · 1.1045 · 1.4974 | −0.4133 · 1.1032 · 1.4977 | −0.41367 · 1.10292 · 1.49777 | −0.41371 · 1.10289 · 1.49777 |
+
+B errs +1.8 … +5.7e-6 at ρ ≤ 0.005. **C₀ = 1.1029 ± 3e-5** (1.102877 independently): σ_peak = C₀K₁Nρ^(λ₁−1) within 0.6 %
+for ρ ≤ 0.02 m, 8.7 % at 0.38; found at 20° on an arc only, so C₀(α) is computed, never stored. Filippi, Lazzarin, Tovo
+2002's closed form [C] would need ω̃₁ ≈ 0.633 (if K carries √(2π)): unchecked.
+
+**9.4 Cost, a degenerate scale, accelerators.** Per geometry in numpy: hp A 2.3–2.6 s (5.8e6 Kelvin evaluations, 21× the
+700-unknown quadratic BEM's), B 4.5 s, the repo's tool 2–3 s on this body; hp at 400–660 DOF errs 2.5e-4 … 6e-3,
+non-monotone, in 0.4–1.1 s. In wasm with the LU (faer, n 1024: 109 ms), **A ≈ 0.4 s, B 0.6–0.8 s**, against 3.5–11 ms
+within 1.44 % (0.14 % in two passes) for `bending-mechanics.md` P2: **35–200× dearer, for precision nothing reads.**
+- **A degenerate scale** [X, review]: the held arc is first-kind with Kelvin's ln r, so the unit of length makes the
+  system singular at two scales (0.365, 0.391 module): the peak read 3.4e7 there, −3.2e-4 at 1e-3 off in ln s, −1e-5 at
+  10 % at unremarkable κ, and drifts 2–5e-7 with the unit elsewhere (margin ≈ 2.1×, unwritten). **Fixed, verified:** a
+  constant per component plus ∫_held t ds = −F (Hsiao–MacCamy [C]): 2.9781927644 at every scale. **The repo's BEM has it
+  too** [X, `ed4/degen_repo.py`]: an annulus held inside dips at an outer radius of 1.31–1.33 length units (b/a 3–12;
+  e^(1/(2(3−4ν))) = 1.320); the record's bodies (mm, m 1) are ≥ 5× larger, a gear of r_a 1.3 mm in mm is not.
+- **Guards:** rim > r_f still answers (2.60 … 3.50 for 2.97); z ≤ 8 fails raw; knot counts jump 1.1e-6 (laws: 1e-9).
+- **Accelerators: no, for other reasons.** Dense assembly suits GPUs (Bempp-cl [R]), but here it is irregular near-field
+  quadrature (60–75 %); WGSL has no f64 [R]; consumer GPUs run f64 at 1/64 [C]; mixed-precision LU pays from n ≈ 2k
+  (Haidar et al. [R]); rule 1. What survives is an f32 LU refined in f64 on the CPU, 2.4× native, ≈ 2× in wasm; alone it
+  misses up to 0.7 (rounding in the factorisation, not κ), refined it recovers 2e-14 in three steps (`t_batch`).
+
+**Verdict (round 4).** *Holds:* convergence to ≈ 5e-8; K₁N to 5–6 digits by projection; exact geometry free in a
+boundary method. *Does not:* exactness as the lever; a singular corner at finite z; meshless κ; accelerators.
+- **Fillet K_t: a computed peak belongs in the expensive mode (`plan.md` has it); this solver does not.** The lever is
+  the model (1–5 % against 1e-7): the record's body, rim and support from the gear's bore or `rim_thickness`, c_p from
+  `hertz.rs`, neighbours until the peak settles, keyed refusals (r_i ≤ 0, z ≤ 8). The candidate engine is P2's BEM,
+  augmented; its 0.13–0.38 % jitter across a mesh-topology change (hp's ≈ 1e-6) needs a fixed topology.
+- **Sharp-corner K: no consumer.** Nothing is singular at finite z; an N-SIF fatigue strength is a measured property;
+  the edge is a contact problem (unknown extent, friction) whose elastic state cannot occur (§4, §5.1), so §4 and §8's
+  edge plan stand. K₁N is a test oracle: the Williams slope, C₀(α), perhaps LWW's constant A. Shareable with contact:
+  only the body's flexibility operator, with the tooth-to-tooth coupling `contact-model.md` lacks, at ≈ 1e-3.
+- **DB: nothing here replaces it;** the default is the owner's call on the record (`decision-bending-default.md`: this
+  is its option D). **Fast mode:** closed forms (DB, ISO or LWW; µs). **Expensive:** the computed peak, cached per
+  geometry (one LU, every load). **Offline:** hp as a reference (laws, surrogate nodes, C₀(α)) once it holds the
+  record's body.
+- **Next:** the law "the output does not depend on the unit of length", with a Lamé annulus canary, on
+  `tools/fillet_bem.py` and P2's port, and the augmented system in P2 before it lands; then the model's inputs, on P2.

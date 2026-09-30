@@ -74,3 +74,12 @@ From Q9, to Stage 4 (the audit's T16.31 and the survivor re-run are there):
     because its search differed. Keep its value as laws (exact section search, continuity, the
     section rule), then judge whether the script still earns its place.
   - The audit's T16.2 (scripts that transcribe the crate) feeds this.
+
+Carried from the exact-geometry research (`notch-research.md` §9):
+- tools/fillet_bem.py has the BEM's degenerate-scale flaw. It fails outright at about 1.32 length
+  units; the recorded gears are ≥5× larger, so the record stands. Two fixes:
+  - add a unit-independence law (the same tooth in mm and in m gives the same K_t), including a Lamé
+    ring case;
+  - apply the standard fix (one constraint on the held boundary).
+  The expensive mode's computed fillet peak (bending-mechanics P2's BEM) must carry both before it
+  lands.
