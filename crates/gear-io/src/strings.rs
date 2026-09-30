@@ -1465,8 +1465,11 @@ mod tests {
             err(TrainError::UnknownMaterial("nothing by that name".into()).note());
             // **A graph that describes no train**: an axis carried by a body
             // on itself, and two axes each carried by the other's body, both
-            // refused by the model where they enter; the general key, for an
-            // invariant with no field of its own yet, fired directly.
+            // refused by the model where they enter; the refusals with a key
+            // of their own that `gear-core`'s
+            // `malformed_graphs_are_refused_where_they_enter_by_name` meets
+            // on its fixtures, and the general key, for an invariant with no
+            // field of its own yet, fired directly.
             {
                 use gear_core::train::{Invariant, LoadCase, Preset, Train};
                 for carriers in [[1, 0], [2, 1]] {
@@ -1479,7 +1482,16 @@ mod tests {
                     assert!(matches!(e, TrainError::Malformed(_)), "{e:?}");
                     err(e.note());
                 }
-                err(TrainError::Malformed(Invariant::NumberGap(3)).note());
+                for invariant in [
+                    Invariant::DistanceTwice(0),
+                    Invariant::RingFirst(1),
+                    Invariant::DistanceOffFrame(2),
+                    Invariant::CarriedCycle(3),
+                    Invariant::NumberGap(2),
+                    Invariant::BodyOnNoAxis(1),
+                ] {
+                    err(TrainError::Malformed(invariant).note());
+                }
             }
             // **A file of no format, and one of another**, refused where it
             // enters and pointed at the converter.

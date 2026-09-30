@@ -1800,6 +1800,12 @@ impl From<WiringError> for TrainError {
     }
 }
 
+/// **A zero-based index as the front end numbers it**, from 1 — an axis,
+/// a mesh or a distance a malformed graph names.
+fn numbered(index: usize) -> u32 {
+    u32::try_from(index + 1).unwrap_or(u32::MAX) // absence: past 2^32 pieces, the largest count
+}
+
 /// A note about one body, carrying its number as the train counts it —
 /// ground being 0.
 fn located(key: &'static str, at: usize) -> Note {
@@ -1850,12 +1856,28 @@ impl crate::note::Explain for TrainError {
             // Each field a refusal can name has its own key; the axis is
             // numbered from one, as the panel numbers axes.
             Self::Malformed(Invariant::CarriedByNothing(axis)) => {
-                Note::new(key::ERROR_TRAIN_MALFORMED_CARRIED_BY)
-                    .count("axis", u32::try_from(*axis + 1).unwrap_or(u32::MAX))
+                Note::new(key::ERROR_TRAIN_MALFORMED_CARRIED_BY).count("axis", numbered(*axis))
             }
             Self::Malformed(Invariant::CarriedInACycle(axis)) => {
                 Note::new(key::ERROR_TRAIN_MALFORMED_CARRIED_BY_CYCLE)
-                    .count("axis", u32::try_from(*axis + 1).unwrap_or(u32::MAX))
+                    .count("axis", numbered(*axis))
+            }
+            Self::Malformed(Invariant::DistanceTwice(d)) => {
+                Note::new(key::ERROR_TRAIN_MALFORMED_DISTANCE_TWICE).count("distance", numbered(*d))
+            }
+            Self::Malformed(Invariant::RingFirst(k)) => {
+                Note::new(key::ERROR_TRAIN_MALFORMED_RING_FIRST).count("mesh", numbered(*k))
+            }
+            Self::Malformed(Invariant::DistanceOffFrame(d)) => {
+                Note::new(key::ERROR_TRAIN_MALFORMED_DISTANCE_OFF_FRAME)
+                    .count("distance", numbered(*d))
+            }
+            Self::Malformed(Invariant::CarriedCycle(d)) => {
+                Note::new(key::ERROR_TRAIN_MALFORMED_CARRIED_CYCLE).count("distance", numbered(*d))
+            }
+            // A body is numbered as the train numbers it, ground 0.
+            Self::Malformed(Invariant::NumberGap(body)) => {
+                located(key::ERROR_TRAIN_MALFORMED_NUMBER_GAP, *body)
             }
             Self::Malformed(_) => Note::new(key::ERROR_TRAIN_MALFORMED),
             // Which part it is belongs to the reader rather than to the

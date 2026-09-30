@@ -229,6 +229,11 @@ train_axes_too_far = "distance {distance}: the two axes it joins on one carrier 
 train_malformed = "the train's graph is not well formed"
 train_malformed_carried_by = "axis {axis}: its carried_by names no body on another axis"
 train_malformed_carried_by_cycle = "axis {axis}: its carried_by carries it round, through its carriers, back to itself"
+train_malformed_distance_twice = "distance {distance}: its two axes have another distance stated between them, and a pair of axes has one"
+train_malformed_ring_first = "mesh {mesh}: its first member is a ring, and a mesh lists its ring second"
+train_malformed_distance_off_frame = "distance {distance}: its two axes stand still in no one frame — neither carried by one body nor one the axis the other's carrier turns about; a line a carrier turns about is one axis, however many bodies turn about it"
+train_malformed_carried_cycle = "distance {distance}: it closes a loop of distances among the axes one carrier carries that no triangle through the carrier's axis places"
+train_malformed_number_gap = "body {body}: nothing names this number, and a train numbers its bodies from 1 without a gap"
 
 [ui]
 app_core_failed = "The calculation core failed to load: {reason}"

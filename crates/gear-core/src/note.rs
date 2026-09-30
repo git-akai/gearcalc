@@ -291,6 +291,17 @@ pub mod key {
     /// `error.train_malformed_carried_by_cycle`
     pub const ERROR_TRAIN_MALFORMED_CARRIED_BY_CYCLE: &str =
         "error.train_malformed_carried_by_cycle";
+    /// `error.train_malformed_distance_twice`
+    pub const ERROR_TRAIN_MALFORMED_DISTANCE_TWICE: &str = "error.train_malformed_distance_twice";
+    /// `error.train_malformed_ring_first`
+    pub const ERROR_TRAIN_MALFORMED_RING_FIRST: &str = "error.train_malformed_ring_first";
+    /// `error.train_malformed_distance_off_frame`
+    pub const ERROR_TRAIN_MALFORMED_DISTANCE_OFF_FRAME: &str =
+        "error.train_malformed_distance_off_frame";
+    /// `error.train_malformed_carried_cycle`
+    pub const ERROR_TRAIN_MALFORMED_CARRIED_CYCLE: &str = "error.train_malformed_carried_cycle";
+    /// `error.train_malformed_number_gap`
+    pub const ERROR_TRAIN_MALFORMED_NUMBER_GAP: &str = "error.train_malformed_number_gap";
     /// `error.train_tips_unclearable`
     pub const ERROR_TRAIN_TIPS_UNCLEARABLE: &str = "error.train_tips_unclearable";
     /// `error.train_file_unversioned`: a geartrain file that states no
@@ -407,6 +418,11 @@ pub mod key {
         ERROR_TRAIN_MALFORMED,
         ERROR_TRAIN_MALFORMED_CARRIED_BY,
         ERROR_TRAIN_MALFORMED_CARRIED_BY_CYCLE,
+        ERROR_TRAIN_MALFORMED_DISTANCE_TWICE,
+        ERROR_TRAIN_MALFORMED_RING_FIRST,
+        ERROR_TRAIN_MALFORMED_DISTANCE_OFF_FRAME,
+        ERROR_TRAIN_MALFORMED_CARRIED_CYCLE,
+        ERROR_TRAIN_MALFORMED_NUMBER_GAP,
     ];
 }
 

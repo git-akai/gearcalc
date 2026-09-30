@@ -119,6 +119,107 @@ impl DisjointSets {
     }
 }
 
+/// **Where a vertex hangs** in a [`CarrierTree`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Hang {
+    /// From the root, `depth` parents up — the root at 0.
+    Root { depth: usize },
+    /// From a vertex with no parent that is not the root.
+    Nothing,
+    /// From a cycle of parents, or on one.
+    Cycle,
+}
+
+/// **A rooted tree given by parent pointers** — the turning pairs of a
+/// gear train, each link hung from the carrier of the axis it turns about
+/// and ground the root, which is Buchsbaum and Freudenstein's tree rule
+/// ("Synthesis of kinematic structure of geared kinematic chains and other
+/// mechanisms", *J. Mechanisms* 5 (1970) 357–392): every link reaches
+/// ground by exactly one chain of carriers.
+///
+/// Built from any parent list, so it names what breaks the rule rather
+/// than assuming it: a vertex whose parents stop short of the root hangs
+/// from nothing, and one whose parents go round hangs from a cycle
+/// ([`Hang`]). Vertex 0 is the root.
+#[derive(Clone, Debug)]
+pub struct CarrierTree {
+    parent: Vec<Option<usize>>,
+    hang: Vec<Hang>,
+}
+
+impl CarrierTree {
+    /// The tree whose vertex `v` hangs from `parent[v]` — `None` for no
+    /// parent; the root's own entry is not read. A parent out of range is
+    /// no parent. Each vertex is walked up once: `O(n)`.
+    #[must_use]
+    pub fn new(parent: Vec<Option<usize>>) -> Self {
+        let n = parent.len();
+        let parent: Vec<Option<usize>> = parent
+            .into_iter()
+            .enumerate()
+            .map(|(v, p)| if v == 0 { None } else { p.filter(|&p| p < n) })
+            .collect();
+        let mut hang: Vec<Option<Hang>> = vec![None; n];
+        if n > 0 {
+            hang[0] = Some(Hang::Root { depth: 0 });
+        }
+        // Each walk goes up until it meets a vertex already decided, the
+        // end of the parents, or itself; every vertex it passed hangs as
+        // that end does. `on_walk` marks the vertices of the walk under way.
+        let mut on_walk = vec![false; n];
+        for start in 0..n {
+            let mut chain: Vec<usize> = Vec::new();
+            let mut at = start;
+            let end = loop {
+                if let Some(h) = hang[at] {
+                    break h;
+                }
+                if on_walk[at] {
+                    break Hang::Cycle;
+                }
+                on_walk[at] = true;
+                chain.push(at);
+                match parent[at] {
+                    Some(p) => at = p,
+                    None => break Hang::Nothing,
+                }
+            };
+            for (up, &v) in chain.iter().rev().enumerate() {
+                hang[v] = Some(match end {
+                    Hang::Root { depth } => Hang::Root {
+                        depth: depth + up + 1,
+                    },
+                    other => other,
+                });
+                on_walk[v] = false;
+            }
+        }
+        // Every vertex is decided by the walk from it, if not before.
+        debug_assert!(hang.iter().all(Option::is_some), "an undecided vertex");
+        Self {
+            parent,
+            hang: hang.into_iter().map(|h| h.unwrap_or(Hang::Cycle)).collect(), // absence: none undecided (asserted)
+        }
+    }
+
+    /// Where `v` hangs.
+    #[must_use]
+    pub fn hang(&self, v: usize) -> Hang {
+        self.hang[v]
+    }
+
+    /// **`v` and the vertices above it**, up to the root (not included),
+    /// or to where the parents stop or come round again — each once.
+    pub fn lineage(&self, v: usize) -> impl Iterator<Item = usize> + '_ {
+        let mut seen: Vec<usize> = Vec::new();
+        std::iter::successors(Some(v), move |&at| self.parent[at]).take_while(move |&at| {
+            let fresh = at != 0 && !seen.contains(&at);
+            seen.push(at);
+            fresh
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     //! Each structure against a brute-force oracle sharing no code with it.
@@ -273,6 +374,72 @@ mod tests {
             holds(n, &itself);
         }
         assert_eq!(runs, 7 * 200);
+    }
+
+    /// **Where a vertex hangs, by walking its parents** — at most `n` steps,
+    /// sharing nothing with the tree's memo: the root reached (at the steps
+    /// taken), a vertex with no parent, or `n` steps without either, which
+    /// is a cycle.
+    fn walked(parent: &[Option<usize>], v: usize) -> Hang {
+        let n = parent.len();
+        let mut at = v;
+        for depth in 0..=n {
+            if at == 0 {
+                return Hang::Root { depth };
+            }
+            match parent[at].filter(|&p| p < n) {
+                Some(p) => at = p,
+                None => return Hang::Nothing,
+            }
+        }
+        Hang::Cycle
+    }
+
+    /// **The tree hangs every vertex where walking its parents does**, and
+    /// its lineage is the walk: every parent list over up to five vertices,
+    /// each parent any vertex, none, or one out of range — the rooted
+    /// trees, the forests hanging from nothing, the self-parents and every
+    /// cycle among them.
+    #[test]
+    fn a_carrier_tree_hangs_every_vertex_where_its_parents_lead() {
+        let mut lists = 0;
+        for n in 1..=5usize {
+            // Each vertex but the root: a parent in 0..n, none, or n.
+            let choices = n + 2;
+            let total = choices.pow(u32::try_from(n - 1).unwrap());
+            for code in 0..total {
+                let mut rest = code;
+                let parent: Vec<Option<usize>> = (0..n)
+                    .map(|v| {
+                        if v == 0 {
+                            return None;
+                        }
+                        let c = rest % choices;
+                        rest /= choices;
+                        match c {
+                            c if c < n => Some(c),
+                            c if c == n => None,
+                            _ => Some(n),
+                        }
+                    })
+                    .collect();
+                let tree = CarrierTree::new(parent.clone());
+                for v in 0..n {
+                    assert_eq!(tree.hang(v), walked(&parent, v), "{parent:?}: vertex {v}");
+                    let lineage: Vec<usize> = tree.lineage(v).collect();
+                    let mut expected = Vec::new();
+                    let mut at = Some(v);
+                    while let Some(x) = at.filter(|&x| x != 0 && x < n && !expected.contains(&x)) {
+                        expected.push(x);
+                        at = parent[x];
+                    }
+                    assert_eq!(lineage, expected, "{parent:?}: lineage of {v}");
+                }
+                lists += 1;
+            }
+        }
+        // (n + 2)^(n − 1) lists for n = 1..=5.
+        assert_eq!(lists, 1 + 4 + 25 + 216 + 2401);
     }
 
     /// **The sets are numbered by their first element, not by the element

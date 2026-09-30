@@ -20,6 +20,7 @@
 //! every distance carries a mesh, and a carrier's body is never removed.
 
 use super::shape::{Member, Shape};
+use super::structure::{CarrierTree, DisjointSets, Hang};
 use super::MemberGear;
 use crate::kinematics::GROUND;
 use crate::params::Auto;
@@ -881,8 +882,16 @@ pub enum Invariant {
     MeshAcrossNoDistance(usize),
     /// An axis distance with no mesh across it.
     DistanceWithNoMesh(usize),
-    /// An axis distance stated twice.
+    /// An axis distance stated twice, either way round.
     DistanceTwice(usize),
+    /// A mesh whose first member is a ring: a ring is a mesh's second.
+    RingFirst(usize),
+    /// An axis distance between two axes that stand still in no one
+    /// frame — neither carried by one body nor one turning about the other.
+    DistanceOffFrame(usize),
+    /// An axis distance closing a cycle of distances among the axes one
+    /// carrier carries that no triangle through the carrier's axis places.
+    CarriedCycle(usize),
     /// An axis with no body and no distance.
     AxisWithNothing(usize),
     /// A carried axis whose carrier is on no other axis.
@@ -909,47 +918,184 @@ pub enum Invariant {
 }
 
 impl Shape {
+    /// **The turning pairs as a tree** ([`CarrierTree`]): ground and each
+    /// listed body, the body hung from the carrier of the axis it turns
+    /// about — ground for a fixed axis, nothing for a carrier the shape
+    /// does not list. Vertex 0 is ground and vertex `s` the body in slot `s`.
+    pub(crate) fn carrier_tree(&self) -> CarrierTree {
+        CarrierTree::new(
+            std::iter::once(None)
+                .chain(self.bodies.iter().map(|b| {
+                    let carrier = self.axes.get(b.axis)?.carried_by;
+                    if carrier == GROUND {
+                        Some(GROUND)
+                    } else {
+                        self.slot_if_any(carrier)
+                    }
+                }))
+                .collect(),
+        )
+    }
+
     /// **Whether every carried axis hangs from ground**: each axis carried
     /// by ground or by a body on another axis, and ground reached down the
-    /// carriers within as many steps as there are axes — the turning pairs
-    /// a tree rooted at ground. The one statement of the rule, read by
+    /// carriers ([`Self::carrier_tree`]) — the turning pairs a tree rooted
+    /// at ground. The one statement of the rule, read by
     /// [`super::Train::check`] and by [`super::Train::validate`] where
     /// input enters.
     ///
     /// # Errors
     ///
     /// [`Invariant::CarriedByNothing`] or [`Invariant::CarriedInACycle`],
-    /// naming the first axis that breaks it.
+    /// naming the first axis that breaks it; an axis whose carriers stop at
+    /// one that hangs from nothing is left to that one's own turn.
     pub fn carriers(&self) -> Result<(), Invariant> {
-        let axis_of = |body: usize| self.bodies.iter().find(|b| b.body == body).map(|b| b.axis);
+        let tree = self.carrier_tree();
         for (a, x) in self.axes.iter().enumerate() {
-            if x.carried_by != GROUND && axis_of(x.carried_by).is_none_or(|c| c == a) {
+            if x.carried_by == GROUND {
+                continue;
+            }
+            let Some(c) = self
+                .slot_if_any(x.carried_by)
+                .filter(|&c| self.bodies[c - 1].axis != a)
+            else {
                 return Err(Invariant::CarriedByNothing(a));
-            }
-            let mut at = a;
-            for _ in 0..=self.axes.len() {
-                match self.axes.get(at).map(|x| x.carried_by) {
-                    Some(GROUND) | None => break,
-                    Some(c) => at = axis_of(c).unwrap_or(usize::MAX),
-                }
-            }
-            if self.axes.get(at).is_some_and(|x| x.carried_by != GROUND) {
+            };
+            if tree.hang(c) == Hang::Cycle {
                 return Err(Invariant::CarriedInACycle(a));
             }
         }
         Ok(())
     }
 
-    /// **What a graph must satisfy before anything reads it**: the checks
-    /// of [`super::Train::check`] input can break and the solve cannot
-    /// survive — today the carriers ([`Self::carriers`]), whose cycle
-    /// would send every walk down them round for ever.
+    /// **One axis distance per pair of axes**, either way round.
+    fn distances_once(&self) -> Result<(), Invariant> {
+        for (d, x) in self.distances.iter().enumerate() {
+            let same =
+                |y: &super::shape::Distance| y.axes == x.axes || y.axes == [x.axes[1], x.axes[0]];
+            if self.distances.iter().filter(|y| same(y)).count() > 1 {
+                return Err(Invariant::DistanceTwice(d));
+            }
+        }
+        Ok(())
+    }
+
+    /// **A ring is its mesh's second member** — the side a mesh's kind is
+    /// read on ([`kind_of`](super::incidence::Indexed::kind_of)).
+    fn rings_second(&self) -> Result<(), Invariant> {
+        match self
+            .meshes
+            .iter()
+            .position(|m| self.members.get(m.a).is_some_and(|x| x.ring.is_some()))
+        {
+            Some(k) => Err(Invariant::RingFirst(k)),
+            None => Ok(()),
+        }
+    }
+
+    /// **Every axis distance holds in one frame** — one axis per line in a
+    /// frame: its two axes carried by one body, or one of them the axis the
+    /// other's carrier turns about. A distance from a carried axis to any
+    /// other axis changes as the carrier turns; where it was meant not to,
+    /// the other axis is the carrier's own line entered twice
+    /// (`work/design-graph.md`, *Where this may be wrong*).
+    fn distances_in_a_frame(&self) -> Result<(), Invariant> {
+        let turns_about =
+            |body: usize, axis: usize| body != GROUND && self.axis_of_body(body) == Some(axis);
+        for (d, x) in self.distances.iter().enumerate() {
+            let [p, q] = x.axes;
+            let (Some(fp), Some(fq)) = (self.axes.get(p), self.axes.get(q)) else {
+                continue;
+            };
+            let (fp, fq) = (fp.carried_by, fq.carried_by);
+            if fp != fq && !turns_about(fp, q) && !turns_about(fq, p) {
+                return Err(Invariant::DistanceOffFrame(d));
+            }
+        }
+        Ok(())
+    }
+
+    /// **Every cycle of distances on a carrier is placed by triangles
+    /// through its axis**, which is what the stagger checks
+    /// ([`staggers`](super::incidence::Indexed::staggers), audit T10.2): each carried axis
+    /// stands at its distance from the carrier's axis, and a distance
+    /// between two that both do fixes the angle between them. So, in each
+    /// carrier's frame, the distances between its carried axes make no
+    /// cycle — a cycle among them over-determines the angles, or, with no
+    /// radius under it, is a polygon nothing places — and a distance from
+    /// an axis at no radius closes no cycle through the carrier's axis. A
+    /// chain hanging off a placed axis stands at any angle and is kept.
+    fn carried_cycles(&self) -> Result<(), Invariant> {
+        let mut seen: Vec<usize> = Vec::new();
+        for carrier in self.axes.iter().map(|a| a.carried_by) {
+            if carrier == GROUND || seen.contains(&carrier) {
+                continue;
+            }
+            seen.push(carrier);
+            let Some(centre) = self.axis_of_body(carrier) else {
+                continue;
+            };
+            let carried: Vec<usize> = (0..self.axes.len())
+                .filter(|&a| self.axes[a].carried_by == carrier)
+                .collect();
+            let local = |a: usize| carried.iter().position(|&x| x == a);
+            let at_radius = |a: usize| {
+                self.distances
+                    .iter()
+                    .any(|d| d.axes == [centre, a] || d.axes == [a, centre])
+            };
+            // The carried axes joined by distances among them, and the
+            // same over the star of radii from the carrier's axis (the last).
+            let n = carried.len();
+            let mut chords = DisjointSets::new(n);
+            let mut placed = DisjointSets::new(n + 1);
+            for (i, &a) in carried.iter().enumerate() {
+                if at_radius(a) {
+                    placed.union(i, n);
+                }
+            }
+            for (d, x) in self.distances.iter().enumerate() {
+                let (Some(i), Some(j)) = (local(x.axes[0]), local(x.axes[1])) else {
+                    continue;
+                };
+                let triangle = at_radius(x.axes[0]) && at_radius(x.axes[1]);
+                if !chords.union(i, j) || (!triangle && !placed.union(i, j)) {
+                    return Err(Invariant::CarriedCycle(d));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// **What a graph must satisfy before anything reads it** — the one
+    /// set of the graph's invariants input can break, read where input
+    /// enters ([`Self::validate`]) and by every edit's check
+    /// ([`super::Train::check`]): the carriers a tree rooted at ground
+    /// ([`Self::carriers`]), one distance per pair of axes, a ring its
+    /// mesh's second member, every distance held in one frame, and every
+    /// cycle of distances on a carrier one its triangles place.
+    ///
+    /// # Errors
+    ///
+    /// The first [`Invariant`] broken, in that order.
+    pub fn invariants(&self) -> Result<(), Invariant> {
+        self.carriers()?;
+        self.distances_once()?;
+        self.rings_second()?;
+        self.distances_in_a_frame()?;
+        self.carried_cycles()
+    }
+
+    /// **[`Self::invariants`], as the solve refuses** — before anything
+    /// reads the graph, so a carrier cycle cannot send a walk down it round
+    /// for ever and a graph that describes no train is refused by name, not
+    /// by the symptom a later reading meets.
     ///
     /// # Errors
     ///
     /// [`super::TrainError::Malformed`], naming the invariant and its field.
     pub fn validate(&self) -> Result<(), super::TrainError> {
-        self.carriers().map_err(super::TrainError::Malformed)
+        self.invariants().map_err(super::TrainError::Malformed)
     }
 }
 
@@ -962,7 +1108,17 @@ impl super::Train {
     ///
     /// [`super::TrainError::Malformed`], naming the invariant and its field.
     pub fn validate(&self) -> Result<(), super::TrainError> {
-        self.shape.validate()
+        self.shape.validate()?;
+        // **The graph's bodies numbered from 1 without a gap**, the number
+        // every part, case and hold names a body by. A hold or a case at a
+        // number past the graph's is the solve's to name (a body the train
+        // does not have); a gap in the graph's own numbering is no body at
+        // all.
+        let s = &self.shape;
+        match (1..=s.max_body()).find(|&b| s.slot_if_any(b).is_none()) {
+            Some(b) => Err(super::TrainError::Malformed(Invariant::NumberGap(b))),
+            None => Ok(()),
+        }
     }
 
     /// **Whether the train is well formed** — what every edit keeps.
@@ -1011,14 +1167,9 @@ impl super::Train {
                 return Err(Invariant::MeshAcrossNoDistance(k));
             }
         }
-        for (d, x) in s.distances.iter().enumerate() {
+        for d in 0..s.distances.len() {
             if at.meshes_on(d).is_empty() {
                 return Err(Invariant::DistanceWithNoMesh(d));
-            }
-            let same =
-                |y: &super::shape::Distance| y.axes == x.axes || y.axes == [x.axes[1], x.axes[0]];
-            if s.distances.iter().filter(|y| same(y)).count() > 1 {
-                return Err(Invariant::DistanceTwice(d));
             }
         }
         for a in 0..s.axes.len() {
@@ -1028,7 +1179,7 @@ impl super::Train {
                 return Err(Invariant::AxisWithNothing(a));
             }
         }
-        s.carriers()?;
+        s.invariants()?;
         if !s.planets_at_a_radius() {
             return Err(Invariant::PlanetMeetsNothing);
         }
@@ -1099,6 +1250,423 @@ mod tests {
 
     fn same(a: &Shape, b: &Shape) -> bool {
         format!("{a:?}") == format!("{b:?}")
+    }
+
+    /// **A graph that describes no train is refused where it enters, by
+    /// the key that names why** — each fixture refused by
+    /// [`solve_train`]'s [`Train::validate`] with its own catalogue key, and
+    /// beside each the near miss that stands: a carrier cycle of three
+    /// axes; an axis distance stated twice, the same way round and the
+    /// other; a mesh listing its ring first; three axes on one carrier
+    /// joined in a cycle, and a cycle through the carrier's axis past an
+    /// axis at no distance from it (the cycles no triangle through the
+    /// carrier's axis places, which T10.2 left), beside meshed planets and
+    /// a planet hanging off another; a sun on an axis entry of its own that
+    /// the carrier does not turn about — two entries for one line — beside
+    /// the set as built; and a body number skipped.
+    #[test]
+    fn malformed_graphs_are_refused_where_they_enter_by_name() {
+        use crate::note::Explain;
+        use arr::{epicyclic, Central};
+        let lib = library();
+        let train = |shape: Shape, load_cases: Vec<LoadCase>| Train {
+            load_cases,
+            reversed_bending: false,
+            shape,
+            held: Vec::new(),
+        };
+        let refused = |name: &str, t: &Train, key: &str| match solve_train(t, &lib) {
+            Err(e) => assert_eq!(e.note().key, key, "{name}: {e:?}"),
+            Ok(_) => panic!("{name}: solved, where it should be refused by {key}"),
+        };
+        let stands = |name: &str, t: &Train| {
+            assert!(t.validate().is_ok(), "{name}: {:?}", t.validate());
+        };
+        let body_on =
+            |s: &Shape, axis: usize| s.bodies.iter().find(|b| b.axis == axis).unwrap().body;
+        let mut checked = 0;
+
+        // A carrier cycle of three axes: each fixed axis of an idler's
+        // line carried by the body on the next.
+        let mut cycle = Preset::Idler.build();
+        for a in 0..3 {
+            cycle.axes[a].carried_by = body_on(&cycle, (a + 1) % 3);
+        }
+        refused(
+            "a carrier cycle",
+            &train(cycle, Vec::new()),
+            "error.train_malformed_carried_by_cycle",
+        );
+        checked += 1;
+
+        // An axis distance twice, the same way round and the other.
+        for turned in [false, true] {
+            let mut twice = Preset::Spur.build();
+            let mut again = twice.distances[0];
+            if turned {
+                again.axes = [again.axes[1], again.axes[0]];
+            }
+            twice.distances.push(again);
+            refused(
+                "a distance twice",
+                &train(twice, Vec::new()),
+                "error.train_malformed_distance_twice",
+            );
+            checked += 1;
+        }
+        stands("a pair", &train(Preset::Spur.build(), Vec::new()));
+
+        // A mesh that lists its ring first.
+        let mut ring_first = Preset::Planetary.build();
+        let k = (0..ring_first.meshes.len())
+            .find(|&k| ring_first.members[ring_first.meshes[k].b].ring.is_some())
+            .unwrap();
+        let m = &mut ring_first.meshes[k];
+        (m.a, m.b) = (m.b, m.a);
+        refused(
+            "a ring first",
+            &train(ring_first, Vec::new()),
+            "error.train_malformed_ring_first",
+        );
+        checked += 1;
+        stands("a set", &train(Preset::Planetary.build(), Vec::new()));
+
+        // Three planet axes on one carrier, each meshing the next; and a
+        // bridge between two planets the sun and the ring mesh, at no
+        // distance from the carrier's axis — the builder states one from
+        // the carrier's axis to every planet axis, which goes where no
+        // central member meshes the axis.
+        let planets: [&[i32]; 3] = [&[18], &[18], &[18]];
+        let centrals = [
+            Central::Sun { on: 0, teeth: 24 },
+            Central::Carrier,
+            Central::Ring { on: 1, teeth: 60 },
+        ];
+        let unmeshed = |mut s: Shape| {
+            let bridge = s.axes.len() - 1;
+            let centre = s.distances[0].axes[0];
+            s.distances.retain(|d| d.axes != [centre, bridge]);
+            s
+        };
+        for (name, meshes) in [
+            (
+                "three carried axes in a cycle",
+                &[(0, 1), (1, 2), (2, 0)][..],
+            ),
+            (
+                "a cycle through the carrier's axis past a bridge",
+                &[(0, 2), (2, 1)][..],
+            ),
+        ] {
+            let s = unmeshed(epicyclic(3, &planets, &centrals, meshes));
+            refused(
+                name,
+                &train(s, Vec::new()),
+                "error.train_malformed_carried_cycle",
+            );
+            checked += 1;
+        }
+        stands(
+            "meshed planets",
+            &train(Preset::MeshedPlanets.build(), Vec::new()),
+        );
+        stands(
+            "a planet hanging off another",
+            &train(
+                unmeshed(epicyclic(3, &planets, &centrals, &[(0, 2)])),
+                Vec::new(),
+            ),
+        );
+
+        // A sun on an axis entry of its own, the same line as the carrier's
+        // in fact and another axis in the graph: its distance to the planet
+        // axis holds in no frame.
+        let mut own_line = Preset::Planetary.build();
+        let sun = own_line.members[0].body;
+        let planet_axis = own_line.members[1].body;
+        let planet_axis = own_line
+            .bodies
+            .iter()
+            .find(|b| b.body == planet_axis)
+            .unwrap()
+            .axis;
+        own_line.axes.push(own_line.axes[0]);
+        let entry = own_line.axes.len() - 1;
+        own_line
+            .bodies
+            .iter_mut()
+            .find(|b| b.body == sun)
+            .unwrap()
+            .axis = entry;
+        let d = (0..own_line.distances.len())
+            .find(|&d| own_line.distances[d].axes.contains(&planet_axis))
+            .unwrap();
+        let mut sun_distance = own_line.distances[d];
+        sun_distance.axes = [entry, planet_axis];
+        own_line.distances.push(sun_distance);
+        refused(
+            "two entries for one line",
+            &train(own_line, Vec::new()),
+            "error.train_malformed_distance_off_frame",
+        );
+        checked += 1;
+
+        // A body number skipped: a pair's second body numbered 3.
+        let mut gap = Preset::Spur.build();
+        gap.renumber_bodies(|b| if b == 2 { 3 } else { b });
+        let cases = vec![LoadCase::ultimate(1, 3, 2.0, 3000.0)];
+        refused(
+            "a body number skipped",
+            &train(gap, cases),
+            "error.train_malformed_number_gap",
+        );
+        checked += 1;
+        stands(
+            "a pair, cased",
+            &train(
+                Preset::Spur.build(),
+                vec![LoadCase::ultimate(1, 2, 2.0, 3000.0)],
+            ),
+        );
+
+        assert_eq!(checked, 8);
+    }
+
+    /// **Every train an edit makes validates, and so does every part of
+    /// it** — the rules input is held to refuse nothing the walk of offered
+    /// edits reaches, and read no train's numbering into a part's: a part
+    /// lists the train's bodies, not a train's own.
+    #[test]
+    fn every_walked_train_and_its_parts_validate() {
+        let mut parts = 0;
+        let visited = super::super::sweep::visited();
+        for (walk, steps, t) in &visited {
+            t.validate()
+                .unwrap_or_else(|e| panic!("{walk}: {steps:?}: {e:?}"));
+            for part in t.parts() {
+                part.shape
+                    .invariants()
+                    .unwrap_or_else(|e| panic!("{walk}: {steps:?}: a part: {e:?}"));
+                parts += 1;
+            }
+        }
+        assert!(
+            visited.len() > 900 && parts > 1000,
+            "{} trains, {parts} parts",
+            visited.len()
+        );
+    }
+
+    /// A shape of bare axes and bodies: `carried_by` per axis, the bodies
+    /// as `(body, axis)`, and `pairs` as its axis distances — no gear, for
+    /// the laws about the frames alone.
+    fn frames(carried_by: &[usize], bodies: &[(usize, usize)], pairs: &[[usize; 2]]) -> Shape {
+        let template = Preset::Planetary.build();
+        Shape {
+            axes: carried_by
+                .iter()
+                .map(|&c| super::super::shape::Axis {
+                    carried_by: c,
+                    ..template.axes[0]
+                })
+                .collect(),
+            bodies: bodies
+                .iter()
+                .map(|&(body, axis)| super::super::shape::BodyOn { body, axis })
+                .collect(),
+            distances: pairs
+                .iter()
+                .map(|&axes| super::super::shape::Distance {
+                    axes,
+                    ..template.distances[0]
+                })
+                .collect(),
+            ..Shape::default()
+        }
+    }
+
+    /// **A distance holds in one frame exactly where it cannot change as
+    /// the carriers turn** — the rule against the geometry it stands for.
+    /// Every chain of carriers over five axes, each carried by ground or by
+    /// a body on an earlier axis (the first axis has a second body, so two
+    /// carriers turn about one line), every pair of axes as the one
+    /// distance: each axis placed in the plane — a fixed one at a point of
+    /// its own, a carried one at an offset from its carrier's axis turned
+    /// by its carrier's angle — at three sets of angles. The rule refuses
+    /// exactly the distances that move. Positions are seeded and generic,
+    /// so a distance that moves moves by the order of its offsets, far
+    /// from the rounding a constant one shows.
+    #[test]
+    fn a_distance_holds_in_a_frame_where_the_carriers_cannot_move_it() {
+        const AXES: usize = 5;
+        // Bodies: one per axis, `axis + 1`, and a second on axis 0.
+        let second = AXES + 1;
+        let mut bodies: Vec<(usize, usize)> = (0..AXES).map(|a| (a + 1, a)).collect();
+        bodies.push((second, 0));
+        let body_axis = |b: usize| bodies.iter().find(|x| x.0 == b).map(|x| x.1);
+        let mut rng = super::super::sweep::Lcg(0x5eed);
+        let mut unit = || rng.pick(1 << 20) as f64 / f64::from(1 << 20) - 0.5;
+        let points: Vec<[f64; 2]> = (0..AXES).map(|_| [unit(), unit()]).collect();
+        let angles: Vec<Vec<f64>> = (0..3)
+            .map(|_| (0..=second).map(|_| 6.0 * unit()).collect())
+            .collect();
+        let (mut held, mut moved, mut widest, mut narrowest) = (0, 0, 0.0_f64, f64::INFINITY); // absence: no distance measured yet
+                                                                                               // Each axis's carrier: ground, or a body on an earlier axis.
+        let choices: Vec<Vec<usize>> = (0..AXES)
+            .map(|a| {
+                std::iter::once(GROUND)
+                    .chain(bodies.iter().filter(|b| b.1 < a).map(|b| b.0))
+                    .collect()
+            })
+            .collect();
+        let total: usize = choices.iter().map(Vec::len).product();
+        for code in 0..total {
+            let mut rest = code;
+            let carried_by: Vec<usize> = choices
+                .iter()
+                .map(|c| {
+                    let pick = c[rest % c.len()];
+                    rest /= c.len();
+                    pick
+                })
+                .collect();
+            let place = |axis: usize, turn: &[f64]| -> [f64; 2] {
+                let mut at = axis;
+                let mut p = [0.0, 0.0];
+                loop {
+                    let c = carried_by[at];
+                    if c == GROUND {
+                        return [p[0] + points[at][0], p[1] + points[at][1]];
+                    }
+                    let (sin, cos) = turn[c].sin_cos();
+                    let [x, y] = points[at];
+                    // The offset turned by the carrier, the carrier's axis
+                    // the rest of the way.
+                    p = [
+                        cos * (p[0] + x) - sin * (p[1] + y),
+                        sin * (p[0] + x) + cos * (p[1] + y),
+                    ];
+                    at = body_axis(c).unwrap();
+                }
+            };
+            for p in 0..AXES {
+                for q in p + 1..AXES {
+                    let s = frames(&carried_by, &bodies, &[[p, q]]);
+                    let spans: Vec<f64> = angles
+                        .iter()
+                        .map(|turn| {
+                            let (a, b) = (place(p, turn), place(q, turn));
+                            (a[0] - b[0]).hypot(a[1] - b[1])
+                        })
+                        .collect();
+                    let change = spans
+                        .iter()
+                        .fold(0.0_f64, |m, x| m.max((x - spans[0]).abs()));
+                    let refused = s.invariants() == Err(Invariant::DistanceOffFrame(0));
+                    if refused {
+                        narrowest = narrowest.min(change);
+                        moved += 1;
+                    } else {
+                        widest = widest.max(change);
+                        held += 1;
+                    }
+                }
+            }
+        }
+        // Rounding moves a constant distance by a few ulp of its size; the
+        // least a moving one moves is far above it.
+        assert!(
+            widest < 1e-12,
+            "a distance the rule holds moved by {widest}"
+        );
+        assert!(
+            narrowest > 1e-3,
+            "a distance the rule refuses moved only {narrowest}"
+        );
+        assert_eq!(held + moved, total * AXES * (AXES - 1) / 2);
+        assert!(held > 100 && moved > 100, "{held} held, {moved} moved");
+    }
+
+    /// **The carried-cycle rule is the cycles it names**, against every
+    /// simple cycle of every frame: an axis fixed in ground with a carrier
+    /// on it and up to four axes it carries, every set of distances among
+    /// the five. A frame is refused exactly where some cycle of its
+    /// distances runs among the carried axes alone, or through the
+    /// carrier's axis past an axis at no distance from it; and the distance
+    /// named closes such a cycle.
+    #[test]
+    fn a_carried_cycle_is_refused_exactly_where_no_triangle_places_it() {
+        // Vertex 0 is the carrier's axis; every cycle of `edges`, as its
+        // vertices, found by extending paths from their least vertex.
+        fn cycles(n: usize, edges: &[[usize; 2]]) -> Vec<Vec<usize>> {
+            let joined = |a: usize, b: usize| edges.iter().any(|e| *e == [a, b] || *e == [b, a]);
+            let mut out = Vec::new();
+            let mut stack: Vec<Vec<usize>> = (0..n).map(|v| vec![v]).collect();
+            while let Some(path) = stack.pop() {
+                let (first, last) = (path[0], path[path.len() - 1]);
+                for next in first..n {
+                    if !joined(last, next) {
+                        continue;
+                    }
+                    if next == first && path.len() >= 3 && path[1] < last {
+                        out.push(path.clone());
+                    } else if next > first && !path.contains(&next) {
+                        let mut longer = path.clone();
+                        longer.push(next);
+                        stack.push(longer);
+                    }
+                }
+            }
+            out
+        }
+        let (mut frames_seen, mut refused) = (0, 0);
+        for m in 1..=4usize {
+            let n = m + 1;
+            let pairs: Vec<[usize; 2]> = (0..n)
+                .flat_map(|a| (a + 1..n).map(move |b| [a, b]))
+                .collect();
+            // The carrier is body 1 on axis 0; axis a > 0 is on body a + 1.
+            let carried_by: Vec<usize> = (0..n).map(|a| if a == 0 { GROUND } else { 1 }).collect();
+            let bodies: Vec<(usize, usize)> = (0..n).map(|a| (a + 1, a)).collect();
+            for mask in 0u32..1 << pairs.len() {
+                let chosen: Vec<[usize; 2]> = pairs
+                    .iter()
+                    .enumerate()
+                    .filter(|(k, _)| (mask >> k) & 1 == 1)
+                    .map(|(_, &p)| p)
+                    .collect();
+                let at_radius = |v: usize| chosen.contains(&[0, v]);
+                let bad =
+                    |c: &Vec<usize>| !c.contains(&0) || c.iter().any(|&v| v != 0 && !at_radius(v));
+                let found = cycles(n, &chosen);
+                let s = frames(&carried_by, &bodies, &chosen);
+                match s.invariants() {
+                    Err(Invariant::CarriedCycle(d)) => {
+                        let [a, b] = chosen[d];
+                        let on_a_bad_cycle = found.iter().filter(|c| bad(c)).any(|c| {
+                            (0..c.len()).any(|i| {
+                                let (x, y) = (c[i], c[(i + 1) % c.len()]);
+                                [x, y] == [a, b] || [y, x] == [a, b]
+                            })
+                        });
+                        assert!(
+                            on_a_bad_cycle,
+                            "{chosen:?}: distance {d} closes no cycle it should"
+                        );
+                        refused += 1;
+                    }
+                    Ok(()) => assert!(
+                        !found.iter().any(bad),
+                        "{chosen:?}: a cycle no triangle places stood: {found:?}"
+                    ),
+                    other => panic!("{chosen:?}: {other:?}"),
+                }
+                frames_seen += 1;
+            }
+        }
+        // 2^1 + 2^3 + 2^6 + 2^10 sets of distances.
+        assert_eq!(frames_seen, 2 + 8 + 64 + 1024);
+        assert!(refused > 500, "only {refused} refused");
     }
 
     /// An edit on a shape outside any train: what it adds is numbered after

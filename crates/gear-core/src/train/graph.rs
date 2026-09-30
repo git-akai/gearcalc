@@ -235,6 +235,7 @@ impl Shape {
         let of = joined.labels();
         let axis_of_body =
             |body: usize| self.bodies.iter().find(|b| b.body == body).map(|b| b.axis);
+        let tree = self.carrier_tree();
         let mut taken_axes: Vec<Option<usize>> = vec![None; self.axes.len()];
         let mut parts = Vec::new();
         for p in 0..joined.count() {
@@ -254,19 +255,18 @@ impl Shape {
                 .filter_map(|&i| axis_of_body(self.members[i].body))
                 .chain(distances.iter().flat_map(|&d| self.distances[d].axes))
                 .collect();
-            // A carried axis brings its carrier's, once: an axis enters the
-            // list at most once, so the closure ends on a carrier cycle too,
-            // which `Train::validate` refuses.
-            let mut k = 0;
-            while k < axes.len() {
-                let carrier = self.axes[axes[k]].carried_by;
-                if carrier != GROUND {
-                    if let Some(a) = axis_of_body(carrier).filter(|a| !axes.contains(a)) {
-                        axes.push(a);
-                    }
-                }
-                k += 1;
-            }
+            // A carried axis brings its carriers' down to ground: each
+            // carrier's lineage in the turning pairs' tree, which ends on
+            // a carrier cycle too (`Train::validate` refuses one).
+            let carriers: Vec<usize> = axes
+                .iter()
+                .map(|&a| self.axes[a].carried_by)
+                .filter(|&carrier| carrier != GROUND)
+                .filter_map(|carrier| self.slot_if_any(carrier))
+                .flat_map(|c| tree.lineage(c))
+                .map(|slot| self.bodies[slot - 1].axis)
+                .collect();
+            axes.extend(carriers);
             axes.sort_unstable();
             axes.dedup();
             for &a in &axes {
