@@ -14,9 +14,12 @@
 //!   `F = r_e (1 − cos θ_a) + tan θ_a (w − w_e)`.
 //!
 //! Each piece meets the next with equal value and slope, so the form is C¹. Its curvature across
-//! the edge is that of `F`'s graph, `κ = F''/(1 + F'²)^{3/2}`: `1/r_e` on the round without a
-//! relief, and with one the summed form's (relief plus round), not the round's own; `0` on the
-//! flank and the land; and it steps at each joint ([`TipForm::joints`]).
+//! the edge is that of `F`'s graph, `κ = F''/(1 + F'²)^{3/2}`. Where the relief applies (above
+//! its end, and on all of the land, since it continues beyond the edge) its `F'' = 2 C sin²θ_a/L²`
+//! is in every piece: `κ = 2 C sin²θ_a/L² / (1 + F'²)^{3/2}` on the flank and the land, and on the
+//! round the summed form's (relief plus round), not the round's own. Where it does not, `κ` is
+//! `1/r_e` on the round and `0` on the flank and the land. It steps at the joints
+//! ([`TipForm::joints`]).
 //!
 //! A sharp edge is a kink (C⁰) and is refused: the field's peak pressure diverges as `r_e → 0`.
 //! The prototype read a sharp edge with the flank's slope and curvature carried past the kink; that
@@ -234,8 +237,9 @@ impl TipForm {
     }
 
     /// Where the pieces meet, in `σ`: the round's tangency with the flank, its end on the tip
-    /// land, and the relief's end where there is one. The curvature steps at these and nowhere
-    /// else.
+    /// land, and the relief's end where there is one. The curvature is continuous everywhere
+    /// else. It steps at both of the round's ends, and at the relief's end by the relief's own
+    /// curvature, which is zero for a relief of no depth: that end is listed, with no step.
     pub fn joints(&self) -> impl Iterator<Item = f64> {
         [
             Some(self.tangency),
@@ -318,6 +322,21 @@ mod tests {
     /// The records' tolerance, `tol.rel`: a closed form's, 1e-13 (the README's rule); every record
     /// states it ([`reproduce`]).
     const REL: f64 = 1e-13;
+
+    /// A tolerance rule: `(rel, oracle, passes_zero)` to the bound a value is held to.
+    type Bound = fn(f64, f64, bool) -> f64;
+
+    /// A value moved ten times the README's closed-form tolerance, written out here rather than
+    /// read from [`closed_bound`]: `1e-13` of its size, or `1e-13` absolute where its size is
+    /// below 1. The larger of the rule's two readings, so ten times the tolerance on either of
+    /// its branches.
+    fn ten_times_the_rule(x: f64) -> f64 {
+        x + 10.0 * REL * x.abs().max(1.0)
+    }
+
+    /// Every value [`reproduce`] compares: 15 laid forms × (5 circles and corner + 3 round
+    /// constants + 25 × 3) + 5 sharp-edge records × 5 + 79 flank-side points × 3.
+    const VALUES: usize = 15 * (5 + 3 + 75) + 5 * 5 + 79 * 3;
 
     fn oracle_file() -> Value {
         serde_json::from_str(include_str!("../../tests/data/field_oracle/form.json"))
@@ -414,8 +433,11 @@ mod tests {
     /// compared and the points beyond the edge counted as refused. Returns the worst miss, the
     /// whole records, the refused points, the `on_edge` flags the port is compared on, and the
     /// sharp records' flags, which are the oracle checked against its own rule (`σ < 0`), not
-    /// the port.
-    fn reproduce(perturb: impl Fn(f64) -> f64) -> (Worst, usize, usize, usize, usize) {
+    /// the port. Each value is held to `bound`: [`closed_bound`], or a plant of it.
+    fn reproduce(
+        perturb: impl Fn(f64) -> f64,
+        bound: Bound,
+    ) -> (Worst, usize, usize, usize, usize) {
         let file = oracle_file();
         let mut worst = Worst::default();
         let (mut whole, mut refused_points, mut flags, mut own_rule) = (0, 0, 0, 0);
@@ -426,7 +448,7 @@ mod tests {
             let rel = num(&rec.tol["rel"]);
             assert_eq!(rel, REL, "{}", rec.id);
             let mut check = |name: &str, port: f64, oracle: f64, passes_zero: bool| {
-                let bound = closed_bound(rel, oracle, passes_zero);
+                let bound = bound(rel, oracle, passes_zero);
                 worst.see(miss(perturb(port), oracle, bound), || {
                     format!("{} {name}: {port:e} vs {oracle:e}", rec.id)
                 });
@@ -493,7 +515,7 @@ mod tests {
 
     #[test]
     fn the_oracle_records_reproduce() {
-        let (worst, whole, refused, flags, own_rule) = reproduce(|x| x);
+        let (worst, whole, refused, flags, own_rule) = reproduce(|x| x, closed_bound);
         eprintln!(
             "form.json: {whole}/20 records whole, {} values within tolerance, worst {:.3} of it \
              ({}); {flags} on_edge flags equal; {refused} points beyond a sharp edge refused, \
@@ -502,36 +524,56 @@ mod tests {
         );
         // Flags: the port's on the 15 laid forms, the oracle's own rule on the 5 sharp ones.
         assert_eq!((whole, refused, flags, own_rule), (15, 46, 15 * 25, 5 * 25));
-        // 15 laid forms × (5 circles and corner + 3 round constants + 25 × 3) + 5 sharp-edge
-        // records × 5 + 79 flank-side points × 3.
-        assert_eq!(worst.count, 15 * (5 + 3 + 75) + 5 * 5 + 79 * 3);
+        assert_eq!(worst.count, VALUES);
         assert!(worst.ratio <= 1.0, "worst {} at {}", worst.ratio, worst.at);
     }
 
     /// The tolerance's two laws: an output a few roundings off still reproduces every record, and
-    /// one ten times the tolerance off reproduces none of the values it touches.
+    /// one ten times the tolerance off ([`ten_times_the_rule`], stated apart from the bound it is
+    /// checked with) misses at every value compared.
+    ///
+    /// Its plant: the bound loosened 100×, under which the fault reproduces. The previous law,
+    /// which moved each value by ten times the bound it then checked it with (`10 > 1` for any
+    /// bound), passes that plant. What the 10× fault cannot catch, a bound less than ten times too
+    /// loose, `oracle.rs`'s pins of [`closed_bound`] do.
     #[test]
     fn the_oracle_tolerance_passes_rounding_and_fails_ten_times_itself() {
-        let (worst, ..) = reproduce(|x| x * (1.0 + 4.0 * EPS));
+        let (worst, ..) = reproduce(|x| x * (1.0 + 4.0 * EPS), closed_bound);
+        assert_eq!((worst.count, worst.missed), (VALUES, 0));
         assert!(
             worst.ratio <= 1.0,
             "rounding failed: {} at {}",
             worst.ratio,
             worst.at
         );
-        let file = oracle_file();
-        let mut seen = 0;
-        for rec in oracle::records(&file) {
-            let rel = num(&rec.tol["rel"]);
-            for v in rec.outputs["values"].as_array().expect("values") {
-                for x in v.as_array().expect("a triple").iter().map(num) {
-                    let bound = closed_bound(rel, x, true);
-                    assert!(miss(x + 10.0 * bound, x, bound) > 1.0);
-                    seen += 1;
+        let every_value_misses = |bound: Bound| {
+            let (worst, ..) = reproduce(ten_times_the_rule, bound);
+            assert_eq!(worst.count, VALUES);
+            worst.missed == VALUES
+        };
+        let loose: Bound = |rel, x, z| 100.0 * closed_bound(rel, x, z);
+        assert!(every_value_misses(closed_bound));
+        assert!(
+            !every_value_misses(loose),
+            "the 100× bound passes the fault"
+        );
+
+        let previous = |bound: Bound| {
+            let file = oracle_file();
+            let mut seen = 0;
+            for rec in oracle::records(&file) {
+                for v in rec.outputs["values"].as_array().expect("values") {
+                    for x in v.as_array().expect("a triple").iter().map(num) {
+                        let b = bound(REL, x, true);
+                        if miss(x + 10.0 * b, x, b) > 1.0 {
+                            seen += 1;
+                        }
+                    }
                 }
             }
-        }
-        assert_eq!(seen, 20 * 25 * 3);
+            seen == 20 * 25 * 3
+        };
+        assert!(previous(closed_bound) && previous(loose));
     }
 
     // ---------------------------------------------------------------- C¹ at every joint
@@ -872,11 +914,8 @@ mod tests {
         };
         let (_, _, least, _) = relieved_round(summed);
         assert!(least > 1.0, "the pieces' sum is nowhere 1/r_e: {least}");
-        // Ten times the tolerance.
-        let ten: Reading = |f, s| {
-            let k = f.at(s).curvature;
-            k + 10.0 * closed_bound(REL, k, true)
-        };
+        // Ten times the tolerance, stated apart from the bound the gate reads.
+        let ten: Reading = |f, s| ten_times_the_rule(f.at(s).curvature);
         for (name, plant) in [("own", own), ("summed", summed), ("10×", ten)] {
             assert!(naive(plant), "{name}: the naive gate passes it");
             assert!(!gate(plant), "{name}: the gate fails it");

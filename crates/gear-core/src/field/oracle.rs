@@ -58,17 +58,23 @@ pub(crate) fn miss(port: f64, oracle: f64, bound: f64) -> f64 {
     }
 }
 
-/// The worst miss seen, where, and how many values were compared.
+/// The worst miss seen, where, how many values were compared, and how many of them missed (a
+/// ratio above 1, or not a number): a fault ten times the tolerance is caught by every value it
+/// touches missing, not by the worst of them.
 #[derive(Default)]
 pub(crate) struct Worst {
     pub ratio: f64,
     pub at: String,
     pub count: usize,
+    pub missed: usize,
 }
 
 impl Worst {
     pub fn see(&mut self, ratio: f64, at: impl FnOnce() -> String) {
         self.count += 1;
+        if ratio > 1.0 || ratio.is_nan() {
+            self.missed += 1;
+        }
         if ratio > self.ratio || ratio.is_nan() {
             self.ratio = ratio;
             self.at = at();
@@ -534,6 +540,33 @@ mod tests {
             .cloned()
             .collect();
         refused(&unread, README, &rest, "make_oracle.py");
+    }
+
+    /// [`closed_bound`], to the bit, at literal values: `rel` of the value's size, floored at `rel`
+    /// absolute only where the value passes zero. A step's 10× law cannot pin this: its fault is
+    /// ten times the larger reading, so a bound up to ten times too loose on either branch passes
+    /// it. Plants, each holding the one pin it cannot fail: the bound loosened 100× (only zero
+    /// room at zero holds), and the relative branch floored at 1 as the other is, 4× looser on
+    /// a value of 0.25 (every pin above 1 in size or passing zero holds).
+    #[test]
+    fn the_closed_bound_is_the_readmes_rule() {
+        let pins = |bound: fn(f64, f64, bool) -> f64| {
+            [
+                (0.5, true, 1e-13),
+                (-0.25, true, 1e-13),
+                (0.0, true, 1e-13),
+                (20.0, true, 2e-12),
+                (-20.0, false, 2e-12),
+                (0.25, false, 2.5e-14),
+                (0.0, false, 0.0),
+            ]
+            .into_iter()
+            .filter(|&(x, passes_zero, b)| bound(1e-13, x, passes_zero) == b)
+            .count()
+        };
+        assert_eq!(pins(closed_bound), 7);
+        assert_eq!(pins(|rel, x, z| 100.0 * closed_bound(rel, x, z)), 1);
+        assert_eq!(pins(|rel, x, _| rel * x.abs().max(1.0)), 5);
     }
 
     /// The md5 is RFC 1321's: its test suite (appendix A.5), whose lengths 0 … 80 bytes cover
