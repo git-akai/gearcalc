@@ -54,13 +54,24 @@ def value(text):
 
 
 def named_spans(code):
-    """`(start, end)` of every `const` item's initializer."""
+    """`(start, end)` of every `const` item's initializer: a `const NAME:`
+    whose type is followed by `=`. A const generic parameter, `<const N:
+    usize>`, has a `,` or `>` there instead, and names nothing."""
     out = []
     for m in CONST.finditer(code):
-        eq = code.find("=", m.end())
-        if eq < 0:
-            continue
-        out.append((eq, rust_source.item_end(code, eq)))
+        depth = 0
+        for k in range(m.end(), len(code)):
+            ch = code[k]
+            if ch in "([<":
+                depth += 1
+            elif ch in ")]>":
+                depth -= 1
+                if depth < 0:
+                    break
+            elif depth == 0 and ch in "=,;{":
+                break
+        if code[k] == "=":
+            out.append((k, rust_source.item_end(code, k)))
     return out
 
 
@@ -167,6 +178,8 @@ mod tests {
 }
 fn after_the_tests() { let _ = 1e-11; }
 fn with_array(pair: &dyn Fn([f64; 2]) -> f64) -> f64 { 1e-5 }
+fn generic<const N: usize>(x: f64) -> f64 { let y = x * 1e-7; y }
+const RANGE: Range<f64> = 3e-6..1.0;
 #[cfg(test)]
 fn test_only() { let _ = 1e-12; }
 '''
@@ -175,7 +188,7 @@ WANT = sorted([
     ("flagged", "1e-9"), ("flagged", "0.0001"), ("flagged", "1.0e-4"), ("flagged", "5E-7"),
     ("flagged", "1e-9_f64"), ("flagged", "0.000_1"), ("flagged", "3e-4"),
     ("lifetimes", "1e-6"), ("not_a_const_item", "1e-8"), ("looks_named", "1e-10"),
-    ("after_the_tests", "1e-11"), ("with_array", "1e-5"),
+    ("after_the_tests", "1e-11"), ("with_array", "1e-5"), ("generic", "1e-7"),
 ])
 
 
@@ -207,10 +220,11 @@ def self_test():
         ("looks_named", "1e-10", "a `let` with a constant's name"),
         ("not_a_const_item", "1e-8", "a `const fn` body"),
         ("with_array", "1e-5", "a function whose signature holds `[f64; 2]`, keyed by its name"),
+        ("generic", "1e-7", "a function with a const generic parameter, which names nothing"),
     ):
         expect(f"found: {why}", (fn, lit) in got)
     for lit, why in (("1e-12", "test code"), ("1e-3", "1e-3 itself"), ("2e-5", "a const struct literal"),
-                     ("1e-7", "a const array"), ("0.0", "zero")):
+                     ("3e-6", "a const whose type has angle brackets"), ("0.0", "zero")):
         expect(f"not found: {why}", all(l != lit for _, l in got))
     # The list: exact both ways, and each entry names its stage.
     key = ("crates/gear-core/src/lib.rs", "after_the_tests", "1e-11")
