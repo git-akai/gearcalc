@@ -1003,28 +1003,72 @@ def slip_layer(yield_point):
     raise ValueError(yield_point)
 
 
-def notch_support(rho_p, q_s):
-    """ISO's support at a notch, `1 + √(0.2 ρ' (1 + 2 q_s))` — the numerator
-    of `Y_δrelT` (M56.3.11), the peak's share the root does not feel."""
-    return 1 + math.sqrt(0.2 * rho_p * (1 + 2 * q_s))
+# A coupon's own relative stress gradient is its bar's, `2/d` in bending. ISO
+# does not state one and the library's sources do not state their bar, so the
+# support is taken over a 10 mm bar's and printed beside the R. R. Moore
+# bar's, 7.62 mm (0.3 in), the smaller rotating-beam specimen (recalled).
+COUPON_BARS = {"a round bar": 10.0, "the R. R. Moore bar": 7.62}
+COUPON_BAR = COUPON_BARS["a round bar"]
 
 
-def surface_relative(rz, strong):
-    """ISO's `Y_RrelT` at a root roughness `Rz` µm (M56.3.12): the line for
-    through-hardened steels of `σ_B ≥ 800` MPa, else normalised steels'."""
-    if rz < 1:
-        return 1.120 if strong else 1.070
-    return 1.674 - 0.529 * (rz + 1) ** 0.1 if strong else 5.306 - 4.203 * (rz + 1) ** 0.01
+def notch_support(rho_p, q_s, bar=COUPON_BAR):
+    """ISO's support at the root over the coupon's: `1 + √(ρ' χ)` at the
+    root's gradient `χ = 0.2 (1 + 2 q_s)` /mm, the form inside `Y_δrelT`
+    (M56.3.11), over the same at a round bar's `2/d`. The coupon's endurance
+    already holds its own bar's support, so crediting the root's alone
+    counts that twice."""
+    def support(chi):
+        return 1 + math.sqrt(rho_p * chi)
+
+    return support(0.2 * (1 + 2 * q_s)) / support(2 / bar)
 
 
-# The root roughness ISO's reference test gear has (its `Y_RrelT` = 1): a
-# hobbed root; and a polished coupon's, which every endurance in the library
-# is, on ISO's line for `Rz < 1` µm.
-RZ_REFERENCE = 10.0
-RZ_POLISHED = 0.5
 # Tensile strength, MPa, from which ISO reads a through-hardened steel's
 # surface on its own line rather than a normalised steel's (M56.3.12).
 STRONG_STEEL = 800.0
+# ISO's `Y_RrelT` lines (M56.3.12): `(below Rz 1, a, b, c)`, the factor
+# `a − b (Rz + 1)^c` over `1 ≤ Rz ≤ 40` µm. The first is case-hardened steels'
+# and through-hardened ones' of `σ_B ≥ STRONG_STEEL`, the second normalised
+# steels' below it, the third nitrided steels', which the library has none of.
+SURFACE_LINES = {
+    f"the line for sigma_B {STRONG_STEEL:g} and above": (1.120, 1.674, 0.529, 0.1),
+    f"the line below sigma_B {STRONG_STEEL:g}": (1.070, 5.306, 4.203, 0.01),
+    "the nitrided steels' line": (1.025, 4.299, 3.259, 0.0058),
+}
+# The top of the range ISO's lines are stated over, µm.
+RZ_MAX = 40.0
+
+
+def surface_relative(rz, line):
+    """ISO's `Y_RrelT` at a root roughness `Rz` µm on one of its lines;
+    refused past the range the lines are stated over."""
+    below, a, b, c = SURFACE_LINES[line]
+    if rz > RZ_MAX:
+        raise ValueError(f"Rz {rz} is past ISO's range")
+    return below if rz < 1 else a - b * (rz + 1) ** c
+
+
+# The root roughness ISO's reference test gear has (its `Y_RrelT` = 1): a
+# hobbed root. A coupon's is read on ISO's line below `Rz` 1 µm, as a polished
+# bar's, though no figure in the library states its finish: the steels' are
+# rotating-beam figures, annealed 4340's published and 4340 Hardened's
+# estimated by the classical 0.5 × UTS ratio. Only the steels are read here.
+# Not every endurance is such a coupon: brass's is a 0.30 × UTS estimate,
+# POM's a moulded ASTM D671 bar, the polyamides' 0.30 × ultimate with no
+# specimen, and ISO has no line for any of them.
+RZ_REFERENCE = 10.0
+RZ_POLISHED = 0.5
+# The roots the surface is printed at: ground (a ground root is typically
+# 2–4 µm), ISO's hobbed reference, and the top of ISO's range.
+RZ_ROOTS = (("ground", 3.0), ("hobbed", RZ_REFERENCE), ("the top of ISO's range", RZ_MAX))
+
+
+def surface_line(steel):
+    """The ISO line a through-hardened library steel is read on."""
+    strong, normalised, _ = SURFACE_LINES
+    return strong if steel["uts"] >= STRONG_STEEL else normalised
+
+
 # Marin's surface factor `a σ_u^b` (Shigley's table, recalled and not
 # checked against a copy): ground and machined.
 MARIN = {"ground": (1.58, -0.085), "machined": (4.51, -0.265)}
@@ -1171,21 +1215,62 @@ def summary():
     # By material: what the root feels is the peak over the notch support,
     # against the coupon's endurance times the surface's factor.
     print("By material, external ordinary fillets: rated over felt, less one, %: (1 + bias) n k_s - 1,")
-    print("n ISO's notch support, k_s the root's surface against the polished coupon.")
+    print(f"n ISO's notch support over the coupon's ({COUPON_BAR:g} mm bar), k_s the root's surface"
+          " against the coupon, read as polished.")
+    felt = [r for r in rows if ext(r) and ordinary(r) and "q_s" in r]
     for st in library_steels():
         rho_p = slip_layer(st["yield_"])
-        strong = st["uts"] >= STRONG_STEEL
-        k_s = surface_relative(RZ_REFERENCE, strong) / surface_relative(RZ_POLISHED, strong)
+        line = surface_line(st)
+        k_s = surface_relative(RZ_REFERENCE, line) / surface_relative(RZ_POLISHED, line)
         for label, with_ks in (("support", 1.0), (f"support and a hobbed root, Rz {RZ_REFERENCE:g}", k_s)):
             for key, model in MODELS[:3]:
-                v = [(1 + r[key]) * notch_support(rho_p, r["q_s"]) * with_ks - 1
-                     for r in rows if ext(r) and ordinary(r) and key in r and "q_s" in r]
+                v = [(1 + r[key]) * notch_support(rho_p, r["q_s"]) * with_ks - 1 for r in felt if key in r]
                 print(_row(f"{st['name']}, {label}", model, v))
-        n = _stats([notch_support(rho_p, r["q_s"]) - 1 for r in rows if ext(r) and ordinary(r) and "q_s" in r])
+        n = _stats([notch_support(rho_p, r["q_s"]) - 1 for r in felt])
         marin = " | ".join(f"Marin {fin} {a * st['uts'] ** b:.3f}" for fin, (a, b) in MARIN.items())
         print(f"factors {st['name']} | slip layer {rho_p:.4f} mm | notch support, median {100 * n[1]:.1f} %"
               f" | the coupon over a hobbed root {1 / k_s:.3f} | sigma_u {st['uts']:g} | {marin}")
     print("brass, POM and the polyamides: no support and no surface figure in ISO; the elastic-peak rows are theirs")
+    print()
+
+    # The note on the root's endurance (`docs/state.md`): what omitting the
+    # surface, and the surface with the support, does to the utilisation.
+    print("The coupon's endurance read as the root's, on the steels, by ISO's lines, against the coupon read"
+          " as polished: the allowable used over the root's, and the rating's utilisation over the root's,"
+          " less one, %.")
+    for st in library_steels():
+        line = surface_line(st)
+        for root, rz in RZ_ROOTS:
+            k = surface_relative(rz, line) / surface_relative(RZ_POLISHED, line)
+            print(f"surface {st['name']} | sigma_u {st['uts']:g}, {line} | {root}, Rz {rz:g}"
+                  f" | allowable {100 * (1 / k - 1):+.1f} % | utilisation {100 * (k - 1):+.1f} %")
+    nitrided = list(SURFACE_LINES)[2]
+    k = surface_relative(RZ_REFERENCE, nitrided) / surface_relative(RZ_POLISHED, nitrided)
+    print(f"surface, {nitrided}, no material in the library | hobbed, Rz {RZ_REFERENCE:g}"
+          f" | allowable {100 * (1 / k - 1):+.1f} % | utilisation {100 * (k - 1):+.1f} %")
+    qs = sorted(r["q_s"] for r in felt)
+    teeth = (("the least", qs[0]), ("the median", _stats(qs)[1]), ("the most", qs[-1]))
+    print(f"With ISO's notch support over the coupon's, a hobbed root, Rz {RZ_REFERENCE:g}, at the external"
+          " ordinary fillets' q_s:")
+    for st in library_steels():
+        rho_p = slip_layer(st["yield_"])
+        line = surface_line(st)
+        k = surface_relative(RZ_REFERENCE, line) / surface_relative(RZ_POLISHED, line)
+        for bar, d in COUPON_BARS.items():
+            for tooth, q in teeth if d == COUPON_BAR else teeth[1:2]:
+                n = notch_support(rho_p, q, d)
+                print(f"pair {st['name']} | slip layer {rho_p:.4f} mm | {bar} of {d:g} mm, gradient {2 / d:.3f} /mm"
+                      f" | {tooth} q_s {q:.2f} | surface {100 * (k - 1):+.1f} % | support {100 * (n - 1):+.1f} %"
+                      f" | utilisation {100 * (k * n - 1):+.1f} %")
+    # A figure reduced from load to stress by ISO's rating carries ISO's
+    # stress over the default's at the same load.
+    both = [r for r in rows if ext(r) and ordinary(r) and "db" in r and "iso" in r]
+    iso_med, db_med = _stats([r["iso"] for r in both])[1], _stats([r["db"] for r in both])[1]
+    lo, med, hi, _, _ = _stats([(1 + r["iso"]) / (1 + r["db"]) - 1 for r in both])
+    print(f"gear root, external ordinary fillets: over the peak, median | ISO {100 * iso_med:+.1f} %"
+          f" | the default {100 * db_med:+.1f} %")
+    print(f"gear root, external ordinary fillets: ISO over the default, tooth by tooth | least {100 * lo:+.1f} %"
+          f" | median {100 * med:+.1f} % | most {100 * hi:+.1f} %")
     print()
     print("Hardness / 3 (Tabor) against the library's own yield and ultimate:")
     for st in library_steels():

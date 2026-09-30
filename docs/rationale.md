@@ -1588,8 +1588,8 @@ read one way, the lower allowable, and the member says it read it so.
 
 **No `R = 0` allowable is derived from these figures by Goodman.** It would put
 4340 Hardened near 1000 MPa, 1.27–1.68× ISO 6336-5's `σ_FE` band and 2.5–3.3×
-AGMA 2001's `s_at`: a polished coupon's endurance carries no notch, surface,
-size or reliability reduction, and uplifting it moves further from a gear root
+AGMA 2001's `s_at`: a coupon's endurance carries no notch, surface, size or
+reliability reduction, and uplifting it moves further from a gear root
 than leaving it. The general-`R` form replaces the switch only once a stored
 figure is a root allowable, and it needs a UTS the library does not carry for
 the steels.

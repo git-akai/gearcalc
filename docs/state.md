@@ -748,8 +748,10 @@ whose size is unmeasured is a debt still owed, and is marked as one.
   figure.** Every figure the library states a ratio for is `R = −1` on a
   coupon, and a one-way root endures more: under Goodman the `R = 0` peak is
   `2/(1 + S_e/S_u)` of it, 1.33–1.54× across the library. So one-way bending
-  is **conservative** by that factor, before the coupon's missing notch,
-  surface, size and reliability reductions, which run the other way.
+  is **conservative** by that factor, before the coupon's missing notch, size
+  and reliability reductions, which run the other way, and its surface's,
+  which does on the steels and is of unknown sign elsewhere (the entry on a
+  coupon's endurance, below).
 - **The steels' fatigue figures against ISO 6336-5's `σ_FE`** (the gear-root,
   `R = 0` endurance ISO's `σ_F` is judged against): 4340 Hardened's 750 MPa
   sits inside the through-hardened band at its hardness, 513–790, so its net
@@ -820,20 +822,20 @@ whose size is unmeasured is a debt still owed, and is marked as one.
 <!-- figures: tools/fillet_bem.py -->
 | Material, external ordinary fillets | Credited beside the peak | Model | Teeth rated | Least | Median | Most | Under, % |
 |---|---|---|---|---|---|---|---|
-| 4340 Hardened | ISO's notch support | the default | 85 | −26.4 | −11.2 | +11.4 | 86 |
-| 4340 Hardened | ISO's notch support | ISO | 85 | −3.3 | +10.9 | +29.2 | 4 |
-| 4340 Hardened | support, and a hobbed root, Rz 10, against the polished coupon | the default | 85 | −34.2 | −20.6 | −0.4 | 100 |
-| 4340 Hardened | the same | the default without its axial term | 85 | −18.9 | −9.0 | +7.1 | 88 |
-| 4340 Hardened | the same | ISO | 85 | −13.5 | −0.8 | +15.5 | 55 |
-| 4340 annealed | ISO's notch support | the default | 85 | −13.8 | +0.9 | +25.4 | 46 |
-| 4340 annealed | support, and a hobbed root, Rz 10, against the polished coupon | the default | 85 | −19.4 | −5.6 | +17.3 | 71 |
-| 4340 annealed | the same | ISO | 85 | +2.6 | +16.9 | +41.5 | 0 |
+| 4340 Hardened | ISO's notch support, over the coupon's | the default | 85 | −27.7 | −12.7 | +9.5 | 88 |
+| 4340 Hardened | ISO's notch support, over the coupon's | ISO | 85 | −4.9 | +9.1 | +27.0 | 6 |
+| 4340 Hardened | support, and a hobbed root, Rz 10, against the coupon read as polished | the default | 85 | −35.3 | −21.9 | −2.0 | 100 |
+| 4340 Hardened | the same | the default without its axial term | 85 | −20.2 | −10.5 | +5.3 | 91 |
+| 4340 Hardened | the same | ISO | 85 | −15.0 | −2.5 | +13.6 | 61 |
+| 4340 annealed | ISO's notch support, over the coupon's | the default | 85 | −19.8 | −6.2 | +16.6 | 72 |
+| 4340 annealed | support, and a hobbed root, Rz 10, against the coupon read as polished | the default | 85 | −25.0 | −12.2 | +9.1 | 91 |
+| 4340 annealed | the same | ISO | 85 | −4.6 | +8.7 | +31.6 | 6 |
 
 <!-- figures: tools/fillet_bem.py -->
-| Material | Slip layer `ρ′`, mm | Notch support, median, % | Polished coupon over a hobbed root | `σ_u`, MPa | Marin, ground | Marin, machined |
+| Material | Slip layer `ρ′`, mm | Notch support over the coupon's, median, % | The coupon, read as polished, over a hobbed root | `σ_u`, MPa | Marin, ground | Marin, machined |
 |---|---|---|---|---|---|---|
-| 4340 annealed | 0.0281 | 18.5 | 1.069 | 690 | 0.906 | 0.798 |
-| 4340 Hardened | 0.0014 | 4.1 | 1.118 | 1500 | 0.849 | 0.649 |
+| 4340 annealed | 0.0281 | 10.3 | 1.069 | 690 | 0.906 | 0.798 |
+| 4340 Hardened | 0.0014 | 2.4 | 1.118 | 1500 | 0.849 | 0.649 |
 
 <!-- figures: tools/fillet_bem.py -->
 | Hardness over three, as a yield it is not | HV | A third of it, MPa | Yield, MPa | Over the yield, % | Ultimate, MPa | Over the ultimate, % |
@@ -849,15 +851,106 @@ whose size is unmeasured is a debt still owed, and is marked as one.
   `Y_S` continued past its `q_s` clamp comes nearest. Rings the default
   underrates and ISO overrates. ISO's slip layer is read by yield point for
   through-hardened steel and the surface factor by `Rz` (IACS UR M56, which
-  reproduces ISO 6336-3); Marin's factors are recalled, not checked against a
-  copy. Brass, POM and the polyamides have neither figure in ISO, so the
-  elastic rows are theirs, with the support (conservative) and the surface
-  (unconservative) unmeasured. A surface factor needs a root roughness or
-  finish per gear, and an ultimate strength and a heat-treatment class per
-  material; none is a field today. Hardness ÷ 3 is read nowhere in the crate
+  reproduces ISO 6336-3); the support is credited over the coupon's own, a
+  round bar's, since the coupon's endurance already holds that; Marin's
+  factors are recalled, not checked against a copy. Brass, POM and the
+  polyamides have neither figure in ISO, so the elastic rows are theirs, with
+  the support unmeasured (its omission conservative) and the surface's size
+  and sign unknown. No surface term is applied, and the entry below says why
+  and what that leaves. Hardness ÷ 3 is read nowhere in the crate
   or the library as a yield — each yield is its datasheet's; it estimates the
   ultimate. Which model is the default is the owner's
   (`work/decision-bending-default.md`).
+
+- **A coupon's endurance is taken as the root's: no surface term and no notch
+  support.** A `fatigue_allowable` measured on a coupon is read as the root's
+  own, whatever the root's finish or route. On the steels, ISO 6336-3's lines
+  (IACS UR M56.3.11–12) give the size, and `tools/fillet_bem.py` prints it in
+  the tables below: the allowable used over the root's, and the rating's
+  utilisation over the root's, each less one, in percent — **a negative
+  utilisation is unconservative**. The first is the surface alone, against
+  the coupon read as polished (ISO's line below `Rz` 1 µm): at a hobbed root,
+  ISO's reference, 4340 Hardened (`σ_u` ≥ 800 MPa, ISO's first line) is
+  judged against an allowable that much **high**, so its utilisation is that
+  much **low**, and annealed 4340 (the second line) by less; a ground root and
+  one at the top of ISO's range sit either side. The second takes the surface
+  with the notch support ISO pairs it with, measured from the coupon's own
+  gradient (a round bar's, with the R. R. Moore bar's beside it), at the
+  median external ordinary tooth's `q_s` and at that band's least and most.
+  The omission leaves the utilisation **low** on 4340 Hardened at every `q_s`
+  (unconservative) and **high** on annealed 4340 at the median
+  (conservative): on the softer steel the omitted support outweighs the
+  omitted surface, except at the least `q_s`, where the two nearly cancel and
+  the utilisation is low. The support grows with `q_s`.
+
+<!-- figures: tools/fillet_bem.py -->
+| The surface alone, against the coupon read as polished | ISO's line | Root | `Rz`, µm | Allowable used over the root's, % | Utilisation, % |
+|---|---|---|---|---|---|
+| 4340 Hardened, `σ_u` 1500 MPa | `σ_B` 800 MPa and above | ground | 3 | +5.0 | −4.8 |
+| 4340 Hardened | the same | hobbed, ISO's reference | 10 | +11.8 | −10.6 |
+| 4340 Hardened | the same | the top of ISO's range | 40 | +23.5 | −19.0 |
+| 4340 annealed, `σ_u` 690 MPa | below `σ_B` 800 MPa | ground | 3 | +2.5 | −2.4 |
+| 4340 annealed | the same | hobbed, ISO's reference | 10 | +6.9 | −6.4 |
+| 4340 annealed | the same | the top of ISO's range | 40 | +13.3 | −11.8 |
+| no material in the library | nitrided steels' | hobbed, ISO's reference | 10 | +3.1 | −3.0 |
+
+<!-- figures: tools/fillet_bem.py -->
+| With ISO's notch support, a hobbed root | Slip layer `ρ′`, mm | The coupon's bar, mm | Its gradient, /mm | External ordinary fillets | `q_s` | Surface, % | Support over the coupon's, % | Utilisation, % |
+|---|---|---|---|---|---|---|---|---|
+| 4340 Hardened | 0.0014 | 10 | 0.2 | the least `q_s` | 1.28 | −10.6 | +1.5 | −9.3 |
+| 4340 Hardened | 0.0014 | 10 | 0.2 | the median | 2.55 | −10.6 | +2.4 | −8.4 |
+| 4340 Hardened | 0.0014 | 10 | 0.2 | the most | 4.71 | −10.6 | +3.7 | −7.3 |
+| 4340 Hardened | 0.0014 | 7.62, R. R. Moore's | 0.262 | the median | 2.55 | −10.6 | +2.2 | −8.6 |
+| 4340 annealed | 0.0281 | 10 | 0.2 | the least `q_s` | 1.28 | −6.4 | +6.2 | −0.7 |
+| 4340 annealed | 0.0281 | 10 | 0.2 | the median | 2.55 | −6.4 | +10.3 | +3.1 |
+| 4340 annealed | 0.0281 | 10 | 0.2 | the most | 4.71 | −6.4 | +15.5 | +8.1 |
+| 4340 annealed | 0.0281 | 7.62, R. R. Moore's | 0.262 | the median | 2.55 | −6.4 | +9.1 | +2.1 |
+
+  On brass, POM and the polyamides no figure exists, and **the sign is
+  unknown**. Nor are all the library's endurances polished coupons. The
+  steels' are read as polished, which neither states: annealed 4340's is a
+  published rotating-beam figure, 4340 Hardened's the classical 0.5 × UTS
+  estimate of one. Brass's is a 0.30 × ultimate estimate of a rotating-beam
+  figure, POM's an ASTM D671 moulded bar, and the polyamides' are 0.30 ×
+  ultimate conventions with no specimen: the library states
+  `fatigue_specimen = "coupon"` and `R = −1` for the steels, the brass and
+  POM, and neither for the polyamides. Where polymer routes were measured, in
+  tension–compression, the surface's share was about nil (as-built against
+  moulded PA12, cracks starting at pores, which the authors tie to the axial
+  load; a second study found a sintered surface's contribution negligible
+  against a finished one), or ran against the roughness (an as-built notch
+  outlived a machined one, at a finite life). No measurement on a polymer
+  root in bending was found. Both sit beside a root-temperature effect of
+  more than 14 % in stress between 30 and 70 °C (about 22–30 % on an assumed
+  S-N slope; every 30 °C gear ran out), which the tool does not model.
+
+  A formed, treated or porous root (as built by additive manufacture, as
+  cast, sintered, peened, rolled, or ground after hardening) moves its
+  endurance by tens of percent either way (10–75 %, recalled and not checked
+  against a source), through residual stress, density, skin and defects that
+  no roughness figure carries. The endurance for such a root should be one
+  measured on it (`fatigue_specimen = "gear_root"`,
+  [reference](reference.md#materials)), reduced from load to stress by this
+  tool's own model: ISO's `σ_FE`, reduced from a pulsator's load by ISO's own
+  stress, sits on a stress above the default's by the table below, at the
+  median ordinary fillet and tooth by tooth; entered as it stands, it rates
+  the root too strong by that gap.
+
+<!-- figures: tools/fillet_bem.py -->
+| A `gear_root` figure reduced from a load by ISO's stress, external ordinary fillets | |
+|---|---|
+| ISO's rating and the default's over the peak, median, % | +6.4 · −15.0 |
+| ISO's rating over the default's, tooth by tooth: least, median, most, % | −6.5 · +24.2 · +72.7 |
+
+  ISO's factor is declined because it has no line off iron and steel. A line
+  chosen for a non-metal sets the answer by the choice (the first table's
+  three lines at a hobbed root) where the one measured polymer comparison
+  shows nil, and applied to steels alone it puts a steel design and a
+  non-steel one on different bases. A roughness term with no material length
+  (the profile's elastic `K_t`) is declined because it takes 34–65 % off a
+  hobbed steel root, several times what ISO's lines take. The argument, and
+  the owner's rule it answers (no new material properties), are
+  `work/surface-factor.md`'s.
 
 - **The axial compression term is applied**, being the second term of the `J`
   whose first term is `Y_F`. It relieved the canary by 10.1 % and 12.2 %, which
@@ -1305,7 +1398,7 @@ its arithmetic. Clause 5.4.3:
 | `Y_ST` | 2.0, the reference test gears' own stress correction (7.4) | Meaningful only against a `σ_Flim` quoted with it |
 | `Y_NT` | life factor, S-N interpolation (Clause 12) | Needs the two S-N points `σ_Flim` carries |
 | `Y_δrelT` | relative notch sensitivity (Clause 13) | The ratio of this gear's notch sensitivity to the test gear's — a *relative* factor with no meaning away from that test gear |
-| `Y_RrelT` | relative surface factor (Clause 14) | Likewise, and needs a fillet roughness this tool does not model |
+| `Y_RrelT` | relative surface factor (Clause 14) | Likewise, and declined on its own terms: it has no line off iron and steel, so a coupon's endurance is read as the root's with the omission's size and sign recorded ([known-approximate](#known-approximate-documented-at-the-call-site)) |
 | `Y_X` | size factor (Clause 15) | Likewise relative |
 | `S_Fmin` | minimum safety factor | A contract between manufacturer and customer (Clause 4), not a property of a gear |
 

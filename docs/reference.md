@@ -3181,6 +3181,36 @@ E*         1/E* = (1−ν₁²)/E₁ + (1−ν₂²)/E₂
 allowables ultimate_allowable, fatigue_allowable — what an ultimate and a fatigue case are judged against
 ```
 
+A fatigue figure says what it was measured at, where its source does:
+
+```text
+fatigue_load_ratio   "reversed" (R = −1) or "pulsating" (R = 0)
+fatigue_specimen     "coupon"      a test bar: a rotating beam, a moulded flexural bar
+                     "gear_root"   a gear's own tooth root, as ISO 6336-5's σ_FE is
+```
+
+The two keys decide only which part of the figure a fully reversed root is
+judged against ([tooth cycles](#tooth-cycles)): a reversed figure as it
+stands; anything else at 0.7 when `reversed_bending` asks — a pulsating
+figure on a gear root by ISO's own convention, and a pulsating coupon or a
+figure that states neither key as the lower reading, which the member says.
+**Nothing else reads the specimen.** No surface, notch-support or size term is
+applied to either kind, so a coupon's endurance is read as the root's own,
+whatever the root's finish or route; the size and sign of that are in
+[state](state.md#known-approximate-documented-at-the-call-site).
+
+**`gear_root` is how an endurance measured on the route's own root is
+stated** — a root as built by additive manufacture, as cast, sintered,
+peened, rolled or ground after hardening, whose endurance such a route moves
+by more than any roughness figure carries. Enter it as a library entry or in
+a member's `material_overrides`, with `fatigue_specimen = "gear_root"` and the
+load ratio it was run at. Reduce the test's load to a stress by this tool's
+own bending rating — the test gear rated here at the load it endured — and
+not by ISO's: a `σ_FE` taken off a pulsator by ISO's stress sits above what
+the default rates at the same load, by the gap
+[state](state.md#known-approximate-documented-at-the-call-site) gives, and
+entered as it stands it carries that gap: the root rated too strong.
+
 Stored SI (density in kg/m³) and displayed in the domain's own units, with the
 two deliberate exceptions of mm for length and MPa for stress.
 
