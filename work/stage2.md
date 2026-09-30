@@ -39,3 +39,25 @@ The audit's Phase 2 exit, plus:
   - Runs after Q9, whose independent bending gate rebuilds DB.
 - **Also from it:** hardness ÷ 3 estimates σ_u, not σ_y (reading it as σ_y is 10–60 % unconservative).
   Check every place the crate or its material notes derive σ_y from hardness.
+
+## Carried
+From Q9, to Stage 4 (the audit's T16.31 and the survivor re-run are there):
+- **T16.13 item 2:** ISO 6336-3 Method B as a gate on the instrument's 30° tangent section at
+  the highest point of single-pair contact. `tools/iso_6336_3_stack.py` reproduces the tool's ISO
+  set to 1e-8 as an analysis run by hand; making it a CI gate means a recorded case list and a
+  derived tolerance, as `bending_gate.py` has.
+- **T16.13 item 3:** the rack-limit checks in `tests/bending.rs` (z = 4000 at 5e-3, the parabola
+  at 1e-2) replaced by Richardson extrapolation of `s`, `h` and `Y_F` from z = 8000 and 16,000 to
+  1e-5, over x ∈ {−0.3, 0, 0.5}, h_f ∈ {1.0, 1.4}, h_a ∈ {0.8, 1.0}.
+- **The absence gate's Stage 3 entries in gear-core:** five sites are tagged for redesigns C
+  (the absorbers' ±5 shift bounds) and K (the 0.02 mm clearance band, the thickness 1.0), so
+  "green over all of gear-core" at Stage 2's exit reads as: no gear-core entry tagged Stage 2
+  remains (`tools/allow_absence.txt`).
+- **The Lewis section at a narrow tip loaded steeply at its tip** (owner's call): the largest
+  parabola that fits touches the flank just under its vertex, which the search now finds. Loaded
+  at the tip, as `gear-cli matrix` loads every design, that moved parabola `Y_F` over the 30°
+  tangent's from at most 1.31 to at most 13.7 (21 % of external designs on the flank, from 13 %);
+  at the rating's own load point it left three clean members of `rating_laws`'s grid with a
+  section Dolan–Broghamer cannot read (`Y_F − axial ≤ 0`), which are now unrated. No train
+  rating in the corpus moved. Whether the section should be sought only below the load point is
+  a model question, not a search one.
