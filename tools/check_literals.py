@@ -17,7 +17,12 @@ empties the list.
 Read: every float literal (a decimal point, an exponent or an `f32`/`f64`
 suffix; underscores allowed) in production code, as `tools/rust_source.py`
 reads it — comments and strings blanked, `#[cfg(test)]` items and test-only
-module files left out. Exactly zero is not a tolerance and is not read.
+module files left out. Exactly zero is not a tolerance and is not read. So is
+**a run of literals joined by `*` or `/`**, `1e-3 / 4.0` or `x / 2.0 /
+1000.0`, which is one constant however it is spelt: its value is taken left
+to right, inverted where the run follows a `/`, and it is read where no
+literal in it is small on its own. A lone divisor (`x / 1000.0`) is a unit
+and is not read.
 
 The list is keyed by file, function and literal, with a count, and must match
 what is found **exactly**: a new site fails, and so does a listed one that is
@@ -75,11 +80,34 @@ def named_spans(code):
     return out
 
 
+# A run of numeric literals joined by `*` or `/`: one constant, however it is
+# spelt.
+LITERAL = r"\d[\d_]*(?:\.\d[\d_]*)?(?:[eE][+-]?\d[\d_]*)?(?:_?f(?:32|64))?"
+RUN = re.compile(rf"(?<![\w.])(?P<pre>/\s*)?(?P<run>{LITERAL}(?:\s*[*/]\s*{LITERAL})+)(?![\w.])")
+
+
+def run_value(run, divided):
+    """What a run multiplies by, evaluated left to right as Rust does, and
+    inverted where the run itself follows a `/`."""
+    parts = re.split(r"\s*([*/])\s*", run)
+    ops = ["/" if divided else "*"] + parts[1::2]
+    v = 1.0
+    for op, lit in zip(ops, parts[0::2]):
+        x = value(lit)
+        if x == 0 and op == "/":
+            return None
+        v = v * x if op == "*" else v / x
+    return v
+
+
 def sites(sources):
-    """`(file, function, literal, line)` of every unnamed small literal."""
+    """`(file, function, literal, line)` of every unnamed small literal, and
+    of every run of literals whose product falls small with none of its own
+    literals small."""
     out = []
     for s in sources:
         named = named_spans(s.code)
+        unnamed = lambda at: not s.in_test(at) and not any(a <= at < b for a, b in named)
         for m in FLOAT.finditer(s.code):
             text = m.group(1)
             if not is_float(text):
@@ -87,10 +115,20 @@ def sites(sources):
             v = value(text)
             if v == 0 or v >= BELOW:
                 continue
-            at = m.start()
-            if s.in_test(at) or any(a <= at < b for a, b in named):
+            if unnamed(m.start()):
+                out.append((s.rel, s.function(m.start()), text, s.line(m.start())))
+        for m in RUN.finditer(s.code):
+            run = m.group("run")
+            lits = re.split(r"\s*[*/]\s*", run)
+            if not any(is_float(x) for x in lits) or any(0 < value(x) < BELOW for x in lits):
                 continue
-            out.append((s.rel, s.function(at), text, s.line(at)))
+            v = run_value(run, bool(m.group("pre")))
+            if v is None or v == 0 or abs(v) >= BELOW:
+                continue
+            at = m.start("run")
+            if unnamed(at):
+                text = ("/ " if m.group("pre") else "") + re.sub(r"\s*([*/])\s*", r" \1 ", run)
+                out.append((s.rel, s.function(at), text, s.line(at)))
     return out
 
 
@@ -179,6 +217,7 @@ mod tests {
 fn after_the_tests() { let _ = 1e-11; }
 fn with_array(pair: &dyn Fn([f64; 2]) -> f64) -> f64 { 1e-5 }
 fn generic<const N: usize>(x: f64) -> f64 { let y = x * 1e-7; y }
+fn arithmetic(x: f64) -> f64 { x * 1e-3/4.0 + x * 0.5 * 0.001 + x / 2.0 / 1000.0 + x / 1000.0 + 2.0 * 3.0 + 1e3 * 1e-4 }
 const RANGE: Range<f64> = 3e-6..1.0;
 #[cfg(test)]
 fn test_only() { let _ = 1e-12; }
@@ -189,6 +228,8 @@ WANT = sorted([
     ("flagged", "1e-9_f64"), ("flagged", "0.000_1"), ("flagged", "3e-4"),
     ("lifetimes", "1e-6"), ("not_a_const_item", "1e-8"), ("looks_named", "1e-10"),
     ("after_the_tests", "1e-11"), ("with_array", "1e-5"), ("generic", "1e-7"),
+    ("arithmetic", "1e-3 / 4.0"), ("arithmetic", "0.5 * 0.001"), ("arithmetic", "/ 2.0 / 1000.0"),
+    ("arithmetic", "1e-4"),
 ])
 
 
@@ -221,6 +262,9 @@ def self_test():
         ("not_a_const_item", "1e-8", "a `const fn` body"),
         ("with_array", "1e-5", "a function whose signature holds `[f64; 2]`, keyed by its name"),
         ("generic", "1e-7", "a function with a const generic parameter, which names nothing"),
+        ("arithmetic", "1e-3 / 4.0", "a quotient of literals none of which is small"),
+        ("arithmetic", "0.5 * 0.001", "a product of literals at and above 1e-3"),
+        ("arithmetic", "/ 2.0 / 1000.0", "a run that divides, after a `/`"),
     ):
         expect(f"found: {why}", (fn, lit) in got)
     for lit, why in (("1e-12", "test code"), ("1e-3", "1e-3 itself"), ("2e-5", "a const struct literal"),

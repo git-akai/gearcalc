@@ -1,9 +1,19 @@
 # Numbers standing for "none" in production code (tools/check_absence.py):
 # `unwrap_or(<literal>)`, `map_or(<literal>, …)`, the same through a closure,
 # and INFINITY, NEG_INFINITY or NAN used as a value, on a line that does not
-# say `// absence: <why>`. Each goes when it becomes an Option or a named
-# refusal, or its line says why it is not an absence. gear-core's go by Stage
-# 2's exit (work/stage2.md). The list must match what the check finds exactly.
+# say `// absence: <why>`. A literal includes an integer's end (`usize::MAX`).
+# The list must match what the check finds exactly.
+#
+# The stage that empties each entry:
+#   Stage 2 (Q3)                      becomes an Option or a named refusal; gear-core's
+#                                     entries are empty at Stage 2's exit (work/stage2.md)
+#   Stage 2 (Q3): needs a stated reason
+#                                     a fold's identity (verify.rs's minima and maxima) or a
+#                                     physical infinity (a line contact's semi-axis, a straight
+#                                     segment's radius): kept as a value, its line says why
+#   Stage 3 (C) / (K)                 a rule of thumb one of the plan's redesigns replaces:
+#                                     C the absorbers' bounds, K the clearance band and thickness
+#   Stage 2 (Q4), Stage 4 (harness)   the file reader's, and the development harness's
 #
 # file	function	site	count	stage that empties it
 crates/gear-cli/src/identity.rs	edits_of	unwrap_or(0)	1	Stage 4 (harness)
@@ -38,6 +48,7 @@ crates/gear-cli/src/matrix.rs	rank_correlation	NAN	1	Stage 4 (harness)
 crates/gear-core/src/auto.rs	admissible_angular_shift	INFINITY	2	Stage 2 (Q3)
 crates/gear-core/src/auto.rs	automatic_profile_shift	map_or(0.0)	1	Stage 2 (Q3)
 crates/gear-core/src/auto.rs	maximise	INFINITY	1	Stage 2 (Q3)
+crates/gear-core/src/auto.rs	refined	unwrap_or(i32::MAX)	1	Stage 2 (Q3)
 crates/gear-core/src/auto.rs	searchable_shift_where	unwrap_or(f64::NAN)	1	Stage 2 (Q3)
 crates/gear-core/src/auto.rs	searchable_shift_where	unwrap_or(f64::NEG_INFINITY)	1	Stage 2 (Q3)
 crates/gear-core/src/contact.rs	efficient_split	map_or(f64::NAN)	1	Stage 2 (Q3)
@@ -46,7 +57,7 @@ crates/gear-core/src/gear.rs	amplitude_for_throw	map_or(f64::NAN)	1	Stage 2 (Q3)
 crates/gear-core/src/gear.rs	amplitude_for_throw	unwrap_or(0.0)	2	Stage 2 (Q3)
 crates/gear-core/src/gear.rs	centre_profile	unwrap_or(0)	1	Stage 2 (Q3)
 crates/gear-core/src/hertz.rs	aspect_ratio	NAN	1	Stage 2 (Q3)
-crates/gear-core/src/hertz.rs	elliptical_contact	INFINITY	2	Stage 2 (Q3)
+crates/gear-core/src/hertz.rs	elliptical_contact	INFINITY	2	Stage 2 (Q3): needs a stated reason
 crates/gear-core/src/hertz.rs	peak_pressure	map_or(0.0)	1	Stage 2 (Q3)
 crates/gear-core/src/metrology.rs	pin_diameter_range_around	INFINITY	1	Stage 2 (Q3)
 crates/gear-core/src/ring.rs	solve_root_end	unwrap_or(0.0)	1	Stage 2 (Q3)
@@ -60,28 +71,35 @@ crates/gear-core/src/strength.rs	fillet_bracket	map_or((0.0,0.0))	1	Stage 2 (Q3)
 crates/gear-core/src/strength.rs	fillet_junction	map_or(0.0)	1	Stage 2 (Q3)
 crates/gear-core/src/strength.rs	fillet_root	map_or(0.0)	1	Stage 2 (Q3)
 crates/gear-core/src/tooth.rs	check_severed	NAN	2	Stage 2 (Q3)
-crates/gear-core/src/tooth.rs	rolling_curvature_radius_turning	INFINITY	1	Stage 2 (Q3)
+crates/gear-core/src/tooth.rs	rolling_curvature_radius_turning	INFINITY	1	Stage 2 (Q3): needs a stated reason
+crates/gear-core/src/train/arrangements.rs	external	unwrap_or(i32::MAX)	1	Stage 2 (Q3)
+crates/gear-core/src/train/arrangements.rs	planetary	unwrap_or(i32::MAX)	1	Stage 2 (Q3)
 crates/gear-core/src/train/arrangements.rs	push_distance	map_or(0.0)	1	Stage 2 (Q3)
-crates/gear-core/src/train/arrangements.rs	push_distance	map_or(0.02)	2	Stage 2 (Q3)
+crates/gear-core/src/train/arrangements.rs	push_distance	map_or(0.02)	2	Stage 3 (K): the clearance band becomes a per-member thickness allowance
 crates/gear-core/src/train/arrangements.rs	with_additional_helix	map_or(0.0)	1	Stage 2 (Q3)
 crates/gear-core/src/train/conditions.rs	read	map_or(0.0)	1	Stage 2 (Q3)
+crates/gear-core/src/train/edits.rs	carriers	unwrap_or(usize::MAX)	1	Stage 2 (Q3)
 crates/gear-core/src/train/flow.rs	known_at	unwrap_or(0.0)	1	Stage 2 (Q3)
 crates/gear-core/src/train/groupings.rs	flow	unwrap_or(f64::INFINITY)	1	Stage 2 (Q3)
 crates/gear-core/src/train/mod.rs	case_mobility	map_or(0)	1	Stage 2 (Q3)
 crates/gear-core/src/train/mod.rs	note	unwrap_or(1)	1	Stage 2 (Q3)
+crates/gear-core/src/train/mod.rs	note	unwrap_or(u32::MAX)	5	Stage 2 (Q3)
 crates/gear-core/src/train/mod.rs	paths_of	map_or((0.0,0.0))	1	Stage 2 (Q3)
 crates/gear-core/src/train/mod.rs	paths_of	map_or(0.0)	1	Stage 2 (Q3)
 crates/gear-core/src/train/mod.rs	relieve_case	unwrap_or(0.0)	1	Stage 2 (Q3)
 crates/gear-core/src/train/mod.rs	shift_asked	map_or(0.0)	1	Stage 2 (Q3)
 crates/gear-core/src/train/mod.rs	shift_asked	unwrap_or(0.0)	1	Stage 2 (Q3)
+crates/gear-core/src/train/mod.rs	solve_parts	map_or(usize::MAX)	1	Stage 2 (Q3)
+crates/gear-core/src/train/mod.rs	solve_parts	unwrap_or(u32::MAX)	3	Stage 2 (Q3)
 crates/gear-core/src/train/mod.rs	speed	map_or(0.0)	1	Stage 2 (Q3)
 crates/gear-core/src/train/mod.rs	torque	map_or(0.0)	1	Stage 2 (Q3)
+crates/gear-core/src/train/preview.rs	whole	unwrap_or(u32::MAX)	1	Stage 2 (Q3)
 crates/gear-core/src/train/shape.rs	absorb	INFINITY	1	Stage 2 (Q3)
 crates/gear-core/src/train/shape.rs	absorb	NAN	2	Stage 2 (Q3)
 crates/gear-core/src/train/shape.rs	absorb	NEG_INFINITY	1	Stage 2 (Q3)
 crates/gear-core/src/train/shape.rs	absorb	map_or(1.0)	1	Stage 2 (Q3)
-crates/gear-core/src/train/shape.rs	absorb	unwrap_or(-5.0)	1	Stage 2 (Q3)
-crates/gear-core/src/train/shape.rs	absorb	unwrap_or(5.0)	1	Stage 2 (Q3)
+crates/gear-core/src/train/shape.rs	absorb	unwrap_or(-5.0)	1	Stage 3 (C): an absorber's bounds come from the closure decomposition, not a guess
+crates/gear-core/src/train/shape.rs	absorb	unwrap_or(5.0)	1	Stage 3 (C): an absorber's bounds come from the closure decomposition, not a guess
 crates/gear-core/src/train/shape.rs	absorbers	map_or(1.0)	1	Stage 2 (Q3)
 crates/gear-core/src/train/shape.rs	chosen_at	map_or(1.0)	1	Stage 2 (Q3)
 crates/gear-core/src/train/shape.rs	count_of	map_or(1)	1	Stage 2 (Q3)
@@ -96,18 +114,20 @@ crates/gear-core/src/train/shape.rs	resolved_helices	unwrap_or(f64::NAN)	1	Stage
 crates/gear-core/src/train/shape.rs	shaft_angle_of	map_or(0.0)	1	Stage 2 (Q3)
 crates/gear-core/src/train/shape.rs	shift_sum	map_or(1.0)	1	Stage 2 (Q3)
 crates/gear-core/src/train/shape.rs	sized	map_or(f64::NAN)	1	Stage 2 (Q3)
-crates/gear-core/src/train/shape.rs	thickness_mods	unwrap_or(1.0)	1	Stage 2 (Q3)
+crates/gear-core/src/train/shape.rs	thickness_mods	unwrap_or(1.0)	1	Stage 3 (K): thickness becomes a per-member allowance
 crates/gear-core/src/train/shape.rs	tip_holds	unwrap_or(f64::NAN)	1	Stage 2 (Q3)
 crates/gear-core/src/train/shape.rs	tip_room	map_or(f64::INFINITY)	1	Stage 2 (Q3)
 crates/gear-core/src/train/shape.rs	tip_room	map_or(f64::NAN)	1	Stage 2 (Q3)
 crates/gear-core/src/train/shape.rs	tooth_sum	map_or(1.0)	1	Stage 2 (Q3)
 crates/gear-core/src/train/wiring.rs	paths_seen	unwrap_or(1)	1	Stage 2 (Q3)
-crates/gear-core/src/verify.rs	check_cut	INFINITY	3	Stage 2 (Q3)
-crates/gear-core/src/verify.rs	check_ring_cut	INFINITY	1	Stage 2 (Q3)
-crates/gear-core/src/verify.rs	fillet_envelope_error	INFINITY	1	Stage 2 (Q3)
-crates/gear-core/src/verify.rs	rack_travel_range	INFINITY	1	Stage 2 (Q3)
-crates/gear-core/src/verify.rs	rack_travel_range	NEG_INFINITY	1	Stage 2 (Q3)
-crates/gear-core/src/verify.rs	ring_cut_envelope_spans	INFINITY	1	Stage 2 (Q3)
-crates/gear-core/src/verify.rs	sdf_matches_polyline	INFINITY	2	Stage 2 (Q3)
-crates/gear-core/src/verify.rs	sdf_matches_polyline	NEG_INFINITY	1	Stage 2 (Q3)
+crates/gear-core/src/verify.rs	check_cut	INFINITY	3	Stage 2 (Q3): needs a stated reason
+crates/gear-core/src/verify.rs	check_ring_cut	INFINITY	1	Stage 2 (Q3): needs a stated reason
+crates/gear-core/src/verify.rs	fillet_envelope_error	INFINITY	1	Stage 2 (Q3): needs a stated reason
+crates/gear-core/src/verify.rs	rack_travel_range	INFINITY	1	Stage 2 (Q3): needs a stated reason
+crates/gear-core/src/verify.rs	rack_travel_range	NEG_INFINITY	1	Stage 2 (Q3): needs a stated reason
+crates/gear-core/src/verify.rs	ring_cut_envelope_spans	INFINITY	1	Stage 2 (Q3): needs a stated reason
+crates/gear-core/src/verify.rs	sdf_matches_polyline	INFINITY	2	Stage 2 (Q3): needs a stated reason
+crates/gear-core/src/verify.rs	sdf_matches_polyline	NEG_INFINITY	1	Stage 2 (Q3): needs a stated reason
+crates/gear-io/src/dxf.rs	polyline	unwrap_or(i32::MAX)	1	Stage 2 (Q4)
+crates/gear-io/src/dxf.rs	table_head	unwrap_or(i32::MAX)	1	Stage 2 (Q4)
 crates/gear-io/src/train.rs	convert	unwrap_or(0)	1	Stage 2 (Q4)

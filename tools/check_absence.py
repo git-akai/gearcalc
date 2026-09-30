@@ -20,12 +20,16 @@ must be gone by Stage 2's exit. The list is keyed by file, function and site,
 with a count, and must match **exactly**, so a new site fails and so does a
 listed one that is gone.
 
-A literal is a number, an `f32`/`f64` constant, or a tuple or array of them.
-A boolean is not read: `map_or(false, …)` answers "is there one that …?", and
-absence answers that truthfully. `unwrap_or_default()` is not read either:
-which default it gives depends on a type this text does not know. Read as
-`tools/rust_source.py` reads production code: comments and strings blanked,
-test code left out.
+A literal is made of numbers (`0.`, `1e-9`, `-1`) and numeric constants
+(`f64::NAN`, `usize::MAX` — an integer's end is a sentinel as much as a
+float's infinity), signed, grouped into tuples or arrays, or combined by
+arithmetic (`1e-3 / 4.0`). A closure counts where it returns one: `|| 0.0`,
+`|_| 0.0`, `|| { 0.0 }`. A reason excuses the one site on its line; a line
+with two sites and one reason excuses neither. A boolean is not read:
+`map_or(false, …)` answers "is there one that …?", and absence answers that
+truthfully. `unwrap_or_default()` is not read either: which default it gives
+depends on a type this text does not know. Read as `tools/rust_source.py`
+reads production code: comments and strings blanked, test code left out.
 """
 
 import re
@@ -40,13 +44,22 @@ ALLOW = ROOT / "tools" / "allow_absence.txt"
 STAGE = re.compile(r"^Stage \d")
 WHY = re.compile(r"//\s*absence:\s*\S")
 
-NUMBER = r"-?\s*\d[\d_]*(?:\.\d[\d_]*)?(?:[eE][+-]?\d[\d_]*)?(?:_?[fiu](?:8|16|32|64|128|size))?"
-CONSTANT = r"-?\s*(?:(?:std|core)\s*::\s*)?f(?:32|64)\s*::\s*[A-Z_]+"
-ATOM = rf"(?:{NUMBER}|{CONSTANT})"
-# A literal, or a tuple or array of them.
-LITERAL = re.compile(rf"^\s*(?:{ATOM}|[(\[]\s*{ATOM}(?:\s*,\s*{ATOM})*\s*,?\s*[)\]])\s*$")
+NUMBER = r"\d[\d_]*(?:\.(?:\d[\d_]*)?)?(?:[eE][+-]?\d[\d_]*)?(?:_?[fiu](?:8|16|32|64|128|size))?"
+NUMERIC_TYPE = r"(?:f32|f64|u8|u16|u32|u64|u128|usize|i8|i16|i32|i64|i128|isize)"
+CONSTANT = rf"(?:(?:std|core)\s*::\s*)?{NUMERIC_TYPE}\s*::\s*[A-Z_]+"
+ATOM = re.compile(rf"{CONSTANT}|{NUMBER}")
+# What may sit between atoms in a literal: signs, arithmetic, grouping.
+GLUE = re.compile(r"^[\s()\[\],+\-*/]*$")
+CLOSURE = re.compile(r"^\s*(?:move\s+)?\|[^|]*\|\s*(?:\{\s*(?P<block>[^{}]*?)\s*\}|(?P<expr>.*?))\s*$", re.S)
 CALL = re.compile(r"\.\s*(unwrap_or|map_or|unwrap_or_else|map_or_else)\s*\(")
 SENTINEL = re.compile(r"(?<![\w:])(?:(?:std|core)\s*::\s*)?(?:f(?:32|64)\s*::\s*)?(INFINITY|NEG_INFINITY|NAN)\b")
+
+
+def is_literal(text):
+    """Whether `text` is made of numbers and numeric constants alone —
+    signed, grouped into tuples or arrays, or combined by arithmetic."""
+    atoms = ATOM.findall(text)
+    return bool(atoms) and bool(GLUE.match(ATOM.sub(" ", text)))
 
 
 def first_argument(code, open_paren):
@@ -74,12 +87,12 @@ def sites(sources):
         for m in CALL.finditer(s.code):
             arg = first_argument(s.code, m.end() - 1)
             if m.group(1).endswith("_else"):
-                closure = re.match(r"\s*\|\s*\|\s*(.*)$", arg, re.S)
-                if not closure or not LITERAL.match(closure.group(1)):
+                closure = CLOSURE.match(arg)
+                body = closure and (closure.group("block") if closure.group("block") is not None else closure.group("expr"))
+                if not body or not is_literal(body):
                     continue
-                body = closure.group(1)
             else:
-                if not LITERAL.match(arg):
+                if not is_literal(arg):
                     continue
                 body = arg
             found.append((m.start(), f"{m.group(1)}({' '.join(body.split())})"))
@@ -88,11 +101,15 @@ def sites(sources):
         for m in SENTINEL.finditer(s.code):
             if not any(a <= m.start() < b for a, b in spans):
                 found.append((m.start(), m.group(1)))
+        found = [(at, site) for at, site in found if not s.in_test(at)]
+        per_line = {}
+        for at, _ in found:
+            per_line[s.line(at)] = per_line.get(s.line(at), 0) + 1
         for at, site in found:
-            if s.in_test(at):
-                continue
             line = s.line(at)
-            if WHY.search(s.comments.get(line, "")):
+            # A reason excuses the one site on its line; a line with two has
+            # one reason for two absences, and excuses neither.
+            if per_line[line] == 1 and WHY.search(s.comments.get(line, "")):
                 continue
             out.append((s.rel, s.function(at), site.replace(" ", ""), line))
     return out
@@ -203,6 +220,18 @@ mod tests {
     fn inside(a: Option<f64>) -> f64 { a.unwrap_or(0.0) + f64::NAN }
 }
 fn after_the_tests(a: Option<f64>) -> f64 { a.unwrap_or(0.0) }
+fn near_misses(a: Option<usize>, b: Option<f64>, c: Result<f64, ()>) -> f64 {
+    let i = a.unwrap_or(usize::MAX);
+    let j = a.map_or(i32::MIN, |v| v as i32);
+    let k = b.unwrap_or(0.);
+    let l = c.unwrap_or_else(|_| 0.0);
+    let n = b.unwrap_or_else(|| { 0.0 });
+    let o = c.map_or_else(|_| -1.0, |v| v);
+    let p = b.unwrap_or(1e-3 / 4.0);
+    let q = b.unwrap_or(0.0) + b.unwrap_or(f64::NAN); // absence: one reason, two sites
+    let r = a.unwrap_or(u32::try_from(7).unwrap_or(0) as usize);
+    k
+}
 '''
 WANT = sorted([
     ("flagged", "unwrap_or(0.0)"), ("flagged", "map_or(1.0)"), ("flagged", "unwrap_or(-1)"),
@@ -212,6 +241,11 @@ WANT = sorted([
     ("flagged", "NEG_INFINITY"), ("flagged", "NAN"), ("flagged", "NAN"),
     ("why_elsewhere", "unwrap_or(0.0)"), ("empty_why", "unwrap_or(0.0)"),
     ("after_the_tests", "unwrap_or(0.0)"),
+    ("near_misses", "unwrap_or(usize::MAX)"), ("near_misses", "map_or(i32::MIN)"),
+    ("near_misses", "unwrap_or(0.)"), ("near_misses", "unwrap_or_else(0.0)"),
+    ("near_misses", "unwrap_or_else(0.0)"), ("near_misses", "map_or_else(-1.0)"),
+    ("near_misses", "unwrap_or(1e-3/4.0)"), ("near_misses", "unwrap_or(0.0)"),
+    ("near_misses", "unwrap_or(f64::NAN)"), ("near_misses", "unwrap_or(0)"),
 ])
 
 
@@ -243,10 +277,19 @@ def self_test():
         ("why_elsewhere", "unwrap_or(0.0)", "a reason on the line above"),
         ("empty_why", "unwrap_or(0.0)", "an empty reason"),
         ("after_the_tests", "unwrap_or(0.0)", "production code after a test module"),
+        ("near_misses", "unwrap_or(usize::MAX)", "an integer's end as the default"),
+        ("near_misses", "map_or(i32::MIN)", "an integer's other end"),
+        ("near_misses", "unwrap_or(0.)", "a float written `0.`"),
+        ("near_misses", "unwrap_or(1e-3/4.0)", "literal arithmetic"),
+        ("near_misses", "map_or_else(-1.0)", "a closure over the error, `|_|`"),
+        ("near_misses", "unwrap_or(f64::NAN)", "two sites on a line with one reason"),
+        ("near_misses", "unwrap_or(0)", "a site inside another's argument"),
     ):
         expect(f"found: {why}", (fn, site) in got)
     expect("not found: a variable, a boolean, a computed closure, a reason, the default, a predicate",
            all(fn != "fine" for fn, _ in got))
+    expect("found: `|| { 0.0 }` and `|_| 0.0` both",
+           sum(1 for fn, site in got if (fn, site) == ("near_misses", "unwrap_or_else(0.0)")) == 2)
     expect("not found: test code or prose", all(fn not in ("inside",) for fn, _ in got))
     listed = {k: (n, "Stage 2 (Q3)") for k, n in counted(found).items()}
     expect("every site listed passes", compare(found, listed) == [])
