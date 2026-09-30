@@ -8,9 +8,14 @@
 //! - [`form`]: a gear's tip form, the relief and the edge round on the flank ([`form::ToothForm`],
 //!   laid on its corner as a [`form::TipForm`]).
 //! - [`gap`]: a gear as the field reads it ([`gap::FieldGear`]).
+//! - [`kernel`]: how a line load on one panel of a contact line moves a body's surface at a point
+//!   of it ([`kernel::Kernel`], a [`kernel::Panel`] on a [`kernel::HalfSpace`]).
 
 pub mod form;
 pub mod gap;
+pub mod kernel;
 
 #[cfg(test)]
 pub(crate) mod oracle;
+#[cfg(test)]
+pub(crate) mod wide;

@@ -580,7 +580,7 @@ fn surface_centre_stress(kappa: f64, nu: f64) -> [f64; 3] {
 }
 
 /// Gauss–Legendre nodes and weights on `[-1, 1]`, by Newton on `P_n`.
-fn gauss_legendre<const N: usize>() -> [(f64, f64); N] {
+pub(crate) fn gauss_legendre<const N: usize>() -> [(f64, f64); N] {
     let mut out = [(0.0, 0.0); N];
     let n = N as f64;
     for (i, slot) in out.iter_mut().enumerate() {
