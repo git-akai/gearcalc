@@ -1,0 +1,727 @@
+{
+ "module": "compliance",
+ "records": [
+  {
+   "id": "compliance/foundation",
+   "fn": "foundation.coefficients(S, H, nu): L*, M* closed form; P*, Q* depth-referenced (Boussinesq/Cerruti along the section)",
+   "inputs": {
+    "cases": [
+     {
+      "S": 1.8,
+      "H": 2.7,
+      "nu": 0.3
+     },
+     {
+      "S": 2.2,
+      "H": 2.7,
+      "nu": 0.3
+     },
+     {
+      "S": 1.8,
+      "H": 7.8,
+      "nu": 0.3
+     },
+     {
+      "S": 2.0,
+      "H": 7.0,
+      "nu": 0.29
+     },
+     {
+      "S": 3.0,
+      "H": 3.5,
+      "nu": 0.32
+     }
+    ]
+   },
+   "outputs": {
+    "cases": [
+     {
+      "L": 5.213915935690491,
+      "M": 1.04,
+      "P": 1.5136939379214636,
+      "Q": 0.47225277031671387
+     },
+     {
+      "L": 5.213915935690491,
+      "M": 1.04,
+      "P": 1.3958628262423214,
+      "Q": 0.43698069700323533
+     },
+     {
+      "L": 5.213915935690491,
+      "M": 1.04,
+      "P": 2.131731595324258,
+      "Q": 0.6134776243199689
+     },
+     {
+      "L": 5.24772044560321,
+      "M": 1.0836000000000001,
+      "P": 2.014912542379172,
+      "Q": 0.5951584734440687
+     },
+     {
+      "L": 5.142869169094269,
+      "M": 0.9504,
+      "P": 1.358789930444733,
+      "Q": 0.41572475478938997
+     }
+    ]
+   },
+   "tol": {
+    "L": {
+     "rel": 1e-13,
+     "basis": "closed form: floating point"
+    },
+    "M": {
+     "rel": 1e-13,
+     "basis": "closed form: floating point"
+    },
+    "P": {
+     "rel": 1e-12,
+     "basis": "24-point Gauss x 6-16 panels; doubling the panels changes nothing"
+    },
+    "Q": {
+     "rel": 1e-12,
+     "basis": "as P"
+    },
+    "basis": "L* = 18(1 - nu^2)/pi and M* = 2(1 - 2nu)(1 + nu) closed form (v1 took L* by quadrature, 8.7e-8 off)"
+   }
+  },
+  {
+   "id": "compliance/p17b15x3",
+   "fn": "field.Member + coupled.derive_foundation: stiff.py's generated tooth at unit module (the involute integrated in its roll parameter, the fillet in the rack roll angle), the half-plane foundation at the rim depth s_R = 1.2 h_t ext / 3.5 m_n ring, read through field.ToothCompliance (Chebyshev in the roll parameter, order by the stated bound)",
+   "inputs": {
+    "z": 17,
+    "beta_deg": 15.0,
+    "x": 0.3,
+    "mn": 2.0,
+    "b": 20.0,
+    "an_deg": 20.0,
+    "E": 206000.0,
+    "nu": 0.3,
+    "ha": 1.0,
+    "hf": 1.25,
+    "rho_f": 0.38,
+    "rho": [
+     16.622024553473896,
+     17.069233367661084,
+     17.516442181848277,
+     17.963650996035465,
+     18.410859810222654,
+     18.858068624409842,
+     19.30527743859703,
+     19.752486252784223,
+     20.020811541296535,
+     20.163918361836437,
+     20.196117396457915,
+     20.19969506697141
+    ]
+   },
+   "outputs": {
+    "lo": 16.622024553473896,
+    "hi": 20.19969506697141,
+    "ra": 20.19969506697141,
+    "rf": 15.69969506697141,
+    "rb": 16.46928848518253,
+    "found_H": 5.3999999999999995,
+    "form_depth": 1.788835256748758,
+    "order": 64,
+    "interp_err": 2.886579864025407e-15,
+    "ct": [
+     1.1333261708042827e-05,
+     1.3560067021133627e-05,
+     1.626728332100777e-05,
+     1.9548727884354905e-05,
+     2.360978055045694e-05,
+     2.8744971054816036e-05,
+     3.539824669878239e-05,
+     4.4324037555906326e-05,
+     5.1353647994167786e-05,
+     5.5866239721914265e-05,
+     5.6975814136234966e-05,
+     5.7101502397757315e-05
+    ],
+    "hd": [
+     1.9432171193172671,
+     1.9223230905506943,
+     1.861060856090636,
+     1.7614988836699454,
+     1.6240461011741418,
+     1.4477714904706334,
+     1.2308149472078205,
+     0.9705579132725531,
+     0.7922659473603966,
+     0.6900328668965184,
+     0.6663262462373608,
+     0.6636760252121211
+    ],
+    "ct_sainsot": [
+     1.5069267572513656e-05,
+     1.7377707732625536e-05,
+     2.024316335091315e-05,
+     2.3757913442889134e-05,
+     2.8133951498554676e-05,
+     3.367257121013818e-05,
+     4.08240676662364e-05,
+     5.03487775790253e-05,
+     5.778837947516053e-05,
+     6.253565893669175e-05,
+     6.369959819538979e-05,
+     6.383136258498612e-05
+    ]
+   },
+   "tol": {
+    "ct": {
+     "rel": 1e-11,
+     "basis": "the tooth is converged: its quadrature to 1e-15 (Gauss-Legendre 48 vs 96), its interpolant to <= 1e-12 (ToothCompliance.TOL, checked at the next grid and on 801 points); a port of the same tooth to its own converged accuracy matches"
+    },
+    "hd": {
+     "rel": 1e-11,
+     "basis": "as ct"
+    },
+    "ct_sainsot": {
+     "rel": 1e-11,
+     "basis": "as ct (Sainsot's fitted foundation)"
+    },
+    "lo": {
+     "rel": 1e-12,
+     "basis": "the form radius: stiff._transition bisection to the last bit"
+    },
+    "order": {
+     "abs": 0,
+     "basis": "informative: a port may interpolate at any order meeting the bound"
+    }
+   }
+  },
+  {
+   "id": "compliance/p17b20",
+   "fn": "field.Member + coupled.derive_foundation: stiff.py's generated tooth at unit module (the involute integrated in its roll parameter, the fillet in the rack roll angle), the half-plane foundation at the rim depth s_R = 1.2 h_t ext / 3.5 m_n ring, read through field.ToothCompliance (Chebyshev in the roll parameter, order by the stated bound)",
+   "inputs": {
+    "z": 17,
+    "beta_deg": 20.0,
+    "x": 0.0,
+    "mn": 1.0,
+    "b": 10.0,
+    "an_deg": 20.0,
+    "E": 206000.0,
+    "nu": 0.3,
+    "ha": 1.0,
+    "hf": 1.25,
+    "rho_f": 0.38,
+    "rho": [
+     8.451766797368233,
+     8.65098483095286,
+     8.850202864537488,
+     9.049420898122115,
+     9.248638931706743,
+     9.44785696529137,
+     9.647074998875997,
+     9.846293032460625,
+     9.9658238526114,
+     10.029573623358482,
+     10.043917321776576,
+     10.045511066045252
+    ]
+   },
+   "outputs": {
+    "lo": 8.451766797368233,
+    "hi": 10.045511066045252,
+    "ra": 10.045511066045252,
+    "rf": 7.795511066045252,
+    "rb": 8.434895353338769,
+    "found_H": 2.6999999999999997,
+    "form_depth": 1.5937442686770193,
+    "order": 32,
+    "interp_err": 8.171241461241152e-14,
+    "ct": [
+     1.5506574272171012e-05,
+     1.7767367928537434e-05,
+     2.0854907780804734e-05,
+     2.4613502164219654e-05,
+     2.920357445718874e-05,
+     3.486576204328367e-05,
+     4.194217809605993e-05,
+     5.095352537209596e-05,
+     5.7634737434721744e-05,
+     6.171291396971715e-05,
+     6.268874509862258e-05,
+     6.279859197973581e-05
+    ],
+    "hd": [
+     0.8794766981183132,
+     0.8737062874341905,
+     0.8513623579554842,
+     0.8134849622424297,
+     0.760834009964665,
+     0.693518623085629,
+     0.6112628624482818,
+     0.513520854198666,
+     0.4471326483586471,
+     0.40926722373217866,
+     0.4005072177330953,
+     0.39952839097476156
+    ],
+    "ct_sainsot": [
+     1.961079861074046e-05,
+     2.1956406083892137e-05,
+     2.5246334721440742e-05,
+     2.9279191025538217e-05,
+     3.4214728256985425e-05,
+     4.02963320102315e-05,
+     4.7869533365897786e-05,
+     5.745854792637419e-05,
+     6.45266208789778e-05,
+     6.882378722038227e-05,
+     6.98501205564551e-05,
+     6.99656068131209e-05
+    ]
+   },
+   "tol": {
+    "ct": {
+     "rel": 1e-11,
+     "basis": "the tooth is converged: its quadrature to 1e-15 (Gauss-Legendre 48 vs 96), its interpolant to <= 1e-12 (ToothCompliance.TOL, checked at the next grid and on 801 points); a port of the same tooth to its own converged accuracy matches"
+    },
+    "hd": {
+     "rel": 1e-11,
+     "basis": "as ct"
+    },
+    "ct_sainsot": {
+     "rel": 1e-11,
+     "basis": "as ct (Sainsot's fitted foundation)"
+    },
+    "lo": {
+     "rel": 1e-12,
+     "basis": "the form radius: stiff._transition bisection to the last bit"
+    },
+    "order": {
+     "abs": 0,
+     "basis": "informative: a port may interpolate at any order meeting the bound"
+    }
+   }
+  },
+  {
+   "id": "compliance/ring43b15",
+   "fn": "field.Member + coupled.derive_foundation: stiff.py's generated tooth at unit module (the involute integrated in its roll parameter, the fillet in the rack roll angle), the half-plane foundation at the rim depth s_R = 1.2 h_t ext / 3.5 m_n ring, read through field.ToothCompliance (Chebyshev in the roll parameter, order by the stated bound); A RING IS THE RACK TOOTH (stiff.Gear z 4000, ISO 6336-1's z_n2 = inf), not its own shaper-cut tooth",
+   "inputs": {
+    "z": -43,
+    "beta_deg": 15.0,
+    "x": -0.3,
+    "mn": 2.0,
+    "b": 20.0,
+    "an_deg": 20.0,
+    "E": 206000.0,
+    "nu": 0.3,
+    "ha": 1.0,
+    "hf": 1.25,
+    "rho_f": 0.38,
+    "rho": [
+     43.11687575763357,
+     43.67937575763357,
+     44.24187575763357,
+     44.80437575763357,
+     45.36687575763357,
+     45.92937575763357,
+     46.49187575763357,
+     47.05437575763357,
+     47.39187575763357,
+     47.57187575763357,
+     47.61237575763357,
+     47.61687575763357
+    ]
+   },
+   "outputs": {
+    "lo": 43.11687575763357,
+    "hi": 47.61687575763357,
+    "ra": 43.11687575763357,
+    "rf": 47.61687575763357,
+    "rb": 41.657612050755816,
+    "found_H": 7.0,
+    "form_depth": 1.9980796754334733,
+    "order": 32,
+    "interp_err": 3.1907809727727e-13,
+    "ct": [
+     5.8652623319243083e-05,
+     4.250860357593294e-05,
+     3.1251621417597795e-05,
+     2.3217251405166828e-05,
+     1.7402465177695592e-05,
+     1.3155551713473081e-05,
+     1.0028901911043211e-05,
+     7.701679724212825e-06,
+     7.49483070198369e-06,
+     7.49483070198369e-06,
+     7.49483070198369e-06,
+     7.49483070198369e-06
+    ],
+    "hd": [
+     0.8963159336997604,
+     1.1147611710076333,
+     1.33284493598427,
+     1.5505671718589744,
+     1.7679278209341587,
+     1.984926824579878,
+     2.201564123229497,
+     2.4178396563748428,
+     2.4403727479881177,
+     2.4403727479881177,
+     2.4403727479881177,
+     2.4403727479881177
+    ],
+    "ct_sainsot": [
+     0.04621663157254468,
+     0.045674185864523056,
+     0.04512785648285999,
+     0.04457598286451461,
+     0.0440175658504107,
+     0.043451957605743226,
+     0.04287871440461662,
+     0.042297519301217466,
+     0.042236442468041896,
+     0.042236442468041896,
+     0.042236442468041896,
+     0.042236442468041896
+    ]
+   },
+   "tol": {
+    "ct": {
+     "rel": 1e-11,
+     "basis": "the tooth is converged: its quadrature to 1e-15 (Gauss-Legendre 48 vs 96), its interpolant to <= 1e-12 (ToothCompliance.TOL, checked at the next grid and on 801 points); a port of the same tooth to its own converged accuracy matches"
+    },
+    "hd": {
+     "rel": 1e-11,
+     "basis": "as ct"
+    },
+    "ct_sainsot": {
+     "rel": 1e-11,
+     "basis": "as ct (Sainsot's fitted foundation)"
+    },
+    "lo": {
+     "rel": 1e-12,
+     "basis": "the form radius: stiff._transition bisection to the last bit"
+    },
+    "order": {
+     "abs": 0,
+     "basis": "informative: a port may interpolate at any order meeting the bound"
+    }
+   }
+  },
+  {
+   "id": "compliance/s17",
+   "fn": "field.Member + coupled.derive_foundation: stiff.py's generated tooth at unit module (the involute integrated in its roll parameter, the fillet in the rack roll angle), the half-plane foundation at the rim depth s_R = 1.2 h_t ext / 3.5 m_n ring, read through field.ToothCompliance (Chebyshev in the roll parameter, order by the stated bound)",
+   "inputs": {
+    "z": 17,
+    "beta_deg": 0.0,
+    "x": 0.0,
+    "mn": 1.0,
+    "b": 10.0,
+    "an_deg": 20.0,
+    "E": 206000.0,
+    "nu": 0.3,
+    "ha": 1.0,
+    "hf": 1.25,
+    "rho_f": 0.38,
+    "rho": [
+     7.9873915402775975,
+     8.176467597742898,
+     8.365543655208198,
+     8.554619712673498,
+     8.7436957701388,
+     8.9327718276041,
+     9.1218478850694,
+     9.3109239425347,
+     9.42436957701388,
+     9.484873915402776,
+     9.498487391540278,
+     9.5
+    ]
+   },
+   "outputs": {
+    "lo": 7.9873915402775975,
+    "hi": 9.5,
+    "ra": 9.5,
+    "rf": 7.25,
+    "rb": 7.987387276680222,
+    "found_H": 2.6999999999999997,
+    "form_depth": 1.5126084597224025,
+    "order": 32,
+    "interp_err": 2.724487302430134e-13,
+    "ct": [
+     1.841970311563568e-05,
+     2.015237440225188e-05,
+     2.3249704939153384e-05,
+     2.70342940472678e-05,
+     3.163458582509242e-05,
+     3.726688189742818e-05,
+     4.4243994883615876e-05,
+     5.3044878748185054e-05,
+     5.952086260981758e-05,
+     6.345724344263394e-05,
+     6.43975651979707e-05,
+     6.450337972958282e-05
+    ],
+    "hd": [
+     0.8602898582530931,
+     0.8533639728999156,
+     0.8340830765391181,
+     0.799214758912947,
+     0.749293800690054,
+     0.6842404399662696,
+     0.6035775840560657,
+     0.5065316031269907,
+     0.44002239952338806,
+     0.40189981018193055,
+     0.39306199968220956,
+     0.392074061710548
+    ],
+    "ct_sainsot": [
+     2.2482081509774498e-05,
+     2.422223389645372e-05,
+     2.7522234738234396e-05,
+     3.158085892733985e-05,
+     3.652240882143619e-05,
+     4.256465831883994e-05,
+     5.002317833336708e-05,
+     5.938002452906303e-05,
+     6.62266847471968e-05,
+     7.037243074880591e-05,
+     7.136099293371037e-05,
+     7.147219334088259e-05
+    ]
+   },
+   "tol": {
+    "ct": {
+     "rel": 1e-11,
+     "basis": "the tooth is converged: its quadrature to 1e-15 (Gauss-Legendre 48 vs 96), its interpolant to <= 1e-12 (ToothCompliance.TOL, checked at the next grid and on 801 points); a port of the same tooth to its own converged accuracy matches"
+    },
+    "hd": {
+     "rel": 1e-11,
+     "basis": "as ct"
+    },
+    "ct_sainsot": {
+     "rel": 1e-11,
+     "basis": "as ct (Sainsot's fitted foundation)"
+    },
+    "lo": {
+     "rel": 1e-12,
+     "basis": "the form radius: stiff._transition bisection to the last bit"
+    },
+    "order": {
+     "abs": 0,
+     "basis": "informative: a port may interpolate at any order meeting the bound"
+    }
+   }
+  },
+  {
+   "id": "compliance/s43",
+   "fn": "field.Member + coupled.derive_foundation: stiff.py's generated tooth at unit module (the involute integrated in its roll parameter, the fillet in the rack roll angle), the half-plane foundation at the rim depth s_R = 1.2 h_t ext / 3.5 m_n ring, read through field.ToothCompliance (Chebyshev in the roll parameter, order by the stated bound)",
+   "inputs": {
+    "z": 43,
+    "beta_deg": 0.0,
+    "x": 0.0,
+    "mn": 1.0,
+    "b": 10.0,
+    "an_deg": 20.0,
+    "E": 206000.0,
+    "nu": 0.3,
+    "ha": 1.0,
+    "hf": 1.25,
+    "rho_f": 0.38,
+    "rho": [
+     20.683313806477724,
+     20.91039958066801,
+     21.137485354858292,
+     21.364571129048578,
+     21.591656903238864,
+     21.818742677429146,
+     22.045828451619432,
+     22.272914225809714,
+     22.409165690323885,
+     22.481833138064776,
+     22.49818331380648,
+     22.5
+    ]
+   },
+   "outputs": {
+    "lo": 20.683313806477724,
+    "hi": 22.5,
+    "ra": 22.5,
+    "rf": 20.25,
+    "rb": 20.203391346897032,
+    "found_H": 2.6999999999999997,
+    "form_depth": 1.8166861935222762,
+    "order": 32,
+    "interp_err": 4.884981308350689e-15,
+    "ct": [
+     9.698653200640013e-06,
+     1.2149076017311573e-05,
+     1.5098706235255401e-05,
+     1.87302036396822e-05,
+     2.327604097104481e-05,
+     2.904432453130297e-05,
+     3.646611280117587e-05,
+     4.6190177741497325e-05,
+     5.3549624838955884e-05,
+     5.808733421080452e-05,
+     5.917703636255766e-05,
+     5.9299782581281824e-05
+    ],
+    "hd": [
+     1.0069583330548122,
+     0.9705514964434293,
+     0.9229196652494083,
+     0.8647490903588312,
+     0.796401196316214,
+     0.7180452777325197,
+     0.6297230960276355,
+     0.5313841120295052,
+     0.4675244013732003,
+     0.4319614465712488,
+     0.4238146708439691,
+     0.42290617443345063
+    ],
+    "ct_sainsot": [
+     1.5073013818560155e-05,
+     1.761843736967084e-05,
+     2.074138534537966e-05,
+     2.4631233983898377e-05,
+     2.9525638844771543e-05,
+     3.5737048544430215e-05,
+     4.370033742494543e-05,
+     5.406773235461545e-05,
+     6.186339172690527e-05,
+     6.664943428096452e-05,
+     6.779652907555862e-05,
+     6.79256867934253e-05
+    ]
+   },
+   "tol": {
+    "ct": {
+     "rel": 1e-11,
+     "basis": "the tooth is converged: its quadrature to 1e-15 (Gauss-Legendre 48 vs 96), its interpolant to <= 1e-12 (ToothCompliance.TOL, checked at the next grid and on 801 points); a port of the same tooth to its own converged accuracy matches"
+    },
+    "hd": {
+     "rel": 1e-11,
+     "basis": "as ct"
+    },
+    "ct_sainsot": {
+     "rel": 1e-11,
+     "basis": "as ct (Sainsot's fitted foundation)"
+    },
+    "lo": {
+     "rel": 1e-12,
+     "basis": "the form radius: stiff._transition bisection to the last bit"
+    },
+    "order": {
+     "abs": 0,
+     "basis": "informative: a port may interpolate at any order meeting the bound"
+    }
+   }
+  },
+  {
+   "id": "compliance/w43b20",
+   "fn": "field.Member + coupled.derive_foundation: stiff.py's generated tooth at unit module (the involute integrated in its roll parameter, the fillet in the rack roll angle), the half-plane foundation at the rim depth s_R = 1.2 h_t ext / 3.5 m_n ring, read through field.ToothCompliance (Chebyshev in the roll parameter, order by the stated bound)",
+   "inputs": {
+    "z": 43,
+    "beta_deg": -20.0,
+    "x": 0.0,
+    "mn": 1.0,
+    "b": 10.0,
+    "an_deg": 20.0,
+    "E": 206000.0,
+    "nu": 0.3,
+    "ha": 1.0,
+    "hf": 1.25,
+    "rho_f": 0.38,
+    "rho": [
+     22.033320822301732,
+     22.26413348304303,
+     22.494946143784325,
+     22.725758804525622,
+     22.95657146526692,
+     23.18738412600822,
+     23.418196786749515,
+     23.649009447490812,
+     23.787497043935588,
+     23.861357095372803,
+     23.87797560694618,
+     23.87982210823211
+    ]
+   },
+   "outputs": {
+    "lo": 22.033320822301732,
+    "hi": 23.87982210823211,
+    "ra": 23.87982210823211,
+    "rf": 21.62982210823211,
+    "rb": 21.33532354079806,
+    "found_H": 2.6999999999999997,
+    "form_depth": 1.8465012859303762,
+    "order": 32,
+    "interp_err": 3.1086244689504383e-15,
+    "ct": [
+     9.121459391085874e-06,
+     1.1515076170397025e-05,
+     1.4418306296835048e-05,
+     1.8017295119379415e-05,
+     2.2550072840375197e-05,
+     2.8333503998308797e-05,
+     3.5811975542011186e-05,
+     4.56538223991814e-05,
+     5.312399701540245e-05,
+     5.773568665941481e-05,
+     5.8843572939272366e-05,
+     5.8968375142654e-05
+    ],
+    "hd": [
+     1.0339466503263042,
+     0.9900678860735604,
+     0.9365106677475197,
+     0.8737200741477457,
+     0.8019502559728315,
+     0.7213322067738962,
+     0.6319105496098345,
+     0.5336652418929261,
+     0.47045494815427075,
+     0.43542610579431523,
+     0.42741783109331277,
+     0.42652514236971767
+    ],
+    "ct_sainsot": [
+     1.497229328310283e-05,
+     1.7445405079928e-05,
+     2.0512698681337753e-05,
+     2.4366087568767267e-05,
+     2.92482057078874e-05,
+     3.547983425461367e-05,
+     4.350882794781171e-05,
+     5.400667411209427e-05,
+     6.192229927124432e-05,
+     6.678772685524924e-05,
+     6.795426649057454e-05,
+     6.80856212742293e-05
+    ]
+   },
+   "tol": {
+    "ct": {
+     "rel": 1e-11,
+     "basis": "the tooth is converged: its quadrature to 1e-15 (Gauss-Legendre 48 vs 96), its interpolant to <= 1e-12 (ToothCompliance.TOL, checked at the next grid and on 801 points); a port of the same tooth to its own converged accuracy matches"
+    },
+    "hd": {
+     "rel": 1e-11,
+     "basis": "as ct"
+    },
+    "ct_sainsot": {
+     "rel": 1e-11,
+     "basis": "as ct (Sainsot's fitted foundation)"
+    },
+    "lo": {
+     "rel": 1e-12,
+     "basis": "the form radius: stiff._transition bisection to the last bit"
+    },
+    "order": {
+     "abs": 0,
+     "basis": "informative: a port may interpolate at any order meeting the bound"
+    }
+   }
+  }
+ ]
+}
