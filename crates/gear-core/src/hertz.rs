@@ -582,13 +582,21 @@ fn surface_centre_stress(kappa: f64, nu: f64) -> [f64; 3] {
 /// Gauss–Legendre nodes and weights on `[-1, 1]`, by Newton on `P_n`.
 pub(crate) fn gauss_legendre<const N: usize>() -> [(f64, f64); N] {
     let mut out = [(0.0, 0.0); N];
-    let n = N as f64;
+    out.copy_from_slice(&gauss_legendre_rule(N));
+    out
+}
+
+/// The `count`-point Gauss–Legendre rule on `[-1, 1]`, by Newton on `P_count`: what
+/// [`gauss_legendre`] returns, for a count known only at run time.
+pub(crate) fn gauss_legendre_rule(count: usize) -> Vec<(f64, f64)> {
+    let mut out = vec![(0.0, 0.0); count];
+    let n = count as f64;
     for (i, slot) in out.iter_mut().enumerate() {
         let mut x = (PI * (i as f64 + 0.75) / (n + 0.5)).cos();
         let mut dp = 1.0;
         for _ in 0..100 {
             let (mut p0, mut p1) = (1.0, x);
-            for k in 2..=N {
+            for k in 2..=count {
                 let k = k as f64;
                 let p2 = ((2.0 * k - 1.0) * x * p1 - (k - 1.0) * p0) / k;
                 p0 = p1;

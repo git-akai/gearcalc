@@ -33,32 +33,42 @@
 //! `ln r` while their difference decays as `−ν h²/r³`, so the first form would carry `G`'s error
 //! amplified by up to `3e7` (`h < b`); the second has none to amplify.
 //!
+//! Neither form takes a difference of two values of one sign. On one side of the point the near
+//! form's depth term is `asinh(D/d_R)` and `h² D/(d_R R₁ R₂)`, `D = (η₂ − η₁)(η₂ + η₁)`,
+//! `d_R = η₂ R₁ + η₁ R₂`, and its surface term, where the panel is short beside its distance from
+//! the point, `∫ G′` by Gauss–Legendre ([`SLOPE_NODES`]); across the point every difference is a
+//! sum. `G` itself is exact to a few roundings of itself at every `r`: the table holds
+//! `G/asinh r`, which is linear in `ln r` below it, and its nodes are a quadrature of positive
+//! terms ([`g_direct`]).
+//!
 //! Ports the prototype's `kernel.G`, `G_direct`, `dG`, `panel`, `panel_sep`, `depth_panel`,
 //! `n_width`, `line_limit` and `shape_C`, and `carlson.aspect` through [`patch_aspect`]; its
 //! records are `tests/data/field_oracle/kernel.json`. Every length here is relative: the kernel is
 //! unchanged when every length is scaled.
 
-use std::f64::consts::{FRAC_PI_2, FRAC_PI_4, LN_2, PI};
+use std::f64::consts::{FRAC_PI_2, FRAC_PI_4, PI};
 use std::sync::OnceLock;
 
 use crate::elliptic::r_d;
-use crate::hertz::{gauss_legendre, patch_aspect};
+use crate::hertz::{gauss_legendre, gauss_legendre_rule, patch_aspect};
 
 /// Where `G`'s table starts, in `u = ln r`. Below it `G` is `(4/π) r ln(4/r)`, whose remainder,
-/// `O(r³ ln r)`, is below `1e-35` there.
+/// `O(r³ ln r)`, is below `1e-24` of `G` there.
 const TABLE_FROM: f64 = -28.0;
 
 /// Where `G`'s table ends, in `u = ln r`. Above it `G` is its asymptote `ln 4r + 1/2 + 1/(16 r²)`,
 /// whose remainder, `O(r⁻⁴)`, is below `1e-24` there.
 const TABLE_TO: f64 = 14.0;
 
-/// The table's step in `u = ln r`. Cubic Hermite with the exact slope errs at most
-/// `step⁴ max|∂⁴G/∂u⁴| / 384` in a cell; `max|∂⁴G/∂u⁴| = 0.205`, at `u ≈ −0.95` (`G`'s
-/// derivatives in `u` decay at both ends), so `2.1e-14` here.
-const TABLE_STEP: f64 = 0.0025;
+/// The table's step in `u = ln r`. The table holds `F = G/asinh r`, which is `(4/π)(ln 4 − u)`,
+/// linear, below it and tends to 1 above it, so cubic Hermite with the exact slope errs at most
+/// `step⁴ max|∂⁴F/∂u⁴ / F| / 384` of `G` in a cell; `max|∂⁴F/∂u⁴ / F| = 0.288`, at `u ≈ 0.05`,
+/// so `1.8e-15` of `G` here. (`G` itself, tabulated, errs up to `0.87 step⁴/384` of itself as
+/// `r → 0`, where it is `(4/π) r ln(4/r)`.)
+const TABLE_STEP: f64 = 0.00125;
 
 /// Gauss–Legendre nodes per cell of [`g_direct`]. Each cell's rule converges as `ρ⁻³²`, `ρ ≥ 4.3`
-/// the Bernstein ellipse through the integrand's nearest branch point, `θ = i asinh r`
+/// the Bernstein ellipse through the integrand's nearest branch point, `ψ = i asinh r`
 /// (`4.3⁻³² ≈ 4e-21`), so the sum is exact to rounding.
 const CELL_NODES: usize = 16;
 
@@ -79,6 +89,19 @@ pub const SEPARATED_FROM: f64 = 0.5;
 
 /// The separated form's rule's bound, as [`WIDTH_TOL`], its branch points at `x = ±i |η_near|`.
 const SEPARATED_TOL: f64 = 1e-14;
+
+/// The bound of the rule that integrates `G′` along a panel on one side of the point, as
+/// [`WIDTH_TOL`]: `G′`'s branch point is the point, `r = 0`, so the Bernstein ellipse is the
+/// panel's through it, `E = k + √(k² − 1)`, `k = |η₁ + η₂|/(η₂ − η₁)`.
+const SLOPE_TOL: f64 = 1e-14;
+
+/// The most Gauss–Legendre nodes the surface term takes along a panel on one side of the point:
+/// at most this many reach [`SLOPE_TOL`] where the farther end is within `4.15` times the nearer
+/// (`E ≥ 2.93`). Beyond it the surface is `G(r₂) − G(r₁)`, whose terms cancel by at most
+/// `(G₂ + G₁)/(G₂ − G₁)` at `r₂ = 4.15 r₁`: 1.7 … 2.9 for a nearer end within `b/2` (the near
+/// form's, with a depth), growing as `2 ln 4r/ln 4.15` beyond (23 at the table's end, `r₁ = e^14`,
+/// on a bare panel four times as long as its distance), each factor on `G`'s own few roundings.
+const SLOPE_NODES: usize = 16;
 
 /// Below this `s = κ²` the shape factor is 1 in floating point: `C − 1 ≈ s (ln(16/s) − 3)/8`
 /// (the expansion of `s R_D(0, 1, s)` about 0) is `7e-24` there, and far below it
@@ -160,17 +183,20 @@ pub enum Route {
 }
 
 impl Panel {
-    /// `None` unless both ends are finite, the half-width is a finite length `> 0`, and a depth,
-    /// where there is one, is a finite length `> 0`.
+    /// `None` unless the half-width is a finite length `> 0`, the panel runs forward (`from <
+    /// to`: a panel of no length loads nothing and a reversed one is the same panel negated),
+    /// both ends are finite in half-widths, and a depth, where there is one, is a finite length
+    /// `> 0`.
     pub fn new(from: f64, to: f64, half_width: f64, depth: Option<f64>) -> Option<Self> {
         let length = |v: f64| v.is_finite() && v > 0.0;
-        (from.is_finite() && to.is_finite() && length(half_width) && depth.is_none_or(length))
-            .then_some(Self {
-                from,
-                to,
-                half_width,
-                depth,
-            })
+        let finite = |end: f64| (end / half_width).is_finite();
+        let ends = from < to && finite(from) && finite(to);
+        (length(half_width) && ends && depth.is_none_or(length)).then_some(Self {
+            from,
+            to,
+            half_width,
+            depth,
+        })
     }
 
     /// The form the kernel reads this panel with.
@@ -215,6 +241,9 @@ pub struct Kernel {
     /// Gauss–Chebyshev (second kind) rules for `φ`, by node count: `(t_k, w_k)` with
     /// `t_k = cos(kπ/(n + 1))` and `w_k = (2/(n + 1)) sin²(kπ/(n + 1))`, `k = 1 … n`.
     rules: Vec<Vec<(f64, f64)>>,
+    /// Gauss–Legendre rules on `[−1, 1]` for `∫ G′` along a panel, by node count, to
+    /// [`SLOPE_NODES`].
+    slopes: Vec<Vec<(f64, f64)>>,
 }
 
 impl Kernel {
@@ -224,12 +253,7 @@ impl Kernel {
         KERNEL.get_or_init(|| Self::with_step(TABLE_STEP))
     }
 
-    /// The kernel with `G` tabulated at `step` in `u = ln r`.
-    #[expect(
-        clippy::expect_used,
-        reason = "G′ is R_D(0, r², 1 + r²): finite arguments, x + y > 0 and z > 0 for every r \
-                  of the table"
-    )]
+    /// The kernel with `F = G/asinh r` tabulated at `step` in `u = ln r`.
     #[expect(
         clippy::cast_possible_truncation,
         clippy::cast_sign_loss,
@@ -241,8 +265,10 @@ impl Kernel {
         let table = (0..count)
             .map(|i| {
                 let r = (TABLE_FROM + i as f64 * step).exp();
-                let slope = g_slope(r).expect("R_D's domain holds on the table");
-                (g_direct_with(r, &cells), r * slope)
+                let (g, area) = (g_direct_with(r, &cells), r.asinh());
+                // dF/du = r G′/A − G r/(√(1 + r²) A²), A = asinh r.
+                let dfdu = r * slope(r) / area - g * r / (r.hypot(1.0) * area * area);
+                (g / area, dfdu)
             })
             .collect();
         let rules = (0..=MAX_WIDTH_NODES)
@@ -256,11 +282,17 @@ impl Kernel {
                     .collect()
             })
             .collect();
-        Self { step, table, rules }
+        let slopes = (0..=SLOPE_NODES).map(gauss_legendre_rule).collect();
+        Self {
+            step,
+            table,
+            rules,
+            slopes,
+        }
     }
 
-    /// `G(r)`: the table's cubic Hermite in `u = ln r` with the exact slope, the asymptote above
-    /// it and the small-`r` form below it; odd, `G(0) = 0`.
+    /// `G(r)`: `asinh r` times the table's cubic Hermite of `G/asinh r` in `u = ln r` with the
+    /// exact slope, the asymptote above it and the small-`r` form below it; odd, `G(0) = 0`.
     #[expect(
         clippy::cast_possible_truncation,
         clippy::cast_sign_loss,
@@ -279,14 +311,16 @@ impl Kernel {
             let cell = at.floor().min((self.table.len() - 2) as f64) as usize;
             let t = at - cell as f64;
             let (t2, t3) = (t * t, t * t * t);
-            let ((g0, d0), (g1, d1)) = (self.table[cell], self.table[cell + 1]);
-            (2.0 * t3 - 3.0 * t2 + 1.0) * g0
+            let ((f0, d0), (f1, d1)) = (self.table[cell], self.table[cell + 1]);
+            let f = (2.0 * t3 - 3.0 * t2 + 1.0) * f0
                 + (t3 - 2.0 * t2 + t) * self.step * d0
-                + (-2.0 * t3 + 3.0 * t2) * g1
-                + (t3 - t2) * self.step * d1
+                + (-2.0 * t3 + 3.0 * t2) * f1
+                + (t3 - t2) * self.step * d1;
+            f * x.asinh()
         } else {
-            // Below the table, and NaN, which the comparisons above pass here.
-            4.0 / PI * x * (4.0 / x).ln()
+            // Below the table, and NaN, which the comparisons above pass here. `ln 4 − ln r`, not
+            // `ln(4/r)`, which overflows for a subnormal `r`.
+            4.0 / PI * x * (4.0_f64.ln() - x.ln())
         };
         value.copysign(r)
     }
@@ -310,8 +344,8 @@ impl Kernel {
         }
     }
 
-    /// The near form: the surface term through `G` less, with a depth, the depth term by the
-    /// width rule.
+    /// The near form: the surface term ([`Kernel::surface`]) less, with a depth, the depth term by
+    /// the width rule.
     fn near(&self, panel: &Panel, body: HalfSpace) -> f64 {
         let Panel {
             from,
@@ -319,11 +353,32 @@ impl Kernel {
             half_width: b,
             depth,
         } = *panel;
-        let surface = body.surface() * (self.g(to / b) - self.g(from / b));
+        let surface = body.surface() * self.surface(from, to, b);
         depth.map_or(surface, |h| {
             let rule = self.rule(width_rule(b, h));
             surface - body.interior() * depth_term(from, to, b, h, body.poisson, rule)
         })
+    }
+
+    /// `G(η₂/b) − G(η₁/b)`, the surface term per unit of `(1 − ν²)/(π E)`. On one side of the
+    /// point, where [`SLOPE_NODES`] Gauss–Legendre nodes reach [`SLOPE_TOL`], `∫ G′` along the
+    /// panel by that rule: the two values of `G` would cancel there by `G/(G′ Δr)`, `2e4` on a
+    /// panel `3e-5 b` long `0.4 b` from the point. Otherwise the difference, which
+    /// across the point is a sum and on one side cancels by at most [`SLOPE_NODES`]' factor.
+    fn surface(&self, from: f64, to: f64, b: f64) -> f64 {
+        if from * to > 0.0 {
+            let k = (from + to).abs() / (to - from);
+            let n = nodes(k + (k * k - 1.0).sqrt(), SLOPE_TOL);
+            if n <= SLOPE_NODES {
+                let (mid, half) = ((from + to) / (2.0 * b), (to - from) / (2.0 * b));
+                let sum: f64 = self.slopes[n]
+                    .iter()
+                    .map(|&(t, w)| w * slope(mid + half * t))
+                    .sum();
+                return half * sum;
+            }
+        }
+        self.g(to / b) - self.g(from / b)
     }
 
     /// The `n`-node rule.
@@ -332,16 +387,29 @@ impl Kernel {
     }
 }
 
-/// The depth term's integral across the width by `rule`, per unit of `(1 + ν)/(2π E)`.
+/// The depth term's integral across the width by `rule`, per unit of `(1 + ν)/(2π E)`:
+/// `∫ φ [2(1 − ν)(asinh(η₂/ρ) − asinh(η₁/ρ)) + h² (η₂/(ρ² R₂) − η₁/(ρ² R₁))]`. Across the point
+/// each difference is a sum of two terms of one sign; on one side it is taken without
+/// cancellation: `asinh(η₂/ρ) − asinh(η₁/ρ) = asinh(D/d_R)` and `η₂/R₂ − η₁/R₁ = ρ² D/(d_R R₁ R₂)`,
+/// `D = (η₂ − η₁)(η₂ + η₁)`, `d_R = η₂ R₁ + η₁ R₂`, whose terms are of one sign there. `d_R`
+/// vanishes only where `ρ` does, at `x = ±i h`, so the width rule serves both.
 fn depth_term(from: f64, to: f64, b: f64, h: f64, nu: f64, rule: &[(f64, f64)]) -> f64 {
+    let (h2, d) = (h * h, (to - from) * (to + from));
+    let one_side = from * to > 0.0;
     rule.iter()
         .map(|&(t, w)| {
             let x = b * t;
-            let r2 = x * x + h * h;
-            let rho = r2.sqrt();
-            let (dist1, dist2) = ((r2 + from * from).sqrt(), (r2 + to * to).sqrt());
-            w * (2.0 * (1.0 - nu) * ((to / rho).asinh() - (from / rho).asinh())
-                + h * h * (to / (r2 * dist2) - from / (r2 * dist1)))
+            let rho2 = x * x + h2;
+            let (dist1, dist2) = ((rho2 + from * from).sqrt(), (rho2 + to * to).sqrt());
+            let (apart, over) = if one_side {
+                let dr = to * dist1 + from * dist2;
+                ((d / dr).asinh(), h2 * d / (dr * dist1 * dist2))
+            } else {
+                let rho = rho2.sqrt();
+                let apart = (to / rho).asinh() - (from / rho).asinh();
+                (apart, h2 * (to / (rho2 * dist2) - from / (rho2 * dist1)))
+            };
+            w * (2.0 * (1.0 - nu) * apart + over)
         })
         .sum()
 }
@@ -386,11 +454,18 @@ fn separated(from: f64, to: f64, b: f64, h: f64, nu: f64, rule: &[(f64, f64)]) -
         .sum()
 }
 
-/// `G(r)` by quadrature of its definition: the `ln sin θ` singularity at `θ = 0` taken out in
-/// closed form (`−∫₀^{π/2} cos²θ ln sin θ dθ = (π/4) ln 2 + π/8`), the rest,
-/// `cos²θ ln(r + √(r² + sin²θ))`, over cells doubling from `min(r, π/4)` to `π/2`, 16-point
-/// Gauss–Legendre on each. Exact to rounding in absolute terms (a few `1e-16` at `r → 0`, where
-/// `G` itself vanishes). Odd, `G(0) = 0`.
+/// `G(r)` by quadrature, integrated by parts so that every term is positive. With
+/// `Φ(x) = ∫₀ˣ φ = (x √(1 − x²) + asin x)/π`, `Φ(1) = 1/2`, and `x = sin ψ`,
+///
+/// ```text
+/// G(r) = 2 ∫₀¹ φ(x) asinh(r/x) dx = asinh r + 2r ∫₀¹ Φ(x) dx/(x √(x² + r²))
+///      = asinh r + (2r/π) ∫₀^{π/2} cos ψ (cos ψ + ψ/sin ψ) dψ / √(sin²ψ + r²),
+/// ```
+///
+/// the integrand bounded (`2/r` at `ψ = 0`) and analytic but for branch points at
+/// `ψ = ±i asinh r`, over cells doubling from `min(r, π/4)` to `π/2`, 16-point Gauss–Legendre on
+/// each, summed with compensation. Exact to a few roundings of `G` itself at every `r`, since
+/// no term is of the other sign. Odd, `G(0) = 0`.
 pub fn g_direct(r: f64) -> f64 {
     g_direct_with(r, &gauss_legendre::<CELL_NODES>())
 }
@@ -400,9 +475,9 @@ fn g_direct_with(r: f64, cells: &[(f64, f64)]) -> f64 {
     if x == 0.0 {
         return r;
     }
-    let f = |th: f64| {
-        let s = th.sin();
-        th.cos().powi(2) * (x + (x * x + s * s).sqrt()).ln()
+    let f = |psi: f64| {
+        let (s, c) = psi.sin_cos();
+        c * (c + psi / s) / s.hypot(x)
     };
     // Cells double from `min(r, π/4)`: `⌈log₂(π/(2 min(r, π/4)))⌉` of them before `π/2`.
     let mut edges = vec![0.0];
@@ -412,17 +487,22 @@ fn g_direct_with(r: f64, cells: &[(f64, f64)]) -> f64 {
         a *= 2.0;
     }
     edges.push(FRAC_PI_2);
-    let total: f64 = edges
-        .windows(2)
-        .map(|e| {
-            let (half, mid) = (0.5 * (e[1] - e[0]), 0.5 * (e[1] + e[0]));
-            half * cells
-                .iter()
-                .map(|&(t, w)| w * f(mid + half * t))
-                .sum::<f64>()
-        })
-        .sum();
-    (4.0 / PI * (total + PI / 4.0 * LN_2 + PI / 8.0)).copysign(r)
+    // Neumaier's compensated sum: its error is two roundings of the total, not one per term.
+    let (mut total, mut carry) = (0.0_f64, 0.0_f64);
+    for e in edges.windows(2) {
+        let (half, mid) = (0.5 * (e[1] - e[0]), 0.5 * (e[1] + e[0]));
+        for &(t, w) in cells {
+            let term = half * w * f(mid + half * t);
+            let next = total + term;
+            carry += if total.abs() >= term.abs() {
+                (total - next) + term
+            } else {
+                (term - next) + total
+            };
+            total = next;
+        }
+    }
+    (x.asinh() + 2.0 * x / PI * (total + carry)).copysign(r)
 }
 
 /// `G′(r) = (4/(3π)) (1 + r²) R_D(0, r², 1 + r²)`, even. `None` at `r = 0`, where it grows as
@@ -430,6 +510,25 @@ fn g_direct_with(r: f64, cells: &[(f64, f64)]) -> f64 {
 pub fn g_slope(r: f64) -> Option<f64> {
     let r2 = r * r;
     r_d(0.0, r2, 1.0 + r2).map(|d| 4.0 / (3.0 * PI) * (1.0 + r2) * d)
+}
+
+/// `G′(r)` for `r ≠ 0`, by `G`'s three forms: the slopes of the outer forms beyond the table's
+/// ends (`(4/π)(ln(4/r) − 1)` below, `1/r − 1/(8 r³)` above, each to `1e-24` of itself there),
+/// [`g_slope`]'s closed form between, where `R_D`'s arguments are finite and `x + y > 0`.
+#[expect(
+    clippy::expect_used,
+    reason = "R_D(0, r², 1 + r²) for e^−28 < |r| < e^14: finite arguments, x + y > 0, z > 0"
+)]
+fn slope(r: f64) -> f64 {
+    let x = r.abs();
+    let u = x.ln();
+    if u >= TABLE_TO {
+        1.0 / x - 1.0 / (8.0 * x * x * x)
+    } else if u > TABLE_FROM {
+        g_slope(x).expect("R_D's domain holds on the table")
+    } else {
+        4.0 / PI * (4.0_f64.ln() - x.ln() - 1.0)
+    }
 }
 
 /// `C = p₀/p_line`, the peak of the Hertz ellipse of curvature ratio `q = k_L/k_A` over the line
@@ -457,8 +556,16 @@ mod tests {
     use crate::field::wide::Wide;
     use crate::hertz::elliptical_contact;
     use serde_json::Value;
+    use std::f64::consts::LN_2;
 
     const EPS: f64 = f64::EPSILON;
+
+    /// How many roundings of `G` [`g_direct`] errs by at most: each term's own dozen (the node,
+    /// its sine and cosine, the quotient, the sum, the product, the hypotenuse, the division,
+    /// the weight and the half-width, each moving the term by at most its own rounding), two
+    /// for the compensated sum, and six for `asinh r` and the terms' combination. Every term is
+    /// positive, so none of these is amplified.
+    const DIRECT_ROUNDINGS: f64 = 20.0;
 
     fn oracle_file() -> Value {
         serde_json::from_str(include_str!("../../tests/data/field_oracle/kernel.json"))
@@ -774,7 +881,7 @@ mod tests {
     #[test]
     fn the_oracle_fails_its_plants() {
         let kernel = Kernel::shared();
-        let v1 = reproduce(kernel, Kernel::near, |x, _| x, bound);
+        let v1 = reproduce(kernel, near_by_differences, |x, _| x, bound);
         eprintln!(
             "the near form everywhere: {:?} panels missed (near, separated), worst {:.3e} ({})",
             v1.panel_misses, v1.worst.ratio, v1.worst.at
@@ -928,36 +1035,40 @@ mod tests {
 
     // ---------------------------------------------------------------- G
 
-    /// `max |∂⁴G/∂u⁴|` over the table, `u = ln r`: `0.205` at `u ≈ −0.95`, rounded up.
-    /// [`the_table_is_g`] holds it against the third differences of the table's exact slope.
-    const G4_MAX: f64 = 0.21;
+    /// `max |∂⁴F/∂u⁴ / F|` over the table, `F = G/asinh r`, `u = ln r`: `0.288` at `u ≈ 0.05`,
+    /// rounded up. [`the_table_is_g`] holds it against the third differences of the table's
+    /// exact slope.
+    const F4_REL: f64 = 0.29;
 
-    /// Cubic Hermite with the exact slope, at `step` in `u`: `step⁴ max|∂⁴G/∂u⁴| / 384`.
+    /// Cubic Hermite of `F` with the exact slope, at `step` in `u`, relative to `G`:
+    /// `step⁴ max|∂⁴F/∂u⁴ / F| / 384`.
     fn hermite(step: f64) -> f64 {
-        step.powi(4) * G4_MAX / 384.0
+        step.powi(4) * F4_REL / 384.0
     }
 
-    /// [`g_direct`]'s rounding at `r`, `G(r) = g`. Its `m = 16 · cells` node terms sum with at
-    /// most `m ε Σ|terms|`; each term carries a few roundings of its own, and the logarithm an
-    /// absolute `ε` where its argument is near 1 (`Σ w cos²θ = π/4`); `Σ|terms| ≤ (π/4)(ln 2 +
-    /// 1/2 + g)`, since `|ln(r + √(r² + sin²θ))| ≤ |ln sin θ| + asinh(r/sin θ)`; the constant
-    /// added in closed form is `(π/4)(ln 2 + 1/2)`. Times `4/π`: `(m + 16) ε (ln 4 + 2 + g)`,
-    /// with at most `2 + log₂(π/(2 min(r, π/4)))` cells.
-    fn direct_rounding(r: f64, g: f64) -> f64 {
-        let cells = 2.0 + (FRAC_PI_2 / r.min(FRAC_PI_4)).log2();
-        (CELL_NODES as f64 * cells + 16.0) * EPS * (4.0_f64.ln() + 2.0 + g.abs())
+    /// [`g_direct`]'s rounding at `G = g`: [`DIRECT_ROUNDINGS`] of it.
+    fn direct_rounding(g: f64) -> f64 {
+        DIRECT_ROUNDINGS * EPS * g.abs()
+    }
+
+    /// The table's rounding at `u = ln r`, relative to `G`: the cell's position `u − TABLE_FROM`
+    /// errs `(|u| + 21) ε` (`ln r`'s own and the subtraction's, whose result is at most 42), which
+    /// moves `ln G` by at most as much (`|d ln F/du| = |r G′/G − r/(√(1 + r²) asinh r)| ≤ 1`,
+    /// both terms in `[0, 1]`); the interpolant's basis, sum and product with `asinh r`, twelve.
+    fn table_rounding(r: f64) -> f64 {
+        (r.ln().abs() + 21.0 + 12.0) * EPS
     }
 
     /// What `G` is held to at `r`: each of its three forms to what that form guarantees. Beyond
-    /// the table's ends, the outer forms, whose remainders are below `1e-24` there, to their few
-    /// roundings (`8 ε |G|`: relative, as the forms are); in the table, the Hermite bound, the
-    /// nodes' rounding, and the interpolant's own (`24 ε |G|`).
+    /// the table's ends, the outer forms, whose remainders are below `1e-24` of `G` there, to
+    /// their few roundings (`8 ε |G|`); in the table, the Hermite bound, the nodes' rounding
+    /// (the Hermite weights of the two values sum to 1), and the table's own.
     fn g_bound(r: f64, g: f64) -> f64 {
         let u = r.ln();
         if u >= TABLE_TO || u <= TABLE_FROM {
             8.0 * EPS * g.abs()
         } else {
-            hermite(TABLE_STEP) + direct_rounding(r, g) + 24.0 * EPS * g.abs()
+            (hermite(TABLE_STEP) + table_rounding(r)) * g.abs() + direct_rounding(g)
         }
     }
 
@@ -973,6 +1084,77 @@ mod tests {
     fn slope_typed(r: f64) -> f64 {
         let r2 = r * r;
         0.424_413_181_58 * (1.0 + r2) * r_d(0.0, r2, 1.0 + r2).expect("R_D")
+    }
+
+    /// The prototype's `G_direct`, and this port's before it: the `ln sin θ` singularity taken
+    /// out in closed form over the whole range, `G = (4/π)[∫ cos²θ ln(r + √(r² + sin²θ)) +
+    /// (π/4) ln 2 + π/8]`, whose two parts cancel to `G ~ r ln(1/r)` as `r → 0`: exact only in
+    /// absolute terms there.
+    fn g_direct_split(r: f64) -> f64 {
+        let x = r.abs();
+        let cells = gauss_legendre::<CELL_NODES>();
+        let f = |th: f64| {
+            let s = th.sin();
+            th.cos().powi(2) * (x + (x * x + s * s).sqrt()).ln()
+        };
+        let mut edges = vec![0.0];
+        let mut a = x.min(FRAC_PI_4);
+        while a < FRAC_PI_2 {
+            edges.push(a);
+            a *= 2.0;
+        }
+        edges.push(FRAC_PI_2);
+        let total: f64 = edges
+            .windows(2)
+            .map(|e| {
+                let (half, mid) = (0.5 * (e[1] - e[0]), 0.5 * (e[1] + e[0]));
+                half * cells
+                    .iter()
+                    .map(|&(t, w)| w * f(mid + half * t))
+                    .sum::<f64>()
+            })
+            .sum();
+        (4.0 / PI * (total + PI / 4.0 * LN_2 + PI / 8.0)).copysign(r)
+    }
+
+    /// `G` itself tabulated in `u = ln r` with its exact slope `r G′`, as this port's table was
+    /// before it held `G/asinh r`, at `step`: cubic Hermite errs up to `0.87 step⁴/384` of `G` as
+    /// `r → 0`, where `∂⁴G/∂u⁴ → G (ln 4 − u − 4)/(ln 4 − u)`.
+    struct GItself {
+        step: f64,
+        table: Vec<(f64, f64)>,
+    }
+
+    impl GItself {
+        #[expect(clippy::cast_possible_truncation, reason = "a node count")]
+        #[expect(clippy::cast_sign_loss, reason = "a node count")]
+        fn new(step: f64) -> Self {
+            let count = ((TABLE_TO - TABLE_FROM) / step).round() as usize + 1;
+            let table = (0..count)
+                .map(|i| {
+                    let r = (TABLE_FROM + i as f64 * step).exp();
+                    (g_direct(r), r * g_slope(r).expect("G′"))
+                })
+                .collect();
+            Self { step, table }
+        }
+
+        #[expect(clippy::cast_possible_truncation, reason = "a cell index")]
+        #[expect(clippy::cast_sign_loss, reason = "a cell index")]
+        fn g(&self, r: f64) -> f64 {
+            let u = r.ln();
+            if !(TABLE_FROM..TABLE_TO).contains(&u) {
+                return Kernel::shared().g(r);
+            }
+            let at = (u - TABLE_FROM) / self.step;
+            let cell = at.floor().min((self.table.len() - 2) as f64) as usize;
+            let t = at - cell as f64;
+            let ((g0, d0), (g1, d1)) = (self.table[cell], self.table[cell + 1]);
+            (2.0 * t.powi(3) - 3.0 * t * t + 1.0) * g0
+                + (t.powi(3) - 2.0 * t * t + t) * self.step * d0
+                + (-2.0 * t.powi(3) + 3.0 * t * t) * g1
+                + (t.powi(3) - t * t) * self.step * d1
+        }
     }
 
     /// Each radius with its reference `(G, G′)`, at steps 1/64 and 1/32.
@@ -1009,7 +1191,7 @@ mod tests {
     fn g_rule(k: usize, r: f64, x: f64) -> f64 {
         match k {
             TABLE => g_bound(r, x),
-            DIRECT => direct_rounding(r, x),
+            DIRECT => direct_rounding(x),
             _ => CLOSED_REL * x.abs(),
         }
     }
@@ -1045,15 +1227,16 @@ mod tests {
     /// **`G`, `G_direct` and `G′` are their definitions' quadratures**: at 81 radii from below the
     /// table to above it, the table (and its outer forms), [`g_direct`] and [`g_slope`] each
     /// equal a double-double quadrature of the definition, in a variable none of them uses, to
-    /// the bound its own form guarantees; the reference at steps 1/32 and 1/64 agrees with
-    /// itself to `1e-20`. The tolerance's two laws: every value a few roundings off passes, ten
-    /// times its bound off misses everywhere.
+    /// the bound its own form guarantees, relative to `G` at every `r`; the reference at steps
+    /// 1/32 and 1/64 agrees with itself to `1e-20`. The tolerance's two laws: every value a few
+    /// roundings off passes, ten times its bound off misses everywhere.
     ///
     /// Plants, each missing somewhere and each passing the looser gate beside it (asserted):
     /// the prototype's tail below the table, linear in `r` (`G(r₀) r/r₀`: under `1e-12`
-    /// absolute); round six's table step, `0.02` (under `1e-10` absolute); [`g_direct`] at 8
-    /// nodes a cell (`1.7e-12` at worst, under `1e-10` absolute); `G′` with `4/(3π)` typed to 11
-    /// digits (under `1e-10` relative).
+    /// absolute); `G` itself tabulated at the previous step, `0.0025` (under `1e-13` of `G`,
+    /// the panel gate's own size); the prototype's `G_direct`, the `ln sin θ` split (under
+    /// `1e-12` absolute); [`g_direct`] at 8 nodes a cell (under `1e-9` of `G`); `G′` with
+    /// `4/(3π)` typed to 11 digits (under `1e-10` relative).
     #[test]
     fn g_is_its_definitions_quadrature() {
         let kernel = Kernel::shared();
@@ -1094,20 +1277,20 @@ mod tests {
                 kernel.g(r)
             }
         };
-        let coarse = Kernel::with_step(0.02);
-        let coarse_table = |r: f64| coarse.g(r);
+        let itself = GItself::new(0.0025);
+        let itself_table = |r: f64| itself.g(r);
         let eight = |r: f64| g_direct_with(r, &gauss_legendre::<8>());
         let absolute = |a: f64| move |_: usize, _: f64, _: f64| a;
+        let relative = |a: f64| move |_: usize, _: f64, x: f64| a * x.abs();
         // (the evaluations, which of them is planted, the looser gate it passes)
-        let plants: [(Evaluations, usize, GBound); 4] = [
+        let plants: [(Evaluations, usize, GBound); 5] = [
             ([&linear, &g_direct, &slope], TABLE, &absolute(1e-12)),
-            ([&coarse_table, &g_direct, &slope], TABLE, &absolute(1e-10)),
-            ([&table, &eight, &slope], DIRECT, &absolute(1e-10)),
-            ([&table, &g_direct, &slope_typed], SLOPE, &|_, _, x: f64| {
-                1e-10 * x.abs()
-            }),
+            ([&itself_table, &g_direct, &slope], TABLE, &relative(1e-13)),
+            ([&table, &g_direct_split, &slope], DIRECT, &absolute(1e-12)),
+            ([&table, &eight, &slope], DIRECT, &relative(1e-9)),
+            ([&table, &g_direct, &slope_typed], SLOPE, &relative(1e-10)),
         ];
-        let (mut caught, mut largest) = ([0; 4], [0.0; 4]);
+        let (mut caught, mut largest) = ([0; 5], [0.0; 5]);
         for (k, (at, planted, looser)) in plants.into_iter().enumerate() {
             let (missed, _) = g_missed(&cases, at, as_is, g_rule);
             assert_eq!(
@@ -1116,13 +1299,13 @@ mod tests {
                 "plant {k} moves only what it plants"
             );
             caught[k] = missed[planted];
-            largest[k] = g_missed(&cases, at, as_is, absolute(1.0)).1[planted];
+            largest[k] = g_missed(&cases, at, as_is, relative(1.0)).1[planted];
             let (near_miss, _) = g_missed(&cases, at, as_is, looser);
             assert_eq!(near_miss[planted], 0, "plant {k} passes the looser gate");
         }
         eprintln!(
-            "G plants missing (tail, step 0.02, 8 nodes, 11 digits): {caught:?}, largest \
-             errors {:?}",
+            "G plants missing (tail, G itself at 0.0025, the ln sin θ split, 8 nodes, 11 \
+             digits): {caught:?}, largest errors of G {:?}",
             largest.map(|x: f64| format!("{x:.1e}"))
         );
         assert!(caught.iter().all(|&m| m > 0), "{caught:?}");
@@ -1178,19 +1361,109 @@ mod tests {
             .collect()
     }
 
+    /// The short panels a graded solve asks for, which the grid above misses: panels on one side
+    /// of the point, the nearer end `0.02 … 0.45 b` from it and `3e-5 … 1 b` long, at depths from
+    /// a third of the width to three hundred widths, alternately either side; panels on the point
+    /// `3e-5 b` long (a graded end at `N` 96) and `5.7e-4 b` (at `N` 48); one of them bare, with a
+    /// bare panel short beside the point and two far out; and the panel of `s0bb` at `N` 96 that
+    /// the prototype's near form errs `7.8e-11` of scale on (`b 0.0593`, `h 0.520`).
+    fn short_cases() -> Vec<(Panel, HalfSpace)> {
+        let b = 0.05;
+        let steel = steel();
+        let mut out = vec![(
+            Panel::new(0.025_126_7, 0.025_128_8, 0.0593, Some(0.520)).expect("a panel"),
+            steel,
+        )];
+        let mut side = 1.0;
+        for depth in [0.3, 3.0, 30.0, 300.0] {
+            for nearer in [0.02, 0.2, 0.45] {
+                for length in [3e-5, 1e-3, 0.1, 1.0] {
+                    let (from, to) = if side > 0.0 {
+                        (nearer, nearer + length)
+                    } else {
+                        (-nearer - length, -nearer)
+                    };
+                    side = -side;
+                    let panel = Panel::new(from * b, to * b, b, Some(depth * b));
+                    out.push((panel.expect("a panel"), steel));
+                }
+            }
+        }
+        for (length, depth) in [
+            (3e-5, Some(0.3)),
+            (3e-5, Some(8.8)),
+            (3e-5, Some(300.0)),
+            (5.7e-4, Some(0.3)),
+            (5.7e-4, Some(8.8)),
+            (3e-5, None),
+        ] {
+            let panel = Panel::new(-length / 2.0 * b, length / 2.0 * b, b, depth.map(|h| h * b));
+            out.push((panel.expect("a panel"), steel));
+        }
+        for (from, to) in [(0.2, 0.2 + 1e-3), (100.0, 100.001), (-3000.2, -3000.0)] {
+            out.push((
+                Panel::new(from * b, to * b, b, None).expect("a panel"),
+                steel,
+            ));
+        }
+        out
+    }
+
     /// The gate: a panel within `1e-13` of its form's scale ([`Terms::scale`]) of the
     /// definition's quadrature.
     const PANEL_GATE: f64 = 1e-13;
 
-    /// **Every panel is its definition's quadrature**: on 67 panels ([`panel_cases`]), the
-    /// kernel's value is the double-double quadrature of the definition to `1e-13` of the scale
-    /// of the form it takes (the porting plan's gate), and the reference at steps 1/32 and 1/64
-    /// agrees with itself to `1e-20` of it. The tolerance's two laws: a value a few roundings off
-    /// passes, ten times the gate off misses on every panel.
+    /// The prototype's near form, and this port's before it: the surface as `G(η₂/b) − G(η₁/b)`
+    /// and the depth term as differences of `asinh` and of `η/R`, on one side of the point as
+    /// across it.
+    fn near_by_differences(kernel: &Kernel, p: &Panel, body: HalfSpace) -> f64 {
+        let (b, nu, from, to) = (p.half_width, body.poisson, p.from, p.to);
+        let surface = body.surface() * (kernel.g(to / b) - kernel.g(from / b));
+        p.depth.map_or(surface, |h| {
+            let depth: f64 = kernel
+                .rule(width_rule(b, h))
+                .iter()
+                .map(|&(t, w)| {
+                    let x = b * t;
+                    let r2 = x * x + h * h;
+                    let rho = r2.sqrt();
+                    let (d1, d2) = ((r2 + from * from).sqrt(), (r2 + to * to).sqrt());
+                    w * (2.0 * (1.0 - nu) * ((to / rho).asinh() - (from / rho).asinh())
+                        + h * h * (to / (r2 * d2) - from / (r2 * d1)))
+                })
+                .sum();
+            surface - body.interior() * depth
+        })
+    }
+
+    /// The prototype's `panel`: the separated form where the port takes it, the near form by
+    /// differences elsewhere.
+    fn prototype_panel(kernel: &Kernel, p: &Panel, body: HalfSpace) -> f64 {
+        match p.route() {
+            Route::Separated => kernel.panel(p, body),
+            Route::Near => near_by_differences(kernel, p, body),
+        }
+    }
+
+    /// Whether the surface of `p` takes `∫ G′` ([`Kernel::surface`]'s rule).
+    fn by_slope(p: &Panel) -> bool {
+        let k = (p.from + p.to).abs() / (p.to - p.from);
+        p.from * p.to > 0.0 && nodes(k + (k * k - 1.0).sqrt(), SLOPE_TOL) <= SLOPE_NODES
+    }
+
+    /// **Every panel is its definition's quadrature**: on the 67 panels of [`panel_cases`] and
+    /// the 58 short ones a graded solve asks for ([`short_cases`]), the kernel's value is the
+    /// double-double quadrature of the definition to `1e-13` of the scale of the form it takes
+    /// (the porting plan's gate), and the reference at steps 1/64 and 1/128 agrees with itself
+    /// to `1e-20` of it. The tolerance's two laws: a value a few roundings off passes, ten times
+    /// the gate off misses on every panel. The short panels' surfaces take both of its forms
+    /// (counted).
     ///
-    /// Plants, each missing some panel: version 1's port (the near form everywhere), which
-    /// the far panels' cancellation fails; round six's `G` table (step 0.02); round six's width
-    /// rule (`1e-10`) on the near panels.
+    /// Plants, each missing some panel: the prototype's `panel` (the near form by differences
+    /// of `G` and of `asinh`), which the short panels fail and every panel of the first grid
+    /// passes (asserted: the grid this gate had); version 1's port (the near form by
+    /// differences everywhere), which the far panels' cancellation fails; round six's `G` table
+    /// (step 0.02); round six's width rule (`1e-10`) on the near panels.
     #[test]
     fn every_panel_is_its_definitions_quadrature() {
         let kernel = Kernel::shared();
@@ -1198,10 +1471,14 @@ mod tests {
         let (mut worst, mut self_worst, mut cancels) = (0.0_f64, 0.0_f64, 0.0_f64);
         let (mut compared, mut rounded, mut tenfold) = (0, 0, 0);
         let (mut v1_missed, mut six_missed, mut rule_missed) = (0, 0, 0);
-        for (p, body) in panel_cases() {
-            let terms = reference_terms(&p, body, 1.0 / 64.0);
+        let (mut prototype_missed, mut prototype_grid) = (0, 0);
+        let mut forms = (0, 0);
+        let grid = panel_cases();
+        let first = grid.len();
+        for (k, (p, body)) in grid.into_iter().chain(short_cases()).enumerate() {
+            let terms = reference_terms(&p, body, 1.0 / 128.0);
             let (fine, scale) = (terms.value(), terms.scale(p.route()));
-            let half = reference_terms(&p, body, 1.0 / 32.0).value();
+            let half = reference_terms(&p, body, 1.0 / 64.0).value();
             self_worst = self_worst.max((fine - half).abs().to_f64() / scale);
             let near_scale = terms.scale(Route::Near);
             cancels = cancels.max(near_scale / fine.abs().to_f64());
@@ -1211,13 +1488,22 @@ mod tests {
             compared += 1;
             rounded += usize::from(off(port * (1.0 + 4.0 * EPS)) <= PANEL_GATE);
             tenfold += usize::from(off(port + 10.0 * PANEL_GATE * scale) > PANEL_GATE);
-            v1_missed += usize::from(off(kernel.near(&p, body)) > PANEL_GATE);
+            v1_missed += usize::from(off(near_by_differences(kernel, &p, body)) > PANEL_GATE);
+            let prototype = usize::from(off(prototype_panel(kernel, &p, body)) > PANEL_GATE);
+            prototype_missed += prototype;
+            prototype_grid += if k < first { prototype } else { 0 };
             six_missed += usize::from(off(coarse.panel(&p, body)) > PANEL_GATE);
+            if k >= first {
+                if by_slope(&p) {
+                    forms.0 += 1;
+                } else {
+                    forms.1 += 1;
+                }
+            }
             if let (Some(h), Route::Near) = (p.depth, p.route()) {
                 let r = h / p.half_width;
                 let n = nodes(r + (1.0 + r * r).sqrt(), 1e-10);
-                let surface = body.surface()
-                    * (kernel.g(p.to / p.half_width) - kernel.g(p.from / p.half_width));
+                let surface = body.surface() * kernel.surface(p.from, p.to, p.half_width);
                 let v = surface
                     - body.interior()
                         * depth_term(p.from, p.to, p.half_width, h, body.poisson, kernel.rule(n));
@@ -1227,17 +1513,81 @@ mod tests {
         eprintln!(
             "{compared} panels against the double-double reference: worst {worst:.2e} of scale \
              (the reference's own step change {self_worst:.1e}; the near form's terms reach \
-             {cancels:.1e} times the value); plants missing: v1 {v1_missed}, step 0.02 \
-             {six_missed}, width 1e-10 {rule_missed}"
+             {cancels:.1e} times the value); the short panels' surfaces by G′ and by G: \
+             {forms:?}; plants missing: the prototype's panel {prototype_missed} ({prototype_grid} \
+             of the first grid), v1 {v1_missed}, step 0.02 {six_missed}, width 1e-10 \
+             {rule_missed}"
         );
-        assert_eq!(compared, 67);
+        assert_eq!((first, compared), (67, 125));
         assert!(
             self_worst < 1e-20,
             "the reference has not converged: {self_worst}"
         );
         assert!(worst <= PANEL_GATE, "worst {worst}");
-        assert_eq!((rounded, tenfold), (67, 67));
-        assert!(v1_missed > 0 && six_missed > 0 && rule_missed > 0);
+        assert_eq!((rounded, tenfold), (125, 125));
+        assert!(forms.0 > 0 && forms.1 > 0, "{forms:?}");
+        assert_eq!(
+            prototype_grid, 0,
+            "the prototype's panel passes the first grid"
+        );
+        assert!(prototype_missed > 0 && v1_missed > 0 && six_missed > 0 && rule_missed > 0);
+    }
+
+    /// **The surface's two forms agree at their switch**: on a panel on one side of the point
+    /// where [`SLOPE_NODES`] nodes just reach [`SLOPE_TOL`] (`E = SLOPE_TOL^{−1/(2(n − 1))}`,
+    /// `n` the most nodes), the rule and `G`'s difference both equal the double-double
+    /// quadrature of the surface term to the panel gate of it, over nearer ends from `1e-6` to
+    /// `1e3` half-widths either side; a panel `1e-9` longer takes the difference. Plant: the
+    /// rule three nodes short at the switch, which misses.
+    #[test]
+    fn the_surface_forms_agree_at_their_switch() {
+        let kernel = Kernel::shared();
+        let body = steel();
+        let b = 0.05;
+        let edge = SLOPE_TOL.powf(-1.0 / (2.0 * (SLOPE_NODES as f64 - 1.0)));
+        let k = 0.5 * (edge + 1.0 / edge);
+        let ratio = (k + 1.0) / (k - 1.0);
+        let (mut worst, mut ran, mut short) = (0.0_f64, 0, 0);
+        for nearer in [1e-6, 1e-3, 0.1, 0.45, 3.0, 1e3] {
+            for side in [1.0, -1.0] {
+                let (a, c) = (nearer * b, nearer * b * ratio * (1.0 - 1e-12));
+                let (from, to) = if side > 0.0 { (a, c) } else { (-c, -a) };
+                let p = Panel::new(from, to, b, None).expect("a panel");
+                assert!(by_slope(&p), "{p:?}");
+                let longer = if side > 0.0 {
+                    Panel::new(from, to * (1.0 + 1e-9), b, None)
+                } else {
+                    Panel::new(from * (1.0 + 1e-9), to, b, None)
+                };
+                assert!(!by_slope(&longer.expect("a panel")));
+                let reference = reference_terms(&p, body, 1.0 / 64.0).surface;
+                let scale = reference.abs().to_f64();
+                let off =
+                    |v: f64| (Wide::of(body.surface() * v) - reference).abs().to_f64() / scale;
+                let rule = kernel.surface(from, to, b);
+                let difference = kernel.g(to / b) - kernel.g(from / b);
+                assert!(off(rule) <= PANEL_GATE, "{p:?}: {:e}", off(rule));
+                assert!(
+                    off(difference) <= PANEL_GATE,
+                    "{p:?}: {:e}",
+                    off(difference)
+                );
+                worst = worst.max(off(rule)).max(off(difference));
+                ran += 1;
+                let (mid, half) = ((from + to) / (2.0 * b), (to - from) / (2.0 * b));
+                let few: f64 = gauss_legendre_rule(SLOPE_NODES - 3)
+                    .iter()
+                    .map(|&(t, w)| w * slope(mid + half * t))
+                    .sum();
+                short += usize::from(off(half * few) > PANEL_GATE);
+            }
+        }
+        eprintln!(
+            "the surface's switch (r₂/r₁ = {ratio:.3}): {ran} panels, worst {worst:.2e} of the \
+             surface; three nodes short misses {short}"
+        );
+        assert_eq!(ran, 12);
+        assert!(short > 0);
     }
 
     // ---------------------------------------------------------------- the line limit
@@ -1689,89 +2039,131 @@ mod tests {
         d / approach - 1.0
     }
 
-    /// The orders a line's approach converges at, per doubling of `N` from 16 to 128, on the two
-    /// curvature ratios: `log₂(e(N)/e(2N))`.
-    fn orders(line: Line) -> Vec<(f64, f64)> {
-        let mut out = Vec::new();
-        for ratio in [(0.05, 0.5), (0.2, 0.4)] {
-            let e: Vec<f64> = [16, 32, 64, 128]
-                .iter()
-                .map(|&n| ellipse_error(n, ratio, line))
-                .collect();
-            for w in e.windows(2) {
-                out.push(((w[0] / w[1]).log2(), w[1]));
-            }
-        }
-        out
+    /// A line's approach error `e(N)` at `N` 16, 32, 64 and 128, on the two curvature ratios.
+    fn errors(line: Line) -> [[f64; 4]; 2] {
+        [(0.05, 0.5), (0.2, 0.4)]
+            .map(|ratio| [16, 32, 64, 128].map(|n| ellipse_error(n, ratio, line)))
     }
 
-    /// **The Hertz ellipse at O(N⁻²)**: the line solve through the kernel reproduces the Hertz
-    /// ellipse, its approach converging at second order in the panel count — the order each
-    /// doubling from 16 to 128 shows rounds to 2 (half an order either side is the half-way to
-    /// the neighbouring orders), on two curvature ratios, the error of one sign throughout.
+    /// The orders each doubling shows, `log₂(e(N)/e(2N))`, all rounding to 2 (half an order
+    /// either side is the half-way to the neighbouring orders), and the error of one sign.
+    fn second_order(e: &[f64; 4]) -> bool {
+        e.windows(2)
+            .all(|w| ((w[0] / w[1]).log2() - 2.0).abs() < 0.5)
+            && e.iter().all(|x| x.signum() == e[0].signum())
+    }
+
+    /// Richardson's extrapolations `R(N) = (4 e(2N) − e(N))/3`, `N` 16, 32, 64: what is left
+    /// once the `N⁻²` term is taken out.
+    fn richardson(e: &[f64; 4]) -> [f64; 3] {
+        [0, 1, 2].map(|k| (4.0 * e[k + 1] - e[k]) / 3.0)
+    }
+
+    /// Whether the limit is Hertz's: `R(N)` keeps one sign and at least halves at each doubling,
+    /// so the remainder it carries vanishes at least at first order. A limit `ε` off Hertz's
+    /// makes `R(N)` settle on `ε` rather than on 0: it stalls, or crosses zero.
+    fn at_hertz(e: &[f64; 4]) -> bool {
+        let r = richardson(e);
+        r.iter().all(|x| x.signum() == r[0].signum())
+            && r.windows(2).all(|w| w[0].abs() >= 2.0 * w[1].abs())
+    }
+
+    /// **The Hertz ellipse at O(N⁻²), in the limit**: the line solve through the kernel
+    /// reproduces the Hertz ellipse, its approach converging at second order in the panel count
+    /// ([`second_order`], on each doubling from 16 to 128) to Hertz's approach itself
+    /// ([`at_hertz`]: Richardson's extrapolation converges on zero), on two curvature ratios.
     ///
-    /// Plants: the shape factor left out (the strips as wide as a line's), a wrong limit; the
-    /// shape factor `2e-4` high, a wrong limit a `|e(128)| < 1e-4` gate passes (asserted); the
-    /// stations at their panels' starts, which converges at first order on the coarse grids.
+    /// Plants: the shape factor left out (the strips as wide as a line's), `2e-4` high, `1e-5`
+    /// high and low, and `2e-5` high, each a wrong limit, and the stations at their panels'
+    /// starts, which converges at first order on the coarse grids. The shape factor `1e-5` and
+    /// `2e-5` off keeps second order (asserted: the gate before the limit passed them); the
+    /// limit catches them. The resolution in `C` lies between `2e-6` (asserted to
+    /// pass: its limit, `≈ 6e-7`, is below the extrapolations' own change at `N` 128) and `1e-5`.
     #[test]
     fn the_hertz_ellipse_converges_at_second_order() {
-        let second = |o: &[(f64, f64)]| {
-            o.iter().all(|&(p, _)| (p - 2.0).abs() < 0.5)
-                && o.iter().all(|&(_, e)| e.signum() == o[0].1.signum())
-        };
-        let port = orders(THE_LINE);
-        eprintln!(
-            "ellipse: orders {:?}, e(128) {:.2e} and {:.2e}",
-            port.iter().map(|o| o.0).collect::<Vec<_>>(),
-            port[2].1,
-            port[5].1
-        );
-        assert_eq!(port.len(), 6);
-        assert!(second(&port), "{port:?}");
+        let gate = |e: &[[f64; 4]; 2]| e.iter().all(|e| second_order(e) && at_hertz(e));
+        let port = errors(THE_LINE);
+        let list = |v: &[f64]| v.iter().map(|x| format!("{x:.3e}")).collect::<Vec<_>>();
+        let seen = |e: &[[f64; 4]; 2]| e.map(|e| (list(&e), list(&richardson(&e))));
+        eprintln!("ellipse: (e(N), R(N)) {:?}", seen(&port));
+        assert!(gate(&port), "{port:?}");
 
-        let plants = [
-            Line {
-                shape: |_| 1.0,
-                ..THE_LINE
-            },
-            Line {
-                shape: |q| 1.0002 * shape_factor(q).expect("q in [0, 1]"),
-                ..THE_LINE
-            },
-            Line {
-                station: -0.5,
-                ..THE_LINE
-            },
+        // (the plant, whether the second-order gate alone passes it)
+        let plants: [(Line, bool); 6] = [
+            (
+                Line {
+                    shape: |_| 1.0,
+                    ..THE_LINE
+                },
+                false,
+            ),
+            (
+                Line {
+                    shape: |q| 1.0002 * shape_factor(q).expect("C"),
+                    ..THE_LINE
+                },
+                false,
+            ),
+            (
+                Line {
+                    shape: |q| (1.0 + 1e-5) * shape_factor(q).expect("C"),
+                    ..THE_LINE
+                },
+                true,
+            ),
+            (
+                Line {
+                    shape: |q| (1.0 - 1e-5) * shape_factor(q).expect("C"),
+                    ..THE_LINE
+                },
+                true,
+            ),
+            (
+                Line {
+                    shape: |q| (1.0 + 2e-5) * shape_factor(q).expect("C"),
+                    ..THE_LINE
+                },
+                true,
+            ),
+            (
+                Line {
+                    station: -0.5,
+                    ..THE_LINE
+                },
+                false,
+            ),
         ];
         let mut failed = 0;
-        for (k, plant) in plants.into_iter().enumerate() {
-            let o = orders(plant);
-            let last = o.last().expect("an order").1;
-            eprintln!(
-                "plant {k}: orders {:?}, e(128) {last:.2e}",
-                o.iter().map(|o| o.0).collect::<Vec<_>>()
-            );
-            assert!(!second(&o), "plant {k} passes");
+        for (k, (plant, keeps_order)) in plants.into_iter().enumerate() {
+            let e = errors(plant);
+            eprintln!("plant {k}: (e(N), R(N)) {:?}", seen(&e));
+            assert!(!gate(&e), "plant {k} passes");
             failed += 1;
-            if k == 1 {
+            if keeps_order {
                 assert!(
-                    last.abs() < 1e-4,
-                    "a near miss: a 1e-4 gate on e(128) passes it"
+                    e.iter().all(second_order),
+                    "plant {k}: the second-order gate alone passes it"
                 );
             }
         }
-        assert_eq!(failed, 3);
+        assert_eq!(failed, 6);
+        let fine = errors(Line {
+            shape: |q| (1.0 + 2e-6) * shape_factor(q).expect("C"),
+            ..THE_LINE
+        });
+        assert!(gate(&fine), "C 2e-6 high is below the resolution: {fine:?}");
     }
 
     // ---------------------------------------------------------------- G, and the shape factor
 
     /// **`G`'s table is its quadrature**: at every cell's middle across the table, where cubic
     /// Hermite errs most, the table equals [`g_direct`] to the Hermite bound and both sides'
-    /// rounding; at each end it meets its outer form to rounding (`8ε` of `G`, both forms exact
-    /// there); `G` is odd and `G(0) = 0`, and `G′` is `None` at 0. The Hermite bound's
-    /// `max|∂⁴G/∂u⁴|` ([`G4_MAX`]) bounds every third difference of the table's exact slope
-    /// `dG/du` over `step³` (each is `∂⁴G/∂u⁴` somewhere in its three cells), and is within 5 % of
-    /// the largest. Plant: round six's step, 0.02, which a `1e-10` gate passes (asserted).
+    /// rounding, relative to `G`; at each end it meets its outer form to rounding (`8ε` of `G`,
+    /// both forms exact there); `G` is odd and `G(0) = 0`, and `G′` is `None` at 0. The Hermite
+    /// bound's `max|∂⁴F/∂u⁴ / F|` ([`F4_REL`]) bounds every third difference of the table's
+    /// exact slope `dF/du` over `step³` (each is `∂⁴F/∂u⁴` somewhere in its three cells) over
+    /// `F`, and is within 5 % of the largest. Plant: `F` at twice the step, `0.0025`, which a
+    /// `1e-13` gate relative to `G` passes (asserted).
     #[test]
     fn the_table_is_g() {
         let midpoints = |k: &Kernel| -> (usize, f64, f64) {
@@ -1780,38 +2172,38 @@ mod tests {
             for i in 0..cells {
                 let r = (TABLE_FROM + (i as f64 + 0.5) * k.step).exp();
                 let (g, direct) = (k.g(r), g_direct(r));
-                let bound =
-                    hermite(TABLE_STEP) + 2.0 * direct_rounding(r, direct) + 24.0 * EPS * g.abs();
+                let bound = (hermite(TABLE_STEP) + table_rounding(r)) * g.abs()
+                    + 2.0 * direct_rounding(direct);
                 worst = worst.max((g - direct).abs() / bound);
-                largest = largest.max((g - direct).abs());
+                largest = largest.max((g - direct).abs() / direct.abs());
             }
             (cells, worst, largest)
         };
         let kernel = Kernel::shared();
         let (cells, worst, largest) = midpoints(kernel);
-        eprintln!("G: {cells} cells, worst {worst:.3} of the bound ({largest:.1e})");
-        assert_eq!(cells, 16_800);
+        eprintln!("G: {cells} cells, worst {worst:.3} of the bound ({largest:.1e} of G)");
+        assert_eq!(cells, 33_600);
         assert!(worst <= 1.0, "{worst}");
-        let (_, six, six_largest) = midpoints(&Kernel::with_step(0.02));
-        eprintln!("round six's step: worst {six:.1e} of the bound ({six_largest:.1e})");
-        assert!(six > 1.0 && six_largest < 1e-10);
+        let (_, twice, twice_largest) = midpoints(&Kernel::with_step(2.0 * TABLE_STEP));
+        eprintln!("twice the step: worst {twice:.1e} of the bound ({twice_largest:.1e} of G)");
+        assert!(twice > 1.0 && twice_largest < 1e-13);
 
         let third = kernel
             .table
             .windows(4)
-            .map(|w| (w[3].1 - 3.0 * w[2].1 + 3.0 * w[1].1 - w[0].1).abs() / kernel.step.powi(3))
+            .map(|w| {
+                let d3 = w[3].1 - 3.0 * w[2].1 + 3.0 * w[1].1 - w[0].1;
+                (d3 / kernel.step.powi(3) / w[1].0.min(w[2].0)).abs()
+            })
             .fold(0.0_f64, f64::max);
-        eprintln!("max |∂⁴G/∂u⁴| over the table's third differences: {third:.4}");
-        assert!(third <= G4_MAX && G4_MAX <= 1.05 * third, "{third}");
+        eprintln!("max |∂⁴F/∂u⁴ / F| over the table's third differences: {third:.4}");
+        assert!(third <= F4_REL && F4_REL <= 1.05 * third, "{third}");
 
         for end in [TABLE_FROM, TABLE_TO] {
             let r = end.exp();
             for x in [r.next_down(), r, r.next_up()] {
                 let g = kernel.g(x);
-                assert!(
-                    (g - g_direct(x)).abs() <= 8.0 * EPS * g.abs().max(1.0),
-                    "{x:e}"
-                );
+                assert!((g - g_direct(x)).abs() <= 8.0 * EPS * g.abs(), "{x:e}");
             }
         }
         for r in [1e-13, 0.3, 7.0, 3e6] {
@@ -1906,16 +2298,23 @@ mod tests {
         assert!(early > 0 && switch > 0 && reach == 0);
     }
 
-    /// What is no panel and no half-space is refused: a panel with an end not a number, a width
-    /// not a finite length `> 0`, or a depth not one (`None` is the bare half-space, not a depth
-    /// of `∞`); a modulus not a finite positive one, a Poisson's ratio outside `(−1, 1/2]`; a
-    /// line limit on a width or depth not a finite length `> 0`. A half-space holds what it was
-    /// given.
+    /// What is no panel and no half-space is refused: a panel of no length or reversed (the
+    /// separated form's `D/d_R` is `0/0` on one of no length), an end not a number or not finite
+    /// in half-widths, a width not a finite length `> 0`, or a depth not one (`None` is the bare
+    /// half-space, not a depth of `∞`); a modulus not a finite positive one, a Poisson's ratio
+    /// outside `(−1, 1/2]`; a line limit on a width or depth not a finite length `> 0`. A
+    /// half-space holds what it was given; a panel a rounding long is a panel, and finite.
     #[test]
     fn what_is_no_panel_is_refused() {
         let good = Panel::new(-0.1, 0.2, 0.05, Some(0.5));
         assert!(good.is_some() && Panel::new(-0.1, 0.2, 0.05, None).is_some());
         let refused = [
+            (0.045, 0.045, 0.05, Some(0.2)),
+            (0.045, 0.045, 0.05, None),
+            (0.0, 0.0, 0.05, Some(0.2)),
+            (0.2, -0.1, 0.05, Some(0.5)),
+            (1e300, 2e300, 1e-10, Some(0.5)),
+            (-1e300, 0.1, 1e-10, None),
             (f64::NAN, 0.2, 0.05, Some(0.5)),
             (-0.1, f64::INFINITY, 0.05, Some(0.5)),
             (-0.1, 0.2, 0.0, Some(0.5)),
@@ -1928,6 +2327,16 @@ mod tests {
         ];
         for (from, to, b, h) in refused {
             assert_eq!(Panel::new(from, to, b, h), None, "{from} {to} {b} {h:?}");
+        }
+        let kernel = Kernel::shared();
+        for (from, h) in [
+            (0.045, Some(0.2)),
+            (0.045, None),
+            (0.0, Some(0.2)),
+            (-0.01, None),
+        ] {
+            let p = Panel::new(from, from.next_up(), 0.05, h).expect("a panel");
+            assert!(kernel.panel(&p, steel()).is_finite(), "{p:?}");
         }
         for (e, nu) in [(206_000.0, 0.5), (1.0, -0.99), (96_500.0, 0.32)] {
             let body = HalfSpace::new(e, nu).expect("a half-space");

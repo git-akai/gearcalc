@@ -94,9 +94,26 @@ the prototype, never widened to a flaw. What each step found:
   - Absence carried as a number: `dG(0) = inf`, the bare half-space as `h = inf`, and `n_width` returning its
     cap for `h/b` not `> 0`. The port types each (`None`; a panel with no depth; a panel refused).
   - `G_direct` is exact only in absolute terms at small `r` (a few `1e-16`, where `G` is `~ r ln(1/r)`): it
-    subtracts the `ln sin θ` singularity over the whole range. The port keeps the method and states the limit:
-    a panel `2e-3 b` long on the point still holds `1e-13` of itself (the panel law), the relative error grows
-    as one over the length below that, and no panel of a solve is near that short.
+    subtracts the `ln sin θ` singularity over the whole range, and `G`'s table takes its nodes from it, so the
+    table carries the same (`4e-6` of `G` at `r = 1e-12`, `5e-13` at `1e-5`). A panel on the point is
+    `2 G(Δ/2b)` of the surface: one `3e-5 b` long, the shortest a graded end makes at `N` 96, errs `1.5e-12` of
+    scale, fifteen times the porting plan's gate. (Corrected: this bullet said the port could keep the method
+    because "no panel of a solve is near that short"; every graded end makes them.) The port integrates `G`
+    by parts, so that no term is of the other sign
+    (`G = asinh r + (2r/π) ∫₀^{π/2} cos ψ (cos ψ + ψ/sin ψ)/√(sin²ψ + r²) dψ`), and tabulates `G/asinh r`,
+    which is linear in `ln r` below the table: `G` holds a few roundings of itself at every `r`.
+  - The near form (`panel` where `panel_sep` does not apply) takes the surface as `G(η₂/b) − G(η₁/b)` and the
+    depth term as `asinh(η₂/ρ) − asinh(η₁/ρ)` and `η₂/R₂ − η₁/R₁`: on a short panel on one side of the point,
+    within `b/2` of it, each is a difference of two nearly equal values. `s0bb` at `N` 96 asks for the panel
+    `[0.0251267, 0.0251288]` (`b 0.0593`, `h 0.520`: `3.6e-5 b` long, `0.42 b` from the point), on which the
+    prototype errs `7.8e-11` of scale, 780 times the porting plan's gate and 78 times this README's `1e-12`
+    (`2.3e-11` at the coordinates as rounded here); a sweep (`b 0.05`, `h/b` 0.3 … 300, lengths 0.001 … 1 `b`,
+    0.02 … 0.45 `b` off the point) puts 72 of 224 over `1e-13`, and a bare panel `1e-3 b` long `100 b` out errs
+    `6e-10`. The panel tolerance's basis above, "each known to ~1e-15 of itself", holds for each value of `G`
+    and not for a difference of two; no record is such a panel, so the records pass. The port takes the depth
+    term as `asinh(D/d_R)` and `h² D/(d_R R₁ R₂)` (`D = (η₂ − η₁)(η₂ + η₁)`, `d_R = η₂ R₁ + η₁ R₂`, the
+    identities `panel_sep` uses) and the surface as `∫ G′` by Gauss–Legendre where the panel is short beside
+    its distance from the point; the panel law holds 58 such panels, to `3e-5 b`, to `1e-13` of scale.
   - This README's "34 cases" for `kernel/panel`: the file holds 35.
 
 ## Provenance of this copy
