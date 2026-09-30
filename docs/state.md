@@ -668,18 +668,46 @@ whose size is unmeasured is a debt still owed, and is marked as one.
   through flank interference (`only_flank_interference_leaves_a_member_unrated`
   in `train/rating_laws.rs` sweeps it).
 
+- **Loaded at the corner of a narrow tip land, the rating is the flank's
+  section under the land, and it grows without bound as the land closes.** The
+  section rule rates each curve's least Lewis measure with its own notch
+  factor; tip-loaded (a contact ratio below one, or `gear-cli matrix`), the
+  vertex sits just under the tip corner, the flank's least just under that, and
+  its chord shrinks with the land. z 9, x 0.5, 25° (a 4 µm land) rates 6.99
+  there against the fillet's 2.49 and ISO's tangent set's 3.88; at x 0.505,
+  15.4; at the pointed limit it diverges, and once pointed the apex is no
+  section (its chord is rounding) and the fillet's governs. **High**, so
+  conservative, without bound, in a regime where the root is not what fails;
+  whether the section should be sought below the load point only is the
+  owner's.
+
+- **The unshared bending rating is taken at the highest point of single-pair
+  contact, and on some small teeth that is not its model's worst.** Across the
+  single-pair zone the tooth carries the whole load, and with the section held
+  the factor `(Y_F − axial)·K_f` can rise from the highest point toward the
+  lowest, the arm shortening and `K_f` growing faster than `Y_F` falls. On 11 of
+  `gear-cli bendgrid`'s 564 rows below `ε_n = 2` the maximum over the zone
+  exceeds the unshared figure, by up to **3.17 %** (z 9, 25°, x 0, `ε_n` 1.7;
+  2.11 % at 20°): **low**, so unconservative by that much. The ramp's rating,
+  which takes the maximum over the whole cycle, finds it with a share of 1.
+  Rating the zone's maximum unshared would close it; it is recorded rather than
+  changed because ISO and AGMA both take the highest point, and the choice is
+  the owner's.
+
 <!-- figures: gear-cli sharingbias -->
 - **Under load sharing the section is held at the highest point of
   single-pair contact** and the load moved on it, rather than searched afresh
   at every load point, which near a pointed apex shrinks onto the point with
   no bound. Measured over 50 equal pairs short of pointed (z 17–100, 14.5° and
   20°, `h_a` 1.0–1.4, each root a working clearance below its mate's tip so
-  the path stays on usable flank): held over afresh 0.871 to 1.000 — **low**,
-  so unconservative, by up to 12.9 %, at z 100, 20°, `h_a` 1.4, ε 2.535, and
+  the path stays on usable flank): held over afresh 0.961 to 1.000 — **low**,
+  so unconservative, by up to 3.9 %, at z 100, 14.5°, `h_a` 1.4, ε 3.132, and
   only past `ε_n = 2`, where the ramp governs away from the single-pair point.
   **Part of the sharing relief is this bias**: at `ε_n ≥ 2` the held section
-  relieves 22.9 to 33.7 %, where sections searched afresh relieve 12.9 to
-  33.6 %.
+  relieves 22.9 to 33.7 %, where sections searched afresh relieve 19.8 to
+  33.6 %. The bias was three times this before the section rule, when a
+  section searched afresh took the flank's tangency where the fillet's rates
+  higher.
 
 
 <!-- figures: tools/iso_6336_3_stack.py -->
@@ -701,12 +729,12 @@ whose size is unmeasured is a debt still owed, and is marked as one.
 
 <!-- figures: gear-cli matrix -->
 - **The ISO set against the default, at the tip**: `gear-cli matrix` study 5's
-  `Y_F·K_f / Y_F·Y_S` reads 0.510 – 3.150, mean 0.852, over the external
+  `Y_F·K_f / Y_F·Y_S` reads 0.510 – 1.801, mean 0.820, over the external
   population. The default is **lower** than the ISO construction on most
-  teeth, by up to half, and **higher** by up to 3.15× where a narrow tip is
-  loaded steeply at its tip and the largest parabola that fits touches the
-  flank under its vertex; the spur band above is the same comparison at the
-  single-pair point, against ISO's own closed form.
+  teeth, by up to half, and **higher** by up to 1.80× where a narrow tip is
+  loaded steeply at its tip and the flank's section under the land governs;
+  the spur band above is the same comparison at the single-pair point,
+  against ISO's own closed form.
 
 - **Hardened 4340's flank estimate is held at the end of ISO's line.** Its
   46 HRC is about 458 HV, past the 360 HV where the through-hardened alloy
@@ -979,20 +1007,22 @@ factor stayed in bending. **The ring is the change worth having.** Against the
 coherent ISO set (60° tangent + `Y_S`), `gear-cli matrix` study 5:
 
 <!-- figures-bold: gear-cli matrix -->
-| ring, the parabola set over the ISO set | before | after |
-|---|---|---|
-| range | 0.789 – 1.226 | **0.901 – 1.163** |
-| mean | 0.877 | **0.970** |
-| spread | 0.437 | **0.261** |
+| ring, the parabola set over the ISO set | before | after | under the section rule |
+|---|---|---|---|
+| range | 0.789 – 1.226 | 0.901 – 1.163 | **0.566 – 1.131** |
+| mean | 0.877 | 0.970 | **0.775** |
+| spread | 0.437 | 0.261 | **0.566** |
 
-Closer to agreement on both counts: the mean has moved from 12 % out to 3 %, and
-the spread is down by two fifths. The remaining 3 % is **expected and has a
-name** — the ISO set does not take the axial compression term, so it reports the
-higher number, and a ratio a little under 1 is that difference showing up where
-it should.
+The notch factor closed most of the gap. The section rule (2026-10-02) then
+moved each ring's rated section from the flank's tangency, where the fillet's
+`K_f` had been applied to a point on the smooth flank, to the fillet's end at
+the flank, where the notch is: a smaller `Y_F` under the same `K_f`. The ISO set
+now reads higher by 22 % on average, but the two sets **rank** ring designs
+alike (Spearman 0.960 against the tangent's `Y_F`, from 0.492), which the
+flank reading did not; the axial term, which ISO omits, is part of the rest.
 
 <!-- figures: gear-cli matrix -->
-The external population reads 0.510 – 3.150, mean 0.852, and the wider spread
+The external population reads 0.510 – 1.801, mean 0.820, and the wider spread
 there is the same thing seen on a population that includes small, undercut and
 narrow-tipped teeth, where the two constructions genuinely disagree about where
 the section is.

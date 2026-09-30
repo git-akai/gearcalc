@@ -117,6 +117,8 @@ pub mod key {
     pub const GEAR_FATIGUE_RATIO_UNSTATED: &str = "gear.fatigue_ratio_unstated";
     /// `gear.bending_unrated`
     pub const GEAR_BENDING_UNRATED: &str = "gear.bending_unrated";
+    /// `gear.bending_unrated_compressed`
+    pub const GEAR_BENDING_UNRATED_COMPRESSED: &str = "gear.bending_unrated_compressed";
     /// `gear.ring_addendum_clamped`
     pub const GEAR_RING_ADDENDUM_CLAMPED: &str = "gear.ring_addendum_clamped";
     /// `gear.face_width_no_source`
@@ -352,6 +354,7 @@ pub mod key {
         GEAR_SHIFT_RAISED_FOR_UNDERCUT,
         GEAR_BENDING_UNRATED_IN_MESH,
         GEAR_BENDING_UNRATED,
+        GEAR_BENDING_UNRATED_COMPRESSED,
         GEAR_FATIGUE_RATIO_UNSTATED,
         GEAR_CONTACT_ABOVE_ALLOWABLE,
         GEAR_CONTACT_FATIGUE_UNJUDGED,

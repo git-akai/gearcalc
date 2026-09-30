@@ -762,10 +762,10 @@ impl Bending {
         short_of_tip: f64,
         model: crate::contact::LoadSharing,
         rim: Option<f64>,
-    ) -> Option<Self> {
+    ) -> Result<Self, crate::strength::Unrated> {
         let (section, share) =
             crate::strength::bending_section_on_path(member, contact_ratio, short_of_tip, model)?;
-        Some(Self {
+        Ok(Self {
             section,
             share,
             rim: rim.map(|s| member.rim_support(s)),
@@ -10716,10 +10716,10 @@ mod tests {
     /// not reaching them.**
     ///
     /// The ramp's worst point is the largest `Y_F · Y_S · share`, and below
-    /// `ε_n = 2` the single-pair boundary is a candidate with a share of
-    /// exactly 1 — so the maximum is almost always the point the unshared
-    /// rating already took (`strength::bending_section_shared` says where it is
-    /// not), and on a hula's meshes it is. A hula stage is the
+    /// `ε_n = 2` the single-pair zone, with a share of exactly 1, holds the
+    /// maximum — almost always at the point the unshared rating already took
+    /// (`strength::bending_section_shared` says where it is not), and on a
+    /// hula's meshes there. A hula stage is the
     /// case worth pinning: **its meshes cannot reach the band at any proportion
     /// it can be built at**, running just above continuous contact by
     /// construction, so the control is offered and provably cannot bite there.

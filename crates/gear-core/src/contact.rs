@@ -1050,8 +1050,8 @@ mod tests {
     /// moving either moves both sides of every comparison and the test does not
     /// notice — `docs/corrections.md`'s "a gate on a ratio cannot see a scale
     /// error", met again. Little else could see them: below `ε = 2` the
-    /// governing point is almost always the single-pair boundary, where the
-    /// share is exactly one. When this was written, perturbing `RAMP_MIN` by two
+    /// governing point is in the single-pair zone, where the share is exactly
+    /// one. When this was written, perturbing `RAMP_MIN` by two
     /// hundredths left all 558 tests, all 26 golden files and every documented
     /// figure unchanged; `gear-cli bendgrid`'s ramp rows, held to an outside
     /// rebuild by `tools/bending_gate.py`, see them now.

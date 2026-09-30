@@ -13,7 +13,9 @@
 //! that is not exactly this product.
 
 use gear_core::contact::LoadSharing;
-use gear_core::strength::{bending_section_on_path, bending_stress, Load, RootStressModel};
+use gear_core::strength::{
+    bending_section_on_path, bending_stress, Load, RootStressModel, Unrated,
+};
 use gear_core::{GearParams, Tooth};
 
 /// One block of the grid: every combination of its lists.
@@ -59,6 +61,17 @@ const BLOCKS: &[Block] = &[
         helix_deg: &[0.0, 15.0],
         proportions: &[(1.25, 1.25, 0.2, 1.0), (1.1, 1.35, 0.25, 1.0)],
         eps_n: &[1.2, 1.5],
+        short_of_tip: &[0.0],
+    },
+    // Loaded at or just under a narrow tip land, where the flank's section
+    // governs with no notch factor (z 9, x 0.5, 25° among them).
+    Block {
+        teeth: &[9, 12],
+        alpha_deg: &[25.0],
+        shift: &[0.45, 0.5],
+        helix_deg: &[0.0],
+        proportions: &[(1.0, 1.25, 0.38, 1.0)],
+        eps_n: &[1.0, 1.05],
         short_of_tip: &[0.0],
     },
 ];
@@ -138,9 +151,16 @@ fn rated(g: &Tooth, eps: f64, short: f64, sharing: LoadSharing) {
             clamps.join(",")
         }
     );
-    let Some((s, share)) = bending_section_on_path(g, eps, short, sharing) else {
-        println!(" | none");
-        return;
+    let (s, share) = match bending_section_on_path(g, eps, short, sharing) {
+        Ok(rated) => rated,
+        Err(why) => {
+            let why = match why {
+                Unrated::NoSection => "no_section",
+                Unrated::Compressed => "compressed",
+            };
+            println!(" | none {why}");
+            return;
+        }
     };
     let force = Load::new(TORQUE, FACE).tangential(g);
     let stress =

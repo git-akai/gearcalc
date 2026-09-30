@@ -553,6 +553,20 @@ A cantilever whose outline is a parabola with its vertex at the load carries
 uniform bending stress, so the largest such parabola inscribed in the tooth
 touches where the real tooth is weakest.
 
+**Which section is rated, and why not the largest parabola's alone.** Each of
+the tooth's two curves offers its own least Lewis measure (a tangency, or an end
+of the curve), and the one that **rates** highest governs, the fillet's with its
+notch factor and the smooth flank's with none
+([reference](reference.md#bending)). Comparing by `Y_F` alone, as Savage's
+"smaller x coordinate" does, applied the fillet's notch factor to whichever
+section had the larger `Y_F` — on a flank point, a stress concentration where
+there is no notch, and on a ring, whose parabola always touches its flank, the
+fillet's `K_f` on a flank section. Rating each where it is removes both: a
+ring's fillet offers its end, which carries its `K_f` and governs, and a
+compressed candidate cannot mask a readable one. What it costs is under tip
+loading at a narrow tip land, where the flank's section under the land governs
+and grows without bound as the land closes (recorded in `docs/state.md`).
+
 **This diverges from ISO 6336 and AGMA 2101**, which specify a fixed 30° tangent.
 
 **Measured:**
@@ -797,10 +811,13 @@ two together instead of evaluating one point.
 allowed the governing point usually *becomes* the highest point of single-pair
 contact — where the share is exactly 1 — so the answer is the one already
 reported, to the bit, since the single-pair boundary is itself a candidate. Not
-always: low on the flank the held section's `K_f` grows as its arm shortens, and
-the maximum, taken over the whole cycle rather than over samples of it, can sit
-there, above the unshared figure — on 11 of `gear-cli bendgrid`'s 564 ramp rows
-below `ε_n = 2`, by up to 3.2 % (z 9, 25°, `ε_n` 1.7). **A hula stage never leaves that regime** — its
+always, and not because of sharing: on some small teeth the full-load factor
+rises from the highest point of single-pair contact toward the lowest, the held
+section's arm shortening and its `K_f` growing, so the maximum over the whole
+cycle sits inside the single-pair zone with a share of exactly 1, above the
+unshared figure — 11 of `gear-cli bendgrid`'s 564 ramp rows below `ε_n = 2`, by
+up to 3.17 % (z 9, 25°, `ε_n` 1.7). That is the unshared rating understating its
+own model, recorded in [state.md](state.md#known-approximate-documented-at-the-call-site). **A hula stage never leaves that regime** — its
 meshes run just above continuous contact by construction — so the control is
 offered there and provably cannot bite.
 

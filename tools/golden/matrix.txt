@@ -11,28 +11,28 @@ parabola · Y_F·K_f                  5.6172%         10               0.00424%
 == 2. rank agreement (Spearman) ==
   30° · Y_F only         vs 30° · Y_F·Y_S          rho = 0.794170  (n=1508)
   30° · Y_F only         vs parabola · Y_F only    rho = 0.897927  (n=1508)
-  30° · Y_F only         vs parabola · Y_F·K_f     rho = 0.834571  (n=1508)
+  30° · Y_F only         vs parabola · Y_F·K_f     rho = 0.912163  (n=1508)
   30° · Y_F·Y_S          vs parabola · Y_F only    rho = 0.705646  (n=1508)
-  30° · Y_F·Y_S          vs parabola · Y_F·K_f     rho = 0.860309  (n=1508)
-  parabola · Y_F only    vs parabola · Y_F·K_f     rho = 0.869854  (n=1521)
+  30° · Y_F·Y_S          vs parabola · Y_F·K_f     rho = 0.875835  (n=1508)
+  parabola · Y_F only    vs parabola · Y_F·K_f     rho = 0.841335  (n=1521)
 
 == 3. gradient sign agreement, ignoring effects below 0.0% ==
                                                      shift  fillet  dedend
   30° · Y_F only         vs 30° · Y_F·Y_S            68.6%   94.6%   63.4%
   30° · Y_F only         vs parabola · Y_F only      87.3%   93.9%   87.6%
-  30° · Y_F only         vs parabola · Y_F·K_f       85.1%   94.6%   84.6%
+  30° · Y_F only         vs parabola · Y_F·K_f       98.7%   94.6%   89.3%
   30° · Y_F·Y_S          vs parabola · Y_F only      66.0%   94.9%   59.6%
-  30° · Y_F·Y_S          vs parabola · Y_F·K_f       67.8%   98.1%   75.1%
-  parabola · Y_F only    vs parabola · Y_F·K_f       96.1%   95.4%   83.7%
+  30° · Y_F·Y_S          vs parabola · Y_F·K_f       67.5%   98.1%   72.9%
+  parabola · Y_F only    vs parabola · Y_F·K_f       88.7%   95.5%   82.1%
 
 == 3. gradient sign agreement, ignoring effects below 1.0% ==
                                                      shift  fillet  dedend
   30° · Y_F only         vs 30° · Y_F·Y_S            99.8%  100.0%   96.4%
   30° · Y_F only         vs parabola · Y_F only      90.0%  100.0%  100.0%
-  30° · Y_F only         vs parabola · Y_F·K_f       90.2%  100.0%  100.0%
+  30° · Y_F only         vs parabola · Y_F·K_f       98.0%  100.0%  100.0%
   30° · Y_F·Y_S          vs parabola · Y_F only      95.6%  100.0%   96.5%
-  30° · Y_F·Y_S          vs parabola · Y_F·K_f       97.0%   99.9%   99.7%
-  parabola · Y_F only    vs parabola · Y_F·K_f       98.7%  100.0%  100.0%
+  30° · Y_F·Y_S          vs parabola · Y_F·K_f       98.6%  100.0%  100.0%
+  parabola · Y_F only    vs parabola · Y_F·K_f       91.4%  100.0%  100.0%
 
 == 4. divergence across the matrix, by tooth count (x=0) ==
      z       spread
@@ -48,11 +48,11 @@ parabola · Y_F·K_f                  5.6172%         10               0.00424%
 
 == 5. parabola against the 30° tangent ==
   designs rated by both        1508
-  parabola tangency on flank   319 (21.2%)
-  Y_F   parabola/tangent       1.007 .. 13.734   mean 1.145   spread 12.727
-  Y_F·K_f / Y_F·Y_S            0.510 .. 3.150   mean 0.852   spread 2.640
-  mean q_s                     1.732 parabola, 3.169 tangent
-  q_s outside Y_S's band       366 parabola (24.3%), 88 tangent (5.8%)
+  parabola tangency on flank   17 (1.1%)
+  Y_F   parabola/tangent       1.003 .. 13.734   mean 1.107   spread 12.731
+  Y_F·K_f / Y_F·Y_S            0.510 .. 1.801   mean 0.820   spread 1.291
+  mean q_s                     2.071 parabola, 3.169 tangent
+  q_s outside Y_S's band       315 parabola (20.9%), 88 tangent (5.8%)
 
 ################ RING (160 designs, tangent at 60°) ################
 
@@ -61,39 +61,39 @@ model                          worst z step       at z    worst x step (fine)
 60° · Y_F only                      2.1224%         33               0.00713%
 60° · Y_F·Y_S                       0.8767%         34               0.00172%
 parabola · Y_F only                 3.3879%         33               0.00949%
-parabola · Y_F·K_f                  3.7135%         34               0.00808%
+parabola · Y_F·K_f                  1.6546%         34               0.00969%
 
 == 2. rank agreement (Spearman) ==
   60° · Y_F only         vs 60° · Y_F·Y_S          rho = 0.425510  (n=160)
   60° · Y_F only         vs parabola · Y_F only    rho = 0.537329  (n=160)
-  60° · Y_F only         vs parabola · Y_F·K_f     rho = 0.492421  (n=160)
+  60° · Y_F only         vs parabola · Y_F·K_f     rho = 0.959912  (n=160)
   60° · Y_F·Y_S          vs parabola · Y_F only    rho = 0.263325  (n=160)
-  60° · Y_F·Y_S          vs parabola · Y_F·K_f     rho = 0.671244  (n=160)
-  parabola · Y_F only    vs parabola · Y_F·K_f     rho = 0.763301  (n=160)
+  60° · Y_F·Y_S          vs parabola · Y_F·K_f     rho = 0.518590  (n=160)
+  parabola · Y_F only    vs parabola · Y_F·K_f     rho = 0.573392  (n=160)
 
 == 3. gradient sign agreement, ignoring effects below 0.0% ==
                                                      shift  fillet  dedend
   60° · Y_F only         vs 60° · Y_F·Y_S            43.1%  100.0%  100.0%
   60° · Y_F only         vs parabola · Y_F only      99.4%  100.0%  100.0%
-  60° · Y_F only         vs parabola · Y_F·K_f       96.2%  100.0%  100.0%
+  60° · Y_F only         vs parabola · Y_F·K_f       98.8%  100.0%  100.0%
   60° · Y_F·Y_S          vs parabola · Y_F only      42.5%  100.0%  100.0%
-  60° · Y_F·Y_S          vs parabola · Y_F·K_f       46.9%  100.0%  100.0%
-  parabola · Y_F only    vs parabola · Y_F·K_f       95.6%  100.0%  100.0%
+  60° · Y_F·Y_S          vs parabola · Y_F·K_f       41.9%  100.0%  100.0%
+  parabola · Y_F only    vs parabola · Y_F·K_f       99.4%  100.0%  100.0%
 
 == 3. gradient sign agreement, ignoring effects below 1.0% ==
                                                      shift  fillet  dedend
   60° · Y_F only         vs 60° · Y_F·Y_S           100.0%    NaN%    NaN%
   60° · Y_F only         vs parabola · Y_F only      94.1%    NaN%    NaN%
-  60° · Y_F only         vs parabola · Y_F·K_f      100.0%    NaN%    NaN%
+  60° · Y_F only         vs parabola · Y_F·K_f       95.7%    NaN%    NaN%
   60° · Y_F·Y_S          vs parabola · Y_F only      50.0%    NaN%    NaN%
-  60° · Y_F·Y_S          vs parabola · Y_F·K_f      100.0%    NaN%    NaN%
+  60° · Y_F·Y_S          vs parabola · Y_F·K_f        0.0%    NaN%    NaN%
   parabola · Y_F only    vs parabola · Y_F·K_f      100.0%    NaN%    NaN%
 
 == 4. divergence across the matrix, by tooth count (x=0) ==
      z       spread
-    40      158.08%
-    48      144.95%
-    60      133.86%
+    40      140.03%
+    48      135.53%
+    60      131.20%
     72      128.45%
     90      125.80%
    120      123.26%
@@ -103,11 +103,11 @@ parabola · Y_F·K_f                  3.7135%         34               0.00808%
 
 == 5. parabola against the 60° tangent ==
   designs rated by both        160
-  parabola tangency on flank   160 (100.0%)
-  Y_F   parabola/tangent       1.273 .. 1.690   mean 1.425   spread 0.417
-  Y_F·K_f / Y_F·Y_S            0.901 .. 1.163   mean 0.970   spread 0.261
-  mean q_s                     1.001 parabola, 4.942 tangent
-  q_s outside Y_S's band       107 parabola (66.9%), 2 tangent (1.2%)
+  parabola tangency on flank   0 (0.0%)
+  Y_F   parabola/tangent       1.052 .. 1.369   mean 1.166   spread 0.316
+  Y_F·K_f / Y_F·Y_S            0.566 .. 1.131   mean 0.775   spread 0.566
+  mean q_s                     1.653 parabola, 4.942 tangent
+  q_s outside Y_S's band       27 parabola (16.9%), 2 tangent (1.2%)
 
 == 6. a ring tooth along its generated flank (tip -> root) ==
   z=40   r 19.000 w 0.9667   r 19.314 w 1.1066   r 19.763 w 1.3893   r 20.338 w 1.8620   r 21.029 w 2.5687

@@ -1806,6 +1806,16 @@ mod tests {
     ///   still reach it is a helical member's virtual flank, whose bracket is
     ///   not the real one's.
     ///
+    /// - `gear.bending_unrated` — a member with no root section at all, as
+    ///   against every section compressed (`gear.bending_unrated_compressed`).
+    ///   Since each curve offers its least Lewis measure over the whole curve,
+    ///   its ends included, a usable tooth always has a candidate section, and
+    ///   a solving train's load point lies on usable flank (T06.1); what is
+    ///   left to reach it is a tooth with no usable flank or no fillet, which
+    ///   the train refuses before rating. Every case the sweep once reached it
+    ///   by had sections the model could not read, and now says so
+    ///   (2026-10-02, the sweep above and `rating_laws`'s grid of 324 pairs).
+    ///
     /// Each is live code with a live message, so it is not deleted on
     /// suspicion.
     ///
@@ -1846,6 +1856,7 @@ mod tests {
         "clamp.ring_fully_filleted",
         "clamp.flank_unsolved",
         "gear.bending_unrated_in_mesh",
+        "gear.bending_unrated",
     ];
 
     #[test]

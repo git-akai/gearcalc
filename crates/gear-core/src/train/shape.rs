@@ -2547,7 +2547,7 @@ impl BuiltMember {
         short_of_tip: f64,
         model: LoadSharing,
         rim: Option<f64>,
-    ) -> Option<super::Bending> {
+    ) -> Result<super::Bending, crate::strength::Unrated> {
         match self {
             Self::Rack { tooth } => {
                 super::Bending::of(tooth, contact_ratio, short_of_tip, model, rim)
@@ -3430,7 +3430,7 @@ pub struct Cut {
     sliding: Vec<Directional<f64>>,
     at_rest: Vec<Directional<f64>>,
     /// Per member, a bending section in each line mesh it is in.
-    bendings: Vec<Vec<(usize, Option<super::Bending>)>>,
+    bendings: Vec<Vec<(usize, Result<super::Bending, crate::strength::Unrated>)>>,
     /// Per distance, its stagger angle ([`DistanceReport::stagger`]).
     staggers: Vec<Option<f64>>,
 }
@@ -3991,7 +3991,7 @@ pub fn cut(shape: &Shape, lib: &MaterialLibrary) -> Result<Cut, TrainError> {
     // loads — its contact is a point tracking diagonally across the flank,
     // and a cantilever loaded across its whole face has no honest reading
     // of it (docs/rationale.md#a-worm-stage-reports-no-bending-stress).
-    let mut bendings: Vec<Vec<(usize, Option<super::Bending>)>> =
+    let mut bendings: Vec<Vec<(usize, Result<super::Bending, crate::strength::Unrated>)>> =
         (0..n).map(|_| Vec::new()).collect();
     for (k, m) in cut.shape.meshes.iter().enumerate() {
         let Some(line) = cut.built.meshes[k].line() else {
@@ -4181,7 +4181,7 @@ pub fn rate(
                                 let b = bendings[i]
                                     .iter()
                                     .find(|(kk, _)| *kk == k)
-                                    .and_then(|(_, b)| b.as_ref());
+                                    .and_then(|(_, b)| b.as_ref().ok());
                                 Loading {
                                     bending: b.and_then(|b| stress_at(b, ft, &probe)),
                                     contact: probe_stress.governing(side),
@@ -4499,7 +4499,7 @@ pub fn rate(
         let mut out = Vec::new();
         let rim = bendings[i]
             .iter()
-            .find_map(|(_, b)| b.as_ref().and_then(|b| b.rim));
+            .find_map(|(_, b)| b.as_ref().ok().and_then(|b| b.rim));
         out.extend(super::rim_below_minimum(rim));
         if let BuiltMember::Rack { tooth } = &*built.members[i] {
             out.extend(super::undercut_note(tooth));
@@ -4533,12 +4533,22 @@ pub fn rate(
         // ...and each mesh whose load point leaves this member no section
         // to rate, where another mesh's did — or, where none did, that the
         // member is not rated in bending at all.
-        if on_a_line(i) && bendings[i].iter().all(|(_, b)| b.is_none()) {
-            out.push(Note::new(key::GEAR_BENDING_UNRATED));
+        // Said by why: a member whose every section is compressed has
+        // sections, and a reader told it has none would look for a geometry
+        // fault.
+        if on_a_line(i) && bendings[i].iter().all(|(_, b)| b.is_err()) {
+            let compressed = bendings[i]
+                .iter()
+                .any(|(_, b)| matches!(b, Err(crate::strength::Unrated::Compressed)));
+            out.push(Note::new(if compressed {
+                key::GEAR_BENDING_UNRATED_COMPRESSED
+            } else {
+                key::GEAR_BENDING_UNRATED
+            }));
         }
-        if bendings[i].iter().any(|(_, b)| b.is_some()) {
+        if bendings[i].iter().any(|(_, b)| b.is_ok()) {
             for (k, b) in &bendings[i] {
-                if b.is_none() {
+                if b.is_err() {
                     // Numbered as the panel numbers meshes, from one.
                     out.push(
                         Note::new(key::GEAR_BENDING_UNRATED_IN_MESH)
@@ -6883,15 +6893,18 @@ mod hula_recorded {
             "z17 σ_F",
         );
         // The rings' fillets are cut on the curtate side of their cutters'
-        // pitch circles, and rated since that side was read (T05.2).
+        // pitch circles, and rated since that side was read (T05.2); each ring
+        // rates at its fillet's end at the flank under the section rule, where
+        // it had rated the flank's tangency with the fillet's notch factor
+        // (4839.5 and 5103.7).
         close(
-            4839.5,
+            4187.0,
             r.members[2].cases[0].bending_stress.unwrap(),
             0.05,
             "z19 ring σ_F",
         );
         close(
-            5103.7,
+            4363.5,
             r.members[3].cases[0].bending_stress.unwrap(),
             0.05,
             "z18 ring σ_F",

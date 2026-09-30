@@ -140,7 +140,14 @@ fn parabola_form_factor_converges_to_its_own_rack_limit() {
             pressure_angle: alpha,
             ..Default::default()
         });
-        let sec = root_section_with(&g, g.u_tip, CriticalSection::LewisParabola).unwrap();
+        // The construction's own section, the largest inscribed parabola.
+        let sec = gear_core::strength::root_section_rated(
+            &g,
+            g.u_tip,
+            CriticalSection::LewisParabola,
+            gear_core::strength::RootStressModel::FormFactorOnly,
+        )
+        .unwrap();
         assert!(
             sec.tangency_on_flank,
             "at z=4000 the parabola must touch the flank"
@@ -224,6 +231,7 @@ fn j_factors_at(z: u32, cutter_teeth: u32, beta: f64) -> (Option<f64>, Option<f6
             p.short_of_tip()[1],
             gear_core::contact::LoadSharing::None,
         )
+        .ok()
         .map(|(s, _)| s)
     }
     let j = |s: Option<gear_core::strength::RootSection>| {
@@ -820,75 +828,6 @@ fn the_fillet_is_tightest_at_its_root() {
 /// The crate used to take the fillet whenever it had a solution and consult the
 /// flank only otherwise. This asserts the rule directly: whichever curve the
 /// section came from, no tangency on the *other* curve is weaker.
-#[test]
-fn the_reported_parabola_is_the_weaker_of_the_two() {
-    use gear_core::solve::{brent, Tol};
-    use gear_core::strength::{root_section_with, CriticalSection, ToothOutline};
-
-    let mut checked = 0;
-    for teeth in [9u32, 13, 17, 25, 40, 80, 150, 300] {
-        for shift in [-0.3_f64, 0.0, 0.3, 0.6] {
-            let g = Tooth::new(GearParams {
-                teeth,
-                profile_shift: shift,
-                ..Default::default()
-            });
-            let Some(got) = root_section_with(&g, g.u_tip, CriticalSection::LewisParabola) else {
-                continue;
-            };
-            // Rebuild the condition here rather than reaching into the crate, so
-            // this is a check on the rule and not a restatement of the code.
-            let (load_point, dir) = ToothOutline::load_at(&g, g.u_tip);
-            let vertex = load_point[1] + (-load_point[0] / dir[0]) * dir[1];
-            let condition = |q: [f64; 2], t: [f64; 2]| q[0] * t[1] + 2.0 * t[0] * (vertex - q[1]);
-            let (flo, fhi) = ToothOutline::fillet_bracket(&g);
-            let (ulo, uhi) = ToothOutline::flank_bracket(&g);
-            let other = [
-                brent(
-                    |s| {
-                        let (q, t) = ToothOutline::fillet_at(&g, s);
-                        condition(q, t)
-                    },
-                    flo,
-                    fhi,
-                    Tol::default(),
-                )
-                .map(|s| ToothOutline::fillet_at(&g, s)),
-                brent(
-                    |u| {
-                        let (q, t) = ToothOutline::flank_at(&g, u);
-                        condition(q, t)
-                    },
-                    ulo,
-                    uhi,
-                    Tol::default(),
-                )
-                .map(|u| ToothOutline::flank_at(&g, u)),
-            ];
-            for cand in other.into_iter().flatten() {
-                let chord = 2.0 * cand.0[0].abs();
-                let arm = vertex - cand.0[1];
-                if arm <= 0.0 {
-                    continue;
-                }
-                // x = s_Fn^2 / (4 h): smaller is weaker, and the reported one
-                // must be no stronger than any candidate.
-                let x_cand = chord * chord / (4.0 * arm);
-                let x_got = got.root_chord * got.root_chord / (4.0 * got.moment_arm);
-                assert!(
-                    x_got <= x_cand * (1.0 + 1e-9),
-                    "z={teeth} x={shift}: reported x {x_got} is stronger than a candidate's {x_cand}"
-                );
-                checked += 1;
-            }
-        }
-    }
-    assert!(
-        checked > 20,
-        "the rule should have been exercised: {checked}"
-    );
-}
-
 /// **A load point is on the tooth**, at every contact ratio.
 ///
 /// `d = ε_n − 1` base pitches back from the tip goes negative below a contact
@@ -979,27 +918,38 @@ fn a_rating_is_taken_at_a_point_on_the_tooth() {
     assert!(root_section(&v, hi).is_some() && root_section(&v, lo).is_some());
 }
 
-/// **The section is the least tangency on either curve.** The Lewis parabola
-/// is the largest that fits, `x²/(y_v − y)` least over the outline, so the
-/// section must be the least of that ratio's interior minima on the fillet and
-/// the flank, found here by brute force from the curves alone: sampled, then
-/// each dip closed by golden section. A search that takes the first tangency it
-/// brackets fails where the flank dips below the fillet's tangency after
-/// rising past it — z 30, x 0.8, 25°, h_a 1.25, ρ 0.2, loaded 0.2 base pitches
-/// below the tip, read the fillet's section 5.9 % low.
+/// **Each curve offers its least Lewis measure, and the highest rated
+/// governs.** The rule, on both kinds of member:
 ///
-/// The tolerance is rounding: the ratio is read off coordinates as large as the
-/// outline's largest, `c`, so each carries `2⁸ε·c` of the operations behind it,
-/// and the ratio `2/x + 1/(y_v − y)` of that relatively; its dip is closed to
-/// the argument's rounding, where the ratio is flat to `ε`.
+/// - each curve (fillet, flank) offers the section where `x²/(y_v − y)` is
+///   least over the whole curve below the vertex — an interior tangency, or
+///   one of the curve's ends — found here by brute force from the curves
+///   alone (sampled, each dip closed by golden section, the ends compared);
+/// - the fillet's is rated with the fillet's notch factor, the smooth flank's
+///   with none (1);
+/// - the governing section is the readable one that rates highest, and one
+///   the model cannot read never masks one it can.
+///
+/// So a ring, whose fillet has no tangency, keeps its fillet's notch factor
+/// through the fillet's end. Two cases carry the history: z 20, x 0.8, 20°,
+/// h_a 1.1 loaded at the tip, where a search that took the first tangency
+/// it bracketed read the fillet's while the flank's is less; and the 5/40
+/// pinion at β 20°, x 1 with its tip held to its width (a virtual 6-tooth
+/// spur), whose flank candidate is compressed (`Y_F` 4.06, axial 4.34) and
+/// once masked its fillet's.
+///
+/// The measure's tolerance is rounding: it is read off coordinates as large
+/// as the outline's largest, `c`, each carrying `2⁸ε·c`, and the ratio
+/// `2/x + 1/(y_v − y)` of that relatively; a dip is closed to the argument's
+/// rounding, where the measure is flat to `ε`.
 #[test]
-fn the_section_is_the_least_tangency_on_either_curve() {
+fn each_curve_offers_its_least_and_the_highest_rated_governs() {
     use gear_core::ring::{Cutter, Ring};
-    use gear_core::strength::{root_section_with, CriticalSection, ToothOutline};
+    use gear_core::strength::{root_section_with, root_sections, RootStressModel, ToothOutline};
 
-    /// The least interior minimum of `x²/(y_v − y)` on one curve, and the
-    /// largest coordinate the sweep saw.
-    fn dips(curve: &dyn Fn(f64) -> [f64; 2], lo: f64, hi: f64, vertex: f64) -> (Vec<f64>, f64) {
+    /// The least of `x²/(y_v − y)` on one curve, its dips and ends, and the
+    /// largest coordinate seen.
+    fn least(curve: &dyn Fn(f64) -> [f64; 2], lo: f64, hi: f64, vertex: f64) -> (Option<f64>, f64) {
         let ratio = |p: f64| {
             let q = curve(p);
             (q[1] < vertex && q[0] > 0.0).then(|| q[0] * q[0] / (vertex - q[1]))
@@ -1014,7 +964,9 @@ fn the_section_is_the_least_tangency_on_either_curve() {
                 ratio(at(i))
             })
             .collect();
-        let mut out = Vec::new();
+        // Both ends; the flank's tip end is under the vertex only by rounding,
+        // and the caller asserts it is not.
+        let mut out = vec![vals[0], vals[n]];
         for i in 1..n {
             let (Some(a), Some(b), Some(c)) = (vals[i - 1], vals[i], vals[i + 1]) else {
                 continue;
@@ -1022,7 +974,6 @@ fn the_section_is_the_least_tangency_on_either_curve() {
             if !(b <= a && b <= c) || (b == a && b == c) {
                 continue;
             }
-            // Golden section on [at(i-1), at(i+1)], to the argument's rounding.
             let g = (5.0_f64.sqrt() - 1.0) / 2.0;
             let (mut l, mut h) = (at(i - 1), at(i + 1));
             while h - l > f64::EPSILON.sqrt() * l.abs().max(h.abs()).max(1e-3) {
@@ -1033,22 +984,20 @@ fn the_section_is_the_least_tangency_on_either_curve() {
                     l = x1;
                 }
             }
-            if let Some(v) = ratio(0.5 * (l + h)) {
-                out.push(v);
-            }
+            out.push(ratio(0.5 * (l + h)));
         }
-        (out, scale)
+        (out.into_iter().flatten().reduce(f64::min), scale)
     }
 
-    let mut checked = 0;
-    let mut flank_under_fillet = 0;
-    let mut rings = 0;
+    let model = RootStressModel::DolanBroghamer;
+    let (mut checked, mut rings, mut flank_governs, mut at_an_end, mut dropped) = (0, 0, 0, 0, 0);
     let mut members: Vec<(String, Box<dyn ToothOutline>)> = Vec::new();
-    for teeth in [12_u32, 20, 30, 40] {
+    for teeth in [6_u32, 9, 12, 20, 30, 40, 150] {
         for (x, alpha, h_a, rho) in [
             (0.8_f64, 25.0_f64, 1.25_f64, 0.2_f64),
-            (0.6, 25.0, 1.25, 0.2),
+            (0.5, 25.0, 1.0, 0.38),
             (0.8, 20.0, 1.1, 0.25),
+            (1.0, 20.0, 0.658, 0.38),
             (0.0, 20.0, 1.0, 0.38),
             (-0.3, 14.5, 1.0, 0.3),
         ] {
@@ -1073,15 +1022,15 @@ fn the_section_is_the_least_tangency_on_either_curve() {
                 root_radius: 0.3,
                 ..Default::default()
             };
-            let ring = Ring::cut_by(
-                &params,
-                &Cutter {
-                    teeth: 20,
-                    addendum: 1.25,
-                    tip_round: 0.3,
-                },
-            );
-            members.push((format!("ring z{teeth} x{x}"), Box::new(ring)));
+            let cutter = Cutter {
+                teeth: 20,
+                addendum: 1.25,
+                tip_round: 0.3,
+            };
+            members.push((
+                format!("ring z{teeth} x{x}"),
+                Box::new(Ring::cut_by(&params, &cutter)),
+            ));
         }
     }
     for (label, g) in &members {
@@ -1095,37 +1044,273 @@ fn the_section_is_the_least_tangency_on_either_curve() {
             let (load_point, dir) = g.load_at(roll);
             let vertex = load_point[1] + (-load_point[0] / dir[0]) * dir[1];
             let (flo, fhi) = g.fillet_bracket();
-            let (fillet, s1) = dips(&|p| g.fillet_at(p).0, flo, fhi, vertex);
-            let (flank, s2) = dips(&|p| g.flank_at(p).0, ulo, uhi, vertex);
-            let Some(least) = fillet.iter().chain(&flank).copied().reduce(f64::min) else {
-                continue;
-            };
-            let got = root_section_with(g.as_ref(), roll, CriticalSection::LewisParabola)
-                .unwrap_or_else(|| panic!("{label} at {frac}: a tangency {least} and no section"));
-            let x_got = got.root_chord * got.root_chord / (4.0 * got.moment_arm);
-            let c = s1.max(s2);
-            let tol = 256.0 * f64::EPSILON * c * (4.0 / got.root_chord + 1.0 / got.moment_arm);
+            let (fillet, c1) = least(&|p| g.fillet_at(p).0, flo, fhi, vertex);
+            let (flank, c2) = least(&|p| g.flank_at(p).0, ulo, uhi, vertex);
+            // The flank's tip is never strictly below the vertex, so its
+            // measure there is none, and a least there is rounding's.
+            let (tq, _) = g.flank_at(tip);
             assert!(
-                (x_got - least).abs() <= tol * least,
-                "{label} at {frac} of the flank: the section's x²/(y_v − y) is {x_got}, \
-                 the least tangency {least} (fillet {fillet:?}, flank {flank:?})"
+                tq[1] >= vertex - 256.0 * f64::EPSILON * tq[1].abs(),
+                "{label} at {frac}: the tip stands {} below the vertex",
+                vertex - tq[1]
             );
+            let found = root_sections(g.as_ref(), roll, CriticalSection::LewisParabola);
+            let measure = |s: &gear_core::strength::RootSection| {
+                s.root_chord * s.root_chord / (4.0 * s.moment_arm)
+            };
+            for (name, want, on_flank) in [("fillet", fillet, false), ("flank", flank, true)] {
+                let got = found.iter().find(|s| s.tangency_on_flank == on_flank);
+                let (Some(want), Some(got)) = (want, got) else {
+                    assert_eq!(
+                        want.is_some(),
+                        got.is_some(),
+                        "{label} at {frac}: the {name}'s least {want:?}, the crate's {got:?}"
+                    );
+                    continue;
+                };
+                let tol = 256.0
+                    * f64::EPSILON
+                    * c1.max(c2)
+                    * (4.0 / got.root_chord + 1.0 / got.moment_arm);
+                assert!(
+                    (measure(got) - want).abs() <= tol * want,
+                    "{label} at {frac}: the {name} offers {}, its least is {want}",
+                    measure(got)
+                );
+                // The notch factor is the curve's: AGMA's fit to Dolan and
+                // Broghamer on the fillet, none on the smooth flank.
+                let notch = got.stress_correction(model).unwrap();
+                let a = got.pressure_angle_rad;
+                let fillets = (0.331 - 0.436 * a)
+                    + (got.root_chord / got.min_fillet_curvature).powf(0.324 - 0.492 * a)
+                        * (got.root_chord / got.moment_arm).powf(0.261 + 0.545 * a);
+                let want = if on_flank { 1.0 } else { fillets };
+                assert!(
+                    (notch - want).abs() <= 4.0 * f64::EPSILON * want,
+                    "{label} at {frac}: the {name}'s section carries a notch factor of {notch}, \
+                     not {want}"
+                );
+                let (lo, hi) = if on_flank { (ulo, uhi) } else { (flo, fhi) };
+                at_an_end += usize::from(got.s == lo || got.s == hi);
+            }
+            // The governing section: the readable candidate rating highest.
+            let rated: Vec<f64> = found
+                .iter()
+                .filter_map(|s| s.bending_factor(model))
+                .collect();
+            dropped += usize::from(rated.len() < found.len() && !rated.is_empty());
+            let governing = root_section_with(g.as_ref(), roll, CriticalSection::LewisParabola);
+            match rated.iter().copied().reduce(f64::max) {
+                Some(best) => {
+                    let g = governing.unwrap();
+                    assert_eq!(g.bending_factor(model), Some(best), "{label} at {frac}");
+                    flank_governs += usize::from(g.tangency_on_flank);
+                }
+                None => assert!(
+                    governing.is_none_or(|g| g.bending_factor(model).is_none()),
+                    "{label} at {frac}: no candidate is readable and the section rates"
+                ),
+            }
             checked += 1;
-            rings += usize::from(!g.tip_at_high_roll());
-            if let (Some(f), Some(k)) = (
-                fillet.iter().copied().reduce(f64::min),
-                flank.iter().copied().reduce(f64::min),
-            ) {
-                flank_under_fillet += usize::from(k < f);
+            if !g.tip_at_high_roll() {
+                rings += 1;
+                assert!(
+                    found.iter().any(|s| !s.tangency_on_flank),
+                    "{label} at {frac}: a ring offers no fillet section"
+                );
             }
         }
     }
     assert!(
-        checked > 60 && rings > 0,
+        checked > 100 && rings >= 24,
         "checked {checked}, rings {rings}"
     );
     assert!(
-        flank_under_fillet > 0,
-        "no case has a flank tangency below a fillet one: the law is vacuous where it matters"
+        flank_governs > 0 && at_an_end > 0 && dropped > 0,
+        "the flank governs {flank_governs} times, a curve's end is its least {at_an_end}, \
+         a compressed candidate is dropped {dropped}: the law must reach each"
+    );
+}
+
+/// **The rating is continuous where its section changes curve or moves to an
+/// end.** Each curve's candidate is its least Lewis measure, at a tangency or
+/// at an end, and the least of a continuous measure over a curve is
+/// continuous; the governing section is the greater of the candidates'
+/// ratings. So wherever a candidate moves between its tangency and its end,
+/// or the governing section changes curve, the measure and the rating may
+/// turn a corner but not step. (A candidate that jumps between two local
+/// minima whose measures tie keeps its `Y_F`, a function of the measure alone,
+/// but not its axial term or notch factor; that is the change this watches.)
+///
+/// Swept over the shift on rack-cut teeth, undercut ones included, and on
+/// rings, each such change is bisected to rounding and the change across it
+/// measured at half-widths `h` of 1e-4 and 1e-7: continuous, it falls with
+/// `h` (by 1e-3, allowed 1e-2); a step leaves it where it was.
+#[test]
+fn the_rating_is_continuous_where_its_section_changes_curve_or_ends() {
+    use gear_core::ring::{Cutter, Ring};
+    use gear_core::strength::{
+        bending_section, root_sections, RootSection, RootStressModel, ToothOutline,
+    };
+
+    /// The rating, the two curves' least measures, and which section each
+    /// curve offers and which governs: `(curve, at an end)`.
+    type State = (f64, [Option<f64>; 2], [Option<(bool, bool)>; 3]);
+    fn state<T: ToothOutline>(g: &T, eps: f64) -> Option<State> {
+        let governing = bending_section(g, eps)?;
+        let f = governing.bending_factor(RootStressModel::DolanBroghamer)?;
+        let kind = |s: &RootSection| {
+            let (lo, hi) = if s.tangency_on_flank {
+                g.flank_bracket()
+            } else {
+                g.fillet_bracket()
+            };
+            (s.tangency_on_flank, s.s == lo || s.s == hi)
+        };
+        // The candidates at the same load point, on the virtual spur (spur
+        // here, so the tooth itself).
+        let (lo, hi) = g.flank_bracket();
+        let tip = if g.tip_at_high_roll() { hi } else { lo };
+        let eps_n = eps;
+        let pitch =
+            std::f64::consts::PI * g.transverse_module() * g.transverse_pressure_angle().cos();
+        let roll = tip
+            + (if g.tip_at_high_roll() { -1.0 } else { 1.0 }) * (eps_n - 1.0).max(0.0) * pitch
+                / g.base_radius();
+        let found = root_sections(g, roll, CriticalSection::LewisParabola);
+        let on = |flank: bool| found.iter().find(|s| s.tangency_on_flank == flank);
+        let measure = |s: &RootSection| s.root_chord * s.root_chord / (4.0 * s.moment_arm);
+        Some((
+            f,
+            [on(false).map(measure), on(true).map(measure)],
+            [
+                Some(kind(&governing)),
+                on(false).map(kind),
+                on(true).map(kind),
+            ],
+        ))
+    }
+    let (mut between_curves, mut to_an_end, mut rings) = (0, 0, 0);
+    let mut check =
+        |label: &str, at: &dyn Fn(f64) -> Option<State>, lo: f64, hi: f64, ring: bool| {
+            let n = 200;
+            let x = |i: usize| lo + (hi - lo) * i as f64 / n as f64;
+            for i in 0..n {
+                let (Some(a), Some(b)) = (at(x(i)), at(x(i + 1))) else {
+                    continue;
+                };
+                if a.2 == b.2 {
+                    continue;
+                }
+                let (mut l, mut r) = (x(i), x(i + 1));
+                for _ in 0..60 {
+                    let m = 0.5 * (l + r);
+                    match at(m) {
+                        Some(s) if s.2 == a.2 => l = m,
+                        _ => r = m,
+                    }
+                }
+                let mid = 0.5 * (l + r);
+                let across =
+                    |h: f64| -> Option<(State, State)> { Some((at(mid - h)?, at(mid + h)?)) };
+                let (Some((wl, wr)), Some((nl, nr))) = (across(1e-4), across(1e-7)) else {
+                    continue;
+                };
+                let continuous = |what: &str, wide: f64, narrow: f64, size: f64| {
+                    assert!(
+                    narrow <= 1e-2 * wide + 256.0 * f64::EPSILON * size,
+                    "{label}: {what} steps where the sections go from {:?} to {:?} at x {mid}: \
+                     {wide} across 2e-4, {narrow} across 2e-7",
+                    a.2,
+                    b.2
+                );
+                };
+                continuous("the rating", (wr.0 - wl.0).abs(), (nr.0 - nl.0).abs(), nl.0);
+                for k in 0..2 {
+                    if let (Some(p), Some(q), Some(pn), Some(qn)) =
+                        (wl.1[k], wr.1[k], nl.1[k], nr.1[k])
+                    {
+                        continuous(
+                            ["the fillet's measure", "the flank's measure"][k],
+                            (q - p).abs(),
+                            (qn - pn).abs(),
+                            pn,
+                        );
+                    }
+                }
+                let governing_curve_changed = a.2[0].map(|g| g.0) != b.2[0].map(|g| g.0);
+                if governing_curve_changed {
+                    between_curves += 1;
+                }
+                for k in 0..3 {
+                    if let (Some(p), Some(q)) = (a.2[k], b.2[k]) {
+                        to_an_end += usize::from(p.0 == q.0 && p.1 != q.1);
+                    }
+                }
+                rings += usize::from(ring);
+            }
+        };
+    // Tip-loaded (ε 1) families stop short of the pointed limit (z9 25°: x
+    // 0.5088; z12 20° h_a 1.1: 0.6214; z30 25° h_a 1.25: 0.661), where the
+    // rule is singular: the flank's least sits under the vanishing tip land
+    // and rates without bound as it closes (at 1e-7 of the limit, 5.7e5),
+    // then gives way to the fillet's (`docs/state.md`). Loaded below the tip,
+    // the vertex is below the tip corner and the limit is crossed smoothly.
+    for (teeth, alpha, h_a, rho, eps, lo, hi) in [
+        (
+            30_u32, 25.0_f64, 1.25_f64, 0.2_f64, 1.2_f64, 0.3_f64, 1.0_f64,
+        ),
+        (20, 25.0, 1.25, 0.2, 1.2, 0.2, 1.0),
+        (9, 25.0, 1.0, 0.38, 1.0, 0.0, 0.48),
+        (12, 20.0, 1.1, 0.25, 1.0, 0.3, 0.6),
+        (30, 25.0, 1.25, 0.2, 1.0, 0.3, 0.64),
+        (40, 20.0, 1.0, 0.38, 1.3, -0.3, 0.8),
+        (9, 20.0, 1.0, 0.38, 1.3, -0.75, 0.2),
+        (7, 20.0, 1.0, 0.38, 1.2, -0.7, 0.2),
+        (10, 14.5, 1.0, 0.38, 1.3, -0.6, 0.3),
+    ] {
+        let make = move |x: f64| {
+            Tooth::new(GearParams {
+                teeth,
+                pressure_angle: alpha,
+                addendum: h_a,
+                root_radius: rho,
+                profile_shift: x,
+                ..Default::default()
+            })
+        };
+        let label = format!("z{teeth} {alpha}° h_a{h_a} ρ{rho} ε{eps}");
+        check(&label, &|x| state(&make(x), eps), lo, hi, false);
+    }
+    for teeth in [40_u32, 60, 90] {
+        let cutter = Cutter {
+            teeth: 20,
+            addendum: 1.25,
+            tip_round: 0.3,
+        };
+        let make = move |x: f64| {
+            Ring::cut_by(
+                &GearParams {
+                    teeth,
+                    profile_shift: x,
+                    root_radius: 0.3,
+                    ..Default::default()
+                },
+                &cutter,
+            )
+        };
+        check(
+            &format!("ring z{teeth}"),
+            &|x| state(&make(x), 1.4),
+            -0.3,
+            0.8,
+            true,
+        );
+    }
+    eprintln!("{between_curves} changes of the governing curve, {to_an_end} of tangency and end, {rings} on rings");
+    assert!(
+        between_curves > 0 && to_an_end > 0,
+        "{between_curves} changes of the governing curve, {to_an_end} of tangency and end: \
+         the sweep must cross both"
     );
 }

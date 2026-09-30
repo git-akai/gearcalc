@@ -32,10 +32,15 @@ ratio, as a train rates a member:
 - **the load**, at the highest point of single-pair contact, `ε_αn − 1` base
   pitches back from the tip (`ε_αn = ε_α / cos²β_b`), or from where contact
   ends `short` base pitches below it, along the involute's normal.
-- **the Lewis section**, by brute force: the largest parabola `x² = 4p(y_v −
-  y)`, vertex where the load line crosses the centreline, that the tooth
-  contains is the least of `x² / (y_v − y)` over both curves: sampled, every
-  dip closed by bisection on its derivative, taken by complex step.
+- **the Lewis section, by the section rule** (2026-10-02): each curve offers
+  its least Lewis measure `x² / (y_v − y)` over the whole curve below the
+  vertex (vertex where the load line crosses the centreline), at an interior
+  least — found by brute force, sampled and closed by bisection on the
+  complex-step derivative — or at one of its ends, the flank's only end being
+  its root (its tip is never below the vertex); the fillet's is rated with
+  the fillet's notch factor, the flank's with none; the readable candidate
+  rating highest governs, and with none readable the row is unrated as
+  compressed, with none at all as having no section.
 - **Dolan and Broghamer as AGMA fits them** (AGMA 908-B89; Mitchiner and
   Mabie, 1982): `(Y_F − axial) · K_f`, `K_f = H + (s_Fn/ρ_f)^L (s_Fn/h_Fe)^M`
   with `H, L, M` linear in `α` in radians, and `ρ_f` the fillet's least radius
@@ -123,6 +128,15 @@ BLOCKS = [
         eps_n=[1.2, 1.5],
         short=[0.0],
     ),
+    dict(
+        teeth=[9, 12],
+        alpha=[25.0],
+        shift=[0.45, 0.5],
+        helix=[0.0],
+        proportions=[(1.0, 1.25, 0.38, 1.0)],
+        eps_n=[1.0, 1.05],
+        short=[0.0],
+    ),
 ]
 SHARINGS = ["none", "ramp"]
 
@@ -155,11 +169,14 @@ class Model:
     virtual_2019: bool = False
     # The round's cap, a fraction of the largest that fits.
     fillet_fraction: float = FILLET_FRACTION
-    # The flank searched whole for one crossing, as the crate once did: no
-    # flank section where the flank has both a greatest and a least.
-    flank_whole: bool = False
     # The ramp's maximum over the 204 samples the crate once took.
     sampled: bool = False
+    # The fillet's notch factor on the flank's section too.
+    flank_notch: bool = False
+    # The section of highest `Y_F` governs, readable or not.
+    by_form_factor: bool = False
+    # Tangencies alone: no curve offers an end.
+    tangency_only: bool = False
 
 
 RATING = Model()
@@ -357,36 +374,31 @@ class Tooth:
                 out.append((kind, p, g(p).real))
         return out, [v for v in (vals[0], vals[n]) if math.isfinite(v)]
 
-    def section(self, y_v, model=RATING):
-        """The Lewis tangency for a vertex at `y_v`, `(curve name, curve,
-        parameter)`: the least of `x²/(y_v − y)` over the fillet and the flank,
-        which is the largest parabola the tooth contains."""
-        best, ends = None, []
-        for name, curve, lo, hi in (
-            ("fillet", self.fillet, self.sig_j, 0.0),
-            ("flank", self.flank, self.u_j, self.u_tip),
+    def candidates(self, y_v, model=RATING):
+        """**What each curve offers**: its least `x²/(y_v − y)` over the whole
+        curve below the vertex and off the centreline — an interior least, or
+        one of its ends — as `(curve name, curve, parameter, at an end)`, the
+        fillet's first. The flank's only end is its root: its tip is never
+        below the vertex (with `δ = u_tip − ψ_b` the load line crosses the
+        centreline at most `r_b/cos δ` out and the tip corner stands
+        `r_b(cos δ + u sin δ)` out, no less wherever the tip's half angle is
+        not negative)."""
+        out = []
+        for name, curve, lo, hi, ends in (
+            ("fillet", self.fillet, self.sig_j, 0.0, (self.sig_j, 0.0)),
+            ("flank", self.flank, self.u_j, self.u_tip, (self.u_j,)),
         ):
-            found, e = self.stationary(curve, lo, hi, y_v)
-            ends += e
-            if model.flank_whole and name == "flank":
-                # One bracket over the whole flank finds a crossing only where
-                # there is one: a least alone, or a greatest alone.
-                if len(found) != 1:
-                    continue
-                _, p, v = found[0]
-                if best is None or v < best[0]:
-                    best = (v, name, curve, p)
-                continue
-            for kind, p, v in found:
-                if kind == "least" and (best is None or v < best[0]):
-                    best = (v, name, curve, p)
-        # A least at a curve's end is a corner, where the crate's search for
-        # a stationary point has no reading: a row the gate cannot hold, and
-        # it says so rather than compare. (The two curves' shared end at a
-        # tangent junction is the least only to rounding.)
-        if not model.flank_whole and ends and (best is None or min(ends) < best[0] * (1 - OPS * EPS)):
-            raise AssertionError(f"the least is at a curve's end, vertex {y_v}")
-        return None if best is None else best[1:]
+            found, _ = self.stationary(curve, lo, hi, y_v)
+            offered = [(v, p, False) for kind, p, v in found if kind == "least"]
+            if not model.tangency_only:
+                for e in ends:
+                    x, y = (c.real for c in curve(e))
+                    if y < y_v and x > 0:
+                        offered.append((x * x / (y_v - y), e, True))
+            if offered:
+                v, p, at_end = min(offered, key=lambda o: (o[0], o[2]))
+                out.append((name, curve, p, at_end))
+        return out
 
 
 def at_load(t, sec, u, model=RATING):
@@ -395,10 +407,10 @@ def at_load(t, sec, u, model=RATING):
     for this load."""
     (lx, ly), (dx, dy), y_v = t.load(u)
     if model.afresh:
-        sec = t.section(y_v.real)
+        sec = governing(t, y_v.real, u, model)[0]
         if sec is None:
             return None
-    name, curve, p = sec
+    name, curve, p, _ = sec
     xt, yt = (c.real for c in curve(p))
     s, h = 2 * xt, y_v - yt
     # The load's angle off the across-tooth direction, whichever way it leans.
@@ -413,7 +425,14 @@ def at_load(t, sec, u, model=RATING):
     else:
         rho_f = t.least_fillet_radius()
     H, L, M = db_coefficients(a, model)
-    k_f = H + (s / rho_f) ** L * (s / h) ** M if h.real > 0 else None
+    # The notch factor belongs to the notch: the fillet's section carries
+    # Dolan and Broghamer's, the smooth flank's none.
+    if h.real <= 0:
+        k_f = None
+    elif name == "flank" and not model.flank_notch:
+        k_f = 1.0 + 0 * s
+    else:
+        k_f = H + (s / rho_f) ** L * (s / h) ** M
     factor = (y_f - axial) * k_f if k_f is not None else None
     if factor is not None and not (cmath.isfinite(factor) and factor.real > 0):
         factor = None
@@ -421,6 +440,28 @@ def at_load(t, sec, u, model=RATING):
         on=name, s_Fn=s, h_Fe=h, alpha_Fen=af, load_x=lx, load_y=ly, y_t=yt, rho_f=rho_f,
         Y_F=y_f, axial=axial, K_f=k_f, factor=factor, y_v=y_v, u=u, section=sec,
     )
+
+
+def governing(t, y_v, u, model=RATING):
+    """**The governing section** for the load at roll `u`: of what each curve
+    offers, the one rated highest, a candidate the model cannot read (its
+    factor not a positive number) never masking one it can. `(section, why)`,
+    the section `None` and `why` the reason where there is none: no candidate
+    at all, or every candidate compressed."""
+    offered = t.candidates(y_v, model)
+    if not offered:
+        return None, "no_section"
+    rated = []
+    for sec in offered:
+        f = at_load(t, sec, u, dataclasses.replace(model, afresh=False))
+        rated.append((sec, f))
+    if model.by_form_factor:
+        sec, f = max(rated, key=lambda r: r[1]["Y_F"].real)
+        return (sec, None) if f["factor"] is not None else (None, "compressed")
+    readable = [(sec, f) for sec, f in rated if f["factor"] is not None]
+    if not readable:
+        return None, "compressed"
+    return max(readable, key=lambda r: r[1]["factor"].real)[0], None
 
 
 def ramp_piece(d, eps, mid):
@@ -477,7 +518,7 @@ def rate(row, model=RATING):
     z_n = z / (cos2_bb * math.cos(beta)) if model.virtual_2019 else z / math.cos(beta) ** 3
     t = Tooth(z_n, m, alpha, row["x"], row["h_a"], row["h_f"], row["rho"], row["k"], model.fillet_fraction)
     if not t.usable:
-        return t, z_n, None
+        return t, z_n, "no_section"
     eps_n = row["eps_a"] / cos2_bb
     pitch = 2 * math.pi / t.z
     u_end = t.u_tip - row["short"] / cos2_bb * pitch
@@ -494,14 +535,12 @@ def rate(row, model=RATING):
 
     hp = max(eps_n - 1, 0.0)
     if not on_flank(hp):
-        return t, z_n, None
+        return t, z_n, "no_section"
     _, _, y_v = t.load(roll(hp))
-    sec = t.section(y_v.real, model)
+    sec, why = governing(t, y_v.real, roll(hp), model)
     if sec is None:
-        return t, z_n, None
+        return t, z_n, why
     f = at_load(t, sec, roll(hp), model)
-    if f is None or f["factor"] is None:
-        return t, z_n, None
     share, d_best, inside, wpp = 1.0, hp, False, 0.0
     if row["sharing"] == "ramp":
         def weight(d, mid):
@@ -537,18 +576,25 @@ def rate(row, model=RATING):
         wpp=wpp,
         eps_n=eps_n,
         tangency=conditioning(t, sec, y_v.real),
+        at_end=sec[3],
         derivs=derivatives(t, sec, roll(d_best), pitch, model, eps_n, d_best) if inside else {},
     )
     return t, z_n, real
 
 
 def conditioning(t, sec, y_v):
-    """How far the tangency's point may sit from its true place, as the
-    rounding of `x` and `y` there: `(δx, δy)`. The condition `x y′ + 2x′(y_v −
-    y)` is computed from coordinates as large as the tip, so it carries
-    `OPS·ε·(|x y′| + 2|x′||y_v − y| + r_a(|y′| + 2|x′|))`; over its slope that
-    is the parameter's rounding, and the curve's speed makes it a length."""
-    _, curve, p = sec
+    """How far the section's point may sit from its true place, as the
+    rounding of `x` and `y` there, and what that does to the measure
+    relatively: `(δx, δy, δg/g)`.
+
+    At a tangency the condition `x y′ + 2x′(y_v − y)` is computed from
+    coordinates as large as the tip, so it carries `OPS·ε·(|x y′| + 2|x′||y_v −
+    y| + r_a(|y′| + 2|x′|))`; over its slope that is the parameter's rounding,
+    the curve's speed makes it a length, and the measure is stationary there.
+    At a curve's end the parameter is the end's own, rounded as the end was
+    found (the junction's roll to its scale, a rack travel to the tip's
+    radius), and the measure moves with it at its own slope."""
+    _, curve, p, at_end = sec
 
     def cond(q):
         x, y = (c.real for c in curve(q))
@@ -556,11 +602,16 @@ def conditioning(t, sec, y_v):
         return x * ys + 2 * xs * (y_v - y), (x, y, xs, ys)
 
     _, (x, y, xs, ys) = cond(p)
+    if at_end:
+        dp = OPS * EPS * (t.u_j_scale if curve == t.flank else t.r_a)
+        g = x * x / (y_v - y)
+        dg = abs(slope(lambda q: (lambda c: c[0] * c[0] / (y_v - c[1]))(curve(q)), p))
+        return abs(xs) * dp, abs(ys) * dp, dg * dp / g
     terms = abs(x * ys) + 2 * abs(xs) * abs(y_v - y) + t.r_a * (abs(ys) + 2 * abs(xs))
     step = 1e-7 * max(abs(p), 1e-3)
     dc = abs(cond(p + step)[0] - cond(p - step)[0]) / (2 * step)
     dp = OPS * EPS * terms / dc
-    return abs(xs) * dp, abs(ys) * dp
+    return abs(xs) * dp, abs(ys) * dp, 0.0
 
 
 def derivatives(t, sec, u, pitch, model, eps_n, d):
@@ -587,7 +638,7 @@ def tolerances(t, f):
     """What each figure may differ by, absolutely, printing included."""
     e = OPS * EPS
     ea = e * t.r_a
-    dx, dy = f["tangency"]
+    dx, dy, dg = f["tangency"]
     m, an = t.m, t.alpha
     s, h, af = f["s_Fn"], f["h_Fe"], f["alpha_Fen"]
     tol = {"load_x": ea, "load_y": ea, "rho_f": ea, "share": e}
@@ -607,12 +658,15 @@ def tolerances(t, f):
     # tangency's rounding does not reach it; its coordinates' does.
     c1 = 6 / ((s / m) ** 2 * math.cos(an))
     tol["Y_F"] = e * f["Y_F"] + c1 * (ca * (y_v + ea) / m + (h / m) * sa * tol["alpha_Fen"]) \
-        + 2 * f["Y_F"] * (2 * ea) / s
+        + 2 * f["Y_F"] * (2 * ea) / s + f["Y_F"] * dg
     tol["axial"] = e * f["axial"] + f["axial"] * tol["s_Fn"] / s + ca / ((s / m) * math.cos(an)) * tol["alpha_Fen"]
     H, L, M = db_coefficients(an)
-    part = f["K_f"] - H
-    tol["K_f"] = e * f["K_f"] + part * (abs(L) * (tol["s_Fn"] / s + tol["rho_f"] / f["rho_f"])
-                                        + abs(M) * (tol["s_Fn"] / s + tol["h_Fe"] / h))
+    if f["on"] == "flank":
+        tol["K_f"] = 0.0
+    else:
+        part = f["K_f"] - H
+        tol["K_f"] = e * f["K_f"] + part * (abs(L) * (tol["s_Fn"] / s + tol["rho_f"] / f["rho_f"])
+                                            + abs(M) * (tol["s_Fn"] / s + tol["h_Fe"] / h))
     diff = f["Y_F"] - f["axial"]
     tol["factor"] = e * f["factor"] + f["K_f"] * (tol["Y_F"] + tol["axial"]) + abs(diff) * tol["K_f"]
     w = f["factor"] * f["share"]
@@ -664,7 +718,8 @@ def parse(text):
         row = {k: (v if k == "sharing" else float(v)) for k, v in r.items()}
         row["z"] = int(r["z"])
         row["tool"] = dict(zip(tool[0::2], tool[1::2]))
-        row["rated"] = None if rated == ["none"] else dict(zip(rated[0::2], rated[1::2]))
+        row["rated"] = None if rated[0] == "none" else dict(zip(rated[0::2], rated[1::2]))
+        row["why"] = rated[1] if rated[0] == "none" else None
         rows.append(row)
     tail = lines[-1].split()
     return header, rows, int(tail[1])
@@ -734,11 +789,15 @@ def check(rows, built):
             if abs(float(tool[key]) - mine[key]) > tol:
                 bad.append(f"row {i}: {key} {tool[key]}, here {mine[key]!r}")
         got = row["rated"]
-        if (got is None) != (f is None):
+        why = f if isinstance(f, str) else None
+        if (got is None) != (why is not None):
             bad.append(f"row {i}: the crate {'has no reading' if got is None else 'rates'}, "
-                       f"here {'none' if f is None else 'a rating'}")
+                       f"here {'none (' + why + ')' if why else 'a rating'}")
             continue
-        if f is None:
+        if why is not None:
+            compared += 1
+            if row["why"] != why:
+                bad.append(f"row {i}: unrated as {row['why']}, here as {why}")
             continue
         rated += 1
         tol = tolerances(t, f)
@@ -770,24 +829,29 @@ def main_check(path):
         print(f"... and {len(bad) - 40} more")
     # Every loop above ran as often as the record is long: every row its five
     # figures of form, every rated row its figures.
-    expected = 5 * len(rows) + len(FIGURES) * rated
+    expected = 5 * len(rows) + len(FIGURES) * rated + sum(1 for _, _, f in built if isinstance(f, str))
     if not bad and compared != expected:
         bad.append(f"compared {compared} figures, the record has {expected}")
-    fs = [f for _, _, f in built if f]
+    fs = [f for _, _, f in built if isinstance(f, dict)]
     moved = sum(1 for f in fs if f["moved"])
     inside = sum(1 for f in fs if f["inside"])
     on = {n: sum(1 for f in fs if f["on"] == n) for n in ("fillet", "flank")}
     capped = sum(1 for t, _, _ in built if t.capped)
+    at_end = sum(1 for f in fs if f["at_end"])
+    reasons = {w: sum(1 for _, _, f in built if f == w) for w in ("no_section", "compressed")}
     print(
         f"{len(rows)} rows, {rated} rated ({on['fillet']} on the fillet, {on['flank']} on the flank, "
         f"{moved} governed off the single-pair point under the ramp, {inside} of them at a peak "
-        f"inside a piece; {capped} rounds capped), {compared} figures compared: "
+        f"inside a piece; {at_end} at a curve's end; {capped} rounds capped; unrated "
+        f"{reasons['no_section']} with no section, {reasons['compressed']} compressed), "
+        f"{compared} figures compared: "
         + ("all within tolerance" if not bad else f"{len(bad)} fault(s)")
     )
     # A grid that cannot see a fault is not a gate: each of these is a
     # search or a rule some row must reach.
     for what, n in (("rated off the single-pair point", moved), ("rated at a peak inside a piece", inside),
-                    ("on the fillet", on["fillet"]), ("on the flank", on["flank"]), ("with a capped round", capped)):
+                    ("on the fillet", on["fillet"]), ("on the flank", on["flank"]), ("with a capped round", capped),
+                    ("rated at a curve's end", at_end), ("unrated as compressed", reasons["compressed"])):
         if n == 0:
             bad.append(f"no row is {what}: that part of the model is untested")
     return 1 if bad else 0
@@ -806,8 +870,9 @@ def recorded(rows, built):
     out = []
     for row, (t, z_n, f) in zip(rows, built):
         tool = dict(row["tool"], rho_mm=repr(t.rho), b_d=repr(t.b_d))
-        r = dict(row, tool=tool, rated=None if f is None else dict(
-            {k: as_printed(f[k]) for k in FIGURES}, on=f["on"]))
+        rated = isinstance(f, dict)
+        r = dict(row, tool=tool, rated=dict({k: as_printed(f[k]) for k in FIGURES}, on=f["on"]) if rated else None,
+                 why=None if rated else f)
         out.append(r)
     return out
 
@@ -816,7 +881,7 @@ def self_test():
     """The gate's own plants, each at or near its blind spot."""
     header, rows, count = parse(RECORD.read_text())
     built = rebuild(rows)
-    rated = [i for i, (_, _, f) in enumerate(built) if f]
+    rated = [i for i, (_, _, f) in enumerate(built) if isinstance(f, dict)]
     results = []
 
     def expect(name, want_fail, planted_rows=rows, planted_count=count):
@@ -834,7 +899,7 @@ def self_test():
     jitter = []
     for n, (row, (t, _, f)) in enumerate(zip(base, built)):
         r = dict(row)
-        if f is not None:
+        if isinstance(f, dict):
             sign = 1 if n % 2 else -1
             tol = tolerances(t, f)
             r["rated"] = dict(r["rated"], **{
@@ -910,23 +975,37 @@ def self_test():
     # The round capped at 0.94 of what fits: only capped rows move.
     expect(f"the round capped at 0.94 of what fits (rows {capped})", True,
            planted_by(Model(fillet_fraction=0.94), set(capped)))
-    # The flank searched whole: rows whose flank has a greatest before its
-    # least lose the flank's section and take the fillet's; the rest agree.
-    whole = rebuild(rows, Model(flank_whole=True), set(flank))
-    differ = [i for i in flank if whole[i][2] is None or whole[i][2]["on"] != "flank"]
-    if not differ:
-        results.append(False)
-        print("WRONG  no flank row has a greatest before its least: the plant cannot be planted")
-    expect(f"the flank searched whole for one crossing (rows {differ[:8]})", True,
-           recorded(rows, [whole[i] if i in differ[:8] else b for i, b in enumerate(built)]))
+    # The rule's near misses, each changing only the rows it reaches: the
+    # fillet's notch factor on the flank's section (the rating before the
+    # rule), the section of highest `Y_F` governing whether it reads or not
+    # (Savage's comparison), and tangencies alone (no curve offering an end:
+    # a ring would lose its notch factor).
+    for name, model, rows_of in (
+        ("the fillet's notch factor on the flank", Model(flank_notch=True), flank),
+        ("the highest Y_F governing", Model(by_form_factor=True), None),
+        ("tangencies alone", Model(tangency_only=True), None),
+    ):
+        other = rebuild(rows, model, set(rows_of) if rows_of is not None else None)
+        differ = [i for i, (o, b) in enumerate(zip(other, built))
+                  if o is not None and recorded([rows[i]], [o]) != recorded([rows[i]], [b])]
+        if not differ:
+            results.append(False)
+            print(f"WRONG  {name}: no row of the grid differs, so the gate cannot see it")
+            continue
+        expect(f"{name} (rows {differ[:6]})", True,
+               recorded(rows, [other[i] if i in differ[:8] else b for i, b in enumerate(built)]))
     # The record's shape.
     expect("a row missing", True, rows[:-1], count - 1)
     shifted = [dict(r) for r in rows]
     shifted[5] = dict(shifted[5], eps_a=shifted[5]["eps_a"] * (1 + 1e-9))
     expect("a contact ratio a billionth off the grid's", True, shifted)
     none = [dict(r) for r in base]
-    none[rated[0]] = dict(none[rated[0]], rated=None)
+    none[rated[0]] = dict(none[rated[0]], rated=None, why="compressed")
     expect("a rated row recorded as having no reading", True, none)
+    swapped = [dict(r) for r in base]
+    i = next(i for i, (_, _, f) in enumerate(built) if f == "compressed")
+    swapped[i] = dict(swapped[i], why="no_section")
+    expect(f"an unrated row's reason swapped (row {i})", True, swapped)
 
     bad = results.count(False)
     print("every plant behaves" if not bad else f"{bad} plant(s) misbehave")

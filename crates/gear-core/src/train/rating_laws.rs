@@ -149,14 +149,6 @@ fn bending_is_absent_or_positive(r: &super::TrainResult, label: &str) -> usize {
     rated
 }
 
-/// Whether member `i` says its bending went unrated.
-fn says_unrated(r: &super::TrainResult, i: usize) -> bool {
-    r.members[i]
-        .notes
-        .iter()
-        .any(|n| n.is(crate::note::key::GEAR_BENDING_UNRATED))
-}
-
 /// **A mate loaded low on its flank is not rated negative.** Against a
 /// long-addendum member the unshifted 300/300 pair runs past `ε_n = 2`, so the
 /// unshared load point `d = ε − 1` sits low on the other member's flank. It
@@ -188,24 +180,18 @@ fn a_mate_loaded_low_on_its_flank_is_not_rated_negative() {
     );
 }
 
-/// **A pair whose tips stay on usable flank rates every member, unless its
-/// section is one the model cannot read.** Since the path of contact ends at
-/// the usable flanks, a load point off every section is reached only through
-/// flank interference: over the grid below, every pair that solves with no
-/// flagged mesh has both members rated or, where not, a Lewis section at the
-/// member's load point on which Dolan–Broghamer's factor is not a positive
-/// number (T08.2's domain) — rebuilt here from the member's own proportions
-/// at its transverse contact ratio. That is where a narrow tip is loaded
-/// steeply at its tip: the largest parabola that fits touches the flank just
-/// under its vertex, with an arm too short for the bending term to outweigh
-/// the axial one (5/40, β 20°, x 1, the tip held to its width). A search that
-/// took the flank's first crossing rated such a tooth at a parabola that
-/// crossed it. The grid reaches unrated members with a flagged mesh too.
+/// **A pair whose tips stay on usable flank rates every member.** Since the
+/// path of contact ends at the usable flanks, a load point off every section
+/// is reached only through flank interference: over the grid below, every
+/// pair that solves with no flagged mesh has both members rated, and the
+/// grid does reach unrated members with one. The 5/40 pinion at β 20°, x 1
+/// with its tip held to its width is the case that tests the section rule:
+/// its flank's candidate is compressed (`Y_F` 4.06 against an axial term of
+/// 4.34) and must not mask its fillet's, which rates.
 #[test]
 fn only_flank_interference_leaves_a_member_unrated() {
-    use crate::strength::{bending_section_by, CriticalSection, RootStressModel};
     let lib = test_library();
-    let (mut clean, mut unrated_with, mut unreadable) = (0, 0, 0);
+    let (mut clean, mut unrated_with) = (0, 0);
     for (z0, z1) in [
         (5_u32, 40_u32),
         (7, 300),
@@ -238,26 +224,12 @@ fn only_flank_interference_leaves_a_member_unrated() {
                         });
                         if r.meshes[0].flank_interference.contains(&true) {
                             unrated_with += usize::from(unrated);
-                            continue;
-                        }
-                        clean += 1;
-                        for (i, g) in r.members.iter().enumerate() {
-                            if g.cases.iter().any(|c| c.bending_stress.is_some()) {
-                                continue;
-                            }
-                            let tooth = crate::Tooth::new(g.params);
-                            let eps = r.meshes[0].line.map(|l| l.contact_ratios.transverse);
-                            let section = eps.and_then(|e| {
-                                bending_section_by(&tooth, e, CriticalSection::LewisParabola)
-                            });
+                        } else {
+                            clean += 1;
                             assert!(
-                                section.is_some_and(|s| s
-                                    .bending_factor(RootStressModel::DolanBroghamer)
-                                    .is_none()),
-                                "{z0}/{z1} β {beta} h_a {addendum} x {x}: member {i} unrated \
-                                 on usable flank with a section the model reads"
+                                !unrated,
+                                "{z0}/{z1} β {beta} h_a {addendum} x {x}: unrated on usable flank"
                             );
-                            unreadable += 1;
                         }
                     }
                 }
@@ -265,16 +237,17 @@ fn only_flank_interference_leaves_a_member_unrated() {
         }
     }
     assert!(
-        clean > 100 && unrated_with > 0 && unreadable > 0,
-        "{clean} clean, {unrated_with} unrated with interference, {unreadable} unreadable"
+        clean > 100 && unrated_with > 0,
+        "{clean} clean, {unrated_with} unrated"
     );
 }
 
-/// **A member with no root section costs its own rating, not the train's.**
-/// Reached only through flank interference
+/// **A member with no rated section costs its own rating, not the train's**,
+/// and says why. Reached only through flank interference
 /// (`only_flank_interference_leaves_a_member_unrated`): the 7-tooth pinion
-/// at `x` −0.8 against 300 at 20° is one; the train was refused whole there
-/// once (a root-section error that blamed undercut).
+/// at `x` −0.8 against 300 at 20° is one, every section it has compressed at
+/// its load point; the train was refused whole there once (a root-section
+/// error that blamed undercut).
 #[test]
 fn a_member_with_no_root_section_is_unrated_and_the_train_solves() {
     let mut s = pair([7, 300]).with_first_helix(20.0);
@@ -297,7 +270,16 @@ fn a_member_with_no_root_section_is_unrated_and_the_train_solves() {
         .collect();
     assert!(!unrated.is_empty(), "both members rated");
     for i in unrated {
-        assert!(says_unrated(&r, i), "member {i}: {:?}", r.members[i].notes);
+        // Its sections exist and are compressed, and it says that rather
+        // than that it has none.
+        assert!(
+            r.members[i]
+                .notes
+                .iter()
+                .any(|n| n.is(crate::note::key::GEAR_BENDING_UNRATED_COMPRESSED)),
+            "member {i}: {:?}",
+            r.members[i].notes
+        );
     }
 }
 

@@ -73,11 +73,11 @@ pub enum CriticalSection {
     /// Unlike the tangent construction this **follows the load point**, which is
     /// the property the cantilever model is supposed to have. On an external
     /// tooth the tangency sits higher up the fillet, the section is narrower,
-    /// and `Y_F` comes out larger: loaded at the tip over `gear-cli matrix`'s
-    /// population, 0.7 % to 13.7× the tangent's, mean 14.5 %. The large end is
-    /// a narrow tip loaded steeply, where the largest parabola that fits
-    /// touches the flank just under its vertex: 21 % of the population
-    /// touches the flank.
+    /// and `Y_F` comes out larger: the section the default rates, loaded at the
+    /// tip over `gear-cli matrix`'s population, 0.3 % to 13.7× the tangent's,
+    /// mean 10.7 %. The large end is a narrow tip loaded steeply, where the
+    /// flank's section under the land governs (1.1 % of the population; see
+    /// [`root_section_rated`] for which section governs, and why).
     ///
     /// **That is `Y_F` alone, and it is not what a designer feels.** The number
     /// a stress is proportional to is the whole bending factor, and a narrower
@@ -109,7 +109,7 @@ pub enum CriticalSection {
     /// against the tangent construction**, so pairing the two mixes
     /// conventions.
     ///
-    /// # On a ring, none of that paragraph holds
+    /// # On a ring
     ///
     /// Measured over 160 ring designs against the 60° tangent
     /// (`gear-cli matrix`, and it could not be measured at all until the 60°
@@ -117,23 +117,19 @@ pub enum CriticalSection {
     ///
     /// | | external | ring |
     /// |---|---|---|
-    /// | tangency on the **flank** | 21.2 % | **100 %** |
-    /// | `Y_F` parabola/tangent | mean 1.145 | mean 1.425 |
-    /// | whole factor, each set's own | mean 0.852 | mean 0.970 |
-    /// | mean `q_s` | 1.73 vs 3.17 | **1.00** vs 4.94 |
-    /// | outside the `Y_S` band | 24.3 % | **66.9 %** |
-    /// | Spearman ρ on `Y_F` | **0.898** | **0.537** |
+    /// | rated section on the **flank** | 1.1 % | 0 % |
+    /// | `Y_F` parabola/tangent | mean 1.107 | mean 1.166 |
+    /// | whole factor, each set's own | mean 0.820 | mean 0.775 |
+    /// | mean `q_s` | 2.07 vs 3.17 | 1.65 vs 4.94 |
+    /// | Spearman ρ on `Y_F`, construction's | **0.898** | **0.537** |
+    /// | Spearman ρ, parabola `K_f` against tangent `Y_F` | 0.912 | 0.960 |
     ///
-    /// The parabola's tangency lands on the involute flank for **every** ring in
-    /// the population, so `s_Fn` is read across the flank while `ρ_F` falls back
-    /// to the fillet junction — two different places — and the `q_s` that comes
-    /// out sits at the bottom of the `Y_S` fit's band, clamped for two rings in
-    /// three. The ranking argument that justifies this default externally is not
-    /// available internally: ρ = 0.537 on `Y_F`, 0.289 on the product, and one
-    /// pair of models in the matrix orders ring designs in *opposite* directions.
-    ///
-    /// **This is a recorded finding, not a settled model** — see
-    /// `docs/state.md`. Nothing here has been changed on the strength of it.
+    /// The largest parabola a ring holds touches its flank, every time, and
+    /// its fillet has no tangency: the fillet offers its end at the flank,
+    /// where the fillet's notch is, and rated with the fillet's notch factor
+    /// that section governs every ring in the population. The largest
+    /// parabola alone still orders ring designs unlike the tangent (ρ =
+    /// 0.537); the rated section orders them alike (0.960).
     ///
     /// For a number to compare against a published ISO or AGMA rating, switch to
     /// [`CriticalSection::TangentAngle`].
@@ -261,11 +257,9 @@ pub struct RootSection {
     /// Which construction located this section.
     pub method: CriticalSection,
     /// True when the inscribed parabola touched the involute flank rather than
-    /// the fillet. Expected on larger teeth; see [`CriticalSection::LewisParabola`].
-    ///
-    /// It does **not** mean the rating is unavailable or approximate. The notch
-    /// is still the fillet and `ρ_F` is still read there — see
-    /// [`RootSection::stress_correction`] — so nothing steps across the seam.
+    /// the fillet; see [`CriticalSection::LewisParabola`]. Such a section is
+    /// on a smooth curve and carries no notch factor
+    /// ([`RootSection::stress_correction`]).
     pub tangency_on_flank: bool,
     /// Parabola parameter `p` in `x² = 4p(y_v − y)`, for drawing the inscribed
     /// parabola. Only meaningful for [`CriticalSection::LewisParabola`].
@@ -680,7 +674,9 @@ pub fn root_section<T: ToothOutline + ?Sized>(g: &T, load_roll: f64) -> Option<R
     root_section_with(g, load_roll, CriticalSection::default())
 }
 
-/// The critical root section, locating it by the chosen construction.
+/// The critical root section, locating it by the chosen construction, the
+/// governing one under the default bending model
+/// ([`root_section_rated`]).
 ///
 /// Returns `None` when the gear has no usable flank — a severed tooth, or a
 /// fillet on which the construction has no solution.
@@ -690,15 +686,55 @@ pub fn root_section_with<T: ToothOutline + ?Sized>(
     load_roll: f64,
     method: CriticalSection,
 ) -> Option<RootSection> {
+    root_section_rated(g, load_roll, method, RootStressModel::default())
+}
+
+/// **The governing root section under a bending model**: of the sections the
+/// construction finds, the one whose rated factor
+/// ([`RootSection::bending_factor`]) is highest — `Y_F`, the axial term and
+/// the notch factor together, never `Y_F` alone.
+///
+/// The notch factor belongs to the notch: a section in the fillet carries the
+/// fillet's, one on the smooth flank none ([`RootSection::stress_correction`]).
+/// A section the model cannot read (its bending factor not a positive number:
+/// the loaded fillet compressed rather than stretched) never masks one it can.
+/// Where none can be read the first found is returned, so the rating can say
+/// why it has none ([`Unrated::Compressed`]); `None` where the construction
+/// finds no section at all.
+#[must_use]
+pub fn root_section_rated<T: ToothOutline + ?Sized>(
+    g: &T,
+    load_roll: f64,
+    method: CriticalSection,
+    model: RootStressModel,
+) -> Option<RootSection> {
+    let found = root_sections(g, load_roll, method);
+    let rated = found
+        .iter()
+        .filter_map(|s| s.bending_factor(model).map(|f| (*s, f)))
+        .reduce(|a, b| if b.1.total_cmp(&a.1).is_gt() { b } else { a })
+        .map(|(s, _)| s);
+    rated.or_else(|| found.first().copied())
+}
+
+/// **Every section the construction finds** for a load at `load_roll`: the
+/// tangent's one; the parabola's tangency on the fillet and on the flank,
+/// each where it has one, the fillet's first.
+#[must_use]
+pub fn root_sections<T: ToothOutline + ?Sized>(
+    g: &T,
+    load_roll: f64,
+    method: CriticalSection,
+) -> Vec<RootSection> {
     if !g.is_usable() || !load_roll.is_finite() {
-        return None;
+        return Vec::new();
     }
 
     // The load has to be resolved first either way: the parabola's vertex sits
     // where the load line crosses the centreline.
     let (load_point, dir) = g.load_at(load_roll);
     if dir[0].abs() < 1e-12 {
-        return None;
+        return Vec::new();
     }
     let crossing = [0.0, load_point[1] + (-load_point[0] / dir[0]) * dir[1]];
     let vertex = crossing[1];
@@ -711,7 +747,7 @@ pub fn root_section_with<T: ToothOutline + ?Sized>(
         // 30° or 60°, and the search does not otherwise know which it is on.
         CriticalSection::TangentAngle => {
             let target = g.tangent_angle_deg().to_radians().tan();
-            brent(
+            let Some(s) = brent(
                 |s| {
                     let (_, t) = g.fillet_at(s);
                     t[0].abs() - target * t[1].abs()
@@ -719,7 +755,10 @@ pub fn root_section_with<T: ToothOutline + ?Sized>(
                 fillet_lo,
                 fillet_hi,
                 Tol::default(),
-            )?
+            ) else {
+                return Vec::new();
+            };
+            s
         }
         // Tangency of the parabola x² = 4p(y_v − y) with the tooth outline.
         // Requiring the point to lie on the parabola and the slopes to match
@@ -733,23 +772,20 @@ pub fn root_section_with<T: ToothOutline + ?Sized>(
         CriticalSection::LewisParabola => {
             let condition = |q: [f64; 2], t: [f64; 2]| q[0] * t[1] + 2.0 * t[0] * (vertex - q[1]);
             let (flank_lo, flank_hi) = g.flank_bracket();
-            // **Both curves, and the weaker wins.** Savage, Rubadeux & Coe:
-            // "both involute and trochoid geometry are used in checking for the
-            // smallest inscribed parabola in the tooth", and "the smaller x
-            // coordinate identifies the weaker inscribed parabola", where
-            // `x = s_Fn²/(4 h_Fe)`. Both candidates share a load point, so they
-            // share `cos α_Fen`, and a smaller `x` is exactly a larger `Y_F` —
-            // so the rule is the higher form factor, which is also the higher
-            // stress.
+            // **Each curve offers its least `x²/(y_v − y)`**, the Lewis
+            // measure, over the whole curve below the vertex: at an interior
+            // tangency, or at one of the curve's ends. Savage, Rubadeux & Coe
+            // search "both involute and trochoid geometry" for "the smallest
+            // inscribed parabola"; here each curve's own smallest is a
+            // candidate section, and the candidates are compared by what each
+            // rates at, the fillet's with its notch factor and the smooth
+            // flank's with none ([`root_section_rated`]) — not by `Y_F`
+            // alone, and an end is as much a candidate as a tangency. A
+            // ring's fillet has no tangency, so its candidate is its end at
+            // the flank, which keeps its notch factor.
             //
-            // It used to search the fillet and fall back to the flank only if
-            // that found nothing. The two agree whenever one curve has no
-            // tangency, which is every ring; they can differ on an external
-            // tooth, where the fillet usually has one and the flank was never
-            // consulted.
-            //
-            // **Each curve is searched only where its tangency is a least of
-            // `x²/(y_v − y)`**, which is what a parabola that fits is:
+            // **Each curve has one interior least at most, found by
+            // construction:**
             //
             // - On the fillet the outline, read as a half-width `w(y)`, falls
             //   and is convex (the fillet is concave toward the space), so
@@ -765,8 +801,8 @@ pub fn root_section_with<T: ToothOutline + ?Sized>(
             //   part the least. So the flank is searched from where that sign
             //   turns: a search of the whole flank finds no sign change when
             //   both are there, and the fillet's tangency was then taken
-            //   where the flank's governs (z 30, x 0.8, 25°, h_a 1.25, ρ 0.2
-            //   at ε 1.2 read 5.9 % low).
+            //   where the flank's is less (z 30, x 0.8, 25°, h_a 1.25, ρ 0.2
+            //   at ε 1.2).
             let turn = |u: f64| {
                 let lean = g.flank_tilt(u);
                 lean.sin() - u * lean.cos().powi(3)
@@ -776,62 +812,124 @@ pub fn root_section_with<T: ToothOutline + ?Sized>(
             } else {
                 brent(turn, flank_lo, flank_hi, Tol::default())
             };
-            let candidates = [
+            let fillet_tangency = brent(
+                |s| {
+                    let (q, t) = g.fillet_at(s);
+                    condition(q, t)
+                },
+                fillet_lo,
+                fillet_hi,
+                Tol::default(),
+            );
+            let flank_tangency = rising.and_then(|from| {
                 brent(
-                    |s| {
-                        let (q, t) = g.fillet_at(s);
+                    |u| {
+                        let (q, t) = g.flank_at(u);
                         condition(q, t)
                     },
-                    fillet_lo,
-                    fillet_hi,
+                    from,
+                    flank_hi,
                     Tol::default(),
                 )
-                .and_then(|s| finish(g, method, s, false, load_point, dir, crossing, vertex)),
-                rising
-                    .and_then(|from| {
-                        brent(
-                            |u| {
-                                let (q, t) = g.flank_at(u);
-                                condition(q, t)
-                            },
-                            from,
-                            flank_hi,
-                            Tol::default(),
-                        )
-                    })
-                    .and_then(|u| finish(g, method, u, true, load_point, dir, crossing, vertex)),
+            });
+            // The Lewis measure at a point, where the point is below the
+            // vertex and off the centreline, each by more than its own
+            // coordinates' rounding ([`beyond_rounding`]): the least over a
+            // curve is never at the vertex's height, where the measure grows
+            // without bound, and a point on the centreline has no chord.
+            let measure = |q: [f64; 2]| {
+                let scale = q[0].hypot(q[1]);
+                (beyond_rounding(vertex - q[1], scale) && beyond_rounding(q[0], scale))
+                    .then(|| q[0] * q[0] / (vertex - q[1]))
+            };
+            // Each curve's least of its tangency and its ends, the tangency
+            // first on a tie.
+            let least = |on: Curve<T>, tangency: Option<f64>, ends: &[f64]| {
+                tangency
+                    .map(|p| (p, true))
+                    .into_iter()
+                    .chain(ends.iter().map(|&p| (p, false)))
+                    .filter_map(|(p, at_tangency)| measure(on(g, p).0).map(|m| (p, at_tangency, m)))
+                    .reduce(|a, b| if b.2 < a.2 { b } else { a })
+            };
+            // **The flank's tip is never below the vertex**, so only its end
+            // at the fillet is a candidate. With `δ = u_tip − ψ_b` the load
+            // line at any roll on the flank crosses the centreline at most
+            // `r_b / cos δ` out (the load angle `u − ψ_b` is greatest at the
+            // tip), and the tip corner stands `r_b (cos δ + u sin δ)` out,
+            // which is no less wherever `u ≥ tan δ`, the tip's half angle not
+            // negative: equal only on a pointed tip loaded at its point,
+            // where the section would have no chord. Counting the tip end let
+            // rounding put that point a hair under the vertex and rate a
+            // chord of 1e-15.
+            let flank_root = if g.tip_at_high_roll() {
+                flank_lo
+            } else {
+                flank_hi
+            };
+            let candidates = [
+                least(T::fillet_at, fillet_tangency, &[fillet_lo, fillet_hi]).and_then(
+                    |(s, at_tangency, _)| {
+                        finish(g, method, s, false, at_tangency, load_point, dir, crossing)
+                    },
+                ),
+                least(T::flank_at, flank_tangency, &[flank_root]).and_then(
+                    |(u, at_tangency, _)| {
+                        finish(g, method, u, true, at_tangency, load_point, dir, crossing)
+                    },
+                ),
             ];
-            // A candidate with no finite form factor is no section; of the
-            // rest the higher wins, the fillet's on a tie.
+            // A candidate with no finite form factor is no section. Which of
+            // the rest governs is a rating's question, not the construction's
+            // ([`root_section_rated`]).
             return candidates
                 .into_iter()
                 .flatten()
                 .filter(|c| c.form_factor.is_finite())
-                .reduce(|a, b| {
-                    if b.form_factor.total_cmp(&a.form_factor).is_gt() {
-                        b
-                    } else {
-                        a
-                    }
-                });
+                .collect();
         }
     };
 
-    finish(g, method, s, false, load_point, dir, crossing, vertex)
+    finish(g, method, s, false, true, load_point, dir, crossing)
+        .into_iter()
+        .collect()
 }
 
-/// Assemble the result once the tangency parameter is known, whichever curve it
-/// was found on.
+/// One of a tooth's two curves, as [`ToothOutline::fillet_at`] and
+/// [`ToothOutline::flank_at`] read it: a point and a tangent at a parameter.
+type Curve<T> = fn(&T, f64) -> ([f64; 2], [f64; 2]);
+
+/// **Whether a length read off coordinates is more than their rounding**:
+/// `length > COORDINATE_ROUNDING · scale`, `scale` the point's distance from
+/// the axis.
+///
+/// A point on a tooth is `R` from the axis at an angle both built from a few
+/// dozen floating operations (a roll, an involute, a sine and a cosine), so
+/// each coordinate carries a few dozen roundings of `R`. `2⁸ε` of `R` bounds
+/// that with a margin, and a half-width or a depth below the vertex no larger
+/// is zero: the apex of a pointed tip loaded at its point, which solves the
+/// tangency condition exactly (`u = tan δ` there) with a chord of about
+/// `ε·R`, and which as a section would rate at 1e13.
+fn beyond_rounding(length: f64, scale: f64) -> bool {
+    length > COORDINATE_ROUNDING * scale
+}
+
+/// The roundings of a point's distance from the axis that a coordinate read
+/// off it carries, with margin: see [`beyond_rounding`].
+const COORDINATE_ROUNDING: f64 = 256.0 * f64::EPSILON;
+
+/// Assemble the section at a point of one curve, whichever curve it is on:
+/// a tangency, or one of the curve's ends (`at_tangency` false).
 #[allow(clippy::too_many_arguments)]
 fn finish<T: ToothOutline + ?Sized>(
     g: &T,
     method: CriticalSection,
     param: f64,
     on_flank: bool,
+    at_tangency: bool,
     load_point: [f64; 2],
     load_dir: [f64; 2],
     crossing: [f64; 2],
-    vertex: f64,
 ) -> Option<RootSection> {
     let s = param;
     let (tangency, raw_tangent) = if on_flank {
@@ -846,28 +944,25 @@ fn finish<T: ToothOutline + ?Sized>(
     let tangent_direction = [sign * raw_tangent[0] / len, sign * raw_tangent[1] / len];
 
     let moment_arm = crossing[1] - tangency[1];
+    // The parabola through the section's point: tangent to the outline there
+    // at a tangency, and through a curve's end otherwise.
     let parabola_p = match method {
-        CriticalSection::LewisParabola => {
+        CriticalSection::LewisParabola if at_tangency => {
             Some(-tangency[0] * raw_tangent[0] / (2.0 * raw_tangent[1]))
         }
+        CriticalSection::LewisParabola => Some(tangency[0] * tangency[0] / (4.0 * moment_arm)),
         CriticalSection::TangentAngle => None,
     };
-    let _ = vertex;
     // cos α_Fen is the share of the load acting across the tooth; the load
     // direction's x-component is exactly that. Read as an arctangent of the
     // two components, since an arccosine is flat to rounding within `√ε` of a
     // square load, where the rating has a corner.
     let load_angle = load_dir[1].abs().atan2(load_dir[0].abs());
 
-    // **The notch is the fillet, wherever the critical section ended up.**
-    //
-    // When the inscribed parabola touches the involute flank — which it does on
-    // any large tooth — the fillet has not stopped existing, and the stress
-    // concentration is still its. So `ρ_F` is read at the fillet point nearest
-    // the section, which is the junction. Reading the *involute's* own curvature
-    // instead is what used to happen, and it is not a notch radius at all: it
-    // jumps from 0.61 mm to 22.9 mm across a single tooth at z = 150→151, while
-    // the junction's runs smoothly through 0.6095, 0.6081, 0.6067.
+    // The fillet's radius at the section, or at the fillet point nearest it
+    // (the junction) for a section on the flank: reported as the notch nearest
+    // the section, and read by a fit only where the section is in the fillet
+    // (`RootSection::stress_correction`).
     let fillet_radius = g.fillet_curvature(if on_flank { g.fillet_junction() } else { s });
     // ...and `ρ_f`, which is not a point on the section at all but the tightest
     // the fillet ever gets. See `RootSection::min_fillet_curvature`.
@@ -1130,24 +1225,25 @@ pub enum RootStressModel {
 pub const NOTCH_PARAMETER_RANGE: std::ops::Range<f64> = 1.0..8.0;
 
 impl RootSection {
-    /// The stress correction factor `Y_S` under the chosen model.
+    /// The stress correction factor (`Y_S`, `K_f`) under the chosen model.
     ///
-    /// # It is always defined, and that took two goes to get right
+    /// # The notch factor belongs to the notch
     ///
-    /// `ρ_F` is the *notch* radius, and the notch is the fillet. When the
-    /// inscribed parabola touches the involute flank — which it does on any large
-    /// tooth — the fillet has not gone anywhere, so `ρ_F` is read at the fillet
-    /// point nearest the section, which is the junction.
+    /// A section in the fillet carries the fillet's notch factor, each model
+    /// reading the radius it was fitted to. **A section on the involute flank
+    /// carries none** (1): the flank is smooth, and a notch factor read from
+    /// the fillet and applied to a point on the flank is a stress
+    /// concentration where there is no notch. That is not a step where the
+    /// section crosses from one curve to the other: the two curves' sections
+    /// are candidates rated side by side ([`root_section_rated`]), the higher
+    /// governs, and the greater of two continuous figures is continuous.
     ///
-    /// An earlier revision read the **involute's** own curvature there instead,
-    /// which is not a notch radius at all: it jumps from 0.61 mm to 22.9 mm
-    /// across one tooth at z = 150→151, `q_s` falls from 1.81 to 0.048, and the
-    /// corrected factor moved 17 % while `Y_F` moved 0.03 %. The revision after
-    /// that refused the combination outright — but *that is still a
-    /// discontinuity*, a number becoming no number, and nothing physical happens
-    /// at 151 teeth to justify either. Reading the fillet's own curvature at the
-    /// junction runs smoothly through the seam: 0.6095, 0.6081, 0.6067, with
-    /// `q_s` at 1.805, 1.808, 1.808. See `docs/corrections.md`.
+    /// An earlier reading took the fillet's radius at its junction for a flank
+    /// section (and before that the involute's own curvature, which jumped
+    /// from 0.61 mm to 22.9 mm across one tooth at z = 150→151; see
+    /// `docs/corrections.md`). `RootSection::fillet_curvature` and
+    /// `notch_parameter` still report the junction's, as what the notch
+    /// nearest the section is.
     ///
     /// The notch parameter is **clamped** into the range the fit is stated for
     /// before being used, so an out-of-range gear gets the value at the boundary
@@ -1168,6 +1264,10 @@ impl RootSection {
         let has_arm = self.moment_arm > 0.0;
         match model {
             RootStressModel::FormFactorOnly => Some(1.0),
+            // **The notch factor belongs to the notch.** A section on the
+            // involute flank is on a smooth curve, and neither fit has a notch
+            // to read there.
+            _ if self.tangency_on_flank => Some(1.0),
             // **Each fit reads the radius it was fitted to**, which is the whole
             // reason both are carried: `ρ_f` here, `ρ_F` below.
             RootStressModel::DolanBroghamer => {
@@ -1621,6 +1721,21 @@ impl<T: ToothOutline + ?Sized> LoadPoint<'_, T> {
     }
 }
 
+/// **Why a member has no bending rating**, said rather than left as a
+/// missing number.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Unrated {
+    /// No section: the tooth has no usable flank, the load point is off it, or
+    /// the construction finds no tangency there.
+    NoSection,
+    /// Every section the construction finds is **compressed** at the loaded
+    /// fillet: the load's push along the tooth outweighs its bending there
+    /// (`Y_F − axial ≤ 0`), or its line crosses the centreline below the
+    /// section. The bending model rates a stretched fillet and has no reading
+    /// of these ([`RootSection::bending_factor`]).
+    Compressed,
+}
+
 /// The worst section over one mesh cycle, and the share of the load on it.
 ///
 /// Shared by every member of every mesh: what a caller supplies is where the
@@ -1652,7 +1767,7 @@ fn worst_over_cycle<T: ToothOutline + ?Sized>(
     eps_n: f64,
     model: LoadSharing,
     afresh: bool,
-) -> Option<(RootSection, f64)> {
+) -> Result<(RootSection, f64), Unrated> {
     // **The section is found once**, at the highest point of single-pair
     // contact, and the sweep moves only the load on it
     // ([`RootSection::loaded_at`]). A section searched afresh at every load
@@ -1661,10 +1776,14 @@ fn worst_over_cycle<T: ToothOutline + ?Sized>(
     // jumped at the pointed limit. A candidate is one the model rates
     // ([`RootSection::bending_factor`]); where it does not, the tooth has no
     // rating at that load point rather than a number.
-    let section = at.at(highest_single_pair(eps_n))?;
-    section.bending_factor(RootStressModel::DolanBroghamer)?;
+    let section = at
+        .at(highest_single_pair(eps_n))
+        .ok_or(Unrated::NoSection)?;
+    section
+        .bending_factor(RootStressModel::DolanBroghamer)
+        .ok_or(Unrated::Compressed)?;
     if matches!(model, LoadSharing::None) {
-        return Some((section, 1.0));
+        return Ok((section, 1.0));
     }
     let (far_roll, far, level) = at.corners();
     // The flank's far end is loaded at its own roll, which `d → roll` would
@@ -1726,8 +1845,12 @@ fn worst_over_cycle<T: ToothOutline + ?Sized>(
     if cuts.len() == 1 {
         best = weighted(cuts[0]).map(|w| (cuts[0], w));
     }
-    let (d, _) = best?;
-    rated(d).map(|(s, _)| (s, crate::contact::load_share(d, eps_n, model)))
+    // The single-pair point's own section is readable, and it is a cut, so
+    // the cycle holds at least one rated point.
+    let (d, _) = best.ok_or(Unrated::Compressed)?;
+    rated(d)
+        .map(|(s, _)| (s, crate::contact::load_share(d, eps_n, model)))
+        .ok_or(Unrated::Compressed)
 }
 
 /// **The highest point of single-pair contact**, in base pitches back from the
@@ -1781,13 +1904,17 @@ fn highest_single_pair(eps_n: f64) -> f64 {
 /// single-pair contact, which is the standard conservative reading; with it, the
 /// whole cycle is swept.
 ///
-/// **Below `ε_n = 2` it usually changes nothing**: the governing point is the
-/// single-pair boundary, where the share is exactly 1, and the answer is the
-/// unshared one. Not always: low on the flank the held section's `K_f` grows
-/// as its arm shortens, and on 11 of `gear-cli bendgrid`'s 564 ramp rows below
-/// 2 the lower flank governs, up to 3.2 % above the unshared figure (z 9, 25°,
-/// ε_n 1.7). At a high contact ratio (`ε ≥ 2`) two pairs are always engaged and
-/// the single-pair zone does not exist.
+/// **Below `ε_n = 2` it relieves nothing inside the single-pair zone**, where
+/// the share is exactly 1, and that zone is where the maximum sits. It is
+/// usually at the highest point of single-pair contact, the unshared
+/// rating's point. Not always: on some small teeth the full-load factor
+/// rises from there toward the lowest point of single-pair contact (its
+/// section held, its arm shorter, its `K_f` larger), and the ramp's maximum
+/// is there, above the unshared figure, with a share of 1 — which is the
+/// unshared rating understating its own model, not sharing (11 of
+/// `gear-cli bendgrid`'s 564 ramp rows below 2, up to 3.17 % at z 9, 25°,
+/// ε_n 1.7; `docs/state.md`). At a high contact ratio (`ε ≥ 2`) two pairs are
+/// always engaged and the single-pair zone does not exist.
 ///
 /// The model itself is an **uncalibrated placeholder** — see [`LoadSharing`] —
 /// which is why it is an option a designer switches on rather than something
@@ -1803,7 +1930,7 @@ pub fn bending_section_shared<T: ToothOutline>(
     transverse_contact_ratio: f64,
     model: LoadSharing,
 ) -> Option<(RootSection, f64)> {
-    bending_section_on_path(g, transverse_contact_ratio, 0.0, model)
+    bending_section_on_path(g, transverse_contact_ratio, 0.0, model).ok()
 }
 
 /// **The sweep as it was: a section searched afresh at every load point.**
@@ -1824,7 +1951,7 @@ pub fn bending_section_searched_afresh<T: ToothOutline>(
         0.0,
         CriticalSection::default(),
     )?;
-    worst_over_cycle(&at, eps_n, model, true)
+    worst_over_cycle(&at, eps_n, model, true).ok()
 }
 
 /// [`bending_section_shared`] on a path whose far end falls `short_of_tip`
@@ -1835,14 +1962,13 @@ pub fn bending_section_searched_afresh<T: ToothOutline>(
 ///
 /// # Errors
 ///
-/// As [`bending_section_shared`].
-#[must_use]
+/// [`Unrated`], saying why: no section, or none the model reads.
 pub fn bending_section_on_path<T: ToothOutline>(
     g: &T,
     transverse_contact_ratio: f64,
     short_of_tip: f64,
     model: LoadSharing,
-) -> Option<(RootSection, f64)> {
+) -> Result<(RootSection, f64), Unrated> {
     let v = g.virtual_spur();
     let (at, eps_n) = load_point(
         g,
@@ -1850,7 +1976,8 @@ pub fn bending_section_on_path<T: ToothOutline>(
         transverse_contact_ratio,
         short_of_tip,
         CriticalSection::default(),
-    )?;
+    )
+    .ok_or(Unrated::NoSection)?;
     worst_over_cycle(&at, eps_n, model, false)
 }
 
@@ -2199,7 +2326,7 @@ mod tests {
                     for eps_n in [1.3_f64, 1.7, 2.3, 2.6] {
                         let eps = eps_n * cos_bb * cos_bb;
                         for short in [0.0_f64, 0.2] {
-                            let Some((s, share)) = bending_section_on_path(&g, eps, short, model)
+                            let Ok((s, share)) = bending_section_on_path(&g, eps, short, model)
                             else {
                                 continue;
                             };
@@ -2757,26 +2884,45 @@ mod tests {
         }
     }
 
-    /// Which curve the parabola touches depends on the tooth, and getting this
-    /// wrong is how the first implementation failed: a fillet-only search finds
-    /// no solution at all on large teeth.
+    /// Which curve the largest inscribed parabola touches depends on the
+    /// tooth, and getting this wrong is how the first implementation failed:
+    /// a fillet-only search finds no solution at all on large teeth. Asked of
+    /// the construction (the section of highest `Y_F`); the rating weighs the
+    /// fillet's by its notch factor, and on these teeth rates the fillet's.
     #[test]
     fn parabola_touches_the_fillet_on_small_teeth_and_the_flank_on_large() {
+        let parabola = |g: &Tooth| {
+            root_section_rated(
+                g,
+                g.u_tip,
+                CriticalSection::LewisParabola,
+                RootStressModel::FormFactorOnly,
+            )
+            .unwrap()
+        };
         let small = Tooth::new(GearParams {
             teeth: 17,
             ..Default::default()
         });
-        let small_sec =
-            root_section_with(&small, small.u_tip, CriticalSection::LewisParabola).unwrap();
-        assert!(!small_sec.tangency_on_flank, "z=17 should touch the fillet");
+        assert!(
+            !parabola(&small).tangency_on_flank,
+            "z=17 should touch the fillet"
+        );
 
         let large = Tooth::new(GearParams {
             teeth: 1000,
             ..Default::default()
         });
-        let large_sec =
-            root_section_with(&large, large.u_tip, CriticalSection::LewisParabola).unwrap();
-        assert!(large_sec.tangency_on_flank, "z=1000 should touch the flank");
+        assert!(
+            parabola(&large).tangency_on_flank,
+            "z=1000 should touch the flank"
+        );
+        assert!(
+            !root_section_with(&large, large.u_tip, CriticalSection::LewisParabola)
+                .unwrap()
+                .tangency_on_flank,
+            "z=1000 rates at its fillet, whose notch outweighs the flank's larger Y_F"
+        );
     }
 
     /// Unlike the 30° tangent, the parabola construction follows the load point.
@@ -2888,71 +3034,50 @@ mod tests {
 
     /// **The bending rating is continuous across the flank/fillet transition.**
     ///
-    /// The inscribed parabola's tangency migrates up the fillet as a tooth grows
-    /// and eventually crosses onto the involute flank. Nothing physical happens
-    /// there — a 151-tooth gear is not stronger or weaker than a 150-tooth one by
-    /// any step — so nothing in the rating may jump either.
-    ///
-    /// What used to jump was `ρ_F`, because on a flank tangency it was read as
-    /// the *involute's* own radius of curvature. An involute is not a notch: that
-    /// number goes 0.61 mm → 22.9 mm across one tooth, `q_s` falls off the bottom
-    /// of the ISO fit's range, and the correction was refused outright rather
-    /// than reported wrong. Refusing is still a discontinuity — a number becomes
-    /// no number — and the answer was to stop asking the flank about a notch. The
-    /// notch is the fillet, and when the section climbs above it the nearest
-    /// fillet point is the junction.
-    ///
-    /// Swept across the seam, every quantity now moves by less than a percent per
-    /// tooth, and the transition is invisible in the numbers.
+    /// The largest inscribed parabola's tangency migrates up the fillet as a
+    /// tooth grows and crosses onto the involute flank. Nothing physical
+    /// happens there — a 151-tooth gear is not stronger or weaker than a
+    /// 150-tooth one by any step — so nothing in a rating may jump either.
+    /// What once jumped was the notch radius read on the flank; what could
+    /// jump now is the notch factor, the fillet's on one side and none on the
+    /// other. It does not, because each curve's section is a candidate rated
+    /// with its own and the higher governs: swept across the seam the
+    /// parabola crosses, every model's rating moves by less than a percent per
+    /// tooth.
     #[test]
     fn the_rating_is_continuous_across_the_flank_fillet_transition() {
-        let of = |z: u32| {
-            let g = Tooth::new(GearParams {
+        let tooth = |z: u32| {
+            Tooth::new(GearParams {
                 teeth: z,
                 ..Default::default()
-            });
-            let sec = root_section_with(&g, g.u_tip, CriticalSection::LewisParabola).unwrap();
-            let ys = sec
-                .stress_correction(RootStressModel::Iso6336)
-                .expect("the correction is defined on either side of the seam");
-            (
-                sec.tangency_on_flank,
-                sec.form_factor,
-                sec.notch_parameter,
-                ys,
-            )
+            })
         };
-
-        // The seam is crossed somewhere in here, and the sweep must not care.
-        let counts: Vec<u32> = (140..=165).collect();
         let mut seen_both = (false, false);
-        let mut previous: Option<(f64, f64, f64)> = None;
-        for &z in &counts {
-            let (on_flank, yf, qs, ys) = of(z);
-            if on_flank {
-                seen_both.1 = true;
-            } else {
-                seen_both.0 = true;
+        for model in [RootStressModel::DolanBroghamer, RootStressModel::Iso6336] {
+            let mut previous: Option<f64> = None;
+            for z in 140..=165_u32 {
+                let g = tooth(z);
+                let parabola = root_section_rated(
+                    &g,
+                    g.u_tip,
+                    CriticalSection::LewisParabola,
+                    RootStressModel::FormFactorOnly,
+                )
+                .unwrap();
+                if parabola.tangency_on_flank {
+                    seen_both.1 = true;
+                } else {
+                    seen_both.0 = true;
+                }
+                let rated = root_section_rated(&g, g.u_tip, CriticalSection::LewisParabola, model)
+                    .and_then(|s| s.bending_factor(model))
+                    .unwrap();
+                if let Some(p) = previous {
+                    let step = ((rated - p) / p).abs();
+                    assert!(step < 0.01, "{model:?} z={z}: the rating stepped by {step}");
+                }
+                previous = Some(rated);
             }
-            if let Some((pyf, pqs, pys)) = previous {
-                let step = |a: f64, b: f64| ((a - b) / b).abs();
-                assert!(
-                    step(yf, pyf) < 0.01,
-                    "z={z}: Y_F stepped by {}",
-                    step(yf, pyf)
-                );
-                assert!(
-                    step(qs, pqs) < 0.01,
-                    "z={z}: q_s stepped by {}",
-                    step(qs, pqs)
-                );
-                assert!(
-                    step(ys, pys) < 0.01,
-                    "z={z}: Y_S stepped by {}",
-                    step(ys, pys)
-                );
-            }
-            previous = Some((yf, qs, ys));
         }
         assert!(
             seen_both.0 && seen_both.1,
@@ -2972,7 +3097,13 @@ mod tests {
             teeth: 1000,
             ..Default::default()
         });
-        let sec = root_section_with(&g, g.u_tip, CriticalSection::LewisParabola).unwrap();
+        let sec = root_section_rated(
+            &g,
+            g.u_tip,
+            CriticalSection::LewisParabola,
+            RootStressModel::FormFactorOnly,
+        )
+        .unwrap();
         assert!(sec.tangency_on_flank, "a 1000-tooth gear touches its flank");
 
         // The fillet's own curvature at its junction with the flank.
@@ -2990,10 +3121,49 @@ mod tests {
             "the two should differ by an order of magnitude: {involute} vs {junction}"
         );
 
-        // The correction is defined, and so is the whole factor.
-        assert!(sec.stress_correction(RootStressModel::Iso6336).is_some());
-        assert!(sec.bending_factor(RootStressModel::Iso6336).is_some());
+        // Reported, and not applied: the section is on the smooth flank.
         assert!(sec.notch_parameter_in_range());
+        for model in [RootStressModel::Iso6336, RootStressModel::DolanBroghamer] {
+            assert_eq!(sec.stress_correction(model), Some(1.0), "{model:?}");
+        }
+    }
+
+    /// **A section's chord and depth are more than rounding.** The apex of a
+    /// pointed tip loaded at its point solves the tangency condition exactly,
+    /// with a chord and an arm of rounding, about `ε·R`; as a section it
+    /// rated at 1e13. Its half-width is within [`COORDINATE_ROUNDING`] of
+    /// its radius, so it is no section and the flank offers its end at the
+    /// fillet; a length ten times that is a length.
+    #[test]
+    fn a_pointed_tip_loaded_at_its_point_is_no_section() {
+        let g = Tooth::new(GearParams {
+            teeth: 12,
+            addendum: 1.1,
+            root_radius: 0.25,
+            profile_shift: 0.7,
+            ..Default::default()
+        });
+        assert!(g.clamps.fired(crate::note::key::CLAMP_TIP_CAPPED_POINTED));
+        let (apex, _) = ToothOutline::flank_at(&g, g.u_tip);
+        let scale = apex[0].hypot(apex[1]);
+        assert!(
+            !beyond_rounding(apex[0], scale),
+            "the apex's half-width {} is a length",
+            apex[0]
+        );
+        assert!(beyond_rounding(10.0 * COORDINATE_ROUNDING * scale, scale));
+        let found = root_sections(&g, g.u_tip, CriticalSection::LewisParabola);
+        assert_eq!(found.len(), 2, "{found:?}");
+        let flank = found.iter().find(|s| s.tangency_on_flank).unwrap();
+        assert_eq!(flank.s, g.u_j, "the flank offers its end at the fillet");
+        assert!(found.iter().all(|s| beyond_rounding(s.root_chord, scale)));
+        let rated = root_section_with(&g, g.u_tip, CriticalSection::LewisParabola)
+            .and_then(|s| s.bending_factor(RootStressModel::DolanBroghamer))
+            .unwrap();
+        assert!(
+            rated < 10.0,
+            "a pointed tip loaded at its point rates {rated}"
+        );
     }
 
     #[test]

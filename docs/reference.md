@@ -1268,13 +1268,30 @@ they change the profile.
 **Critical section: the Lewis parabola.** A cantilever whose outline is a
 parabola with its vertex at the load carries uniform bending stress, so the
 largest such parabola inscribed in the tooth touches where the tooth is weakest.
-**Both the fillet and the flank are searched and the weaker tangency wins** —
-Savage, Rubadeux & Coe: "both involute and trochoid geometry are used in checking
-for the smallest inscribed parabola", and "the smaller x coordinate identifies
-the weaker inscribed parabola", `x = s_Fn²/(4 h_Fe)`. Both candidates share a
-load point and so share `cos α_Fen`, which makes a smaller `x` exactly a larger
-`Y_F`. A ring's tangency is on the flank every time, which is one of the two
-cases the model is told to search rather than a departure from it.
+Savage, Rubadeux & Coe search "both involute and trochoid geometry", and so does
+this, under one rule (the section rule, 2026-10-02):
+
+- **Each curve offers its least Lewis measure** `x²/(y_v − y)`, over the whole
+  curve below the vertex: at an interior tangency, or at one of its ends. Each
+  curve has one interior least at most, found by construction (the fillet's
+  half-width is convex and falling; on the involute the condition reads
+  `r_b(cos δ + u sin δ + u/sin δ) = 2|y_v|`, whose left side falls then rises).
+  The flank's only end is its root: its tip is never below the vertex.
+- **The notch factor belongs to the notch**: the fillet's section carries the
+  fillet's `K_f`, the smooth flank's none (1).
+- **The governing section is the highest rated**, by its full factor
+  `(Y_F − axial)·K_f`, never by `Y_F` alone (Savage's "the smaller x coordinate
+  identifies the weaker inscribed parabola" compares by `Y_F`). A candidate the
+  model cannot read — its fillet compressed, `Y_F − axial ≤ 0` — never masks one
+  it can; where none can be read the member is unrated, and says so
+  (`gear.bending_unrated_compressed`).
+
+A ring's fillet has no tangency, so it offers its end at the flank, which keeps
+the fillet's notch factor, and that governs its rating. The rating is
+continuous wherever the governing section changes curve or moves between a
+tangency and an end, except under tip loading at a vanishing tip land, where
+the flank's section rates without bound as the land closes
+([state.md](state.md#known-approximate-documented-at-the-call-site)).
 `CriticalSection::TangentAngle` retains the ISO tangent for a
 standards-comparable number — **30° on an external tooth and 60° on a ring's**
 (ISO 6336-3:2019, 6.1). Not because the tooth points the other way round — a
@@ -1293,7 +1310,8 @@ ring's 60° is reachable only by asking for the tangent construction explicitly.
 
 **Two fillet radii, and each fit reads its own.** `ρ_F` is the radius **at the
 critical section** — ISO's definition, and what `Y_S` was fitted to; on a flank
-tangency it falls back to the fillet junction. `ρ_f` is the **minimum** over the
+section it is reported at the fillet junction and not applied, the flank having
+no notch. `ρ_f` is the **minimum** over the
 whole fillet — Dolan and Broghamer's definition, and what `K_f` was fitted to;
 it is defined wherever the section ended up and needs no fallback. They are not
 close: the junction is the flattest point the fillet has and the root the
@@ -1422,7 +1440,7 @@ the part rather than a second model.
 | Own buildable range | shown | not shown — a rack's range is not a ring's |
 
 Everything else is **one code path taking both**: the parabola search, the
-weaker-tangency rule, `ρ_f` at the fillet's minimum, `K_f`, the axial term, the
+section rule, `ρ_f` at the fillet's minimum, `K_f`, the axial term, the
 load-sharing sweep, the width law and the reversal rule. So is the entry point —
 `bending_section_shared` is generic over `ToothOutline`, where it used to be two
 near-identical functions, and `train::Bending::of` likewise. What a new kind of
@@ -2988,11 +3006,14 @@ The share is `RAMP_MIN + (RAMP_MAX − RAMP_MIN)·t` with
 expression, continuous everywhere, and identical to the two-branch form below
 `ε_αn = 2` — where the single-pair plateau covers the whole region they could
 differ in.
-**Below it the model usually changes nothing**: the single-pair boundary is a
-candidate with a share of exactly 1, and the maximum is almost always the point
-the unshared rating already took. Low on a small tooth's flank the held
-section's `K_f` grows as its arm shortens and can govern instead, by up to 3.2 %
-over the unshared figure on `gear-cli bendgrid`'s grid. A hula stage
+**Below it the model relieves nothing inside the single-pair zone**, where the
+share is exactly 1 and the maximum sits: usually at the highest point of
+single-pair contact, the point the unshared rating takes. On some small teeth
+the full-load factor rises from there toward the lowest point of single-pair
+contact, and the maximum is there, up to 3.17 % above the unshared figure on
+`gear-cli bendgrid`'s grid — the unshared rating understating its own model
+([state.md](state.md#known-approximate-documented-at-the-call-site)), not
+sharing. A hula stage
 cannot reach the band at any proportion it can be built at — its meshes run just
 above continuous contact by construction — so the control is offered there and
 provably cannot bite.

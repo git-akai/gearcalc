@@ -19,7 +19,7 @@
 
 use gear_core::ring::{Cutter, Ring};
 use gear_core::strength::{
-    root_section_with, CriticalSection, RootSection, RootStressModel, ToothOutline,
+    root_section_rated, CriticalSection, RootSection, RootStressModel, ToothOutline,
 };
 use gear_core::{GearParams, Tooth};
 
@@ -54,20 +54,27 @@ impl Member {
         }
     }
 
-    /// This member's critical section under one construction, loaded at its tip.
+    /// This member's critical section under one construction, loaded at its
+    /// tip: of the sections the construction finds, the one `model` rates
+    /// highest (`root_section_rated`).
     ///
     /// Tip loading for both: without a mate there is no outer point of
     /// single-pair contact, so the tip is the one point both members define
     /// the same way, which is what makes the two populations comparable.
-    pub fn section(self, p: GearParams, method: CriticalSection) -> Option<RootSection> {
+    pub fn section(
+        self,
+        p: GearParams,
+        method: CriticalSection,
+        model: RootStressModel,
+    ) -> Option<RootSection> {
         match self {
             Self::External => {
                 let g = Tooth::new(p);
-                root_section_with(&g, g.u_tip, method)
+                root_section_rated(&g, g.u_tip, method, model)
             }
             Self::Internal => {
                 let r = Ring::cut_by(&p, &Cutter::default());
-                root_section_with(&r, r.u_tip, method)
+                root_section_rated(&r, r.u_tip, method, model)
             }
         }
     }
@@ -100,7 +107,7 @@ impl Model {
     /// The bending factor this model predicts, or `None` where the geometry has
     /// no root section at all.
     pub fn evaluate(self, on: Member, p: GearParams) -> Option<f64> {
-        on.section(p, self.section)
+        on.section(p, self.section, self.concentration)
             .and_then(|s| s.bending_factor(self.concentration))
     }
 }
@@ -398,8 +405,12 @@ pub fn parting(on: Member, pop: &[GearParams]) -> Parting {
     };
     for p in pop {
         let (Some(para), Some(tan)) = (
-            on.section(*p, CriticalSection::LewisParabola),
-            on.section(*p, CriticalSection::TangentAngle),
+            on.section(
+                *p,
+                CriticalSection::LewisParabola,
+                RootStressModel::DolanBroghamer,
+            ),
+            on.section(*p, CriticalSection::TangentAngle, RootStressModel::Iso6336),
         ) else {
             continue;
         };
@@ -512,72 +523,63 @@ mod tests {
     /// 1.081 to 0.970 and three documents went on quoting the old one for a
     /// commit. A quoted figure with nothing asserting it is a comment.
     ///
-    /// Wide tolerances deliberately: this pins the *claims* — that the parabola
-    /// lands on a ring's flank every time, that the two sets agree on a ring to
-    /// within a few percent, that `q_s` collapses under the parabola — not the
-    /// last digit of a population mean.
+    /// Wide tolerances deliberately: this pins the *claims* — that the two
+    /// sets rank ring designs alike under the section rule, that a ring rates
+    /// at its fillet, and that the rated section's `q_s` sits low in `Y_S`'s
+    /// band — not the last digit of a population mean.
     ///
-    /// Every design here is loaded at its tip. On a narrow tip loaded steeply
-    /// the largest parabola that fits touches the flank just under its vertex,
-    /// which a flank search that took the first crossing it bracketed never
-    /// found: that moved the external flank share from 12.9 % to 21.2 % and
-    /// the mean `Y_F` ratio from 1.055 to 1.145, and left the ring unmoved.
+    /// Every design here is loaded at its tip, and each model's section is the
+    /// one it rates highest (`root_section_rated`). Under the section rule
+    /// the parabola's rated section is the fillet's on every ring (its end at
+    /// the flank, with the fillet's notch factor) and on 98.9 % of external
+    /// teeth; the flank's governs only under a narrow tip land. That moved the
+    /// ring's set ratio from 0.970 to 0.775 and its `Y_F` ratio from 1.425 to
+    /// 1.166, and the external set ratio's top from 3.15 to 1.80.
     #[test]
     fn the_studies_report_the_figures_the_documents_quote() {
         let ext = parting(Member::External, &population_for(Member::External));
         let ring = parting(Member::Internal, &population_for(Member::Internal));
 
         assert_eq!(ring.n, 160, "the ring population");
-        assert_eq!(
-            ring.on_flank, ring.n,
-            "a ring's parabola lands on the flank every time"
-        );
+        assert_eq!(ring.on_flank, 0, "a ring rates at its fillet every time");
         let ext_flank = ext.on_flank as f64 / ext.n as f64;
         assert!(
-            (0.18..0.25).contains(&ext_flank),
-            "external flank tangencies ~21.2%, got {:.1}%",
+            ext_flank > 0.0 && ext_flank < 0.02,
+            "external flank sections ~1.1%, got {:.1}%",
             100.0 * ext_flank
         );
 
-        // `Y_F` alone: the parabola's section is the narrower one, much more so
-        // on a ring.
+        // `Y_F` alone: the parabola's section is the narrower one.
         assert!(
-            (ext.form[2] - 1.145).abs() < 0.02,
+            (ext.form[2] - 1.107).abs() < 0.02,
             "external Y_F {:?}",
             ext.form
         );
         assert!(
-            (ring.form[2] - 1.425).abs() < 0.05,
+            (ring.form[2] - 1.166).abs() < 0.05,
             "ring Y_F {:?}",
             ring.form
         );
 
-        // The whole factor, each set carrying its own notch model: the ring is
-        // the one that matters, and it agrees to a few percent.
+        // The whole factor, each set carrying its own notch model.
         assert!(
-            (ring.factor[2] - 0.970).abs() < 0.03,
+            (ring.factor[2] - 0.775).abs() < 0.03,
             "ring set ratio {:?}",
             ring.factor
         );
         assert!(
-            (ext.factor[2] - 0.827).abs() < 0.05,
+            (ext.factor[2] - 0.820).abs() < 0.05,
             "external set ratio {:?}",
             ext.factor
         );
 
-        // And why `Y_S` does not belong on a parabola section: `q_s` collapses
-        // to the floor of its band, where the tangent section sits inside it.
+        // The rated section's `q_s` sits low in `Y_S`'s band, the tangent
+        // section's inside it.
         assert!(
-            ring.notch[0] < 1.2 && ring.notch[1] > 4.0,
+            ring.notch[0] < 2.0 && ring.notch[1] > 4.0,
             "ring q_s parabola {:.3} vs tangent {:.3}",
             ring.notch[0],
             ring.notch[1]
-        );
-        let ring_out = ring.notch_out[0] as f64 / ring.n as f64;
-        assert!(
-            ring_out > 0.6,
-            "two rings in three leave the Y_S band under the parabola, got {:.1}%",
-            100.0 * ring_out
         );
     }
 
