@@ -641,6 +641,56 @@ mod tests {
         assert!(v > 5.0 && s <= 1.0, "value at 10×: {v}");
     }
 
+    /// At a joint, where the curvature steps, `at` reads the side its doc names, to the bit: the
+    /// flank's at the round's tangency, the land's at its end, the unrelieved side at the
+    /// relief's end; one unit in the last place into the other piece, that piece. And `on_edge`
+    /// is exactly "not on the flank" at each joint and one unit either side of it.
+    #[test]
+    fn each_joint_reads_its_stated_side() {
+        let mut read = 0;
+        for f in forms() {
+            let relieved = |s: f64| f.relief.is_some_and(|(_, end)| s < end);
+            let (t, l) = (f.tangency, f.land);
+            // (joint, its side's piece and relief, the other side's point, piece and relief)
+            let mut sides = vec![
+                (
+                    t,
+                    Edge::Flank,
+                    relieved(t),
+                    t.next_down(),
+                    Edge::Round,
+                    relieved(t),
+                ),
+                (
+                    l,
+                    Edge::Land,
+                    relieved(l),
+                    l.next_up(),
+                    Edge::Round,
+                    relieved(l),
+                ),
+            ];
+            if let Some((_, end)) = f.relief {
+                let e = f.edge_at(end);
+                sides.push((end, e, false, end.next_down(), e, true));
+            }
+            for (joint, edge, relief, other, other_edge, other_relief) in sides {
+                assert_eq!(f.edge_at(joint), edge);
+                assert_eq!(f.at(joint), f.piece(joint, edge, relief).point());
+                assert_eq!(f.edge_at(other), other_edge);
+                assert_eq!(
+                    f.at(other),
+                    f.piece(other, other_edge, other_relief).point()
+                );
+                for s in [joint.next_down(), joint, joint.next_up()] {
+                    assert_eq!(f.on_edge(s), f.edge_at(s) != Edge::Flank, "{s}");
+                }
+                read += 1;
+            }
+        }
+        assert_eq!(read, 5 * 4 * (2 + 3 + 3));
+    }
+
     // ---------------------------------------------------------------- 1/r_e on the round
 
     /// `|κ r_e − 1|` over its bound at `n` points inside the round of an unrelieved form, reading
@@ -873,18 +923,22 @@ mod tests {
                 (f64::NAN, 0.4),
                 (f64::INFINITY, 0.4),
                 (0.005, 1e-170),
+                // The curvature 2 C sin²θ_a / L² overflowing where C and sin²θ_a / L² (1e10)
+                // do not: by the factor C alone, and by the factor 2 alone (C sin²θ_a / L² 1e308).
+                (1e300, 1e-5 * c.sin),
+                (1e298, 1e-5 * c.sin),
             ] {
                 let form = with(Some(0.1), Some(Relief { depth, length }));
                 assert_eq!(TipForm::new(&form, c), Err(FormRefused::NotARelief));
                 refused += 1;
             }
-            let none = Relief {
-                depth: 0.0,
-                length: 0.4,
-            };
-            assert!(TipForm::new(&with(Some(0.1), Some(none)), c).is_ok());
+            // Laid: no depth, and the largest curvature above held to a finite 5e307.
+            for (depth, length) in [(0.0, 0.4), (0.25e298, 1e-5 * c.sin)] {
+                let form = with(Some(0.1), Some(Relief { depth, length }));
+                assert!(TipForm::new(&form, c).is_ok(), "{depth} {length}");
+            }
         }
-        assert_eq!(refused, 5 * (5 + 4 + 8));
+        assert_eq!(refused, 5 * (5 + 4 + 10));
     }
 
     /// The near miss the refusal exists for: `r_e = 1e-160` is positive and finite, so a check of

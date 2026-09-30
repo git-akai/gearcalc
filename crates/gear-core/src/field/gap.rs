@@ -101,4 +101,27 @@ mod tests {
         assert!(FieldGear::from_spec(&spec(17)).is_some());
         assert!(FieldGear::from_spec(&spec(-43)).is_some());
     }
+
+    /// Each circle is held to a finite positive length on its own: an infinite module (every
+    /// radius infinite, the twist a finite 0) and a ring whose tip circle is its axis (z −2 at
+    /// β 0: `r + m h_a = 0`, every other input finite) are no gear.
+    #[test]
+    fn a_circle_that_is_no_length_is_no_gear() {
+        let infinite = GearSpec {
+            module: f64::INFINITY,
+            ..spec(17)
+        };
+        let on_axis = GearSpec {
+            helix_angle: 0.0,
+            ..spec(-2)
+        };
+        for s in [infinite, on_axis] {
+            assert_eq!(FieldGear::from_spec(&s), None, "{s:?}");
+        }
+        let near = GearSpec {
+            helix_angle: 0.0,
+            ..spec(-3)
+        };
+        assert!(FieldGear::from_spec(&near).is_some());
+    }
 }
