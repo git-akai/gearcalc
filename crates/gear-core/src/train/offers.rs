@@ -475,13 +475,55 @@ mod tests {
         Ok(())
     }
 
+    /// **A fresh case names only open ports** (audit T13.6): of either
+    /// kind, off, its entries and its sweep at open ports — at numbers the
+    /// graph does not list, parked, on an empty train.
+    fn a_fresh_case_names_open_ports(t: &Train) -> Result<(), String> {
+        let open: Vec<usize> = t.open_ports().iter().map(|p| p.body).collect();
+        let listed = |b: usize| t.shape.bodies.iter().any(|x| x.body == b);
+        for kind in super::super::CaseKind::BOTH {
+            let (torque, speed) = kind.fresh_figures();
+            let f = t.fresh_case(kind, torque, speed);
+            let sweep = match f.duty {
+                super::super::Duty::Intermittent { at, .. } => at,
+                super::super::Duty::Continuous { .. } => None,
+            };
+            let fits = |b: usize| {
+                if t.shape.members.is_empty() {
+                    !listed(b)
+                } else {
+                    open.contains(&b)
+                }
+            };
+            if f.enabled || !f.loads.iter().map(|l| l.at).chain(sweep).all(fits) {
+                return Err(format!("fresh {kind:?}: {f:?}"));
+            }
+        }
+        Ok(())
+    }
+
+    /// **A fresh case, switched off, moves no answer** (audit T13.6): the
+    /// train with a fresh fatigue case pushed — the kind whose sweep a
+    /// solve reads — solves exactly where it solved without it.
+    fn a_fresh_case_moves_nothing(t: &Train, solved: bool) -> Result<(), String> {
+        let kind = super::super::CaseKind::Fatigue;
+        let (torque, speed) = kind.fresh_figures();
+        let mut u = t.clone();
+        u.load_cases.push(t.fresh_case(kind, torque, speed));
+        if solve_train(&u, &test_library()).is_ok() == solved {
+            Ok(())
+        } else {
+            Err("a fresh case, pushed, moved the answer".into())
+        }
+    }
+
     /// What a walk asserts of the train after every step, `solved` saying
     /// whether the train before it solved: the train well formed; offers
     /// at the train and a solve that do not panic; a train that solved
     /// kept solving or refused by a named reason other than a wiring that
     /// describes no mechanism; every flow saying each body and mesh once;
-    /// every fatigue case counting its cycles or saying why not; and the
-    /// train the same after a trip through JSON.
+    /// every fatigue case counting its cycles or saying why not; a fresh
+    /// case fitting it; and the train the same after a trip through JSON.
     fn laws(t: &Train, solved: bool) -> Result<bool, String> {
         let lib = test_library();
         t.check().map_err(|e| format!("check: {e:?}"))?;
@@ -496,6 +538,8 @@ mod tests {
             }
             Err(_) => {}
         }
+        a_fresh_case_names_open_ports(t)?;
+        a_fresh_case_moves_nothing(t, r.is_ok())?;
         let json = serde_json::to_string(t).unwrap();
         let back: Train = serde_json::from_str(&json).map_err(|e| format!("json: {e}"))?;
         if serde_json::to_string(&back).unwrap() != json {
@@ -815,5 +859,33 @@ mod tests {
             assert!(r.cases.iter().all(|c| c.solved), "{p:?}: {:?}", r.cases);
         }
         assert!(refused > 0 && kept > 0, "refused {refused}, kept {kept}");
+    }
+
+    /// **A fresh case lands on open ports wherever the train has them**
+    /// (audit T13.6): on every train the walk visits, and on each with its
+    /// cases taken away — so no headline says where a case runs and, where
+    /// the walk's edits left the chain without two ends, nothing but the
+    /// open ports can — a fresh case of either kind names only open ports,
+    /// or parked numbers on an empty train. Without the open ports to fall
+    /// back on, a case landed past the last body and the train refused it.
+    #[test]
+    fn a_fresh_case_lands_on_open_ports() {
+        let (mut checked, mut endless) = (0, 0);
+        for (name, steps, t) in super::super::sweep::visited() {
+            let mut bare = t.clone();
+            bare.load_cases.clear();
+            if bare.chain_ends().is_none() && !bare.shape.members.is_empty() {
+                endless += 1;
+            }
+            for u in [&t, &bare] {
+                a_fresh_case_names_open_ports(u)
+                    .unwrap_or_else(|e| panic!("{name}: {steps:?}: {e}"));
+                checked += 1;
+            }
+        }
+        assert!(
+            endless > 0 && checked > 0,
+            "{endless} of {checked} without ends"
+        );
     }
 }

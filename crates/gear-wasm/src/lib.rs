@@ -1216,7 +1216,7 @@ pub struct GearTabDefaults {
 }
 
 fn defaults_impl() -> Result<String, String> {
-    use gear_core::train::{LoadCase, Train};
+    use gear_core::train::{CaseKind, LoadCase, Train};
 
     // The tab starts with an automatic face width, where the core's own
     // default is a plain 10 mm. Both are right for their caller: the CLI and
@@ -1267,15 +1267,15 @@ fn defaults_impl() -> Result<String, String> {
             // the pair's two gears: a peak at the first, reacted at the
             // second; a load from the second, held still, with the first
             // reacting it — through a mesh that locks, nothing reaches it;
-            // and a fatigue load a fifth of the peak — a running load rather
-            // than the stall the ultimate case is, so a fresh tab shows the
-            // two ratings answering different questions.
+            // and a fatigue load. The peak and the fatigue load are fresh
+            // cases, at the figures every case added starts at
+            // (`CaseKind::fresh_figures`).
             Train::chained(vec![spur], |t| {
                 let (input, output) = (t.port(0, 1), t.port(0, 2));
                 vec![
-                    LoadCase::ultimate(input, output, 0.1, 30_000.0),
+                    LoadCase::fresh(CaseKind::Ultimate, input, output),
                     LoadCase::back_driving(input, output, 3.0),
-                    LoadCase::fatigue(input, output, 0.02, 30_000.0),
+                    LoadCase::fresh(CaseKind::Fatigue, input, output),
                 ]
             })
         },
@@ -1732,12 +1732,10 @@ fn apply_edit(
 ) -> Result<(), gear_core::train::EditRefused> {
     match edit {
         TrainEdit::Graph(edit) => train.edit(edit)?,
-        // The figures a fresh case starts at are the shipped train's.
+        // The figures a fresh case starts at are the core's, which the
+        // shipped train's cases start at too.
         TrainEdit::AddCase(kind) => {
-            let (torque, speed) = match kind {
-                gear_core::train::CaseKind::Ultimate => (0.1, 30_000.0),
-                gear_core::train::CaseKind::Fatigue => (0.02, 30_000.0),
-            };
+            let (torque, speed) = kind.fresh_figures();
             let case = train.fresh_case(kind, torque, speed);
             train.load_cases.push(case);
         }
@@ -1848,6 +1846,36 @@ pub fn version() -> String {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    /// **A case added is the shipped train's case of that kind**, figure
+    /// for figure (audit T13.6): the torque and speed a fresh case starts
+    /// at are stated once, so `add_case` on the shipped train gives, for
+    /// each kind, the loads and the duty the shipped train's own case of
+    /// that kind has — switched off, as a case added is.
+    #[test]
+    fn a_case_added_is_the_shipped_trains_case_of_its_kind() {
+        let d: serde_json::Value = serde_json::from_str(&defaults_impl().unwrap()).unwrap();
+        let train = &d["train"];
+        let shipped = train["load_cases"].as_array().unwrap();
+        for kind in ["ultimate", "fatigue"] {
+            let edited: serde_json::Value = serde_json::from_str(
+                &edit_train_impl(
+                    &serde_json::json!({ "train": train, "edit": { "add_case": kind } })
+                        .to_string(),
+                )
+                .unwrap(),
+            )
+            .unwrap();
+            let added = edited["load_cases"].as_array().unwrap().last().unwrap();
+            let own = shipped
+                .iter()
+                .find(|c| c["kind"] == kind)
+                .unwrap_or_else(|| panic!("no shipped {kind} case"));
+            assert_eq!(added["enabled"], false, "{kind}: added switched off");
+            assert_eq!(added["loads"], own["loads"], "{kind}: the loads");
+            assert_eq!(added["duty"], own["duty"], "{kind}: the duty");
+        }
+    }
 
     /// **A chain of these stages as JSON**, with the three classic cases
     /// written between its two ends by the core's own constructors — a

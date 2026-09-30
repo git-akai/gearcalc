@@ -2945,7 +2945,30 @@ pub enum CaseKind {
 impl CaseKind {
     /// Both kinds, in the order they are reported.
     pub const BOTH: [Self; 2] = [Self::Ultimate, Self::Fatigue];
+
+    /// **The torque, N·m, and the speed, rpm, a fresh case of this kind
+    /// starts at** — a new train's cases and every case the panel adds,
+    /// stated once ([`LoadCase::fresh`]). The panel's starting example, for
+    /// the designer to overwrite, and nothing any gear is sized by until a
+    /// case is written and switched on.
+    #[must_use]
+    pub const fn fresh_figures(self) -> (f64, f64) {
+        match self {
+            Self::Ultimate => (FRESH_STALL_NM, FRESH_SPEED_RPM),
+            Self::Fatigue => (FRESH_RUNNING_NM, FRESH_SPEED_RPM),
+        }
+    }
 }
+
+/// A fresh ultimate case's torque, N·m: a small motor's stall, the peak an
+/// ultimate case is survived at.
+const FRESH_STALL_NM: f64 = 0.1;
+/// A fresh fatigue case's torque, N·m: a fifth of the stall — a running
+/// load rather than the peak, so a fresh train's two ratings answer
+/// different questions.
+const FRESH_RUNNING_NM: f64 = FRESH_STALL_NM / 5.0;
+/// The speed a fresh case turns at, rpm: the same small motor's.
+const FRESH_SPEED_RPM: f64 = 30_000.0;
 
 /// A quantity held for each **kind** of load case — the one two-valued shape
 /// left once the cases themselves became a list, and it is about allowables
@@ -3272,6 +3295,17 @@ impl LoadCase {
     pub fn fatigue(input: usize, output: usize, torque: f64, speed: f64) -> Self {
         Self {
             kind: CaseKind::Fatigue,
+            ..Self::ultimate(input, output, torque, speed)
+        }
+    }
+
+    /// **A fresh case of this kind between two ports**, at the figures a
+    /// fresh case starts at ([`CaseKind::fresh_figures`]).
+    #[must_use]
+    pub fn fresh(kind: CaseKind, input: usize, output: usize) -> Self {
+        let (torque, speed) = kind.fresh_figures();
+        Self {
+            kind,
             ..Self::ultimate(input, output, torque, speed)
         }
     }

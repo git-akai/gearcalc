@@ -1158,9 +1158,9 @@ impl Train {
                 [] => (self.max_body() + 1, self.max_body() + 2),
             }
         });
-        let mut case = match kind {
-            super::CaseKind::Ultimate => super::LoadCase::ultimate(input, output, torque, speed),
-            super::CaseKind::Fatigue => super::LoadCase::fatigue(input, output, torque, speed),
+        let mut case = super::LoadCase {
+            kind,
+            ..super::LoadCase::ultimate(input, output, torque, speed)
         };
         case.enabled = false;
         // On a train with gears, a case names its open ports and nothing
