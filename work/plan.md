@@ -232,6 +232,10 @@ caught, test workspace included) and the 130-constant perturbation.
   - Refined the same day: each curve contributes its constrained extremum of the Lewis measure — an
     interior tangency, or the curve's end where it has none. Otherwise a ring's fillet, which has no
     interior tangency, would drop out, and rings would lose their notch factor, rated about 60 % low.
+- 2026-10-02 — orchestrator's call: a tip loaded at its point, as its land vanishes, rates without bound.
+  That is the elastic singularity at a sharp tip, the same mechanics as the sharp contact edge. It
+  stays continuous divergence with a note, never a cap or a jump. Its cure is the notch research's
+  bound from common properties, once one is verified.
 - 2026-10-02 — owner's idea, researched at low priority: the tooth geometry is known exactly, so
   exact-geometry solvers may beat mesh methods for notch stresses. Candidates: IGA and IGA-BEM, and
   Trefftz / MFS / particular solutions with Williams corner functions in the basis.
