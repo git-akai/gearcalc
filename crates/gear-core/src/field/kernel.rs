@@ -487,22 +487,29 @@ fn g_direct_with(r: f64, cells: &[(f64, f64)]) -> f64 {
         a *= 2.0;
     }
     edges.push(FRAC_PI_2);
-    // Neumaier's compensated sum: its error is two roundings of the total, not one per term.
-    let (mut total, mut carry) = (0.0_f64, 0.0_f64);
-    for e in edges.windows(2) {
+    let total = compensated(edges.windows(2).flat_map(|e| {
         let (half, mid) = (0.5 * (e[1] - e[0]), 0.5 * (e[1] + e[0]));
-        for &(t, w) in cells {
-            let term = half * w * f(mid + half * t);
-            let next = total + term;
-            carry += if total.abs() >= term.abs() {
-                (total - next) + term
-            } else {
-                (term - next) + total
-            };
-            total = next;
-        }
+        cells
+            .iter()
+            .map(move |&(t, w)| half * w * f(mid + half * t))
+    }));
+    (x.asinh() + 2.0 * x / PI * total).copysign(r)
+}
+
+/// Neumaier's compensated sum: each addition's rounding is carried apart and added once at the
+/// end, so the sum errs two roundings of itself rather than one per term.
+fn compensated(terms: impl IntoIterator<Item = f64>) -> f64 {
+    let (mut total, mut carry) = (0.0_f64, 0.0_f64);
+    for term in terms {
+        let next = total + term;
+        carry += if total.abs() >= term.abs() {
+            (total - next) + term
+        } else {
+            (term - next) + total
+        };
+        total = next;
     }
-    (x.asinh() + 2.0 * x / PI * (total + carry)).copysign(r)
+    total + carry
 }
 
 /// `G′(r) = (4/(3π)) (1 + r²) R_D(0, r², 1 + r²)`, even. `None` at `r = 0`, where it grows as
@@ -1311,6 +1318,24 @@ mod tests {
         assert!(caught.iter().all(|&m| m > 0), "{caught:?}");
     }
 
+    /// **The compensated sum keeps what rounding drops**: `1`, then a thousand `2⁻⁶⁰` (each below
+    /// half an ulp of 1, so a plain sum drops every one), then `−1`, sums to `1000 · 2⁻⁶⁰`
+    /// exactly, in either order; a plain sum gives 0 (asserted).
+    #[test]
+    fn the_compensated_sum_keeps_what_rounding_drops() {
+        let tiny = 2.0_f64.powi(-60);
+        let terms = || {
+            std::iter::once(1.0)
+                .chain(std::iter::repeat_n(tiny, 1000))
+                .chain(std::iter::once(-1.0))
+        };
+        assert_eq!(compensated(terms()), 1000.0 * tiny);
+        let reversed: Vec<f64> = terms().collect::<Vec<_>>().into_iter().rev().collect();
+        assert_eq!(compensated(reversed), 1000.0 * tiny);
+        assert_eq!(terms().sum::<f64>(), 0.0);
+        assert_eq!(compensated(std::iter::empty()), 0.0);
+    }
+
     // ---------------------------------------------------------------- the panels
 
     /// The panels the definition's quadrature is held on, in half-widths (`b = 0.05`): at depths
@@ -1533,12 +1558,25 @@ mod tests {
         assert!(prototype_missed > 0 && v1_missed > 0 && six_missed > 0 && rule_missed > 0);
     }
 
+    /// `∫ G′` along the panel `[from, to]` (in half-widths `b`) by the `n`-node Gauss–Legendre
+    /// rule, as the kernel's surface takes it.
+    fn along(from: f64, to: f64, b: f64, n: usize) -> f64 {
+        let (mid, half) = ((from + to) / (2.0 * b), (to - from) / (2.0 * b));
+        let sum: f64 = gauss_legendre_rule(n)
+            .iter()
+            .map(|&(t, w)| w * slope(mid + half * t))
+            .sum();
+        half * sum
+    }
+
     /// **The surface's two forms agree at their switch**: on a panel on one side of the point
     /// where [`SLOPE_NODES`] nodes just reach [`SLOPE_TOL`] (`E = SLOPE_TOL^{−1/(2(n − 1))}`,
     /// `n` the most nodes), the rule and `G`'s difference both equal the double-double
     /// quadrature of the surface term to the panel gate of it, over nearer ends from `1e-6` to
-    /// `1e3` half-widths either side; a panel `1e-9` longer takes the difference. Plant: the
-    /// rule three nodes short at the switch, which misses.
+    /// `1e3` half-widths either side. The kernel takes the rule there at its most nodes, the
+    /// difference on a panel `1e-9` longer, and on a panel a millionth as long the rule at the
+    /// count its own ellipse gives, each compared to the bit. Plant: the rule three nodes short
+    /// at the switch, which misses.
     #[test]
     fn the_surface_forms_agree_at_their_switch() {
         let kernel = Kernel::shared();
@@ -1559,13 +1597,22 @@ mod tests {
                 } else {
                     Panel::new(from * (1.0 + 1e-9), to, b, None)
                 };
-                assert!(!by_slope(&longer.expect("a panel")));
+                let longer = longer.expect("a panel");
+                assert!(!by_slope(&longer));
                 let reference = reference_terms(&p, body, 1.0 / 64.0).surface;
                 let scale = reference.abs().to_f64();
                 let off =
                     |v: f64| (Wide::of(body.surface() * v) - reference).abs().to_f64() / scale;
                 let rule = kernel.surface(from, to, b);
                 let difference = kernel.g(to / b) - kernel.g(from / b);
+                assert_eq!(rule, along(from, to, b, SLOPE_NODES), "{p:?}");
+                let (e1, e2) = (longer.from, longer.to);
+                let taken = kernel.surface(e1, e2, b);
+                assert_eq!(taken, kernel.g(e2 / b) - kernel.g(e1 / b), "{longer:?}");
+                let (s1, s2) = (from, from + (to - from) * 1e-6);
+                let k_short = (s1 + s2).abs() / (s2 - s1);
+                let n = nodes(k_short + (k_short * k_short - 1.0).sqrt(), SLOPE_TOL);
+                assert_eq!(kernel.surface(s1, s2, b), along(s1, s2, b, n), "{s1} {s2}");
                 assert!(off(rule) <= PANEL_GATE, "{p:?}: {:e}", off(rule));
                 assert!(
                     off(difference) <= PANEL_GATE,
@@ -1574,12 +1621,7 @@ mod tests {
                 );
                 worst = worst.max(off(rule)).max(off(difference));
                 ran += 1;
-                let (mid, half) = ((from + to) / (2.0 * b), (to - from) / (2.0 * b));
-                let few: f64 = gauss_legendre_rule(SLOPE_NODES - 3)
-                    .iter()
-                    .map(|&(t, w)| w * slope(mid + half * t))
-                    .sum();
-                short += usize::from(off(half * few) > PANEL_GATE);
+                short += usize::from(off(along(from, to, b, SLOPE_NODES - 3)) > PANEL_GATE);
             }
         }
         eprintln!(
@@ -2162,7 +2204,9 @@ mod tests {
     /// both forms exact there); `G` is odd and `G(0) = 0`, and `G′` is `None` at 0. The Hermite
     /// bound's `max|∂⁴F/∂u⁴ / F|` ([`F4_REL`]) bounds every third difference of the table's
     /// exact slope `dF/du` over `step³` (each is `∂⁴F/∂u⁴` somewhere in its three cells) over
-    /// `F`, and is within 5 % of the largest. Plant: `F` at twice the step, `0.0025`, which a
+    /// `F`, and is within 5 % of the largest. `G′` beyond the ends is the outer forms' slopes,
+    /// which meet the closed form at each end to its roundings (`16ε`; the far slope's
+    /// `1/(8 r³)` is `8.6e-14` of it there). Plant: `F` at twice the step, `0.0025`, which a
     /// `1e-13` gate relative to `G` passes (asserted).
     #[test]
     fn the_table_is_g() {
@@ -2204,6 +2248,11 @@ mod tests {
             for x in [r.next_down(), r, r.next_up()] {
                 let g = kernel.g(x);
                 assert!((g - g_direct(x)).abs() <= 8.0 * EPS * g.abs(), "{x:e}");
+                let closed = g_slope(x).expect("G′");
+                assert!(
+                    (slope(x) - closed).abs() <= 16.0 * EPS * closed,
+                    "G′({x:e})"
+                );
             }
         }
         for r in [1e-13, 0.3, 7.0, 3e6] {
