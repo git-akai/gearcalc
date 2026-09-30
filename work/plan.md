@@ -224,6 +224,13 @@ caught, test workspace included) and the 130-constant perturbation.
     - a closed-form limit at Σ → 0;
     - tooth stiffness in series, derived from the generated tooth and gated against ISO 6336-1's c′
       and c_γ.
+- 2026-10-02 — owner: the contact model moves to Rust before its development is finished, because
+  Python run time is the bottleneck, and development continues in Rust.
+  - The Python prototype becomes the differential oracle: a generated JSON set of inputs and outputs
+    that each Rust module must reproduce to a derived tolerance. The verifiers' independent scripts
+    stay as a second check.
+  - The port runs module by module (port → differential test → adversarial review). It is an
+    expensive-mode library with a harness command, not yet wired into the live solve.
 - 2026-10-02 — orchestrator's call, from rule 5: a cycle of carried axes is refused only when its loop
   fails to close geometrically (a numeric residual with a derived tolerance, T10.2). A structural
   rule would refuse buildable layouts: a bridge idler between planets, or a planet loop that closes
