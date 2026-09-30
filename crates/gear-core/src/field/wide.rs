@@ -89,23 +89,38 @@ impl Wide {
         y + (self - y * y) * Self::of(0.5 / q)
     }
 
-    /// `eˣ`: `x = k ln 2 + r`, `e^r` by its Taylor series at `r/2¹⁰`, squared ten times.
+    /// `eˣ`: `x = k ln 2 + r`, `e^r` from [`Wide::exp_m1_reduced`].
     #[expect(clippy::cast_possible_truncation, reason = "k is a small exponent")]
     pub fn exp(self) -> Self {
         let k = (self.hi / LN_2.hi).round();
-        let r = (self - LN_2 * Self::of(k)).scale(-10);
-        // e^r − 1 by its series, |r| ≤ ln 2 / 2¹¹: 12 terms put the next below 1e-33.
+        let r = self - LN_2 * Self::of(k);
+        (r.exp_m1_reduced() + Self::of(1.0)).scale(k as i32)
+    }
+
+    /// `eˣ − 1` for `|x| ≤ ln 2 / 2`, without cancellation: its series at `x/2¹⁰`, then
+    /// `(1 + s)² − 1 = s (2 + s)` ten times.
+    fn exp_m1_reduced(self) -> Self {
+        let r = self.scale(-10);
+        // |r| ≤ ln 2 / 2¹¹: 12 terms put the next below 1e-33 of the sum.
         let mut term = r;
         let mut sum = r;
         for n in 2..=12 {
             term = term * r / Self::of(f64::from(n));
             sum = sum + term;
         }
-        // (1 + s)² − 1 = s (2 + s), ten times.
         for _ in 0..10 {
             sum = sum * (sum + Self::of(2.0));
         }
-        (sum + Self::of(1.0)).scale(k as i32)
+        sum
+    }
+
+    /// `eˣ − 1`, to 32 digits of itself however small `x` is.
+    pub fn exp_m1(self) -> Self {
+        if self.hi.abs() <= LN_2.hi / 2.0 {
+            self.exp_m1_reduced()
+        } else {
+            self.exp() - Self::of(1.0)
+        }
     }
 
     /// `ln x` by Newton on `eʸ = x` from the `f64` logarithm: two steps double 16 digits twice.
@@ -117,10 +132,23 @@ impl Wide {
         y
     }
 
-    /// `asinh x = ln(|x| + √(x² + 1))`, odd.
+    /// `ln(1 + x)`, to 32 digits of itself however small `x` is: Newton on `e^y − 1 = x`
+    /// ([`Wide::exp_m1`]) from the `f64` value, two steps doubling 16 digits twice.
+    pub fn ln_1p(self) -> Self {
+        let mut y = Self::of(self.hi.ln_1p());
+        for _ in 0..2 {
+            let m = y.exp_m1();
+            y = y + (self - m) / (m + Self::of(1.0));
+        }
+        y
+    }
+
+    /// `asinh x = ln(1 + |x| + x²/(1 + √(x² + 1)))`, odd: every term of one sign, so to 32
+    /// digits of itself at small `x` as at large.
     pub fn asinh(self) -> Self {
         let a = self.abs();
-        let v = (a + (a * a + Self::of(1.0)).sqrt()).ln();
+        let one = Self::of(1.0);
+        let v = (a + a * a / (one + (a * a + one).sqrt())).ln_1p();
         if self.hi < 0.0 {
             -v
         } else {
@@ -133,9 +161,17 @@ impl Wide {
         (e + Self::of(1.0) / e).scale(-1)
     }
 
+    /// `sinh x = (m + m/(1 + m))/2`, `m = e^|x| − 1`: a sum of two terms of one sign, so to 32
+    /// digits of itself however small `x` is (`(eˣ − e⁻ˣ)/2` differences two values near 1, and
+    /// keeps about 16 digits at `x ≈ 1e-16`). Odd.
     pub fn sinh(self) -> Self {
-        let e = self.exp();
-        (e - Self::of(1.0) / e).scale(-1)
+        let m = self.abs().exp_m1();
+        let v = (m + m / (m + Self::of(1.0))).scale(-1);
+        if self.hi < 0.0 {
+            -v
+        } else {
+            v
+        }
     }
 }
 
@@ -194,8 +230,10 @@ mod tests {
     /// The constants and the functions against identities they must satisfy to 32 digits:
     /// `(√2)² = 2`, `e^{ln 3} = 3`, `ln(e) = 1` through `exp(1)`, `asinh(sinh 0.7) = 0.7`,
     /// `cosh² − sinh² = 1`, `(1/3)·3 = 1`, `e^{ln 2} = 2` (the constant ln 2 against `exp`),
-    /// and `sin π = 0` by its series (the constant π). A plant: π's low word dropped fails the
-    /// last, and ln 2's the one before.
+    /// `sin π = 0` by its series (the constant π), and `sinh`, `eˣ − 1` and `asinh` against their
+    /// series at small arguments, `ln(1 + x)` against `eˣ − 1` there, `ln_1p(e − 1) = 1` and
+    /// `asinh 10⁴⁰ = ln(2·10⁴⁰)`. Plants: π's low word dropped fails `sin π`, ln 2's
+    /// `e^{ln 2}`, and `sinh` as `(eˣ − e⁻ˣ)/2` three of the five small arguments.
     #[test]
     fn the_functions_hold_their_identities_to_32_digits() {
         let tol = 1e-30;
@@ -222,6 +260,28 @@ mod tests {
             sum
         };
         assert!(sin(PI).abs().to_f64() < tol);
+        // sinh x = x (1 + x²/6 + …) and eˣ − 1 = x (1 + x/2 + …), to 32 digits of themselves at
+        // small x; asinh undoes sinh there. A plant: (eˣ − e⁻ˣ)/2, whose eˣ holds 1 + x to 32
+        // digits of 1, not of x: it misses from 1e-8 to 1e-16 (4.6e-17 of itself there), and
+        // holds only where x's square falls below x's own low word.
+        let of_itself = |a: Wide, b: Wide| (a - b).abs().to_f64() <= tol * b.abs().to_f64();
+        let (mut small, mut naive_missed) = (0, 0);
+        for x in [1e-40, -3e-25, 1e-16, 1e-12, 1e-8] {
+            let w = Wide::of(x);
+            let series = w * (one + w * w / Wide::of(6.0));
+            assert!(of_itself(w.sinh(), series), "sinh {x}");
+            let m1 = w * (one + w / two + w * w / Wide::of(6.0) + w * w * w / Wide::of(24.0));
+            assert!(of_itself(w.exp_m1(), m1), "exp_m1 {x}");
+            assert!(of_itself(w.sinh().asinh(), w), "asinh sinh {x}");
+            assert!(of_itself((-w).exp_m1().ln_1p(), -w), "ln_1p {x}");
+            let naive = (w.exp() - one / w.exp()).scale(-1);
+            naive_missed += usize::from(!of_itself(naive, series));
+            small += 1;
+        }
+        assert_eq!((small, naive_missed), (5, 3));
+        assert!(close(x.exp_m1() + one, x.exp()));
+        assert!(close(Wide::of(1e40).asinh(), (Wide::of(2e40)).ln()));
+        assert!(close((one.exp() - one).ln_1p(), one));
         let crude = Wide::of(std::f64::consts::PI);
         assert!(sin(crude).abs().to_f64() > 1e-17);
         let crude_ln2 = Wide::of(std::f64::consts::LN_2);
