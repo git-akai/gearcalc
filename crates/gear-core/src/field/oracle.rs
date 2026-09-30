@@ -542,6 +542,204 @@ mod tests {
         refused(&unread, README, &rest, "make_oracle.py");
     }
 
+    /// Every number literal of a JSON text, in document order. A string is skipped whole, escapes
+    /// included, so a digit in an id or a note is not read as a number.
+    fn number_literals(text: &str) -> Vec<&str> {
+        let bytes = text.as_bytes();
+        let mut out = Vec::new();
+        let mut i = 0;
+        while i < bytes.len() {
+            match bytes[i] {
+                b'"' => {
+                    i += 1;
+                    while bytes[i] != b'"' {
+                        i += if bytes[i] == b'\\' { 2 } else { 1 };
+                    }
+                    i += 1;
+                }
+                b'-' | b'0'..=b'9' => {
+                    let start = i;
+                    while i < bytes.len()
+                        && matches!(bytes[i], b'-' | b'+' | b'.' | b'e' | b'E' | b'0'..=b'9')
+                    {
+                        i += 1;
+                    }
+                    out.push(&text[start..i]);
+                }
+                _ => i += 1,
+            }
+        }
+        out
+    }
+
+    /// The text's own value of a literal: `str::parse`, correctly rounded, as Python's `repr`
+    /// wrote each float to round-trip.
+    fn written(literal: &str) -> f64 {
+        literal.parse().expect("a JSON number is a Rust float")
+    }
+
+    /// The literals of `text` that `read` reads to other bits than [`written`]'s.
+    fn misread(text: &str, read: impl Fn(&str) -> f64) -> Vec<&str> {
+        number_literals(text)
+            .into_iter()
+            .filter(|t| read(t).to_bits() != written(t).to_bits())
+            .collect()
+    }
+
+    /// The bits of every number `value` holds, as the harness reads it ([`num`]), sorted.
+    fn held(value: &Value) -> Vec<u64> {
+        fn walk(v: &Value, out: &mut Vec<u64>) {
+            match v {
+                Value::Number(_) => out.push(num(v).to_bits()),
+                Value::Array(a) => a.iter().for_each(|x| walk(x, out)),
+                Value::Object(o) => o.values().for_each(|x| walk(x, out)),
+                _ => {}
+            }
+        }
+        let mut out = Vec::new();
+        walk(value, &mut out);
+        out.sort_unstable();
+        out
+    }
+
+    /// How many numbers the parsed `value` holds that `text`'s literals, as [`written`], do not
+    /// (as multisets of bits): 0 when the harness reads every number as it was written.
+    fn held_apart(value: &Value, text: &str) -> usize {
+        let mut wrote: Vec<u64> = number_literals(text)
+            .into_iter()
+            .map(|t| written(t).to_bits())
+            .collect();
+        wrote.sort_unstable();
+        let (held, mut apart, mut j) = (held(value), 0, 0);
+        for bits in held {
+            while j < wrote.len() && wrote[j] < bits {
+                j += 1;
+            }
+            if j < wrote.len() && wrote[j] == bits {
+                j += 1;
+            } else {
+                apart += 1;
+            }
+        }
+        apart
+    }
+
+    /// serde_json's default float reader (without `float_roundtrip`), step for step: the digits
+    /// as a `u64` significand (those past its overflow dropped, an integer's counted in the
+    /// exponent), then `significand as f64` times or over `10^|e|`, each of the two rounded: the
+    /// double rounding that misreads a 17-digit literal.
+    fn default_reader(literal: &str) -> f64 {
+        let (negative, rest) = literal
+            .strip_prefix('-')
+            .map_or((false, literal), |r| (true, r));
+        let (mantissa, e) = rest.split_once(['e', 'E']).map_or((rest, 0), |(m, e)| {
+            (m, e.parse::<i32>().expect("an exponent"))
+        });
+        let (whole, fraction) = mantissa.split_once('.').unwrap_or((mantissa, ""));
+        let (mut significand, mut exponent) = (0_u64, e);
+        for c in whole.bytes() {
+            match significand
+                .checked_mul(10)
+                .and_then(|s| s.checked_add(u64::from(c - b'0')))
+            {
+                Some(s) => significand = s,
+                None => exponent += 1,
+            }
+        }
+        for c in fraction.bytes() {
+            match significand
+                .checked_mul(10)
+                .and_then(|s| s.checked_add(u64::from(c - b'0')))
+            {
+                Some(s) => (significand, exponent) = (s, exponent - 1),
+                None => break,
+            }
+        }
+        let mut f = significand as f64;
+        while exponent < -308 && f != 0.0 {
+            (f, exponent) = (f / 1e308, exponent + 308);
+        }
+        // serde_json's `POW10[|e|]`: the literal `1e|e|`, correctly rounded.
+        let pow: f64 = format!("1e{}", exponent.abs())
+            .parse()
+            .expect("a power of ten");
+        f = if exponent >= 0 { f * pow } else { f / pow };
+        if negative {
+            -f
+        } else {
+            f
+        }
+    }
+
+    /// Every number of every JSON file of the copy reads to the bits its text was written as:
+    /// the parse each step's test reads (serde_json with `float_roundtrip`) holds, as a multiset,
+    /// exactly the literals' own values, and reads each literal alone to them. The multiset alone
+    /// is not enough: under the default reader one of `gap.json`'s 646 misreads lands on another
+    /// literal's value, and it counts 645. Plants, each refused by exactly the literals it
+    /// touches: serde_json's default reader, which rounds twice and misreads 46 of
+    /// `kernel.json`'s literals (2496 of the copy's); two near misses a comparison by value passes, a reader one ulp
+    /// off on a literal written once and one that drops the sign of `gap.json`'s one `-0.0`;
+    /// and a parse that holds one number an ulp off.
+    #[test]
+    fn every_number_reads_to_the_bits_it_was_written_as() {
+        let serde = |t: &str| serde_json::from_str::<f64>(t).expect("a number");
+        let text = |name: &str| std::str::from_utf8(bytes(name)).expect("UTF-8");
+        let json: Vec<&str> = FILES
+            .iter()
+            .map(|(f, _)| *f)
+            .filter(|f| f.ends_with(".json"))
+            .collect();
+        let mut literals = 0;
+        for name in &json {
+            let (text, value) = (text(name), parse(bytes(name)));
+            assert_eq!(held(&value).len(), number_literals(text).len(), "{name}");
+            assert_eq!(held_apart(&value, text), 0, "{name}");
+            assert_eq!(misread(text, serde), Vec::<&str>::new(), "{name}");
+            literals += number_literals(text).len();
+        }
+        assert_eq!((json.len(), literals), (9, 25_041));
+
+        // What serde_json without `float_roundtrip` misread in each file, measured before the
+        // feature was set: the plant reproduces it file for file.
+        let default: Vec<usize> = json
+            .iter()
+            .map(|name| misread(text(name), default_reader).len())
+            .collect();
+        assert_eq!(default, [0, 150, 46, 206, 46, 646, 39, 1309, 54]);
+
+        let kernel = text("kernel.json");
+        let all = number_literals(kernel);
+        let once = *all
+            .iter()
+            .find(|t| all.iter().filter(|u| u == t).count() == 1)
+            .expect("a literal written once");
+        let ulp_off = |t: &str| {
+            let v = written(t);
+            if t == once {
+                f64::from_bits(v.to_bits() + 1)
+            } else {
+                v
+            }
+        };
+        assert_eq!(misread(kernel, ulp_off), vec![once]);
+
+        let gap = text("gap.json");
+        let unsigned = |t: &str| {
+            let v = written(t);
+            if v == 0.0 {
+                0.0
+            } else {
+                v
+            }
+        };
+        assert_eq!(misread(gap, unsigned), vec!["-0.0"]);
+
+        let mut nudged = parse(bytes("kernel.json"));
+        let r = &mut nudged["records"][0]["inputs"]["r"][1];
+        *r = Value::from(f64::from_bits(num(r).to_bits() + 1));
+        assert_eq!(held_apart(&nudged, kernel), 1);
+    }
+
     /// [`closed_bound`], to the bit, at literal values: `rel` of the value's size, floored at `rel`
     /// absolute only where the value passes zero. A step's 10× law cannot pin this: its fault is
     /// ten times the larger reading, so a bound up to ten times too loose on either branch passes

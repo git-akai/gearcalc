@@ -34,4 +34,7 @@ workspace = true
 # carries it: the crate's own tests always build with `serde` on, so the
 # round trip runs under a plain `cargo nextest run`.
 gear-core = { path = ".", features = ["serde"] }
-serde_json = "1"
+# `float_roundtrip`: every number of the contact oracle's JSON read to the bits its text was
+# written as (`field::oracle`'s law); the default reader rounds twice and misreads about one
+# literal in ten by an ulp.
+serde_json = { version = "1", features = ["float_roundtrip"] }

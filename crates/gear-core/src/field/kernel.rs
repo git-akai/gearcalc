@@ -33,13 +33,19 @@
 //! `ln r` while their difference decays as `−ν h²/r³`, so the first form would carry `G`'s error
 //! amplified by up to `3e7` (`h < b`); the second has none to amplify.
 //!
-//! Neither form takes a difference of two values of one sign. On one side of the point the near
-//! form's depth term is `asinh(D/d_R)` and `h² D/(d_R R₁ R₂)`, `D = (η₂ − η₁)(η₂ + η₁)`,
-//! `d_R = η₂ R₁ + η₁ R₂`, and its surface term, where the panel is short beside its distance from
-//! the point, `∫ G′` by Gauss–Legendre ([`SLOPE_NODES`]); across the point every difference is a
-//! sum. `G` itself is exact to a few roundings of itself at every `r`: the table holds
-//! `G/asinh r`, which is linear in `ln r` below it, and its nodes are a quadrature of positive
-//! terms ([`g_direct`]).
+//! Within the near form's terms, the differences that cancel are removed. On one side of the
+//! point its depth term is `asinh(D/d_R)` and `h² D/(d_R R₁ R₂)`, `D = (η₂ − η₁)(η₂ + η₁)`,
+//! `d_R = η₂ R₁ + η₁ R₂`, rather than differences of `asinh(η/ρ)` and of `η/R`; its surface term,
+//! where the farther end is within `4.15` times the nearer, is `∫ G′` by Gauss–Legendre
+//! ([`SLOPE_NODES`]) rather than `G(r₂) − G(r₁)`; across the point every difference is a sum.
+//! Two differences remain, each bounded. The near form is its surface term less its depth term,
+//! two values of one sign, so it errs a few roundings of the larger of them rather than of the
+//! value: its gate is `1e-13` of that scale, and the separated form takes over where the two
+//! would amplify `G`'s error. Beyond the `4.15` ratio the surface is `G(r₂) − G(r₁)`, which
+//! cancels by a factor of at most 2.9 with its nearer end within `b/2` of the point, growing to
+//! 23 at the table's end ([`SLOPE_NODES`]). `G` itself is exact to a few roundings of itself at
+//! every `r`: the table holds `G/asinh r`, which is linear in `ln r` below it, and its nodes are
+//! a quadrature of positive terms ([`g_direct`]).
 //!
 //! Ports the prototype's `kernel.G`, `G_direct`, `dG`, `panel`, `panel_sep`, `depth_panel`,
 //! `n_width`, `line_limit` and `shape_C`, and `carlson.aspect` through [`patch_aspect`]; its
@@ -73,8 +79,8 @@ const TABLE_STEP: f64 = 0.00125;
 const CELL_NODES: usize = 16;
 
 /// The width rule's bound: `n` Gauss–Chebyshev nodes integrate the depth term to `O(E⁻²ⁿ)`, `E`
-/// the Bernstein ellipse through its branch points `±i h`; `n` is the least that puts `E⁻²ⁿ`
-/// below this.
+/// the Bernstein ellipse through its branch points `±i h`; `n` is the least count that puts
+/// `E⁻²ⁿ` below this, plus one node of margin for the error's constant ([`nodes`]).
 const WIDTH_TOL: f64 = 1e-14;
 
 /// The most nodes the width rule takes. The rule asks more only above `b/h ≈ 3.9`, where a strip
@@ -211,16 +217,16 @@ impl Panel {
     }
 }
 
-/// The width rule: the least `n ≥ 2` Gauss–Chebyshev nodes with `E⁻²ⁿ ≤ 1e-14`,
-/// `E = h/b + √(1 + (h/b)²)` the Bernstein ellipse through the depth term's branch points
-/// `x = ±i h`, at most [`MAX_WIDTH_NODES`].
+/// The width rule's Gauss–Chebyshev node count for [`WIDTH_TOL`] ([`nodes`]), `E = h/b +
+/// √(1 + (h/b)²)` the Bernstein ellipse through the depth term's branch points `x = ±i h`.
 fn width_rule(half_width: f64, depth: f64) -> usize {
     let r = depth / half_width;
     nodes(r + (1.0 + r * r).sqrt(), WIDTH_TOL)
 }
 
-/// The least `n ≥ 2` with `E⁻²ⁿ` below `tol`, `n = ⌈ln(1/tol) / (2 ln E)⌉ + 1`, at most
-/// [`MAX_WIDTH_NODES`].
+/// A rule's node count for the Bernstein ellipse `E` and bound `tol`: the least count with
+/// `E⁻²ⁿ ≤ tol`, `⌈ln(1/tol) / (2 ln E)⌉`, plus one node of margin for the error's constant,
+/// `n = ⌈ln(1/tol) / (2 ln E)⌉ + 1`, held to `[2, MAX_WIDTH_NODES]`.
 #[expect(
     clippy::cast_possible_truncation,
     clippy::cast_sign_loss,
@@ -231,12 +237,14 @@ fn nodes(ellipse: f64, tol: f64) -> usize {
     n.clamp(2.0, MAX_WIDTH_NODES as f64) as usize
 }
 
-/// `G`, tabulated once, and the Gauss–Chebyshev rules across the width.
+/// The kernel's tables, built once: `F = G/asinh r` in `u = ln r`, whose cubic Hermite gives
+/// `G` ([`Kernel::g`]); the Gauss–Chebyshev rules across the width, for the depth term and the
+/// separated form; and the Gauss–Legendre rules along a panel, for the surface term's `∫ G′`.
 #[derive(Clone, Debug)]
 pub struct Kernel {
     /// The table's step in `u = ln r`.
     step: f64,
-    /// `(G, dG/du = r G′(r))` at `u = TABLE_FROM + i · step`.
+    /// `(F, dF/du)`, `F = G/asinh r`, at `u = TABLE_FROM + i · step`.
     table: Vec<(f64, f64)>,
     /// Gauss–Chebyshev (second kind) rules for `φ`, by node count: `(t_k, w_k)` with
     /// `t_k = cos(kπ/(n + 1))` and `w_k = (2/(n + 1)) sin²(kπ/(n + 1))`, `k = 1 … n`.
