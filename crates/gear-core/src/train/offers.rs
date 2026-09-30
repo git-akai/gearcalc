@@ -524,6 +524,28 @@ mod tests {
         }
     }
 
+    /// **A body the graph lists is bare only where something names it**
+    /// (audit T13.12): a hold or a case's entry or sweep; one bare and
+    /// named by nothing is a number nothing would read again.
+    fn nothing_bare_unnamed(t: &Train) -> Result<(), String> {
+        let named = |b: usize| {
+            t.held.contains(&b)
+                || t.load_cases.iter().any(|c| {
+                    c.loads.iter().any(|l| l.at == b)
+                        || matches!(c.duty, super::super::Duty::Intermittent { at: Some(at), .. } if at == b)
+                })
+        };
+        match t
+            .shape
+            .bodies
+            .iter()
+            .find(|b| t.shape.is_bare(b.body) && !named(b.body))
+        {
+            Some(b) => Err(format!("body {} is bare and named by nothing", b.body)),
+            None => Ok(()),
+        }
+    }
+
     /// What a walk asserts of the train after every step, `solved` saying
     /// whether the train before it solved: the train well formed; offers
     /// at the train and a solve that do not panic; a train that solved
@@ -531,8 +553,8 @@ mod tests {
     /// describes no mechanism; every flow saying each body and mesh once;
     /// every fatigue case counting its cycles or saying why not; a fresh
     /// case fitting it; a gear added (`step`, as the walk logs it) never
-    /// locking a train that turned; and the train the same after a trip
-    /// through JSON.
+    /// locking a train that turned; no body bare and named by nothing; and
+    /// the train the same after a trip through JSON.
     fn laws(t: &Train, solved: bool, step: &str) -> Result<bool, String> {
         let lib = test_library();
         t.check().map_err(|e| format!("check: {e:?}"))?;
@@ -553,6 +575,7 @@ mod tests {
         }
         a_fresh_case_names_open_ports(t)?;
         a_fresh_case_moves_nothing(t, r.is_ok())?;
+        nothing_bare_unnamed(t)?;
         let json = serde_json::to_string(t).unwrap();
         let back: Train = serde_json::from_str(&json).map_err(|e| format!("json: {e}"))?;
         if serde_json::to_string(&back).unwrap() != json {

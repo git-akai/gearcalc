@@ -1177,35 +1177,35 @@ impl Train {
         case
     }
 
-    /// **Every body with nothing on it that nothing else names, given up**,
-    /// and every axis that leaves with nothing on it — a set's carrier
-    /// that carried the planets a removal took.
+    /// **Every bare body nothing else names, given up** ([`Shape::is_bare`]),
+    /// with its couplings, and every axis that leaves with nothing on it — a
+    /// set's carrier that carried the planets a removal took.
     ///
-    /// A body with no member, no axis to carry and no coupling is a shaft
-    /// in neutral, which is a state worth being able to reach — but only
-    /// while something means it to be there. A hold or a case's entry is a
-    /// reason. Neither, and it is a number nothing would ever read again.
+    /// A body with no member, no axis to carry and no coupling holding it
+    /// on a fixed axis is a shaft in neutral, which is a state worth being
+    /// able to reach — but only while something means it to be there. A
+    /// hold or a case's entry is a reason. Neither, and it is a number
+    /// nothing would ever read again. The orbiting ones go first, since
+    /// their couplings are what may leave a fixed shaft bare; a fixed shaft
+    /// given up is in no coupling, so the second pass frees nothing more.
     fn drop_bare(&mut self) {
-        let named = |body: usize| {
-            self.held.contains(&body)
-                || self.load_cases.iter().any(|c| {
+        let named = |t: &Self, body: usize| {
+            t.held.contains(&body)
+                || t.load_cases.iter().any(|c| {
                     c.loads.iter().any(|l| l.at == body)
                         || matches!(c.duty, super::Duty::Intermittent { at: Some(at), .. } if at == body)
                 })
         };
-        let s = &self.shape.indexed();
-        let bare: Vec<usize> = s
-            .bodies
-            .iter()
-            .map(|b| b.body)
-            .filter(|&b| {
-                s.members_on(b).is_empty()
-                    && !s.carries_an_axis(b)
-                    && !s.couplings.iter().any(|c| c.contains(&b))
-                    && !named(b)
-            })
-            .collect();
-        self.shape.bodies.retain(|b| !bare.contains(&b.body));
+        for orbiting in [true, false] {
+            let s = &self.shape;
+            let bare: Vec<usize> = s
+                .bodies
+                .iter()
+                .map(|b| b.body)
+                .filter(|&b| s.orbits(b) == orbiting && s.is_bare(b) && !named(self, b))
+                .collect();
+            self.shape.drop_bodies(&bare);
+        }
         self.shape.drop_empty_axes();
     }
 
@@ -1445,6 +1445,10 @@ impl Train {
                     return Err(super::EditRefused::NoSuchIndex);
                 }
                 self.release(body);
+                // A bare body its hold was all that named goes, as any
+                // edit's does ([`Self::drop_bare`]).
+                self.drop_bare();
+                self.prune();
                 Ok(())
             }
             Edit::Insert { shape, at } => self.insert(shape, at),

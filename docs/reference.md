@@ -2452,11 +2452,14 @@ asked (`AddRatio`); a **step**; a **coupling**; a gear **moved**; a **join**,
 a **hold**, a **release**; a preset **inserted** at a body, its input on that
 shaft (`Insert`); and a member, a mesh, an axis, a body or a coupling
 **removed with what goes with it** (`Remove`) — a gear left meshing nothing,
-then any it leaves the same, until none does; a gear's body where nothing
-else is on it, though a shaft an offset coupling turns stays with its
-coupling; a distance left with no mesh; an axis left with nothing on it —
-refused where a planet would be left meeting nothing on its carrier's axis,
-whose radius it runs at. Each is made on a copy and kept whole or refused
+then any it leaves the same, until none does; a body left **bare** — no
+gear on it, no axis carried, and no coupling holding it on a fixed axis, so
+a shaft an offset coupling turns stays with its coupling and a planet body
+with nothing on it goes with its coupling (`Shape::is_bare`, the one rule
+wherever a body is given up; the train keeps one a hold or a case names,
+and a release gives up one only its hold named); a distance left with no
+mesh; an axis left with nothing on it — refused where a planet would be
+left meeting nothing on its carrier's axis, whose radius it runs at. Each is made on a copy and kept whole or refused
 whole. **No edit drops or moves a case's load or reaction**: one that
 would leave a load or a reaction on a body held, cut off from the gears or
 taken off the train — or joined to another the same case names — is refused

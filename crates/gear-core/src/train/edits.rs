@@ -732,9 +732,9 @@ impl Shape {
     }
 
     /// **`gears` taken off `axis`**, with what goes with them: every body
-    /// left on it with nothing on it, every distance left with no mesh, and
-    /// the axis where nothing is left on it — the axes after it numbered
-    /// down.
+    /// left on it bare ([`Self::is_bare`]), every distance left with no
+    /// mesh, and the axis where nothing is left on it — the axes after it
+    /// numbered down. A shaft a coupling turns stays, and its axis with it.
     fn clear_axis(&mut self, axis: usize, gears: Vec<usize>) {
         let before: Vec<usize> = self
             .bodies
@@ -743,17 +743,32 @@ impl Shape {
             .map(|b| b.body)
             .collect();
         self.cascade(gears);
-        let at = self.indexed();
-        let bare: Vec<usize> = before
-            .into_iter()
-            .filter(|&b| at.members_on(b).is_empty() && !self.carries_an_axis(b))
-            .collect();
+        let bare: Vec<usize> = before.into_iter().filter(|&b| self.is_bare(b)).collect();
         self.drop_bodies(&bare);
         self.tidy();
     }
 
+    /// **Whether a body is bare** — the one rule every place that gives a
+    /// body up asks: no gear on it, it carries no axis, and no coupling
+    /// holds it on a fixed axis. A shaft on a fixed axis a coupling turns
+    /// is a port the train may load, and stays; an orbiting body with
+    /// nothing on it turns nothing its coupling could carry, and goes with
+    /// its couplings ([`Self::drop_bodies`]). The train gives a bare body up
+    /// where nothing else names it ([`super::Train::drop_bare`]).
+    pub(crate) fn is_bare(&self, body: usize) -> bool {
+        let coupled = self.couplings.iter().any(|c| c.contains(&body));
+        self.members_on_body(body).is_empty()
+            && !self.carries_an_axis(body)
+            && (self.orbits(body) || !coupled)
+    }
+
+    /// Whether a body is on an axis a carrier turns.
+    pub(crate) fn orbits(&self, body: usize) -> bool {
+        self.axis_of_body(body).is_some_and(|a| self.carried(a))
+    }
+
     /// Bodies taken out by number, with every coupling they are in.
-    fn drop_bodies(&mut self, bodies: &[usize]) {
+    pub(crate) fn drop_bodies(&mut self, bodies: &[usize]) {
         self.bodies.retain(|b| !bodies.contains(&b.body));
         self.couplings
             .retain(|c| !c.iter().any(|b| bodies.contains(b)));
@@ -858,22 +873,18 @@ impl Shape {
 
     // ---------------------------------------------------------- the drops ---
 
-    /// A body off the graph where nothing is on it, it carries no axis and
-    /// no coupling turns it — with nothing left to say what it is.
+    /// A body off the graph, with its couplings, where it is bare
+    /// ([`Self::is_bare`]).
     fn drop_if_bare(&mut self, body: usize) {
-        if self.members_on_body(body).is_empty()
-            && !self.carries_an_axis(body)
-            && !self.couplings.iter().any(|c| c.contains(&body))
-        {
-            self.bodies.retain(|b| b.body != body);
+        if self.is_bare(body) {
+            self.drop_bodies(&[body]);
         }
     }
 
-    /// A member gone, with its meshes, and its body off the graph where it
-    /// was alone on it, the body carries no axis and no coupling turns it
-    /// from a fixed axis — a shaft a planet's turn is taken off to stays
-    /// with its coupling, while a planet body left with nothing on it goes
-    /// with the coupling it turned.
+    /// A member gone, with its meshes, and its body off the graph where the
+    /// member leaves it bare ([`Self::drop_if_bare`]) — a shaft a planet's
+    /// turn is taken off to stays with its coupling, while a planet body
+    /// left with nothing on it goes with the coupling it turned.
     fn drop_member(&mut self, member: usize) {
         let body = self.members[member].body;
         self.meshes.retain(|m| m.a != member && m.b != member);
@@ -886,15 +897,7 @@ impl Shape {
             }
         }
         self.members.remove(member);
-        let coupled = self.couplings.iter().any(|c| c.contains(&body));
-        let orbiting = self.axis_of_body(body).is_some_and(|a| self.carried(a));
-        if self.members_on_body(body).is_empty()
-            && !self.carries_an_axis(body)
-            && (!coupled || orbiting)
-        {
-            self.bodies.retain(|b| b.body != body);
-            self.couplings.retain(|c| !c.contains(&body));
-        }
+        self.drop_if_bare(body);
     }
 }
 
@@ -2101,6 +2104,34 @@ mod tests {
         assert_ne!(debug(&u), debug(&t), "a case it has is switched");
     }
 
+    /// **A release gives up a body only its hold named** (audit T13.12), as
+    /// every other edit gives up a bare body nothing names: a set's held
+    /// ring whose gear moved off it stays while held, and released it goes,
+    /// the numbers closing up — where it stayed listed, named by nothing.
+    #[test]
+    fn a_release_gives_up_a_body_only_its_hold_named() {
+        let mut t =
+            super::super::testing::cased(vec![Preset::Spur.build(), Preset::MeshedPlanets.build()]);
+        let ring = t.port(1, 3);
+        assert!(t.held.contains(&ring), "the set's ring is held");
+        let gear = t.member(1, 3).expect("the set's ring gear");
+        assert_eq!(t.shape.members[gear].body, ring);
+        let sun = t.port(1, 1);
+        t.edit(Edit::Move {
+            member: gear,
+            to: Some(sun),
+        })
+        .unwrap();
+        assert!(
+            t.shape.is_bare(ring) && t.held.contains(&ring),
+            "bare, held"
+        );
+        let before = t.shape.bodies.len();
+        t.edit(Edit::Release(ring)).unwrap();
+        t.check().unwrap();
+        assert_eq!(t.shape.bodies.len(), before - 1, "{:?}", t.shape.bodies);
+    }
+
     /// **A move keeps what a body was told**: a gear alone on its body
     /// moved to a new one changes nothing; one that shares its body — the
     /// pair's second gear on the sun's shaft — takes a body of its own, the
@@ -2286,6 +2317,100 @@ mod tests {
         for b in 1..=before.max_body() {
             assert_eq!(t.ends_of(b), before.ends_of(b), "body {b} moved");
         }
+    }
+
+    /// **One rule for a bare body** (audit T13.12), where the removal of an
+    /// axis asked otherwise. A body is given up — by the shape, and by the
+    /// train where nothing names it — when no gear is on it, it carries no
+    /// axis, and no coupling holds it on a fixed axis
+    /// ([`Shape::is_bare`]). The removal of an axis took a shaft a coupling
+    /// turns, with the coupling — a join the designer made, undone unasked;
+    /// a shaft on a fixed axis a coupling turns is a port, and stays. An
+    /// uncoupled planocentric with a pair after it joined to the planet by
+    /// a coupling: the pair's input axis removed takes its gears and leaves
+    /// the shaft, its coupling and the axis it stands on.
+    #[test]
+    fn removing_an_axis_leaves_a_shaft_a_coupling_turns() {
+        let uncoupled = arr::epicyclic(
+            1,
+            &[&[arr::external(30)]],
+            &[
+                arr::Central::Carrier,
+                arr::Central::Ring { on: 0, teeth: 33 },
+            ],
+            &[],
+        );
+        let t = Train::chained(vec![uncoupled, Preset::Spur.build()], |_| Vec::new());
+        let (planet, end) = (3, t.port(1, 1));
+        assert_eq!(t.shape.couplings, vec![[planet, end]]);
+        let axis = t.shape.bodies.iter().find(|b| b.body == end).unwrap().axis;
+        let mut u = t.clone();
+        u.edit(Edit::Remove(Piece::Axis(axis))).unwrap();
+        u.check().unwrap();
+        assert!(
+            u.shape
+                .bodies
+                .iter()
+                .any(|b| b.body == end && b.axis == axis),
+            "the coupled shaft stays on its axis: {:?}",
+            u.shape.bodies
+        );
+        assert_eq!(u.shape.couplings, vec![[planet, end]], "with its coupling");
+        assert!(u.shape.members_on_body(end).is_empty(), "its gears gone");
+    }
+
+    /// **One rule for a bare body** (audit T13.12), where the train's own
+    /// sweep asked otherwise: a planet body whose gears have all moved off
+    /// it stayed, coupled — a body no mesh turns, holding the shaft it
+    /// coupled to. An orbiting body with nothing on it is bare whatever it
+    /// is coupled to ([`Shape::is_bare`]): it goes with its coupling, and
+    /// the shaft with it where nothing names it; where a case reacts at the
+    /// shaft, the shaft stays in neutral with the case at it. A
+    /// planocentric with a step on its planet, both planet gears moved onto
+    /// a new body of the planet's axis.
+    #[test]
+    fn a_planet_body_left_bare_goes_with_its_coupling() {
+        let mut t = Train::chained(vec![Preset::Planocentric.build()], |_| Vec::new());
+        t.edit(Edit::AddStep { axis: 1 }).unwrap();
+        let (shaft, planet_body) = (3, 4);
+        assert_eq!(t.shape.couplings, vec![[shaft, planet_body]]);
+        let on_planet = t.shape.members_on_body(planet_body);
+        assert_eq!(on_planet.len(), 2, "a stepped planet");
+        t.edit(Edit::Move {
+            member: on_planet[0],
+            to: None,
+        })
+        .unwrap();
+        let fresh = t.shape.members[on_planet[0]].body;
+        let last = Edit::Move {
+            member: on_planet[1],
+            to: Some(fresh),
+        };
+        let mut u = t.clone();
+        u.edit(last.clone()).unwrap();
+        u.check().unwrap();
+        assert!(u.shape.couplings.is_empty(), "{:?}", u.shape.couplings);
+        assert_eq!(
+            u.shape.bodies.len(),
+            t.shape.bodies.len() - 2,
+            "the planet body and the shaft it turned, named by nothing, go: {:?}",
+            u.shape.bodies
+        );
+        // Cased, the shaft is the output a case reacts at: it stays, in
+        // neutral — a port nothing drives, as a layshaft's output is between
+        // its two ratios — and the planet body goes with its coupling.
+        let mut v = t.clone();
+        v.load_cases = vec![LoadCase::ultimate(1, shaft, 1.0, 1000.0)];
+        let before = v.shape.bodies.len();
+        v.edit(last).unwrap();
+        v.check().unwrap();
+        assert!(v.shape.couplings.is_empty(), "{:?}", v.shape.couplings);
+        assert_eq!(v.shape.bodies.len(), before - 1, "{:?}", v.shape.bodies);
+        assert!(
+            v.shape.bodies.iter().any(|b| b.body == shaft),
+            "the output stays"
+        );
+        assert_eq!(v.load_cases[0].loads[1].at, shaft, "and the case at it");
     }
 
     /// **The hula is reached from the Wolfrom preset by edits**:
