@@ -744,7 +744,7 @@ pub fn worm(starts: u32, wheel_teeth: u32) -> Shape {
 #[must_use]
 pub fn planetary(sun: u32, planet: u32, ring: u32, count: u32) -> Shape {
     let mut shape = epicyclic(
-        count.max(1),
+        count,
         &[&[i32::try_from(planet).unwrap_or(i32::MAX)]],
         &[
             Central::Sun { on: 0, teeth: sun },
@@ -967,6 +967,46 @@ mod tests {
     use super::super::test_library as library;
     use super::*;
     use crate::train::testing::alone;
+
+    /// **Every arrangement a builder makes crosses the wire and back
+    /// unchanged** (T01.4): each shape through JSON, as the boundary carries
+    /// it, read back and written again to the same text, and admitted by the
+    /// input table ([`crate::input::shape`]) — every preset, the
+    /// arrangements no button lays out, and each builder at the readings of
+    /// its size a designer states, among them a worm whose 7 mm cannot hold
+    /// its starts (it seeded a helix that was no number, which JSON writes
+    /// as `null` and no reader takes for one).
+    #[test]
+    fn every_arrangement_crosses_the_wire_and_back_unchanged() {
+        let mut shapes: Vec<(String, Shape)> = super::super::sweep::arrangements();
+        let built = [
+            ("worm 17/23, 45°", worm(17, 23).with_first_helix(45.0)),
+            ("worm 17/23", worm(17, 23)),
+            ("worm 9/40 at 8 mm", worm(9, 40).with_first_diameter(8.0)),
+            ("worm 1/40 at 20 mm", worm(1, 40).with_first_diameter(20.0)),
+            ("pair 15°", pair([17, 43]).with_additional_helix(15.0)),
+            ("crossed 60°", crossed([17, 43], 60.0)),
+            ("line of four", line(&[17, 25, 31, 43])),
+            ("layshaft", layshaft((17, 43), &[(41, 19), (29, 31)], 0)),
+            ("hula", hula([65, 61, 57, 61], [1.0, 1.0])),
+            ("planetary, free size", planetary(12, 30, 72, 3).size_free()),
+            ("wolfrom", wolfrom(18, [60, 61], 3)),
+            ("stepped", stepped(24, [18, 17], [60, 59], 3)),
+            ("planocentric", planocentric(30, 33)),
+            ("meshed planets", meshed_planets(24, [18, 18], 96, 3)),
+            ("ravigneaux", ravigneaux([18, 30], [22, 18], 62, 3)),
+            ("worm and pair", worm_and_pair((1, 40), (17, 43))),
+        ];
+        shapes.extend(built.into_iter().map(|(n, s)| (n.to_owned(), s)));
+        for (name, shape) in &shapes {
+            let text = serde_json::to_string(shape).unwrap();
+            let back: Shape =
+                serde_json::from_str(&text).unwrap_or_else(|e| panic!("{name}: {e}\n{text}"));
+            assert_eq!(serde_json::to_string(&back).unwrap(), text, "{name}");
+            crate::input::shape(shape).unwrap_or_else(|e| panic!("{name}: {e}"));
+        }
+        assert_eq!(shapes.len(), super::super::sweep::arrangements().len() + 16);
+    }
 
     /// The arrangement asked with `held` held, loaded at `input` and
     /// reacted at `output` — its slots, as a train of one numbers them.

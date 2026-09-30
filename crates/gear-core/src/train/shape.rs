@@ -253,8 +253,10 @@ pub struct Distance {
     pub tip_clearance: f64,
     pub tolerance_plus: f64,
     pub tolerance_minus: f64,
-    /// Axial float of the first axis's members, mm — a rigid slide that
-    /// opens one flank as far as it closes the other on a helical mesh.
+    /// Axial float, mm — a rigid slide that opens one flank as far as it
+    /// closes the other on a helical mesh — along each of its meshes' first
+    /// member's axis: the worm's, on a worm pair. The two axes a distance
+    /// lists are a pair and not an order; nothing reads which is first.
     pub axial_clearance: f64,
 }
 
@@ -385,8 +387,7 @@ impl Shape {
 
     /// How many instances of a body's axis there are.
     fn count_of(&self, shaft: Body) -> u32 {
-        self.axis_of_slot(shaft)
-            .map_or(1, |a| self.axes[a].count.max(1))
+        self.axis_of_slot(shaft).map_or(1, |a| self.axes[a].count)
     }
 
     /// **The mesh groups**: the connected components of the mesh graph, in
@@ -505,7 +506,7 @@ impl Shape {
     pub(crate) fn first_pitch_diameter(&self) -> f64 {
         let s = self.indexed();
         let m = &s.members[0];
-        f64::from(m.gear.teeth.max(1)) * m.normal_module() / s.helix_angles()[0].to_radians().cos()
+        f64::from(m.gear.teeth) * m.normal_module() / s.helix_angles()[0].to_radians().cos()
     }
 
     /// The shifts the shape settles on under a search — what the tests
@@ -749,7 +750,7 @@ impl Indexed<'_> {
             shaft_angle_rad: self.shaft_angle_of(mesh).to_radians(),
             starts: self.members[m.a].gear.teeth,
             wheel_teeth: self.members[m.b].gear.teeth,
-            worm_pitch_diameter: f64::from(self.members[m.a].gear.teeth.max(1)) * module
+            worm_pitch_diameter: f64::from(self.members[m.a].gear.teeth) * module
                 / helix[m.a].to_radians().cos(),
             profile_shifts: [eff(m.a), eff(m.b)],
         })
@@ -1136,18 +1137,15 @@ impl Indexed<'_> {
     fn size_reaching(&self, mesh: usize, target: f64, at: &dyn Fn(f64) -> f64) -> Option<f64> {
         let m = self.meshes[mesh];
         let a = &self.members[m.a];
-        let z1 = f64::from(a.gear.teeth.max(1));
+        let z1 = f64::from(a.gear.teeth);
         let floor = z1 * a.normal_module();
         // The designer's own number, held to the tooth's own diameter below
         // which no pair exists.
         let from = a.pitch_diameter.manual.max(floor * 1.000_001);
         let sigma = self.shaft_angle_of(mesh).to_radians();
-        let turning = Screw::least_distance_lead_angle(
-            a.gear.teeth.max(1),
-            self.members[m.b].gear.teeth,
-            sigma,
-        )
-        .map(|least| floor / least.sin());
+        let turning =
+            Screw::least_distance_lead_angle(a.gear.teeth, self.members[m.b].gear.teeth, sigma)
+                .map(|least| floor / least.sin());
         // The diameter is the helix read the other way, and the search runs
         // over the diameter so the branch is the diameter's.
         let helix_of = |d1: f64| (floor / d1).clamp(-1.0, 1.0).acos().to_degrees();
@@ -4929,7 +4927,7 @@ impl Indexed<'_> {
             for &i in group {
                 let m = &self.members[i];
                 out.push(Reading::helix(i, &m.gear, |b| b));
-                let z1 = f64::from(m.gear.teeth.max(1)) * m.normal_module();
+                let z1 = f64::from(m.gear.teeth) * m.normal_module();
                 out.push(Reading {
                     freedom: Freedom::Member(i, MemberFreedom::PitchDiameter),
                     helix: (!m.pitch_diameter.auto).then(|| {

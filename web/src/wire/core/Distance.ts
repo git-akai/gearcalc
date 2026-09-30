@@ -39,7 +39,9 @@ clearance: Auto<number>,
  */
 tip_clearance: number, tolerance_plus: number, tolerance_minus: number, 
 /**
- * Axial float of the first axis's members, mm — a rigid slide that
- * opens one flank as far as it closes the other on a helical mesh.
+ * Axial float, mm — a rigid slide that opens one flank as far as it
+ * closes the other on a helical mesh — along each of its meshes' first
+ * member's axis: the worm's, on a worm pair. The two axes a distance
+ * lists are a pair and not an order; nothing reads which is first.
  */
 axial_clearance: number, };

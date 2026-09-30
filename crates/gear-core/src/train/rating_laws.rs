@@ -667,3 +667,103 @@ fn a_crossed_mesh_holds_its_tips() {
         assert!(held > 0, "{p:?}: nothing was held");
     }
 }
+
+/// **A contact rated at any pressure angle the table admits is a figure, or
+/// a refusal that names why** (T01.7). Every arrangement, every member at
+/// 45°, 60°, 75°, 85°, 89° and 89.9° — the whole of the steep half of
+/// `(0°, 90°)`: the train either solves, every member's every case a
+/// finite contact stress (nought only on a mesh that carries nothing) and a
+/// finite bending stress or none, where a line contact's member says so
+/// (`gear.bending_unrated`) and a member on point contacts alone has none
+/// by decision; or it is refused, by a catalogue key. The line and point
+/// contacts answer steep flanks alike: a contact rated, a root said.
+#[test]
+fn a_steep_flank_is_rated_or_refused_by_name() {
+    use crate::note::{key, Explain};
+    let lib = test_library();
+    let (mut rated, mut refused) = (0, 0);
+    for (name, shape) in super::sweep::arrangements() {
+        for alpha in [45.0, 60.0, 75.0, 85.0, 89.0, 89.9] {
+            let mut t = super::sweep::cased(vec![shape.clone()]);
+            for m in &mut t.shape.members {
+                m.pressure_angle = Auto::fixed(alpha);
+            }
+            let r = match solve_train(&t, &lib) {
+                Ok(r) => r,
+                Err(e) => {
+                    assert!(e.note().key.starts_with("error."), "{name} {alpha}: {e:?}");
+                    refused += 1;
+                    continue;
+                }
+            };
+            let s = t.shape.indexed();
+            for (i, g) in r.members.iter().enumerate() {
+                let line = s.meshes_of(i).iter().any(|&k| {
+                    s.distance_of(k)
+                        .is_some_and(|d| s.distances[d].angle == 0.0)
+                });
+                for c in &g.cases {
+                    let at = format!("{name} {alpha}° member {i} case {}", c.case);
+                    assert!(
+                        c.contact_stress.is_finite() && c.contact_stress >= 0.0,
+                        "{at}"
+                    );
+                    match c.bending_stress {
+                        Some(b) => assert!(b.is_finite() && b >= 0.0, "{at}: {b}"),
+                        None if line => assert!(
+                            g.notes.iter().any(|n| n.is(key::GEAR_BENDING_UNRATED)),
+                            "{at}: no bending, and nothing said"
+                        ),
+                        None => {}
+                    }
+                }
+            }
+            rated += 1;
+        }
+    }
+    assert_eq!(rated + refused, 6 * super::sweep::arrangements().len());
+    assert!(rated > refused, "{rated} rated, {refused} refused");
+}
+
+/// **An axis distance's two axes are a pair, not an order** (T14.6):
+/// swapping them on every distance of every arrangement changes nothing the
+/// train reports — no member, mesh, distance, axis, path or case figure, and
+/// no note. The axial float in particular is read along the mesh's own
+/// first member and the worm's axis, never along whichever axis a distance
+/// happens to list first; the worm, whose float is 0.04 mm, is among them.
+#[test]
+fn a_distance_read_either_way_round_is_the_same_distance() {
+    let lib = test_library();
+    let mut asked = 0;
+    for (name, shape) in super::sweep::arrangements() {
+        let t = super::sweep::cased(vec![shape.clone()]);
+        let mut swapped = t.clone();
+        for d in &mut swapped.shape.distances {
+            d.axes = [d.axes[1], d.axes[0]];
+        }
+        let (a, b) = (solve_train(&t, &lib), solve_train(&swapped, &lib));
+        let seen = |r: &super::TrainResult| {
+            format!(
+                "{:?}",
+                (
+                    &r.members,
+                    &r.meshes,
+                    &r.distances,
+                    &r.axes,
+                    &r.paths,
+                    &r.cases,
+                    r.parts
+                        .iter()
+                        .map(|p| (&p.cases, &p.notes))
+                        .collect::<Vec<_>>()
+                )
+            )
+        };
+        match (a, b) {
+            (Ok(a), Ok(b)) => assert_eq!(seen(&a), seen(&b), "{name}"),
+            (a, b) => panic!("{name}: {:?} against {:?}", a.err(), b.err()),
+        }
+        asked += 1;
+    }
+    assert_eq!(asked, super::sweep::arrangements().len());
+}
