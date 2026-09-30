@@ -382,6 +382,26 @@ const out = {
     solve_gear: [{ module: 0 }, { teeth: 0 }].map((p) =>
       call("solve_gear", () => w.solve_gear(JSON.stringify({ ...gear, params: { ...gear.params, ...p } }))),
     ),
+    drawn: [{ module: 0 }, { teeth: 0 }].map((p) => {
+      const req = JSON.stringify({ ...gear, params: { ...gear.params, ...p } });
+      return [
+        call("gear_profile", () => w.gear_profile(req, 24).length),
+        call("export_dxf", () => w.export_dxf(req).length),
+      ];
+    }),
+    // A file whose mesh names a member past the list, and one whose axis is
+    // carried by its own body: the one refused by the index's field, the
+    // other by the invariant's key.
+    import_train: [
+      (t) => (t.shape.meshes[0].b = t.shape.members.length),
+      (t) => (t.shape.axes[0].carried_by = t.shape.bodies.find((b) => b.axis === 0).body),
+    ].map((edit) => {
+      const train = structuredClone(defaults.train);
+      edit(train);
+      return call("import_train", () =>
+        w.import_train(w.export_train(JSON.stringify({ name: "malformed", train }))),
+      );
+    }),
     gear_profile: [-1, 2 ** 31, 2 ** 16 + 1, 1].map((n) =>
       call("gear_profile", () => w.gear_profile(gearJson, n).length),
     ),

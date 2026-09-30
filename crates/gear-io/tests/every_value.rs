@@ -255,3 +255,62 @@ fn every_value_a_file_holds_is_refused_by_name_or_read_without_a_panic() {
     assert_eq!(n.asked, n.solved + n.named + n.structural);
     assert!(n.solved > 0 && n.named > 0 && n.structural > 0);
 }
+
+/// **The file trap, refused by name** (carried item 1): a file whose gear
+/// has a helix of ±90°, a pressure angle of 0° or 90°, a thickness
+/// coefficient of 0 or 2, a module of nought — or any of them not a number
+/// — read the graph alone before the table, then built a tooth of it and
+/// indexed its empty flank (`&r[1..]`). Each is refused where the file is
+/// read, naming the field; the angle just inside each bound reads.
+#[test]
+fn the_file_trap_is_refused_by_name() {
+    let lib = gear_io::default_library();
+    let doc = TrainDocument {
+        name: "trap".into(),
+        train: cased(vec![gear_core::train::Preset::Spur.build()]),
+    };
+    let root: toml::Value = toml::from_str(&to_toml(&doc).unwrap()).unwrap();
+    let at = "train.shape.members.0";
+    let given = |v: f64| {
+        let mut t = toml::Table::new();
+        t.insert("auto".into(), toml::Value::Boolean(false));
+        t.insert("manual".into(), toml::Value::Float(v));
+        toml::Value::Table(t)
+    };
+    let cases: [(&str, f64, bool); 13] = [
+        ("gear.helix_angle", 90.0, false),
+        ("gear.helix_angle", -90.0, false),
+        ("gear.helix_angle", f64::NAN, false),
+        ("gear.helix_angle", 89.999, true),
+        ("pressure_angle", 90.0, false),
+        ("pressure_angle", 0.0, false),
+        ("pressure_angle", 89.999, true),
+        ("pressure_angle", 0.001, true),
+        ("thickness_mod", 2.0, false),
+        ("thickness_mod", 0.0, false),
+        ("thickness_mod", 1.999, true),
+        ("module", 0.0, false),
+        ("module", f64::NAN, false),
+    ];
+    let mut refused = 0;
+    for (field, v, reads) in cases {
+        let mut file = root.clone();
+        set(&mut file, &format!("{at}.{field}"), given(v));
+        let text = toml::to_string(&file).unwrap();
+        match from_toml(&text) {
+            Ok(imported) if reads => {
+                let r = catch_unwind(AssertUnwindSafe(|| {
+                    gear_core::train::solve_train(&imported.document.train, &lib)
+                }));
+                assert!(r.is_ok(), "{field} = {v}: the solve panicked");
+            }
+            Err(e) if !reads => {
+                let note = e.note().unwrap();
+                assert_eq!(note.values["field"], format!("{at}.{field}.manual"), "{v}");
+                refused += 1;
+            }
+            other => panic!("{field} = {v}: {:?}", other.map(|_| "read")),
+        }
+    }
+    assert_eq!(refused, 9);
+}

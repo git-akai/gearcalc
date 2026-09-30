@@ -305,6 +305,10 @@ impl Tooth {
         }
     }
 
+    /// **One tooth, cut by the rack its parameters ask for.** Total: input the
+    /// boundary refuses ([`GearParams::check`]) builds a tooth that says what
+    /// it could not solve, or has no flank to draw — never a panic — so every
+    /// entry that takes a gear from outside reads it through the check first.
     #[must_use]
     pub fn new(params: GearParams) -> Self {
         Self::build(params, false)
