@@ -423,10 +423,9 @@ impl crate::ring::Ring {
             } else {
                 one.len()
             };
-            if out.capacity() - out.len() < one.len() {
-                out.try_reserve(wanted)
-                    .map_err(|_| crate::input::Refused::past_memory("teeth", f64::from(z)))?;
-            }
+            // Room already there is a no-op; room short grows as `Vec` grows.
+            out.try_reserve(wanted)
+                .map_err(|_| crate::input::Refused::past_memory("teeth", f64::from(z)))?;
             out.extend_from_slice(&one);
         }
 

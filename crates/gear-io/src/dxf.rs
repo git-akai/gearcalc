@@ -91,10 +91,25 @@ impl Writer {
 
     fn tag(&mut self, code: i32, value: &str) {
         let tag = format!("{code}\n{value}\n");
-        self.full = self.full || self.out.try_reserve(tag.len()).is_err();
-        if !self.full {
+        if self.room(tag.len()) {
             self.out.push_str(&tag);
         }
+    }
+
+    /// Room for `bytes` more, or the writer full from here on: one tag that
+    /// found none leaves every later one unwritten, however small.
+    fn room(&mut self, bytes: usize) -> bool {
+        self.full = self.full || self.out.try_reserve(bytes).is_err();
+        !self.full
+    }
+
+    /// The drawing, or refused whole naming `teeth` where any tag found no
+    /// room — never a file written in part.
+    fn finish(self, teeth: f64) -> Result<String, Refused> {
+        if self.full {
+            return Err(Refused::past_memory("teeth", teeth));
+        }
+        Ok(self.out)
     }
 
     fn int(&mut self, code: i32, value: i32) {
@@ -207,10 +222,7 @@ fn outline_to_dxf(
     objects(&mut w);
 
     w.tag(0, "EOF");
-    if w.full {
-        return Err(Refused::past_memory("teeth", teeth));
-    }
-    Ok(w.out)
+    w.finish(teeth)
 }
 
 /// The handles of the records that other records point at.
@@ -545,6 +557,29 @@ mod tests {
             },
         )
         .unwrap()
+    }
+
+    /// **A drawing past memory is refused whole, by the count.** A tag that
+    /// finds no room leaves the writer full: nothing after it is written,
+    /// however small, and the drawing is refused naming `teeth` rather than
+    /// handed back in part. (`usize::MAX` bytes is past any allocator, so
+    /// the refusal is the same on every machine.)
+    #[test]
+    fn a_writer_that_finds_no_room_writes_nothing_more_and_refuses() {
+        let mut w = Writer::new();
+        w.tag(0, "SECTION");
+        let written = w.out.clone();
+        assert!(w.room(1), "a byte's room is there");
+        assert!(!w.room(usize::MAX), "no machine has usize::MAX bytes");
+        w.tag(0, "EOF");
+        assert_eq!(w.out, written, "a full writer wrote on");
+        assert!(!w.room(1), "a full writer found room again");
+        let refused = w.finish(17.0).unwrap_err();
+        assert_eq!(refused, Refused::past_memory("teeth", 17.0));
+
+        let mut w = Writer::new();
+        w.tag(0, "EOF");
+        assert_eq!(w.finish(17.0).unwrap(), "0\nEOF\n");
     }
 
     fn tags(dxf: &str) -> Vec<(i32, String)> {

@@ -281,8 +281,9 @@ impl Gear {
         let positions = if concentric {
             None
         } else {
-            for k in 0..z {
-                let i = group[usize::try_from(k.min(z - k)).unwrap_or(0)];
+            // `k` twice: a count for its angle, an index for its group.
+            for (k, at) in (0..z).zip(0..count) {
+                let i = group[at.min(count - at)];
                 let base = std::f64::consts::TAU * f64::from(k) / f64::from(z);
                 which.push(i);
                 seat.push(base + params.index_offset * (mean.psi_b - teeth[i].psi_b));
@@ -748,7 +749,7 @@ impl Gear {
     fn which(&self, k: usize) -> usize {
         self.positions
             .as_ref()
-            .map_or(0, |p| p.which[k % self.count])
+            .map_or(0, |p| p.which[k % self.count]) // absence: a concentric gear's one tooth is its first
     }
 }
 
@@ -801,10 +802,9 @@ impl Gear {
             } else {
                 one.len()
             };
-            if out.capacity() - out.len() < one.len() {
-                out.try_reserve(wanted)
-                    .map_err(|_| Refused::past_memory("teeth", teeth))?;
-            }
+            // Room already there is a no-op; room short grows as `Vec` grows.
+            out.try_reserve(wanted)
+                .map_err(|_| Refused::past_memory("teeth", teeth))?;
             out.extend_from_slice(&one);
         }
         Ok(out)
