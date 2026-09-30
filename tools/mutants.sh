@@ -20,7 +20,11 @@
 #   MUTANTS_JOBS=1           mutants built and tested at once. Each is a whole
 #                            copy of the tree building the workspace, and two
 #                            of them beside an editor exhaust this machine.
-#   NEXTEST_TEST_THREADS=3   tests at once within one mutant's run.
+#   MUTANTS_TEST_THREADS=1   tests at once within one mutant's run. One, and not
+#                            the build slot's inherited NEXTEST_TEST_THREADS: a
+#                            mutant that breaks a loop's exit allocates without
+#                            bound, and three such tests at once starve this
+#                            machine. The watchdog's kill reads as caught.
 #   CARGO_BUILD_JOBS=4       rustc processes within one build.
 #   MUTANTS_OUT=target       where `mutants.out/` (the caught, missed, unviable
 #                            and timeout lists) is written.
@@ -65,7 +69,7 @@ command -v cargo-mutants >/dev/null || {
   exit 2
 }
 
-export NEXTEST_TEST_THREADS="${NEXTEST_TEST_THREADS:-3}"
+export NEXTEST_TEST_THREADS="${MUTANTS_TEST_THREADS:-1}"
 export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-4}"
 args=(
   mutants
