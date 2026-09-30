@@ -224,6 +224,13 @@ caught, test workspace included) and the 130-constant perturbation.
     - a closed-form limit at Σ → 0;
     - tooth stiffness in series, derived from the generated tooth and gated against ISO 6336-1's c′
       and c_γ.
+- 2026-10-02 — owner's idea, researched at low priority: the tooth geometry is known exactly, so
+  exact-geometry solvers may beat mesh methods for notch stresses. Candidates: IGA and IGA-BEM, and
+  Trefftz / MFS / particular solutions with Williams corner functions in the basis.
+  - The singular coefficient is the notch stress intensity factor.
+  - Batched dense linear algebra suits accelerators.
+  - Being evaluated as a round in `notch-research.md`, including whether a computed K_t should replace
+    the Dolan–Broghamer fit.
 - 2026-10-02 — owner: the contact model moves to Rust before its development is finished, because
   Python run time is the bottleneck, and development continues in Rust.
   - The Python prototype becomes the differential oracle: a generated JSON set of inputs and outputs
