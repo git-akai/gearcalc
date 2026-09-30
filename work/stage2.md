@@ -53,11 +53,11 @@ From Q9, to Stage 4 (the audit's T16.31 and the survivor re-run are there):
   (the absorbers' ±5 shift bounds) and K (the 0.02 mm clearance band, the thickness 1.0), so
   "green over all of gear-core" at Stage 2's exit reads as: no gear-core entry tagged Stage 2
   remains (`tools/allow_absence.txt`).
-- **The Lewis section at a narrow tip loaded steeply at its tip** (owner's call): the largest
-  parabola that fits touches the flank just under its vertex, which the search now finds. Loaded
-  at the tip, as `gear-cli matrix` loads every design, that moved parabola `Y_F` over the 30°
-  tangent's from at most 1.31 to at most 13.7 (21 % of external designs on the flank, from 13 %);
-  at the rating's own load point it left three clean members of `rating_laws`'s grid with a
-  section Dolan–Broghamer cannot read (`Y_F − axial ≤ 0`), which are now unrated. No train
-  rating in the corpus moved. Whether the section should be sought only below the load point is
-  a model question, not a search one.
+- **The section rule** (orchestrator's call, 2026-10-02, `plan.md`), landed by Q9: each curve
+  offers its least Lewis measure (tangency or end) rated with its own notch factor, the highest
+  readable governs. Left for the owner:
+  - tip-loaded at a vanishing tip land, the flank's section under the land governs and rates
+    without bound as the land closes (z 9 x 0.5 25°: 6.99 against ISO's 3.88; recorded in
+    state.md). Seeking the section below the load point only is the model question;
+  - the unshared rating is taken at the highest point of single-pair contact, which on some
+    small teeth is not the model's worst: up to 3.17 % low (state.md).
