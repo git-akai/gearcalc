@@ -2174,6 +2174,7 @@ pub(crate) fn distance_notes(target: Option<f64>, nominal: f64, clearance: f64) 
     ts(export, export_to = "core/")
 )]
 #[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
+#[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
 pub enum Freedom {
     /// The distance a pair of the shape's axes run at — its axis distance —
     /// by the distance's index in the shape: a pair has one, a Ravigneaux
@@ -2977,6 +2978,7 @@ fn root_allowable(material: &Material, kind: CaseKind) -> f64 {
     ts(export, export_to = "core/")
 )]
 #[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
+#[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
 pub enum Duty {
     /// A limited sweep, repeated. The range is measured at a **named** port —
     /// the sweep is a fact about the mechanism's motion, not about where its
@@ -3879,6 +3881,7 @@ pub enum LoadFreedom {
     derive(ts_rs::TS),
     ts(export, export_to = "core/")
 )]
+#[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
 pub struct CaseFreedom {
     pub load: usize,
     pub which: LoadFreedom,

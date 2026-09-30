@@ -255,10 +255,10 @@ And elsewhere:
   measures. Both cross and come back unread, so a train or a library taken
   through the panel keeps them. Kept on purpose, against the rule that what
   nothing reads goes (`docs/state.md#worth-doing-next`).
-- **Eight modules carry no `#[cfg(test)]` module** — `metrology.rs`,
-  `params.rs`, `tooth.rs`, `verify.rs`, `train/pair.rs`, `train/conditions.rs`,
-  `train/wiring.rs`, `train/planetary.rs` — and seven of them are covered from
-  somewhere else: the integration suite for the first, third and fourth, the
+- **Seven modules carry no `#[cfg(test)]` module** — `params.rs`,
+  `tooth.rs`, `verify.rs`, `train/pair.rs`, `train/conditions.rs`,
+  `train/wiring.rs`, `train/planetary.rs` — and six of them are covered from
+  somewhere else: the integration suite for the second and third, the
   golden corpus for the guards in `params.rs`, and `train/mod.rs`'s and
   `train/shape.rs`'s laws for the last three (a wiring that miscounts paths, a
   convention that names the wrong output, a preset that holds the wrong body

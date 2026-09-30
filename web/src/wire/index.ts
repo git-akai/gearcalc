@@ -100,7 +100,6 @@ export type { Adopted } from "./wasm/Adopted";
 export type { ClassRef } from "./wasm/ClassRef";
 export type { CutterRef } from "./wasm/CutterRef";
 export type { Defaults } from "./wasm/Defaults";
-export type { DutyEdit } from "./wasm/DutyEdit";
 export type { EditRequest } from "./wasm/EditRequest";
 export type { GearRequest } from "./wasm/GearRequest";
 export type { GearSummary } from "./wasm/GearSummary";

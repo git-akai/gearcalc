@@ -30,6 +30,7 @@ use crate::note::Note;
     derive(ts_rs::TS),
     ts(export, export_to = "core/")
 )]
+#[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
 pub enum Target {
     /// Nothing selected: the presets a train takes at its output.
     Train,

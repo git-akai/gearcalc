@@ -37,6 +37,7 @@ use crate::params::Auto;
     derive(ts_rs::TS),
     ts(export, export_to = "core/")
 )]
+#[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
 pub enum Edit {
     /// **A gear meshing `mate`**, on `on` — a ring where `ring` — sized to
     /// what it meets: to the distance between the two axes where they have
@@ -89,6 +90,7 @@ pub enum Edit {
     derive(ts_rs::TS),
     ts(export, export_to = "core/")
 )]
+#[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
 pub enum Place {
     /// On a body the train has.
     Body(usize),
@@ -108,6 +110,7 @@ pub enum Place {
     derive(ts_rs::TS),
     ts(export, export_to = "core/")
 )]
+#[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
 pub enum Piece {
     Member(usize),
     Mesh(usize),

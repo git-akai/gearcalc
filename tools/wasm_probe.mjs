@@ -329,6 +329,16 @@ const out = {
   misspelt: call("solve_train", () =>
     JSON.parse(w.solve_train(JSON.stringify({ train: defaults.train, materails: library }))),
   ),
+  // ...and inside an edit, where one read past changed what the edit did:
+  // a move's `tu` moved the gear to a new body, an insert's `att` laid the
+  // set in at the output, and a key beside the duty variant.
+  misspelt_edits: [
+    { graph: { move: { member: 0, tu: 2 } } },
+    { graph: { insert: { shape: preset("planetary"), att: 1 } } },
+    { duty: { case: 0, intermittent: true }, extra: 1 },
+  ].map((edit) =>
+    call("edit_train", () => JSON.parse(w.edit_train(JSON.stringify({ train: defaults.train, edit })))),
+  ),
   export_materials: call("export_materials", () => w.export_materials(JSON.stringify(library))),
   import_materials: call("import_materials", () =>
     JSON.parse(w.import_materials(w.export_materials(JSON.stringify(library)))),

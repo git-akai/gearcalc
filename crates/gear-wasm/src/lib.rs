@@ -418,6 +418,45 @@ fn summarise(ecc: &gear_core::gear::Gear, req: &GearRequest, params: GearParams)
     }
 }
 
+/// **A request read as `T`, or why not — naming the field it stops at.**
+///
+/// serde names a field a struct does not have. A key beside an enum's
+/// variant — one object holding the variant and another key — it refuses at
+/// that key as "expected value" without naming it, so the key that starts
+/// where the refusal stands is read off the request and named.
+fn read<T: serde::de::DeserializeOwned>(input: &str) -> Result<T, String> {
+    serde_json::from_str(input).map_err(|e| {
+        let beside = e
+            .to_string()
+            .starts_with("expected value")
+            .then(|| key_after_comma(input, e.line(), e.column()))
+            .flatten();
+        match beside {
+            Some(key) => format!("unknown field `{key}` beside a variant, {e}"),
+            None => e.to_string(),
+        }
+    })
+}
+
+/// The key of the member that the comma after `line`, `column` (serde_json's,
+/// from one: the last character it read) opens, where a comma follows and a
+/// key follows it.
+fn key_after_comma(input: &str, line: usize, column: usize) -> Option<&str> {
+    let before: usize = input
+        .split_inclusive('\n')
+        .take(line.checked_sub(1)?)
+        .map(str::len)
+        .sum();
+    let read = input.get(before + column.checked_sub(1)?..)?;
+    let rest = read.get(read.chars().next()?.len_utf8()..)?.trim_start();
+    let body = rest.strip_prefix(',')?.trim_start().strip_prefix('"')?;
+    let end = body.find('"')?;
+    body[end + 1..]
+        .trim_start()
+        .starts_with(':')
+        .then(|| &body[..end])
+}
+
 // The work lives in plain-Rust functions so it is testable on the host.
 // `JsError` cannot even be constructed off a wasm target, so wrapping the logic
 // in it directly would make the error paths untestable — which is exactly where
@@ -553,7 +592,7 @@ fn ring_of(req: &RingRequest) -> gear_core::ring::Ring {
 }
 
 fn parse_ring(input: &str) -> Result<RingRequest, String> {
-    serde_json::from_str(input).map_err(|e| format!("bad ring request: {e}"))
+    read(input).map_err(|e| format!("bad ring request: {e}"))
 }
 
 fn solve_ring_impl(input: &str) -> Result<String, String> {
@@ -620,7 +659,7 @@ fn export_ring_dxf_impl(input: &str) -> Result<String, String> {
 }
 
 fn parse(input: &str) -> Result<GearRequest, String> {
-    serde_json::from_str(input).map_err(|e| format!("bad gear request: {e}"))
+    read(input).map_err(|e| format!("bad gear request: {e}"))
 }
 
 /// The mate, built as an ordinary gear from the shared module, pressure angle
@@ -831,8 +870,7 @@ fn entering(shape: &gear_core::train::Shape) -> Result<(), String> {
 
 fn solve_train_impl(input: &str) -> Result<String, String> {
     use gear_core::note::Explain;
-    let req: TrainRequest =
-        serde_json::from_str(input).map_err(|e| format!("bad train request: {e}"))?;
+    let req: TrainRequest = read(input).map_err(|e| format!("bad train request: {e}"))?;
     // A graph that describes no train is the train's failure, with nothing
     // read off it.
     if let Err(e) = req.train.validate() {
@@ -1008,8 +1046,7 @@ fn import_materials_impl(toml_text: &str) -> Result<String, String> {
 }
 
 fn export_materials_impl(library_json: &str) -> Result<String, String> {
-    let lib: gear_core::MaterialLibrary =
-        serde_json::from_str(library_json).map_err(|e| e.to_string())?;
+    let lib: gear_core::MaterialLibrary = read(library_json)?;
     gear_io::to_toml(&lib).map_err(|e| e.to_string())
 }
 
@@ -1024,8 +1061,7 @@ fn import_train_impl(toml_text: &str) -> Result<String, String> {
 }
 
 fn export_train_impl(document_json: &str) -> Result<String, String> {
-    let doc: gear_io::TrainDocument =
-        serde_json::from_str(document_json).map_err(|e| e.to_string())?;
+    let doc: gear_io::TrainDocument = read(document_json)?;
     gear_io::train::to_toml(&doc).map_err(|e| e.to_string())
 }
 
@@ -1449,7 +1485,7 @@ pub struct AdoptOutcome {
 }
 
 fn adopt_member_impl(input: &str) -> Result<String, String> {
-    let req: AdoptRequest = serde_json::from_str(input).map_err(|e| e.to_string())?;
+    let req: AdoptRequest = read(input)?;
     entering(&req.train.shape)?;
     // A member the train does not have, or a worm, is a defect on the other
     // side of the boundary — the panel lists what can be adopted — so each
@@ -1540,7 +1576,7 @@ pub struct RelieveRequest {
 }
 
 fn relieve_impl(input: &str) -> Result<String, String> {
-    let req: RelieveRequest = serde_json::from_str(input).map_err(|e| e.to_string())?;
+    let req: RelieveRequest = read(input)?;
     entering(&req.shape)?;
     serde_json::to_string(&req.shape.relieved_from(req.just, &req.figures))
         .map_err(|e| e.to_string())
@@ -1591,7 +1627,7 @@ pub struct RelieveCaseRequest {
 }
 
 fn relieve_case_impl(input: &str) -> Result<String, String> {
-    let mut req: RelieveCaseRequest = serde_json::from_str(input).map_err(|e| e.to_string())?;
+    let mut req: RelieveCaseRequest = read(input)?;
     entering(&req.train.shape)?;
     let lib = req
         .materials
@@ -1643,6 +1679,7 @@ pub fn edit_train(input: &str) -> Result<String, JsError> {
 /// One edit [`edit_train`] and [`preview_edit`] make.
 #[derive(Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[serde(deny_unknown_fields)]
 #[cfg_attr(
     feature = "typescript",
     derive(ts_rs::TS),
@@ -1653,23 +1690,8 @@ pub enum TrainEdit {
     Graph(gear_core::train::Edit),
     /// A fresh case of that kind.
     AddCase(gear_core::train::CaseKind),
-    /// A case's duty switched.
-    Duty(DutyEdit),
-}
-
-/// A case's duty switched, seeded as a fresh case's is.
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-#[cfg_attr(
-    feature = "typescript",
-    derive(ts_rs::TS),
-    ts(export, export_to = "wasm/")
-)]
-pub struct DutyEdit {
-    /// The case, by index.
-    pub case: usize,
-    /// Intermittent, or continuous.
-    pub intermittent: bool,
+    /// A case's duty switched, seeded as a fresh case's is.
+    Duty { case: usize, intermittent: bool },
 }
 
 /// What [`edit_train`] is asked.
@@ -1686,7 +1708,7 @@ pub struct EditRequest {
 }
 
 fn edit_train_impl(input: &str) -> Result<String, String> {
-    let EditRequest { mut train, edit } = serde_json::from_str(input).map_err(|e| e.to_string())?;
+    let EditRequest { mut train, edit } = read(input)?;
     entering(&train.shape)?;
     // **A refusal crosses as its catalogue key**, which is what the panel
     // says beside the verb; its `Display` is English for a log.
@@ -1712,7 +1734,7 @@ fn apply_edit(
             let case = train.fresh_case(kind, torque, speed);
             train.load_cases.push(case);
         }
-        TrainEdit::Duty(DutyEdit { case, intermittent }) => train.set_duty(case, intermittent),
+        TrainEdit::Duty { case, intermittent } => train.set_duty(case, intermittent),
     }
     Ok(())
 }
@@ -1759,7 +1781,7 @@ fn preview_edit_impl(input: &str) -> Result<String, String> {
         train,
         materials,
         edit,
-    } = serde_json::from_str(input).map_err(|e| e.to_string())?;
+    } = read(input)?;
     entering(&train.shape)?;
     let lib = materials.unwrap_or_else(gear_io::default_library);
     let mut after = train.clone();
@@ -1803,7 +1825,7 @@ pub struct OffersRequest {
 }
 
 fn offers_impl(input: &str) -> Result<String, String> {
-    let OffersRequest { train, at } = serde_json::from_str(input).map_err(|e| e.to_string())?;
+    let OffersRequest { train, at } = read(input)?;
     entering(&train.shape)?;
     serde_json::to_string(&train.offers(at)).map_err(|e| e.to_string())
 }
@@ -2417,128 +2439,205 @@ mod tests {
         assert_eq!(calls.len(), 5 * 14);
     }
 
-    /// **Every request refuses a field it does not have, and names it.** A
-    /// misspelt field read past in silence is an input dropped with nothing
-    /// said — `materails` for `materials` rated a train against a library
-    /// nobody chose. Each entry that reads JSON is asked a valid request
-    /// (which it answers) and the same with a stray field at its root and in
-    /// each nested request type; every one must come back refused, naming
-    /// the field.
+    /// Every path of `v` at which an object stands, as a JSON pointer.
+    fn object_paths(v: &serde_json::Value, at: &str, out: &mut Vec<String>) {
+        match v {
+            serde_json::Value::Object(m) => {
+                out.push(at.to_string());
+                for (k, x) in m {
+                    object_paths(x, &format!("{at}/{k}"), out);
+                }
+            }
+            serde_json::Value::Array(a) => {
+                for (i, x) in a.iter().enumerate() {
+                    object_paths(x, &format!("{at}/{i}"), out);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// **Every request refuses a field it does not have, at every object in
+    /// it, and names it.** A misspelt field read past in silence is an input
+    /// dropped with nothing said — `materails` for `materials` rated a train
+    /// against a library nobody chose; `{ "move": { "member": 0, "tu": 3 } }`
+    /// moved a gear to a new body. Each entry that reads JSON is asked valid
+    /// requests (each answered) that between them hold every request type —
+    /// every edit, every duty, both freedoms, a ring's cutter, a carried axis,
+    /// a coupling, a worm, a material library — and then each request with a
+    /// stray key planted in turn in **every object it holds**, a key beside
+    /// an enum's variant included; every one must be refused, naming the key.
     #[test]
     fn every_request_refuses_a_field_it_does_not_have() {
+        use gear_core::train::{Duty, Load, LoadCase, LoadRole, Preset, Train};
+        use serde_json::json;
         let d: serde_json::Value = serde_json::from_str(&defaults_impl().unwrap()).unwrap();
         let library: serde_json::Value =
             serde_json::from_str(&default_materials_impl().unwrap()).unwrap();
-        let train = d["train"].clone();
-        let gear = serde_json::json!({
-            "params": d["gear"]["params"],
+        // A pair, a set (a ring's cutter, a carried axis), a worm and a
+        // planocentric (a coupling), with a case of each duty and each role.
+        let train = Train::chained(
+            vec![
+                Preset::Spur.build(),
+                Preset::Planetary.build(),
+                Preset::Worm.build(),
+                Preset::Planocentric.build(),
+            ],
+            |t| {
+                let (start, end) = (t.port(0, 1), t.port(1, 2));
+                vec![
+                    LoadCase {
+                        loads: vec![
+                            Load::given(start, 1.0, 100.0),
+                            Load::derived(end),
+                            Load::declared(t.port(2, 2), LoadRole::Free),
+                        ],
+                        ..LoadCase::ultimate(start, end, 1.0, 100.0)
+                    },
+                    LoadCase {
+                        duty: Duty::Continuous {
+                            runtime_hours: 10.0,
+                        },
+                        ..LoadCase::fatigue(start, end, 0.5, 100.0)
+                    },
+                ]
+            },
+        );
+        let train = serde_json::to_value(&train).unwrap();
+        let shape = train["shape"].clone();
+        let mut params = d["gear"]["params"].clone();
+        params["angular_shift"] = json!(0.2);
+        let gear = json!({
+            "params": params,
             "pin_diameter": 1.75,
             "tolerance_class": { "scale": "fine", "grade": 4 },
+            "chord_tolerance": 0.001,
+            "reference_circles": true,
+            "working_depth": 1.25,
             "mate": d["gear"]["mate"],
         });
         let ring = {
             let mut params = d["gear"]["params"].clone();
             params["teeth"] = 60.into();
-            serde_json::json!({ "params": params, "cutter": d["gear"]["cutter"] })
+            json!({
+                "params": params, "pin_diameter": 1.75, "cutter": d["gear"]["cutter"],
+                "chord_tolerance": 0.001, "reference_circles": true,
+            })
         };
-        let duty = serde_json::json!({ "duty": { "case": 0, "intermittent": true } });
+        let preset = preset(&d, "spur");
+        // Every edit of the graph's, and the two of a case's.
+        let edits = [
+            json!({ "graph": { "add_gear": { "mate": 0, "on": { "body": 1 }, "ring": false } } }),
+            json!({ "graph": { "add_gear": { "mate": 0, "on": { "new_body": 0 }, "ring": false } } }),
+            json!({ "graph": { "add_ratio": { "distance": 0, "shared": 1 } } }),
+            json!({ "graph": { "add_step": { "axis": 3 } } }),
+            json!({ "graph": { "couple": { "body": 1 } } }),
+            json!({ "graph": { "remove": { "member": 0 } } }),
+            json!({ "graph": { "move": { "member": 0, "to": null } } }),
+            json!({ "graph": { "join": { "a": 1, "b": 2 } } }),
+            json!({ "graph": { "hold": 1 } }),
+            json!({ "graph": { "release": 1 } }),
+            json!({ "graph": { "insert": { "shape": preset, "at": null } } }),
+            json!({ "add_case": "fatigue" }),
+            json!({ "duty": { "case": 0, "intermittent": false } }),
+        ];
         type Entry = fn(&str) -> Result<String, String>;
         let profile: Entry = |s| gear_profile_impl(s, 4).map(|_| String::new());
         let ring_outline: Entry = |s| ring_profile_impl(s, 4).map(|_| String::new());
-        // Each entry, a valid request, and the paths a stray field is put at.
-        let cases: Vec<(&str, Entry, serde_json::Value, Vec<&str>)> = vec![
-            (
-                "solve_gear",
-                solve_gear_impl,
-                gear.clone(),
-                vec!["", "/mate", "/tolerance_class"],
-            ),
-            ("gear_profile", profile, gear.clone(), vec![""]),
-            ("export_dxf", export_dxf_impl, gear, vec![""]),
-            (
-                "solve_ring",
-                solve_ring_impl,
-                ring.clone(),
-                vec!["", "/cutter"],
-            ),
-            ("ring_profile", ring_outline, ring.clone(), vec![""]),
-            ("export_ring_dxf", export_ring_dxf_impl, ring, vec![""]),
+        let mut cases: Vec<(&str, Entry, serde_json::Value)> = vec![
+            ("solve_gear", solve_gear_impl, gear.clone()),
+            ("gear_profile", profile, gear.clone()),
+            ("export_dxf", export_dxf_impl, gear),
+            ("solve_ring", solve_ring_impl, ring.clone()),
+            ("ring_profile", ring_outline, ring.clone()),
+            ("export_ring_dxf", export_ring_dxf_impl, ring),
             (
                 "solve_train",
                 solve_train_impl,
-                serde_json::json!({ "train": train, "materials": library }),
-                vec![""],
+                json!({ "train": train, "materials": library }),
             ),
             (
                 "adopt_member",
                 adopt_member_impl,
-                serde_json::json!({ "train": train, "materials": library, "member": 0 }),
-                vec![""],
+                json!({ "train": train, "member": 0 }),
             ),
             (
                 "relieve",
                 relieve_impl,
-                serde_json::json!({ "shape": train["shape"], "just": null, "figures": [] }),
-                vec![""],
+                json!({
+                    "shape": shape,
+                    "just": { "member": [0, "shift"] },
+                    "figures": [
+                        { "freedom": { "distance": 0 }, "value": 20.0 },
+                        { "freedom": { "member": [1, "helix"] }, "value": null },
+                    ],
+                }),
             ),
             (
                 "relieve_case",
                 relieve_case_impl,
-                serde_json::json!({ "train": train, "materials": library, "case": 0, "just": null }),
-                vec![""],
-            ),
-            (
-                "edit_train",
-                edit_train_impl,
-                serde_json::json!({ "train": train, "edit": duty }),
-                vec!["", "/edit/duty"],
-            ),
-            (
-                "preview_edit",
-                preview_edit_impl,
-                serde_json::json!({ "train": train, "materials": library, "edit": duty }),
-                vec!["", "/edit/duty"],
+                json!({
+                    "train": train, "materials": library, "case": 0,
+                    "just": { "load": 0, "which": "speed" },
+                }),
             ),
             (
                 "offers",
                 offers_impl,
-                serde_json::json!({ "train": train, "at": "train" }),
-                vec![""],
+                json!({ "train": train, "at": { "member": 0 } }),
             ),
             (
                 "export_train",
                 export_train_impl,
-                serde_json::json!({ "name": "stray", "train": train }),
-                vec![""],
+                json!({ "name": "stray", "train": train }),
             ),
+            ("export_materials", export_materials_impl, library),
         ];
-        let mut accepted = Vec::new();
+        for edit in &edits {
+            cases.push((
+                "edit_train",
+                edit_train_impl,
+                json!({ "train": train, "edit": edit }),
+            ));
+            cases.push((
+                "preview_edit",
+                preview_edit_impl,
+                json!({ "train": train, "edit": edit }),
+            ));
+        }
+        let mut read_past = Vec::new();
         let mut asked = 0;
-        for (name, entry, valid, paths) in cases {
+        for (name, entry, valid) in &cases {
+            // A valid request is answered — an edit the core refuses by its
+            // key being an answer too.
             if let Err(e) = entry(&valid.to_string()) {
-                accepted.push(format!("{name}: a valid request refused: {e}"));
+                if !e.starts_with("ui.") {
+                    read_past.push(format!("{name}: a valid request refused: {e}"));
+                }
             }
+            let mut paths = Vec::new();
+            object_paths(valid, "", &mut paths);
             for path in paths {
                 let mut stray = valid.clone();
                 stray
-                    .pointer_mut(path)
+                    .pointer_mut(&path)
                     .and_then(serde_json::Value::as_object_mut)
-                    .unwrap_or_else(|| panic!("{name}: no object at {path:?}"))
-                    .insert("materails".into(), serde_json::json!({}));
+                    .unwrap()
+                    .insert("materails".into(), json!({}));
                 asked += 1;
                 match entry(&stray.to_string()) {
-                    Err(e) if e.contains("materails") => {}
-                    Err(e) => accepted.push(format!("{name}{path}: refused, not naming it: {e}")),
-                    Ok(_) => accepted.push(format!("{name}{path}: answered")),
+                    Err(e) if e.contains("`materails`") => {}
+                    Err(e) => read_past.push(format!("{name}{path}: refused, not naming it: {e}")),
+                    Ok(_) => read_past.push(format!("{name}{path}: answered")),
                 }
             }
         }
-        assert_eq!(asked, 19, "stray fields asked");
         assert!(
-            accepted.is_empty(),
+            read_past.is_empty(),
             "read past a stray field:\n{}",
-            accepted.join("\n")
+            read_past.join("\n")
         );
+        assert_eq!(asked, 6329, "stray fields asked, one in every object");
     }
 
     #[test]

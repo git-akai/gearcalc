@@ -100,6 +100,47 @@ impl Space {
         }
     }
 
+    /// **A pin too large for this space by construction**, the upper end of
+    /// the bracket [`pin_diameter_range`] bisects; at or below nought where
+    /// every pin is too large, and `None` where none is.
+    ///
+    /// A ring's pin has a seat only while its centre is outside the base
+    /// circle, `d ≤ 2 r_b cos β_b · half_space` ([`pin_seat`]): twice that has
+    /// none. An external pin at centre angle `φ` touches at roll
+    /// `u_c = sin²β_b tan φ + cos²β_b (φ − half_space)`, which is at least
+    /// `φ − cos²β_b · half_space` and at least `sin²β_b tan φ − cos²β_b ·
+    /// half_space`. With `reach = u_tip + cos²β_b · half_space`, the first
+    /// puts the contact past the tip at `φ = (reach + π/2)/2` wherever
+    /// `reach < π/2`, and the second at `tan φ = 2 reach / sin²β_b` wherever
+    /// the helix is not straight — each by a margin of a fraction of the
+    /// quantities, not a rounding. Where neither holds, the flank rolls past
+    /// the angle at which its normal parallels the space's centreline before
+    /// it reaches the tip, and every pin past the smallest seats: a few teeth
+    /// at a large shift. The one check types the outcome: a construction
+    /// the inverse involute cannot reach, or a space not made of numbers, is
+    /// `None` too.
+    #[must_use]
+    pub fn too_large(&self) -> Option<f64> {
+        let cos_b = self.beta_b.cos();
+        let top = if self.sign < 0.0 {
+            4.0 * self.rb * cos_b * self.half_space
+        } else {
+            let cos2 = cos_b * cos_b;
+            let sin2 = 1.0 - cos2;
+            let reach = crate::involute::roll_at_radius(self.tip, self.rb) + cos2 * self.half_space;
+            let phi = if reach < std::f64::consts::FRAC_PI_2 {
+                (0.5 * (reach + std::f64::consts::FRAC_PI_2)).max(0.0)
+            } else if sin2 > 0.0 {
+                (2.0 * reach / sin2).atan()
+            } else {
+                return None;
+            };
+            2.0 * self.rb * cos_b * (inv(phi) + self.half_space)
+        };
+        (top.is_finite() && (top <= 0.0 || self.seat(top) == Err(MeasurementError::PinTooLarge)))
+            .then_some(top)
+    }
+
     /// Where a pin of this diameter sits, `(pin centre radius, contact
     /// radius)`, or which way it is off the flanks.
     ///
@@ -170,59 +211,59 @@ pub fn pin_diameter_range_around(gear: &crate::gear::Gear) -> Option<(f64, f64)>
 }
 
 /// **The pin diameters that measure this space**, `(smallest, largest)`, or
-/// `None` where none does.
+/// `None` where none does — or where no pin is too large, so that no interval
+/// bounds the pins that do ([`Space::too_large`]).
 ///
 /// Where a pin sits is monotone in its diameter and every failure is off one
 /// end of that map ([`MeasurementError`]), so the diameters that seat are one
 /// interval, and each of its ends is where the verdict changes — found by
 /// bisection on the verdict itself rather than by a residual per condition,
 /// since which condition binds at each end is exactly what differs between an
-/// external gear, a ring and a helical one. The bisection halves the doubles
-/// themselves — positive doubles order as their bit patterns do — so it closes
-/// on two neighbouring doubles within 64 halvings, whatever the ends'
-/// magnitudes. Each end is the side of that bracket that does **not** seat —
-/// the largest pin too small and the smallest too large — so the interval is
-/// open at both ends and every diameter strictly inside it seats
-/// ([`pin_bound`]).
+/// external gear, a ring and a helical one. The bracket is nought and a pin
+/// too large by construction, and the bisection halves the doubles themselves
+/// ([`halve`]), so it closes on two neighbouring doubles. Each end is the side
+/// of that bracket that does **not** seat — the largest pin too small and the
+/// smallest too large — so the interval is open at both ends and every
+/// diameter strictly inside it seats ([`pin_bound`]).
 #[must_use]
 pub fn pin_diameter_range(space: &Space) -> Option<(f64, f64)> {
     use MeasurementError::{PinTooLarge, PinTooSmall};
     let verdict = |d: f64| space.seat(d).err();
-    // Small at nothing, and large somewhere: a pin much wider than the space
-    // is off the tip end whatever the kind. Walked out from the base radius
-    // rather than guessed, and a space no pin reaches at all is `None`.
-    let mut hi = space.rb;
-    let mut steps = 0;
-    while verdict(hi) != Some(PinTooLarge) {
-        hi *= 2.0;
-        steps += 1;
-        if steps > 64 {
-            return None;
-        }
+    let top = space.too_large()?;
+    if top <= 0.0 {
+        return None;
     }
-    // Over the bit patterns of `0 ≤ lo < hi`: at most 64 halvings, one a bit.
-    let bisect = |lo: f64, hi: f64, below: fn(Option<MeasurementError>) -> bool| {
-        let (mut lo, mut hi) = (lo.to_bits(), hi.to_bits());
-        while hi - lo > 1 {
-            let mid = lo + (hi - lo) / 2;
-            if below(verdict(f64::from_bits(mid))) {
-                lo = mid;
-            } else {
-                hi = mid;
-            }
-        }
-        (f64::from_bits(lo), f64::from_bits(hi))
-    };
     // The largest pin too small, and the smallest too large: each end is
     // outside the range. A space nothing is too small for opens at nought.
     let smallest = if verdict(0.0) == Some(PinTooSmall) {
-        bisect(0.0, hi, |v| v == Some(PinTooSmall)).0
+        halve(0.0, top, |d| verdict(d) == Some(PinTooSmall)).0
     } else {
         0.0
     };
-    let largest = bisect(0.0, hi, |v| v != Some(PinTooLarge)).1;
+    let largest = halve(0.0, top, |d| verdict(d) != Some(PinTooLarge)).1;
     (smallest < largest && space.seat(0.5 * (smallest + largest)).is_ok())
         .then_some((smallest, largest))
+}
+
+/// **Bisection over the doubles themselves**: `below` holds at `lo` and not at
+/// `hi`, and the two close on neighbouring doubles. Doubles `0 ≤ lo < hi`
+/// order as their bit patterns do, so each halving halves an integer gap
+/// below 2⁶³ — at most 63 halvings, whatever the ends' magnitudes. Returns
+/// the ends and the halvings taken.
+fn halve(lo: f64, hi: f64, below: impl Fn(f64) -> bool) -> (f64, f64, u32) {
+    debug_assert!(lo.to_bits() < hi.to_bits() && hi.is_finite(), "{lo} {hi}");
+    let (mut lo, mut hi) = (lo.to_bits(), hi.to_bits());
+    let mut halvings = 0;
+    while hi - lo > 1 {
+        let mid = lo + (hi - lo) / 2;
+        if below(f64::from_bits(mid)) {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
+        halvings += 1;
+    }
+    (f64::from_bits(lo), f64::from_bits(hi), halvings)
 }
 
 /// **A length along the flank's normal, as a roll in the transverse plane.**
@@ -868,4 +909,77 @@ pub fn between_pins(
         contact_radius,
         limits: None,
     })
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+    use crate::GearParams;
+
+    /// Spaces of external gears (spur and helical, shifted, few teeth to
+    /// many) and of rings.
+    fn spaces() -> Vec<Space> {
+        let mut out = Vec::new();
+        for teeth in [6, 9, 17, 40, 120] {
+            for profile_shift in [-0.5, 0.0, 0.6] {
+                for helix_angle in [0.0, 15.0, 40.0] {
+                    let p = GearParams {
+                        teeth,
+                        profile_shift,
+                        helix_angle,
+                        ..GearParams::default()
+                    };
+                    out.push(Space::of(&Tooth::new(p)));
+                    if teeth >= 40 {
+                        let ring = crate::ring::Ring::cut_by(&p, &crate::ring::Cutter::default());
+                        out.push(Space::of_ring(&ring));
+                    }
+                }
+            }
+        }
+        out
+    }
+
+    /// **The top of the bracket is too large by construction**, on every
+    /// space of the grid, none of which rolls past the parallel point.
+    #[test]
+    fn every_space_has_a_pin_too_large_by_construction() {
+        let mut built = 0;
+        for space in spaces() {
+            let top = space.too_large().expect("a pin too large");
+            if top > 0.0 {
+                assert_eq!(space.seat(top).err(), Some(MeasurementError::PinTooLarge));
+                built += 1;
+            }
+        }
+        assert_eq!(built, 63, "spaces with a positive top");
+    }
+
+    /// **The halving closes on neighbouring doubles in at most 64 halvings**,
+    /// from nought to each space's top, for both ends of every range; and a
+    /// bracket spanning every positive double closes too.
+    #[test]
+    fn the_halving_closes_on_neighbours_within_64_halvings() {
+        let mut asked = 0;
+        for space in spaces() {
+            let top = space.too_large().unwrap();
+            if top <= 0.0 {
+                continue;
+            }
+            for below in [
+                (|v| v == Some(MeasurementError::PinTooSmall))
+                    as fn(Option<MeasurementError>) -> bool,
+                |v| v != Some(MeasurementError::PinTooLarge),
+            ] {
+                let (lo, hi, halvings) = halve(0.0, top, |d| below(space.seat(d).err()));
+                assert!(halvings <= 64, "{halvings}");
+                assert_eq!(lo.to_bits() + 1, hi.to_bits(), "{lo} {hi}");
+                asked += 1;
+            }
+        }
+        assert_eq!(asked, 2 * 63);
+        let (lo, hi, halvings) = halve(0.0, f64::MAX, |d| d < 1.0);
+        assert_eq!((lo.next_up(), hi, halvings <= 64), (1.0, 1.0, true));
+    }
 }
