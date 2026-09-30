@@ -767,3 +767,38 @@ fn a_distance_read_either_way_round_is_the_same_distance() {
     }
     assert_eq!(asked, super::sweep::arrangements().len());
 }
+
+/// **Every mesh's efficiency is a fraction for every friction the table
+/// admits** (T01.8): every arrangement with both coefficients of every mesh
+/// at 0, 0.06, 0.5, 2, 5 and 100 — line and point contacts alike, the worm
+/// and the crossed pair among them — every mesh's efficiency either way in
+/// `[0, 1]`. A negative coefficient, which drove a spur mesh to 1.004 and a
+/// worm's to 1.63, is refused where it enters (`crate::input::MESH`).
+#[test]
+fn a_mesh_efficiency_is_a_fraction_at_every_friction_admitted() {
+    let lib = test_library();
+    let mut read = 0;
+    for (name, shape) in super::sweep::arrangements() {
+        for mu in [0.0, 0.06, 0.5, 2.0, 5.0, 100.0] {
+            let mut t = super::sweep::cased(vec![shape.clone()]);
+            for m in &mut t.shape.meshes {
+                m.sliding_friction = mu;
+                m.static_friction = mu;
+            }
+            let r = solve_train(&t, &lib).unwrap_or_else(|e| panic!("{name} at {mu}: {e}"));
+            for (k, m) in r.meshes.iter().enumerate() {
+                for e in [m.efficiency.forward, m.efficiency.backward] {
+                    assert!((0.0..=1.0).contains(&e), "{name} at µ {mu}, mesh {k}: {e}");
+                    read += 1;
+                }
+            }
+        }
+        let mut t = super::sweep::cased(vec![shape.clone()]);
+        t.shape.meshes[0].sliding_friction = -0.02;
+        assert!(
+            matches!(solve_train(&t, &lib), Err(super::TrainError::Input(ref r)) if r.field == "shape.meshes.0.sliding_friction"),
+            "{name}: a negative friction refused by its field"
+        );
+    }
+    assert!(read > 6 * 2 * super::sweep::arrangements().len());
+}
