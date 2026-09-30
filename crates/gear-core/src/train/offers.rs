@@ -998,55 +998,232 @@ mod tests {
         );
     }
 
-    /// **Which bodies can be driven** — each, alone, driven at one turn
-    /// under the train's holds: one whose drive the conditions refuse is
-    /// forced still. By the number, ground first; `None` where the system
-    /// does not build or its arithmetic overflows. A reading of what turns
-    /// that shares nothing with `Train::turning`'s basis of free motions.
-    fn drivable(t: &Train) -> Option<Vec<bool>> {
-        use crate::kinematics::{Condition, Refusal};
-        let system = t.system().ok()?;
-        let held = t.conditions(system.bodies()).ok()?;
-        (0..system.bodies())
-            .map(|b| {
-                if held[b] == Condition::Ground {
-                    return Some(false);
-                }
-                let mut c = held.clone();
-                c[b] = Condition::Drive(crate::ratio::Ratio::ONE);
-                match system.motion(&c) {
-                    Ok(_) => Some(true),
-                    Err(Refusal::Conflicts(_)) => Some(false),
-                    Err(_) => None,
-                }
-            })
-            .collect()
+    /// **Every speed relation the graph states, as rows over its bodies**
+    /// — read off the members, meshes, axes, couplings and holds directly,
+    /// not through the train's kinematic system: each mesh
+    /// `z_a (ω_a − ω_f) ± z_b (ω_b − ω_f) = 0` in the frame `f` both its
+    /// axes stand still in (a ring's count negative), each coupling
+    /// `ω_a = ω_b`, ground and each hold `ω = 0`; every row scaled to unit
+    /// length. `None` where two axes of a mesh stand in no one frame this
+    /// reading finds, or the graph lists no body.
+    fn speed_rows(t: &Train) -> Option<(Vec<Vec<f64>>, usize)> {
+        let s = &t.shape;
+        let n = s.max_body() + 1;
+        let axis = |b: usize| s.bodies.iter().find(|x| x.body == b).map(|x| x.axis);
+        let carrier = |a: usize| s.axes[a].carried_by;
+        let mut rows: Vec<Vec<f64>> = Vec::new();
+        for m in &s.meshes {
+            let (ma, mb) = (&s.members[m.a], &s.members[m.b]);
+            let (xa, xb) = (axis(ma.body)?, axis(mb.body)?);
+            let (ca, cb) = (carrier(xa), carrier(xb));
+            // The frame: the carrier both axes share, or the carrier of the
+            // one that orbits about the other's line.
+            let frame = if ca == cb || cb == GROUND || axis(ca) == Some(xb) {
+                ca
+            } else if ca == GROUND || axis(cb) == Some(xa) {
+                cb
+            } else {
+                return None;
+            };
+            let za = f64::from(ma.gear.teeth);
+            let zb = f64::from(mb.gear.teeth);
+            let sign = if ma.ring.is_some() || mb.ring.is_some() {
+                -1.0
+            } else {
+                1.0
+            };
+            let mut row = vec![0.0; n];
+            row[ma.body] += za;
+            row[mb.body] += sign * zb;
+            row[frame] -= za + sign * zb;
+            rows.push(row);
+        }
+        for &[a, b] in &s.couplings {
+            let mut row = vec![0.0; n];
+            row[a] = 1.0;
+            row[b] = -1.0;
+            rows.push(row);
+        }
+        for h in std::iter::once(GROUND).chain(t.held.iter().copied().filter(|&h| h < n)) {
+            let mut row = vec![0.0; n];
+            row[h] = 1.0;
+            rows.push(row);
+        }
+        for row in &mut rows {
+            let norm = row.iter().map(|x| x * x).sum::<f64>().sqrt();
+            row.iter_mut().for_each(|x| *x /= norm);
+        }
+        Some((rows, n))
     }
 
-    /// Whether `after` — `before` edited, its bodies renumbered by `map` —
-    /// has a body standing still that turned before or is new, and that it
-    /// does not hold ([`drivable`]).
-    fn stops(before: &Train, after: &Train, map: &[Option<usize>]) -> Option<bool> {
-        let (was, now) = (drivable(before)?, drivable(after)?);
-        Some((1..now.len()).any(|n| {
-            let from: Vec<usize> = (0..map.len()).filter(|&o| map[o] == Some(n)).collect();
-            let could = from.is_empty() || from.iter().any(|&o| was.get(o) == Some(&true));
-            !now[n] && could && !after.held.contains(&n)
+    /// **Which bodies can turn, by a singular value decomposition** of
+    /// [`speed_rows`] in floating point (one-sided Jacobi): a body turns
+    /// where the null space of the rows reaches it. The rank tolerance is
+    /// the backward error of the decomposition, `τ = max(m, n)·ε·σ_max`, a
+    /// singular value at or below it counted nought; a body's reach into the
+    /// null space is the norm of its row of the null basis, and the basis
+    /// computed is within `max(m, n)·ε·σ_max / δ` of the exact one, `δ` the
+    /// least singular value above `τ` (Wedin) — so a reach above that turns.
+    /// A different arithmetic and a different method from the train's exact
+    /// elimination.
+    fn turns_by_svd(t: &Train) -> Option<Vec<bool>> {
+        let (rows, n) = speed_rows(t)?;
+        let m = rows.len();
+        // Columns of A, rotated in place, and V accumulating the rotations.
+        let mut a: Vec<Vec<f64>> = (0..n)
+            .map(|j| rows.iter().map(|r| r[j]).collect())
+            .collect();
+        let mut v: Vec<Vec<f64>> = (0..n)
+            .map(|j| (0..n).map(|i| f64::from(u8::from(i == j))).collect())
+            .collect();
+        let dot = |x: &[f64], y: &[f64]| x.iter().zip(y).map(|(p, q)| p * q).sum::<f64>();
+        // Jacobi converges quadratically; far fewer sweeps than this
+        // settle any matrix of this size, and one that does not is said.
+        const SWEEPS: usize = 64;
+        // A column already below the rounding of the whole matrix — its
+        // Frobenius norm squared is `m`, every row being a unit — has
+        // nothing left to orthogonalise.
+        let rows_f = f64::from(u32::try_from(m).unwrap());
+        let floor = f64::EPSILON * f64::EPSILON * rows_f;
+        let rounding = rows_f * f64::EPSILON;
+        let mut settled = false;
+        for _ in 0..SWEEPS {
+            let mut rotated = false;
+            for p in 0..n {
+                for q in p + 1..n {
+                    let (alpha, beta, gamma) =
+                        (dot(&a[p], &a[p]), dot(&a[q], &a[q]), dot(&a[p], &a[q]));
+                    // Orthogonal to the rounding of an `m`-term dot product.
+                    if alpha <= floor
+                        || beta <= floor
+                        || gamma.abs() <= rounding * (alpha * beta).sqrt()
+                    {
+                        continue;
+                    }
+                    rotated = true;
+                    let zeta = (beta - alpha) / (2.0 * gamma);
+                    let tan = zeta.signum() / (zeta.abs() + (1.0 + zeta * zeta).sqrt());
+                    let cos = 1.0 / (1.0 + tan * tan).sqrt();
+                    let sin = cos * tan;
+                    for w in [&mut a, &mut v] {
+                        let (lo, hi) = w.split_at_mut(q);
+                        for (x, y) in lo[p].iter_mut().zip(hi[0].iter_mut()) {
+                            (*x, *y) = (cos * *x - sin * *y, sin * *x + cos * *y);
+                        }
+                    }
+                }
+            }
+            if !rotated {
+                settled = true;
+                break;
+            }
+        }
+        assert!(settled, "Jacobi did not settle in {SWEEPS} sweeps");
+        let sigma: Vec<f64> = a.iter().map(|c| dot(c, c).sqrt()).collect();
+        let most = sigma.iter().copied().fold(0.0, f64::max);
+        let size = f64::from(u32::try_from(m.max(n)).unwrap());
+        let tau = size * f64::EPSILON * most;
+        let null: Vec<usize> = (0..n).filter(|&j| sigma[j] <= tau).collect();
+        let gap = sigma
+            .iter()
+            .copied()
+            .filter(|&x| x > tau)
+            .fold(f64::INFINITY, f64::min);
+        let reach = tau / gap;
+        Some(
+            (0..n)
+                .map(|b| null.iter().map(|&j| v[j][b] * v[j][b]).sum::<f64>().sqrt() > reach)
+                .collect(),
+        )
+    }
+
+    /// **What a body is, by what the graph says is on it**: each gear on it
+    /// that `before` had too — but a gear the edit moved, whose body it
+    /// states anew — each planet gear on an axis it carries, and each gear
+    /// on the body it is coupled to; resolved to the body that held the
+    /// same in `before`. Empty for a body the edit added. Read off the two
+    /// graphs, not the edit's renumbering.
+    fn was(before: &Train, after: &Train, body: usize, edit: &Edit) -> Vec<usize> {
+        let old = before.shape.members.len();
+        let moved = match edit {
+            Edit::Move { member, .. } => Some(*member),
+            _ => None,
+        };
+        let kept = |i: &usize| *i < old && Some(*i) != moved;
+        let axis_in =
+            |t: &Train, b: usize| t.shape.bodies.iter().find(|x| x.body == b).map(|x| x.axis);
+        let on = |t: &Train, b: usize| -> Vec<usize> {
+            (0..t.shape.members.len())
+                .filter(|&i| t.shape.members[i].body == b)
+                .collect()
+        };
+        let mut out = Vec::new();
+        for i in on(after, body).into_iter().filter(kept) {
+            out.push(before.shape.members[i].body);
+        }
+        for (x, a) in after.shape.axes.iter().enumerate() {
+            if a.carried_by != body {
+                continue;
+            }
+            for i in (0..after.shape.members.len()).filter(kept) {
+                if axis_in(after, after.shape.members[i].body) == Some(x) {
+                    let then = axis_in(before, before.shape.members[i].body);
+                    out.extend(then.map(|y| before.shape.axes[y].carried_by));
+                }
+            }
+        }
+        for &[x, y] in &after.shape.couplings {
+            let other = if x == body {
+                y
+            } else if y == body {
+                x
+            } else {
+                continue;
+            };
+            for i in on(after, other).into_iter().filter(kept) {
+                let then = before.shape.members[i].body;
+                out.extend(
+                    before.shape.couplings.iter().filter_map(|&[p, q]| {
+                        (p == then).then_some(q).or((q == then).then_some(p))
+                    }),
+                );
+            }
+        }
+        out.sort_unstable();
+        out.dedup();
+        out
+    }
+
+    /// Whether `after` — `before` with `edit` made by its own rule — has a
+    /// body standing still that turned before or is new and that it does
+    /// not hold: by [`turns_by_svd`] and [`was`], sharing neither the
+    /// train's kinematic system nor the edit's renumbering with the rule.
+    fn stops(before: &Train, after: &Train, edit: &Edit) -> Option<bool> {
+        let (turned, turns) = (turns_by_svd(before)?, turns_by_svd(after)?);
+        Some(after.shape.bodies.iter().map(|b| b.body).any(|n| {
+            let then = was(before, after, n, edit);
+            let could = then.is_empty() || then.iter().any(|&o| turned.get(o) == Some(&true));
+            !turns[n] && could && !after.held.contains(&n)
         }))
     }
 
     /// **An edit is refused as a lock exactly where it stops a body that
     /// could turn** (audit T13.9, the orchestrator's rule): on every start
     /// of the walk, a set released beside a pair after it (which still
-    /// turns whatever meshes are added), three pairs in a chain, uncased,
-    /// and every train the walks from seeds 10481, 50045 and 50568 visit —
+    /// turns whatever meshes are added), three pairs in a chain, uncased, a
+    /// held pair beside a free set, and every train the walks from seeds
+    /// 10481, 50045 and 50568 visit —
     /// every offer at every piece not refused for another reason is made by
     /// its own rule, unchecked, and it is refused as `Locks` if and only if
-    /// the train it makes has a body standing still, read by driving each
-    /// body alone ([`drivable`]), that turned before or is new and is not
-    /// held. The mobility of the meshes without the holds, which the rule
-    /// first read, misses a lock on a held set and refuses gears on a
-    /// released one that still turns; both fail here.
+    /// the train it makes has a body standing still that turned before or
+    /// is new and is not held — what turns read by a floating-point null
+    /// space of the speed relations the graph states ([`turns_by_svd`]),
+    /// each body known by what is on it ([`was`]): neither the train's
+    /// exact kinematic system nor the edit's renumbering. The mobility of
+    /// the meshes without the holds, which the rule first read, misses a
+    /// lock on a held set and refuses gears on a released one that still
+    /// turns; a renumbering that follows no body where a join or a move
+    /// took it misreads what stopped; each fails here.
     #[test]
     fn a_lock_is_refused_exactly_where_a_body_that_turned_stops() {
         let locks = Some(Note::new(super::super::EditRefused::Locks.key()));
@@ -1054,6 +1231,20 @@ mod tests {
         let ring = released.port(0, 3);
         released.edit(Edit::Release(ring)).unwrap();
         let pairs = Train::chained(vec![Preset::Spur.build(); 3], |_| Vec::new());
+        // A pair held at its input, its output standing still, beside a set
+        // with nothing held, apart — built in code, since a hold that stops
+        // a body is no edit's. Joining the pair's still output (2) to the
+        // set's sun (3) stops the sun alone, the set turning on in its other
+        // freedom: a join numbered by the lower body, the one that stood
+        // still, which a renumbering that follows no body misreads.
+        let mut set = Preset::Planetary.build();
+        set.renumber_bodies(|b| b + 2);
+        let apart = Train {
+            load_cases: Vec::new(),
+            reversed_bending: false,
+            shape: super::super::graph::graph_of(&[Preset::Spur.build(), set], 1).shape,
+            held: vec![1],
+        };
         let walked = [10481, 50045, 50568].into_iter().flat_map(|seed| {
             super::super::sweep::walked(seed..seed + 1, 8)
                 .into_iter()
@@ -1062,23 +1253,30 @@ mod tests {
         let fixtures = [
             ("a released set, a pair after it".to_owned(), released),
             ("three pairs".to_owned(), pairs),
+            ("a held pair beside a free set".to_owned(), apart),
         ];
-        let (mut refused, mut made) = (0, 0);
+        let (mut refused, mut made, mut undecided) = (0, 0, 0);
         for (name, t) in trains().into_iter().chain(fixtures).chain(walked) {
             for at in targets(&t) {
                 for o in t.offers(at) {
                     if o.refused.is_some() && o.refused != locks {
                         continue;
                     }
-                    let mut u = t.clone();
                     let context = format!("{name}: at {at:?}, {:?}", o.edit);
+                    // A removal takes rows away and forces nothing still.
+                    if matches!(o.edit, Edit::Remove(_)) {
+                        assert_ne!(o.refused, locks, "{context}");
+                        continue;
+                    }
+                    let mut u = t.clone();
                     let map = u
                         .make(o.edit.clone())
                         .unwrap_or_else(|e| panic!("{context}: {e:?}"));
                     // One entry per number the train had: a body the edit
                     // adds is the image of none of them.
                     assert_eq!(map.len(), t.max_body() + 1, "{context}: {map:?}");
-                    let Some(stops) = stops(&t, &u, &map) else {
+                    let Some(stops) = stops(&t, &u, &o.edit) else {
+                        undecided += 1;
                         continue;
                     };
                     assert_eq!(o.refused == locks, stops, "{context}");
@@ -1091,8 +1289,8 @@ mod tests {
             }
         }
         assert!(
-            refused > 100 && made > 1000,
-            "{refused} refused, {made} made"
+            refused > 100 && made > 1000 && undecided * 100 < made,
+            "{refused} refused, {made} made, {undecided} undecided"
         );
     }
 }

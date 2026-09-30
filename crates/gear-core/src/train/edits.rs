@@ -177,10 +177,10 @@ pub enum EditRefused {
     Geared,
     /// Two bodies an axis distance apart made one: a shaft is straight.
     Apart,
-    /// A body a case loads or reacts at held, left in no part, or joined
-    /// to a held body or to another the same case names: the load would
-    /// be grounded, cut off or dropped, and a load is never moved to a
-    /// guessed body or dropped.
+    /// A body a case loads, reacts or measures its sweep at held, left in
+    /// no part, or joined to a held body or to another the same case
+    /// names: the figure would be grounded, cut off or dropped, and a
+    /// stated figure is never moved to a guessed body or dropped.
     Loaded,
     /// **A gear meshing in two frames** — a gear on a fixed axis meshing a
     /// sun or a ring whose other mates ride a carrier — which the wiring
@@ -237,7 +237,7 @@ impl std::fmt::Display for EditRefused {
             Self::NoDistance => "no axis distance joins those axes",
             Self::Geared => "those bodies are geared to each other",
             Self::Apart => "those bodies are an axis distance apart",
-            Self::Loaded => "a case loads or reacts at a body this would hold, cut off or join to another it names",
+            Self::Loaded => "a case loads, reacts or measures its sweep at a body this would hold, cut off or join to another it names",
             Self::TwoFrames => "that gear would mesh in two frames",
         })
     }
@@ -2405,6 +2405,51 @@ mod tests {
         let mut w = cased.clone();
         assert_eq!(w.edit(removal), Err(EditRefused::Loaded));
         assert_eq!(debug(&w), debug(&cased), "refused whole");
+    }
+
+    /// **An axis removed goes, held or not, or the removal is refused by
+    /// name**: on every train the walk visits and the grid's, every axis
+    /// removed, with every coupled body held and without: made, the train
+    /// has fewer axes than it had, so the axis asked is gone — never an Ok
+    /// that leaves it standing because a shaft on it was coupled or held.
+    #[test]
+    fn an_axis_removed_goes_held_or_not() {
+        let trains = super::super::sweep::visited()
+            .into_iter()
+            .map(|(name, steps, t)| (format!("{name}: {steps:?}"), t))
+            .chain(super::super::sweep::trains());
+        let (mut made, mut held_made) = (0, 0);
+        for (name, t) in trains {
+            let coupled: Vec<usize> = t.shape.couplings.iter().flatten().copied().collect();
+            for axis in 0..t.shape.axes.len() {
+                for held in [false, true] {
+                    let mut u = t.clone();
+                    if held {
+                        if coupled.is_empty() {
+                            continue;
+                        }
+                        for &b in &coupled {
+                            if !u.held.contains(&b) {
+                                u.held.push(b);
+                            }
+                        }
+                    }
+                    let before = u.shape.axes.len();
+                    if u.edit(Edit::Remove(Piece::Axis(axis))).is_ok() {
+                        assert!(
+                            u.shape.axes.len() < before,
+                            "{name}: held {held}, axis {axis} left standing"
+                        );
+                        made += 1;
+                        held_made += usize::from(held);
+                    }
+                }
+            }
+        }
+        assert!(
+            made > 100 && held_made > 10,
+            "{made} made, {held_made} with holds"
+        );
     }
 
     /// **One rule for a bare body** (audit T13.12), where the train's own

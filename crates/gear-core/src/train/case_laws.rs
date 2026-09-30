@@ -496,9 +496,15 @@ fn two_entries_of_one_case_at_one_body_are_refused() {
         Load::declared(2, LoadRole::Reacted),
     );
     // The two entries side by side, and apart with another between — a
-    // check of neighbours alone sees only the first.
+    // check of neighbours alone sees only the first — and two of different
+    // roles at one body, which a check of like roles alone would pass.
+    let at_the_load = Load::declared(1, LoadRole::Reacted);
     let mut refused = 0;
-    for loads in [vec![given, given, reacted], vec![given, reacted, given]] {
+    for loads in [
+        vec![given, given, reacted],
+        vec![given, reacted, given],
+        vec![given, at_the_load, reacted],
+    ] {
         t.load_cases = vec![LoadCase {
             loads,
             ..LoadCase::ultimate(1, 2, TORQUE_NM, SPEED_RPM)
@@ -514,9 +520,9 @@ fn two_entries_of_one_case_at_one_body_are_refused() {
         );
         refused += 1;
     }
-    assert_eq!(refused, 2);
+    assert_eq!(refused, 3);
     // One entry fewer is the case it was meant to be.
-    t.load_cases[0].loads.remove(2);
+    t.load_cases[0].loads.remove(1);
     assert!(solve_train(&t, &lib).unwrap().cases[0].solved);
 }
 
@@ -610,4 +616,39 @@ fn a_fresh_cases_figures_are_their_basis() {
         );
         assert_eq!(c.duty, Duty::intermittent(Some(2)));
     }
+}
+
+/// **Switched to intermittent, a case's sweep is seeded at its reaction**
+/// (`Train::set_duty`): the body a designer's reaction names is where the
+/// output's travel is known, whichever order the case lists its entries
+/// in; with no reaction, at its first entry; with none, unset.
+#[test]
+fn a_sweep_is_seeded_at_the_cases_reaction() {
+    use super::arrangements::Preset;
+    use super::testing::cased;
+    use super::{Load, LoadRole};
+    let (load, reaction) = (
+        Load::given(1, TORQUE_NM, SPEED_RPM),
+        Load::declared(2, LoadRole::Reacted),
+    );
+    let mut seeded = 0;
+    for (loads, at) in [
+        (vec![load, reaction], Some(2)),
+        (vec![reaction, load], Some(2)),
+        (vec![load], Some(1)),
+        (Vec::new(), None),
+    ] {
+        let mut t = cased(vec![Preset::Spur.build()]);
+        t.load_cases = vec![LoadCase {
+            loads: loads.clone(),
+            duty: Duty::Continuous {
+                runtime_hours: 1000.0,
+            },
+            ..LoadCase::fatigue(1, 2, TORQUE_NM, SPEED_RPM)
+        }];
+        t.set_duty(0, true).unwrap();
+        assert_eq!(t.load_cases[0].duty, Duty::intermittent(at), "{loads:?}");
+        seeded += 1;
+    }
+    assert_eq!(seeded, 4);
 }
