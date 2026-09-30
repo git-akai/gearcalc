@@ -24,3 +24,18 @@ The audit's Phase 2 exit, plus:
 - The absence gate is green over all of gear-core.
 - Every refusal key has a fixture on either side of its cause.
 - Every value a note quotes is the report's own value (L4, T16.20).
+
+## Added from the notch research (`notch-research.md`)
+- **Q10: the default bending rating's bias.** The research's boundary-element (BEM) check says the
+  crate's default Dolan–Broghamer rating is net unconservative on the hardened steel: −2 … −11 %
+  median, worst −26 %.
+  - Most of it comes from the subtracted axial term.
+  - Rating against a polished-coupon endurance limit with no surface factor adds roughly 15–35 %.
+  - The crate's own ISO/DB ratio (1.25 median) supports it, but the BEM's Peterson-shoulder canary
+    was never run.
+  - Steps: run the canary (to within 0.5 %); re-run the BEM grid; record the verified bias with its
+    size and sign in state.md (rule 6); bring the choice of default (DB or ISO Y_S), and the missing
+    surface factor, to the owner.
+  - Runs after Q9, whose independent bending gate rebuilds DB.
+- **Also from it:** hardness ÷ 3 estimates σ_u, not σ_y (reading it as σ_y is 10–60 % unconservative).
+  Check every place the crate or its material notes derive σ_y from hardness.
