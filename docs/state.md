@@ -765,57 +765,99 @@ whose size is unmeasured is a debt still owed, and is marked as one.
   gap is not where its bias is. It is not raised per gear because an undercut
   tooth already says so on its own account.
 
-<!-- figures: tools/fillet_bem.py -->
 - **The default bending rating is below the exact elastic peak at the root —
   unconservative — and its axial term is most of the gap.**
-  `tools/fillet_bem.py` loads 228 of the crate's own generated teeth at the
-  crate's own load point and solves each by a boundary-element method that
-  shares no code with the crate: external z 12 to 1000 at 14.5°, 20° and 25°,
-  x 0 and 0.5, rack rounds 0.38 to 0.01 against a 43-tooth mate; rings z 40 to
-  200 at 20° and 25°, shaper rounds 0.2 to 0.03 against a 17-tooth pinion; mesh
-  convergence median 0.011 %, worst 0.121 %. Rated over peak, less one, min /
-  median / max:
-  - **external teeth with ordinary fillets** (`ρ_f/s_Fn ≥ 0.1`, 85):
-    Dolan–Broghamer **−14.8 %** (−30.1 to +7.6), 89 % of them under. Without
-    the axial term it is −1.9 % (−13.7 to +15.7): the term, 12.6 % of `Y_F` at
-    the median, is most of the gap, and it is why the gap grows with pressure
-    angle (−7.5, −16.4 and −23.6 % at 14.5°, 20° and 25°) and with tooth count
-    (−6.4 % at z 12, −20.0 % at z 1000). On the 30 undercut teeth among
-    them, of a kind Dolan and Broghamer's specimens never included, it reads
-    −4.6 % (−15.2 to +7.6), and on the other 55 −19.2 %. ISO's `Y_F·Y_S` on
-    its own section reads +6.9 % (−7.1 to +22.8), 7 % under;
-  - **tighter fillets** are worse for both: at `0.02 ≤ ρ_f/s_Fn < 0.1` (66)
-    the default reads −31.1 %; below 0.02 (29), −52.9 % (−71.5 to −34.9) and
-    ISO −29.9 %, every tooth under. ISO past its `q_s = 8` clamp (37) reads
-    −25.3 %, and +2.9 % with `Y_S` continued past it;
-  - **rings** (48; the shaper's small round puts 42 in the middle band): the
-    default −26.8 % (−52.3 to −12.3), every one under, and −10.8 % without the
-    axial term; ISO's set +26.3 %;
-  - **by material**, on the ordinary external fillets, first with ISO's notch
-    support (its slip layer `ρ′` by yield point: 4.1 % at the median on 4340
-    Hardened, 18.5 % on annealed) and then with the root's surface against the
-    polished coupon every endurance in the library is measured on (ISO's
-    `Y_RrelT`: the coupon is 1.118 times as strong as a hobbed root at `Rz` 10
-    on 4340 Hardened, 1.069 on annealed): 4340 Hardened **−11.2 %**, then
-    **−20.6 %**, every tooth under; annealed 4340 +1.3 %, then −5.2 %. ISO's
-    set: +11.3 % then −0.5 %, and +25.6 % then +17.5 %. Marin's factor
-    (recalled, not checked against a copy) is harsher: 0.849 ground and 0.649
-    machined at 1500 MPa. Brass, POM and the polyamides have neither figure in
-    ISO, so the elastic-peak rows are theirs, with the support (conservative)
-    and the surface (unconservative) unmeasured. A surface factor needs a root
-    roughness or finish per gear, and an ultimate strength and a heat-treatment
-    class per material, none of which is a field today;
-  - **the instrument** passes Kirsch's hole, Inglis's ellipse and Golovin's
-    curved bar, and agrees with an independent Trefftz solver on four stepped
-    bars to within 0.06 %. Against both, the pre-registered canary —
-    Peterson's Chart 3.4, a fit to photoelastic data — reads −1.99, −1.87,
-    +0.46 and −0.55 %, outside 0.5 % on three, so the gate is held to the
-    solvers (`--self-test`) and the chart is reported;
-  - **hardness ÷ 3 is read nowhere** as a yield, in the crate or in the
-    library, whose yields are each datasheet's own: it estimates the ultimate
-    (+9 % and −0 %), and read as a yield it would be +60 % high on annealed
-    4340 and +10 % on hardened. Which bending model is the default is the
-    owner's (`work/decision-bending-default.md`).
+  `tools/fillet_bem.py` loads the crate's own generated teeth, external and
+  ring, at the crate's own load point and solves each by a boundary-element
+  method that shares no code with the crate; the tables below are what it
+  prints. Each figure is the rating over the peak, less one, in percent:
+  **negative is unconservative**. A fillet is ordinary where `ρ_f/s_Fn` is a
+  tenth or more, tight below a fiftieth, middle between. The instrument is
+  held to three exact solutions and, on four stepped bars, to a second solver
+  with no boundary integral in it (`tools/shoulder_trefftz.py`); against both,
+  the pre-registered canary — Peterson's Chart 3.4, a fit to photoelastic data
+  — is off by more than the gate on three of the four, so the gate is held to
+  the solvers and the chart is reported.
+
+<!-- figures: tools/fillet_bem.py -->
+| The record | |
+|---|---|
+| teeth solved; mesh convergence over the last two passes, median and worst, %; the gate every canary and body check is held to, % | 228 · 0.010 · 0.121 · 0.5 |
+| pinions modelled whole on their shaft, z (a sector of five teeth elsewhere) | 12, 17 |
+| the axial term's share of `Y_F`, external ordinary fillets, median, % | 12.6 |
+
+<!-- figures: tools/fillet_bem.py -->
+| Canary bar | Chart 3.4 | BEM | Trefftz | BEM against Trefftz, % | Chart against Trefftz, % |
+|---|---|---|---|---|---|
+| D/d 1.5, r/d 0.05 | 2.3393 | 2.3863 | 2.3868 | −0.02 | −1.99 |
+| D/d 1.5, r/d 0.1 | 1.8620 | 1.8986 | 1.8974 | +0.06 | −1.87 |
+| D/d 2, r/d 0.1 | 1.9506 | 1.9418 | 1.9416 | +0.01 | +0.46 |
+| D/d 2, r/d 0.2 | 1.5641 | 1.5722 | 1.5728 | −0.04 | −0.55 |
+
+<!-- figures: tools/fillet_bem.py -->
+| Teeth | Model | Teeth rated | Least | Median | Most | Under the peak, % |
+|---|---|---|---|---|---|---|
+| external, ordinary fillet | Dolan–Broghamer, the default | 85 | −30.1 | −15.0 | +7.4 | 89 |
+| external, ordinary fillet | the default without its axial term | 85 | −13.7 | −2.3 | +15.4 | 60 |
+| external, ordinary fillet | ISO `Y_F·Y_S` on its own section | 85 | −7.1 | +6.4 | +22.8 | 7 |
+| external, ordinary fillet at 14.5° | the default | 31 | −20.1 | −7.8 | +7.4 | 71 |
+| external, ordinary fillet at 20° | the default | 29 | −26.3 | −16.9 | −4.0 | 100 |
+| external, ordinary fillet at 20° | ISO | 29 | −1.9 | +7.9 | +17.6 | 3 |
+| external, ordinary fillet at 25° | the default | 25 | −30.1 | −24.5 | −11.0 | 100 |
+| external, ordinary fillet at z 12 | the default | 21 | −25.6 | −7.0 | +4.7 | 81 |
+| external, ordinary fillet at z 1000 | the default | 10 | −28.9 | −20.0 | −14.0 | 100 |
+| external, ordinary fillet, undercut | the default | 30 | −15.9 | −5.0 | +7.4 | 70 |
+| external, ordinary fillet, not undercut | the default | 55 | −30.1 | −19.2 | −7.5 | 100 |
+| external, middle fillet | the default | 66 | −47.2 | −31.1 | −5.6 | 100 |
+| external, middle fillet | ISO | 66 | −20.5 | +2.4 | +24.8 | 39 |
+| external, tight fillet | the default | 29 | −71.5 | −52.9 | −34.9 | 100 |
+| external, tight fillet | ISO | 29 | −57.5 | −29.9 | −7.8 | 100 |
+| external, tight fillet | ISO, `Y_S` continued past its clamp | 29 | −23.9 | −3.7 | +30.6 | 55 |
+| ring, every fillet | the default | 48 | −52.3 | −26.8 | −12.3 | 100 |
+| ring, every fillet | the default without its axial term | 48 | −39.6 | −10.8 | +2.3 | 94 |
+| ring, every fillet | ISO | 48 | −7.5 | +26.3 | +31.1 | 4 |
+
+<!-- figures: tools/fillet_bem.py -->
+| Material, external ordinary fillets | Credited beside the peak | Model | Teeth rated | Least | Median | Most | Under, % |
+|---|---|---|---|---|---|---|---|
+| 4340 Hardened | ISO's notch support | the default | 85 | −26.4 | −11.2 | +11.4 | 86 |
+| 4340 Hardened | ISO's notch support | ISO | 85 | −3.3 | +10.9 | +29.2 | 4 |
+| 4340 Hardened | support, and a hobbed root, Rz 10, against the polished coupon | the default | 85 | −34.2 | −20.6 | −0.4 | 100 |
+| 4340 Hardened | the same | the default without its axial term | 85 | −18.9 | −9.0 | +7.1 | 88 |
+| 4340 Hardened | the same | ISO | 85 | −13.5 | −0.8 | +15.5 | 55 |
+| 4340 annealed | ISO's notch support | the default | 85 | −13.8 | +0.9 | +25.4 | 46 |
+| 4340 annealed | support, and a hobbed root, Rz 10, against the polished coupon | the default | 85 | −19.4 | −5.6 | +17.3 | 71 |
+| 4340 annealed | the same | ISO | 85 | +2.6 | +16.9 | +41.5 | 0 |
+
+<!-- figures: tools/fillet_bem.py -->
+| Material | Slip layer `ρ′`, mm | Notch support, median, % | Polished coupon over a hobbed root | `σ_u`, MPa | Marin, ground | Marin, machined |
+|---|---|---|---|---|---|---|
+| 4340 annealed | 0.0281 | 18.5 | 1.069 | 690 | 0.906 | 0.798 |
+| 4340 Hardened | 0.0014 | 4.1 | 1.118 | 1500 | 0.849 | 0.649 |
+
+<!-- figures: tools/fillet_bem.py -->
+| Hardness over three, as a yield it is not | HV | A third of it, MPa | Yield, MPa | Over the yield, % | Ultimate, MPa | Over the ultimate, % |
+|---|---|---|---|---|---|---|
+| 4340 annealed | 230 | 752 | 470 | +60 | 690 | +9 |
+| 4340 Hardened | 458 | 1497 | 1365 | +10 | 1500 | −0 |
+
+  What the tables say. The default is under the peak almost everywhere, and
+  its axial term is most of why: without it the ordinary fillets centre on
+  the peak. The gap grows with pressure angle and tooth count; the steepest
+  angle is past what Dolan and Broghamer calibrated, and at the middle one
+  every ordinary tooth is still under. Tight fillets defeat both fits; ISO's
+  `Y_S` continued past its `q_s` clamp comes nearest. Rings the default
+  underrates and ISO overrates. ISO's slip layer is read by yield point for
+  through-hardened steel and the surface factor by `Rz` (IACS UR M56, which
+  reproduces ISO 6336-3); Marin's factors are recalled, not checked against a
+  copy. Brass, POM and the polyamides have neither figure in ISO, so the
+  elastic rows are theirs, with the support (conservative) and the surface
+  (unconservative) unmeasured. A surface factor needs a root roughness or
+  finish per gear, and an ultimate strength and a heat-treatment class per
+  material; none is a field today. Hardness ÷ 3 is read nowhere in the crate
+  or the library as a yield — each yield is its datasheet's; it estimates the
+  ultimate. Which model is the default is the owner's
+  (`work/decision-bending-default.md`).
 
 - **The axial compression term is applied**, being the second term of the `J`
   whose first term is `Y_F`. It relieved the canary by 10.1 % and 12.2 %, which
