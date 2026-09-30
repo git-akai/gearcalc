@@ -232,6 +232,22 @@ caught, test workspace included) and the 130-constant perturbation.
   - Refined the same day: each curve contributes its constrained extremum of the Lewis measure — an
     interior tangency, or the curve's end where it has none. Otherwise a ring's fillet, which has no
     interior tangency, would drop out, and rings would lose their notch factor, rated about 60 % low.
+- 2026-10-03 — owner, on the bending default and the surface factor (Q10 confirmed DB unconservative:
+  −15 % median on ordinary external fillets, every ring under):
+  - A computed K_t goes into the expensive mode's plan regardless of the fast-mode default, unless
+    something supersedes it.
+  - The owner is leaning towards "A". Which option A means is being clarified. They also ask whether a
+    more generic model built directly on mechanics is possible:
+    - published models are a baseline, and departing from them is allowed;
+    - mechanics has no preferred geometric frames or terms.
+    This research round is held for the owner's further input.
+  - Surface factor:
+    - Rule: no additional material properties, since composites and new materials have none.
+    - ISO's factor is acceptable only if it holds on non-metals and other manufacturing routes
+      (molded, sintered, additive).
+    - If realistic inputs give more deviation as the material basis moves, it adds risk when comparing
+      dissimilar designs, and then no term with a note is preferred.
+    - Being investigated in `surface-factor.md`.
 - 2026-10-02 — orchestrator's call: a tip loaded at its point, as its land vanishes, rates without bound.
   That is the elastic singularity at a sharp tip, the same mechanics as the sharp contact edge. It
   stays continuous divergence with a note, never a cap or a jump. Its cure is the notch research's
