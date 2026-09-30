@@ -61,3 +61,16 @@ From Q9, to Stage 4 (the audit's T16.31 and the survivor re-run are there):
     state.md). Seeking the section below the load point only is the model question;
   - the unshared rating is taken at the highest point of single-pair contact, which on some
     small teeth is not the model's worst: up to 3.17 % low (state.md).
+
+## Added 2026-10-03: validators classified by method (owner's principle)
+- **Q11: every independent check in the repo, classified.** Covers tools/*.py, tools/golden-backed
+  scripts, the tests' oracles and gear-cli instruments. Each is either:
+  - a **different method**: keep it (e.g. fillet_bem.py's BEM against the closed-form ratings;
+    validate_dxf.py's ezdxf parser; helical_measurement.py's surface oracle; exact canaries;
+    published data); or
+  - a **same-method mirror**, which transcribes the crate's own formulas in another language: retire
+    it, and move whatever it caught into conventional Rust laws that stand alone.
+  - bending_gate.py rebuilds the Dolan–Broghamer rating by the same method, yet it found real bugs
+    because its search differed. Keep its value as laws (exact section search, continuity, the
+    section rule), then judge whether the script still earns its place.
+  - The audit's T16.2 (scripts that transcribe the crate) feeds this.

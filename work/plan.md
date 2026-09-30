@@ -232,6 +232,15 @@ caught, test workspace included) and the 130-constant perturbation.
   - Refined the same day: each curve contributes its constrained extremum of the Lewis measure — an
     interior tangency, or the curve's end where it has none. Otherwise a ring's fillet, which has no
     interior tangency, would drop out, and rings would lose their notch factor, rated about 60 % low.
+- 2026-10-03 — owner (general principle): independent checking code is useful during development only
+  unless it applies a fundamentally different method.
+  - A same-method mirror in another language only confirms the language is consistent. It carries its
+    own upkeep and passes its own flaws on.
+  - Once a port is done, the prototype is removed (the contact model's Python goes after the Rust port).
+  - Validators that mirror the crate's method are replaced by conventional tests: laws, and
+    different-method checks.
+  - The ablation classifies every validator and discards the mirrors. The contact port's steps from
+    P2 onward carry the rule, and a final RETIRE step replaces the oracle with laws and deletes it.
 - 2026-10-03 — owner, on the bending default and the surface factor (Q10 confirmed DB unconservative:
   −15 % median on ordinary external fillets, every ring under):
   - A computed K_t goes into the expensive mode's plan regardless of the fast-mode default, unless
@@ -240,7 +249,8 @@ caught, test workspace included) and the 130-constant perturbation.
     more generic model built directly on mechanics is possible:
     - published models are a baseline, and departing from them is allowed;
     - mechanics has no preferred geometric frames or terms.
-    This research round is held for the owner's further input.
+    The owner asked for an investigation before choosing. It runs as a workflow into
+    `bending-mechanics.md`, and the fast default is unchanged in the meantime.
   - Surface factor:
     - Rule: no additional material properties, since composites and new materials have none.
     - ISO's factor is acceptable only if it holds on non-metals and other manufacturing routes

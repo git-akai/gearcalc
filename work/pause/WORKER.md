@@ -48,3 +48,11 @@ The audit tasks you cite are in /home/user/gearcalc/audit/workstreams/Tnn-*.md; 
    `cargo mutants --in-diff` sample on the package's own lines (cargo-mutants is in the dev shell once
    Stage 2's tooling lands; until then use /nix/store's cargo-mutants 27.1.0 — find it with
    `ls -d /nix/store/*cargo-mutants*`).
+- cargo-mutants: run it through tools/mutants.sh (1 job) or with `--jobs 1` and NEXTEST_TEST_THREADS=1 plus
+  a per-test timeout. Mutants that break termination grow without bound; running several at once
+  starves the machine. A mutant killed by the watchdog counts as caught.
+- **Owner's principle on validators:** an independent check has lasting value only if it applies a
+  fundamentally DIFFERENT method (a BEM against a closed form, an exact solution, published data, a
+  different parser). A same-method mirror in another language only checks language consistency. It
+  carries its own upkeep and passes its flaws on. Do not add mirrors; prefer conventional laws. When
+  porting from a prototype, never loosen the port to match a prototype flaw: decide from the physics.
