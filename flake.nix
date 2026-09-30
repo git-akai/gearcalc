@@ -222,6 +222,10 @@
               (rustToolchainFor system)   # includes rust-analyzer, rustfmt, clippy
               pkgs.cargo-nextest          # fast parallel test runner
               pkgs.cargo-llvm-cov         # coverage
+              # Mutation testing, `tools/mutants.sh`: which changed operator,
+              # constant or return value no test notices. The version is the
+              # lock's nixpkgs' (27.1.0 at this lock), as the audit's was.
+              pkgs.cargo-mutants
               pkgs.bacon                  # watch mode
               pkgs.cargo-edit
               pkgs.wasm-bindgen-cli       # Rust -> wasm boundary
