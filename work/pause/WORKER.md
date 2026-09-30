@@ -25,3 +25,26 @@ The audit tasks you cite are in /home/user/gearcalc/audit/workstreams/Tnn-*.md; 
   `npm ci` delete through the link. Run `npm ci` inside your own worktree's web/ instead.
 - Never leave a server (vite preview/dev) running: anything started under `gc` inherits its slot lock
   and blocks every other build until killed. Stop what you start before you finish.
+
+## Rules added after Stage 1 (from work/stage1-exit.md §3; the checkers' recurring findings)
+1. **A gate ships its own plants.** Its --self-test or law includes at least one NEAR-MISS fault that a
+   naive or the previous version of the gate would pass. An assertion inside a loop or branch also
+   asserts how many times it ran.
+2. **A tolerance has two laws:** a rounding-level input passes; a fault at 10× the tolerance fails.
+   Its value is an ε·operation-count expression with its derivation, a named user input, or a constant
+   whose basis is stated. "Measured + x %" only in #[ignore]d canaries.
+3. **Absence is typed.** No new `unwrap_or(<literal>)`, `map_or(<literal>, …)`, or INFINITY/NAN used as
+   a value unless the line says `// absence: <why>`. A solver Option that "cannot" be None gets a
+   debug_assert!.
+4. **Land on a bound by construction** (the bracket end with the needed sign, or tagging by
+   construction). No retry, nudge or grow loop; a loop that is truly needed has a derived trip count
+   and a law that it exits on the first pass.
+5. **Kinds.** A new `match kind`, ring branch or per-kind default ships a law over both kinds and a
+   continuity law across the switch. A default is a rule per gear, never per kind or birth site.
+6. **Close each package with a proof table** (law | fails at base (test file only) | passes at head).
+   A fixture that turns a shipped default off names it, and the law also runs at the defaults. Each
+   exception list names the stage that empties it.
+7. **Before handing to the checker:** report the work-count diff and run a small
+   `cargo mutants --in-diff` sample on the package's own lines (cargo-mutants is in the dev shell once
+   Stage 2's tooling lands; until then use /nix/store's cargo-mutants 27.1.0 — find it with
+   `ls -d /nix/store/*cargo-mutants*`).

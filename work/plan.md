@@ -224,6 +224,17 @@ caught, test workspace included) and the 130-constant perturbation.
     - a closed-form limit at Σ → 0;
     - tooth stiffness in series, derived from the generated tooth and gated against ISO 6336-1's c′
       and c_γ.
+- 2026-10-01 — Stage 1 closed (`stage1-exit.md`). Stage 1 met the audit's Phase 1 exit except for two
+  items: the four flow-rule mutants (T16.28) and the survivor re-run. A 149-mutant sample of Stage 1's
+  own lines caught 91.6 % of the non-equivalent mutants.
+  - Order changes adopted:
+    - graph steps M1–M3 move into Stage 2, ahead of V;
+    - T16.13 becomes a Stage 2 gate;
+    - T16.28's laws open redesign F;
+    - F stays first in Stage 3;
+    - search redesign C resolves bounds once per shift plan, and its exit turns the count snapshot
+      into the bound calls ≤ C·dof·budget.
+  - Seven worker rules were added (WORKER.md) and three Stage 2 exit conditions (`stage2.md`).
 - 2026-10-01 — settled by the owner's rules after the fifth contact verification:
   - The matched (hobbed) worm wheel needs a new capped Newton solve, a seed search and a fallback
     minimiser. It is therefore implemented but not exposed; the involute wheel stays.
