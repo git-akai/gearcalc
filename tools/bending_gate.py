@@ -35,8 +35,10 @@ ratio, as a train rates a member:
 - **the Lewis section, by the section rule** (2026-10-02): each curve offers
   its least Lewis measure `x² / (y_v − y)` over the whole curve below the
   vertex (vertex where the load line crosses the centreline), at an interior
-  least — found by brute force, sampled and closed by bisection on the
-  complex-step derivative — or at one of its ends, the flank's only end being
+  least — bracketed by construction, the fillet over its whole length and the
+  flank from where its condition turns to where it reaches the vertex's
+  height, and closed by bisection on the complex-step condition — or at one
+  of its ends, the flank's only end being
   its root (its tip is never below the vertex); the fillet's is rated with
   the fillet's notch factor, the flank's with none; the readable candidate
   rating highest governs, and with none readable the row is unrated as
@@ -131,7 +133,7 @@ BLOCKS = [
     dict(
         teeth=[9, 12],
         alpha=[25.0],
-        shift=[0.45, 0.5],
+        shift=[0.45, 0.5, 0.505, 0.508],
         helix=[0.0],
         proportions=[(1.0, 1.25, 0.38, 1.0)],
         eps_n=[1.0, 1.05],
@@ -348,31 +350,56 @@ class Tooth:
         dx, dy = (x - bx) / n, (y - by) / n
         return (x, y), (dx, dy), y - x * dy / dx
 
-    def stationary(self, curve, lo, hi, y_v):
-        """Every interior least and greatest of `x²/(y_v − y)` on a curve, as
-        `(kind, parameter, value)`, and its finite values at the two ends."""
-        def g(p):
-            x, y = curve(p)
-            return x * x / (y_v - y)
+    def condition(self, curve, y_v):
+        """The tangency condition `x y′ + 2x′(y_v − y)` along a curve, its
+        derivatives by complex step: its sign is that of the Lewis measure's
+        slope along the curve's parameter."""
+        def c(q):
+            x, y = (v.real for v in curve(q))
+            xs, ys = (slope(lambda t: curve(t)[k], q) for k in (0, 1))
+            return x * ys + 2 * xs * (y_v - y)
 
-        n = 600
-        ps = [lo + (hi - lo) * i / n for i in range(n + 1)]
-        vals = []
-        for p in ps:
-            x, y = curve(p)
-            vals.append(g(p).real if y.real < y_v and x.real > 0 else math.inf)
-        out = []
-        for i in range(1, n):
-            if not all(math.isfinite(v) for v in vals[i - 1:i + 2]):
-                continue
-            for kind, sign in (("least", 1), ("greatest", -1)):
-                if sign * vals[i] > min(sign * vals[i - 1], sign * vals[i + 1]):
-                    continue
-                if not sign * slope(g, ps[i - 1]) < 0 < sign * slope(g, ps[i + 1]):
-                    continue
-                p = bisect(lambda q: slope(g, q), ps[i - 1], ps[i + 1])
-                out.append((kind, p, g(p).real))
-        return out, [v for v in (vals[0], vals[n]) if math.isfinite(v)]
+        return c
+
+    def interior_least(self, name, y_v):
+        """A curve's one interior least of the Lewis measure, bracketed by
+        construction, or `None`.
+
+        - The fillet: read as a half-width `w(y)` it falls and is convex, so
+          `w + 2w′(y_v − y)` rises and the condition changes sign once at most
+          over the whole fillet: a bisection wherever its ends differ.
+        - The flank: an involute, whose condition is `r_b(cos δ + u sin δ +
+          u/sin δ) = 2y_v` with `δ = u − ψ_b`; the left side falls, then rises
+          from where `sin δ − u cos³δ` turns positive, and the least is where
+          it crosses on the rising part. That part ends where the flank
+          reaches the vertex's height, where the condition is `x y′ > 0`, so
+          the bracket's far end has its sign by construction — including the
+          last stretch under the tip, which a sampled search can step over
+          (z 9, x 0.505, 25°: 600 samples found the fillet's 2.48 where the
+          flank's under the land rates 15.4)."""
+        if name == "fillet":
+            lo, hi = self.sig_j, 0.0
+            c = self.condition(self.fillet, y_v)
+            clo, chi = c(lo), c(hi)
+            return bisect(c, lo, hi) if clo and chi and (clo < 0) != (chi < 0) else None
+        lo, hi = self.u_j, self.u_tip
+        height = lambda u: self.flank(u)[1].real - y_v
+        top = hi if height(hi) < 0 else bisect(height, lo, hi)
+        turn = lambda u: math.sin(u - self.psi_b) - u * math.cos(u - self.psi_b) ** 3
+        if turn(top) <= 0:
+            return None
+        start = lo if turn(lo) >= 0 else bisect(turn, lo, top)
+        c = self.condition(self.flank, y_v)
+        if c(start) >= 0 or c(top) <= 0:
+            return None
+        return bisect(c, start, top)
+
+    def off_the_axis(self, x, y, y_v):
+        """Whether a point is below the vertex and off the centreline by more
+        than its coordinates' rounding, `OPS·ε` of its radius: the apex of a
+        pointed tip loaded at its point is on both, to rounding."""
+        r = math.hypot(x, y)
+        return x > OPS * EPS * r and y_v - y > OPS * EPS * r
 
     def candidates(self, y_v, model=RATING):
         """**What each curve offers**: its least `x²/(y_v − y)` over the whole
@@ -388,12 +415,16 @@ class Tooth:
             ("fillet", self.fillet, self.sig_j, 0.0, (self.sig_j, 0.0)),
             ("flank", self.flank, self.u_j, self.u_tip, (self.u_j,)),
         ):
-            found, _ = self.stationary(curve, lo, hi, y_v)
-            offered = [(v, p, False) for kind, p, v in found if kind == "least"]
+            offered = []
+            interior = self.interior_least(name, y_v)
+            if interior is not None:
+                x, y = (c.real for c in curve(interior))
+                if self.off_the_axis(x, y, y_v):
+                    offered.append((x * x / (y_v - y), interior, False))
             if not model.tangency_only:
                 for e in ends:
                     x, y = (c.real for c in curve(e))
-                    if y < y_v and x > 0:
+                    if self.off_the_axis(x, y, y_v):
                         offered.append((x * x / (y_v - y), e, True))
             if offered:
                 v, p, at_end = min(offered, key=lambda o: (o[0], o[2]))

@@ -64,11 +64,12 @@ const BLOCKS: &[Block] = &[
         short_of_tip: &[0.0],
     },
     // Loaded at or just under a narrow tip land, where the flank's section
-    // governs with no notch factor (z 9, x 0.5, 25° among them).
+    // governs with no notch factor (z 9, x 0.5, 25° among them), up to a land
+    // of a few microns (z 9 at 25° is pointed from x 0.5088).
     Block {
         teeth: &[9, 12],
         alpha_deg: &[25.0],
-        shift: &[0.45, 0.5],
+        shift: &[0.45, 0.5, 0.505, 0.508],
         helix_deg: &[0.0],
         proportions: &[(1.0, 1.25, 0.38, 1.0)],
         eps_n: &[1.0, 1.05],
