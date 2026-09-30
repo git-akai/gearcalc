@@ -230,8 +230,7 @@ pub fn step(t: &Train, rng: &mut Lcg, log: &mut Vec<String>) -> Option<Result<Tr
         1 if !u.load_cases.is_empty() => {
             let (case, intermittent) = (rng.pick(u.load_cases.len()), rng.pick(2) == 0);
             log.push(format!("set_duty({case}, {intermittent})"));
-            u.set_duty(case, intermittent);
-            Some(Ok(u))
+            Some(u.set_duty(case, intermittent).map(|()| u))
         }
         2 | 3 if !u.shape.bodies.is_empty() => {
             let b = u.shape.bodies[rng.pick(u.shape.bodies.len())].body;

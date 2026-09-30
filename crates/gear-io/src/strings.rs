@@ -1795,7 +1795,7 @@ mod tests {
             let plano = Train::chained(vec![Preset::Planocentric.build()], |_| Vec::new());
             fire(&plano, Edit::Remove(Piece::Coupling(0)));
             let mut set = Train::chained(vec![Preset::Planetary.build()], |_| Vec::new());
-            set.release(3);
+            set.edit(Edit::Release(3)).expect("the set's ring is held");
             set.load_cases = vec![LoadCase::ultimate(1, 2, 1.0, 1000.0)];
             fire(&set, Edit::Hold(3));
         }

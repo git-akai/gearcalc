@@ -563,7 +563,7 @@ fn a_sweep_with_no_entry_to_follow_is_unset_and_said() {
         },
         ..LoadCase::fatigue(1, 2, TORQUE_NM, SPEED_RPM)
     }];
-    t.set_duty(0, true);
+    t.set_duty(0, true).unwrap();
     t.load_cases[0].loads = vec![
         Load::given(1, TORQUE_NM, SPEED_RPM),
         Load::declared(2, LoadRole::Reacted),

@@ -265,6 +265,13 @@ mod tests {
                         assert!(!unchanged(&t, &u), "{context}: changes nothing");
                         u.check().unwrap_or_else(|e| panic!("{context}: {e:?}"));
                     }
+                    // The one key that says no cause — an edit asked of the
+                    // wrong level — is never what a piece offers.
+                    assert_ne!(
+                        offer.refused,
+                        Some(Note::new(super::super::EditRefused::WrongFamily.key())),
+                        "{context}"
+                    );
                     offered += 1;
                 }
             }
@@ -432,7 +439,7 @@ mod tests {
                 on: Place::Body(2),
                 ring: true,
             }),
-            Err(super::super::EditRefused::WrongFamily)
+            Err(super::super::EditRefused::RingCrossed)
         );
     }
 

@@ -128,10 +128,26 @@ pub enum EditRefused {
     /// A planet gear would be left meeting nothing on its carrier's axis,
     /// whose radius it runs at: the last member meeting it, taken.
     LastOnItsStep,
-    /// The edit belongs to another kind of piece: a step on an axis
-    /// nothing carries, a coupling from a body on one, two rings in mesh,
-    /// the axis a carrier turns about removed.
+    /// **An edit the shape does not make**: a join, a hold, a release or
+    /// an insert asked of the shape, which are the train's
+    /// ([`super::Train::edit`]).
     WrongFamily,
+    /// **A step or a coupling off a carried axis**: a step goes on the
+    /// planets of an axis a carrier turns, and a coupling takes an
+    /// orbiting body's turn to its carrier's axis.
+    NotCarried,
+    /// **The axis a carrier turns about**, taken away: the planets it
+    /// carries would hang from nothing.
+    CentralAxis,
+    /// **Two rings in mesh**: an internal gear meshes an external one.
+    RingToRing,
+    /// **A new fixed axis at a gear that meshes riding a carrier** — a
+    /// planet, or a sun or a ring meshing planets: its meshes stand in the
+    /// carrier's frame, which no axis fixed in ground shares.
+    OrbitingMate,
+    /// **A ring across crossed shafts**: the screw model has no internal
+    /// kind.
+    RingCrossed,
     /// A body not on the member's axis.
     NotOnTheAxis,
     /// No member of that kind fits at the radius the axis runs at: a sun
@@ -171,6 +187,11 @@ impl EditRefused {
             Self::NoSuchIndex => "ui.train_edit_refused_no_such",
             Self::LastOnItsStep => "ui.train_edit_refused_last_on_step",
             Self::WrongFamily => "ui.train_edit_refused_family",
+            Self::NotCarried => "ui.train_edit_refused_not_carried",
+            Self::CentralAxis => "ui.train_edit_refused_central_axis",
+            Self::RingToRing => "ui.train_edit_refused_ring_to_ring",
+            Self::OrbitingMate => "ui.train_edit_refused_orbiting_mate",
+            Self::RingCrossed => "ui.train_edit_refused_ring_crossed",
             Self::NotOnTheAxis => "ui.train_edit_refused_axis",
             Self::NoRoom => "ui.train_edit_refused_no_room",
             Self::CarriesAnAxis => "ui.train_edit_refused_carrier",
@@ -190,6 +211,11 @@ impl std::fmt::Display for EditRefused {
             Self::NoSuchIndex => "no such member, mesh, axis or body",
             Self::LastOnItsStep => "the last on its step",
             Self::WrongFamily => "not an edit of this family",
+            Self::NotCarried => "that axis is not carried",
+            Self::CentralAxis => "a carrier turns about that axis",
+            Self::RingToRing => "two rings do not mesh",
+            Self::OrbitingMate => "that gear meshes riding a carrier",
+            Self::RingCrossed => "a ring does not mesh across crossed shafts",
             Self::NotOnTheAxis => "not a body on the member's axis",
             Self::NoRoom => "nothing of that kind fits at this radius",
             Self::CarriesAnAxis => "that body carries an axis",
@@ -255,7 +281,7 @@ impl Shape {
         let wiring = s.wiring();
         for k in 0..self.meshes.len() {
             if s.kind_of(k).is_none() {
-                return Err(EditRefused::WrongFamily);
+                return Err(EditRefused::RingCrossed);
             }
             if wiring.frame(k).is_err() {
                 return Err(EditRefused::TwoFrames);
@@ -358,7 +384,7 @@ impl Shape {
             .ok_or(EditRefused::NoSuchIndex)?;
         // Two rings in mesh are no mesh.
         if ring && self.members[mate].ring.is_some() {
-            return Err(EditRefused::WrongFamily);
+            return Err(EditRefused::RingToRing);
         }
         let (axis, body) = match on {
             Place::NewAxis => return self.add_on_new_axis(mate, from, ring, next),
@@ -409,7 +435,7 @@ impl Shape {
         next: usize,
     ) -> Result<(), EditRefused> {
         if self.indexed().frame_of_member(mate) != GROUND {
-            return Err(EditRefused::WrongFamily);
+            return Err(EditRefused::OrbitingMate);
         }
         let axis = self.push_axis(GROUND, 1);
         let body = self.push_body(axis, next);
@@ -584,7 +610,7 @@ impl Shape {
             return Err(EditRefused::NoSuchIndex);
         }
         if !self.carried(axis) {
-            return Err(EditRefused::WrongFamily);
+            return Err(EditRefused::NotCarried);
         }
         let body = self
             .bodies
@@ -635,7 +661,7 @@ impl Shape {
                     return Err(EditRefused::NoSuchIndex);
                 }
                 if self.turns_a_carrier(axis) {
-                    return Err(EditRefused::WrongFamily);
+                    return Err(EditRefused::CentralAxis);
                 }
                 let gears = (0..self.members.len())
                     .filter(|&i| self.axis_of_slot(self.slot_of_member(i)) == Some(axis))
@@ -776,7 +802,7 @@ impl Shape {
     fn couple(&mut self, body: usize, next: usize) -> Result<(), EditRefused> {
         let axis = self.axis_of_body(body).ok_or(EditRefused::NoSuchIndex)?;
         if !self.carried(axis) {
-            return Err(EditRefused::WrongFamily);
+            return Err(EditRefused::NotCarried);
         }
         if self.couplings.iter().any(|c| c.contains(&body)) {
             return Err(EditRefused::Coupled);
@@ -1751,7 +1777,7 @@ mod tests {
             (
                 Preset::Spur.build(),
                 Edit::Couple { body: 1 },
-                EditRefused::WrongFamily,
+                EditRefused::NotCarried,
             ),
             (
                 plano.clone(),
@@ -1770,13 +1796,13 @@ mod tests {
             (
                 Preset::Spur.build(),
                 Edit::AddStep { axis: 0 },
-                EditRefused::WrongFamily,
+                EditRefused::NotCarried,
             ),
             // The axis a carrier turns about is no axis to take away.
             (
                 Preset::Planetary.build(),
                 Edit::Remove(Piece::Axis(0)),
-                EditRefused::WrongFamily,
+                EditRefused::CentralAxis,
             ),
             (
                 Preset::Planetary.build(),
@@ -1808,7 +1834,7 @@ mod tests {
                     on: Place::NewAxis,
                     ring: true,
                 },
-                EditRefused::WrongFamily,
+                EditRefused::RingToRing,
             ),
             // A gear fixed to the carrier of the planet it meshes locks it.
             (
@@ -1837,6 +1863,118 @@ mod tests {
             assert_eq!(edit(&mut shape, what.clone()), Err(why), "{what:?}");
             assert!(same(&shape, &before), "{what:?} touched the shape");
         }
+    }
+
+    /// **A refusal says why** (audit T13.8): each edit of another family is
+    /// refused by the key that names its cause, the shape unchanged — a
+    /// coupling or a step off a carried axis, the axis a carrier turns about
+    /// taken away, two rings in mesh, a gear on a new fixed axis at a mate
+    /// that meshes in a carrier's frame (a planet, and a sun meshing
+    /// planets), and a ring across crossed shafts.
+    #[test]
+    fn a_refusal_says_why() {
+        let cases: Vec<(Preset, Edit, &str)> = vec![
+            (
+                Preset::Spur,
+                Edit::Couple { body: 1 },
+                "ui.train_edit_refused_not_carried",
+            ),
+            (
+                Preset::Spur,
+                Edit::AddStep { axis: 0 },
+                "ui.train_edit_refused_not_carried",
+            ),
+            (
+                Preset::Planetary,
+                Edit::Remove(Piece::Axis(0)),
+                "ui.train_edit_refused_central_axis",
+            ),
+            (
+                Preset::Planetary,
+                Edit::AddGear {
+                    mate: 2,
+                    on: Place::NewAxis,
+                    ring: true,
+                },
+                "ui.train_edit_refused_ring_to_ring",
+            ),
+            (
+                Preset::Planetary,
+                Edit::AddGear {
+                    mate: 1,
+                    on: Place::NewAxis,
+                    ring: false,
+                },
+                "ui.train_edit_refused_orbiting_mate",
+            ),
+            (
+                Preset::Planetary,
+                Edit::AddGear {
+                    mate: 0,
+                    on: Place::NewAxis,
+                    ring: false,
+                },
+                "ui.train_edit_refused_orbiting_mate",
+            ),
+            (
+                Preset::Worm,
+                Edit::AddGear {
+                    mate: 0,
+                    on: Place::Body(2),
+                    ring: true,
+                },
+                "ui.train_edit_refused_ring_crossed",
+            ),
+        ];
+        for (p, what, key) in cases {
+            let before = p.build();
+            let mut shape = before.clone();
+            let got = edit(&mut shape, what.clone()).map_err(EditRefused::key);
+            assert_eq!(got, Err(key), "{p:?} {what:?}");
+            assert!(same(&shape, &before), "{what:?} touched the shape");
+        }
+    }
+
+    /// **A hold and a release are one rule both ways** (audit T13.8): each
+    /// refuses ground and a body the train does not list by `NoSuchIndex`,
+    /// the train unchanged; and each asked of a body already so — a hold
+    /// of a held body, a release of a free one — changes nothing and is no
+    /// refusal.
+    #[test]
+    fn a_hold_and_a_release_are_one_rule_both_ways() {
+        let t = super::super::testing::cased(vec![Preset::Planetary.build()]);
+        // Sun 1, carrier 2, ring 3 held by convention, planet 4.
+        assert_eq!(t.held, vec![3]);
+        for body in [GROUND, 99] {
+            for what in [Edit::Hold(body), Edit::Release(body)] {
+                let mut u = t.clone();
+                assert_eq!(
+                    u.edit(what.clone()),
+                    Err(EditRefused::NoSuchIndex),
+                    "{what:?}"
+                );
+                assert_eq!(debug(&u), debug(&t), "{what:?} refused whole");
+            }
+        }
+        for what in [Edit::Hold(3), Edit::Release(4)] {
+            let mut u = t.clone();
+            assert_eq!(u.edit(what.clone()), Ok(()), "{what:?}");
+            assert_eq!(debug(&u), debug(&t), "{what:?} changed nothing");
+        }
+    }
+
+    /// **A duty is switched on a case the train has** (audit T13.8): a case
+    /// past the list is refused by `NoSuchIndex`, the train unchanged,
+    /// where it did nothing and said so to no one.
+    #[test]
+    fn a_duty_is_switched_on_a_case_the_train_has() {
+        let t = super::super::testing::cased(vec![Preset::Spur.build()]);
+        let mut u = t.clone();
+        let past = t.load_cases.len();
+        assert_eq!(u.set_duty(past, true), Err(EditRefused::NoSuchIndex));
+        assert_eq!(debug(&u), debug(&t), "refused whole");
+        assert_eq!(u.set_duty(past - 1, false), Ok(()));
+        assert_ne!(debug(&u), debug(&t), "a case it has is switched");
     }
 
     /// **A move keeps what a body was told**: a gear alone on its body
@@ -2178,7 +2316,7 @@ mod tests {
         let end = t.split(1, end);
         assert!(t.shape.couplings.is_empty(), "the end is its own");
         assert_eq!(t.parts().len(), 2);
-        t.join(end, planet);
+        t.join(end, planet).unwrap();
         assert_eq!(t.shape.couplings, vec![[end, planet]], "joined again");
         // ...and power crosses it: the crank drives the pair's output.
         t.load_cases = vec![LoadCase::ultimate(1, t.port(1, 2), 1.0, 1000.0)];
@@ -2197,7 +2335,7 @@ mod tests {
         let b = t.split(2, t.port(1, 2));
         assert_eq!((t.ends_of(a).len(), t.ends_of(b).len()), (1, 1));
         let before = t.clone();
-        t.join(a, b);
+        assert_eq!(t.edit(Edit::Join { a, b }), Err(EditRefused::Apart));
         assert_eq!(format!("{t:?}"), format!("{before:?}"), "refused");
     }
 

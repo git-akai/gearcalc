@@ -867,13 +867,10 @@ impl Train {
     /// an axis a carrier turns orbits, and no shaft on a fixed axis can be
     /// the same body — so the two keep their numbers and turn as one
     /// through a coupling, which is what the join meant. Two ends at an
-    /// axis distance from each other are refused, as is a part with both.
-    pub fn join(&mut self, a: usize, b: usize) {
-        let _ = self.try_join(a, b);
-    }
-
-    /// As [`Self::join`], saying why a join is refused.
-    fn try_join(&mut self, a: usize, b: usize) -> Result<(), super::EditRefused> {
+    /// axis distance from each other are refused, as is a part with both —
+    /// each by the key that says why ([`super::Edit::Join`], the one way in
+    /// from outside the crate).
+    pub(crate) fn join(&mut self, a: usize, b: usize) -> Result<(), super::EditRefused> {
         if a == b {
             return Ok(());
         }
@@ -1078,10 +1075,12 @@ impl Train {
     }
 
     /// **A body held to ground**, in so many words. A held body is fixed,
-    /// and no case can say anything of it: [`super::Edit::Hold`] refuses a
-    /// body a case loads or reacts at ([`super::EditRefused::Loaded`]), and
-    /// what is left to drop here is a free entry.
-    pub fn hold(&mut self, body: usize) {
+    /// and no case can say anything of it: [`super::Edit::Hold`], the one
+    /// way in from outside the crate, refuses a body the train does not
+    /// list and one a case loads or reacts at
+    /// ([`super::EditRefused::Loaded`]), and what is left to drop here is a
+    /// free entry.
+    pub(crate) fn hold(&mut self, body: usize) {
         self.settle_held(body);
     }
 
@@ -1110,8 +1109,9 @@ impl Train {
     }
 
     /// **A body released**: the hold on it taken out, and nothing written
-    /// in its place — a body the train does not hold is free.
-    pub fn release(&mut self, body: usize) {
+    /// in its place — a body the train does not hold is free
+    /// ([`super::Edit::Release`], the one way in from outside the crate).
+    pub(crate) fn release(&mut self, body: usize) {
         self.held.retain(|&b| b != body);
     }
 
@@ -1214,9 +1214,14 @@ impl Train {
     /// measured at the case's reaction — its first reacted entry, else its
     /// first entry of any kind, else unset — or a thousand hours. A body
     /// only the old sweep named is given up, and the numbers close up.
-    pub fn set_duty(&mut self, case: usize, intermittent: bool) {
+    ///
+    /// # Errors
+    ///
+    /// [`super::EditRefused::NoSuchIndex`] for a case the train has not,
+    /// the train unchanged.
+    pub fn set_duty(&mut self, case: usize, intermittent: bool) -> Result<(), super::EditRefused> {
         let Some(c) = self.load_cases.get_mut(case) else {
-            return;
+            return Err(super::EditRefused::NoSuchIndex);
         };
         let at = sweep_body(&c.loads);
         c.duty = if intermittent {
@@ -1227,6 +1232,7 @@ impl Train {
             }
         };
         let _ = self.prune();
+        Ok(())
     }
 
     /// **A shape appended to the train and joined onward** — a preset's,
@@ -1287,7 +1293,10 @@ impl Train {
                     }
                 }
             }
-            self.join(from, input);
+            // The chain's open output and a body just laid in: neither
+            // held, loaded or geared to the other, so nothing refuses.
+            let joined = self.join(from, input);
+            debug_assert!(joined.is_ok(), "{joined:?}");
         }
     }
 
@@ -1325,7 +1334,7 @@ impl Train {
         }
         let mut t = self.clone();
         let (input, _) = t.lay(shape);
-        t.try_join(at, input)?;
+        t.join(at, input)?;
         *self = t;
         Ok(())
     }
@@ -1395,13 +1404,19 @@ impl Train {
         Ok(())
     }
 
+    /// Whether the graph lists `body` — ground never, being no body a hold
+    /// or a release can name.
+    fn lists(&self, body: usize) -> bool {
+        body != GROUND && self.shape.bodies.iter().any(|b| b.body == body)
+    }
+
     /// [`Self::edit`], unchecked: each edit's own rule.
     fn make(&mut self, edit: super::Edit) -> Result<(), super::EditRefused> {
         use super::Edit;
         match edit {
-            Edit::Join { a, b } => self.try_join(a, b),
+            Edit::Join { a, b } => self.join(a, b),
             Edit::Hold(body) => {
-                if body == GROUND || !self.shape.bodies.iter().any(|b| b.body == body) {
+                if !self.lists(body) {
                     return Err(super::EditRefused::NoSuchIndex);
                 }
                 // A load is never dropped by a hold: moved first, or refused.
@@ -1417,6 +1432,9 @@ impl Train {
                 Ok(())
             }
             Edit::Release(body) => {
+                if !self.lists(body) {
+                    return Err(super::EditRefused::NoSuchIndex);
+                }
                 self.release(body);
                 Ok(())
             }

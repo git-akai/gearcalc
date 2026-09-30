@@ -1739,7 +1739,7 @@ fn apply_edit(
             let case = train.fresh_case(kind, torque, speed);
             train.load_cases.push(case);
         }
-        TrainEdit::Duty { case, intermittent } => train.set_duty(case, intermittent),
+        TrainEdit::Duty { case, intermittent } => train.set_duty(case, intermittent)?,
     }
     Ok(())
 }
@@ -3933,7 +3933,7 @@ mod tests {
             .unwrap_err();
             let keys = [
                 gear_core::train::EditRefused::Geared,
-                gear_core::train::EditRefused::WrongFamily,
+                gear_core::train::EditRefused::NotCarried,
             ]
             .map(gear_core::train::EditRefused::key);
             assert!(keys.contains(&e.as_str()), "{edit}: {e}");

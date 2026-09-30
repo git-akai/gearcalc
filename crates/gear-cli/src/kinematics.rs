@@ -39,7 +39,7 @@
 
 use gear_core::train::arrangements as arr;
 use gear_core::train::{
-    solve_train, Duty, LoadCase, MemberGear, Shape, ShapeResult, Train, TrainResult,
+    solve_train, Duty, Edit, LoadCase, MemberGear, Shape, ShapeResult, Train, TrainResult,
 };
 
 /// The loads every fixture is rated for, between two bodies: one from each,
@@ -285,17 +285,20 @@ pub(crate) fn fixtures() -> Vec<(String, Train)> {
     // shared body and leaves by the ring.
     out.push(("set-then-pair".to_string(), {
         let mut t = Train::chained(vec![set(), pair(17, 43, 0.0)], |_| Vec::new());
-        t.release(t.port(0, 3));
-        t.hold(t.port(0, 2));
-        t.split(1, t.port(0, 2));
-        t.join(t.port(0, 3), t.port(1, 1));
+        let (ring, carrier) = (t.port(0, 3), t.port(0, 2));
+        edit(&mut t, Edit::Release(ring));
+        edit(&mut t, Edit::Hold(carrier));
+        t.split(1, carrier);
+        let (a, b) = (t.port(0, 3), t.port(1, 1));
+        edit(&mut t, Edit::Join { a, b });
         t.load_cases = loads(t.port(0, 1), t.port(1, 2));
         t
     }));
     out.push(("pair-then-set".to_string(), {
         let mut t = Train::chained(vec![pair(17, 43, 0.0), set()], |_| Vec::new());
-        t.release(t.port(1, 3));
-        t.hold(t.port(1, 2));
+        let (ring, carrier) = (t.port(1, 3), t.port(1, 2));
+        edit(&mut t, Edit::Release(ring));
+        edit(&mut t, Edit::Hold(carrier));
         t.load_cases = loads(t.port(0, 1), t.port(1, 3));
         t
     }));
@@ -317,15 +320,26 @@ pub(crate) fn fixtures() -> Vec<(String, Train)> {
     // both, so the sun cannot turn, named at the hold that closed it.
     out.push(("ring-released".to_string(), {
         let mut t = arranged("sun", "ring");
-        t.release(t.port(0, 3));
+        let ring = t.port(0, 3);
+        edit(&mut t, Edit::Release(ring));
         t
     }));
     out.push(("conflict".to_string(), {
+        // A hold no edit makes — the case reacts at the ring — written as
+        // a train built in code is, for the conflict it names.
         let mut t = arranged("sun", "carrier");
-        t.hold(t.port(0, 3));
+        let ring = t.port(0, 3);
+        t.held.push(ring);
         t
     }));
     out
+}
+
+/// **An edit a fixture makes as the panel would** ([`Train::edit`]),
+/// refused only by a fixture that is wrong.
+fn edit(t: &mut Train, what: Edit) {
+    t.edit(what)
+        .expect("a fixture's edit is one the panel would make");
 }
 
 /// One slot's `(case, speed, torque)` per load case.

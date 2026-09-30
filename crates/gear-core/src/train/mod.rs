@@ -7526,7 +7526,7 @@ mod tests {
         let mut t = train_of(vec![reversing(), arr::pair([17, 43])]);
         t.held = carrier_held(&t, 0);
         t.split(1, t.port(0, 2));
-        t.join(t.port(0, 3), t.port(1, 1));
+        t.join(t.port(0, 3), t.port(1, 1)).unwrap();
         let r = solve_train(&t, &lib).expect("a reversing stage can be followed");
         assert!(across(&t, 0, &lib).ratio < 0.0, "this set reverses");
         for (k, s) in r.by_part.iter().enumerate() {
@@ -7728,7 +7728,7 @@ mod tests {
             "the pair is held with it"
         );
         t.split(1, t.port(0, carrier));
-        t.join(t.port(0, ring), t.port(1, 1));
+        t.join(t.port(0, ring), t.port(1, 1)).unwrap();
         solve_train(&t, &lib).expect("solves");
         assert!(across(&t, 0, &lib).ratio < 0.0, "carrier held reverses");
 
@@ -7736,7 +7736,7 @@ mod tests {
         // by the sun, and the pair before it is what it was.
         let mut t = Train::chained(vec![arr::pair([17, 43]), set()], |_| Vec::new());
         t.split(1, t.port(1, sun));
-        t.join(t.port(0, 2), t.port(1, carrier));
+        t.join(t.port(0, 2), t.port(1, carrier)).unwrap();
         let (start, end) = ends_of(&t);
         assert_eq!((start, end), (t.port(0, 1), t.port(1, sun)));
         t.load_cases = vec![LoadCase::ultimate(start, end, 2.0, 3000.0)];
@@ -7756,7 +7756,7 @@ mod tests {
         // ...and joined by its ring with its sun held: entered at the ring,
         // leaving by the carrier at the ring-in ratio.
         t.split(1, t.port(1, carrier));
-        t.join(t.port(0, 2), t.port(1, ring));
+        t.join(t.port(0, 2), t.port(1, ring)).unwrap();
         t.held = vec![t.port(1, sun)];
         let (start, end) = ends_of(&t);
         assert_eq!(end, t.port(1, carrier));
@@ -8272,7 +8272,7 @@ mod tests {
             |_| Vec::new(),
         );
         t.split(1, t.port(0, carrier));
-        t.join(t.port(0, sun), t.port(1, 1));
+        t.join(t.port(0, sun), t.port(1, 1)).unwrap();
         let (start, end) = ends_of(&t);
         assert_eq!(start, t.port(0, carrier));
         t.load_cases = vec![LoadCase::ultimate(start, end, 2.0, 3000.0)];
