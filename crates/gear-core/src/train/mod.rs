@@ -57,6 +57,7 @@ pub mod graph;
 mod groupings;
 #[cfg(test)]
 mod homogeneity;
+mod incidence;
 mod offers;
 mod pair;
 mod planetary;
@@ -1741,13 +1742,13 @@ pub enum TrainError {
     /// **Two axes on one carrier cannot stand where their distances put
     /// them**: the distance between them is longer than their two
     /// distances from the carrier's axis together, or shorter than their
-    /// difference ([`shape::Shape::staggers`]) — `too_close` says which.
+    /// difference ([`staggers`](incidence::Indexed::staggers)) — `too_close` says which.
     /// Zero-based, as the distances are indexed; the front end numbers
     /// from 1.
     AxesCannotBePlaced { distance: usize, too_close: bool },
     /// **Two given distances ask one mesh group two sizes**: each with both
     /// its mesh's shifts pinned decides the group's helix, and they decide
-    /// it differently ([`shape::Shape::resolved_helices`]). The mesh that
+    /// it differently ([`resolved_helices`](incidence::Indexed::resolved_helices)). The mesh that
     /// sized the group first and the one that asked another, zero-based;
     /// the front end numbers from 1.
     SizeOverConstrained { meshes: [usize; 2] },
@@ -2277,7 +2278,7 @@ pub struct Figure {
 /// and at most one of them stands.
 ///
 /// A kind lists its readings in **relief order, least precious first**, and
-/// the solve honours the **last** one given ([`Shape::helix_angles`]). So the reading
+/// the solve honours the **last** one given ([`helix_angles`](incidence::Indexed::helix_angles)). So the reading
 /// relief leaves standing is the reading the solve reads, by construction —
 /// there is no second list stating the precedence again in an `if` chain, and
 /// nothing for the two to disagree about.
@@ -3696,7 +3697,10 @@ fn paths_of(
     let distance_of: Vec<Option<usize>> = parts
         .iter()
         .flat_map(|p| {
-            (0..p.shape.meshes.len()).map(|j| p.shape.distance_of(j).map(|d| p.distances[d]))
+            let at = p.shape.indexed();
+            (0..p.shape.meshes.len())
+                .map(|j| at.distance_of(j).map(|d| p.distances[d]))
+                .collect::<Vec<_>>()
         })
         .collect();
     // The flow driving `from` against `to` through `meshes`: its
@@ -8830,7 +8834,7 @@ mod tests {
         assert!(!pair.members[0].pitch_diameter.auto, "the diameter stands");
         assert_eq!(pair.members[0].pitch_diameter.manual, 20.0);
         let expect = (17.0_f64 / 20.0).acos().to_degrees();
-        assert!((pair.helix_angles()[0] - expect).abs() < 1e-12);
+        assert!((pair.indexed().helix_angles()[0] - expect).abs() < 1e-12);
 
         // ...and a ratio given the size to decide is the most precious of all.
         let mut with_ratio = arr::pair([17, 43]).with_first_helix(10.0);
@@ -8844,7 +8848,7 @@ mod tests {
             .manual
             .min(pair.members[1].gear.face_width.manual);
         let expect = helix_for_overlap(1.2, 1.0, width).expect("reachable at the preset's width");
-        assert!((pair.helix_angles()[0] - expect).abs() < 1e-12);
+        assert!((pair.indexed().helix_angles()[0] - expect).abs() < 1e-12);
     }
 
     /// **A crossed pair has no overlap, and its ratio is turned back

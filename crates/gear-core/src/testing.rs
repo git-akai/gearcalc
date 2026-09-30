@@ -64,6 +64,7 @@ pub mod work {
         static RINGS: Cell<u64> = const { Cell::new(0) };
         static EVALUATIONS: Cell<u64> = const { Cell::new(0) };
         static TRIALS: Cell<u64> = const { Cell::new(0) };
+        static INCIDENCES: Cell<u64> = const { Cell::new(0) };
         static SEARCHES: std::cell::RefCell<Vec<Walked>> = const { std::cell::RefCell::new(Vec::new()) };
     }
 
@@ -114,6 +115,8 @@ pub mod work {
         pub evaluations: u64,
         /// Candidate trains a shape's search scored (`trial_efficiency`).
         pub trials: u64,
+        /// Incidences built (`train::incidence::Incidence::of`).
+        pub incidences: u64,
     }
 
     fn bump(c: &'static std::thread::LocalKey<Cell<u64>>) {
@@ -136,6 +139,10 @@ pub mod work {
         bump(&TRIALS);
     }
 
+    pub fn incidence() {
+        bump(&INCIDENCES);
+    }
+
     /// The work `f` does on this thread, and what it returns.
     pub fn of<T>(f: impl FnOnce() -> T) -> (Work, T) {
         let read = || Work {
@@ -143,6 +150,7 @@ pub mod work {
             rings: RINGS.with(Cell::get),
             evaluations: EVALUATIONS.with(Cell::get),
             trials: TRIALS.with(Cell::get),
+            incidences: INCIDENCES.with(Cell::get),
         };
         let before = read();
         let out = f();
@@ -153,6 +161,7 @@ pub mod work {
                 rings: after.rings - before.rings,
                 evaluations: after.evaluations - before.evaluations,
                 trials: after.trials - before.trials,
+                incidences: after.incidences - before.incidences,
             },
             out,
         )

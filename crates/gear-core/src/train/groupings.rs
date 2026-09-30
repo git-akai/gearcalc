@@ -112,11 +112,12 @@ impl Train {
     #[must_use]
     pub fn groupings(&self) -> Groupings {
         let s = &self.shape;
+        let at = s.indexed();
         let centres = (0..s.distances.len())
             .map(|d| Centre {
                 distance: d,
                 axes: s.distances[d].axes,
-                meshes: s.meshes_on(d),
+                meshes: at.meshes_on(d).to_vec(),
             })
             .collect();
         let axes = (0..s.axes.len())
@@ -130,7 +131,7 @@ impl Train {
                     .filter(|b| b.axis == a)
                     .map(|b| AxisBody {
                         body: b.body,
-                        members: s.members_on_body(b.body),
+                        members: at.members_on(b.body).to_vec(),
                         carries: (0..s.axes.len())
                             .filter(|&x| s.axes[x].carried_by == b.body)
                             .collect(),

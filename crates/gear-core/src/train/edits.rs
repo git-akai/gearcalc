@@ -246,12 +246,14 @@ impl Shape {
     }
 
     /// **Every mesh has a kind and a frame**: a ring on crossed shafts has
-    /// no kind the screw model holds ([`Self::kind_of`]), and a member
+    /// no kind the screw model holds
+    /// ([`kind_of`](super::incidence::Indexed::kind_of)), and a member
     /// meshing in two frames none the wiring holds ([`super::Wiring::frame`]).
     fn meshes_whole(&self) -> Result<(), EditRefused> {
-        let wiring = self.wiring();
+        let s = self.indexed();
+        let wiring = s.wiring();
         for k in 0..self.meshes.len() {
-            if self.kind_of(k).is_none() {
+            if s.kind_of(k).is_none() {
                 return Err(EditRefused::WrongFamily);
             }
             if wiring.frame(k).is_err() {
@@ -288,15 +290,7 @@ impl Shape {
     }
 
     pub(crate) fn members_on_body(&self, body: usize) -> Vec<usize> {
-        (0..self.members.len())
-            .filter(|&i| self.members[i].body == body)
-            .collect()
-    }
-
-    fn meshes_of_member(&self, member: usize) -> Vec<usize> {
-        (0..self.meshes.len())
-            .filter(|&k| self.meshes[k].a == member || self.meshes[k].b == member)
-            .collect()
+        self.indexed().members_on(body).to_vec()
     }
 
     /// The other member of a mesh.
@@ -413,7 +407,7 @@ impl Shape {
         ring: bool,
         next: usize,
     ) -> Result<(), EditRefused> {
-        if self.frame_of_member(mate) != GROUND {
+        if self.indexed().frame_of_member(mate) != GROUND {
             return Err(EditRefused::WrongFamily);
         }
         let axis = self.push_axis(GROUND, 1);
@@ -464,11 +458,12 @@ impl Shape {
         // teeth, so a ring a tooth *larger* at that radius has nowhere to
         // close; a tooth smaller always has.
         let floor = if ring { f64::from(zp) + 2.0 } else { 4.0 };
+        let at = self.indexed();
         let taken = |z: f64| {
             (0..self.members.len())
                 .filter(|&p| self.axis_of_slot(self.slot_of_member(p)) == Some(planet_axis))
                 .filter(|&p| self.members[p].gear.teeth == zp)
-                .flat_map(|p| self.meshes_of_member(p).into_iter().map(move |k| (p, k)))
+                .flat_map(|p| at.meshes_of(p).iter().map(move |&k| (p, k)))
                 .any(|(p, k)| {
                     let c = self.mate(k, p);
                     self.members[c].ring.is_some() == ring
@@ -498,14 +493,15 @@ impl Shape {
         distance: usize,
         ring: bool,
     ) -> Result<u32, EditRefused> {
-        let first = *self
+        let s = self.indexed();
+        let first = *s
             .meshes_on(distance)
             .first()
             .ok_or(EditRefused::NoDistance)?;
         let m = self.meshes[first];
         let on_axis = |i: usize| self.axis_of_slot(self.slot_of_member(i)) == Some(axis);
         let across = if on_axis(m.a) { m.a } else { m.b };
-        if self.is_crossed(first) {
+        if s.is_crossed(first) {
             return Ok(self.members[across].gear.teeth);
         }
         let signed = |i: usize| {
@@ -516,7 +512,7 @@ impl Shape {
                 z
             }
         };
-        let (shared, helix) = (self.shared(), self.helix_angles());
+        let (shared, helix) = (self.shared(), s.helix_angles());
         let transverse = |i: usize| shared.members[i].normal_module() / helix[i].to_radians().cos();
         let span = ((signed(m.a) + signed(m.b)).abs() * transverse(m.a) / transverse(mate)).round();
         let zm = f64::from(self.members[mate].gear.teeth);
@@ -571,6 +567,7 @@ impl Shape {
             return Err(EditRefused::NoSuchIndex);
         }
         let first = self
+            .indexed()
             .meshes_on(distance)
             .first()
             .copied()
@@ -646,9 +643,10 @@ impl Shape {
                     return Err(EditRefused::NoSuchIndex);
                 }
                 let m = self.meshes.remove(k);
+                let at = self.indexed();
                 let loose = [m.a, m.b]
                     .into_iter()
-                    .filter(|&i| self.meshes_of_member(i).is_empty())
+                    .filter(|&i| at.meshes_of(i).is_empty())
                     .collect();
                 self.cascade(loose);
             }
@@ -691,8 +689,9 @@ impl Shape {
             for &i in going.iter().rev() {
                 self.drop_member(i);
             }
+            let at = self.indexed();
             going = (0..self.members.len())
-                .filter(|&i| self.meshes_of_member(i).is_empty())
+                .filter(|&i| at.meshes_of(i).is_empty())
                 .collect();
         }
     }
@@ -709,9 +708,10 @@ impl Shape {
             .map(|b| b.body)
             .collect();
         self.cascade(gears);
+        let at = self.indexed();
         let bare: Vec<usize> = before
             .into_iter()
-            .filter(|&b| self.members_on_body(b).is_empty() && !self.carries_an_axis(b))
+            .filter(|&b| at.members_on(b).is_empty() && !self.carries_an_axis(b))
             .collect();
         self.drop_bodies(&bare);
         self.tidy();
@@ -727,8 +727,9 @@ impl Shape {
     /// Every distance left with no mesh on it, and every axis left with
     /// nothing on it, taken out.
     fn tidy(&mut self) {
+        let s = self.indexed();
         let meshless: Vec<usize> = (0..self.distances.len())
-            .filter(|&d| self.meshes_on(d).is_empty())
+            .filter(|&d| s.meshes_on(d).is_empty())
             .collect();
         for &d in meshless.iter().rev() {
             self.distances.remove(d);
@@ -993,11 +994,12 @@ impl super::Train {
                 return Err(Invariant::BodyListedTwice(b.body));
             }
         }
+        let at = s.indexed();
         for (i, m) in s.members.iter().enumerate() {
             if axis_of(m.body).is_none() {
                 return Err(Invariant::MemberOnNoBody(i));
             }
-            if !s.meshes.iter().any(|x| x.a == i || x.b == i) {
+            if at.meshes_of(i).is_empty() {
                 return Err(Invariant::MemberInNoMesh(i));
             }
         }
@@ -1005,12 +1007,12 @@ impl super::Train {
             if axis_of(s.members[m.a].body) == axis_of(s.members[m.b].body) {
                 return Err(Invariant::MeshOnOneAxis(k));
             }
-            if s.distance_of(k).is_none() {
+            if at.distance_of(k).is_none() {
                 return Err(Invariant::MeshAcrossNoDistance(k));
             }
         }
         for (d, x) in s.distances.iter().enumerate() {
-            if s.meshes_on(d).is_empty() {
+            if at.meshes_on(d).is_empty() {
                 return Err(Invariant::DistanceWithNoMesh(d));
             }
             let same =
@@ -1115,7 +1117,7 @@ mod tests {
     /// The body another ratio across `distance` shares: its first mesh's
     /// second gear's.
     fn shared(shape: &Shape, distance: usize) -> usize {
-        shape.members[shape.meshes[shape.meshes_on(distance)[0]].b].body
+        shape.members[shape.meshes[shape.indexed().meshes_on(distance)[0]].b].body
     }
 
     /// **What a designer adds to a preset first**, each on its first
@@ -1832,7 +1834,7 @@ mod tests {
     /// axis, crossed, or round a planet (sized to the carrier radius, and
     /// moved a tooth off a count that would turn as one).
     fn misfit(u: &Train, mate: usize) -> Option<String> {
-        let s = &u.shape;
+        let s = &u.shape.indexed();
         let k = s.meshes.len() - 1;
         let d = s.distance_of(k)?;
         let first = s.meshes_on(d)[0];

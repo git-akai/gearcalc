@@ -220,12 +220,13 @@ impl Shape {
     #[must_use]
     pub fn parts(&self) -> Vec<Part> {
         let n = self.members.len();
+        let at = self.indexed();
         let mut joined = DisjointSets::new(n);
         for m in &self.meshes {
             joined.union(m.a, m.b);
         }
         for d in 0..self.distances.len() {
-            let on = self.meshes_on(d);
+            let on = at.meshes_on(d);
             for w in on.windows(2) {
                 joined.union(self.meshes[w[0]].a, self.meshes[w[1]].a);
             }
@@ -243,7 +244,7 @@ impl Shape {
                 .collect();
             let distances: Vec<usize> = (0..self.distances.len())
                 .filter(|&d| {
-                    self.meshes_on(d)
+                    at.meshes_on(d)
                         .first()
                         .is_some_and(|&k| of[self.meshes[k].a] == p)
                 })

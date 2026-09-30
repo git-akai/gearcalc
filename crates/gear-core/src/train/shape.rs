@@ -35,6 +35,7 @@
 //! members is one — the sign of a mesh is derived from its members, never
 //! stated.
 
+use super::incidence::{Incidence, Indexed};
 use super::structure::DisjointSets;
 use super::wiring::{BodyLabel, MeshSpec, Mount, Wiring};
 use super::{
@@ -197,8 +198,8 @@ pub struct MeshInput {
     ///
     /// **The search's unit is not the mesh but its component** — the meshes
     /// a free member is shared between, and every mesh on an automatic
-    /// distance an absorber ties together ([`Shape::search_components`]):
-    /// a planet's shift moves both its meshes. So a component is searched
+    /// distance an absorber ties together: a planet's shift moves both its
+    /// meshes. So a component is searched
     /// where *any* of its meshes asks, and a component none of whose
     /// meshes asks keeps its undercut shifts. What is given constrains the
     /// search rather than being overruled by it.
@@ -333,17 +334,6 @@ impl Shape {
         }
     }
 
-    /// **Whether a member is a worm's thread**: the first member of a mesh
-    /// across a distance sized as a worm drive — which is a thread with
-    /// proportions of its own, and no gear a gear tab can hold; its wheel
-    /// is one.
-    #[must_use]
-    pub fn is_worm_thread(&self, member: usize) -> bool {
-        self.meshes.iter().enumerate().any(|(k, m)| {
-            m.a == member && self.distance_of(k).is_some_and(|d| self.distances[d].worm)
-        })
-    }
-
     /// The slot a member spins with.
     pub(crate) fn slot_of_member(&self, member: usize) -> Body {
         self.slot(self.members[member].body)
@@ -387,6 +377,244 @@ impl Shape {
         }
     }
 
+    /// Whether a body's axis is one of `N` alike.
+    fn replicated(&self, shaft: Body) -> bool {
+        self.axis_of_slot(shaft)
+            .is_some_and(|a| self.axes[a].count > 1)
+    }
+
+    /// How many instances of a body's axis there are.
+    fn count_of(&self, shaft: Body) -> u32 {
+        self.axis_of_slot(shaft)
+            .map_or(1, |a| self.axes[a].count.max(1))
+    }
+
+    /// **The mesh groups**: the connected components of the mesh graph, in
+    /// member order — two gears in mesh share a normal module and a pressure
+    /// angle, so everything a run of meshes joins does. One group for a pair
+    /// or a set; two for a hula or a stepped planet, whose meshes do
+    /// not join; three for a layshaft's three pairs. A **layer over the
+    /// graph**, read off it and never stored: what a panel offers one box
+    /// for and writes to every member of.
+    #[must_use]
+    pub fn mesh_groups(&self) -> Vec<Vec<usize>> {
+        let mut groups = DisjointSets::new(self.members.len());
+        for m in &self.meshes {
+            groups.union(m.a, m.b);
+        }
+        groups.components()
+    }
+
+    /// **Every member cut at its mesh group's module and pressure angle** —
+    /// the one member that states each, or the group's first where none
+    /// does — written into the members that follow. Two members that both
+    /// state one and disagree are left as they are: the mesh they share
+    /// refuses them by name, which is what a designer needs to see.
+    pub fn share(&mut self) {
+        for group in self.mesh_groups() {
+            let pick = |get: &dyn Fn(&Member) -> Auto<f64>| -> f64 {
+                group
+                    .iter()
+                    .map(|&i| get(&self.members[i]))
+                    .find(|a| !a.auto)
+                    .unwrap_or_else(|| get(&self.members[group[0]]))
+                    .manual
+            };
+            let module = pick(&|m| m.module);
+            let pressure_angle = pick(&|m| m.pressure_angle);
+            for &i in &group {
+                let m = &mut self.members[i];
+                if m.module.auto {
+                    m.module.manual = module;
+                }
+                if m.pressure_angle.auto {
+                    m.pressure_angle.manual = pressure_angle;
+                }
+            }
+        }
+    }
+
+    /// This shape, shared ([`Self::share`]).
+    #[must_use]
+    pub fn shared(&self) -> Self {
+        let mut s = self.clone();
+        s.share();
+        s
+    }
+
+    /// **Every mesh searched, or none** — what one switch on a stage used to
+    /// say, for a fixture that means the whole shape. The panel sets each
+    /// mesh's own.
+    pub fn set_search(&mut self, on: bool) {
+        for m in &mut self.meshes {
+            m.search = on;
+        }
+    }
+
+    /// **Every mesh under one sharing model** — as [`Self::set_search`].
+    pub fn set_load_sharing(&mut self, sharing: LoadSharing) {
+        for m in &mut self.meshes {
+            m.load_sharing = sharing;
+        }
+    }
+
+    /// The shifts the closure settles on, or why it could not — what the
+    /// laws of the set's closure ask, with no rating in the way.
+    #[cfg(test)]
+    pub(crate) fn closure(&self) -> Result<Vec<f64>, TrainError> {
+        let s = self.indexed();
+        let helix = s.helix_angles();
+        s.chosen_at(&crate::auto::Search::SHIPPED, &helix)
+            .map(|c| c.shifts)
+    }
+
+    /// The gear a member would build at a shift, the helix as the readings
+    /// decide.
+    #[cfg(test)]
+    pub(crate) fn params_of(&self, i: usize, x: f64) -> GearParams {
+        let s = self.indexed();
+        s.params_at(i, x, &s.helix_angles())
+    }
+
+    /// A member's parameters before any automatic value is resolved.
+    #[cfg(test)]
+    pub(crate) fn base_params_of(&self, i: usize) -> GearParams {
+        let s = self.indexed();
+        s.base_params(i, &s.helix_angles())
+    }
+
+    /// Whether the optimiser chose, agreed with the floor, or found nothing.
+    #[cfg(test)]
+    pub(crate) fn searched(&self, search: &crate::auto::Search) -> super::Searched {
+        let s = self.indexed();
+        let helix = s.helix_angles();
+        s.chosen_at(search, &helix)
+            .map_or(super::Searched::FoundNothing, |c| c.how)
+    }
+
+    /// The shifts the shape settles on at the shipped effort.
+    #[cfg(test)]
+    pub(crate) fn shifts(&self) -> Vec<f64> {
+        self.shifts_at(&crate::auto::Search::SHIPPED)
+    }
+
+    /// **The first member's pitch diameter**, mm, as the shape reads it
+    /// from the helix the readings decide — a worm's size, stated or
+    /// derived.
+    #[cfg(test)]
+    pub(crate) fn first_pitch_diameter(&self) -> f64 {
+        let s = self.indexed();
+        let m = &s.members[0];
+        f64::from(m.gear.teeth.max(1)) * m.normal_module() / s.helix_angles()[0].to_radians().cos()
+    }
+
+    /// The shifts the shape settles on under a search — what the tests
+    /// written against the retired stage types' own choosers ask.
+    #[cfg(test)]
+    pub(crate) fn shifts_at(&self, search: &crate::auto::Search) -> Vec<f64> {
+        let s = self.indexed();
+        let helix = s.helix_angles();
+        s.chosen_at(search, &helix)
+            .map(|c| c.shifts)
+            .unwrap_or_else(|_| s.asked(&helix).iter().map(|a| a.settled).collect())
+    }
+
+    /// Every member cut and every mesh at its running distance, at these
+    /// shifts, the helices as the readings decide.
+    #[cfg(test)]
+    pub(crate) fn build_at(&self, x: &[f64]) -> Result<Built, TrainError> {
+        let s = self.indexed();
+        let helix = s.helix_angles();
+        s.build(x, &helix, &s.plan(&helix).held)
+    }
+
+    /// **Whether a member is a worm's thread**: the first member of a mesh
+    /// across a distance sized as a worm drive — which is a thread with
+    /// proportions of its own, and no gear a gear tab can hold; its wheel
+    /// is one.
+    #[must_use]
+    pub fn is_worm_thread(&self, member: usize) -> bool {
+        self.indexed().is_worm_thread(member)
+    }
+
+    /// **Whether `count` identical planets on an axis can be assembled
+    /// equally spaced**, and whether they all mesh in the same phase.
+    ///
+    /// `None` where the rule below does not reach: an axis with a mesh to
+    /// another replicated axis, whose phase is not a central member's.
+    ///
+    /// # The rule
+    ///
+    /// A mesh between a central member `c` and a gear `p` on the axis is
+    /// the phase relation `z_c(θ_c − φ) + z_p(ψ − φ) ≡ K (mod 2π)`, the
+    /// kinematic row integrated, with the counts signed as the rows sign
+    /// them (a ring's negative), `φ` the planet's place round the carrier
+    /// and `ψ` its own turn. With every central member held at `θ_c = 0`
+    /// and the planets at `φ_j = 2πj/N`, two meshes `i, i'` on one axis
+    /// each fix `ψ_j` up to a whole tooth of their own gear, and the two
+    /// agree exactly when
+    ///
+    /// ```text
+    /// j (z_ci z_pi' − z_ci' z_pi) / N  ∈  z_pi ℤ + z_pi' ℤ  =  gcd(z_pi, z_pi') ℤ
+    /// ```
+    ///
+    /// for every `j` — that is, `N · gcd(z_pi, z_pi')` divides
+    /// `z_ci z_pi' − z_ci' z_pi`. On a simple planet, `z_pi = z_pi'`, this
+    /// is the textbook `N | z_s + z_r`; on a stepped planet it is
+    /// `N · gcd(z_p1, z_p2) | z_s z_p2 + z_r z_p1`. Simultaneous meshing —
+    /// every planet in the same phase — is `N | z_c` for every central
+    /// member the axis meets. `assembly` in this module's tests holds the
+    /// rule to a search over the phases that shares none of it.
+    #[must_use]
+    pub fn assembly(&self, axis: usize) -> Option<(bool, bool)> {
+        self.indexed().assembly(axis)
+    }
+
+    /// **What each member is, read off the shape** — the one rule, for the
+    /// harness's English and the panel's catalogue alike. A ring is a member
+    /// with a cutter; a planet is one on a carried axis; a sun meets a planet
+    /// from an axis that is not carried; a worm and its wheel are the two
+    /// ends of the first mesh on a distance marked as a worm drive; anything
+    /// else is a gear that goes by its number. Numbered where a role is
+    /// shared — a Wolfrom's two rings, a Ravigneaux's two suns, a hula's
+    /// two wobble gears — by the order the shape lists them.
+    #[must_use]
+    pub fn member_names(&self) -> Vec<MemberName> {
+        self.indexed().member_names()
+    }
+
+    /// **Each member's thickness coefficient, the automatic ones following
+    /// the given.** A mesh binds its two: across an external mesh they sum
+    /// to 2, and a ring takes its pinion's — so a given `k` is propagated
+    /// mesh by mesh, as the helix is, until nothing moves, and a member
+    /// nothing reaches is the standard tooth, `k = 1`.
+    #[must_use]
+    pub fn thickness_mods(&self) -> Vec<f64> {
+        self.indexed().thickness_mods()
+    }
+
+    /// **The screw gearing of a crossed mesh**, at the shifts the shape
+    /// settles on and the helices the readings decide — what the harness
+    /// prints a worm's lead angle and sizing from.
+    ///
+    /// # Errors
+    ///
+    /// [`TrainError::Screw`] where the pair cannot exist, and a wiring error
+    /// where the mesh is not on crossed shafts.
+    pub fn screw(&self, mesh: usize) -> Result<Screw, TrainError> {
+        self.indexed().screw(mesh)
+    }
+}
+
+impl Indexed<'_> {
+    /// [`Shape::is_worm_thread`], through the incidence.
+    pub fn is_worm_thread(&self, member: usize) -> bool {
+        self.meshes_of(member).iter().any(|&k| {
+            self.meshes[k].a == member
+                && self.distance_of(k).is_some_and(|d| self.distances[d].worm)
+        })
+    }
+
     /// **The frame a member's axis stands still in for meshing purposes**:
     /// its carrier where it rides one; where it is central, the carrier of
     /// the planets it meshes — a sun's or a ring's, whose axis that carrier
@@ -406,30 +634,21 @@ impl Shape {
         if c != GROUND {
             return c;
         }
-        self.meshes
+        self.meshes_of(member)
             .iter()
-            .filter_map(|m| {
-                (m.a == member)
-                    .then_some(m.b)
-                    .or((m.b == member).then_some(m.a))
+            .map(|&k| {
+                let m = self.meshes[k];
+                if m.a == member {
+                    m.b
+                } else {
+                    m.a
+                }
             })
             .find_map(|mate| {
                 let carrier = self.carrier_slot(self.axis_of_slot(self.slot_of_member(mate))?);
                 (carrier != GROUND && self.axis_of_slot(carrier) == Some(axis)).then_some(carrier)
             })
             .unwrap_or(GROUND)
-    }
-
-    /// Whether a body's axis is one of `N` alike.
-    fn replicated(&self, shaft: Body) -> bool {
-        self.axis_of_slot(shaft)
-            .is_some_and(|a| self.axes[a].count > 1)
-    }
-
-    /// How many instances of a body's axis there are.
-    fn count_of(&self, shaft: Body) -> u32 {
-        self.axis_of_slot(shaft)
-            .map_or(1, |a| self.axes[a].count.max(1))
     }
 
     /// A mesh's kind, from its members: internal where exactly one is a
@@ -547,26 +766,6 @@ impl Shape {
         )
     }
 
-    /// The distance a mesh runs at — the entry for its two axes, either way
-    /// round.
-    pub(crate) fn distance_of(&self, mesh: usize) -> Option<usize> {
-        let m = self.meshes[mesh];
-        let (a, b) = (
-            self.axis_of_slot(self.slot_of_member(m.a))?,
-            self.axis_of_slot(self.slot_of_member(m.b))?,
-        );
-        self.distances
-            .iter()
-            .position(|d| d.axes == [a, b] || d.axes == [b, a])
-    }
-
-    /// The meshes on one distance, in order.
-    pub(crate) fn meshes_on(&self, distance: usize) -> Vec<usize> {
-        (0..self.meshes.len())
-            .filter(|&m| self.distance_of(m) == Some(distance))
-            .collect()
-    }
-
     /// **Who can absorb for a later mesh on a distance**, in order of
     /// preference: the members of the first mesh and of this one with
     /// leverage on the difference between the two — a shift moves a
@@ -629,35 +828,7 @@ impl Shape {
         (!d.distance.auto).then_some(d.distance.manual)
     }
 
-    /// **Whether `count` identical planets on an axis can be assembled
-    /// equally spaced**, and whether they all mesh in the same phase.
-    ///
-    /// `None` where the rule below does not reach: an axis with a mesh to
-    /// another replicated axis, whose phase is not a central member's.
-    ///
-    /// # The rule
-    ///
-    /// A mesh between a central member `c` and a gear `p` on the axis is
-    /// the phase relation `z_c(θ_c − φ) + z_p(ψ − φ) ≡ K (mod 2π)`, the
-    /// kinematic row integrated, with the counts signed as the rows sign
-    /// them (a ring's negative), `φ` the planet's place round the carrier
-    /// and `ψ` its own turn. With every central member held at `θ_c = 0`
-    /// and the planets at `φ_j = 2πj/N`, two meshes `i, i'` on one axis
-    /// each fix `ψ_j` up to a whole tooth of their own gear, and the two
-    /// agree exactly when
-    ///
-    /// ```text
-    /// j (z_ci z_pi' − z_ci' z_pi) / N  ∈  z_pi ℤ + z_pi' ℤ  =  gcd(z_pi, z_pi') ℤ
-    /// ```
-    ///
-    /// for every `j` — that is, `N · gcd(z_pi, z_pi')` divides
-    /// `z_ci z_pi' − z_ci' z_pi`. On a simple planet, `z_pi = z_pi'`, this
-    /// is the textbook `N | z_s + z_r`; on a stepped planet it is
-    /// `N · gcd(z_p1, z_p2) | z_s z_p2 + z_r z_p1`. Simultaneous meshing —
-    /// every planet in the same phase — is `N | z_c` for every central
-    /// member the axis meets. `assembly` in this module's tests holds the
-    /// rule to a search over the phases that shares none of it.
-    #[must_use]
+    /// [`Shape::assembly`], through the incidence.
     pub fn assembly(&self, axis: usize) -> Option<(bool, bool)> {
         let count = self.axes.get(axis)?.count;
         // Each mesh from this axis to a central member: (signed central
@@ -707,15 +878,7 @@ impl Shape {
         Some((equal, simultaneous))
     }
 
-    /// **What each member is, read off the shape** — the one rule, for the
-    /// harness's English and the panel's catalogue alike. A ring is a member
-    /// with a cutter; a planet is one on a carried axis; a sun meets a planet
-    /// from an axis that is not carried; a worm and its wheel are the two
-    /// ends of the first mesh on a distance marked as a worm drive; anything
-    /// else is a gear that goes by its number. Numbered where a role is
-    /// shared — a Wolfrom's two rings, a Ravigneaux's two suns, a hula's
-    /// two wobble gears — by the order the shape lists them.
-    #[must_use]
+    /// [`Shape::member_names`], through the incidence.
     pub fn member_names(&self) -> Vec<MemberName> {
         let carried = |i: usize| self.is_planet_gear(i);
         let role = |i: usize| -> MemberRole {
@@ -1076,12 +1239,7 @@ impl Shape {
         }
     }
 
-    /// **Each member's thickness coefficient, the automatic ones following
-    /// the given.** A mesh binds its two: across an external mesh they sum
-    /// to 2, and a ring takes its pinion's — so a given `k` is propagated
-    /// mesh by mesh, as the helix is, until nothing moves, and a member
-    /// nothing reaches is the standard tooth, `k = 1`.
-    #[must_use]
+    /// [`Shape::thickness_mods`], through the incidence.
     pub fn thickness_mods(&self) -> Vec<f64> {
         let mut out: Vec<Option<f64>> = self
             .members
@@ -1112,22 +1270,6 @@ impl Shape {
             }
         }
         out.into_iter().map(|k| k.unwrap_or(1.0)).collect()
-    }
-
-    /// **The mesh groups**: the connected components of the mesh graph, in
-    /// member order — two gears in mesh share a normal module and a pressure
-    /// angle, so everything a run of meshes joins does. One group for a pair
-    /// or a set; two for a hula or a stepped planet, whose meshes do
-    /// not join; three for a layshaft's three pairs. A **layer over the
-    /// graph**, read off it and never stored: what a panel offers one box
-    /// for and writes to every member of.
-    #[must_use]
-    pub fn mesh_groups(&self) -> Vec<Vec<usize>> {
-        let mut groups = DisjointSets::new(self.members.len());
-        for m in &self.meshes {
-            groups.union(m.a, m.b);
-        }
-        groups.components()
     }
 
     /// The parameters a member builds at, at a shift: the addendum held to
@@ -1253,7 +1395,7 @@ impl Shape {
     fn plan_held(&self, helix: &[f64], held: Vec<Option<f64>>) -> Plan {
         let asked = self.asked(helix);
         let n = self.members.len();
-        let in_meshes = |i: usize| self.meshes.iter().filter(|m| m.a == i || m.b == i).count();
+        let in_meshes = |i: usize| self.meshes_of(i).len();
         let mut role: Vec<Role> = (0..n)
             .map(|i| {
                 if asked[i].given.is_some() {
@@ -1280,7 +1422,7 @@ impl Shape {
                 let mut planned = vec![false; self.meshes.len()];
                 loop {
                     let mut moved = false;
-                    for &m in &meshes {
+                    for &m in meshes {
                         if planned[m] {
                             continue;
                         }
@@ -1302,7 +1444,7 @@ impl Shape {
                         break;
                     }
                 }
-                for &m in &meshes {
+                for &m in meshes {
                     if planned[m] {
                         continue;
                     }
@@ -1555,7 +1697,8 @@ impl Shape {
         };
         let asked = self.distances[distance].tip_clearance;
         meshes
-            .into_iter()
+            .iter()
+            .copied()
             .filter(|&k| self.kind_of(k) == Some(MeshKind::Internal))
             .map(|k| {
                 let m = self.meshes[k];
@@ -1936,59 +2079,6 @@ impl Shape {
         })
     }
 
-    /// **Every member cut at its mesh group's module and pressure angle** —
-    /// the one member that states each, or the group's first where none
-    /// does — written into the members that follow. Two members that both
-    /// state one and disagree are left as they are: the mesh they share
-    /// refuses them by name, which is what a designer needs to see.
-    pub fn share(&mut self) {
-        for group in self.mesh_groups() {
-            let pick = |get: &dyn Fn(&Member) -> Auto<f64>| -> f64 {
-                group
-                    .iter()
-                    .map(|&i| get(&self.members[i]))
-                    .find(|a| !a.auto)
-                    .unwrap_or_else(|| get(&self.members[group[0]]))
-                    .manual
-            };
-            let module = pick(&|m| m.module);
-            let pressure_angle = pick(&|m| m.pressure_angle);
-            for &i in &group {
-                let m = &mut self.members[i];
-                if m.module.auto {
-                    m.module.manual = module;
-                }
-                if m.pressure_angle.auto {
-                    m.pressure_angle.manual = pressure_angle;
-                }
-            }
-        }
-    }
-
-    /// This shape, shared ([`Self::share`]).
-    #[must_use]
-    pub fn shared(&self) -> Self {
-        let mut s = self.clone();
-        s.share();
-        s
-    }
-
-    /// **Every mesh searched, or none** — what one switch on a stage used to
-    /// say, for a fixture that means the whole shape. The panel sets each
-    /// mesh's own.
-    pub fn set_search(&mut self, on: bool) {
-        for m in &mut self.meshes {
-            m.search = on;
-        }
-    }
-
-    /// **Every mesh under one sharing model** — as [`Self::set_search`].
-    pub fn set_load_sharing(&mut self, sharing: LoadSharing) {
-        for m in &mut self.meshes {
-            m.load_sharing = sharing;
-        }
-    }
-
     /// **The search's coordinates over the free members**: the sum and
     /// the division, not the two shifts, wherever both members of one mesh
     /// are free — the sum sets the operating pressure angle and the length
@@ -2048,10 +2138,7 @@ impl Shape {
             if plan.role[i] != Role::Free {
                 continue;
             }
-            let mine: Vec<usize> = (0..n)
-                .filter(|&k| self.meshes[k].a == i || self.meshes[k].b == i)
-                .collect();
-            for w in mine.windows(2) {
+            for w in self.meshes_of(i).windows(2) {
                 joined.union(w[0], w[1]);
             }
         }
@@ -2069,12 +2156,7 @@ impl Shape {
             }
         }
         (0..self.members.len())
-            .map(|i| {
-                self.meshes
-                    .iter()
-                    .enumerate()
-                    .any(|(k, m)| (m.a == i || m.b == i) && asks[partition[k]])
-            })
+            .map(|i| self.meshes_of(i).iter().any(|&k| asks[partition[k]]))
             .collect()
     }
 
@@ -2100,7 +2182,7 @@ impl Shape {
         let mut out: Vec<(Vec<usize>, Vec<usize>)> = Vec::new();
         for (k, axis) in axes.iter().enumerate() {
             let i = first_member(axis);
-            let touched = self.meshes.iter().position(|m| m.a == i || m.b == i);
+            let touched = self.meshes_of(i).first().copied();
             match touched.map(|m| partition[m]) {
                 Some(c) => match place[c] {
                     Some(p) => out[p].0.push(k),
@@ -2121,23 +2203,7 @@ impl Shape {
         out
     }
 
-    /// The shifts the closure settles on, or why it could not — what the
-    /// laws of the set's closure ask, with no rating in the way.
-    #[cfg(test)]
-    pub(crate) fn closure(&self) -> Result<Vec<f64>, TrainError> {
-        let helix = self.helix_angles();
-        self.chosen_at(&crate::auto::Search::SHIPPED, &helix)
-            .map(|c| c.shifts)
-    }
-
-    /// **The screw gearing of a crossed mesh**, at the shifts the shape
-    /// settles on and the helices the readings decide — what the harness
-    /// prints a worm's lead angle and sizing from.
-    ///
-    /// # Errors
-    ///
-    /// [`TrainError::Screw`] where the pair cannot exist, and a wiring error
-    /// where the mesh is not on crossed shafts.
+    /// [`Shape::screw`], through the incidence.
     pub fn screw(&self, mesh: usize) -> Result<Screw, TrainError> {
         if !self.is_crossed(mesh) {
             return Err(TrainError::Wiring(super::WiringError::NotAMesh(mesh)));
@@ -2147,61 +2213,6 @@ impl Shape {
             .chosen_at(&crate::auto::Search::SHIPPED, &helix)?
             .shifts;
         self.screw_of(mesh, &x, &helix)
-    }
-
-    /// The gear a member would build at a shift, the helix as the readings
-    /// decide.
-    #[cfg(test)]
-    pub(crate) fn params_of(&self, i: usize, x: f64) -> GearParams {
-        self.params_at(i, x, &self.helix_angles())
-    }
-
-    /// A member's parameters before any automatic value is resolved.
-    #[cfg(test)]
-    pub(crate) fn base_params_of(&self, i: usize) -> GearParams {
-        self.base_params(i, &self.helix_angles())
-    }
-
-    /// Whether the optimiser chose, agreed with the floor, or found nothing.
-    #[cfg(test)]
-    pub(crate) fn searched(&self, search: &crate::auto::Search) -> super::Searched {
-        let helix = self.helix_angles();
-        self.chosen_at(search, &helix)
-            .map_or(super::Searched::FoundNothing, |c| c.how)
-    }
-
-    /// The shifts the shape settles on at the shipped effort.
-    #[cfg(test)]
-    pub(crate) fn shifts(&self) -> Vec<f64> {
-        self.shifts_at(&crate::auto::Search::SHIPPED)
-    }
-
-    /// **The first member's pitch diameter**, mm, as the shape reads it
-    /// from the helix the readings decide — a worm's size, stated or
-    /// derived.
-    #[cfg(test)]
-    pub(crate) fn first_pitch_diameter(&self) -> f64 {
-        let m = &self.members[0];
-        f64::from(m.gear.teeth.max(1)) * m.normal_module()
-            / self.helix_angles()[0].to_radians().cos()
-    }
-
-    /// The shifts the shape settles on under a search — what the tests
-    /// written against the retired stage types' own choosers ask.
-    #[cfg(test)]
-    pub(crate) fn shifts_at(&self, search: &crate::auto::Search) -> Vec<f64> {
-        let helix = self.helix_angles();
-        self.chosen_at(search, &helix)
-            .map(|c| c.shifts)
-            .unwrap_or_else(|_| self.asked(&helix).iter().map(|a| a.settled).collect())
-    }
-
-    /// Every member cut and every mesh at its running distance, at these
-    /// shifts, the helices as the readings decide.
-    #[cfg(test)]
-    pub(crate) fn build_at(&self, x: &[f64]) -> Result<Built, TrainError> {
-        let helix = self.helix_angles();
-        self.build(x, &helix, &self.plan(&helix).held)
     }
 
     /// The product of every mesh's efficiency at these shifts, or nothing
@@ -2307,7 +2318,7 @@ struct Plan {
     constraints: Vec<Constraint>,
     /// **The running distance each distance is held to**, where it is: the
     /// one stated with its clearance, or the one the tips sized it to
-    /// ([`Shape::sized`]). A held distance is one every mesh on it reaches.
+    /// ([`Indexed::sized`]). A held distance is one every mesh on it reaches.
     held: Vec<Option<f64>>,
     /// The members that reach a sum on a given distance, **in the order
     /// they were planned** — a shared member reached from one mesh is what
@@ -2349,7 +2360,7 @@ struct ClosureStructure {
     every: SearchStructure,
 }
 
-/// What a search moves, and how it groups it ([`Shape::search_components`]).
+/// What a search moves, and how it groups it ([`Indexed::search_components`]).
 #[derive(Debug)]
 #[allow(
     dead_code,
@@ -2365,10 +2376,11 @@ struct SearchStructure {
 impl Shape {
     /// **The shape's [`Structure`]**, read as [`cut`] reads it: every member
     /// at its group's module and pressure angle, the helices resolved, the
-    /// frames from the wiring, and the plan [`Self::chosen_at`] starts from.
+    /// frames from the wiring, and the plan [`Indexed::chosen_at`] starts from.
     #[must_use]
     pub fn structure(&self) -> Structure {
-        let shape = self.shared();
+        let shared = self.shared();
+        let shape = shared.indexed();
         let wiring = shape.wiring();
         let frames = (0..shape.meshes.len()).map(|k| wiring.frame(k)).collect();
         let (helix, conflict) = shape.resolved_helices();
@@ -2378,15 +2390,17 @@ impl Shape {
         };
         Structure { frames, closure }
     }
+}
 
-    /// [`Self::structure`]'s closure, as [`Self::chosen_at`] builds it.
+impl Indexed<'_> {
+    /// [`Shape::structure`]'s closure, as [`Self::chosen_at`] builds it.
     fn closure_structure(&self, helix: &[f64]) -> Result<ClosureStructure, TrainError> {
         let (plan, _) = self.sized_plan(helix)?;
-        let mut every = self.clone();
+        let mut every = self.shape().clone();
         every.set_search(true);
         Ok(ClosureStructure {
             asked: self.search_structure(&plan),
-            every: every.search_structure(&plan),
+            every: every.indexed().search_structure(&plan),
             roles: plan.role,
             held: plan.held,
             constraints: plan.constraints,
@@ -2551,7 +2565,7 @@ pub(crate) struct BuiltMesh {
     pub(crate) running: f64,
     pub(crate) contact: BuiltContact,
     /// Per side: the tip held to its mate's junction on this mesh
-    /// ([`Shape::tip_holds`]), so it reaches past nothing.
+    /// ([`Indexed::tip_holds`]), so it reaches past nothing.
     pub(crate) held: [bool; 2],
     /// Per side: the radius a held tip landed on, as the hold read it
     /// off the mate as first cut. Read by the laws that hold the tip to it.
@@ -2933,13 +2947,13 @@ pub(crate) struct Built {
     /// Per distance: the running distance every mesh on it agrees at.
     pub(crate) running: Vec<Option<f64>>,
     /// Per member: the addendum its meshes held its tip to, where one did
-    /// ([`Shape::tip_holds`]).
+    /// ([`Indexed::tip_holds`]).
     pub(crate) mate: Vec<Option<f64>>,
     /// Per member: asked to be held, and no tip length clears a mate.
     pub(crate) unholdable: Vec<bool>,
 }
 
-impl Shape {
+impl Indexed<'_> {
     /// **Every member cut and every mesh at its running distance**, at these
     /// shifts.
     fn build(&self, x: &[f64], helix: &[f64], held: &[Option<f64>]) -> Result<Built, TrainError> {
@@ -3256,7 +3270,7 @@ fn lands_on(tip: f64, bound: f64) -> bool {
     tip.to_bits() == bound.to_bits()
 }
 
-/// What [`Shape::tip_holds`] found.
+/// What [`Indexed::tip_holds`] found.
 struct Holds {
     /// Per member: the addendum its meshes hold its tip to, where it binds.
     bound: Vec<Option<f64>>,
@@ -3402,14 +3416,14 @@ pub struct ShapeResult {
 pub struct Cut {
     /// Every member at its group's module and pressure angle.
     shape: Shape,
-    /// Every member's helix angle, degrees ([`Shape::helix_angles`]).
+    /// Every member's helix angle, degrees ([`Indexed::helix_angles`]).
     helix: Vec<f64>,
     wiring: Wiring,
     chosen: Chosen,
     built: Built,
     materials: Vec<Material>,
-    /// The meshes each member is in.
-    meshes_of: Vec<Vec<usize>>,
+    /// What meets what in `shape`, built once for the cut and its rating.
+    at: Incidence,
     /// The width a worm distance's proportions give a member, where one does.
     recommended: Vec<Option<f64>>,
     /// Each mesh's efficiency sliding, and at rest.
@@ -3438,7 +3452,8 @@ impl Cut {
 
     /// Whether member `i` is in a line mesh.
     fn on_a_line(&self, i: usize) -> bool {
-        self.meshes_of[i]
+        self.at
+            .meshes_of(i)
             .iter()
             .any(|&k| self.built.meshes[k].line().is_some())
     }
@@ -3455,9 +3470,14 @@ impl Cut {
         let m = self.shape.meshes[k];
         [width(m.a), width(m.b)]
     }
+
+    /// The cut shape, read through the incidence the cut built.
+    fn indexed(&self) -> Indexed<'_> {
+        Indexed::over(&self.shape, &self.at)
+    }
 }
 
-impl Shape {
+impl Indexed<'_> {
     /// **Where two axes on one carrier stand**: for each distance joining
     /// two axes one carrier carries, each at a running distance from the
     /// carrier's own axis, the angle about that axis between them, degrees
@@ -3472,9 +3492,8 @@ impl Shape {
     /// gives it, so the shape describes nothing that can be assembled.
     pub(crate) fn staggers(&self, running: &[Option<f64>]) -> Result<Vec<Option<f64>>, TrainError> {
         let between = |a: usize, b: usize| {
-            self.distances
-                .iter()
-                .position(|d| d.axes == [a, b] || d.axes == [b, a])
+            self.at
+                .between(a, b)
                 .and_then(|d| running.get(d).copied().flatten())
         };
         let mut out = vec![None; self.distances.len()];
@@ -3525,7 +3544,9 @@ impl Shape {
 pub fn cut(shape: &Shape, lib: &MaterialLibrary) -> Result<Cut, TrainError> {
     // **Every member at its group's module and pressure angle** before
     // anything reads one — a member that follows reads what it follows.
-    let shape = shape.shared();
+    let shared = shape.shared();
+    let at = Incidence::of(&shared);
+    let shape = Indexed::over(&shared, &at);
     let n = shape.members.len();
     let (helix, conflict) = shape.resolved_helices();
     if let Some(meshes) = conflict {
@@ -3554,14 +3575,6 @@ pub fn cut(shape: &Shape, lib: &MaterialLibrary) -> Result<Cut, TrainError> {
         })
         .collect::<Result<_, _>>()?;
 
-    // ---- the meshes each member is in.
-    let meshes_of: Vec<Vec<usize>> = (0..n)
-        .map(|i| {
-            (0..shape.meshes.len())
-                .filter(|&k| shape.meshes[k].a == i || shape.meshes[k].b == i)
-                .collect()
-        })
-        .collect();
     // ---- the widths a point contact runs at, decided before anything that
     // reads them: a worm distance's conventional proportions, or the width
     // in the box. Nothing rates a crossed pair's face — its pressure does
@@ -3572,7 +3585,7 @@ pub fn cut(shape: &Shape, lib: &MaterialLibrary) -> Result<Cut, TrainError> {
     // point contact's zone is read at the width it ends with.
     let recommended: Vec<Option<f64>> = (0..n)
         .map(|i| {
-            meshes_of[i].iter().find_map(|&k| {
+            shape.meshes_of(i).iter().find_map(|&k| {
                 let d = shape.distance_of(k)?;
                 let BuiltContact::Point(p) = &built.meshes[k].contact else {
                     return None;
@@ -3597,13 +3610,13 @@ pub fn cut(shape: &Shape, lib: &MaterialLibrary) -> Result<Cut, TrainError> {
         })
         .collect();
     let mut cut = Cut {
-        shape,
+        shape: shared,
         helix,
         wiring,
         chosen,
         built,
         materials,
-        meshes_of,
+        at,
         recommended,
         sliding: Vec::new(),
         at_rest: Vec::new(),
@@ -3671,19 +3684,21 @@ pub fn rate(
     reversal: super::Reversal,
 ) -> Result<ShapeResult, TrainError> {
     let Cut {
-        shape,
+        shape: _,
         helix,
         wiring,
         chosen,
         built,
         materials,
-        meshes_of,
+        at: _,
         recommended,
         sliding,
         at_rest,
         bendings,
         staggers,
     } = cut;
+    let shape = &cut.indexed();
+    let meshes_of = |i: usize| shape.meshes_of(i);
     let n = shape.members.len();
     let x = &chosen.shifts;
     let on_a_line = |i: usize| cut.on_a_line(i);
@@ -3798,7 +3813,7 @@ pub fn rate(
         )
         .map(|s| s * b.share)
     };
-    let always_reverses = |i: usize| meshes_of[i].len() > 1;
+    let always_reverses = |i: usize| meshes_of(i).len() > 1;
     let rating = |i: usize, widths: &[f64]| -> MemberRating<'_> {
         // A line mesh's loading at the probe width, every case a scale of
         // it; a point mesh's at its own width, case by case.
@@ -3809,7 +3824,7 @@ pub fn rate(
                 case: load.case,
                 kind: load.kind,
                 reverses: load.reverses(),
-                meshes: meshes_of[i]
+                meshes: meshes_of(i)
                     .iter()
                     .map(|&k| {
                         let m = shape.meshes[k];
@@ -3885,7 +3900,7 @@ pub fn rate(
         })
         .collect();
     let for_overlap = |i: usize| -> f64 {
-        meshes_of[i]
+        meshes_of(i)
             .iter()
             .map(|&k| mesh_floor[k])
             .fold(0.0_f64, f64::max)
@@ -3921,7 +3936,7 @@ pub fn rate(
         .collect();
     let widths: Vec<f64> = (0..n)
         .map(|i| {
-            let wanted = meshes_of[i]
+            let wanted = meshes_of(i)
                 .iter()
                 .map(|&k| mesh_ask[k])
                 .fold(0.0_f64, f64::max);
@@ -4006,7 +4021,7 @@ pub fn rate(
         // of its three shifts given and its distance too — is said of that
         // mesh, and a mesh assembled inside its zero-backlash distance is
         // said of that one.
-        for &k in &meshes {
+        for &k in meshes {
             let bm = &built.meshes[k];
             notes.extend(super::distance_notes(
                 shape
@@ -4205,7 +4220,7 @@ pub fn rate(
     // body's figure (`ShapeResult::cases`), not the gear's. A member in two
     // meshes reports the larger.
     let member_torque = |i: usize, c: &super::CaseLoad| -> f64 {
-        meshes_of[i]
+        meshes_of(i)
             .iter()
             .map(|&k| {
                 let m = shape.meshes[k];
@@ -4466,6 +4481,73 @@ impl Shape {
         out
     }
 
+    /// **One relation per mesh**: a mesh's two shifts, the clearance and the
+    /// size are related to the distance it runs at by one equation, so of
+    /// them all but one may be given. **The distance is a freedom of the
+    /// first mesh on it alone**: an automatic distance is whatever the
+    /// first mesh's shifts leave, and every later mesh on it *absorbs* the
+    /// difference on one of its members — so a later mesh's relation is
+    /// the shifts that can absorb for it, in the plan's own order of
+    /// preference ([`Indexed::absorbers`]), and at least one of those gives:
+    /// a planet between a sun and a ring before either, never a planet
+    /// between two rings, which closes nothing, and neither the clearance
+    /// nor the size, which move every mesh on the distance together and
+    /// close no difference between two.
+    /// The distance gives way first — it is the one a designer expects to
+    /// give when they pin everything else — then the shifts, then the
+    /// clearance, then the size, since a shift moves the teeth where a
+    /// size changes them. And of the distance and the clearance at most
+    /// one may be automatic.
+    ///
+    /// It was one relation per *distance*, counting entries less meshes —
+    /// the right total and the wrong distribution: a layshaft's three pairs
+    /// pinned and relieved gave the distance and the first pair's two
+    /// shifts back and left the other two pairs both-given on a distance
+    /// the first defined, which the solve refuses (`NoCommonDistance`).
+    /// The law `every_input_relief_leaves_given_is_honoured_by_the_solve`
+    /// found it the day the layshaft joined the presets it sweeps.
+    ///
+    /// The clearance sits *after* the shifts, where the pair had it before
+    /// them, because a shape with three shifts on one distance can be over
+    /// by two: relieving the clearance would hand it straight back to the
+    /// group below, which pins it again, and the walk would never settle.
+    /// A shift gives instead, which is what the set's own kind did.
+    pub fn freedoms(&self) -> Vec<FreedomGroup> {
+        self.indexed().freedoms()
+    }
+
+    /// The shape *is* the topology: each member spins with its body in the
+    /// frame its axis stands still in, and a mesh's sign is its members'.
+    pub fn wiring(&self) -> Wiring {
+        self.indexed().wiring()
+    }
+
+    /// **Every body that is not replicated is a port**, in body order — a
+    /// pair's two members, a set's sun, carrier and ring, a layshaft, a
+    /// shaft an offset coupling turns, and a single orbiting member: a
+    /// hula's wobble body is the same body with four gears on it. (For a
+    /// while a body
+    /// on a carried axis was no port, because a case reacted every open
+    /// port it did not load and so held the wobble body; a case declares
+    /// what it reacts now, and an orbiting port is a port.) What is held by
+    /// convention is the first ring's body, where there is a ring.
+    pub fn ports(&self) -> Ports {
+        let ports: Vec<Body> = (1..=self.bodies.len())
+            .filter(|&s| !self.replicated(s))
+            .collect();
+        let held: Vec<Body> = self
+            .members
+            .iter()
+            .filter(|m| m.ring.is_some())
+            .map(|m| self.slot(m.body))
+            .find(|s| ports.contains(s))
+            .into_iter()
+            .collect();
+        Ports { ports, held }
+    }
+}
+
+impl Indexed<'_> {
     /// **Every reading of a size, mesh group by mesh group**: each member's
     /// helix in its own hand and its pitch diameter, and the group's first
     /// mesh's overlap where every width of the group is given and the
@@ -4506,37 +4588,7 @@ impl Shape {
         out
     }
 
-    /// **One relation per mesh**: a mesh's two shifts, the clearance and the
-    /// size are related to the distance it runs at by one equation, so of
-    /// them all but one may be given. **The distance is a freedom of the
-    /// first mesh on it alone**: an automatic distance is whatever the
-    /// first mesh's shifts leave, and every later mesh on it *absorbs* the
-    /// difference on one of its members — so a later mesh's relation is
-    /// the shifts that can absorb for it, in the plan's own order of
-    /// preference ([`Self::absorbers`]), and at least one of those gives:
-    /// a planet between a sun and a ring before either, never a planet
-    /// between two rings, which closes nothing, and neither the clearance
-    /// nor the size, which move every mesh on the distance together and
-    /// close no difference between two.
-    /// The distance gives way first — it is the one a designer expects to
-    /// give when they pin everything else — then the shifts, then the
-    /// clearance, then the size, since a shift moves the teeth where a
-    /// size changes them. And of the distance and the clearance at most
-    /// one may be automatic.
-    ///
-    /// It was one relation per *distance*, counting entries less meshes —
-    /// the right total and the wrong distribution: a layshaft's three pairs
-    /// pinned and relieved gave the distance and the first pair's two
-    /// shifts back and left the other two pairs both-given on a distance
-    /// the first defined, which the solve refuses (`NoCommonDistance`).
-    /// The law `every_input_relief_leaves_given_is_honoured_by_the_solve`
-    /// found it the day the layshaft joined the presets it sweeps.
-    ///
-    /// The clearance sits *after* the shifts, where the pair had it before
-    /// them, because a shape with three shifts on one distance can be over
-    /// by two: relieving the clearance would hand it straight back to the
-    /// group below, which pins it again, and the walk would never settle.
-    /// A shift gives instead, which is what the set's own kind did.
+    /// [`Shape::freedoms`], through the incidence.
     pub fn freedoms(&self) -> Vec<FreedomGroup> {
         let mut groups = Vec::new();
         // **One size entry per mesh group**: in the relation of the first
@@ -4643,8 +4695,7 @@ impl Shape {
         groups
     }
 
-    /// The shape *is* the topology: each member spins with its body in the
-    /// frame its axis stands still in, and a mesh's sign is its members'.
+    /// [`Shape::wiring`], through the incidence.
     pub fn wiring(&self) -> Wiring {
         Wiring {
             slots: (0..=self.bodies.len()).map(|s| self.label_of(s)).collect(),
@@ -4676,30 +4727,6 @@ impl Shape {
                 .map(|c| c.map(|b| self.slot(b)))
                 .collect(),
         }
-    }
-
-    /// **Every body that is not replicated is a port**, in body order — a
-    /// pair's two members, a set's sun, carrier and ring, a layshaft, a
-    /// shaft an offset coupling turns, and a single orbiting member: a
-    /// hula's wobble body is the same body with four gears on it. (For a
-    /// while a body
-    /// on a carried axis was no port, because a case reacted every open
-    /// port it did not load and so held the wobble body; a case declares
-    /// what it reacts now, and an orbiting port is a port.) What is held by
-    /// convention is the first ring's body, where there is a ring.
-    pub fn ports(&self) -> Ports {
-        let ports: Vec<Body> = (1..=self.bodies.len())
-            .filter(|&s| !self.replicated(s))
-            .collect();
-        let held: Vec<Body> = self
-            .members
-            .iter()
-            .filter(|m| m.ring.is_some())
-            .map(|m| self.slot(m.body))
-            .find(|s| ports.contains(s))
-            .into_iter()
-            .collect();
-        Ports { ports, held }
     }
 }
 
@@ -4740,7 +4767,7 @@ mod tests {
             s.distances[0].worm = false;
             s
         }] {
-            assert!(shape.is_crossed(0) && shape.screw(0).is_ok());
+            assert!(shape.indexed().is_crossed(0) && shape.screw(0).is_ok());
             let r = try_alone_at(&shape, 2.0, 3000.0).unwrap();
             assert!(r.meshes[0].point.is_some());
             assert_eq!(r.members.len(), 2);
@@ -5677,7 +5704,7 @@ mod tests {
                     Auto::fixed(settled[i])
                 };
             }
-            let plan = s.plan(&s.helix_angles());
+            let plan = s.indexed().plan(&s.indexed().helix_angles());
             assert_eq!(
                 plan.role[absorber],
                 Role::Absorbs(0),
@@ -5718,7 +5745,10 @@ mod tests {
     /// the set is refused for it unless its distances happen to agree.
     #[test]
     fn the_planet_closes_the_set_unless_it_is_pinned() {
-        let role_of = |shape: &Shape| shape.plan(&shape.helix_angles()).role;
+        let role_of = |shape: &Shape| {
+            let s = shape.indexed();
+            s.plan(&s.helix_angles()).role
+        };
         assert_eq!(role_of(&arr::planetary(12, 30, 72, 3))[1], Role::Absorbs(0));
         let mut s = arr::planetary(12, 30, 72, 3);
         s.members[1].gear.profile_shift = Auto::fixed(0.0);
@@ -7204,10 +7234,11 @@ mod rings_as_members {
                 m.gear.min_tip_width = min;
                 m.gear.addendum = 1.4;
             }
-            let helix = shape.helix_angles();
+            let s = shape.indexed();
+            let helix = s.helix_angles();
             for i in 0..shape.members.len() {
                 for x in [-0.3, 0.0, 0.5] {
-                    let p = shape.params_at(i, x, &helix);
+                    let p = s.params_at(i, x, &helix);
                     let (width, widest) = match shape.members[i].ring {
                         None => {
                             let t = Tooth::new(p);
@@ -7240,7 +7271,8 @@ mod rings_as_members {
     fn a_ring_asking_for_no_undercut_is_generated_to_its_tip() {
         let mut short_at_zero = 0;
         for preset in Preset::ALL {
-            let shape = preset.build();
+            let built = preset.build();
+            let shape = built.indexed();
             let helix = shape.helix_angles();
             let asked = shape.asked(&helix);
             for (i, (member, a)) in shape.members.iter().zip(&asked).enumerate() {
@@ -7287,7 +7319,8 @@ mod rings_as_members {
     fn a_search_starts_at_every_members_floor() {
         let mut rings = 0;
         for preset in Preset::ALL {
-            let shape = preset.build();
+            let built = preset.build();
+            let shape = built.indexed();
             let helix = shape.helix_angles();
             let asked = shape.asked(&helix);
             for (i, a) in asked.iter().enumerate() {
@@ -7335,6 +7368,7 @@ mod tip_sizing {
                 s
             },
         ] {
+            let shape = shape.indexed();
             let helix = shape.helix_angles();
             let plan = shape.plan(&helix);
             let (held, bound_by) = shape.sized(&helix, &plan, &[]).unwrap();
@@ -7631,10 +7665,11 @@ mod partition_laws {
             assert_eq!(s.mesh_groups(), components(n, meshed), "{name}");
             // Two members are one part where a mesh joins them or their
             // meshes are on one distance.
+            let at = s.indexed();
             let distance_of = |i: usize| -> Vec<Option<usize>> {
                 (0..s.meshes.len())
                     .filter(|&k| s.meshes[k].a == i || s.meshes[k].b == i)
-                    .map(|k| s.distance_of(k))
+                    .map(|k| at.distance_of(k))
                     .collect()
             };
             let parted = |i: usize, j: usize| {
@@ -7658,7 +7693,8 @@ mod partition_laws {
     fn a_search_component_is_one_asking_component() {
         let (mut checked, mut searched) = (0, 0);
         for (name, shape) in shapes() {
-            let shape = shape.shared();
+            let shared = shape.shared();
+            let shape = shared.indexed();
             let (helix, conflict) = shape.resolved_helices();
             if conflict.is_some() {
                 continue;
@@ -7666,8 +7702,9 @@ mod partition_laws {
             let Ok((plan, _)) = shape.sized_plan(&helix) else {
                 continue;
             };
-            let mut every = shape.clone();
+            let mut every = shared.clone();
             every.set_search(true);
+            let every = every.indexed();
             for s in [&shape, &every] {
                 let on = |k: usize, i: usize| s.meshes[k].a == i || s.meshes[k].b == i;
                 let joined = |k: usize, q: usize| {

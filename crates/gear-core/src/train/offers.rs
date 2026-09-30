@@ -154,7 +154,7 @@ impl Train {
             }
             Target::Mesh(k) if k < s.meshes.len() => {
                 let m = s.meshes[k];
-                if let Some(distance) = s.distance_of(k) {
+                if let Some(distance) = s.indexed().distance_of(k) {
                     for shared in [s.members[m.a].body, s.members[m.b].body] {
                         out.push(plain(Edit::AddRatio { distance, shared }));
                     }
@@ -326,9 +326,11 @@ mod tests {
             for d in 0..s.distances.len() {
                 for &shared in &bodies {
                     let on_shared = |i: usize| s.members[i].body == shared;
-                    let meshes = s
+                    let at = s.indexed();
+                    let meshes = at
                         .meshes_on(d)
-                        .into_iter()
+                        .iter()
+                        .copied()
                         .filter(|&k| on_shared(s.meshes[k].a) || on_shared(s.meshes[k].b));
                     let at = std::iter::once(Target::Distance(d)).chain(meshes.map(Target::Mesh));
                     sweep.push((

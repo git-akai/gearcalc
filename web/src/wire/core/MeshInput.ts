@@ -39,8 +39,8 @@ load_sharing: LoadSharing,
  *
  * **The search's unit is not the mesh but its component** — the meshes
  * a free member is shared between, and every mesh on an automatic
- * distance an absorber ties together ([`Shape::search_components`]):
- * a planet's shift moves both its meshes. So a component is searched
+ * distance an absorber ties together: a planet's shift moves both its
+ * meshes. So a component is searched
  * where *any* of its meshes asks, and a component none of whose
  * meshes asks keeps its undercut shifts. What is given constrains the
  * search rather than being overruled by it.

@@ -198,7 +198,7 @@ mod tests {
             let mut s = stage.clone();
             s.distances[0].angle = 0.0;
             s.set_search(false);
-            s.with_additional_helix(stage.helix_angles()[0])
+            s.with_additional_helix(stage.indexed().helix_angles()[0])
         };
         try_alone(&flat)
             .expect("the parallel counterpart is buildable")
@@ -1260,7 +1260,7 @@ mod tests {
         // The helix angles are what the shaft angle says they are, and they sum
         // to it — the relation the screw model runs on.
         let (b1, b2) = {
-            let h = spur.helix_angles();
+            let h = spur.indexed().helix_angles();
             (h[0], h[1])
         };
         assert!((b1 - 45.0).abs() < 1e-12 && (b2 - 45.0).abs() < 1e-12);
@@ -1278,7 +1278,7 @@ mod tests {
         for additional in [0.0_f64, 12.5, -30.0] {
             let stage = arr::pair([17, 43]).with_additional_helix(additional);
             let (b1, b2) = {
-                let h = stage.helix_angles();
+                let h = stage.indexed().helix_angles();
                 (h[0], h[1])
             };
             assert!((b1 - additional).abs() < 1e-12);

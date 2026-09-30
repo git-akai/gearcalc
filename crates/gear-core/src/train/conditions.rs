@@ -1189,13 +1189,13 @@ impl Train {
                         || matches!(c.duty, super::Duty::Intermittent { at, .. } if at == body)
                 })
         };
-        let s = &self.shape;
+        let s = &self.shape.indexed();
         let bare: Vec<usize> = s
             .bodies
             .iter()
             .map(|b| b.body)
             .filter(|&b| {
-                s.members_on_body(b).is_empty()
+                s.members_on(b).is_empty()
                     && !s.carries_an_axis(b)
                     && !s.couplings.iter().any(|c| c.contains(&b))
                     && !named(b)
