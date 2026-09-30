@@ -20,6 +20,7 @@
 pub mod auto;
 pub mod contact;
 pub mod elliptic;
+pub mod field;
 #[cfg(feature = "serde")]
 pub mod finite;
 pub mod gear;
