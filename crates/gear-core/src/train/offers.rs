@@ -241,40 +241,11 @@ mod tests {
     //! hold, removal, ratio, step, coupling and stage at every index — is
     //! offered at the piece it names.
 
-    use super::super::testing::{cased, grid, Context, SPEED_RPM as SPEED, TORQUE_NM as TORQUE};
-    use super::super::{solve_train, test_library, CaseKind, LoadRole, TrainError};
+    use super::super::sweep::{starts as trains, step, targets, Lcg, DEPTH, WALKS};
+    use super::super::testing::cased;
+    use super::super::{solve_train, test_library, LoadRole, TrainError};
     use super::*;
     use std::panic::{catch_unwind, AssertUnwindSafe};
-
-    /// Every train of the grid ([`super::super::testing`]), and alone and
-    /// after a pair each with its first gear's helix given.
-    fn trains() -> Vec<(String, Train)> {
-        let mut out = Vec::new();
-        for e in grid() {
-            out.push((e.name.clone(), e.train()));
-            if e.context == Context::BeforeLayshaft {
-                continue;
-            }
-            out.push((
-                format!("{}, helix 20", e.name),
-                e.train_of(e.shape.clone().with_first_helix(20.0)),
-            ));
-        }
-        out
-    }
-
-    /// Every piece of the train, and the train.
-    fn targets(t: &Train) -> Vec<Target> {
-        let s = &t.shape;
-        std::iter::once(Target::Train)
-            .chain((0..s.members.len()).map(Target::Member))
-            .chain((0..s.meshes.len()).map(Target::Mesh))
-            .chain(s.bodies.iter().map(|b| Target::Body(b.body)))
-            .chain((0..s.axes.len()).map(Target::Axis))
-            .chain((0..s.distances.len()).map(Target::Distance))
-            .chain((0..s.couplings.len()).map(Target::Coupling))
-            .collect()
-    }
 
     #[test]
     fn an_offer_is_its_edit() {
@@ -463,20 +434,6 @@ mod tests {
         );
     }
 
-    /// A fixed linear congruential generator (Knuth's MMIX constants): the
-    /// walk's one source of choice, so a failure replays from its seed.
-    struct Lcg(u64);
-
-    impl Lcg {
-        fn pick(&mut self, n: usize) -> usize {
-            self.0 = self
-                .0
-                .wrapping_mul(6_364_136_223_846_793_005)
-                .wrapping_add(1_442_695_040_888_963_407);
-            usize::try_from(self.0 >> 33).unwrap() % n.max(1)
-        }
-    }
-
     /// Whether a solve failed as a wiring that describes no mechanism —
     /// which an edit the graph offers must never make.
     fn wiring(e: &TrainError) -> bool {
@@ -484,60 +441,6 @@ mod tests {
             TrainError::Wiring(_) => true,
             TrainError::InPart { cause, .. } => wiring(cause),
             _ => false,
-        }
-    }
-
-    /// One step of a walk: a case added or its duty switched, a hold, a
-    /// release or a join at a body, or any offer the graph makes at any
-    /// piece — each as the panel asks it. `None` where the choice made
-    /// has nothing to offer.
-    fn step(t: &Train, rng: &mut Lcg, log: &mut Vec<String>) -> Option<Train> {
-        let mut u = t.clone();
-        match rng.pick(8) {
-            0 => {
-                let kind = [CaseKind::Ultimate, CaseKind::Fatigue][rng.pick(2)];
-                log.push(format!("fresh_case({kind:?})"));
-                let case = u.fresh_case(kind, TORQUE, SPEED);
-                u.load_cases.push(case);
-                Some(u)
-            }
-            1 if !u.load_cases.is_empty() => {
-                let (case, intermittent) = (rng.pick(u.load_cases.len()), rng.pick(2) == 0);
-                log.push(format!("set_duty({case}, {intermittent})"));
-                u.set_duty(case, intermittent);
-                Some(u)
-            }
-            2 | 3 if !u.shape.bodies.is_empty() => {
-                let b = u.shape.bodies[rng.pick(u.shape.bodies.len())].body;
-                let open: Vec<Edit> = t
-                    .offers(Target::Body(b))
-                    .into_iter()
-                    .filter(|o| o.refused.is_none())
-                    .map(|o| o.edit)
-                    .filter(|e| matches!(e, Edit::Hold(_) | Edit::Release(_) | Edit::Join { .. }))
-                    .collect();
-                let edit = open.get(rng.pick(open.len()))?.clone();
-                log.push(format!("{edit:?}"));
-                u.edit(edit).unwrap();
-                Some(u)
-            }
-            _ => {
-                let at = targets(t);
-                let at = at[rng.pick(at.len())];
-                let open: Vec<Offer> = t
-                    .offers(at)
-                    .into_iter()
-                    .filter(|o| o.refused.is_none())
-                    .collect();
-                let offer = open.get(rng.pick(open.len()))?;
-                let named = match &offer.edit {
-                    Edit::Insert { at, .. } => format!("Insert {:?} at {at:?}", offer.preset),
-                    e => format!("{e:?}"),
-                };
-                log.push(format!("{named} @ {at:?}"));
-                u.edit(offer.edit.clone()).unwrap();
-                Some(u)
-            }
         }
     }
 
@@ -576,8 +479,6 @@ mod tests {
     /// case names, a join onto a held body.
     #[test]
     fn a_walk_of_offered_edits_keeps_the_train_whole() {
-        const WALKS: usize = 200;
-        const DEPTH: usize = 4;
         let starts = trains();
         let mut failures: Vec<String> = Vec::new();
         for walk in 0..WALKS {
@@ -595,7 +496,8 @@ mod tests {
             };
             for _ in 0..DEPTH {
                 let made = catch_unwind(AssertUnwindSafe(|| {
-                    let u = step(&t, &mut rng, &mut steps)?;
+                    let u = step(&t, &mut rng, &mut steps)?
+                        .unwrap_or_else(|e| panic!("an offered edit refused: {e:?}"));
                     Some((laws(&u, solved), u))
                 }));
                 match made {

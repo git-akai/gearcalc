@@ -1814,40 +1814,7 @@ impl Shape {
         else {
             return fallback(&plan, &bound_by, super::Searched::FoundNothing);
         };
-        // **The sum and the division, not the two shifts**, wherever both
-        // members of one mesh are free: the sum sets the operating pressure
-        // angle and the length of the path, the division only moves its two
-        // ends, and a search that moves one shift at a time can only
-        // zig-zag up that diagonal (`auto::Pinned::place`). A member free on
-        // its own keeps its own coordinate.
-        let paired: Vec<(usize, usize, f64)> = self
-            .meshes
-            .iter()
-            .enumerate()
-            .filter_map(|(k, m)| {
-                let (pa, pb) = (
-                    free.iter().position(|&i| i == m.a)?,
-                    free.iter().position(|&i| i == m.b)?,
-                );
-                Some((pa, pb, self.kind_of(k).map_or(1.0, MeshKind::sign)))
-            })
-            .collect();
-        let mut used = vec![false; free.len()];
-        let mut axes: Vec<Coordinate> = Vec::new();
-        for (pa, pb, sign) in paired {
-            if used[pa] || used[pb] {
-                continue;
-            }
-            used[pa] = true;
-            used[pb] = true;
-            axes.push(Coordinate::Sum(pa, pb, sign));
-            axes.push(Coordinate::Division(pa, pb, sign));
-        }
-        for (k, &u) in used.iter().enumerate() {
-            if !u {
-                axes.push(Coordinate::Own(k));
-            }
-        }
+        let axes = self.search_coordinates(&free);
         let box_: Vec<(f64, f64)> = axes
             .iter()
             .map(|c| match *c {
@@ -2028,6 +1995,45 @@ impl Shape {
         for m in &mut self.meshes {
             m.load_sharing = sharing;
         }
+    }
+
+    /// **The search's coordinates over the free members**: the sum and
+    /// the division, not the two shifts, wherever both members of one mesh
+    /// are free — the sum sets the operating pressure angle and the length
+    /// of the path, the division only moves its two ends, and a search that
+    /// moves one shift at a time can only zig-zag up that diagonal
+    /// (`auto::Pinned::place`). A member free on its own keeps its own
+    /// coordinate.
+    fn search_coordinates(&self, free: &[usize]) -> Vec<Coordinate> {
+        let paired: Vec<(usize, usize, f64)> = self
+            .meshes
+            .iter()
+            .enumerate()
+            .filter_map(|(k, m)| {
+                let (pa, pb) = (
+                    free.iter().position(|&i| i == m.a)?,
+                    free.iter().position(|&i| i == m.b)?,
+                );
+                Some((pa, pb, self.kind_of(k).map_or(1.0, MeshKind::sign)))
+            })
+            .collect();
+        let mut used = vec![false; free.len()];
+        let mut axes: Vec<Coordinate> = Vec::new();
+        for (pa, pb, sign) in paired {
+            if used[pa] || used[pb] {
+                continue;
+            }
+            used[pa] = true;
+            used[pb] = true;
+            axes.push(Coordinate::Sum(pa, pb, sign));
+            axes.push(Coordinate::Division(pa, pb, sign));
+        }
+        for (k, &u) in used.iter().enumerate() {
+            if !u {
+                axes.push(Coordinate::Own(k));
+            }
+        }
+        axes
     }
 
     /// **Which members a search may move**: those in a component — meshes
@@ -2356,6 +2362,106 @@ struct Plan {
     /// they were planned** — a shared member reached from one mesh is what
     /// the next mesh's member reaches from.
     reaches: Vec<(usize, usize)>,
+}
+
+/// **What the solve reads off a shape's structure** before a number is
+/// chosen — each mesh's frame, who decides each shift, and how the search
+/// groups what it moves — the record `gear-cli identity` keeps, so a change
+/// to how the structure is read is held to reading it the same way even
+/// where no number it feeds moves. Read through its `Debug` alone.
+#[derive(Debug)]
+#[allow(
+    dead_code,
+    reason = "read through its Debug alone, by gear-cli identity"
+)]
+pub struct Structure {
+    /// Each mesh's frame ([`Wiring::frame`]), or why it has none.
+    frames: Vec<Result<Body, super::WiringError>>,
+    closure: Result<ClosureStructure, TrainError>,
+}
+
+/// [`Structure`]'s closure: the plan the solve closes the shifts by, after
+/// the tips have sized what they size at the undercut floors, and what a
+/// search would move there — as the meshes ask, and with every mesh asking,
+/// so the search's structure is recorded on a shape that asks for none.
+#[derive(Debug)]
+#[allow(
+    dead_code,
+    reason = "read through its Debug alone, by gear-cli identity"
+)]
+struct ClosureStructure {
+    roles: Vec<Role>,
+    held: Vec<Option<f64>>,
+    constraints: Vec<Constraint>,
+    reaches: Vec<(usize, usize)>,
+    asked: SearchStructure,
+    every: SearchStructure,
+}
+
+/// What a search moves, and how it groups it ([`Shape::search_components`]).
+#[derive(Debug)]
+#[allow(
+    dead_code,
+    reason = "read through its Debug alone, by gear-cli identity"
+)]
+struct SearchStructure {
+    asking: Vec<bool>,
+    free: Vec<usize>,
+    coordinates: Vec<Coordinate>,
+    components: Vec<(Vec<usize>, Vec<usize>)>,
+}
+
+impl Shape {
+    /// **The shape's [`Structure`]**, read as [`cut`] reads it: every member
+    /// at its group's module and pressure angle, the helices resolved, the
+    /// frames from the wiring, and the plan [`Self::chosen_at`] starts from.
+    #[must_use]
+    pub fn structure(&self) -> Structure {
+        let shape = self.shared();
+        let wiring = shape.wiring();
+        let frames = (0..shape.meshes.len()).map(|k| wiring.frame(k)).collect();
+        let (helix, conflict) = shape.resolved_helices();
+        let closure = match conflict {
+            Some(meshes) => Err(TrainError::SizeOverConstrained { meshes }),
+            None => shape.closure_structure(&helix),
+        };
+        Structure { frames, closure }
+    }
+
+    /// [`Self::structure`]'s closure, as [`Self::chosen_at`] builds it.
+    fn closure_structure(&self, helix: &[f64]) -> Result<ClosureStructure, TrainError> {
+        let mut plan = self.plan(helix);
+        let (held, _) = self.sized(helix, &plan, &[])?;
+        if held != plan.held {
+            plan = self.plan_held(helix, held);
+        }
+        let mut every = self.clone();
+        every.set_search(true);
+        Ok(ClosureStructure {
+            asked: self.search_structure(&plan),
+            every: every.search_structure(&plan),
+            roles: plan.role,
+            held: plan.held,
+            constraints: plan.constraints,
+            reaches: plan.reaches,
+        })
+    }
+
+    /// What a search at `plan` moves, as [`Self::chosen_at`] reads it.
+    fn search_structure(&self, plan: &Plan) -> SearchStructure {
+        let asking = self.asking_members(plan);
+        let free: Vec<usize> = (0..self.members.len())
+            .filter(|&i| plan.role[i] == Role::Free && asking[i])
+            .collect();
+        let coordinates = self.search_coordinates(&free);
+        let components = self.search_components(plan, &coordinates, &free);
+        SearchStructure {
+            asking,
+            free,
+            coordinates,
+            components,
+        }
+    }
 }
 
 /// What the tips sized: the running distance each distance is held to, and

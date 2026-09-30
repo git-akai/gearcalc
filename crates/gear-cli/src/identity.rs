@@ -26,7 +26,13 @@
 //!   fixed mate, its span and over-pins measurements, its admissible ranges,
 //!   and the same as a ring; DXF text on a sub-grid;
 //! - crossed-axis screw pairs: the pair, its path of contact, efficiency and
-//!   locking.
+//!   locking;
+//! - **the structure the solve reads**, before any number: how each train
+//!   falls into parts, its mesh groups, and per part each mesh's frame, who
+//!   decides each shift and how a search groups what it moves
+//!   (`Shape::structure`) — over every train above and every train the
+//!   seeded walk of offered edits visits (`train::sweep`), so a change to how
+//!   the structure is read shows even where no number it feeds moves.
 //!
 //! Not in the golden corpus: its output is megabytes of bits that only a
 //! comparison between two builds reads.
@@ -75,16 +81,20 @@ fn guarded(what: &str, f: impl FnOnce() + std::panic::UnwindSafe) {
     }
 }
 
-fn trains(lib: &MaterialLibrary) {
-    let fixtures = crate::graph::fixtures()
+/// Every train `gear-cli graph` and `gear-cli kinematics` solve, named.
+fn fixtures() -> impl Iterator<Item = (String, Train)> {
+    crate::graph::fixtures()
         .into_iter()
         .map(|(n, t)| (format!("graph {n}"), t))
         .chain(
             crate::kinematics::fixtures()
                 .into_iter()
                 .map(|(n, t)| (format!("kinematics {n}"), t)),
-        );
-    for (name, train) in fixtures {
+        )
+}
+
+fn trains(lib: &MaterialLibrary) {
+    for (name, train) in fixtures() {
         println!("== train {name}");
         guarded(&name, || {
             let solved = solve_train(&train, lib);
@@ -488,6 +498,28 @@ fn screws() {
     }
 }
 
+/// **The structure of every train**: the fixtures [`trains`] solves, then
+/// every train the seeded walk visits, each labelled by the steps that made
+/// it.
+fn structures() {
+    let walked = gear_core::train::sweep::visited()
+        .into_iter()
+        .map(|(walk, steps, t)| (format!("{walk}: {steps:?}"), t));
+    for (name, train) in fixtures().chain(walked) {
+        println!("== structure {name}");
+        guarded(&name, || {
+            println!("mesh groups {:?}", train.shape.mesh_groups());
+            for (p, part) in train.parts().iter().enumerate() {
+                println!(
+                    "part {p}: members {:?} meshes {:?} distances {:?} axes {:?} couplings {:?}",
+                    part.members, part.meshes, part.distances, part.axes, part.couplings
+                );
+                println!("{:#?}", part.shape.structure());
+            }
+        });
+    }
+}
+
 pub fn run() {
     let lib = gear_io::default_library();
     trains(&lib);
@@ -495,4 +527,5 @@ pub fn run() {
     edits(&lib);
     gears();
     screws();
+    structures();
 }
