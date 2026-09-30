@@ -123,6 +123,7 @@ python3 tools/train_kinematics.py                  # every topology's speeds and
 python3 tools/breakaway.py                         # whether a preset breaks away, each way, with the sign kept
 python3 tools/bending_gate.py                      # the default bending rating, rebuilt from the rack (gear-cli bendgrid)
 python3 tools/iso_6336_3_stack.py                  # where this tool stands against ISO 6336-3, factor by factor
+python3 tools/fillet_bem.py                        # the bending ratings against the exact elastic peak (--run re-solves, --self-test its canaries)
 python3 tools/line_census.py                       # the prose-to-code ratio, at this tree or between two
 ```
 
@@ -758,12 +759,68 @@ whose size is unmeasured is a debt still owed, and is marked as one.
   converted.
 - **`K_f`'s calibration contained no undercut teeth.** Dolan and Broghamer's
   photoelastic specimens "contained various standard gear teeth but did not
-  include any undercut gears", and this tool rates undercut teeth. Size
-  unmeasured, sign unknown — **a debt**. It is not raised per gear because an
-  undercut tooth already says so on its own account.
+  include any undercut gears", and this tool rates undercut teeth. Measured
+  now against the exact elastic peak (the entry below): the default rates
+  undercut teeth less far below the peak than the rest, so the calibration's
+  gap is not where its bias is. It is not raised per gear because an undercut
+  tooth already says so on its own account.
+
+<!-- figures: tools/fillet_bem.py -->
+- **The default bending rating is below the exact elastic peak at the root —
+  unconservative — and its axial term is most of the gap.**
+  `tools/fillet_bem.py` loads 228 of the crate's own generated teeth at the
+  crate's own load point and solves each by a boundary-element method that
+  shares no code with the crate: external z 12 to 1000 at 14.5°, 20° and 25°,
+  x 0 and 0.5, rack rounds 0.38 to 0.01 against a 43-tooth mate; rings z 40 to
+  200 at 20° and 25°, shaper rounds 0.2 to 0.03 against a 17-tooth pinion; mesh
+  convergence median 0.011 %, worst 0.121 %. Rated over peak, less one, min /
+  median / max:
+  - **external teeth with ordinary fillets** (`ρ_f/s_Fn ≥ 0.1`, 85):
+    Dolan–Broghamer **−14.8 %** (−30.1 to +7.6), 89 % of them under. Without
+    the axial term it is −1.9 % (−13.7 to +15.7): the term, 12.6 % of `Y_F` at
+    the median, is most of the gap, and it is why the gap grows with pressure
+    angle (−7.5, −16.4 and −23.6 % at 14.5°, 20° and 25°) and with tooth count
+    (−6.4 % at z 12, −20.0 % at z 1000). On the 30 undercut teeth among
+    them, of a kind Dolan and Broghamer's specimens never included, it reads
+    −4.6 % (−15.2 to +7.6), and on the other 55 −19.2 %. ISO's `Y_F·Y_S` on
+    its own section reads +6.9 % (−7.1 to +22.8), 7 % under;
+  - **tighter fillets** are worse for both: at `0.02 ≤ ρ_f/s_Fn < 0.1` (66)
+    the default reads −31.1 %; below 0.02 (29), −52.9 % (−71.5 to −34.9) and
+    ISO −29.9 %, every tooth under. ISO past its `q_s = 8` clamp (37) reads
+    −25.3 %, and +2.9 % with `Y_S` continued past it;
+  - **rings** (48; the shaper's small round puts 42 in the middle band): the
+    default −26.8 % (−52.3 to −12.3), every one under, and −10.8 % without the
+    axial term; ISO's set +26.3 %;
+  - **by material**, on the ordinary external fillets, first with ISO's notch
+    support (its slip layer `ρ′` by yield point: 4.1 % at the median on 4340
+    Hardened, 18.5 % on annealed) and then with the root's surface against the
+    polished coupon every endurance in the library is measured on (ISO's
+    `Y_RrelT`: the coupon is 1.118 times as strong as a hobbed root at `Rz` 10
+    on 4340 Hardened, 1.069 on annealed): 4340 Hardened **−11.2 %**, then
+    **−20.6 %**, every tooth under; annealed 4340 +1.3 %, then −5.2 %. ISO's
+    set: +11.3 % then −0.5 %, and +25.6 % then +17.5 %. Marin's factor
+    (recalled, not checked against a copy) is harsher: 0.849 ground and 0.649
+    machined at 1500 MPa. Brass, POM and the polyamides have neither figure in
+    ISO, so the elastic-peak rows are theirs, with the support (conservative)
+    and the surface (unconservative) unmeasured. A surface factor needs a root
+    roughness or finish per gear, and an ultimate strength and a heat-treatment
+    class per material, none of which is a field today;
+  - **the instrument** passes Kirsch's hole, Inglis's ellipse and Golovin's
+    curved bar, and agrees with an independent Trefftz solver on four stepped
+    bars to within 0.06 %. Against both, the pre-registered canary —
+    Peterson's Chart 3.4, a fit to photoelastic data — reads −1.99, −1.87,
+    +0.46 and −0.55 %, outside 0.5 % on three, so the gate is held to the
+    solvers (`--self-test`) and the chart is reported;
+  - **hardness ÷ 3 is read nowhere** as a yield, in the crate or in the
+    library, whose yields are each datasheet's own: it estimates the ultimate
+    (+9 % and −0 %), and read as a yield it would be +60 % high on annealed
+    4340 and +10 % on hardened. Which bending model is the default is the
+    owner's (`work/decision-bending-default.md`).
+
 - **The axial compression term is applied**, being the second term of the `J`
   whose first term is `Y_F`. It relieved the canary by 10.1 % and 12.2 %, which
-  is the size the debt had been carrying. **ISO omits it**, so the ISO
+  is the size the debt had been carrying. Against the exact elastic peak it is
+  most of the default's shortfall (the entry above). **ISO omits it**, so the ISO
   comparison set omits it too and a number from that set is not an AGMA `J`.
 - **The load point is on the flank, and used not to be.** `d = ε_n − 1` base
   pitches back from the tip goes **negative below a contact ratio of 1** — a
