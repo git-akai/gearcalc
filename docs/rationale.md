@@ -1015,8 +1015,8 @@ that leaves, so a drive that cannot start reads as nought rather than below it,
 and a test of whether nought is positive is decided by rounding. The compound
 broke away by three parts in 10¹⁵ alone and after a spur, and did not after an
 idler, until the flow read a power within its own zero as nought.
-`tools/breakaway.py` keeps the sign, from a moment balance on every body, and
-holds the crate's figures to it.
+`tools/breakaway.py` keeps the sign, from the carrier-frame power flow with no
+search in it, and holds the crate's figures to it.
 
 **A number quoted in a warning is the number the reader will go and change**, so
 the self-locking note names the *static* coefficient — the one that actually
@@ -1366,8 +1366,10 @@ Now each has its own (`train::allowable`, keyed by rating and kind):
   (Johnson 4.2), and **it has no closed form**: it is a bracketed maximisation
   over depth of the stress field on the axis, which is closed form only at the
   line and, on the axis, the circle; between them the field is Boussinesq's
-  summed over the patch (`hertz::first_yield_factor`,
-  `tools/first_yield.py`). It needs a yield stress, so a material whose
+  summed over the patch (`hertz::first_yield_factor`; its laws hold the
+  line's field to Flamant's line load summed over the strip, the circle's to
+  its closed form, and both ends to Johnson's figures). It needs a yield
+  stress, so a material whose
   ultimate figure is a stress at break has no reading and is not judged
   (`gear.contact_ultimate_unjudged`).
 

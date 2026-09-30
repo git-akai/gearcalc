@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""A geartrain's speeds and torques, from rigid-body velocities alone.
+"""A geartrain's speeds, from rigid-body velocities alone.
 
 `gear_core::kinematics` writes one row per mesh in the frame of the member
 carrying its axes:
@@ -19,8 +19,8 @@ knows the words sun, ring or planet.
 `gear-cli kinematics` prints is rebuilt here as a layout, and each body's
 exact speed in `tools/golden/kinematics.txt` -- the corpus `check_golden.sh`
 holds to what the harness prints -- must equal the rigid-body one as a
-rational. `crate_rows` below restates the crate's row formula and is a second,
-weaker assertion: it checks the formula, and only the corpus checks the crate.
+rational. Nothing here restates the crate's row formula: a transcription of
+it would check the transcription, and the corpus is what checks the crate.
 
     tools/train_kinematics.py                # every topology; exits 1 on a disagreement
     tools/train_kinematics.py --verbose      # ...with the speeds printed
@@ -54,12 +54,6 @@ whatever X is, since `(X - p_a) . n_hat` is the base radius wherever X sits on
 the tangent. It contains no tooth count at all: the counts enter only as base
 radii. The line is built in floating point; each row is then read back as the
 rational it is to a part in 10^9, and every solve below is exact.
-
-**A torque, from virtual work.** For a lossless train the external torques do no
-net work over any motion the structure allows, so `sum(T_i w_i) = 0` for every
-solution of the velocity constraints. Written out for a basis of that solution
-space, that is one equation per degree of freedom, and it determines the
-reactions -- again with no formula from the crate in it.
 
 # What this does not do, and what does
 
@@ -293,78 +287,6 @@ class Train:
             rows.append(row)
         return solve(rows, n)
 
-    def torques(self, applied):
-        """Reactions, from virtual work.
-
-        `sum(T_i w_i) = 0` for every motion the structure allows, which is one
-        equation per basis vector of the *unconditioned* velocity solution.
-
-        `applied` maps a shaft to its **known** torque and every other shaft is
-        solved for. A shaft carrying nothing is an explicit zero in it, not an
-        omission: a first draft inferred "carries nothing" from "neither driven
-        nor grounded", which puts a zero on the output shaft of every pair --
-        the one place the load certainly is -- and the system came back
-        inconsistent. *An absent thing is not a zero-length thing*
-        (`docs/corrections.md`), met in a Python harness.
-        """
-        n = len(self.shafts)
-        _, basis = solve(self.rows(), n)
-        rows = []
-        for v in basis:
-            rows.append(list(v) + [F(0)])
-        for shaft, value in applied.items():
-            row = [F(0)] * (n + 1)
-            row[shaft] = F(1)
-            row[n] = F(value)
-            rows.append(row)
-        return solve(rows, n)
-
-
-# ---------------------------------------------------------------- the crate's
-#
-# The relation `gear_core::kinematics` writes, restated so the two can be
-# compared. This is the *only* place a tooth count appears as a coefficient.
-
-
-def crate_rows(t, internal):
-    """`z_a (w_a - w_f) + z_b (w_b - w_f) = 0`, the ring's count negative."""
-    out = []
-    for k, (a, b) in enumerate(t.meshes):
-        (_, sa, fa, za, _) = t.gears[a]
-        (_, sb, _, zb, _) = t.gears[b]
-        za, zb = F(za), F(zb)
-        if k in internal:
-            # Whichever of the two is the ring carries the negative count.
-            if za > zb:
-                za = -za
-            else:
-                zb = -zb
-        row = [F(0)] * (len(t.shafts) + 1)
-        row[sa] += za
-        row[sb] += zb
-        row[fa] -= za + zb
-        out.append(row)
-    return out
-
-
-def crate_speeds(t, internal, conditions):
-    rows = crate_rows(t, internal)
-    n = len(t.shafts)
-    for shaft, value in conditions.items():
-        row = [F(0)] * (n + 1)
-        row[shaft] = F(1)
-        row[n] = F(value)
-        rows.append(row)
-    return solve(rows, n)
-
-
-def internal_meshes(t):
-    """Which meshes the *layout* makes internal -- derived from the base
-    circles, not declared: the ones whose line of action is the tangent that
-    does not cross between the centres."""
-    return {k for k, (a, b) in enumerate(t.meshes) if t.line_of_action(a, b)[1]}
-
-
 # ----------------------------------------------------------------- topologies
 
 
@@ -376,19 +298,6 @@ def fixed_pair(z1, z2, internal=False):
     g2 = t.gear("2", b, 0, z2, offset)
     t.mesh(g1, g2)
     return t
-
-
-def chain(z):
-    """A run of fixed-axis pairs, each on its own shaft."""
-    t = Train()
-    at = F(0)
-    gears = []
-    for i, zi in enumerate(z):
-        s = t.shaft(f"s{i}")
-        gears.append(t.gear(f"g{i}", s, 0, zi, at))
-        if i:
-            at += F(z[i] + z[i + 1], 2) if i + 1 < len(z) else F(0)
-    return t, gears
 
 
 def crossed_ratio(z1, z2, sigma_deg):
@@ -957,76 +866,6 @@ def against_crate(verbose, text=None):
     return fail
 
 
-# ---------------------------------------------------------------------- cases
-
-
-def compare(label, t, conditions, report, verbose, fail):
-    """Both derivations, on one topology, and the laws both must obey."""
-    n = len(t.shafts)
-    try:
-        mine, basis = t.speeds(conditions)
-    except ValueError as e:
-        print(f"  {label:<38} LAYOUT  {e}")
-        return fail + 1
-    theirs, _ = crate_speeds(t, internal_meshes(t), conditions)
-    ok = mine == theirs
-    # **Lock-up**: a train locked solid turns as one body, which both
-    # derivations must admit. Asserted on this side too, because it is a
-    # property of the mechanism rather than of either way of writing it.
-    ones = [F(1)] * n
-    for row in t.rows():
-        if sum(c * w for c, w in zip(row[:n], ones)) != 0:
-            ok = False
-            print(f"  {label:<38} LOCKUP  a row does not admit solid rotation")
-    shown = " ".join(
-        f"{name}={mine[i]}" for i, name in enumerate(t.shafts) if i in report.values()
-    )
-    extra = f"  +{len(basis)} free" if basis else ""
-    print(f"  {label:<38}{'ok' if ok else 'DISAGREE':>9}   {shown}{extra}")
-    if not ok:
-        print(f"      velocities: {mine}")
-        print(f"      tooth rows: {theirs}")
-    if verbose and basis:
-        for v in basis:
-            print(f"      free direction: {v}")
-    return fail + (not ok)
-
-
-def power_balance(label, t, applied, conditions, fail):
-    """`sum(T w) = 0`, with the torques solved from virtual work and the speeds
-    from the velocity constraints -- two answers from one matrix, and the law
-    that ties them.
-
-    Ground's reaction comes back **zero** on a pure epicyclic, and that is
-    right rather than a miss: nothing in such a set meshes against ground, so no
-    row touches it and no torque can reach it. The reaction is on the shaft that
-    is actually held. It reaches ground the moment something meshes against it
-    -- which is what a fixed-axis pair does, and where the 17/43 line's -120/17
-    comes from.
-
-    **Ground is a reference, not a part.** A train here has no housing: an
-    element is fixed to ground, carries a load, or is attached to another
-    element. A frame need not stand still either -- in a compound set it is a
-    carrier, and it turns."""
-    n = len(t.shafts)
-    speeds, basis = t.speeds(conditions)
-    if basis:
-        print(f"  {label:<38} SKIP    not determined")
-        return fail
-    torques, free = t.torques(applied)
-    if free:
-        print(f"  {label:<38} SKIP    torques not determined")
-        return fail
-    power = sum(tq * w for tq, w in zip(torques, speeds))
-    total = sum(torques)
-    ok = power == 0 and total == 0
-    print(
-        f"  {label:<38}{'ok' if ok else 'FAIL':>9}   "
-        f"power {power}  sum {total}  reaction at ground {torques[0]}"
-    )
-    return fail + (not ok)
-
-
 # Faults planted in the recorded corpus, each of which must fail.
 PLANTED = [
     ("a total ratio with no path line", "total ratio -4171/289", "total ratio -4171/290"),
@@ -1063,131 +902,13 @@ def main():
     if "--self-test" in sys.argv:
         return self_test()
     verbose = "--verbose" in sys.argv
-    fail = 0
-
     print("\nthe crate, as `gear-cli kinematics` recorded it (tools/golden/kinematics.txt)\n")
-    fail += against_crate(verbose)
-
-    print("\nfixed-axis pairs -- the mesh kind comes out of the layout\n")
-    for (z1, z2, internal) in [(17, 43, False), (9, 37, False), (20, 60, True)]:
-        t = fixed_pair(z1, z2, internal)
-        report = {"a": 1, "b": 2}
-        fail = compare(
-            f"{z1}/{z2} {'internal' if internal else 'external'}",
-            t,
-            {0: 0, 1: 1},
-            report,
-            verbose,
-            fail,
-        )
-
-    print("\nan epicyclic set, in all six arrangements\n")
-    t, s = simple_set(24, 18, 60)
-    for held in ("sun", "carrier", "ring"):
-        for driven in ("sun", "carrier", "ring"):
-            if held == driven:
-                continue
-            fail = compare(
-                f"{driven} driven, {held} held",
-                t,
-                {0: 0, s[held]: 0, s[driven]: 1},
-                s,
-                verbose,
-                fail,
-            )
-    print("\n...and with nothing held, which is a differential\n")
-    fail = compare("sun driven, nothing held", t, {0: 0, s["sun"]: 1}, s, verbose, fail)
-
-    print("\ncompound and meshed planets -- no model change, only ticks\n")
-    # A stepped planet: one planet shaft, two gears, two rings at one carrier
-    # radius; and a Wolfrom proper, whose two rings sit a tooth apart at one
-    # radius and which the crate closes by profile shift — the base circles
-    # need no closing, so it has a row here too.
-    t, s = compound_set(24, 18, 60, 17, 59)
-    fail = compare(
-        "stepped planet, ring1 held, sun driven",
-        t,
-        {0: 0, s["ring1"]: 0, s["sun"]: 1},
-        s,
-        verbose,
-        fail,
-    )
-    t, s = wolfrom(18, 60, 61)
-    fail = compare(
-        "wolfrom 18/60/61, ring1 held, carrier driven",
-        t,
-        {0: 0, s["ring1"]: 0, s["carrier"]: 1},
-        s,
-        verbose,
-        fail,
-    )
-    t, s = meshed_planets(24, 18, 18, 96)
-    fail = compare(
-        "meshed planets, ring held, sun driven",
-        t,
-        {0: 0, s["ring"]: 0, s["sun"]: 1},
-        s,
-        verbose,
-        fail,
-    )
-
-    print("\nthe arrangements the shape reaches -- the same rows, more of them\n")
-    t, s = layshaft((17, 43), [(41, 19), (29, 31), (17, 43)], 1)
-    fail = compare("layshaft, second pair engaged", t, {0: 0, s["input"]: 1}, s, verbose, fail)
-    t, s = planocentric(30, 33)
-    fail = compare(
-        "planocentric 30/33, carrier in, ring held",
-        t,
-        {0: 0, s["ring"]: 0, s["carrier"]: 1},
-        s,
-        verbose,
-        fail,
-    )
-    t, s = ravigneaux(18, 30, 22, 18, 62)
-    for driven, held in (("sun1", "ring"), ("sun2", "ring"), ("sun1", "sun2")):
-        fail = compare(
-            f"ravigneaux, {driven} driven, {held} held",
-            t,
-            {0: 0, s[held]: 0, s[driven]: 1},
-            s,
-            verbose,
-            fail,
-        )
-
-    print("\na hula stage -- two internal meshes on one crank\n")
-    for z in ([65, 61, 57, 61], [18, 17, 17, 18], [19, 18, 17, 16]):
-        t, s = hula(z)
-        fail = compare(
-            f"z {z}, gear 1 held, crank driven",
-            t,
-            {0: 0, s["g1"]: 0, s["crank"]: 1},
-            s,
-            verbose,
-            fail,
-        )
-
-    print("\ntorque from virtual work, and the power it must balance\n")
-    t = fixed_pair(17, 43)
-    fail = power_balance("17/43 pair, 2 Nm in", t, {1: 2}, {0: 0, 1: 1}, fail)
-    t, s = simple_set(24, 18, 60)
-    for held in ("sun", "carrier", "ring"):
-        for driven in ("sun", "carrier", "ring"):
-            if held == driven:
-                continue
-            fail = power_balance(
-                f"set, {driven} driven at 1, {held} held",
-                t,
-                {s[driven]: 1, s["planet"]: 0},
-                {0: 0, s[held]: 0, s[driven]: 1},
-                fail,
-            )
-
+    fail = against_crate(verbose)
     print()
     if fail:
-        print(f"{fail} disagreement(s) between the two derivations")
+        print(f"{fail} section(s) where the crate and rigid-body velocities disagree")
         return 1
-    print("every topology: the crate's recorded speeds, rigid-body velocities and the "
-          "tooth-count rows agree")
+    print("every recorded section: the crate's speeds are the rigid-body ones")
     return 0
 
 

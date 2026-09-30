@@ -1502,9 +1502,10 @@ d_M = √( d_b² + (W_k cos β_b)² )
 
 Spur is `cos 0 = 1`. Dividing by `cos β_b` instead — reading `W` as if it lay in
 the transverse plane — puts the contact too high by `1/cos² β_b` in roll.
-`tools/helical_measurement.py` finds the same contact from the flank surface
-alone, and `tests/metrology.rs` holds the crate to a surface oracle over the
-shared grid.
+`tests/metrology.rs` finds the same contact from the flank surface alone — the
+helicoid as a surface, a ball's nearest point and the span's two tangent planes
+each by Newton on it (`tests/common`'s `Helicoid`) — and holds the crate to it
+over the shared grid.
 
 `k` is chosen from the exact admissible range (both contact points between form
 and tip radius), picking the one nearest the pitch circle; it reports "no valid

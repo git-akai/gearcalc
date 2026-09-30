@@ -1053,8 +1053,8 @@ mod tests {
     /// governing point is in the single-pair zone, where the share is exactly
     /// one. When this was written, perturbing `RAMP_MIN` by two
     /// hundredths left all 558 tests, all 26 golden files and every documented
-    /// figure unchanged; `gear-cli bendgrid`'s ramp rows, held to an outside
-    /// rebuild by `tools/bending_gate.py`, see them now.
+    /// figure unchanged; `gear-cli bendgrid`'s ramp rows, recorded in the
+    /// corpus, see them now.
     ///
     /// So the two ends are pinned here as the figures they are. A canary on an
     /// **uncalibrated** number is the right shape for one — it is not a law and

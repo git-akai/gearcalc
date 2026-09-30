@@ -300,7 +300,8 @@ fn the_span_anvils_touch_the_helicoid_where_the_span_says() {
 }
 
 /// The cases the finding was made on, with the figures
-/// `tools/helical_measurement.py` computes from the surface alone.
+/// the surface alone gives (`common::Helicoid`), recorded when the contact
+/// moved into the base tangent plane.
 #[test]
 fn helical_contact_at_the_recorded_cases() {
     let gear = |teeth, helix_angle| {

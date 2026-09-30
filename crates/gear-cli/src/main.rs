@@ -452,7 +452,7 @@ const COMMANDS: &[Command] = &[
     Command {
         name: "bendgrid",
         args: "",
-        summary: "the default bending rating over a grid of tooth counts, shifts, pressure angles, helices and contact ratios, at full precision, for `tools/bending_gate.py`",
+        summary: "the default bending rating over a grid of tooth counts, shifts, pressure angles, helices and contact ratios, at full precision: the corpus's record of the rating across its domain",
         run: |_| bendgrid::run(),
         record: Record::Cases(&["bendgrid"]),
         slow: false
@@ -2586,9 +2586,9 @@ fn iso_report(z: [u32; 2], alpha: f64, helix: f64, x: [f64; 2], face: f64, torqu
         mat.elastic_modulus.value,
         mat.poissons_ratio.value
     );
-    // First subsurface yield, `p_Y = C·σ_y`, at the line and circle limits:
-    // for `tools/first_yield.py`, which derives both from the closed-form
-    // fields itself.
+    // First subsurface yield, `p_Y = C·σ_y`, at the line and circle limits,
+    // recorded; `hertz`'s laws hold both fields to results derived another
+    // way.
     for nu in [0.3, mat.poissons_ratio.value] {
         let c = |kappa: f64| gear_core::hertz::first_yield_factor(kappa, nu).unwrap_or(f64::NAN);
         println!(

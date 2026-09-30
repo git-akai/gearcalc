@@ -180,8 +180,11 @@ comparing the envelope it leaves.
 
 ## Verification tooling
 
-These check the Rust against something that shares no code with it, and are run
-by hand rather than in CI. **The exhaustive list of every check is
+These check the Rust against a different method — a surface differentiated, a
+parser that shares no code, a closed form with no search in it, a boundary
+element solve — and some run in CI. A script that restated the crate's own
+formulas checked only its transcription, and was retired for Rust laws.
+**The exhaustive list of every check is
 [`CLAUDE.md`](CLAUDE.md)'s own table** — this and `docs/state.md` used to carry
 counts of their own, which disagreed with each other about both the number and
 the membership:
@@ -190,10 +193,9 @@ the membership:
 python3 tools/validate_dxf.py <file.dxf> ...   # an export's structure, then its geometry
 python3 tools/worm_flank_curvature.py          # worm flank curvature from the surface itself
 python3 tools/crossed_path.py                  # a crossed pair's path of contact, from the surfaces
-python3 tools/helical_measurement.py           # a helical ball's and span's contact, from the flank surface
-python3 tools/hula_kinematics.py               # a hula stage's ratio, from the rolling circles
-python3 tools/train_kinematics.py              # any topology's speeds and torques, from rigid-body velocities
-python3 tools/bending_gate.py                  # the default bending rating, rebuilt from the rack
+python3 tools/train_kinematics.py              # every recorded topology's speeds, from rigid-body velocities
+python3 tools/breakaway.py                     # each preset's efficiency, from the carrier-frame power flow
+python3 tools/fillet_bem.py                    # the bending ratings against the exact elastic peak
 python3 tools/iso_6336_3_stack.py              # where this tool stands against ISO 6336-3, factor by factor
 
 python3 tools/check_strings.py                 # every UI message is used, and every used one exists

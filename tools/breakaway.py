@@ -9,26 +9,17 @@ pushed as well -- reads as nought, and whether nought is "above" nought was
 once decided by rounding: a compound set back-driven at rest broke away by
 three parts in 10^15, alone and after a spur, and did not after an idler.
 
-This reaches the same figures twice, **sign included**, and says which half
-fails:
-
-  - **the flow**: speeds from the rows of each mesh with the chosen body held;
-    torques from the moment balance of every body a case leaves free, each
-    mesh's driven side at its `eta`, over every assignment of which side
-    drives; the best consistent one, as the output's power over the input's.
-    This *is* the crate's method (`gear_core::train::flow`: the 2^M
-    assignments, the same two filters, the maximum) written again, so it
-    checks the crate's arithmetic and not its choices: a different rule for
-    which consistent assignment wins would be written here too.
-  - **the closed form**, the independent half: the carrier-frame power flow of
-    an epicyclic set (Pennestrì and Freudenstein, 1993; del Castillo, 2002).
-    In the frame of the carrier the planet body is a shaft, each central
-    member feeds it or draws from it through one mesh, and which it does is
-    the sign of its power in the *ideal* flow; each mesh then passes `eta` of
-    what enters it. With the carrier's moment balance and the case's given
-    torques that is a linear system with no search in it -- the `eta_0^w`
-    form, `w` the ideal flow's sign, for every preset below, the three-ring
-    compound included.
+This reaches the same figures, **sign included**, by a method that shares no
+search with the crate's: the carrier-frame power flow of an epicyclic set
+(Pennestrì and Freudenstein, 1993; del Castillo, 2002). In the frame of the
+carrier the planet body is a shaft, each central member feeds it or draws from
+it through one mesh, and which it does is the sign of its power in the *ideal*
+flow; each mesh then passes `eta` of what enters it. With the carrier's moment
+balance and the case's given torques that is a linear system with no search in
+it -- the `eta_0^w` form, `w` the ideal flow's sign, for every preset below,
+the three-ring compound included. The crate's flow instead tries each of the
+`2^M` assignments of which side of each mesh drives and keeps the best
+consistent one (`gear_core::train::flow`).
 
 # What is read, and what is assumed
 
@@ -45,7 +36,6 @@ coefficient is twice its sliding one (`train::arrangements::FRICTION`), so
 at rest every mesh loses exactly twice what it loses running.
 """
 
-import itertools
 import pathlib
 import re
 import sys
@@ -78,7 +68,8 @@ PRESETS = {
 
 
 def closed_form(preset, read, scale):
-    """Forward and backward efficiency by the carrier-frame power flow.
+    """Forward and backward efficiency by the carrier-frame power flow, and
+    the forward ratio, input over output.
 
     Each mesh joins one central member X to the planet body. With the carrier
     H and the relative speed `u = w_p - w_H`, X turns at
@@ -136,9 +127,10 @@ def closed_form(preset, read, scale):
             feeds = ideal[b] * rel[b] > 0
             weights[b] = eta if feeds else 1 / eta
         t = torques(weights)
-        return -t[loaded] * w[loaded] / (t[driven] * w[driven])
+        return -t[loaded] * w[loaded] / (t[driven] * w[driven]), w[driven] / w[loaded]
 
-    return run(top["input"], top["output"]), run(top["output"], top["input"])
+    (forward, ratio), (backward, _) = run(top["input"], top["output"]), run(top["output"], top["input"])
+    return forward, backward, ratio
 
 
 def section(name):
@@ -162,113 +154,26 @@ def section(name):
     }
 
 
-def solve(preset, read, scale):
-    """Speeds, and the signed efficiency each way, with every mesh losing
-    `scale` times what it loses running."""
-    top = PRESETS[preset]
-    bodies = sorted({b for b, _ in top["members"].values()} | {top["frame"]})
-    index = {b: i for i, b in enumerate(bodies)}
-    # (a's body, a's signed teeth, b's body, b's signed teeth, eta)
-    meshes = []
-    for a, b, eta in read["meshes"]:
-        (ba, ring_a), (bb, ring_b) = top["members"][a], top["members"][b]
-        za = -read["teeth"][a] if ring_a else read["teeth"][a]
-        zb = -read["teeth"][b] if ring_b else read["teeth"][b]
-        meshes.append((ba, za, bb, zb, 1 - scale * (1 - eta)))
-    frame = top["frame"]
-
-    # Speeds: each mesh's pitch points move together in its frame,
-    # za (wa - wf) + zb (wb - wf) = 0, with the held body still and the
-    # input at one.
-    rows, rhs = [], []
-    for ba, za, bb, zb, _ in meshes:
-        row = np.zeros(len(bodies))
-        row[index[ba]] += za
-        row[index[bb]] += zb
-        row[index[frame]] -= za + zb
-        rows.append(row)
-        rhs.append(0.0)
-    for body, value in ((top["held"], 0.0), (top["input"], 1.0)):
-        row = np.zeros(len(bodies))
-        row[index[body]] = 1.0
-        rows.append(row)
-        rhs.append(value)
-    w = np.linalg.lstsq(np.array(rows), np.array(rhs), rcond=None)[0]
-
-    def efficiency(driven, loaded):
-        """The best consistent flow driving `driven` against `loaded`, as
-        the loaded body's power over the driven one's -- negative where
-        the loaded body must be driven too."""
-        free = [b for b in bodies if b not in (top["held"], driven, loaded)]
-        found = []
-        for drivers in itertools.product((0, 1), repeat=len(meshes)):
-            # The torque each mesh puts on each body, per unit of its force:
-            # the driver's side whole, the driven side at eta, and the frame
-            # the reaction of both.
-            def on(k, body):
-                ba, za, bb, zb, eta = meshes[k]
-                ta, tb = (za, eta * zb) if drivers[k] == 0 else (eta * za, zb)
-                t = 0.0
-                if ba == body:
-                    t += ta
-                if bb == body:
-                    t += tb
-                if frame == body:
-                    t -= ta + tb
-                return t
-            # External torque plus the meshes' is nought on every body; the
-            # driven body's external torque is one, working with its motion.
-            a = [[on(k, b) for k in range(len(meshes))] for b in free + [driven]]
-            r = [0.0] * len(free) + [-np.sign(w[index[driven]])]
-            try:
-                c = np.linalg.solve(np.array(a), np.array(r))
-            except np.linalg.LinAlgError:
-                continue
-            ext = {b: -sum(c[k] * on(k, b) for k in range(len(meshes))) for b in bodies}
-            # Each driver gives power up into its mesh, in the mesh's frame...
-            works = all(
-                c[k] * on(k, meshes[k][0 if drivers[k] == 0 else 2])
-                * (w[index[meshes[k][0 if drivers[k] == 0 else 2]]] - w[index[frame]])
-                <= 1e-12
-                for k in range(len(meshes))
-            )
-            # ...and the train loses power rather than making it.
-            loss = sum(ext[b] * w[index[b]] for b in bodies)
-            if works and loss >= -1e-12:
-                p_in = ext[driven] * w[index[driven]]
-                found.append(-ext[loaded] * w[index[loaded]] / p_in)
-        return max(found) if found else None
-
-    return w, index, (efficiency(top["input"], top["output"]),
-                      efficiency(top["output"], top["input"]))
-
-
 def main():
     fail = 0
-    print(f"\n{'preset':<12}{'ratio':>12}   {'way':<9}{'half':<13}{'running':>13}"
+    print(f"\n{'preset':<12}{'ratio':>12}   {'way':<9}{'running':>13}"
           f"{'at rest':>13}{'expected':>13}{'crate':>13}")
     for preset, top in PRESETS.items():
         read = section(preset)
-        w, index, running = solve(preset, read, 1.0)
-        _, _, resting = solve(preset, read, STATIC_OVER_SLIDING)
-        closed = (closed_form(preset, read, 1.0), closed_form(preset, read, STATIC_OVER_SLIDING))
-        ratio = w[index[top["input"]]] / w[index[top["output"]]]
+        forward, backward, ratio = closed_form(preset, read, 1.0)
+        rest_f, rest_b, _ = closed_form(preset, read, STATIC_OVER_SLIDING)
         ok = read["ends"] == (top["input"], top["output"]) and abs(
             ratio - read["ratio"]) < 1e-6 * abs(ratio)
         fail += not ok
-        for half, (run_both, rest_both) in (
-            ("the flow", (running, resting)),
-            ("closed form", closed),
-        ):
-            for way, run, rest, crate in zip(("forward", "backward"), run_both, rest_both,
-                                             read["efficiency"]):
-                # Once moving where it breaks away, and nothing where it cannot.
-                expected = run if rest > 0 else 0.0
-                agree = ok and abs(expected - crate) < 5e-6
-                fail += not agree
-                print(f"{preset:<12}{ratio:>12.6f}   {way:<9}{half:<13}{run * 100:>12.6f}%"
-                      f"{rest * 100:>12.6f}%{expected * 100:>12.6f}%{crate * 100:>12.6f}%"
-                      f"   {'ok' if agree else 'FAIL'}")
+        for way, run, rest, crate in zip(("forward", "backward"), (forward, backward),
+                                         (rest_f, rest_b), read["efficiency"]):
+            # Once moving where it breaks away, and nothing where it cannot.
+            expected = run if rest > 0 else 0.0
+            agree = ok and abs(expected - crate) < 5e-6
+            fail += not agree
+            print(f"{preset:<12}{ratio:>12.6f}   {way:<9}{run * 100:>12.6f}%"
+                  f"{rest * 100:>12.6f}%{expected * 100:>12.6f}%{crate * 100:>12.6f}%"
+                  f"   {'ok' if agree else 'FAIL'}")
     print()
     if fail:
         print(f"{fail} figure(s) disagree")

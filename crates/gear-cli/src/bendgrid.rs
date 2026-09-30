@@ -1,6 +1,7 @@
 //! **The default bending rating over a grid, every figure at full
-//! precision**, for `tools/bending_gate.py`, which rebuilds each one from the
-//! tooth's stated proportions and shares no code with `gear_core::strength`.
+//! precision**: the corpus's record of the rating across its domain — tooth
+//! counts 9 to 3000, the three offered pressure angles, shifts, helices and
+//! contact ratios — which the rest of the corpus reaches only at a few teeth.
 //!
 //! Each row is one member rated as a train rates it: the section and share
 //! `bending_section_on_path` returns and the stress `bending_stress` makes of
@@ -8,9 +9,6 @@
 //! bending model, so the grid states it (in the normal plane, `ε_αn`) rather
 //! than taking it from a mate; `ε_αn ≥ 2` rows under the ramp are where the
 //! held section and one searched afresh part.
-//!
-//! The grid is written here and again in the gate, which refuses a record
-//! that is not exactly this product.
 
 use gear_core::contact::LoadSharing;
 use gear_core::strength::{
@@ -134,8 +132,8 @@ pub fn run() {
 }
 
 /// The rest of one row: the virtual member's tool and form, then its rating
-/// or `none`. The tool is printed to the bit, since the gate takes a round
-/// the tooth capped as the one it was cut by; everything else to 13 digits.
+/// or `none`. The tool is printed to the bit, a capped round included;
+/// everything else to 13 digits.
 fn rated(g: &Tooth, eps: f64, short: f64, sharing: LoadSharing) {
     let v = g.virtual_spur();
     let clamps: Vec<&str> = v.clamps.notes.iter().map(|n| n.key.as_str()).collect();

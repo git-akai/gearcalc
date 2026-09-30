@@ -118,10 +118,8 @@ cargo run --release --bin gear-cli -- matrix        # the bending matrix, on ext
 cargo run --release --bin gear-cli -- verify 100   # the two-sided cutter check
 python3 tools/worm_flank_curvature.py              # ZI vs ZN vs ZA, from the surface
 python3 tools/crossed_path.py                      # the crossed path, from the surfaces
-python3 tools/hula_kinematics.py                   # the hula ratio, from the no-slip condition
-python3 tools/train_kinematics.py                  # every topology's speeds and torques, from rigid-body velocities
-python3 tools/breakaway.py                         # whether a preset breaks away, each way, with the sign kept
-python3 tools/bending_gate.py                      # the default bending rating, rebuilt from the rack (gear-cli bendgrid)
+python3 tools/train_kinematics.py                  # every recorded topology's speeds, from rigid-body velocities
+python3 tools/breakaway.py                         # whether a preset breaks away, each way, from the carrier-frame flow
 python3 tools/iso_6336_3_stack.py                  # where this tool stands against ISO 6336-3, factor by factor
 python3 tools/fillet_bem.py                        # the bending ratings against the exact elastic peak (--run re-solves, --self-test its canaries)
 python3 tools/line_census.py                       # the prose-to-code ratio, at this tree or between two
@@ -146,23 +144,22 @@ one set, disagreeing about the number and the membership — which is the failur
 this section's own opening is about, met twice one paragraph further down. The
 fix is the same one: no count outside the table that is the list.
 
-`train_kinematics.py` and `hula_kinematics.py` **are not one script** and
-neither covers the other, which is worth saying because they look alike.
-`hula_kinematics.py` integrates the no-slip condition through a full revolution,
-in 200 000 steps, on one arrangement; `train_kinematics.py` writes rigid-body
-velocities along each mesh's line of action — the common tangent to the two
-**base circles**, which profile shift does not touch, so nothing has to
-close — at one instant, on any topology: a pair, an epicyclic set in all six
-arrangements, a compound planet, a Wolfrom, meshed planets, a Ravigneaux, a
-hula stage; and adds torque from virtual work. Instantaneous over everything, and integrated over the one
-case where standing still is worth doubting.
+**Each script applies a method the crate does not**; one that restated the
+crate's own formulas checked only its transcription, and went for the Rust law
+that holds the crate itself. `train_kinematics.py` writes rigid-body velocities
+along each mesh's line of action — the common tangent to the two **base
+circles**, which profile shift does not touch, so nothing has to close — at
+one instant, on every topology `gear-cli kinematics` records, and holds each
+body's exact speed there to it. A hula's speeds are held in Rust to the no-slip
+condition at its two pitch points, on every arrangement at one and two teeth of
+difference (`a_hulas_speeds_are_its_pitch_points_rolling_without_slip`).
 
-`breakaway.py` is the lossy side of the same set of questions, which
-`train_kinematics.py` does not ask: each mesh's driven side is at its `η`,
-running and at rest, and the efficiency keeps its **sign**. The crate's flow
-counts only the power that leaves, so a drive that cannot start reads as
-nought there and below nought here. That is the difference the breakaway rule
-turns on, and rounding once decided it.
+`breakaway.py` is the lossy side of the same questions: the carrier-frame power
+flow, each mesh's driven side at its `η` with the direction read off the ideal
+flow rather than searched, running and at rest, and the efficiency keeps its
+**sign**. The crate's flow counts only the power that leaves, so a drive that
+cannot start reads as nought there and below nought here. That is the
+difference the breakaway rule turns on, and rounding once decided it.
 
 `crossed_path.py` builds both flanks as parametric surfaces, checks the line of
 action the construction gives against their normals, and measures the zone of
