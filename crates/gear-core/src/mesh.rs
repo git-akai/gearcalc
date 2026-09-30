@@ -190,9 +190,28 @@ pub enum MeshError {
     OutsideInvoluteDomain,
     /// The actual centre distance is below the base-circle limit.
     CentreDistanceTooSmall,
-    /// **A list per tooth past the machine's memory**: an eccentric gear's
-    /// centre distance read at every one of its `teeth`.
+    /// **A list per tooth past the output budget**: an eccentric gear's
+    /// centre distance read at every one of its `teeth`, `size` bytes
+    /// against a budget of `budget` ([`crate::input::Budget`]).
+    PastBudget { teeth: u32, size: u64, budget: u64 },
+    /// The same list within its budget, and past the machine's memory.
     PastMemory { teeth: u32 },
+}
+
+impl MeshError {
+    /// A per-tooth list's refusal, as the mesh's: by the budget where it was
+    /// the budget's, else by memory.
+    #[must_use]
+    pub fn refused(teeth: u32, why: &crate::input::Refused) -> Self {
+        match why.reason {
+            crate::input::Reason::PastBudget { size, budget } => Self::PastBudget {
+                teeth,
+                size,
+                budget,
+            },
+            _ => Self::PastMemory { teeth },
+        }
+    }
 }
 
 /// A meshing pair, with the derived operating geometry.
@@ -760,6 +779,19 @@ impl crate::note::Explain for MeshError {
             Self::RingTooSmall => key::ERROR_MESH_RING_TOO_SMALL,
             Self::OutsideInvoluteDomain => key::ERROR_MESH_OUTSIDE_INVOLUTE_DOMAIN,
             Self::CentreDistanceTooSmall => key::ERROR_MESH_AXIS_DISTANCE_TOO_SMALL,
+            Self::PastBudget {
+                teeth,
+                size,
+                budget,
+            } => {
+                return crate::input::Refused::past_budget(
+                    "teeth",
+                    f64::from(*teeth),
+                    *size,
+                    *budget,
+                )
+                .note()
+            }
             Self::PastMemory { teeth } => {
                 return crate::input::Refused::past_memory("teeth", f64::from(*teeth)).note()
             }
@@ -778,6 +810,16 @@ impl std::fmt::Display for MeshError {
                 "no such gear pair: the profile shifts require the base circles to overlap"
             }
             Self::CentreDistanceTooSmall => "the axis distance is below the base-circle limit",
+            Self::PastBudget {
+                teeth,
+                size,
+                budget,
+            } => {
+                return write!(
+                    f,
+                    "{teeth} teeth: the output would be {size} bytes, past its budget of {budget}"
+                );
+            }
             Self::PastMemory { teeth } => {
                 return write!(f, "{teeth} teeth: more than this machine's memory holds");
             }

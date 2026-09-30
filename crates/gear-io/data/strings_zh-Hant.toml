@@ -139,6 +139,7 @@ train_file_format = "此檔案為格式 {found}，本工具讀取格式 {current
 input_not_finite = "{field} 不是有限的數"
 input_out_of_range = "{field} 為 {value}，超出 {bound}"
 input_past_memory = "{field} 為 {value}：超出本機記憶體所能容納"
+output_past_budget = "{field} 為 {value}：輸出將為 {size} 位元組，超出其預算 {budget}"
 train_size_over_constrained = "嚙合 {first} 與 {second}：在所有變位都固定時，它們給定的軸間距要求齒輪具有兩個不同的尺寸——請放開一個變位、一個軸間距或尺寸"
 train_axes_too_close = "軸間距 {distance}：它連接的同一行星架上的兩根軸相距太近，無法在各自到行星架軸線的距離處放置"
 train_axes_too_far = "軸間距 {distance}：它連接的同一行星架上的兩根軸相距太遠，無法在各自到行星架軸線的距離處放置"

@@ -59,7 +59,6 @@ crates/gear-core/src/gear.rs	centre_profile	unwrap_or(0)	1	Stage 2 (Q3)
 crates/gear-core/src/hertz.rs	aspect_ratio	NAN	1	Stage 2 (Q3)
 crates/gear-core/src/hertz.rs	elliptical_contact	INFINITY	2	Stage 2 (Q3): needs a stated reason
 crates/gear-core/src/hertz.rs	peak_pressure	map_or(0.0)	1	Stage 2 (Q3)
-crates/gear-core/src/metrology.rs	pin_diameter_range_around	INFINITY	1	Stage 2 (Q3)
 crates/gear-core/src/ring.rs	solve_root_end	unwrap_or(0.0)	1	Stage 2 (Q3)
 crates/gear-core/src/screw.rs	face_widths_for	unwrap_or(0.0)	1	Stage 2 (Q3)
 crates/gear-core/src/screw.rs	least_distance_lead_angle	NAN	1	Stage 2 (Q3)

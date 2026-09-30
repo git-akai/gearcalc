@@ -322,9 +322,13 @@ pub mod key {
     /// ([`crate::input`]).
     pub const ERROR_INPUT_OUT_OF_RANGE: &str = "error.input_out_of_range";
     /// `error.input_past_memory`: a count whose per-unit lists — a gear's
-    /// teeth drawn — are more than the machine's memory holds
-    /// ([`crate::input::Refused::past_memory`]).
+    /// teeth drawn — are within the output budget and still more than the
+    /// machine's memory holds ([`crate::input::Refused::past_memory`]).
     pub const ERROR_INPUT_PAST_MEMORY: &str = "error.input_past_memory";
+    /// `error.output_past_budget`: an output — a drawing, a DXF, an
+    /// eccentric gear's teeth — whose predicted size is past the output
+    /// budget ([`crate::input::Budget`]), refused before it is built.
+    pub const ERROR_OUTPUT_PAST_BUDGET: &str = "error.output_past_budget";
     /// `error.train_file_unversioned`: a geartrain file that states no
     /// format (read by `gear_io::train`).
     pub const ERROR_TRAIN_FILE_UNVERSIONED: &str = "error.train_file_unversioned";
@@ -441,6 +445,7 @@ pub mod key {
         ERROR_INPUT_NOT_FINITE,
         ERROR_INPUT_OUT_OF_RANGE,
         ERROR_INPUT_PAST_MEMORY,
+        ERROR_OUTPUT_PAST_BUDGET,
         ERROR_TRAIN_SIZE_OVER_CONSTRAINED,
         ERROR_TRAIN_AXES_TOO_CLOSE,
         ERROR_TRAIN_AXES_TOO_FAR,

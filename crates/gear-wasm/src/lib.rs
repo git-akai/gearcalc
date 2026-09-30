@@ -14,7 +14,7 @@
 //! does not cover — each comes back as an explanation the UI can show, because
 //! a plausible-looking number for an impossible measurement is worse than none.
 
-use gear_core::input::Refused;
+use gear_core::input::{Budget, Refused};
 use gear_core::jgma;
 use gear_core::metrology::{self, PinCount};
 use gear_core::note::{Explain, Note};
@@ -681,7 +681,9 @@ fn ring_summary(req: &RingRequest) -> RingSummary {
 fn ring_profile_impl(input: &str, points_per_tooth: u32) -> Result<Vec<f64>, String> {
     let req = parse_ring(input)?;
     let n = points(points_per_tooth)?;
-    let drawn = ring_of(&req).profile(n).map_err(params_refusal)?;
+    let drawn = ring_of(&req)
+        .profile(n, Budget::DEFAULT)
+        .map_err(params_refusal)?;
     flat(&drawn, req.params.teeth)
 }
 
@@ -691,12 +693,15 @@ fn params_refusal(e: gear_core::input::Refused) -> String {
 }
 
 /// **A drawing's points as the canvas takes them**, `[x, y, x, y, …]`, the
-/// list given room first ([`gear_core::input::room`]): twice the points,
-/// past memory where they are, refused naming the gear's `teeth`.
+/// list admitted by the budget first ([`Budget::room`]) — the drawing's
+/// own size again, so within it wherever the drawing was — refused naming
+/// the gear's `teeth`.
 fn flat(points: &[[f64; 2]], teeth: u32) -> Result<Vec<f64>, String> {
     let mut out = Vec::new();
     let n = points.len().saturating_mul(2);
-    gear_core::input::room(&mut out, n, "teeth", f64::from(teeth)).map_err(params_refusal)?;
+    Budget::DEFAULT
+        .room(&mut out, n, "teeth", f64::from(teeth))
+        .map_err(params_refusal)?;
     out.extend(points.iter().flatten());
     Ok(out)
 }
@@ -712,6 +717,7 @@ fn export_ring_dxf_impl(input: &str) -> Result<String, String> {
             reference_circles: req
                 .reference_circles
                 .unwrap_or(REFERENCE_CIRCLES_BY_DEFAULT),
+            budget: Budget::DEFAULT,
         },
     )
     .map_err(params_refusal)
@@ -795,6 +801,7 @@ fn resolved_params(req: &GearRequest) -> Result<GearParams, String> {
         kind,
         gear_core::mesh::MeshSide::First,
         target.abs(),
+        Budget::DEFAULT,
     )
     .map_err(|_| {
         refusal(&Note::new("ui.gear_throw_unreachable").number("throw", target.abs(), 4))
@@ -812,7 +819,7 @@ fn solve_gear_impl(input: &str) -> Result<String, String> {
     // degenerate of the eccentric assembly, and its `mean` is `Tooth::new`
     // verbatim. Building it here means every scalar the summary quotes is a
     // tooth the gear actually has.
-    let ecc = gear_core::gear::Gear::try_new(params).map_err(params_refusal)?;
+    let ecc = gear_core::gear::Gear::try_new(params, Budget::DEFAULT).map_err(params_refusal)?;
     serde_json::to_string(&summarise(&ecc, &req, params))
         .map_err(|e| format!("could not encode result: {e}"))
 }
@@ -820,7 +827,9 @@ fn solve_gear_impl(input: &str) -> Result<String, String> {
 fn gear_profile_impl(input: &str, points_per_tooth: u32) -> Result<Vec<f64>, String> {
     let req = parse(input)?;
     let n = points(points_per_tooth)?;
-    let drawn = built(&req)?.profile(n).map_err(params_refusal)?;
+    let drawn = built(&req)?
+        .profile(n, Budget::DEFAULT)
+        .map_err(params_refusal)?;
     flat(&drawn, req.params.teeth)
 }
 
@@ -828,7 +837,7 @@ fn gear_profile_impl(input: &str, points_per_tooth: u32) -> Result<Vec<f64>, Str
 /// ([`gear_core::gear::Gear::try_new`]), past memory refused naming
 /// `params.teeth`.
 fn built(req: &GearRequest) -> Result<gear_core::gear::Gear, String> {
-    gear_core::gear::Gear::try_new(resolved_params(req)?).map_err(params_refusal)
+    gear_core::gear::Gear::try_new(resolved_params(req)?, Budget::DEFAULT).map_err(params_refusal)
 }
 
 fn export_dxf_impl(input: &str) -> Result<String, String> {
@@ -843,6 +852,7 @@ fn export_dxf_impl(input: &str) -> Result<String, String> {
             reference_circles: req
                 .reference_circles
                 .unwrap_or(REFERENCE_CIRCLES_BY_DEFAULT),
+            budget: Budget::DEFAULT,
         },
     )
     .map_err(params_refusal)
@@ -1158,14 +1168,14 @@ fn centre_profile(params: GearParams, req: &GearRequest) -> Maybe<gear_core::gea
     }
     // The gear the summary reads is built already (`solve_gear_impl`), so
     // its lists have room; it is built again here as the mate's partner.
-    let Ok(gear) = gear_core::gear::Gear::try_new(params) else {
+    let Ok(gear) = gear_core::gear::Gear::try_new(params, Budget::DEFAULT) else {
         return Maybe::Unavailable {
             unavailable: Refused::past_memory("teeth", f64::from(params.teeth))
                 .within("params")
                 .note(),
         };
     };
-    match gear.centre_profile(&other, kind, MeshSide::First) {
+    match gear.centre_profile(&other, kind, MeshSide::First, Budget::DEFAULT) {
         Ok(p) => Maybe::Value(p),
         // `inv α_w < 0` at some tooth: no centre distance puts that tooth in the
         // mate's space at zero backlash. The shift term carries `1/Σz`, and for
@@ -2819,14 +2829,14 @@ mod tests {
     }
 
     /// **A huge count is answered or refused naming it, never trapped** —
-    /// here, on the host, at the sizes whose lists are past any address
-    /// space (the drawings of every tooth a wire's count carries, 4.3e9, at a
-    /// screen's most points a tooth or an export's finest chord), so the
-    /// allocator's answer is the same on every machine; the payload's
-    /// probe asks the browser's 4 GB at the counts that trapped it (3e7 and
-    /// 3e8 teeth). The summary of a concentric gear of 3e8 and 4.3e9 teeth
-    /// is answered — its teeth one tooth, every reading one reading — and
-    /// every number in it finite.
+    /// the drawings of every tooth a wire's count carries (4.3e9, at a
+    /// screen's most points a tooth or an export's finest chord) refused by
+    /// the output budget from their predicted size, before a second tooth
+    /// is drawn, and so the same on every machine whatever its allocator
+    /// would grant; the payload's probe asks the browser at the counts that
+    /// trapped it (3e7 and 3e8 teeth). The summary of a concentric gear of
+    /// 3e8 and 4.3e9 teeth is answered — its teeth one tooth, every reading
+    /// one reading — and every number in it finite.
     #[test]
     fn a_huge_count_is_answered_or_refused_by_name() {
         let gear: serde_json::Value = serde_json::from_str(REQ).unwrap();
@@ -2842,8 +2852,13 @@ mod tests {
         };
         let past = |r: Result<String, String>, at: &str| {
             let n: Note = serde_json::from_str(&r.expect_err(at)).unwrap();
-            assert_eq!(n.key, "error.input_past_memory", "{at}: {n:?}");
+            assert_eq!(n.key, "error.output_past_budget", "{at}: {n:?}");
             assert_eq!(n.values["field"], "params.teeth", "{at}");
+            assert_eq!(
+                n.values["budget"],
+                Budget::DEFAULT.bytes.to_string(),
+                "{at}"
+            );
         };
         for teeth in [300_000_000, u32::MAX] {
             let req = with(teeth, serde_json::json!({}));
@@ -2851,7 +2866,7 @@ mod tests {
                 serde_json::from_str::<serde_json::Value>(&req).unwrap()["params"].clone(),
             )
             .unwrap();
-            let g = gear_core::gear::Gear::try_new(params).unwrap();
+            let g = gear_core::gear::Gear::try_new(params, Budget::DEFAULT).unwrap();
             let summary = summarise(&g, &parse(&req).unwrap(), params);
             assert!(
                 gear_core::finite::non_finite(&summary).is_empty(),
@@ -2926,7 +2941,7 @@ mod tests {
                 refused += 1;
                 return;
             }
-            let Ok(g) = gear_core::gear::Gear::try_new(params) else {
+            let Ok(g) = gear_core::gear::Gear::try_new(params, Budget::DEFAULT) else {
                 refused += 1;
                 return;
             };
@@ -2936,12 +2951,12 @@ mod tests {
             }
             // Drawn only where one tooth's list is small beside memory.
             if params.teeth <= 1_000 {
-                if let Ok(p) = g.profile(64) {
+                if let Ok(p) = g.profile(64, Budget::DEFAULT) {
                     if !non_finite(&p).is_empty() {
                         faults.push(format!("{what}: profile"));
                     }
                 }
-                if let Ok(o) = g.outline(req.chord_tolerance.unwrap_or(1e-3)) {
+                if let Ok(o) = g.outline(req.chord_tolerance.unwrap_or(1e-3), Budget::DEFAULT) {
                     if o.iter()
                         .any(|v| !(v.x.is_finite() && v.y.is_finite() && v.bulge.is_finite()))
                     {
@@ -3037,7 +3052,7 @@ mod tests {
                     faults.push(format!("ring {under}.{} = {x:e}: {bad:?}", f.path));
                 }
                 if req.params.teeth <= 1_000 {
-                    if let Ok(o) = ring_of(&req).outline(1e-3) {
+                    if let Ok(o) = ring_of(&req).outline(1e-3, Budget::DEFAULT) {
                         if o.iter().any(|v| !(v.x.is_finite() && v.y.is_finite())) {
                             faults.push(format!("ring {under}.{} = {x:e}: outline", f.path));
                         }

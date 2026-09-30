@@ -252,7 +252,9 @@ pub const GEAR: &[Row<GearParams>] = &[
     row!("helix_angle", |p| Some(p.helix_angle), HELIX_ANGLE),
     row!("addendum", |p| Some(p.addendum), FIGURE),
     row!("dedendum", |p| Some(p.dedendum), FIGURE),
-    row!("root_radius", |p| Some(p.root_radius), FIGURE),
+    // A tool's tip round is a radius: nought is a sharp tool (held to the
+    // least the cut admits, `Rack`), and one below nought describes none.
+    row!("root_radius", |p| Some(p.root_radius), NOT_NEGATIVE),
     row!("thickness_mod", |p| Some(p.thickness_mod), THICKNESS_MOD),
     row!("angular_shift", |p| Some(p.angular_shift), FIGURE),
     row!("index_offset", |p| Some(p.index_offset), FIGURE),
@@ -342,7 +344,11 @@ pub const MEMBER: &[Row<Member>] = &[
         NOT_NEGATIVE
     ),
     row!("gear.dedendum", |m| Some(m.gear.dedendum), FIGURE),
-    row!("gear.root_radius", |m| Some(m.gear.root_radius), FIGURE),
+    row!(
+        "gear.root_radius",
+        |m| Some(m.gear.root_radius),
+        NOT_NEGATIVE
+    ),
     given!("gear.helix_angle.manual", gear.helix_angle, HELIX_ANGLE),
     // Read where given, and where no rating sizes it: an automatic width
     // with no source stands at its box (`FaceSources::width_for`).
@@ -619,9 +625,15 @@ pub enum Reason {
     NotFinite,
     /// Outside its row's bound.
     Outside(Bound),
-    /// **More than the machine's memory holds** where the model lists
-    /// something per unit of it — a gear's teeth drawn, a ring's outline.
-    /// The bound is what the allocator gives, and no chosen cap.
+    /// **An output past its budget** ([`Budget`]): what the value would
+    /// have the model build — a drawing's points, a DXF's text, an eccentric
+    /// gear's teeth — is `size` bytes, and the budget `budget`. Predicted
+    /// from the value before anything is built, so it is the same refusal
+    /// in every build.
+    PastBudget { size: u64, budget: u64 },
+    /// **Within its budget, and still more than the machine's memory
+    /// holds**: the allocator's refusal, where memory is short of what the
+    /// budget admits.
     PastMemory,
 }
 
@@ -640,7 +652,10 @@ impl PartialEq for Refused {
                     b.exclusive_max,
                 )),
             ),
-            Reason::PastMemory => (2, None),
+            Reason::PastBudget { size, budget } => {
+                (2, Some((Some(*size), Some(*budget), false, false)))
+            }
+            Reason::PastMemory => (3, None),
         };
         self.field == other.field
             && self.value.to_bits() == other.value.to_bits()
@@ -661,6 +676,17 @@ impl Refused {
         }
     }
 
+    /// **An output of `size` bytes past a budget of `budget`**, refused
+    /// naming the `field` whose value `n` asked for it.
+    #[must_use]
+    pub fn past_budget(field: &str, n: f64, size: u64, budget: u64) -> Self {
+        Self {
+            field: field.to_owned(),
+            value: n,
+            reason: Reason::PastBudget { size, budget },
+        }
+    }
+
     /// **A list `n` long that the machine's memory could not hold**,
     /// refused naming `field` (a gear's `teeth`), its value `n`.
     #[must_use]
@@ -677,7 +703,7 @@ impl Refused {
     pub fn bound(&self) -> Option<Bound> {
         match self.reason {
             Reason::Outside(b) => Some(b),
-            Reason::NotFinite | Reason::PastMemory => None,
+            Reason::NotFinite | Reason::PastBudget { .. } | Reason::PastMemory => None,
         }
     }
 }
@@ -692,6 +718,12 @@ impl std::fmt::Display for Refused {
                 self.field,
                 figure(self.value),
                 interval(&b)
+            ),
+            Reason::PastBudget { size, budget } => write!(
+                f,
+                "{} is {}: the output would be {size} bytes, past its budget of {budget}",
+                self.field,
+                figure(self.value)
             ),
             Reason::PastMemory => write!(
                 f,
@@ -714,6 +746,11 @@ impl Explain for Refused {
                 .text("field", field)
                 .text("value", figure(self.value))
                 .text("bound", interval(&b)),
+            Reason::PastBudget { size, budget } => Note::new(key::ERROR_OUTPUT_PAST_BUDGET)
+                .text("field", field)
+                .text("value", figure(self.value))
+                .text("size", size.to_string())
+                .text("budget", budget.to_string()),
             Reason::PastMemory => Note::new(key::ERROR_INPUT_PAST_MEMORY)
                 .text("field", field)
                 .text("value", figure(self.value)),
@@ -721,17 +758,72 @@ impl Explain for Refused {
     }
 }
 
-/// **Room for `n` more in `v`, or the refusal naming `field`** — every
-/// list the model makes per tooth or per vertex asks through this, so a
-/// count past memory is refused by name where it would otherwise stop the
-/// process. `count` is the field's own value, for the refusal to quote.
+// ---------------------------------------------------------- the budget ---
+
+/// **The most one output may take, in bytes as the core builds it** — a
+/// drawing's points or vertices, a DXF's text, an eccentric gear's teeth
+/// and the centre distance read at each. A setting, stated and
+/// overridable (every function that builds one is handed it; the harness
+/// reads `GEARCALC_OUTPUT_BUDGET`), and not engineering: it bounds what one
+/// request may have the machine build.
 ///
-/// # Errors
-///
-/// [`Refused::past_memory`], naming `field`.
-pub fn room<T>(v: &mut Vec<T>, n: usize, field: &str, count: f64) -> Result<(), Refused> {
-    v.try_reserve_exact(n)
-        .map_err(|_| Refused::past_memory(field, count))
+/// It is checked from the size an output **will** have, predicted from the
+/// value that asks for it before anything is built — so the refusal is the
+/// same in every build and never the allocator's to give: Linux's
+/// overcommit grants a list its memory cannot back, and then the process is
+/// ended by whatever notices, not refused.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Budget {
+    pub bytes: usize,
+}
+
+impl Budget {
+    /// **2²⁷ bytes, 128 MiB**, on two bases, both met. As a drawing, 2²⁷
+    /// bytes of points (`[f64; 2]`, 16 bytes each) is 8 388 608 of them, the
+    /// smallest power of two holding one for every pixel of a 4K display
+    /// (3840 × 2160 = 8 294 400): past it no screen the panel is drawn on
+    /// shows a difference. As memory, an output crosses the browser held as
+    /// the core's list and as its JSON (a double's 8 bytes written as at most
+    /// 24 characters, three a byte), so one at the budget takes 4 × 128 MiB
+    /// at most — an eighth of the 4 GiB a wasm32 module addresses.
+    pub const DEFAULT: Self = Self { bytes: 1 << 27 };
+
+    /// **`n` items of `each` bytes admitted, or refused** naming `field`
+    /// at the `value` that asked for them.
+    ///
+    /// # Errors
+    ///
+    /// [`Refused::past_budget`], its size counted in `u64` — what a
+    /// 32-bit target's `usize` could not say of a drawing of billions of
+    /// teeth — and saturating past it.
+    pub fn admit(self, n: usize, each: usize, field: &str, value: f64) -> Result<(), Refused> {
+        // `usize` into `u64` on every target this builds for.
+        let (size, budget) = ((n as u64).saturating_mul(each as u64), self.bytes as u64);
+        if size <= budget {
+            Ok(())
+        } else {
+            Err(Refused::past_budget(field, value, size, budget))
+        }
+    }
+
+    /// **Room in `v` for `n` more, admitted by the budget first**: the
+    /// list's whole length is what is charged, and only then is memory
+    /// asked for — exactly `n` into an empty list, as `Vec` grows after —
+    /// refused naming `field` if the allocator will not give it even so.
+    ///
+    /// # Errors
+    ///
+    /// [`Refused::past_budget`], or [`Refused::past_memory`] beneath it.
+    pub fn room<T>(self, v: &mut Vec<T>, n: usize, field: &str, value: f64) -> Result<(), Refused> {
+        self.admit(
+            v.len().saturating_add(n),
+            std::mem::size_of::<T>(),
+            field,
+            value,
+        )?;
+        v.try_reserve(n)
+            .map_err(|_| Refused::past_memory(field, value))
+    }
 }
 
 /// A figure as it was given, exactly: its shortest decimal that reads back

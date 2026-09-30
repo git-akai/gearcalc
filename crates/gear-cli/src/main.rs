@@ -27,7 +27,9 @@ mod identity;
 mod kinematics;
 mod matrix;
 
-use gear_core::input::{FIGURE, HELIX_ANGLE, MODULE, POSITIVE, PRESSURE_ANGLE, SHAFT_ANGLE};
+use gear_core::input::{
+    Budget, FIGURE, HELIX_ANGLE, MODULE, POSITIVE, PRESSURE_ANGLE, SHAFT_ANGLE,
+};
 use gear_core::train::arrangements as arr;
 use gear_core::{GearParams, Tooth};
 
@@ -381,6 +383,24 @@ fn opt<T: std::str::FromStr>(args: &[String], n: usize) -> Option<T> {
 fn refuse(why: &dyn std::fmt::Display) -> ! {
     eprintln!("refused: {why}");
     std::process::exit(2)
+}
+
+/// Where the harness is told its output budget, in bytes.
+const BUDGET_VARIABLE: &str = "GEARCALC_OUTPUT_BUDGET";
+
+/// **The output budget the harness builds within**: `GEARCALC_OUTPUT_BUDGET`
+/// bytes where it is set, the core's default ([`Budget::DEFAULT`]) where it
+/// is not — what a drawing or an export is refused against, from its size
+/// predicted before it is built, whatever this machine's allocator would
+/// have granted.
+fn budget() -> Budget {
+    match std::env::var(BUDGET_VARIABLE) {
+        Err(_) => Budget::DEFAULT,
+        Ok(v) => v.trim().parse().map_or_else(
+            |_| refuse(&format!("{BUDGET_VARIABLE} is {v}: not a count of bytes")),
+            |bytes| Budget { bytes },
+        ),
+    }
 }
 
 /// **A positional figure, or its default where absent, held to the bound the
@@ -1155,11 +1175,13 @@ fn roll_pair(ring: &gear_core::ring::Ring, pinion: &gear_core::Gear, a: f64, tit
     const TOLERANCE: f64 = 1e-5;
     let pin_pts = flatten(
         &pinion
-            .outline(TOLERANCE)
+            .outline(TOLERANCE, budget())
             .expect("a sweep's pinion is drawn"),
     );
     let bore = Boundary::new(&flatten(
-        &ring.outline(TOLERANCE).expect("a sweep's ring is drawn"),
+        &ring
+            .outline(TOLERANCE, budget())
+            .expect("a sweep's ring is drawn"),
     ));
 
     let (z1, z2) = (f64::from(pinion.mean().params.teeth), f64::from(ring.teeth));
@@ -2876,7 +2898,8 @@ fn show(p: GearParams) {
             println!("    - {}", words().render(n));
         }
     }
-    let drawn = gear_core::gear::Gear::try_new(g.params).and_then(|g| g.profile(400));
+    let drawn =
+        gear_core::gear::Gear::try_new(g.params, budget()).and_then(|g| g.profile(400, budget()));
     match drawn {
         Ok(pts) => println!("  profile points {:12}", pts.len()),
         Err(e) => refuse(&e),
@@ -3035,12 +3058,15 @@ fn verify(limit: usize) {
 
 /// Write a DXF to stdout, for inspecting or importing into CAD.
 fn dxf(teeth: u32, x: f64, tol: f64, angular_shift: f64) {
-    let g = gear_core::gear::Gear::try_new(asked(GearParams {
-        teeth,
-        profile_shift: x,
-        angular_shift,
-        ..Default::default()
-    }))
+    let g = gear_core::gear::Gear::try_new(
+        asked(GearParams {
+            teeth,
+            profile_shift: x,
+            angular_shift,
+            ..Default::default()
+        }),
+        budget(),
+    )
     .unwrap_or_else(|e| refuse(&e));
     chord(tol);
     let text = gear_io::gear_to_dxf(
@@ -3048,6 +3074,7 @@ fn dxf(teeth: u32, x: f64, tol: f64, angular_shift: f64) {
         &gear_io::DxfOptions {
             chord_tolerance: tol,
             reference_circles: true,
+            budget: budget(),
         },
     );
     print!("{}", text.unwrap_or_else(|e| refuse(&e)));
@@ -3069,6 +3096,7 @@ fn dxf_ring(teeth: u32, x: f64, tol: f64) {
         &gear_io::DxfOptions {
             chord_tolerance: tol,
             reference_circles: true,
+            budget: budget(),
         },
     );
     print!("{}", text.unwrap_or_else(|e| refuse(&e)));

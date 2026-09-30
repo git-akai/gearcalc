@@ -1572,15 +1572,31 @@ Not a queue with a head; this is what a next session would pick from.
 - **What the input table leaves** (`gear_core::input`, Stage 2's V). Every
   number that enters has a row and is refused by its field or held and
   said; what is not yet asked of it:
-  - **a count's bound is the allocator's.** A gear of any `u32` count is
-    solved at once (its teeth one tooth, its readings one reading), and a
-    list per tooth — a drawing, an eccentric gear's teeth — is given room
-    before it is written, refused naming `teeth` where memory will not
-    hold it. The browser's 4 GB decides that the same way everywhere; a
-    native harness's allocator may grant a list its memory cannot back
-    (Linux's overcommit set to always), and there the refusal is the
-    kernel's. After a trap of any other kind the stack is put back and the
-    panic's words said (`core.ts`'s `guarded`); the module is not
+  - **an output's bound is a budget, not the allocator.** A gear of any
+    `u32` count is solved at once (its teeth one tooth, its readings one
+    reading, its best span found by halving); what is built per tooth — a
+    drawing, a DXF, an eccentric gear's teeth, its centre distance read at
+    each — is checked against one named output budget
+    (`gear_core::input::Budget`, 2²⁷ bytes: a point for every pixel of a 4K
+    display, and an eighth of wasm32's 4 GiB held as a list and its JSON;
+    the harness reads `GEARCALC_OUTPUT_BUDGET`) from the size it will have,
+    predicted before it is built, and refused naming `teeth`, its size and
+    the budget. So the refusal is the same in every build: Linux's
+    overcommit no longer decides it. Within the budget the allocator may
+    still refuse, named the same way. What the budget does not bound is
+    time where the answer needs every tooth: at the budget's edge (an
+    eccentric gear of some 670 000 teeth) its pins, span and centre
+    distance read round in under 0.7 s natively, and a throw's inversion,
+    a hundred trials over every tooth, in 2.2 s;
+  - **an eccentric gear's span is set from its mean tooth** and carried
+    round to the nearest count that measures everywhere
+    (`metrology::best_span_around`), where it was the count whose worst
+    contact lands nearest — every count read at every position, 10¹¹
+    readings at the budget's edge, choosing among roundings at the
+    steepest pressure angle. The count differs on 19 of 648 eccentric
+    gears swept, 18 where the mean tooth's count does not measure
+    everywhere; an evenly cut gear's is the same, bit for bit. After a trap of any other kind the stack is put back
+    and the panic's words said (`core.ts`'s `guarded`); the module is not
     re-instantiated, which this wasm-bindgen's glue does not allow
     (`initSync` returns the instance it has);
   - **the panel's train boxes do not read the table's bounds yet** (T01.8's

@@ -169,23 +169,24 @@ impl Space {
         }
         Ok((r_m, contact))
     }
-}
 
-/// The space after tooth `i` of an assembled gear: bounded by two teeth that
-/// need not agree, so its half-angle is the gear's rather than one tooth's,
-/// and its flank and root are those of the tooth the pin's contact is read
-/// against.
-fn space_at(gear: &crate::gear::Gear, i: usize) -> Space {
-    let mean = gear.mean();
-    let t = gear.tooth(i).0;
-    Space {
-        half_space: gear.space_half_angle(i),
-        rb: mean.rb,
-        beta_b: mean.base_helix_angle(),
-        sign: 1.0,
-        tip: t.ra,
-        form: t.r_j,
-        root: t.rf,
+    /// The space after tooth `i` of an assembled gear: bounded by two teeth
+    /// that need not agree, so its half-angle is the gear's rather than one
+    /// tooth's, and its flank and root are those of the tooth the pin's
+    /// contact is read against.
+    #[must_use]
+    pub fn after(gear: &crate::gear::Gear, i: usize) -> Self {
+        let mean = gear.mean();
+        let t = gear.tooth(i).0;
+        Self {
+            half_space: gear.space_half_angle(i),
+            rb: mean.rb,
+            beta_b: mean.base_helix_angle(),
+            sign: 1.0,
+            tip: t.ra,
+            form: t.r_j,
+            root: t.rf,
+        }
     }
 }
 
@@ -199,15 +200,28 @@ pub fn pin_bound((smallest, largest): (f64, f64)) -> Bound {
 
 /// [`pin_diameter_range`] over every space of an assembled gear — the pins
 /// that measure at **every** position, as one caliper carried round.
+///
+/// The range is the largest of the spaces' smallest ends and the smallest
+/// of their largest, so a space's end is sought only where it can move the
+/// range found so far: one reading just inside each end says whether it
+/// can, since a space's verdict is monotone in the pin
+/// ([`pin_diameter_range`]). Round an eccentric gear the range settles in
+/// a few spaces, and each after costs three readings rather than two
+/// bisections. The spaces either side of the variation's two extremes —
+/// the first tooth, cut at the largest shift, and the one half a turn
+/// round — are read first, where the ends lie; the order changes nothing
+/// found, a largest and a smallest being what they are in any order.
 #[must_use]
 pub fn pin_diameter_range_around(gear: &crate::gear::Gear) -> Option<(f64, f64)> {
-    (0..positions(gear))
-        .map(|i| pin_diameter_range(&space_at(gear, i)))
-        .try_fold((0.0_f64, f64::INFINITY), |(lo, hi), r| {
-            let (a, b) = r?;
-            let (lo, hi) = (lo.max(a), hi.min(b));
-            (lo < hi).then_some((lo, hi))
-        })
+    let z = positions(gear);
+    let extremes = [0, z - 1, z / 2, (z / 2).saturating_sub(1)];
+    let mut known: Option<(f64, f64)> = None;
+    for i in extremes.into_iter().chain(0..z) {
+        let (a, b) = pin_range_within(&Space::after(gear, i), known)?;
+        let (lo, hi) = known.map_or((a, b), |(lo, hi)| (lo.max(a), hi.min(b)));
+        known = Some((lo < hi).then_some((lo, hi))?);
+    }
+    known
 }
 
 /// **The pin diameters that measure this space**, `(smallest, largest)`, or
@@ -227,22 +241,47 @@ pub fn pin_diameter_range_around(gear: &crate::gear::Gear) -> Option<(f64, f64)>
 /// diameter strictly inside it seats ([`pin_bound`]).
 #[must_use]
 pub fn pin_diameter_range(space: &Space) -> Option<(f64, f64)> {
+    pin_range_within(space, None)
+}
+
+/// [`pin_diameter_range`], where a range `known` from other spaces is
+/// held to it: an end of this space's that cannot move the range — the
+/// smallest end at or below `known`'s, the largest at or above — is not
+/// sought, and stands as `known`'s own. Which it is, one reading just
+/// inside `known`'s end says, the verdict being monotone in the pin. `None`
+/// where this space has no range, or — with an end not sought — where
+/// `known` is not a range either.
+fn pin_range_within(space: &Space, known: Option<(f64, f64)>) -> Option<(f64, f64)> {
     use MeasurementError::{PinTooLarge, PinTooSmall};
-    let verdict = |d: f64| space.seat(d).err();
+    let small = |d: f64| space.seat(d).err() == Some(PinTooSmall);
+    let large = |d: f64| space.seat(d).err() == Some(PinTooLarge);
     let top = space.too_large()?;
     if top <= 0.0 {
         return None;
     }
     // The largest pin too small, and the smallest too large: each end is
     // outside the range. A space nothing is too small for opens at nought.
-    let smallest = if verdict(0.0) == Some(PinTooSmall) {
-        halve(0.0, top, |d| verdict(d) == Some(PinTooSmall)).0
-    } else {
-        0.0
+    let smallest = match known {
+        Some((lo, _)) if !small(lo.next_up()) => None,
+        _ => Some(if small(0.0) {
+            halve(0.0, top, small).0
+        } else {
+            0.0
+        }),
     };
-    let largest = halve(0.0, top, |d| verdict(d) != Some(PinTooLarge)).1;
-    (smallest < largest && space.seat(0.5 * (smallest + largest)).is_ok())
-        .then_some((smallest, largest))
+    let largest = match known {
+        Some((_, hi)) if !large(hi.next_down()) => None,
+        _ => Some(halve(0.0, top, |d| !large(d)).1),
+    };
+    match (smallest, largest) {
+        (Some(s), Some(l)) => (s < l && space.seat(0.5 * (s + l)).is_ok()).then_some((s, l)),
+        // An end that holds `known`'s: every pin between the space's ends
+        // seats, so the space's range is what the two ends leave.
+        (s, l) => {
+            let (lo, hi) = known?;
+            Some((s.unwrap_or(lo), l.unwrap_or(hi)))
+        }
+    }
 }
 
 /// **Bisection over the doubles themselves**: `below` holds at `lo` and not at
@@ -372,53 +411,6 @@ fn positions(gear: &crate::gear::Gear) -> usize {
     }
 }
 
-/// **The spans worth asking of a gear**: every count on an eccentric gear;
-/// on a concentric one, the counts whose contact lands on usable flank,
-/// found by halving rather than by asking each of `z`.
-///
-/// A concentric gear's span over `k` teeth rolls `2π(k−1)/z + 2ψ_b` round
-/// its base circle, rising with `k`, and is valid while half that roll lies
-/// on usable flank ([`span_over_teeth_at`]); so the valid counts are one
-/// run, found by halving on which side of it a count falls. Every count
-/// outside the run is `None`, as asking it would have been.
-fn span_counts(gear: &crate::gear::Gear) -> std::ops::RangeInclusive<u32> {
-    let z = gear.mean().params.teeth;
-    if !gear.is_concentric() {
-        return 1..=z;
-    }
-    let mean = gear.mean();
-    let bb = mean.base_helix_angle();
-    let roll_at = |radius: f64| crate::involute::roll_at_radius(radius, mean.rb);
-    let (lo, hi) = (roll_at(mean.r_j), roll_at(mean.ra));
-    // Half the roll a span over `k` teeth takes, as `span_over_teeth_at`
-    // reads it at the one tooth.
-    let half_roll = |k: u32| {
-        let sweep =
-            std::f64::consts::TAU * f64::from(k - 1) / f64::from(z) + mean.psi_b + mean.psi_b;
-        transverse_roll(sweep * bb.cos(), bb) / 2.0
-    };
-    // The first count whose half-roll reaches `at`, by halving on `[1, z]`:
-    // `z + 1` where none does.
-    let first_reaching = |at: f64, strict: bool| {
-        let (mut a, mut b) = (1_u32, z.saturating_add(1));
-        while a < b {
-            let mid = a + (b - a) / 2;
-            let h = half_roll(mid);
-            let reaches = if strict { h > at } else { h >= at };
-            if reaches {
-                b = mid;
-            } else {
-                a = mid + 1;
-            }
-        }
-        a
-    };
-    // One count either side, for the rounding of the two routes to agree.
-    let from = first_reaching(lo, false).saturating_sub(1).max(1);
-    let to = first_reaching(hi, true).min(z);
-    from..=to
-}
-
 /// Span over `k` teeth starting at tooth `j`, on a gear whose teeth may differ.
 ///
 /// # The span is a distance between two flank seats, and always was
@@ -456,11 +448,46 @@ fn span_counts(gear: &crate::gear::Gear) -> std::ops::RangeInclusive<u32> {
 /// intersection of two intervals and needs no search.
 #[must_use]
 pub fn span_over_teeth_at(gear: &crate::gear::Gear, j: usize, k: u32) -> Option<Span> {
+    match reach(gear, j, k) {
+        Reach::On(s) => Some(s),
+        Reach::Short | Reach::Past => None,
+    }
+}
+
+/// **Where a span over `k` teeth from `j` stands against the usable
+/// flank**: short of it, on it, or past it — [`span_over_teeth_at`]'s
+/// verdict with the side it fails on.
+///
+/// On a concentric gear each side is one run of counts. The span's roll
+/// rises with `k` and every test is one direction of it: short while the
+/// span is not positive or its faces cannot both reach the form radius,
+/// past once they cannot both stay under the tip — and a tooth whose
+/// usable flank is empty is short at every count not past. So the counts
+/// that measure are those between the first not short and the first past,
+/// found by halving ([`best_span_around`]).
+#[derive(Clone, Copy, Debug)]
+enum Reach {
+    Short,
+    On(Span),
+    Past,
+}
+
+fn reach(gear: &crate::gear::Gear, j: usize, k: u32) -> Reach {
     if k == 0 {
-        return None;
+        return Reach::Short;
+    }
+    let last = (j + k as usize - 1) % gear.teeth();
+    reach_between(gear, gear.tooth(j).0, gear.tooth(last).0, k)
+}
+
+/// [`reach`] from tooth `first` to tooth `last`, `k` teeth apart on the
+/// gear's pitch — the gear's own two at a position, or the nominal tooth
+/// at both ends ([`nominal_count`]).
+fn reach_between(gear: &crate::gear::Gear, first: &Tooth, last: &Tooth, k: u32) -> Reach {
+    if k == 0 {
+        return Reach::Short;
     }
     let z = gear.teeth();
-    let last = (j + k as usize - 1) % z;
     let mean = gear.mean();
     let bb = mean.base_helix_angle();
 
@@ -472,15 +499,12 @@ pub fn span_over_teeth_at(gear: &crate::gear::Gear, j: usize, k: u32) -> Option<
     // outright, and the λ term is a difference of two `ψ` that is *exactly* zero
     // when the teeth agree (`docs/corrections.md`).
     let lam = mean.params.index_offset;
-    let (psi_first, psi_last) = (gear.tooth(j).0.psi_b, gear.tooth(last).0.psi_b);
+    let (psi_first, psi_last) = (first.psi_b, last.psi_b);
     let sweep = std::f64::consts::TAU * f64::from(k - 1) / z as f64
         + lam * (psi_first - psi_last)
         + psi_first
         + psi_last;
     let nominal = mean.rb * bb.cos() * sweep;
-    if !nominal.is_finite() || nominal <= 0.0 {
-        return None;
-    }
 
     // The two unwrapped lengths, in units of `r_b`, sum to the span's
     // transverse roll; each contact radius rises with its own. So the
@@ -489,19 +513,26 @@ pub fn span_over_teeth_at(gear: &crate::gear::Gear, j: usize, k: u32) -> Option<
     let total = transverse_roll(sweep * bb.cos(), bb);
     let roll_at = |radius: f64| crate::involute::roll_at_radius(radius, mean.rb);
     let usable = |t: &Tooth| (roll_at(t.r_j), roll_at(t.ra));
-    let (a_lo, a_hi) = usable(gear.tooth(j).0);
-    let (b_lo, b_hi) = usable(gear.tooth(last).0);
+    let (a_lo, a_hi) = usable(first);
+    let (b_lo, b_hi) = usable(last);
     // `u_a ∈ [a_lo, a_hi]` and `total − u_a ∈ [b_lo, b_hi]`.
+    if !(nominal.is_finite() && nominal > 0.0) || a_lo > total - b_lo {
+        return Reach::Short;
+    }
+    if total - b_hi > a_hi {
+        return Reach::Past;
+    }
     let lo = a_lo.max(total - b_hi);
     let hi = a_hi.min(total - b_lo);
     if lo > hi {
-        return None;
+        // An empty usable flank: no count measures.
+        return Reach::Short;
     }
     // Report the placement nearest the symmetric one, which is what a
     // metrologist centres on and what an evenly cut gear gives exactly.
     let u_a = (total / 2.0).clamp(lo, hi);
 
-    Some(Span {
+    Reach::On(Span {
         teeth_spanned: k,
         nominal,
         contact_radius: mean.rb * f64::hypot(1.0, u_a),
@@ -713,61 +744,168 @@ pub fn over_pins(
 /// The span a metrologist would use, and how far it varies around the
 /// revolution.
 ///
-/// One `k` for the whole gear — a caliper is set once and carried round — so the
-/// admissible counts are intersected over every starting tooth rather than
-/// chosen per tooth. The `k` picked is the one whose contact lands nearest the
-/// pitch circle, averaged over the revolution, which is [`best_span`]'s rule
-/// read across all the positions instead of one.
+/// One `k` for the whole gear — a caliper is set once and carried round. It
+/// is set from the **nominal tooth**: the count whose span on that tooth
+/// lands nearest the pitch circle (the first, where two land as near),
+/// found by halving ([`nominal_count`]) — a gear of billions of teeth is
+/// some hundred readings. Then it is carried round: where some position
+/// does not measure at that count, the counts either side are tried, the
+/// nearer first and the smaller of two as near, until one measures at
+/// every position. The nominal tooth is the gear's one tooth on an evenly
+/// cut gear, so this is [`best_span`]'s rule, and on an eccentric one the
+/// mean tooth — the drawing's, whose contact the revolution's averages.
 ///
-/// Returns the span at each starting tooth's `[smallest, largest]`. An evenly
-/// cut gear's two ends are the **same bits**, so a caller can report a range
-/// unconditionally and have an ordinary gear read as a single number.
+/// It was the count whose *worst* contact round the revolution lands
+/// nearest, found by reading every count at every position: the same count
+/// on an evenly cut gear, and on 629 of 648 eccentric ones swept over count,
+/// amplitude, indexing, angle, helix and shift — the 19 are 18 where the
+/// nominal count does not measure everywhere, and one where both measure
+/// and the worst contact sits nearer at the count below. At the steepest
+/// pressure angle the table admits every contact is within a rounding of
+/// the pitch circle, and the worst-contact rule chose among roundings at a
+/// cost of every count times every position — some 10¹¹ readings on the
+/// largest eccentric gear the output budget admits.
+///
+/// Returns the span at the first position and its `[smallest, largest]` round
+/// every position. An evenly cut gear's two ends are the **same bits**, so a
+/// caller can report a range unconditionally and have an ordinary gear read as
+/// a single number.
 ///
 /// # Errors
 ///
 /// [`MeasurementError::NoValidSpan`] when no `k` is measurable at *every*
-/// position. That is stricter than asking per tooth, and deliberately: a span
-/// that can only be taken at some angular positions is not a measurement of the
-/// gear.
+/// position — or the nominal tooth has no span to set it by. That is stricter
+/// than asking per tooth, and deliberately: a span that can only be taken at
+/// some angular positions is not a measurement of the gear.
 pub fn best_span_around(gear: &crate::gear::Gear) -> Result<(Span, [f64; 2]), MeasurementError> {
-    let z = positions(gear);
-    let mean = gear.mean();
-    let mut best: Option<(Span, [f64; 2], f64)> = None;
+    let z = gear.mean().params.teeth;
+    let set = nominal_count(gear).ok_or(MeasurementError::NoValidSpan)?;
+    let either_side = (1..z).flat_map(|d| {
+        [
+            set.checked_sub(d).filter(|&k| k >= 1),
+            set.checked_add(d).filter(|&k| k <= z),
+        ]
+    });
+    let mut hot = Hot::default();
+    std::iter::once(set)
+        .chain(either_side.flatten())
+        .find_map(|k| round(gear, k, &mut hot))
+        .ok_or(MeasurementError::NoValidSpan)
+}
 
-    for k in span_counts(gear) {
-        let mut lo = f64::MAX;
-        let mut hi = f64::MIN;
-        let mut worst_offset = 0.0_f64;
-        let mut at_first = None;
-        let mut every = true;
-        for j in 0..z {
-            match span_over_teeth_at(gear, j, k) {
-                Some(s) => {
-                    lo = lo.min(s.nominal);
-                    hi = hi.max(s.nominal);
-                    worst_offset = worst_offset.max((s.contact_radius - mean.r).abs());
-                    if j == 0 {
-                        at_first = Some(s);
-                    }
-                }
-                None => {
-                    every = false;
-                    break;
-                }
-            }
-        }
-        if !every {
-            continue;
-        }
-        let Some(s) = at_first else { continue };
-        let better = best.as_ref().is_none_or(|(_, _, w)| worst_offset < *w);
-        if better {
-            best = Some((s, [lo, hi], worst_offset));
+/// **The span over `k` teeth of the nominal tooth**, on the gear's pitch —
+/// the gear's one tooth where its teeth are one, read at the first
+/// position, and its mean tooth where they differ: the tooth a caliper is
+/// set by ([`best_span_around`]). `None` by [`span_over_teeth_at`]'s rule.
+#[must_use]
+pub fn nominal_span_over(gear: &crate::gear::Gear, k: u32) -> Option<Span> {
+    match nominal_reach(gear, k) {
+        Reach::On(s) => Some(s),
+        Reach::Short | Reach::Past => None,
+    }
+}
+
+fn nominal_reach(gear: &crate::gear::Gear, k: u32) -> Reach {
+    let tooth = if gear.is_concentric() {
+        gear.tooth(0).0
+    } else {
+        gear.mean()
+    };
+    reach_between(gear, tooth, tooth, k)
+}
+
+/// **The first count in `[from, to)` that `holds`**, by halving, where
+/// `holds` is false and then true over the range; `to` where it never does.
+fn first_count(from: u32, to: u32, holds: impl Fn(u32) -> bool) -> u32 {
+    let (mut a, mut b) = (from, to);
+    while a < b {
+        let mid = a + (b - a) / 2;
+        if holds(mid) {
+            b = mid;
+        } else {
+            a = mid + 1;
         }
     }
+    a
+}
 
-    best.map(|(s, range, _)| (s, range))
-        .ok_or(MeasurementError::NoValidSpan)
+/// **The count the nominal tooth's span lands nearest the pitch circle
+/// with** ([`nominal_span_over`]), the first of two as near, by halving
+/// rather than by asking each count.
+///
+/// Every position of the one tooth reads alike, so the counts that measure
+/// are one run ([`Reach`]), and along it the contact radius only rises —
+/// the half-roll it sits at rises with `k`, and so do both ends it is held
+/// between — so its distance from the pitch circle falls to where it
+/// crosses and rises after. The count kept is the first at the least
+/// distance: the first reaching the pitch circle, or the one before it, and
+/// there the first of the counts before it that sit as close.
+fn nominal_count(gear: &crate::gear::Gear) -> Option<u32> {
+    let z = gear.mean().params.teeth;
+    let r = gear.mean().r;
+    let at = |k: u32| nominal_reach(gear, k);
+    let end = z.saturating_add(1);
+    let from = first_count(1, end, |k| !matches!(at(k), Reach::Short));
+    let to = first_count(from, end, |k| matches!(at(k), Reach::Past));
+    // Inside the run every count measures.
+    let on = |k: u32| match at(k) {
+        Reach::On(s) => Some(s),
+        Reach::Short | Reach::Past => None,
+    };
+    let offset = |k: u32| on(k).map(|s| (s.contact_radius - r).abs());
+    let crossing = first_count(from, to, |k| on(k).is_some_and(|s| s.contact_radius >= r));
+    let before = (crossing > from).then(|| crossing - 1);
+    let after = (crossing < to).then_some(crossing);
+    match (before, after) {
+        (Some(b), Some(a)) if offset(b) > offset(a) => Some(a),
+        (Some(b), _) => {
+            let least = offset(b);
+            Some(first_count(from, b, |k| offset(k) <= least))
+        }
+        (None, after) => after,
+    }
+}
+
+/// **The positions that last refused a count**, read first for the next:
+/// the counts either side of one that does not measure somewhere tend not
+/// to measure at the same place.
+#[derive(Default)]
+struct Hot([Option<usize>; HOT]);
+
+/// How many positions [`Hot`] keeps.
+const HOT: usize = 4;
+
+impl Hot {
+    fn push(&mut self, j: usize) {
+        if !self.0.contains(&Some(j)) {
+            self.0.rotate_right(1);
+            self.0[0] = Some(j);
+        }
+    }
+}
+
+/// **A span over `k` teeth read round every position**: the reading at the
+/// first and its range — or `None` where some position does not measure,
+/// given up there.
+fn round(gear: &crate::gear::Gear, k: u32, hot: &mut Hot) -> Option<(Span, [f64; 2])> {
+    // The positions that refused the counts before, then every position
+    // in order (those among them twice, which read the same).
+    let first: Vec<usize> = hot.0.iter().flatten().copied().collect();
+    let mut lo = f64::MAX;
+    let mut hi = f64::MIN;
+    let mut at_first = None;
+    for j in first.into_iter().chain(0..positions(gear)) {
+        let Some(s) = span_over_teeth_at(gear, j, k) else {
+            hot.push(j);
+            return None;
+        };
+        lo = lo.min(s.nominal);
+        hi = hi.max(s.nominal);
+        if j == 0 {
+            at_first = Some(s);
+        }
+    }
+    at_first.map(|s| (s, [lo, hi]))
 }
 
 /// **Over pins at every position round the gear**, or why one fails.
@@ -828,7 +966,7 @@ pub fn over_pins_at(
     // into one of `z − 1` — the same angle, and not the same `cos`. That last
     // ulp reaches the screen as a range on a gear that has none.
     let seat = |i: usize| -> Result<([f64; 2], f64), MeasurementError> {
-        let (r_m, contact) = space_at(gear, i).seat(pin_diameter)?;
+        let (r_m, contact) = Space::after(gear, i).seat(pin_diameter)?;
         // Relative to the first pin's space, so every angle in the measurement
         // is a *difference* and the pitch terms cancel exactly.
         let c = gear.space_centre_delta(start, i);

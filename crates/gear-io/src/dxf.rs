@@ -35,7 +35,7 @@
 //! chord tolerance passed to [`gear_core::gear::Gear::outline`].
 
 use gear_core::gear::Gear;
-use gear_core::input::Refused;
+use gear_core::input::{Budget, Refused};
 use gear_core::outline::Envelope;
 use gear_core::ring::Ring;
 use gear_core::Vertex;
@@ -57,6 +57,9 @@ pub struct DxfOptions {
     pub chord_tolerance: f64,
     /// Emit the pitch, base, tip and root circles on a construction layer.
     pub reference_circles: bool,
+    /// The most the drawing may take, its text and the outline it is
+    /// written from together ([`Budget`]).
+    pub budget: Budget,
 }
 
 impl Default for DxfOptions {
@@ -64,6 +67,7 @@ impl Default for DxfOptions {
         Self {
             chord_tolerance: gear_core::outline::DEFAULT_CHORD_TOLERANCE,
             reference_circles: true,
+            budget: Budget::DEFAULT,
         }
     }
 }
@@ -72,20 +76,33 @@ impl Default for DxfOptions {
 struct Writer {
     out: String,
     next: u32,
-    /// Whether a tag found no room: the drawing is more than the machine's
-    /// memory holds, and is refused rather than written in part.
-    full: bool,
+    /// What the text may take.
+    budget: Budget,
+    /// Why a tag found no room, where one did: the drawing is past its
+    /// budget, or within it and past memory, and is refused rather than
+    /// written in part.
+    full: Option<Full>,
+}
+
+/// Why a writer is full.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Full {
+    /// The text would have been this many bytes, past the budget.
+    Budget(usize),
+    /// The allocator's refusal, within the budget.
+    Memory,
 }
 
 impl Writer {
-    fn new() -> Self {
+    fn new(budget: Budget) -> Self {
         Self {
             out: String::new(),
             // Handles must be non-zero and unique. The records other records
             // *point at* are named in `handle` below and take the low numbers;
             // everything else counts up from here, so the two cannot collide.
             next: handle::FIRST_COUNTED,
-            full: false,
+            budget,
+            full: None,
         }
     }
 
@@ -96,20 +113,35 @@ impl Writer {
         }
     }
 
-    /// Room for `bytes` more, or the writer full from here on: one tag that
-    /// found none leaves every later one unwritten, however small.
+    /// Room for `bytes` more, the text's length charged against the budget
+    /// before memory is asked for, or the writer full from here on: one tag
+    /// that found none leaves every later one unwritten, however small.
     fn room(&mut self, bytes: usize) -> bool {
-        self.full = self.full || self.out.try_reserve(bytes).is_err();
-        !self.full
+        if self.full.is_none() {
+            let size = self.out.len().saturating_add(bytes);
+            if size > self.budget.bytes {
+                self.full = Some(Full::Budget(size));
+            } else if self.out.try_reserve(bytes).is_err() {
+                self.full = Some(Full::Memory);
+            }
+        }
+        self.full.is_none()
     }
 
     /// The drawing, or refused whole naming `teeth` where any tag found no
     /// room — never a file written in part.
     fn finish(self, teeth: f64) -> Result<String, Refused> {
-        if self.full {
-            return Err(Refused::past_memory("teeth", teeth));
+        match self.full {
+            // `usize` into `u64` on every target this builds for.
+            Some(Full::Budget(size)) => Err(Refused::past_budget(
+                "teeth",
+                teeth,
+                size as u64,
+                self.budget.bytes as u64,
+            )),
+            Some(Full::Memory) => Err(Refused::past_memory("teeth", teeth)),
+            None => Ok(self.out),
         }
-        Ok(self.out)
     }
 
     fn int(&mut self, code: i32, value: i32) {
@@ -147,13 +179,17 @@ impl Writer {
 ///
 /// # Errors
 ///
-/// [`Refused::past_memory`], naming `teeth`, where the drawing is more than
-/// the machine's memory holds.
+/// [`Refused::past_budget`], naming `teeth`, where the drawing is more than
+/// its budget ([`DxfOptions::budget`]): each vertex of the outline is
+/// charged the text it will be written as, so the refusal comes from the
+/// first tooth's vertices before the rest are made.
 pub fn gear_to_dxf(gear: &Gear, opts: &DxfOptions) -> Result<String, Refused> {
     let mean = gear.mean();
     let teeth = f64::from(mean.params.teeth);
+    // Every tooth's tip lies within the mean tip and the eccentricity.
+    let extent = mean.ra + mean.params.module * mean.params.angular_shift.abs();
     outline_to_dxf(
-        &gear.outline(opts.chord_tolerance)?,
+        &gear.outline_charged(opts.chord_tolerance, opts.budget, vertex_bytes(extent))?,
         &[
             Envelope::circle(mean.r),
             Envelope::circle(mean.rb),
@@ -173,20 +209,35 @@ pub fn gear_to_dxf(gear: &Gear, opts: &DxfOptions) -> Result<String, Refused> {
 ///
 /// # Errors
 ///
-/// [`Refused::past_memory`], naming `teeth`, where the drawing is more than
-/// the machine's memory holds.
+/// As [`gear_to_dxf`].
 pub fn ring_to_dxf(ring: &Ring, opts: &DxfOptions) -> Result<String, Refused> {
     // The rim circle joins the reference circles on the construction layer
     // rather than the profile layer: it is where the *drawing* shades the
     // material to, and a real ring's outside diameter is the designer's
     // (`Ring::rim_radius`). Putting it on the profile layer would hand CAD a
     // boundary nobody chose.
+    // A ring's bore lies within its root circle.
     outline_to_dxf(
-        &ring.outline(opts.chord_tolerance)?,
+        &ring.outline_charged(opts.chord_tolerance, opts.budget, vertex_bytes(ring.rf))?,
         &[ring.r, ring.rb, ring.ra, ring.rf, ring.rim_radius()].map(Envelope::circle),
         opts,
         f64::from(ring.teeth),
     )
+}
+
+/// **What one vertex of an outline within `extent` of the axis costs**: the
+/// vertex as the core holds it and the text it is written as — its `x`,
+/// `y` and bulge, each a tag of a two-digit code and a value written as
+/// [`Writer::real`] writes it, the longest such value within the extent —
+/// or within a unit, which holds a bulge: `tan` of a quarter of its arc,
+/// under one on every root arc between two teeth or more. A prediction:
+/// the writer charges what it actually writes as it writes it.
+fn vertex_bytes(extent: f64) -> usize {
+    const TAGS: usize = 3;
+    let widest = format!("{:.12}", -extent.abs().max(1.0)).len();
+    // A code, its newline, the value and its newline.
+    let tag = "10\n".len() + widest + "\n".len();
+    std::mem::size_of::<Vertex>() + TAGS * tag
 }
 
 /// Write any closed outline, with its reference curves.
@@ -200,7 +251,7 @@ fn outline_to_dxf(
     opts: &DxfOptions,
     teeth: f64,
 ) -> Result<String, Refused> {
-    let mut w = Writer::new();
+    let mut w = Writer::new(opts.budget);
     header(&mut w);
     classes(&mut w);
     tables(&mut w, opts.reference_circles);
@@ -554,32 +605,135 @@ mod tests {
             &DxfOptions {
                 chord_tolerance,
                 reference_circles: true,
+                budget: Budget::DEFAULT,
             },
         )
         .unwrap()
     }
 
-    /// **A drawing past memory is refused whole, by the count.** A tag that
-    /// finds no room leaves the writer full: nothing after it is written,
-    /// however small, and the drawing is refused naming `teeth` rather than
-    /// handed back in part. (`usize::MAX` bytes is past any allocator, so
-    /// the refusal is the same on every machine.)
+    /// **A drawing past its budget is refused whole, by the count.** The
+    /// text is charged as it is written: a tag that would take it past the
+    /// budget leaves the writer full, nothing after it is written however
+    /// small, and the drawing is refused naming `teeth`, its size and the
+    /// budget, rather than handed back in part. A text exactly at the budget
+    /// is written; a byte more is not.
     #[test]
-    fn a_writer_that_finds_no_room_writes_nothing_more_and_refuses() {
-        let mut w = Writer::new();
-        w.tag(0, "SECTION");
+    fn a_writer_past_its_budget_writes_nothing_more_and_refuses() {
+        let eof = "0\nEOF\n";
+        let budget = Budget {
+            bytes: 2 * eof.len(),
+        };
+        let mut w = Writer::new(budget);
+        w.tag(0, "EOF");
+        w.tag(0, "EOF");
+        assert_eq!(w.finish(17.0).unwrap(), eof.repeat(2), "at the budget");
+
+        let mut w = Writer::new(budget);
+        w.tag(0, "EOF");
         let written = w.out.clone();
-        assert!(w.room(1), "a byte's room is there");
-        assert!(!w.room(usize::MAX), "no machine has usize::MAX bytes");
+        assert!(!w.room(eof.len() + 1), "a byte past the budget");
         w.tag(0, "EOF");
         assert_eq!(w.out, written, "a full writer wrote on");
         assert!(!w.room(1), "a full writer found room again");
         let refused = w.finish(17.0).unwrap_err();
-        assert_eq!(refused, Refused::past_memory("teeth", 17.0));
+        let size = 2 * eof.len() + 1;
+        assert_eq!(
+            refused,
+            Refused::past_budget("teeth", 17.0, size as u64, budget.bytes as u64)
+        );
+    }
 
-        let mut w = Writer::new();
-        w.tag(0, "EOF");
-        assert_eq!(w.finish(17.0).unwrap(), "0\nEOF\n");
+    /// **A DXF is refused from what its outline will write, before the rest
+    /// is made**: each vertex is charged its own size and the most text it
+    /// can be written as (`vertex_bytes`, from the drawing's extent), which
+    /// bounds what every vertex of the outline is written as — so at a byte
+    /// short of the outline's charge the drawing is refused with that
+    /// charge as its size, from its first tooth; at the charge and the
+    /// text's length it is written, the same text as at any budget above;
+    /// and a byte short of the text, where that is past the charge, the
+    /// writer refuses it with the text's size. On an ordinary gear, an
+    /// eccentric one and a ring.
+    #[test]
+    fn a_dxf_is_refused_from_what_its_outline_will_write() {
+        let tol = 1e-3;
+        let opts = |bytes: usize| DxfOptions {
+            chord_tolerance: tol,
+            reference_circles: true,
+            budget: Budget { bytes },
+        };
+        let written = |v: &Vertex| {
+            let tag = |x: f64| "10\n".len() + format!("{x:.12}").len() + "\n".len();
+            tag(v.x) + tag(v.y) + if v.bulge != 0.0 { tag(v.bulge) } else { 0 }
+        };
+        let law =
+            |outline: Vec<Vertex>, each: usize, dxf: &dyn Fn(usize) -> Result<String, Refused>| {
+                let most = outline.iter().map(written).max().unwrap_or(0);
+                assert!(
+                    most + std::mem::size_of::<Vertex>() <= each,
+                    "{most} past {each}"
+                );
+                let charge = outline.len() * each;
+                let full = dxf(Budget::DEFAULT.bytes).unwrap();
+                let enough = charge.max(full.len());
+                assert_eq!(dxf(enough).unwrap(), full);
+                let refused = dxf(charge - 1).unwrap_err();
+                let bytes = |n: usize| n as u64;
+                assert_eq!(
+                    refused,
+                    Refused::past_budget("teeth", refused.value, bytes(charge), bytes(charge - 1))
+                );
+                if full.len() > charge {
+                    let refused = dxf(full.len() - 1).unwrap_err();
+                    assert_eq!(
+                        refused,
+                        Refused::past_budget(
+                            "teeth",
+                            refused.value,
+                            bytes(full.len()),
+                            bytes(full.len() - 1)
+                        )
+                    );
+                }
+            };
+        for (teeth, angular_shift) in [(9, 0.0), (17, 0.0), (60, 0.0), (24, 0.25)] {
+            let g = Gear::new(GearParams {
+                teeth,
+                angular_shift,
+                ..Default::default()
+            });
+            let extent = g.mean().ra + g.mean().params.module * angular_shift;
+            law(
+                g.outline(tol, Budget::DEFAULT).unwrap(),
+                vertex_bytes(extent),
+                &|bytes| gear_to_dxf(&g, &opts(bytes)),
+            );
+        }
+        let ring = Ring::cut_by(
+            &GearParams {
+                teeth: 43,
+                ..Default::default()
+            },
+            &gear_core::ring::Cutter::default(),
+        );
+        law(
+            ring.outline(tol, Budget::DEFAULT).unwrap(),
+            vertex_bytes(ring.rf),
+            &|bytes| ring_to_dxf(&ring, &opts(bytes)),
+        );
+    }
+
+    /// **Within its budget and past memory, the allocator's refusal**, by
+    /// the count: `usize::MAX` bytes admitted by a budget as large and
+    /// granted by no allocator, so the same on every machine.
+    #[test]
+    fn a_writer_within_its_budget_and_past_memory_refuses() {
+        let mut w = Writer::new(Budget { bytes: usize::MAX });
+        assert!(!w.room(usize::MAX));
+        assert!(!w.room(1), "a full writer found room again");
+        assert_eq!(
+            w.finish(17.0).unwrap_err(),
+            Refused::past_memory("teeth", 17.0)
+        );
     }
 
     fn tags(dxf: &str) -> Vec<(i32, String)> {
@@ -898,12 +1052,13 @@ mod tests {
             teeth: 9,
             ..Default::default()
         });
-        let want = g.outline(1e-3).unwrap();
+        let want = g.outline(1e-3, gear_core::input::Budget::DEFAULT).unwrap();
         let dxf = gear_to_dxf(
             &g,
             &DxfOptions {
                 chord_tolerance: 1e-3,
                 reference_circles: false,
+                budget: Budget::DEFAULT,
             },
         )
         .unwrap();
@@ -1037,12 +1192,13 @@ mod tests {
             teeth: 12,
             ..Default::default()
         });
-        let outline = g.outline(1e-3).unwrap();
+        let outline = g.outline(1e-3, gear_core::input::Budget::DEFAULT).unwrap();
         let dxf = gear_to_dxf(
             &g,
             &DxfOptions {
                 chord_tolerance: 1e-3,
                 reference_circles: false,
+                budget: Budget::DEFAULT,
             },
         )
         .unwrap();

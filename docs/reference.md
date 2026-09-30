@@ -1595,8 +1595,11 @@ point, and the ulp between them reaches the screen as a range on a gear that has
 none.
 
 One `k` and one pin diameter serve the whole revolution — a caliper is set once
-and carried round — so the admissible counts are intersected over every starting
-position rather than chosen per tooth. Each measurement is reported at the datum
+and carried round. The count is set from the **nominal tooth** (the mean tooth,
+the one an evenly cut gear's every tooth is) by the single-gear rule, nearest
+the pitch circle, and carried round: where some position does not measure at it,
+the counts either side are tried, nearer first, until one measures at every
+position. The pins' range is intersected over every space. Each measurement is reported at the datum
 tooth with the `[smallest, largest]` it takes around the revolution; **an evenly
 cut gear's two ends are the same bits**, so a caller reports a range
 unconditionally and an ordinary gear reads as one number.

@@ -407,8 +407,14 @@ fn gear(p: &GearParams, opened_by: f64, dxf: Option<&gear_io::DxfOptions>) {
     guarded(&name, || {
         let g = Gear::new(*p);
         println!("{g:#?}");
-        println!("profile {}", drawn(g.profile(PER_TOOTH)));
-        println!("outline {}", drawn(g.outline(OUTLINE_TOLERANCE)));
+        println!(
+            "profile {}",
+            drawn(g.profile(PER_TOOTH, gear_core::input::Budget::DEFAULT))
+        );
+        println!(
+            "outline {}",
+            drawn(g.outline(OUTLINE_TOLERANCE, gear_core::input::Budget::DEFAULT))
+        );
         println!("admissible {:#?}", auto::admissible_ranges(p, p.dedendum));
         measured(&g);
         if let Some(o) = dxf {
@@ -450,8 +456,14 @@ fn ring(p: &GearParams, dxf: Option<&gear_io::DxfOptions>) {
         };
         let r = Ring::cut_by(&rp, &Cutter::default());
         println!("{r:#?}");
-        println!("profile {}", drawn(r.profile(PER_TOOTH)));
-        println!("outline {}", drawn(r.outline(OUTLINE_TOLERANCE)));
+        println!(
+            "profile {}",
+            drawn(r.profile(PER_TOOTH, gear_core::input::Budget::DEFAULT))
+        );
+        println!(
+            "outline {}",
+            drawn(r.outline(OUTLINE_TOLERANCE, gear_core::input::Budget::DEFAULT))
+        );
         if let Some(o) = dxf {
             println!("dxf\n{}", drawn_text(gear_io::ring_to_dxf(&r, o)));
         }

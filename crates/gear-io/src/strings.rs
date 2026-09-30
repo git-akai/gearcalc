@@ -636,20 +636,28 @@ mod tests {
             }
         }
 
-        // **A drawing past the machine's memory**: every tooth a wire's
-        // count can carry, at a point budget whose outline is past what any
-        // address space maps (4.3e9 teeth × 8,193 points × 16 bytes, some
-        // 560 TB) — refused naming the teeth rather than stopping.
+        // **A drawing past its budget**: every tooth a wire's count can
+        // carry, at a point budget whose outline is some 560 TB (4.3e9 teeth
+        // × 8,193 points × 16 bytes) — refused from its predicted size,
+        // naming the teeth. And **within a budget and past memory**: a
+        // budget as large as an address, and a list of as many bytes, which
+        // no allocator grants.
         {
+            use gear_core::input::Budget;
             use gear_core::note::Explain;
             let drawn = gear_core::Gear::new(GearParams {
                 teeth: u32::MAX,
                 ..Default::default()
             })
-            .profile(1 << 13);
+            .profile(1 << 13, Budget::DEFAULT);
             match drawn {
                 Err(e) => record(&[e.note()]),
                 Ok(_) => panic!("a drawing of 4.3e9 teeth was held"),
+            }
+            let unbounded = Budget { bytes: usize::MAX };
+            match unbounded.room(&mut Vec::<u8>::new(), usize::MAX, "teeth", 1.0) {
+                Err(e) => record(&[e.note()]),
+                Ok(()) => panic!("usize::MAX bytes were granted"),
             }
         }
 

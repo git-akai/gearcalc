@@ -143,6 +143,7 @@ train_file_format = "diese Datei hat das Format {found}, und dieses Werkzeug lie
 input_not_finite = "{field} ist keine endliche Zahl"
 input_out_of_range = "{field} ist {value}, außerhalb von {bound}"
 input_past_memory = "{field} ist {value}: mehr, als der Speicher dieses Rechners fasst"
+output_past_budget = "{field} ist {value}: die Ausgabe wäre {size} Bytes groß, über ihrem Budget von {budget}"
 train_size_over_constrained = "Eingriffe {first} und {second}: ihre vorgegebenen Achsabstände verlangen bei festgelegten Profilverschiebungen zwei verschiedene Größen ihrer Räder — eine Verschiebung, einen Abstand oder die Größe freigeben"
 train_axes_too_close = "Achsabstand {distance}: die beiden Achsen, die er auf einem Träger verbindet, liegen zu nah beieinander, um bei ihren Abständen zur Trägerachse zu stehen"
 train_axes_too_far = "Achsabstand {distance}: die beiden Achsen, die er auf einem Träger verbindet, liegen zu weit auseinander, um bei ihren Abständen zur Trägerachse zu stehen"

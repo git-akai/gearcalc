@@ -3631,23 +3631,23 @@
    "ok": [
     [
      "en",
-     577
+     578
     ],
     [
      "de",
-     577
+     578
     ],
     [
      "pt",
-     577
+     578
     ],
     [
      "zh-Hans",
-     577
+     578
     ],
     [
      "zh-Hant",
-     577
+     578
     ]
    ]
   },
@@ -33738,17 +33738,28 @@
    "summarised": {
     "ok": 150000000
    },
+   "steepest": {
+    "ok": {
+     "teeth_spanned": 1879804509,
+     "nominal": "4294967294.9999995",
+     "contact_radius": "2147483647.4999998",
+     "around": [
+      "4294967294.9999995",
+      "4294967294.9999995"
+     ]
+    }
+   },
    "drawn": {
-    "refused": "{\"key\":\"error.input_past_memory\",\"values\":{\"field\":\"params.teeth\",\"value\":\"30000000\"}}"
+    "refused": "{\"key\":\"error.output_past_budget\",\"values\":{\"budget\":\"134217728\",\"field\":\"params.teeth\",\"size\":\"10080000016\",\"value\":\"30000000\"}}"
    },
    "exported": {
-    "refused": "{\"key\":\"error.input_past_memory\",\"values\":{\"field\":\"params.teeth\",\"value\":\"30000000\"}}"
+    "refused": "{\"key\":\"error.output_past_budget\",\"values\":{\"budget\":\"134217728\",\"field\":\"params.teeth\",\"size\":\"88740000000\",\"value\":\"30000000\"}}"
    },
    "eccentric": {
-    "refused": "{\"key\":\"error.input_past_memory\",\"values\":{\"field\":\"params.teeth\",\"value\":\"30000000\"}}"
+    "refused": "{\"key\":\"error.output_past_budget\",\"values\":{\"budget\":\"134217728\",\"field\":\"params.teeth\",\"size\":\"186000372\",\"value\":\"1000000\"}}"
    },
    "ring": {
-    "refused": "{\"key\":\"error.input_past_memory\",\"values\":{\"field\":\"params.teeth\",\"value\":\"30000000\"}}"
+    "refused": "{\"key\":\"error.output_past_budget\",\"values\":{\"budget\":\"134217728\",\"field\":\"params.teeth\",\"size\":\"10080000016\",\"value\":\"30000000\"}}"
    },
    "panicked": {
     "ok": ""

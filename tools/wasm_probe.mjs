@@ -438,19 +438,26 @@ const out = {
   ),
   // **A huge count answered or refused naming it, never trapped** — the
   // counts that trapped the browser's 4 GB: a concentric gear of 3e8 teeth
-  // is summarised at once (its teeth one tooth); drawing 3e7 of them, even
-  // at a point a tooth, and exporting them are refused naming the teeth,
-  // and so is an eccentric gear of 3e7, whose teeth each differ. The hook
-  // `start` installs has said no panic after them (`last_panic` empty).
+  // is summarised at once (its teeth one tooth), and so is one of every
+  // tooth a wire's count carries at the steepest pressure angle the table
+  // admits, whose spans measure over half the gear (found by halving, not
+  // by reading two billion counts); drawing 3e7 teeth, even at a point a
+  // tooth, and exporting them are refused by the output budget naming the
+  // teeth, and so is an eccentric gear of a million, whose teeth each
+  // differ. The hook `start` installs has said no panic after them
+  // (`last_panic` empty).
   huge_counts: (() => {
     call("start", () => w.start());
     const at = (teeth, extra = {}) =>
       JSON.stringify({ ...gear, params: { ...gear.params, teeth, ...extra } });
     return {
       summarised: call("solve_gear", () => JSON.parse(w.solve_gear(at(300_000_000))).pitch_radius),
+      steepest: call("solve_gear", () =>
+        JSON.parse(w.solve_gear(at(4_294_967_295, { pressure_angle: 89.99999999999999 }))).span,
+      ),
       drawn: call("gear_profile", () => w.gear_profile(at(30_000_000), 1).length),
       exported: call("export_dxf", () => w.export_dxf(at(30_000_000)).length),
-      eccentric: call("solve_gear", () => w.solve_gear(at(30_000_000, { angular_shift: 0.1 }))),
+      eccentric: call("solve_gear", () => w.solve_gear(at(1_000_000, { angular_shift: 0.1 }))),
       ring: call("ring_profile", () =>
         w.ring_profile(JSON.stringify({ ...ring, params: { ...ring.params, teeth: 30_000_000 } }), 1).length,
       ),

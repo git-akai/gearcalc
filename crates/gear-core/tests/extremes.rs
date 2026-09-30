@@ -23,7 +23,9 @@ mod common;
 fn is_constructible(p: GearParams) -> bool {
     let g = Tooth::new(p);
     let finite = [g.r, g.rb, g.ra, g.rf, g.st].iter().all(|v| v.is_finite());
-    let outline = Gear::new(p).profile(120).unwrap();
+    let outline = Gear::new(p)
+        .profile(120, gear_core::input::Budget::DEFAULT)
+        .unwrap();
     let closed = outline.len() > 8 && outline.first() == outline.last();
     let simple = common::crossings(&outline[..outline.len() - 1]) == 0;
     finite && g.ra > g.rf && g.rf > 0.0 && closed && simple

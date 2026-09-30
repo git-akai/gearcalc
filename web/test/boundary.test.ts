@@ -122,13 +122,17 @@ test("five thousand traps are said, and the next call is answered", () => {
 });
 
 // **A huge count is refused naming it, never trapped**: the drawing of a
-// gear whose every tooth the browser's memory cannot hold.
-test("a drawing past memory is refused by name", () => {
+// gear whose every tooth is past the output budget, refused from its size
+// before it is drawn. The size and the budget are the core's figures, read
+// back from what it said; the words around them and the field are checked.
+test("a drawing past its budget is refused by name", () => {
   const d = defaults().gear;
   const huge: GearRequest = { params: { ...d.params, teeth: 300_000_000 }, chord_tolerance: d.chord_tolerance, reference_circles: false };
   const r = profile(huge, 8);
-  expect("error" in r && r.error).toBe(
-    t(KEY, { detail: t("error.input_past_memory", { field: "params.teeth", value: "300000000" }) }),
+  const said = "error" in r ? r.error : "";
+  const [size, budget] = said.match(/(\d+)\D+(\d+)\D*$/)?.slice(1) ?? ["", ""];
+  expect(said).toBe(
+    t(KEY, { detail: t("error.output_past_budget", { field: "params.teeth", value: "300000000", size, budget }) }),
   );
   expect("ok" in solve(huge)).toBe(true);
 });

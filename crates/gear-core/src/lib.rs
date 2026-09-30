@@ -14,7 +14,7 @@
 //! // A tooth is one tooth's form; a gear is the assembly that repeats it.
 //! let t = Tooth::new(GearParams { teeth: 17, profile_shift: 0.2, ..Default::default() });
 //! assert!(!t.undercut);
-//! let outline = Gear::new(t.params).profile(400).unwrap();   // closed cross-section, CCW
+//! let outline = Gear::new(t.params).profile(400, gear_core::input::Budget::DEFAULT).unwrap();   // closed cross-section, CCW
 //! ```
 
 pub mod auto;

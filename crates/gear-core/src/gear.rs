@@ -51,7 +51,7 @@
 //! z-fold replication it replaces — gated, not hoped for. `λ` has no effect
 //! there either, since there is nothing for it to correct towards.
 
-use crate::input::Refused;
+use crate::input::{Budget, Refused};
 use crate::involute::inv;
 use crate::mesh::{operating_geometry, MeshError, MeshKind, MeshSide};
 use crate::note::{key, Note};
@@ -93,25 +93,17 @@ pub struct Gear {
     /// eccentric one — teeth `k` and `z − k` take the same shift, since `cos` is
     /// even about the axis of the variation.
     teeth: Vec<Tooth>,
-    /// Which distinct tooth each position uses and where it is seated — for
-    /// an eccentric gear alone. A concentric gear's positions are its one
-    /// tooth at `2πk/z`, read off `k` ([`Self::tooth`]), so a count of
-    /// billions costs what one tooth does.
-    positions: Option<Positions>,
+    /// Which distinct tooth each position uses, by the position's fold
+    /// `min(k, z − k)` — for an eccentric gear alone. A concentric gear's
+    /// positions are its one tooth, so a count of billions costs what one
+    /// tooth does; and every seat is read off `k` where it is asked
+    /// ([`Self::tooth`]), so nothing is kept per position.
+    group: Option<Vec<usize>>,
     /// How many teeth, `z`.
     count: usize,
     /// The gear at the mean shift — what every scalar output is quoted from, and
     /// what the whole gear is when the variation is zero.
     mean: Tooth,
-}
-
-/// An eccentric gear's teeth, position by position.
-#[derive(Clone, Debug)]
-struct Positions {
-    /// Which distinct tooth each of the `z` positions uses.
-    which: Vec<usize>,
-    /// Where each tooth's centreline sits, radians.
-    seat: Vec<f64>,
 }
 
 /// **The shift the `k`th tooth is cut at**, `x + Δx cos θ_k`.
@@ -143,25 +135,27 @@ impl Gear {
     ///
     /// # Panics
     ///
-    /// Where an eccentric gear's per-tooth lists are more than the machine's
-    /// memory holds — a count no boundary admits unasked: each reads a gear
-    /// through [`Self::try_new`]. A concentric gear lists nothing per tooth.
+    /// Where an eccentric gear's teeth are past the default output budget
+    /// ([`Budget::DEFAULT`]) — a count no boundary admits unasked: each
+    /// reads a gear through [`Self::try_new`]. A concentric gear keeps one
+    /// tooth.
     #[must_use]
     #[expect(
         clippy::expect_used,
-        reason = "a gear built in the crate's own code has a count its memory holds; input reads `try_new`"
+        reason = "a gear built in the crate's own code has a count its budget holds; input reads `try_new`"
     )]
     pub fn new(params: GearParams) -> Self {
-        Self::try_new(params).expect("a gear's per-tooth lists past memory")
+        Self::try_new(params, Budget::DEFAULT).expect("a gear's teeth past the output budget")
     }
 
-    /// [`Self::new`], refusing a count whose per-tooth lists the machine's
-    /// memory does not hold.
+    /// [`Self::new`], refusing an eccentric gear whose teeth are past
+    /// `budget` before any is cut.
     ///
     /// # Errors
     ///
-    /// [`Refused::past_memory`], naming `teeth`.
-    pub fn try_new(params: GearParams) -> Result<Self, Refused> {
+    /// [`Refused::past_budget`] (or [`Refused::past_memory`] beneath it),
+    /// naming `teeth`.
+    pub fn try_new(params: GearParams, budget: Budget) -> Result<Self, Refused> {
         let z = params.teeth.max(1);
         let count = usize::try_from(z).map_err(|_| Refused::past_memory("teeth", f64::from(z)))?;
         let shift_at = |k: u32| shift_at(&params, k);
@@ -176,24 +170,17 @@ impl Gear {
         // read at a single position.
         let half = z / 2;
         let concentric = shift_at(0) == shift_at(half);
-        // **Every list an eccentric gear keeps per tooth, given room before
-        // any is written**, the largest first: a count past memory is
-        // refused having touched nothing. A concentric gear keeps one tooth.
-        let distinct = if concentric { 1 } else { count / 2 + 1 };
-        let per_position = if concentric { 0 } else { count };
+        let distinct = Self::admit(&params, budget)?;
+        let asked = f64::from(z);
         let mut teeth: Vec<Tooth> = Vec::new();
         let mut wanted: Vec<(Rack, Vec<Note>)> = Vec::new();
         let mut shifts: Vec<f64> = Vec::new();
         let mut group: Vec<usize> = Vec::new();
-        let mut which: Vec<usize> = Vec::new();
-        let mut seat: Vec<f64> = Vec::new();
-        let asked = f64::from(z);
-        crate::input::room(&mut teeth, distinct, "teeth", asked)?;
-        crate::input::room(&mut wanted, distinct, "teeth", asked)?;
-        crate::input::room(&mut shifts, distinct, "teeth", asked)?;
-        crate::input::room(&mut group, distinct, "teeth", asked)?;
-        crate::input::room(&mut which, per_position, "teeth", asked)?;
-        crate::input::room(&mut seat, per_position, "teeth", asked)?;
+        let past = |_| Refused::past_memory("teeth", asked);
+        teeth.try_reserve_exact(distinct).map_err(past)?;
+        wanted.try_reserve_exact(distinct).map_err(past)?;
+        shifts.try_reserve_exact(distinct).map_err(past)?;
+        group.try_reserve_exact(distinct).map_err(past)?;
         if concentric {
             shifts.push(shift_at(0));
         } else {
@@ -274,29 +261,44 @@ impl Gear {
             }
         }
 
-        // Seats. `ψ_b` is the angular half-thickness at the base circle — the
-        // seat of the flank — and the correction is towards the mean tooth's.
-        // A concentric gear's teeth are its mean's, so its correction is
-        // nought and its seats are `2πk/z`, read where they are asked.
-        let positions = if concentric {
-            None
-        } else {
-            // `k` twice: a count for its angle, an index for its group.
-            for (k, at) in (0..z).zip(0..count) {
-                let i = group[at.min(count - at)];
-                let base = std::f64::consts::TAU * f64::from(k) / f64::from(z);
-                which.push(i);
-                seat.push(base + params.index_offset * (mean.psi_b - teeth[i].psi_b));
-            }
-            Some(Positions { which, seat })
-        };
-
         Ok(Self {
             teeth,
-            positions,
+            group: (!concentric).then_some(group),
             count,
             mean,
         })
+    }
+
+    /// **The distinct teeth a gear of `params` keeps, admitted by `budget`**
+    /// before any is cut: one for a concentric gear, whatever its count;
+    /// `⌊z/2⌋ + 1` for an eccentric one, each with what is kept beside it
+    /// while the gear is built (the tool it asks for, its shift, its
+    /// group), charged at once as the size they will have together.
+    ///
+    /// # Errors
+    ///
+    /// [`Refused::past_budget`], naming `teeth`.
+    pub fn admit(params: &GearParams, budget: Budget) -> Result<usize, Refused> {
+        let z = params.teeth.max(1);
+        Self::admit_teeth(z, shift_at(params, 0) != shift_at(params, z / 2), budget)
+    }
+
+    /// [`Self::admit`] by the count and whether the teeth vary — what a
+    /// throw asks of the gear it is solving for, before its variation is
+    /// known.
+    ///
+    /// # Errors
+    ///
+    /// [`Refused::past_budget`], naming `teeth`.
+    pub fn admit_teeth(z: u32, eccentric: bool, budget: Budget) -> Result<usize, Refused> {
+        // `u32` into `usize` on every target this builds for.
+        let distinct = if eccentric { z as usize / 2 + 1 } else { 1 };
+        let each = std::mem::size_of::<Tooth>()
+            + std::mem::size_of::<(Rack, Vec<Note>)>()
+            + std::mem::size_of::<f64>()
+            + std::mem::size_of::<usize>();
+        budget.admit(distinct, each, "teeth", f64::from(z))?;
+        Ok(distinct)
     }
 
     /// **Whether every tooth is the one tooth** — a concentric gear, whose
@@ -304,7 +306,7 @@ impl Gear {
     /// reading taken round the revolution is then one reading.
     #[must_use]
     pub fn is_concentric(&self) -> bool {
-        self.positions.is_none()
+        self.group.is_none()
     }
 
     /// The gear at the mean shift.
@@ -551,16 +553,21 @@ impl Gear {
     }
 
     /// The tooth at position `k`, and where it is seated.
+    ///
+    /// Seats. `ψ_b` is the angular half-thickness at the base circle — the
+    /// seat of the flank — and the correction is towards the mean tooth's,
+    /// by the indexing offset `λ`. A concentric gear's teeth are its mean's,
+    /// so its correction is nought and its seats are `2πk/z`.
     #[must_use]
     pub fn tooth(&self, k: usize) -> (&Tooth, f64) {
         let i = k % self.count;
-        match &self.positions {
-            Some(p) => (&self.teeth[p.which[i]], p.seat[i]),
-            // The expression every seat is built on, at the one tooth.
-            None => (
-                &self.teeth[0],
-                std::f64::consts::TAU * i as f64 / self.count as f64,
-            ),
+        let t = &self.teeth[self.which(i)];
+        let base = std::f64::consts::TAU * i as f64 / self.count as f64;
+        if self.is_concentric() {
+            (t, base)
+        } else {
+            let lambda = self.mean.params.index_offset;
+            (t, base + lambda * (self.mean.psi_b - t.psi_b))
         }
     }
 
@@ -676,13 +683,15 @@ impl Gear {
     /// The whole outline, closed, as `[x, y]` in the gear's own frame.
     ///
     /// `per_tooth` is the point budget for one tooth, as for the single-gear
-    /// generator it replaces.
+    /// generator it replaces; `budget` is the drawing's, in bytes.
     ///
     /// # Errors
     ///
-    /// [`Refused::past_memory`], naming `teeth`, where the outline is more
-    /// points than the machine's memory holds.
-    pub fn profile(&self, per_tooth: usize) -> Result<Vec<[f64; 2]>, Refused> {
+    /// [`Refused::past_budget`], naming `teeth`, where the drawing is more
+    /// than `budget` — refused from the first tooth's points times the count
+    /// before a second is drawn, and on an eccentric gear, whose teeth
+    /// differ a point or two, as each is added.
+    pub fn profile(&self, per_tooth: usize, budget: Budget) -> Result<Vec<[f64; 2]>, Refused> {
         // A virtual spur gear has a fractional tooth count and exists only to be
         // measured; replicating it would draw a shape whose teeth do not close.
         // Caught in development rather than emitted as a plausible wrong outline.
@@ -692,43 +701,43 @@ impl Gear {
             self.mean.z
         );
 
-        // Each distinct tooth's half-profile, mirrored into a full one. Computed
-        // once per distinct tooth rather than once per position, which is what
-        // keeps a concentric gear at exactly one generation.
-        let halves: Vec<(Vec<f64>, Vec<f64>)> = self
-            .teeth
-            .iter()
-            .map(|g| {
-                let (r, th) = g.half_profile((per_tooth / 2).max(8));
-                let mut r_full: Vec<f64> = r.iter().rev().copied().collect();
-                let mut th_full: Vec<f64> = th.iter().rev().map(|t| -t).collect();
-                // The tip centre is shared by the two halves; a half with no
-                // point (a tooth refused at the boundary, built anyway) draws
-                // nothing rather than indexing one.
-                r_full.extend(r.iter().skip(1));
-                th_full.extend(th.iter().skip(1));
-                (r_full, th_full)
-            })
-            .collect();
+        // A tooth's half-profile, mirrored into a full one: drawn for a
+        // position when it is drawn, so a concentric gear is one generation
+        // and an eccentric one keeps no list of its teeth's.
+        let full = |g: &Tooth| {
+            let (r, th) = g.half_profile((per_tooth / 2).max(8));
+            let mut r_full: Vec<f64> = r.iter().rev().copied().collect();
+            let mut th_full: Vec<f64> = th.iter().rev().map(|t| -t).collect();
+            // The tip centre is shared by the two halves; a half with no
+            // point (a tooth refused at the boundary, built anyway) draws
+            // nothing rather than indexing one.
+            r_full.extend(r.iter().skip(1));
+            th_full.extend(th.iter().skip(1));
+            (r_full, th_full)
+        };
 
-        // Every position's points, and the closing one, reserved at once.
-        let teeth = self.mean.params.teeth;
-        let past = || Refused::past_memory("teeth", f64::from(teeth));
-        let points = if self.is_concentric() {
-            halves[0].0.len().checked_mul(self.count)
-        } else {
-            (0..self.count).try_fold(0_usize, |n, k| n.checked_add(halves[self.which(k)].0.len()))
-        }
-        .and_then(|n| n.checked_add(1));
+        let teeth = f64::from(self.mean.params.teeth);
+        let mut drawn = (self.which(0), full(&self.teeth[self.which(0)]));
+        // The first tooth's points at every position, and the closing one:
+        // the drawing's size exactly where the teeth are one tooth.
         let mut out = Vec::new();
-        crate::input::room(
+        budget.room(
             &mut out,
-            points.ok_or_else(past)?,
+            drawn
+                .1
+                 .0
+                .len()
+                .saturating_mul(self.count)
+                .saturating_add(1),
             "teeth",
-            f64::from(teeth),
+            teeth,
         )?;
         for k in 0..self.count {
-            let (r_full, th_full) = &halves[self.which(k)];
+            if self.which(k) != drawn.0 {
+                drawn = (self.which(k), full(&self.teeth[self.which(k)]));
+                budget.room(&mut out, drawn.1 .0.len() + 1, "teeth", teeth)?;
+            }
+            let (r_full, th_full) = &drawn.1;
             let base = self.tooth(k).1;
             for (rr, tt) in r_full.iter().zip(th_full) {
                 // Corrected for the tool's motion and for where the neighbours
@@ -745,11 +754,10 @@ impl Gear {
         Ok(out)
     }
 
-    /// Which distinct tooth position `k` uses.
+    /// Which distinct tooth position `k` uses: its fold's group.
     fn which(&self, k: usize) -> usize {
-        self.positions
-            .as_ref()
-            .map_or(0, |p| p.which[k % self.count]) // absence: a concentric gear's one tooth is its first
+        let i = k % self.count;
+        self.group.as_ref().map_or(0, |g| g[i.min(self.count - i)]) // absence: a concentric gear's one tooth is its first
     }
 }
 
@@ -776,9 +784,35 @@ impl Gear {
     ///
     /// # Errors
     ///
-    /// [`Refused::past_memory`], naming `teeth`, where the outline is more
-    /// vertices than the machine's memory holds.
-    pub fn outline(&self, chord_tolerance: f64) -> Result<Vec<crate::outline::Vertex>, Refused> {
+    /// [`Refused::past_budget`], naming `teeth`, where the outline is more
+    /// than `budget`: refused from the first tooth's vertices times the
+    /// count before a second is made.
+    pub fn outline(
+        &self,
+        chord_tolerance: f64,
+        budget: Budget,
+    ) -> Result<Vec<crate::outline::Vertex>, Refused> {
+        self.outline_charged(
+            chord_tolerance,
+            budget,
+            std::mem::size_of::<crate::outline::Vertex>(),
+        )
+    }
+
+    /// [`Self::outline`], each vertex charged `each` bytes against the
+    /// budget rather than its own size — what a caller that turns every
+    /// vertex into more (a DXF's text) charges, so that its output is
+    /// refused before the outline is made rather than after.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::outline`].
+    pub fn outline_charged(
+        &self,
+        chord_tolerance: f64,
+        budget: Budget,
+        each: usize,
+    ) -> Result<Vec<crate::outline::Vertex>, Refused> {
         let chord_tolerance = self.chord_tolerance(chord_tolerance);
         let teeth = f64::from(self.mean.params.teeth);
         // A constant root is a circle and stays an exact arc in the export; a
@@ -787,8 +821,9 @@ impl Gear {
         // outline — one root, two consumers.
         let varying = self.mean.params.angular_shift != 0.0;
         let mut out = Vec::new();
-        // Each position's vertices are made apart and then given room: the
-        // first sizes the rest, which a concentric gear's all match.
+        // Each position's vertices are made apart and then charged: the
+        // first, times the count, is the outline's size — exactly, where the
+        // teeth are one tooth — and each after is charged as it is added.
         let mut one = Vec::new();
         for k in 0..self.count {
             let displace = |r: f64, tt: f64| self.corrected(k, r, tt);
@@ -802,6 +837,7 @@ impl Gear {
             } else {
                 one.len()
             };
+            budget.admit(out.len().saturating_add(wanted), each, "teeth", teeth)?;
             // Room already there is a no-op; room short grows as `Vec` grows.
             out.try_reserve(wanted)
                 .map_err(|_| Refused::past_memory("teeth", teeth))?;
@@ -1046,12 +1082,14 @@ impl Gear {
     /// operating pressure angle below zero — the eccentricity is larger than the
     /// pair can absorb; [`MeshError::CentreDistanceTooSmall`] if the best-fit
     /// sinusoid a real mechanism would track brings the axes inside the
-    /// base-circle limit.
+    /// base-circle limit; [`MeshError::PastBudget`] if one figure a tooth is
+    /// past `budget`.
     pub fn centre_profile(
         &self,
         mate: &Tooth,
         kind: MeshKind,
         at: MeshSide,
+        budget: Budget,
     ) -> Result<CentreProfile, MeshError> {
         centre_profile_of(
             &self.mean,
@@ -1067,6 +1105,7 @@ impl Gear {
             mate,
             kind,
             at,
+            budget,
         )
     }
 }
@@ -1090,6 +1129,36 @@ fn centre_profile_of(
     mate: &Tooth,
     kind: MeshKind,
     at: MeshSide,
+    budget: Budget,
+) -> Result<CentreProfile, MeshError> {
+    let read = Read::Profile;
+    fitted(mean, teeth, shift, mate, kind, at, budget, read)
+}
+
+/// **How much of the profile a caller reads.** A throw's trials read only
+/// the sinusoid's amplitude and whether the profile exists at all — the
+/// same checks, in the same order, on the same numbers — and skip what the
+/// departure costs; the angles' sines and cosines, the same at every
+/// trial, are handed in once.
+#[derive(Clone, Copy)]
+enum Read<'a> {
+    Profile,
+    Amplitude(&'a [(f64, f64)]),
+}
+
+/// [`centre_profile_of`], read as `read` asks: under [`Read::Amplitude`]
+/// the profile's `sinusoid_error` and `sinusoid_backlash` are not worked
+/// out and stand at nought.
+#[allow(clippy::too_many_arguments)]
+fn fitted(
+    mean: &Tooth,
+    teeth: u32,
+    shift: &dyn Fn(u32) -> f64,
+    mate: &Tooth,
+    kind: MeshKind,
+    at: MeshSide,
+    budget: Budget,
+    read: Read<'_>,
 ) -> Result<CentreProfile, MeshError> {
     {
         let g = mean;
@@ -1126,13 +1195,34 @@ fn centre_profile_of(
         // report zero throw for every amplitude, and λ is not a property of the
         // *pair* at all. It is gated now
         // (`the_commanded_centre_distance_does_not_depend_on_the_indexing`).
-        // One figure per tooth, given room first.
+        // One figure per tooth, admitted by the budget first.
         let mut commanded = Vec::new();
         let n = usize::try_from(teeth).map_err(|_| MeshError::PastMemory { teeth })?;
-        crate::input::room(&mut commanded, n, "teeth", f64::from(teeth))
-            .map_err(|_| MeshError::PastMemory { teeth })?;
+        budget
+            .room(&mut commanded, n, "teeth", f64::from(teeth))
+            .map_err(|e| MeshError::refused(teeth, &e))?;
+        // The teeth at the variation's extremes first — its largest shift
+        // and its smallest, half a turn round — where a smooth variation
+        // runs out of involute first: a throw's trial past the pair's reach
+        // is told so without reading the rest. The same error the loop
+        // below gives, from the same numbers it reads again.
+        for k in [0, teeth / 2] {
+            let x_sum = sign_e * (shift(k) + g.params.thickness_shift()) + sign_m * x_mate;
+            operating_geometry(g.mt, g.alpha_t, g.alpha_n, z_sum, x_sum)
+                .ok_or(MeshError::OutsideInvoluteDomain)?;
+        }
         for k in 0..teeth {
-            let x_e = shift(k) + g.params.thickness_shift();
+            let x = shift(k);
+            // Tooth `k` and its mirror `z − k` are cut at the same shift, to
+            // the bit, wherever the variation is folded about its axis
+            // ([`shift_at`]): the mirror's distance, already worked out, is
+            // this one's.
+            let mirror = teeth - k;
+            if mirror < k && shift(mirror).to_bits() == x.to_bits() {
+                commanded.push(commanded[mirror as usize]);
+                continue;
+            }
+            let x_e = x + g.params.thickness_shift();
             let x_sum = sign_e * x_e + sign_m * x_mate;
             commanded.push(
                 operating_geometry(g.mt, g.alpha_t, g.alpha_n, z_sum, x_sum)
@@ -1165,7 +1255,10 @@ fn centre_profile_of(
         // exactly zero when the samples are.
         let (mut c, mut s) = (0.0, 0.0);
         for (k, a) in commanded.iter().enumerate() {
-            let (sin, cos) = angle(k).sin_cos();
+            let (sin, cos) = match read {
+                Read::Amplitude(angles) => angles[k],
+                Read::Profile => angle(k).sin_cos(),
+            };
             c += (a - mean) * cos;
             s += (a - mean) * sin;
         }
@@ -1175,28 +1268,27 @@ fn centre_profile_of(
 
         let mut error = 0.0_f64;
         let mut play = [f64::MAX, f64::MIN];
+        let full = matches!(read, Read::Profile);
         for (k, &ideal) in commanded.iter().enumerate() {
             let fit = mean + amplitude * (angle(k) - phase).cos();
-            error = error.max((ideal - fit).abs());
             // What the mechanism's departure costs, by the docs/reference.md#axis-distance-and-backlash law: the ideal
             // is the zero-backlash distance at this position, the fit is where
             // the machine actually puts the axes.
             let a_ref = g.mt * z_sum.abs() / 2.0;
             let cos_actual = a_ref * g.alpha_t.cos() / fit;
-            let alpha_actual = if (-1.0..=1.0).contains(&cos_actual) {
-                cos_actual.acos()
-            } else {
-                return Err(MeshError::CentreDistanceTooSmall);
-            };
             let cos_ideal = a_ref * g.alpha_t.cos() / ideal;
-            let alpha_ideal = if (-1.0..=1.0).contains(&cos_ideal) {
-                cos_ideal.acos()
-            } else {
+            if !(-1.0..=1.0).contains(&cos_actual) || !(-1.0..=1.0).contains(&cos_ideal) {
                 return Err(MeshError::CentreDistanceTooSmall);
-            };
-            let j = 2.0 * fit * (inv(alpha_actual) - inv(alpha_ideal));
-            play[0] = play[0].min(j);
-            play[1] = play[1].max(j);
+            }
+            if full {
+                error = error.max((ideal - fit).abs());
+                let j = 2.0 * fit * (inv(cos_actual.acos()) - inv(cos_ideal.acos()));
+                play[0] = play[0].min(j);
+                play[1] = play[1].max(j);
+            }
+        }
+        if !full {
+            (error, play) = (0.0, [0.0; 2]);
         }
 
         let (lo, hi) = commanded
@@ -1242,13 +1334,15 @@ fn centre_profile_of(
 /// [`MeshError::Incompatible`] or the mate's own error if the pair cannot mesh
 /// at the mean shift; [`MeshError::OutsideInvoluteDomain`] if the largest
 /// amplitude the pair can absorb still falls short of the requested throw, and
-/// if `target` is not positive and finite.
+/// if `target` is not positive and finite; [`MeshError::PastBudget`] if an
+/// eccentric gear of `params.teeth` is past `budget` ([`Gear::admit_teeth`]).
 pub fn amplitude_for_throw(
     params: GearParams,
     mate: &Tooth,
     kind: MeshKind,
     at: MeshSide,
     target: f64,
+    budget: Budget,
 ) -> Result<f64, MeshError> {
     if !target.is_finite() || target < 0.0 {
         return Err(MeshError::OutsideInvoluteDomain);
@@ -1256,6 +1350,11 @@ pub fn amplitude_for_throw(
     if target == 0.0 {
         return Ok(0.0);
     }
+    // **The gear it is for, admitted first**: an eccentric gear of this
+    // count, which a throw asks for, past the budget is refused before a
+    // trial is read — every trial reads each of its teeth.
+    Gear::admit_teeth(params.teeth.max(1), true, budget)
+        .map_err(|e| MeshError::refused(params.teeth, &e))?;
 
     // **The gear is not built.** Only the shift each tooth is cut at varies with
     // the amplitude; the rack, the tooth count and the mate are the same at
@@ -1264,18 +1363,36 @@ pub fn amplitude_for_throw(
     // over [`shift_at`] — which is what takes this from a hundred milliseconds
     // to under one, on a panel that re-solves as a designer types.
     let mean = Tooth::new(params);
+    // Every trial reads the teeth at the same angles: their sines and
+    // cosines, and the cosine each tooth's shift is cut at, worked out once
+    // — the same numbers each trial would work out ([`shift_at`]).
+    let teeth = params.teeth.max(1);
+    let angle = |k: u32| std::f64::consts::TAU * f64::from(k) / f64::from(teeth);
+    let (mut angles, mut folds) = (Vec::new(), Vec::new());
+    let refused = |e: Refused| MeshError::refused(teeth, &e);
+    budget
+        .room(&mut angles, teeth as usize, "teeth", f64::from(teeth))
+        .map_err(refused)?;
+    budget
+        .room(
+            &mut folds,
+            teeth as usize / 2 + 1,
+            "teeth",
+            f64::from(teeth),
+        )
+        .map_err(refused)?;
+    angles.extend((0..teeth).map(|k| angle(k).sin_cos()));
+    folds.extend((0..=teeth / 2).map(|k| angle(k).cos()));
     let throw = |dx: f64| {
-        let at_dx = GearParams {
-            angular_shift: dx,
-            ..params
-        };
-        centre_profile_of(
+        fitted(
             &mean,
-            params.teeth.max(1),
-            &|k| shift_at(&at_dx, k),
+            teeth,
+            &|k| params.profile_shift + dx * folds[k.min(teeth - k) as usize],
             mate,
             kind,
             at,
+            budget,
+            Read::Amplitude(&angles),
         )
         .map(|p| p.sinusoid.amplitude)
     };
@@ -1346,6 +1463,74 @@ pub fn amplitude_for_throw(
 mod tests {
     use super::*;
 
+    /// **An output is charged its size, before it is built**: a concentric
+    /// gear's drawing and outline, and a ring's, are admitted by a budget of
+    /// exactly their size — the first tooth's points or vertices at every
+    /// position, which is theirs — and refused a byte short, naming `teeth`
+    /// and that size; an eccentric gear's teeth are admitted at exactly
+    /// what [`Gear::admit`] charges and refused a byte short, before a
+    /// tooth is cut. So the size refused is the size the output would have
+    /// had, and the budget is what decides — never the allocator.
+    #[test]
+    fn an_output_is_charged_its_size_and_refused_a_byte_short() {
+        let charged = |size: usize, draw: &dyn Fn(Budget) -> Result<usize, Refused>| {
+            assert_eq!(draw(Budget { bytes: size }), Ok(size), "at its size");
+            let short = Budget { bytes: size - 1 };
+            let refused = draw(short).expect_err("a byte short");
+            assert_eq!(refused.field, "teeth");
+            assert!(
+                matches!(refused.reason, crate::input::Reason::PastBudget { size: s, budget } if s == size as u64 && budget == s - 1),
+                "{refused:?}"
+            );
+        };
+        for teeth in [5_u32, 17, 60] {
+            let p = GearParams {
+                teeth,
+                ..GearParams::default()
+            };
+            let g = Gear::new(p);
+            let point = std::mem::size_of::<[f64; 2]>();
+            let vertex = std::mem::size_of::<crate::outline::Vertex>();
+            let drawn = g.profile(400, Budget::DEFAULT).unwrap().len();
+            charged(drawn * point, &|b| {
+                g.profile(400, b).map(|v| v.len() * point)
+            });
+            let outlined = g.outline(1e-3, Budget::DEFAULT).unwrap().len();
+            charged(outlined * vertex, &|b| {
+                g.outline(1e-3, b).map(|v| v.len() * vertex)
+            });
+            let ring = crate::ring::Ring::cut_by(
+                &GearParams {
+                    teeth: teeth + 40,
+                    ..p
+                },
+                &crate::ring::Cutter::default(),
+            );
+            let drawn = ring.profile(400, Budget::DEFAULT).unwrap().len();
+            charged(drawn * point, &|b| {
+                ring.profile(400, b).map(|v| v.len() * point)
+            });
+            let outlined = ring.outline(1e-3, Budget::DEFAULT).unwrap().len();
+            charged(outlined * vertex, &|b| {
+                ring.outline(1e-3, b).map(|v| v.len() * vertex)
+            });
+
+            let eccentric = GearParams {
+                angular_shift: 0.2,
+                ..p
+            };
+            let kept = Gear::admit(&eccentric, Budget::DEFAULT).unwrap();
+            assert_eq!(kept, teeth as usize / 2 + 1);
+            let each = std::mem::size_of::<Tooth>()
+                + std::mem::size_of::<(Rack, Vec<Note>)>()
+                + std::mem::size_of::<f64>()
+                + std::mem::size_of::<usize>();
+            charged(kept * each, &|b| {
+                Gear::try_new(eccentric, b).map(|g| g.distinct_teeth() * each)
+            });
+        }
+    }
+
     /// **A throw the geometry reaches is a throw the search reaches.**
     ///
     /// `amplitude_for_throw` used to search a flat two modules of amplitude,
@@ -1375,7 +1560,12 @@ mod tests {
                     angular_shift: dx,
                     ..params
                 })
-                .centre_profile(&mate, MeshKind::External, MeshSide::First)
+                .centre_profile(
+                    &mate,
+                    MeshKind::External,
+                    MeshSide::First,
+                    crate::input::Budget::DEFAULT,
+                )
                 .map(|q| q.sinusoid.amplitude)
             };
 
@@ -1394,14 +1584,20 @@ mod tests {
 
             // ...and the throw it gives must be recoverable.
             let target = throw_at(feasible).expect("feasible by construction");
-            let found =
-                amplitude_for_throw(params, &mate, MeshKind::External, MeshSide::First, target)
-                    .unwrap_or_else(|e| {
-                        panic!(
-                            "z={z}: throw {target} is produced at dx={feasible} and the \
+            let found = amplitude_for_throw(
+                params,
+                &mate,
+                MeshKind::External,
+                MeshSide::First,
+                target,
+                crate::input::Budget::DEFAULT,
+            )
+            .unwrap_or_else(|e| {
+                panic!(
+                    "z={z}: throw {target} is produced at dx={feasible} and the \
                         inversion refused it: {e:?}"
-                        )
-                    });
+                )
+            });
             let got = throw_at(found).expect("the inversion must return a buildable dx");
             assert!(
                 (got - target).abs() < 1e-6,
@@ -1477,20 +1673,37 @@ mod tests {
                     angular_shift: dx,
                     ..base
                 };
-                let Ok(built) = Gear::new(at_dx).centre_profile(&mate, kind, at) else {
+                let Ok(built) =
+                    Gear::new(at_dx).centre_profile(&mate, kind, at, crate::input::Budget::DEFAULT)
+                else {
                     // An amplitude this pair cannot absorb: both roads have to
                     // refuse it, and the closed form is asked so that a silent
                     // difference in *which* cases exist would show up here too.
                     assert!(
-                        centre_profile_of(&mean, teeth, &|i| shift_at(&at_dx, i), &mate, kind, at)
-                            .is_err(),
+                        centre_profile_of(
+                            &mean,
+                            teeth,
+                            &|i| shift_at(&at_dx, i),
+                            &mate,
+                            kind,
+                            at,
+                            Budget::DEFAULT
+                        )
+                        .is_err(),
                         "dx {dx}: the built pair refused and the closed form did not"
                     );
                     continue;
                 };
-                let direct =
-                    centre_profile_of(&mean, teeth, &|i| shift_at(&at_dx, i), &mate, kind, at)
-                        .expect("and so does the closed form");
+                let direct = centre_profile_of(
+                    &mean,
+                    teeth,
+                    &|i| shift_at(&at_dx, i),
+                    &mate,
+                    kind,
+                    at,
+                    Budget::DEFAULT,
+                )
+                .expect("and so does the closed form");
                 for (a, b, what) in [
                     (
                         built.sinusoid.amplitude,
@@ -1534,7 +1747,14 @@ mod tests {
             ..GearParams::default()
         });
         let (work, found) = crate::testing::work::of(|| {
-            amplitude_for_throw(base, &mate, MeshKind::External, MeshSide::First, 0.05)
+            amplitude_for_throw(
+                base,
+                &mate,
+                MeshKind::External,
+                MeshSide::First,
+                0.05,
+                crate::input::Budget::DEFAULT,
+            )
         });
         found.expect("reachable");
         assert_eq!(
@@ -1561,8 +1781,15 @@ mod tests {
         });
         let start = std::time::Instant::now();
         for _ in 0..5 {
-            amplitude_for_throw(base, &mate, MeshKind::External, MeshSide::First, 0.05)
-                .expect("reachable");
+            amplitude_for_throw(
+                base,
+                &mate,
+                MeshKind::External,
+                MeshSide::First,
+                0.05,
+                crate::input::Budget::DEFAULT,
+            )
+            .expect("reachable");
         }
         let each = start.elapsed() / 5;
         assert!(
@@ -1622,7 +1849,9 @@ mod tests {
                             was.push(first);
                         }
 
-                        let now = Gear::new(params).profile(per_tooth).unwrap();
+                        let now = Gear::new(params)
+                            .profile(per_tooth, crate::input::Budget::DEFAULT)
+                            .unwrap();
                         assert_eq!(now.len(), was.len(), "z={teeth} x={shift}");
                         for (i, (a, b)) in now.iter().zip(&was).enumerate() {
                             assert_eq!(
@@ -1907,7 +2136,9 @@ mod tests {
                 MeshSide::Second,
             ),
         ] {
-            let profile = e.centre_profile(&mate, kind, at).expect("a meshable pair");
+            let profile = e
+                .centre_profile(&mate, kind, at, crate::input::Budget::DEFAULT)
+                .expect("a meshable pair");
             for k in 0..profile.commanded.len() {
                 let (tooth, _) = e.tooth(k);
                 // The ring is member 2, whichever gear that is — the same
@@ -1957,7 +2188,7 @@ mod tests {
                     index_offset: lambda,
                     ..Default::default()
                 })
-                .centre_profile(&mate, kind, MeshSide::First)
+                .centre_profile(&mate, kind, MeshSide::First, crate::input::Budget::DEFAULT)
                 .expect("a meshable pair")
             };
 
@@ -2011,7 +2242,14 @@ mod tests {
                     ..Default::default()
                 };
                 for target in [0.05_f64, 0.15, 0.3] {
-                    let dx = match amplitude_for_throw(base, &mate, kind, MeshSide::First, target) {
+                    let dx = match amplitude_for_throw(
+                        base,
+                        &mate,
+                        kind,
+                        MeshSide::First,
+                        target,
+                        crate::input::Budget::DEFAULT,
+                    ) {
                         Ok(dx) => dx,
                         Err(_) => continue, // an out-of-reach target is its own test below
                     };
@@ -2019,7 +2257,7 @@ mod tests {
                         angular_shift: dx,
                         ..base
                     })
-                    .centre_profile(&mate, kind, MeshSide::First)
+                    .centre_profile(&mate, kind, MeshSide::First, crate::input::Budget::DEFAULT)
                     .unwrap()
                     .sinusoid
                     .amplitude;
@@ -2052,12 +2290,26 @@ mod tests {
         };
         // z 24 in z 26 gives out at a tiny amplitude — 3 mm of throw is far past it.
         assert_eq!(
-            amplitude_for_throw(base, &close, MeshKind::Internal, MeshSide::First, 3.0),
+            amplitude_for_throw(
+                base,
+                &close,
+                MeshKind::Internal,
+                MeshSide::First,
+                3.0,
+                crate::input::Budget::DEFAULT
+            ),
             Err(MeshError::OutsideInvoluteDomain)
         );
         // A zero target is a concentric gear, not an error.
         assert_eq!(
-            amplitude_for_throw(base, &roomy, MeshKind::External, MeshSide::First, 0.0),
+            amplitude_for_throw(
+                base,
+                &roomy,
+                MeshKind::External,
+                MeshSide::First,
+                0.0,
+                crate::input::Budget::DEFAULT
+            ),
             Ok(0.0)
         );
         // And λ reaches none of it: the same throw needs the same amplitude
@@ -2072,6 +2324,7 @@ mod tests {
                 MeshKind::External,
                 MeshSide::First,
                 0.2,
+                crate::input::Budget::DEFAULT,
             )
         };
         assert_eq!(at(1.0), at(0.0));
@@ -2092,8 +2345,13 @@ mod tests {
             ..Default::default()
         });
         assert_eq!(
-            e.centre_profile(&small, MeshKind::Internal, MeshSide::First)
-                .unwrap_err(),
+            e.centre_profile(
+                &small,
+                MeshKind::Internal,
+                MeshSide::First,
+                crate::input::Budget::DEFAULT
+            )
+            .unwrap_err(),
             MeshError::RingTooSmall
         );
         // ...and read the other way round: an eccentric *ring* must be the
@@ -2111,6 +2369,7 @@ mod tests {
                 }),
                 MeshKind::Internal,
                 MeshSide::Second,
+                crate::input::Budget::DEFAULT,
             )
             .unwrap_err(),
             MeshError::RingTooSmall
@@ -2132,7 +2391,12 @@ mod tests {
             angular_shift: 0.5,
             ..Default::default()
         })
-        .centre_profile(&mate, MeshKind::Internal, crate::mesh::MeshSide::First)
+        .centre_profile(
+            &mate,
+            MeshKind::Internal,
+            crate::mesh::MeshSide::First,
+            crate::input::Budget::DEFAULT,
+        )
         .unwrap_err();
         assert_eq!(err, MeshError::OutsideInvoluteDomain);
     }
@@ -2197,7 +2461,12 @@ mod tests {
             ..Default::default()
         });
         let p = flat
-            .centre_profile(&mate, MeshKind::External, MeshSide::First)
+            .centre_profile(
+                &mate,
+                MeshKind::External,
+                MeshSide::First,
+                crate::input::Budget::DEFAULT,
+            )
             .unwrap();
         let mesh = Mesh::new(flat.mean(), &mate, MeshKind::External).unwrap();
         for a in &p.commanded {
@@ -2228,7 +2497,12 @@ mod tests {
                 angular_shift: shift,
                 ..Default::default()
             })
-            .centre_profile(&mate, MeshKind::External, MeshSide::First)
+            .centre_profile(
+                &mate,
+                MeshKind::External,
+                MeshSide::First,
+                crate::input::Budget::DEFAULT,
+            )
             .expect("a meshable pair")
         };
 
@@ -2589,7 +2863,7 @@ mod tests {
             // Screen: doubling the points must nearly halve the largest jump.
             let mut previous = f64::MAX;
             for n in [600_usize, 1200, 2400, 4800] {
-                let jump = radial_jump(&e.profile(n).unwrap());
+                let jump = radial_jump(&e.profile(n, crate::input::Budget::DEFAULT).unwrap());
                 assert!(
                     jump < 0.6 * previous,
                     "z={teeth} Δx={amplitude} λ={lambda}: {n} points a tooth jump {jump} mm \
@@ -2610,7 +2884,7 @@ mod tests {
             let mut previous = f64::MAX;
             for tol in [1e-2_f64, 1e-3, 1e-4] {
                 let jump = radial_jump(
-                    &e.outline(tol)
+                    &e.outline(tol, crate::input::Budget::DEFAULT)
                         .unwrap()
                         .iter()
                         .map(|v| [v.x, v.y])
@@ -2738,7 +3012,7 @@ mod tests {
             let below = junction * 1.02;
             let mut previous = f64::MAX;
             for n in [600_usize, 1200, 2400, 4800] {
-                let turn = turning(&e.profile(n).unwrap(), below);
+                let turn = turning(&e.profile(n, crate::input::Budget::DEFAULT).unwrap(), below);
                 assert!(
                     turn < 0.6 * previous,
                     "z={teeth} x={shift} Δx={amplitude}: at {n} points a tooth the root \
@@ -2759,7 +3033,7 @@ mod tests {
             teeth: 24,
             ..Default::default()
         })
-        .outline(1e-3)
+        .outline(1e-3, crate::input::Budget::DEFAULT)
         .unwrap();
         let arcs = flat.iter().filter(|v| v.bulge != 0.0).count();
         // Three arcs a tooth: the tip, and the root either side of it — the
@@ -2774,7 +3048,7 @@ mod tests {
             angular_shift: 0.25,
             ..Default::default()
         })
-        .outline(1e-3)
+        .outline(1e-3, crate::input::Budget::DEFAULT)
         .unwrap();
         // One left: the tip. Both root halves gave up their arcs, since a
         // varying root is not a circle at all.
@@ -2818,7 +3092,7 @@ mod tests {
         // and what a check on the raw spread would have confused with a tooth.
         let screen = |g: &Gear| {
             spread(
-                g.profile(600)
+                g.profile(600, crate::input::Budget::DEFAULT)
                     .unwrap()
                     .iter()
                     .map(|p| p[0].hypot(p[1]))
@@ -2827,7 +3101,7 @@ mod tests {
         };
         let export = |g: &Gear| {
             spread(
-                g.outline(1e-3)
+                g.outline(1e-3, crate::input::Budget::DEFAULT)
                     .unwrap()
                     .iter()
                     .map(|v| v.x.hypot(v.y))

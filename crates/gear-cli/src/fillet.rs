@@ -136,7 +136,7 @@ pub fn run(args: &[String]) {
         return;
     }
     match parse(args) {
-        Some(c) => report(c, args.get(7).map(String::as_str) == Some("outline")),
+        Some(c) => report(asked(c), args.get(7).map(String::as_str) == Some("outline")),
         None => {
             println!("usage: fillet grid | fillet <external|ring> z alpha x rho mate [outline]")
         }
@@ -154,6 +154,33 @@ fn parse(args: &[String]) -> Option<Case> {
         round: args.get(5)?.parse().ok()?,
         mate: args.get(6)?.parse().ok()?,
     })
+}
+
+/// **A case as the harness is asked it**, read against the table every
+/// entry reads a gear through (`gear_core::input`): the member, its mate
+/// (under `mate`) and, for a ring, the shaper whose round it is (under
+/// `cutter`) — refused naming the field.
+fn asked(c: Case) -> Case {
+    let member = params(c.teeth, c.alpha_deg, c.shift, c.round).check();
+    let mate = params(c.mate, c.alpha_deg, 0.0, c.round)
+        .check()
+        .map_err(|e| e.within("mate"));
+    let cutter = match c.kind {
+        Kind::External => Ok(()),
+        Kind::Ring => ring_cutter(c.round).check().map_err(|e| e.within("cutter")),
+    };
+    if let Err(e) = member.and(mate).and(cutter) {
+        crate::refuse(&e);
+    }
+    c
+}
+
+/// The shaper a ring case is cut by: the default, its tip round the case's.
+fn ring_cutter(round: f64) -> Cutter {
+    Cutter {
+        tip_round: round,
+        ..Cutter::default()
+    }
 }
 
 fn params(teeth: u32, alpha_deg: f64, shift: f64, round: f64) -> GearParams {
@@ -195,11 +222,10 @@ fn report(c: Case, outline: bool) {
             );
         }
         Kind::Ring => {
-            let cutter = Cutter {
-                tip_round: c.round,
-                ..Cutter::default()
-            };
-            let r = Ring::cut_by(&params(c.teeth, c.alpha_deg, c.shift, c.round), &cutter);
+            let r = Ring::cut_by(
+                &params(c.teeth, c.alpha_deg, c.shift, c.round),
+                &ring_cutter(c.round),
+            );
             let eps = ring::mesh_with(&r, &mate).map(|m| m.contact_ratio);
             member(&r, eps, [r.ra, r.rf, r.half_pitch], None, -1.0, outline);
         }

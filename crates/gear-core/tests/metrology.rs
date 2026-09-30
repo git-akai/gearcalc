@@ -1059,7 +1059,9 @@ fn the_span_is_what_a_caliper_reads_off_the_drawn_teeth() {
 
             let mut previous = f64::MAX;
             for per_tooth in [900_usize, 3600] {
-                let pts = gear.profile(per_tooth).unwrap();
+                let pts = gear
+                    .profile(per_tooth, gear_core::input::Budget::DEFAULT)
+                    .unwrap();
                 let (mut lo, mut hi) = (f64::MAX, f64::MIN);
                 for q in &pts {
                     // Only the teeth the caliper is over. The bounds are the two
@@ -1318,53 +1320,105 @@ fn over_pins_around_reads_exactly_where_its_bound_admits() {
     assert_eq!(asked, 5 * 25 * 2);
 }
 
+/// **The best span as reading every count at every position finds it** —
+/// the scan as it was: the first count at the smallest worst distance of
+/// its contact from the pitch circle, among those every position measures.
+fn scanned_span(gear: &gear_core::gear::Gear) -> Option<(u32, f64, [f64; 2])> {
+    use gear_core::metrology::span_over_teeth_at;
+    let z = gear.teeth();
+    let r = gear.mean().r;
+    let mut best: Option<(u32, f64, [f64; 2], f64)> = None;
+    for k in 1..=gear.mean().params.teeth {
+        let mut spans = Vec::new();
+        for j in 0..z {
+            match span_over_teeth_at(gear, j, k) {
+                Some(s) => spans.push(s),
+                None => {
+                    spans.clear();
+                    break;
+                }
+            }
+        }
+        if spans.is_empty() {
+            continue;
+        }
+        let lo = spans.iter().map(|s| s.nominal).fold(f64::MAX, f64::min);
+        let hi = spans.iter().map(|s| s.nominal).fold(f64::MIN, f64::max);
+        let worst = spans
+            .iter()
+            .map(|s| (s.contact_radius - r).abs())
+            .fold(0.0_f64, f64::max);
+        if best.is_none_or(|(_, _, _, w)| worst < w) {
+            best = Some((k, spans[0].nominal, [lo, hi], worst));
+        }
+    }
+    best.map(|(k, n, range, _)| (k, n, range))
+}
+
+/// **The span the caliper rule keeps, by reading everything**: the count
+/// the nominal tooth's span lands nearest the pitch circle with, found by
+/// asking every count (the first of two as near), and then it and the
+/// counts either side in order — the nearer first, the smaller of two as
+/// near — until one measures at every position, each read at every one.
+fn ruled_span(gear: &gear_core::gear::Gear) -> Option<(u32, f64, [f64; 2])> {
+    use gear_core::metrology::{nominal_span_over, span_over_teeth_at};
+    let z = gear.mean().params.teeth;
+    let r = gear.mean().r;
+    let mut set: Option<(u32, f64)> = None;
+    for k in 1..=z {
+        if let Some(s) = nominal_span_over(gear, k) {
+            let d = (s.contact_radius - r).abs();
+            if set.is_none_or(|(_, w)| d < w) {
+                set = Some((k, d));
+            }
+        }
+    }
+    let (set, _) = set?;
+    let mut order = vec![set];
+    for d in 1..z {
+        if set > d {
+            order.push(set - d);
+        }
+        if set + d <= z {
+            order.push(set + d);
+        }
+    }
+    order.into_iter().find_map(|k| {
+        let spans: Option<Vec<_>> = (0..gear.teeth())
+            .map(|j| span_over_teeth_at(gear, j, k))
+            .collect();
+        let spans = spans?;
+        let lo = spans.iter().map(|s| s.nominal).fold(f64::MAX, f64::min);
+        let hi = spans.iter().map(|s| s.nominal).fold(f64::MIN, f64::max);
+        Some((k, spans[0].nominal, [lo, hi]))
+    })
+}
+
+/// A span's reading as its bits, for two routes to be compared exactly.
+fn span_bits(x: Option<(u32, f64, [f64; 2])>) -> Option<(u32, u64, u64, u64)> {
+    x.map(|(k, n, [a, b])| (k, n.to_bits(), a.to_bits(), b.to_bits()))
+}
+
 /// **A concentric gear's readings round the revolution are one reading, and
 /// its spans are found without asking every count** — the same answers, to
 /// the bit, as asking every position and every count: over tooth counts
-/// from 5 to 400, shifts either side of nought, both helices and two
-/// pressure angles, the best span and its range is the one a scan of
-/// every count at every position finds (the scan as it was: first
-/// smallest offset from the pitch circle wins). And a gear of every tooth
-/// a wire's count carries answers at once, its teeth built once.
+/// from 5 to 400, shifts either side of nought, both helices and pressure
+/// angles up to the table's steepest (one double short of 90°, where the
+/// counts that measure run to half the gear), the best span and its range
+/// is the one a scan of every count at every position finds. And a gear of
+/// every tooth a wire's count carries answers at once, its teeth built
+/// once — at the steepest pressure angle too, where the scan read two
+/// billion counts.
 #[test]
 fn a_concentric_gears_readings_are_one_reading_found_without_a_scan() {
     use gear_core::gear::Gear;
-    use gear_core::metrology::{best_span_around, span_over_teeth_at};
-    let scan = |gear: &Gear| {
-        let z = gear.teeth();
-        let r = gear.mean().r;
-        let mut best: Option<(u32, f64, [f64; 2], f64)> = None;
-        for k in 1..=gear.mean().params.teeth {
-            let mut spans = Vec::new();
-            for j in 0..z {
-                match span_over_teeth_at(gear, j, k) {
-                    Some(s) => spans.push(s),
-                    None => {
-                        spans.clear();
-                        break;
-                    }
-                }
-            }
-            if spans.is_empty() {
-                continue;
-            }
-            let lo = spans.iter().map(|s| s.nominal).fold(f64::MAX, f64::min);
-            let hi = spans.iter().map(|s| s.nominal).fold(f64::MIN, f64::max);
-            let worst = spans
-                .iter()
-                .map(|s| (s.contact_radius - r).abs())
-                .fold(0.0_f64, f64::max);
-            if best.is_none_or(|(_, _, _, w)| worst < w) {
-                best = Some((k, spans[0].nominal, [lo, hi], worst));
-            }
-        }
-        best.map(|(k, n, range, _)| (k, n, range))
-    };
+    use gear_core::metrology::best_span_around;
+    let steepest = 90.0_f64.next_down();
     let mut asked = 0;
     for teeth in [5_u32, 9, 17, 43, 100, 257, 400] {
         for shift in [-0.4, 0.0, 0.6] {
             for helix in [0.0, 25.0] {
-                for alpha in [14.5, 25.0] {
+                for alpha in [14.5, 25.0, 60.0, 89.9, steepest] {
                     let g = Gear::new(GearParams {
                         teeth,
                         profile_shift: shift,
@@ -1376,20 +1430,15 @@ fn a_concentric_gears_readings_are_one_reading_found_without_a_scan() {
                     let fast = best_span_around(&g)
                         .ok()
                         .map(|(s, range)| (s.teeth_spanned, s.nominal, range));
-                    let bits = |x: Option<(u32, f64, [f64; 2])>| {
-                        x.map(|(k, n, [a, b])| (k, n.to_bits(), a.to_bits(), b.to_bits()))
-                    };
-                    assert_eq!(
-                        bits(fast),
-                        bits(scan(&g)),
-                        "z {teeth} x {shift} β {helix} α {alpha}"
-                    );
+                    let tag = format!("z {teeth} x {shift} β {helix} α {alpha}");
+                    assert_eq!(span_bits(fast), span_bits(scanned_span(&g)), "{tag}");
+                    assert_eq!(span_bits(fast), span_bits(ruled_span(&g)), "{tag}");
                     asked += 1;
                 }
             }
         }
     }
-    assert_eq!(asked, 7 * 3 * 2 * 2);
+    assert_eq!(asked, 7 * 3 * 2 * 5);
     // Every tooth a wire's count carries: one tooth built, and every reading
     // taken at once.
     let huge = Gear::new(GearParams {
@@ -1403,4 +1452,65 @@ fn a_concentric_gears_readings_are_one_reading_found_without_a_scan() {
     assert!(huge.per_tooth_clamps().teeth.is_empty());
     let v = huge.variation();
     assert_eq!((v.drive_pitch_error, v.drive_index_error), (0.0, 0.0));
+    let steep = Gear::new(GearParams {
+        teeth: u32::MAX,
+        pressure_angle: steepest,
+        ..GearParams::default()
+    });
+    let span = best_span_around(&steep).expect("a span at the steepest angle");
+    assert!(
+        span.0.teeth_spanned > u32::MAX / 4,
+        "the run is half the gear"
+    );
+}
+
+/// **Round an eccentric gear the best span and the pins' range are what
+/// reading everything finds**, to the bit: the span the caliper rule keeps
+/// when every count and every position is read ([`ruled_span`]), though the
+/// nominal count is found by halving; and the range that every space's own,
+/// sought whole, intersects to, though a space's end is sought only where
+/// it could move what the spaces before left. Over counts to a hundred,
+/// two amplitudes, the indexing offset off and on, and pressure angles to
+/// the table's steepest — where every contact is within a rounding of the
+/// pitch circle.
+#[test]
+fn an_eccentric_gears_readings_are_what_reading_everything_finds() {
+    use gear_core::gear::Gear;
+    use gear_core::metrology::{
+        best_span_around, pin_diameter_range, pin_diameter_range_around, Space,
+    };
+    let mut asked = 0;
+    for teeth in [9_u32, 17, 43, 100] {
+        for angular_shift in [0.1, 0.4] {
+            for index_offset in [0.0, 0.5] {
+                for pressure_angle in [20.0, 60.0, 90.0_f64.next_down()] {
+                    let g = Gear::new(GearParams {
+                        teeth,
+                        angular_shift,
+                        index_offset,
+                        pressure_angle,
+                        ..GearParams::default()
+                    });
+                    assert!(!g.is_concentric());
+                    let tag =
+                        format!("z {teeth} Δx {angular_shift} λ {index_offset} α {pressure_angle}");
+                    let fast = best_span_around(&g)
+                        .ok()
+                        .map(|(s, range)| (s.teeth_spanned, s.nominal, range));
+                    assert_eq!(span_bits(fast), span_bits(ruled_span(&g)), "{tag}");
+                    let whole = (0..g.teeth())
+                        .map(|i| pin_diameter_range(&Space::after(&g, i)))
+                        .try_fold((0.0_f64, f64::INFINITY), |(lo, hi), r| {
+                            let (a, b) = r?;
+                            let (lo, hi) = (lo.max(a), hi.min(b));
+                            (lo < hi).then_some((lo, hi))
+                        });
+                    let bits = |r: Option<(f64, f64)>| r.map(|(a, b)| (a.to_bits(), b.to_bits()));
+                    assert_eq!(bits(pin_diameter_range_around(&g)), bits(whole), "{tag}");
+                    asked += 1;
+                }
+            }
+        }
+    }
+    assert_eq!(asked, 4 * 2 * 2 * 3);
 }
