@@ -1585,17 +1585,22 @@ Not a queue with a head; this is what a next session would pick from.
     overcommit no longer decides it. Within the budget the allocator may
     still refuse, named the same way. What the budget does not bound is
     time where the answer needs every tooth: at the budget's edge (an
-    eccentric gear of some 670 000 teeth) its pins, span and centre
-    distance read round in under 0.7 s natively, and a throw's inversion,
-    a hundred trials over every tooth, in 2.2 s;
+    eccentric gear of some 670 000 teeth) its pins' range takes 3.4 s
+    natively (a bisection a space, sought whole: a space's verdict flips
+    over an ulp or two beside its ends, so no end can be skipped exactly),
+    a throw's inversion 2.2 s (a hundred trials over every tooth), and
+    its span, centre distance and the rest under 0.3 s;
   - **an eccentric gear's span is set from its mean tooth** and carried
     round to the nearest count that measures everywhere
     (`metrology::best_span_around`), where it was the count whose worst
     contact lands nearest — every count read at every position, 10¹¹
     readings at the budget's edge, choosing among roundings at the
-    steepest pressure angle. The count differs on 19 of 648 eccentric
-    gears swept, 18 where the mean tooth's count does not measure
-    everywhere; an evenly cut gear's is the same, bit for bit. After a trap of any other kind the stack is put back
+    steepest pressure angle. Over 5 184 eccentric gears swept (count,
+    amplitude, indexing, angle, helix, shift), 5 070 keep their count, 75
+    have no span either way and none gains or loses one; on the other 39
+    the count kept has its worst contact **at most 0.34 m farther** from
+    the pitch circle than the old rule's — never nearer. An evenly cut
+    gear's is the same, bit for bit. After a trap of any other kind the stack is put back
     and the panic's words said (`core.ts`'s `guarded`); the module is not
     re-instantiated, which this wasm-bindgen's glue does not allow
     (`initSync` returns the instance it has);

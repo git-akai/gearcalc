@@ -1467,9 +1467,8 @@ fn a_concentric_gears_readings_are_one_reading_found_without_a_scan() {
 /// **Round an eccentric gear the best span and the pins' range are what
 /// reading everything finds**, to the bit: the span the caliper rule keeps
 /// when every count and every position is read ([`ruled_span`]), though the
-/// nominal count is found by halving; and the range that every space's own,
-/// sought whole, intersects to, though a space's end is sought only where
-/// it could move what the spaces before left. Over counts to a hundred,
+/// nominal count is found by halving; and the range that every space's own
+/// intersects to. Over counts to a hundred,
 /// two amplitudes, the indexing offset off and on, and pressure angles to
 /// the table's steepest — where every contact is within a rounding of the
 /// pitch circle.

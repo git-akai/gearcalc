@@ -201,27 +201,23 @@ pub fn pin_bound((smallest, largest): (f64, f64)) -> Bound {
 /// [`pin_diameter_range`] over every space of an assembled gear — the pins
 /// that measure at **every** position, as one caliper carried round.
 ///
-/// The range is the largest of the spaces' smallest ends and the smallest
-/// of their largest, so a space's end is sought only where it can move the
-/// range found so far: one reading just inside each end says whether it
-/// can, since a space's verdict is monotone in the pin
-/// ([`pin_diameter_range`]). Round an eccentric gear the range settles in
-/// a few spaces, and each after costs three readings rather than two
-/// bisections. The spaces either side of the variation's two extremes —
-/// the first tooth, cut at the largest shift, and the one half a turn
-/// round — are read first, where the ends lie; the order changes nothing
-/// found, a largest and a smallest being what they are in any order.
+/// Every space's range is sought whole. Seeking only the ends that could
+/// move the range found so far — one reading inside each end — is exact
+/// only where a space's verdict is monotone to the last double, and it is
+/// not: next to an end the pin seat's rounding flips it over an ulp or two
+/// (space 11 of a 23-tooth gear at `Δx` 0.3: a pin one ulp past its
+/// largest end seats), so a range found that way could admit a pin some
+/// space refuses. On an eccentric gear this is a bisection a space — some
+/// 3 s natively at the output budget's edge, 670 000 teeth.
 #[must_use]
 pub fn pin_diameter_range_around(gear: &crate::gear::Gear) -> Option<(f64, f64)> {
-    let z = positions(gear);
-    let extremes = [0, z - 1, z / 2, (z / 2).saturating_sub(1)];
-    let mut known: Option<(f64, f64)> = None;
-    for i in extremes.into_iter().chain(0..z) {
-        let (a, b) = pin_range_within(&Space::after(gear, i), known)?;
-        let (lo, hi) = known.map_or((a, b), |(lo, hi)| (lo.max(a), hi.min(b)));
-        known = Some((lo < hi).then_some((lo, hi))?);
-    }
-    known
+    (0..positions(gear))
+        .map(|i| pin_diameter_range(&Space::after(gear, i)))
+        .try_fold((0.0_f64, f64::INFINITY), |(lo, hi), r| {
+            let (a, b) = r?;
+            let (lo, hi) = (lo.max(a), hi.min(b));
+            (lo < hi).then_some((lo, hi))
+        })
 }
 
 /// **The pin diameters that measure this space**, `(smallest, largest)`, or
@@ -241,47 +237,22 @@ pub fn pin_diameter_range_around(gear: &crate::gear::Gear) -> Option<(f64, f64)>
 /// diameter strictly inside it seats ([`pin_bound`]).
 #[must_use]
 pub fn pin_diameter_range(space: &Space) -> Option<(f64, f64)> {
-    pin_range_within(space, None)
-}
-
-/// [`pin_diameter_range`], where a range `known` from other spaces is
-/// held to it: an end of this space's that cannot move the range — the
-/// smallest end at or below `known`'s, the largest at or above — is not
-/// sought, and stands as `known`'s own. Which it is, one reading just
-/// inside `known`'s end says, the verdict being monotone in the pin. `None`
-/// where this space has no range, or — with an end not sought — where
-/// `known` is not a range either.
-fn pin_range_within(space: &Space, known: Option<(f64, f64)>) -> Option<(f64, f64)> {
     use MeasurementError::{PinTooLarge, PinTooSmall};
-    let small = |d: f64| space.seat(d).err() == Some(PinTooSmall);
-    let large = |d: f64| space.seat(d).err() == Some(PinTooLarge);
+    let verdict = |d: f64| space.seat(d).err();
     let top = space.too_large()?;
     if top <= 0.0 {
         return None;
     }
     // The largest pin too small, and the smallest too large: each end is
     // outside the range. A space nothing is too small for opens at nought.
-    let smallest = match known {
-        Some((lo, _)) if !small(lo.next_up()) => None,
-        _ => Some(if small(0.0) {
-            halve(0.0, top, small).0
-        } else {
-            0.0
-        }),
+    let smallest = if verdict(0.0) == Some(PinTooSmall) {
+        halve(0.0, top, |d| verdict(d) == Some(PinTooSmall)).0
+    } else {
+        0.0
     };
-    let largest = match known {
-        Some((_, hi)) if !large(hi.next_down()) => None,
-        _ => Some(halve(0.0, top, |d| !large(d)).1),
-    };
-    match (smallest, largest) {
-        (Some(s), Some(l)) => (s < l && space.seat(0.5 * (s + l)).is_ok()).then_some((s, l)),
-        // An end that holds `known`'s: every pin between the space's ends
-        // seats, so the space's range is what the two ends leave.
-        (s, l) => {
-            let (lo, hi) = known?;
-            Some((s.unwrap_or(lo), l.unwrap_or(hi)))
-        }
-    }
+    let largest = halve(0.0, top, |d| verdict(d) != Some(PinTooLarge)).1;
+    (smallest < largest && space.seat(0.5 * (smallest + largest)).is_ok())
+        .then_some((smallest, largest))
 }
 
 /// **Bisection over the doubles themselves**: `below` holds at `lo` and not at
@@ -757,14 +728,15 @@ pub fn over_pins(
 ///
 /// It was the count whose *worst* contact round the revolution lands
 /// nearest, found by reading every count at every position: the same count
-/// on an evenly cut gear, and on 629 of 648 eccentric ones swept over count,
-/// amplitude, indexing, angle, helix and shift — the 19 are 18 where the
-/// nominal count does not measure everywhere, and one where both measure
-/// and the worst contact sits nearer at the count below. At the steepest
-/// pressure angle the table admits every contact is within a rounding of
-/// the pitch circle, and the worst-contact rule chose among roundings at a
-/// cost of every count times every position — some 10¹¹ readings on the
-/// largest eccentric gear the output budget admits.
+/// on an evenly cut gear, and on 5 070 of the 5 109 eccentric ones with a
+/// span in a sweep of 5 184 over count, amplitude, indexing, angle, helix
+/// and shift (none gains or loses a span). On the other 39 the count kept
+/// has its worst contact at most 0.34 modules farther from the pitch circle
+/// (`docs/state.md`). At the steepest pressure angle the table admits every
+/// contact is within a rounding of the pitch circle, and the worst-contact
+/// rule chose among roundings at a cost of every count times every
+/// position — some 10¹¹ readings on the largest eccentric gear the output
+/// budget admits.
 ///
 /// Returns the span at the first position and its `[smallest, largest]` round
 /// every position. An evenly cut gear's two ends are the **same bits**, so a
