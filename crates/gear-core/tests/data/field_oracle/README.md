@@ -86,6 +86,8 @@ path here). `make_oracle.py` is the script that wrote them, kept here as their p
 Python, whose md5 sums `index.json` lists, and does not run from this directory. The JSON files and the script are
 byte for byte the prototype's; this README is the one file changed: its three section-number references name their
 sections instead, since the repository's pointer check refuses a bare one, and this section is added.
+The oracle's own test (`the_copy_is_version_two_and_whole`, in `crates/gear-core/src/field/oracle.rs`) holds every
+file here but this README to the table below by its md5, and refuses a file in this directory the table does not list.
 
 | File | md5 |
 |---|---|
