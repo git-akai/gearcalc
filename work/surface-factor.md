@@ -214,7 +214,9 @@ gap.
 - **ISO 6336-2's `Z_R` (flank) is a different case**, not decided here. It is consistent with the library's
   σ_Hlim basis, needs no new material property (C_ZR reads σ_Hlim), and applies only to the steel flanks the
   tool rates. Omitting it overrates a hobbed flank (Rz10 ≈ 10) by 9–17 % in permissible stress. It belongs
-  with `Z_L` and `Z_v` and should go to the owner separately.
+  with `Z_L` and `Z_v` and should go to the owner separately. *Since decided by the owner (plan.md,
+  2026-10-03): no factor, with a note; `docs/state.md` carries it, sized by `tools/iso_6336_3_stack.py`.
+  This file's evidence is the root's and was not extended to flanks.*
 
 ## Sources
 

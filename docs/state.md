@@ -654,8 +654,10 @@ whose size is unmeasured is a debt still owed, and is marked as one.
   `σ_F` is **low** by their product and `σ_H` by its square root —
   unconservative, by a size the tool cannot know since it depends on speed,
   accuracy and mounting. Each rated case says so (`train.stresses_nominal`).
-  The allowables are not ISO's `σ_Flim` or `σ_Hlim` either, so this entry
-  states the stress's bias, not the whole margin's
+  The root's allowables are not ISO's `σ_Flim`, and the steels' flank
+  allowable, ISO's `σ_Hlim`, is read with none of ISO 6336-2's factors on it
+  (the entry on its roughness, below), so this entry states the stress's
+  bias, not the whole margin's
   ([rationale](rationale.md#no-isoagma-correction-factors)).
 - **Bending past `ε_αn = 2` is taken where the tooth never carries the whole
   load**, `ε_n − 1` base pitches from the tip, and ISO's `Y_DT` is declined.
@@ -726,7 +728,8 @@ whose size is unmeasured is a debt still owed, and is marked as one.
   - **contact** on the pinion: 692.7 against 616.8 MPa on the 17/43 spur
     (+12.3 %, ISO's `Z_ε`), 630.6 against 475.2 MPa at 20° helix and full
     overlap (+32.7 %). **High** — conservative by `1/Z_ε`, which ISO's
-    `σ_Hlim` is calibrated with. The allowables' own bias is a separate entry.
+    `σ_Hlim` is calibrated with. The flank allowable's own biases are
+    separate entries: the end of its line, and its roughness.
 
 <!-- figures: gear-cli matrix -->
 - **The ISO set against the default, at the tip**: `gear-cli matrix` study 5's
@@ -951,6 +954,88 @@ whose size is unmeasured is a debt still owed, and is marked as one.
   hobbed steel root, several times what ISO's lines take. The argument, and
   the owner's rule it answers (no new material properties), are
   `work/surface-factor.md`'s.
+
+- **A flank allowable is taken as the flank's own, whatever its roughness:
+  ISO 6336-2's `Z_R` is not applied.** The steels' flank allowable is ISO
+  6336-5's `σ_Hlim`, estimated from hardness, and `σ_Hlim` is referred to a
+  flank of `Rz10` 3 µm, where ISO's roughness factor is 1. `Z_R` is
+  `(3/Rz10)^C_ZR`: `Rz10` is the two flanks' mean `Rz` scaled by
+  `(10 mm/ρ_red)^(1/3)`, `ρ_red` the relative radius at the pitch point, and
+  `C_ZR` is read off `σ_Hlim` and falls as it rises past 850 MPa (IACS UR
+  M56, which reproduces ISO 6336-2:2019). The tool judges a flank against its
+  allowable as it stands. A flank rougher than ISO's reference is therefore
+  judged against an allowable that much **high**: its utilisation is that
+  much **low**, and the width contact asks, which goes as the allowable's
+  inverse square, that much too narrow — **unconservative**. A smoother flank
+  goes the other way, by the formula as reproduced, which states no bound.
+  The omission grows as the pair shrinks, since `Rz10` does. It reaches the fatigue case only: the ultimate case is judged at
+  first yield below the flank, not against `σ_Hlim`.
+  `tools/iso_6336_3_stack.py` prints it below on the canary pair (17/43,
+  20°, unshifted) at three modules, the same flank on both members: each
+  figure is the omission's, less one, in percent, and **a negative
+  utilisation or width is unconservative**. Both library steels read the
+  same `C_ZR` at their grade, so they share the rows; the last two are at
+  ISO's least exponent, which a flank allowable above 1200 MPa takes.
+
+<!-- figures: tools/iso_6336_3_stack.py -->
+| Flank allowable | Grade | `σ_Hlim`, MPa | `C_ZR` |
+|---|---|---|---|
+| 4340 annealed | MQ | 675.0 | 0.150 |
+| 4340 Hardened | MQ | 845.7 | 0.150 |
+| none: brass, POM and the polyamides, 6 of the library's 8, whose contact fatigue is not judged | | | |
+
+<!-- figures: tools/iso_6336_3_stack.py -->
+| Flank | `C_ZR` | `Rz`, µm | Module | `ρ_red`, mm | `Rz10`, µm | `Z_R` | Allowable used over the flank's, % | Utilisation, % | Width contact asks, % |
+|---|---|---|---|---|---|---|---|---|---|
+| superfinished | 0.150 | 1 | 1 | 2.083 | 1.69 | 1.090 | −8.3 | +9.0 | +18.9 |
+| superfinished | 0.150 | 1 | 2 | 4.167 | 1.34 | 1.129 | −11.4 | +12.9 | +27.4 |
+| superfinished | 0.150 | 1 | 5 | 10.417 | 0.99 | 1.182 | −15.4 | +18.2 | +39.6 |
+| ground | 0.150 | 3 | 1 | 2.083 | 5.06 | 0.925 | +8.2 | −7.5 | −14.5 |
+| ground | 0.150 | 3 | 2 | 4.167 | 4.02 | 0.957 | +4.5 | −4.3 | −8.4 |
+| ground | 0.150 | 3 | 5 | 10.417 | 2.96 | 1.002 | −0.2 | +0.2 | +0.4 |
+| hobbed | 0.150 | 10 | 1 | 2.083 | 16.87 | 0.772 | +29.6 | −22.8 | −40.4 |
+| hobbed | 0.150 | 10 | 2 | 4.167 | 13.39 | 0.799 | +25.2 | −20.1 | −36.2 |
+| hobbed | 0.150 | 10 | 5 | 10.417 | 9.86 | 0.836 | +19.5 | −16.4 | −30.0 |
+| ground, at ISO's least exponent | 0.080 | 3 | 1 | 2.083 | 5.06 | 0.959 | +4.3 | −4.1 | −8.0 |
+| hobbed, at ISO's least exponent | 0.080 | 10 | 1 | 2.083 | 16.87 | 0.871 | +14.8 | −12.9 | −24.1 |
+
+  The stress's own bias runs the other way: the tool's `σ_H` stands above
+  ISO's, by `1/Z_ε` (the ISO entry above). Against ISO's whole check, every
+  other factor at 1, a ground flank at the canary's size nets conservative and
+  a hobbed one unconservative:
+
+<!-- figures: tools/iso_6336_3_stack.py -->
+| With the stress's own bias, at the canary's size | The tool's `σ_H` over ISO's, % | The omitted `Z_R`, % | Utilisation against ISO's check, % |
+|---|---|---|---|
+| superfinished, `Rz` 1 | +12.3 | +9.0 | +22.4 |
+| ground, `Rz` 3 | +12.3 | −7.5 | +3.8 |
+| hobbed, `Rz` 10 | +12.3 | −22.8 | −13.3 |
+
+  ISO's factor is declined by the owner's rule for the root's surface term,
+  applied to the flank (`work/plan.md`, 2026-10-03), though the case is not
+  the root's. On the library's steels `Z_R` would need no new material
+  property: a flank's `Rz` is a drawing's, `ρ_red` the pair's, and `C_ZR`
+  reads the `σ_Hlim` they carry; and, unlike the root's lines, `C_ZR` is
+  continuous, with no step at a class boundary. What it lacks is a basis off
+  them. `C_ZR` is keyed to `σ_Hlim`, which ISO 6336-5 gives for iron and
+  steel only, so a flank figure for any other material would pick its
+  exponent by the size of its number. `Z_R` is a ratio against ISO's
+  reference flank, so applying it to a `contact_fatigue_allowable` entered as
+  published or measured needs the roughness that figure was run at, which a
+  source rarely states: a new attribute on every material. Applied to the
+  steels alone, it would judge a steel flank and a figure entered for any
+  other on different bases. `work/surface-factor.md`'s measured evidence is
+  the root's, in bending, and does not reach a flank; its corrections name
+  `Z_R` a different case. **What is known off the steels** is only that
+  nothing reads the factor today: brass, POM and the polyamides carry no
+  flank allowable, so their contact fatigue is not judged (the first table).
+  **What is not known** is how far ISO's factor misses on steel flanks off
+  the finishes and treatments behind its data, and whether roughness moves a
+  brass or polymer flank's endurance at all, or which way:
+  `surface-factor.md` did not look at flanks, and no flank measurement was
+  sought for this entry. ISO groups `Z_R` with `Z_L` and `Z_v`, the
+  lubricant's and the speed's factors; neither is applied, and neither is
+  sized, since the tool takes no lubricant — a debt still owed.
 
 - **The axial compression term is applied**, being the second term of the `J`
   whose first term is `Y_F`. It relieved the canary by 10.1 % and 12.2 %, which

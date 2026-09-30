@@ -25,6 +25,10 @@ computes ISO's figures itself and prints the ratio tool / ISO:
 - **contact**: ISO 6336-2's pinion
   `σ_H = Z_B Z_H Z_E Z_ε Z_β √(F_t (u+1)/(d_1 b u))` against the tool's rated
   pinion stress.
+- **the flank's roughness**: ISO 6336-2's `Z_R`, which the tool does not
+  apply, on each library flank allowable as `gear-cli strength` reports it,
+  and what omitting it does to the allowable, the utilisation and the width
+  contact asks.
 
 Every stress is nominal on both sides: no `K_A`, `K_v`, `K_Fβ`, `K_Fα`.
 
@@ -51,8 +55,10 @@ anything alone.
 
 import math
 import os
+import re
 import subprocess
 import sys
+import tomllib
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # The harness `tools/check_figures.py` hands over, else the release build.
@@ -325,6 +331,128 @@ def rate(z1, z2, alpha_deg, beta_deg=0.0, face=10.0):
     return rows, (r["rated_1"], sigma_h, z_eps)
 
 
+
+# ---------------------------------------- ISO 6336-2's roughness factor ----
+#
+# `Z_R = (3 / Rz10)^C_ZR`, `Rz10 = Rz (10 / ρ_red)^(1/3)`: `Rz` the mean of
+# the two flanks', `ρ_red` the pair's relative radius at the pitch point, and
+# `C_ZR` read off `σ_Hlim` (IACS UR M56.2.10 c, which reproduces ISO
+# 6336-2:2019). `Z_R` is 1 at `Rz10` 3 µm, the flank `σ_Hlim` is referred to.
+# The tool applies none: every flank is judged against its allowable as it
+# stands, and these are what that leaves.
+
+# `Rz10` where `Z_R` is 1, µm, and the relative radius `Rz10` is scaled to, mm.
+RZ10_REFERENCE = 3.0
+RHO_REFERENCE = 10.0
+# `C_ZR`'s bands: `σ_Hlim` below the first, MPa, takes the first exponent, above
+# the second the second, and between them `0.32 − 0.0002 σ_Hlim`, which meets
+# both ends.
+C_ZR_BANDS = ((850.0, 0.15), (1200.0, 0.08))
+# The flanks the factor is printed at, `Rz` µm on both: a superfinished flank,
+# smoother than ISO's reference; a ground one (a ground flank is typically
+# 2–4 µm); and a hobbed one (Ra 1.6 µm, by ISO's `Rz ≈ 6 Ra`).
+FLANKS = (("superfinished", 1.0), ("ground", 3.0), ("hobbed", 10.0))
+# The canary pair and the modules it is printed at: a flank's `Rz10` grows as
+# the pair shrinks.
+CANARY = (17, 43, 20.0)
+MODULES = (1.0, 2.0, 5.0)
+
+
+def c_zr(sigma_hlim: float) -> float:
+    """ISO's exponent on `3/Rz10`, from the flank allowable, MPa."""
+    (low, below), (high, above) = C_ZR_BANDS
+    if sigma_hlim < low:
+        return below
+    if sigma_hlim > high:
+        return above
+    return 0.32 - 0.0002 * sigma_hlim
+
+
+def pitch_relative_radius(z1: int, z2: int, m: float, alpha_deg: float) -> float:
+    """`ρ_red` at the pitch point of an unshifted external spur pair, mm:
+    each flank's `d_b tan α_wt / 2`, in series."""
+    a = math.radians(alpha_deg)
+    rho = [z * m * math.cos(a) * math.tan(a) / 2 for z in (z1, z2)]
+    return rho[0] * rho[1] / (rho[0] + rho[1])
+
+
+def roughness_factor(rz: float, rho_red: float, exponent: float):
+    """`(Rz10, Z_R)` for a flank of `Rz` µm on a pair of `ρ_red` mm."""
+    rz10 = rz * (RHO_REFERENCE / rho_red) ** (1 / 3)
+    return rz10, (RZ10_REFERENCE / rz10) ** exponent
+
+
+def flank_allowables():
+    """Each library material's flank allowable at its own grade, MPa, as
+    `gear-cli strength` reports the one a fatigue case is judged against, or
+    None where it has none; with the grade an estimate is read at, or
+    `published` for a figure the library states."""
+    path = os.path.join(ROOT, "crates", "gear-io", "data", "materials_default.toml")
+    with open(path, "rb") as f:
+        lib = tomllib.load(f)
+    out = []
+    for m in lib["material"]:
+        z1, z2, _ = CANARY
+        text = subprocess.run(
+            [BIN, "strength", str(z1), str(z2), "2.0", m["name"]],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+        lines = [l for l in text.splitlines() if "b_min against fatigue" in l]
+        assert len(lines) == 1, (m["name"], text)
+        found = re.search(r"allowable ([0-9.]+) MPa", lines[0])
+        estimate = m.get("contact_estimate")
+        grade = estimate.get("grade", "mq").upper() if estimate else "published"
+        out.append((m["name"], float(found.group(1)) if found else None, grade))
+    return out
+
+
+def roughness(spur_bias: float) -> None:
+    """The `Z_R` the tool omits, printed row by row for `docs/state.md`."""
+    print("\n== the flank's roughness: ISO 6336-2's Z_R, which the tool does not apply ==")
+    print(f"  Z_R = (3/Rz10)^C_ZR, Rz10 = Rz (10/rho_red)^(1/3); 1 at Rz10 {RZ10_REFERENCE:g} µm."
+          " Each figure is the omission's, less one, %: the allowable used over the flank's (1/Z_R),"
+          " the utilisation over the flank's (Z_R), and the width contact asks over the flank's"
+          " (Z_R^2). Negative utilisation and width are unconservative.")
+    allowables = flank_allowables()
+    rated = [(n, s, g) for n, s, g in allowables if s is not None]
+    for name, sigma, grade in rated:
+        print(f"  allowable {name} | {grade} | sigma_Hlim {sigma:.1f} MPa | C_ZR {c_zr(sigma):.3f}")
+    unrated = [n for n, s, _ in allowables if s is None]
+    print(f"  no flank allowable, so contact fatigue is not judged and Z_R has nothing to multiply:"
+          f" {', '.join(unrated)} ({len(unrated)} of {len(allowables)})")
+    z1, z2, alpha = CANARY
+
+    def row(label, exponent, flank, rz, m):
+        rho = pitch_relative_radius(z1, z2, m, alpha)
+        rz10, f = roughness_factor(rz, rho, exponent)
+        print(f"  {label} C_ZR {exponent:.3f} | {flank} | Rz {rz:g} | {z1}/{z2} module {m:g}"
+              f" | rho_red {rho:.3f} mm | Rz10 {rz10:.2f} | Z_R {f:.3f}"
+              f" | allowable {100 * (1 / f - 1):+.1f} % | utilisation {100 * (f - 1):+.1f} %"
+              f" | width {100 * (f * f - 1):+.1f} %")
+
+    exponents = sorted({c_zr(s) for _, s, _ in rated})
+    for exponent in exponents:
+        for flank, rz in FLANKS:
+            for m in MODULES:
+                row("roughness", exponent, flank, rz, m)
+        # With the stress's own bias against ISO, on the spur canary at its
+        # own size: the utilisation against ISO's whole check, `Z_ε` and
+        # `Z_R` both in, every other factor at 1.
+        rho = pitch_relative_radius(z1, z2, MODULES[0], alpha)
+        for flank, rz in FLANKS:
+            f = roughness_factor(rz, rho, exponent)[1]
+            print(f"  net C_ZR {exponent:.3f} | {flank}, Rz {rz:g}, module {MODULES[0]:g}"
+                  f" | stress {100 * (spur_bias - 1):+.1f} % | roughness {100 * (f - 1):+.1f} %"
+                  f" | utilisation {100 * (spur_bias * f - 1):+.1f} %")
+    # ISO's least exponent, which a flank allowable above the top band takes:
+    # the least the omission can be on ISO's steels at a given flank.
+    least = C_ZR_BANDS[1][1]
+    for flank, rz in FLANKS[1:]:
+        row(f"least, sigma_Hlim above {C_ZR_BANDS[1][0]:g} MPa,", least, flank, rz, MODULES[0])
+
+
 def main() -> None:
     if not os.path.exists(BIN):
         sys.exit(f"{BIN} is not built: `cargo build --release --bin gear-cli` first")
@@ -372,15 +500,19 @@ def main() -> None:
         )
 
     print("\n== contact, the pinion: tool / ISO 6336-2 (Z_B Z_H Z_E Z_ε Z_β) ==")
+    over = {}
     for label, args in (
         ("17/43 spur, 10 mm", (17, 43, 20.0, 0.0, 10.0)),
         ("17/43 beta 20 deg, 10 mm, ε_β > 1", (17, 43, 20.0, 20.0, 10.0)),
     ):
         tool_h, iso_h, z_eps = rate(*args)[1]
+        over[label] = tool_h / iso_h
         print(
             f"  {label:<34} {tool_h:.1f} against {iso_h:.1f} MPa: "
             f"{100 * (tool_h / iso_h - 1):+.1f} % (1/Z_ε {1 / z_eps:.4f})"
         )
+
+    roughness(over["17/43 spur, 10 mm"])
 
 
 if __name__ == "__main__":

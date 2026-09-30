@@ -419,7 +419,8 @@ impl Material {
 
     /// **The flank's pitting endurance**: a published figure where there is
     /// one, else the estimate from hardness at its grade, basis `Estimated`;
-    /// `None` where neither exists.
+    /// `None` where neither exists. Read as any flank's own, whatever its
+    /// roughness: ISO 6336-2's `Z_R` is not applied (docs/state.md).
     #[must_use]
     pub fn flank_endurance(&self) -> Option<Value> {
         self.contact_fatigue_allowable.clone().or_else(|| {

@@ -3211,6 +3211,14 @@ the default rates at the same load, by the gap
 [state](state.md#known-approximate-documented-at-the-call-site) gives, and
 entered as it stands it carries that gap: the root rated too strong.
 
+**A flank's pitting endurance is read the same way.**
+`contact_fatigue_allowable`, or the estimate from hardness on ISO 6336-5's
+line at the grade asked, is judged as it stands. ISO's figure is referred to
+a flank of `Rz10` 3 µm, and ISO 6336-2's roughness factor `Z_R` is not
+applied, so it is read as any flank's own, whatever the flank's finish; the
+size and sign of that are in
+[state](state.md#known-approximate-documented-at-the-call-site).
+
 Stored SI (density in kg/m³) and displayed in the domain's own units, with the
 two deliberate exceptions of mm for length and MPa for stress.
 

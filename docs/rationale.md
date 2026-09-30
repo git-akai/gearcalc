@@ -1355,7 +1355,11 @@ Now each has its own (`train::allowable`, keyed by rating and kind):
   it says otherwise (`HardnessEstimate`, `Overrides::contact_grade`);
   nothing publishes one for the brass, POM or the polyamides, so they carry
   none, and contact fatigue on them is **not judged** and says so
-  (`gear.contact_fatigue_unjudged`) rather than borrowing a number.
+  (`gear.contact_fatigue_unjudged`) rather than borrowing a number. The
+  figure is referred to ISO's reference flank and read as any flank's own,
+  whatever its roughness: ISO 6336-2's `Z_R` is not applied, and the size and
+  sign of that are in
+  [state](state.md#known-approximate-documented-at-the-call-site).
 - **Ultimate**: first yield below the flank, `p_Y = C(κ, ν)·σ_y` by von Mises.
   A flank under a single overload fails by subsurface shear, not at the tensile
   figure. `C` is 1.79 for a line contact and 1.60 for a circle at `ν = 0.3`
