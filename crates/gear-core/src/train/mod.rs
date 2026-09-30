@@ -503,8 +503,20 @@ pub(crate) fn line_mesh_report(cases: &[CaseLoad], m: LineMesh) -> MeshReport {
     // neither epicyclic stage asked either, while there were such stages.
     let mut notes = m.notes;
     let r = &m.contact_ratios;
-    if r.transverse < 1.0 {
-        notes.push(Note::new(key::MESH_CONTACT_RATIO_BELOW_ONE).number("ratio", r.transverse, 3));
+    // Continuity is the total's: a helix keeps a pair in contact across a
+    // transverse gap, and only `ε_γ < 1` loses it. A transverse ratio below
+    // one under a total that keeps contact is said as what it is — outside
+    // the range ISO 6336 rates.
+    if r.total < 1.0 {
+        notes.push(Note::new(key::MESH_CONTACT_RATIO_BELOW_ONE).number("ratio", r.total, 3));
+    } else if r.transverse < 1.0 {
+        notes.push(
+            Note::new(key::MESH_TRANSVERSE_CONTACT_RATIO_BELOW_ONE).number(
+                "ratio",
+                r.transverse,
+                3,
+            ),
+        );
     }
     // Without the figure: it is drawn beside the ratio's own box.
     if r.overlap > 0.0 && !r.has_full_axial_overlap() {
@@ -9006,6 +9018,61 @@ mod tests {
             new.is_empty() && cleared.is_empty(),
             "of {checked} given inputs ({freed} freed), not honoured and not listed: {new:?}; listed and now honoured: {cleared:?}"
         );
+    }
+
+    /// **"Loses contact" is said on the ratio that governs continuity, `ε_γ`**,
+    /// and a transverse ratio below one under a total at or above it is said
+    /// as what it is: outside the range ISO 6336 rates, with contact kept by
+    /// the helix (T06.4). Four pairs, each note quoting its own ratio:
+    /// - a 30° helical 17/43 at `h_a` 0.55 and 60 mm: `ε_α < 1 ≤ ε_γ`, the
+    ///   ISO note and not "loses contact";
+    /// - the same at a face narrow enough that `ε_γ < 1`: "loses contact",
+    ///   quoting `ε_γ` — a rule that fired on `ε_α` and quoted it passes the
+    ///   first pair's absence and fails here;
+    /// - a spur pair at `h_a` 0.55: "loses contact", `ε_γ = ε_α`;
+    /// - the helical pair at its full addendum: neither.
+    #[test]
+    fn loses_contact_is_said_on_the_total_ratio() {
+        let solved = |helix: f64, addendum: f64, face: f64| {
+            let mut s = arr::pair([17, 43]).with_first_helix(helix);
+            for m in &mut s.members {
+                m.gear.addendum = addendum;
+                m.gear.face_width = Auto::fixed(face);
+            }
+            let r = try_alone(&s).expect("the pair solves");
+            let m = &r.meshes[0];
+            let ratios = m.line.expect("a line contact").contact_ratios;
+            let quoted = |k: &str| {
+                let found: Vec<&Note> = m.notes.iter().filter(|n| n.is(k)).collect();
+                assert!(found.len() <= 1, "{k} said {} times", found.len());
+                found.first().map(|n| n.values["ratio"].clone())
+            };
+            (
+                ratios,
+                quoted(key::MESH_CONTACT_RATIO_BELOW_ONE),
+                quoted(key::MESH_TRANSVERSE_CONTACT_RATIO_BELOW_ONE),
+            )
+        };
+        let figure = |x: f64| Some(format!("{x:.3}"));
+
+        let (r, lost, iso) = solved(30.0, 0.55, 60.0);
+        assert!(r.transverse < 1.0 && r.total >= 1.0, "{r:?}");
+        assert_eq!(lost, None, "ε_γ {} keeps contact", r.total);
+        assert_eq!(iso, figure(r.transverse));
+
+        let (r, lost, iso) = solved(30.0, 0.55, 1.0);
+        assert!(r.total < 1.0 && r.overlap > 0.0, "{r:?}");
+        assert_eq!(lost, figure(r.total));
+        assert_eq!(iso, None, "one note for one shortfall");
+
+        let (r, lost, iso) = solved(0.0, 0.55, 60.0);
+        assert!(r.total < 1.0 && r.overlap == 0.0, "{r:?}");
+        assert_eq!(lost, figure(r.total));
+        assert_eq!(iso, None);
+
+        let (r, lost, iso) = solved(30.0, 1.0, 60.0);
+        assert!(r.transverse >= 1.0, "{r:?}");
+        assert_eq!((lost, iso), (None, None));
     }
 
     /// **The reading relief leaves standing is the reading the solve reads.**

@@ -1870,9 +1870,10 @@ fn worst_over_cycle<T: ToothOutline + ?Sized>(
 /// sample list while the unshared branch did not, which is the shape of the bug:
 /// **one quantity, computed twice, agreeing until it mattered.**
 ///
-/// A mesh below a contact ratio of 1 is already reported
-/// (`mesh.contact_ratio_below_one`); what this fixes is that it was
-/// also rated at a point on no tooth.
+/// A mesh below a transverse contact ratio of 1 is already reported
+/// (`mesh.transverse_contact_ratio_below_one`, or
+/// `mesh.contact_ratio_below_one` where the helix does not make it up);
+/// what this fixes is that it was also rated at a point on no tooth.
 fn highest_single_pair(eps_n: f64) -> f64 {
     (eps_n - 1.0).max(0.0)
 }

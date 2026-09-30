@@ -73,6 +73,7 @@ contact_ultimate_unjudged = "该极限值为断裂应力，而齿面下的初始
 [mesh]
 overlap_below_one = "纵向重合度小于 1；外形是斜齿而受力如同直齿"
 contact_ratio_below_one = "重合度 {ratio}：低于 1，齿对在齿与齿之间失去接触"
+transverse_contact_ratio_below_one = "端面重合度 {ratio}：低于 1，超出 ISO 6336 的评定范围；螺旋角使齿对保持接触"
 load_sharing_out_of_band = "虚拟重合度 {ratio}：始终有两对齿啮合，不存在单齿啮合区——不做载荷分配时，弯曲取在轮齿从未承担全部载荷之处；做载荷分配时，斜坡模型属于外推（在高重合度直齿轮副上实测为降低 25–32 %，模型并不保证其方向）"
 flank_interference = "构件 {member} 的齿面沿啮合线在可用范围之外 {depth} mm 处被接触：重合度、效率和强度只计可用齿面"
 contact_off_face = "理想接触偏离齿宽：轮齿在齿宽边缘接触，本交错轴模型不计算该接触；重合度取齿宽所能承载的最大值，而效率和接触压力沿齿顶限定的区段读取，会低估边缘接触的压力"

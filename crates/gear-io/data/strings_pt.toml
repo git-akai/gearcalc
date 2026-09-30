@@ -78,6 +78,7 @@ contact_ultimate_unjudged = "o valor último é uma tensão de rotura, e a prime
 [mesh]
 overlap_below_one = "razão de recobrimento abaixo de 1; helicoidal na forma mas carregada como uma engrenagem de dentes retos"
 contact_ratio_below_one = "razão de contacto {ratio}: abaixo de 1, o par perde o contacto entre dentes"
+transverse_contact_ratio_below_one = "razão de contacto transversal {ratio}: abaixo de 1, fora da gama que a ISO 6336 avalia; a hélice mantém o par em contacto"
 load_sharing_out_of_band = "razão de contacto virtual {ratio}: há sempre dois pares engrenados, pelo que não existe zona de um só par — sem partilha, a flexão é tomada onde o dente nunca leva a carga toda; com partilha, a rampa extrapola (medido como um alívio de 25–32 % em pares de alta razão de contacto, sentido que o modelo não fixa)"
 flank_interference = "o flanco do elemento {member} é alcançado {depth} mm além da sua extensão útil ao longo da linha de ação: razão de contacto, rendimento e tensões contam só os flancos úteis"
 contact_off_face = "o contacto ideal sai das larguras de face: os dentes tocam-se numa aresta da face, que este modelo de eixos cruzados não calcula; a razão de contacto é o máximo que as faces suportam, enquanto rendimento e pressão são lidos ao longo da zona das cabeças e subestimam a pressão de um contacto de aresta"

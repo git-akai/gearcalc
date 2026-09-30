@@ -1304,6 +1304,19 @@ mod tests {
                     }
                 }
             }
+            // **A transverse ratio below one that the helix makes up**: a 30°
+            // helical 17/43 at a 0.55-module addendum and 60 mm, `ε_α` 0.76
+            // under `ε_γ` 10.3 — outside ISO 6336's range, not out of contact.
+            {
+                let mut s = arr::pair([17, 43]).with_first_helix(30.0);
+                for m in &mut s.members {
+                    m.gear.addendum = 0.55;
+                    m.gear.face_width = gear_core::params::Auto::fixed(60.0);
+                }
+                if let Ok(r) = solve_spur(&s, 2.0, 0.0, &lib) {
+                    record(&r.every_note());
+                }
+            }
             // An automatic face width with every rating switched off: it
             // stands at its box, which a box of nought would not (a face of
             // nothing is refused where it enters).

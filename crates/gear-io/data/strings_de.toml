@@ -77,6 +77,7 @@ contact_ultimate_unjudged = "der Grenzwert ist eine Bruchspannung, das erste Fli
 [mesh]
 overlap_below_one = "Sprungüberdeckung unter 1; schrägverzahnt in der Form, aber belastet wie ein Geradzahnrad"
 contact_ratio_below_one = "Überdeckung {ratio}: unter 1, das Paar verliert zwischen den Zähnen den Kontakt"
+transverse_contact_ratio_below_one = "Profilüberdeckung {ratio}: unter 1, außerhalb des Bereichs, den ISO 6336 bewertet; die Schrägung hält das Paar im Eingriff"
 load_sharing_out_of_band = "virtuelle Überdeckung {ratio}: stets sind zwei Paare im Eingriff, es gibt keinen Einzeleingriffsbereich — ohne Lastaufteilung liegt der Biegepunkt dort, wo der Zahn nie die ganze Last trägt; mit ihr extrapoliert die Rampe (gemessen als 25–32 % Entlastung an Stirnradpaaren hoher Überdeckung, eine Richtung, die das Modell nicht festlegt)"
 flank_interference = "die Flanke von Glied {member} wird {depth} mm entlang der Eingriffslinie über ihr nutzbares Ende hinaus erreicht: Überdeckung, Wirkungsgrad und Festigkeit zählen nur die nutzbaren Flanken"
 contact_off_face = "der ideale Eingriff läuft von den Zahnbreiten ab: die Zähne berühren sich an einer Stirnkante, die dieses Modell gekreuzter Achsen nicht berechnet; die Überdeckung ist das Höchste, was die Breiten tragen, Wirkungsgrad und Pressung werden entlang der Kopfzone gelesen und unterschätzen die Pressung eines Kantentragens"

@@ -137,6 +137,9 @@ pub mod key {
     // two meshes and says which.
     /// `mesh.contact_ratio_below_one`
     pub const MESH_CONTACT_RATIO_BELOW_ONE: &str = "mesh.contact_ratio_below_one";
+    /// `mesh.transverse_contact_ratio_below_one`
+    pub const MESH_TRANSVERSE_CONTACT_RATIO_BELOW_ONE: &str =
+        "mesh.transverse_contact_ratio_below_one";
     /// `mesh.low_efficiency`
     pub const MESH_LOW_EFFICIENCY: &str = "mesh.low_efficiency";
     /// `mesh.near_self_locking`
@@ -388,6 +391,7 @@ pub mod key {
         GEAR_REVERSED_BENDING_APPLIED,
         GEAR_RIM_BELOW_MINIMUM,
         MESH_CONTACT_RATIO_BELOW_ONE,
+        MESH_TRANSVERSE_CONTACT_RATIO_BELOW_ONE,
         MESH_LOW_EFFICIENCY,
         MESH_NEAR_SELF_LOCKING,
         MESH_FORWARD_LOCKING,
