@@ -1833,10 +1833,28 @@ pub struct EditRequest {
 fn edit_train_impl(input: &str) -> Result<String, String> {
     let EditRequest { mut train, edit } = read(input)?;
     entering(&train, None)?;
+    edit_entering(&edit)?;
     // **A refusal crosses as its catalogue key**, which is what the panel
     // says beside the verb; its `Display` is English for a log.
     apply_edit(&mut train, edit).map_err(|e| e.key().to_string())?;
     serde_json::to_string(&train).map_err(|e| e.to_string())
+}
+
+/// **An edit as it enters**: a shape an insert lays in is read through the
+/// table and the graph's invariants as a train's is
+/// ([`gear_core::train::Shape::validate`]), a field it names placed where
+/// the request holds it. Every index an edit names is the edit's own rule
+/// to refuse ([`gear_core::train::EditRefused::NoSuchIndex`]).
+fn edit_entering(edit: &TrainEdit) -> Result<(), String> {
+    let TrainEdit::Graph(gear_core::train::Edit::Insert { shape, .. }) = edit else {
+        return Ok(());
+    };
+    shape.validate().map_err(|e| {
+        refusal(&match e {
+            gear_core::train::TrainError::Input(r) => r.within("edit.graph.insert.shape").note(),
+            other => other.note(),
+        })
+    })
 }
 
 /// **One edit made by the core's rules** — the one match [`edit_train`] and
@@ -1904,6 +1922,7 @@ fn preview_edit_impl(input: &str) -> Result<String, String> {
         edit,
     } = read(input)?;
     entering(&train, materials.as_ref())?;
+    edit_entering(&edit)?;
     let lib = materials.unwrap_or_else(gear_io::default_library);
     let mut after = train.clone();
     let made = apply_edit(&mut after, edit);
@@ -2618,6 +2637,136 @@ mod tests {
             faults.join("\n")
         );
         assert_eq!(calls.len(), 5 * 13);
+    }
+
+    /// **Every index a request carries beside its train, past its list, is
+    /// refused or read as nothing — never followed.** The default train and
+    /// the planetary set, each asked with every index an edit, a preview, a
+    /// case's relief, an adoption, the offers and a graph's relief name at
+    /// its list's length, one past it and 99: the edits' refusals are
+    /// `EditRefused::NoSuchIndex`'s, a preview says the refusal, and the
+    /// rest refuse or answer. A shape laid in by an insert is read through
+    /// the table, as a train is: its mesh past its members is refused by
+    /// that field. Every call returns.
+    #[test]
+    fn every_index_beside_the_train_is_refused_or_read_as_nothing() {
+        use serde_json::{json, Value};
+        use std::panic::{catch_unwind, AssertUnwindSafe};
+        let d: Value = serde_json::from_str(&defaults_impl().unwrap()).unwrap();
+        let mut set = d["train"].clone();
+        set["shape"] = preset(&d, "planetary");
+        let mut bad_shape = preset(&d, "spur");
+        bad_shape["meshes"][0]["b"] = json!(99);
+        type Call = Box<dyn Fn() -> Result<String, String>>;
+        let mut calls: Vec<(String, Call)> = Vec::new();
+        for train in [d["train"].clone(), set] {
+            let n = |list: &str| train["shape"][list].as_array().unwrap().len();
+            for past in [n("members"), n("members") + 1, n("bodies") + 1, 99] {
+                let edits = [
+                    json!({"graph": {"remove": {"member": past}}}),
+                    json!({"graph": {"remove": {"mesh": past}}}),
+                    json!({"graph": {"remove": {"axis": past}}}),
+                    json!({"graph": {"remove": {"body": past}}}),
+                    json!({"graph": {"remove": {"coupling": past}}}),
+                    json!({"graph": {"add_gear": {"mate": past, "on": "new_axis", "ring": false}}}),
+                    json!({"graph": {"add_gear": {"mate": 0, "on": {"body": past}, "ring": false}}}),
+                    json!({"graph": {"add_gear": {"mate": 0, "on": {"new_body": past}, "ring": false}}}),
+                    json!({"graph": {"add_ratio": {"distance": past, "shared": past}}}),
+                    json!({"graph": {"add_step": {"axis": past}}}),
+                    json!({"graph": {"couple": {"body": past}}}),
+                    json!({"graph": {"move": {"member": past, "to": past}}}),
+                    json!({"graph": {"join": {"a": past, "b": 1}}}),
+                    json!({"graph": {"hold": past}}),
+                    json!({"graph": {"release": past}}),
+                    json!({"graph": {"insert": {"shape": preset(&d, "spur"), "at": past}}}),
+                    json!({"graph": {"insert": {"shape": bad_shape, "at": null}}}),
+                    json!({"duty": {"case": past, "intermittent": true}}),
+                ];
+                for edit in edits {
+                    let r = json!({"train": train, "edit": edit}).to_string();
+                    let p = json!({"train": train, "edit": edit}).to_string();
+                    calls.push((
+                        format!("edit {edit}"),
+                        Box::new(move || edit_train_impl(&r)),
+                    ));
+                    calls.push((
+                        format!("preview {p}"),
+                        Box::new(move || preview_edit_impl(&p)),
+                    ));
+                }
+                let others = [
+                    (
+                        "relieve_case",
+                        json!({"train": train, "case": past, "just": null}),
+                    ),
+                    (
+                        "relieve_case",
+                        json!({"train": train, "case": 0, "just": {"load": past, "which": "speed"}}),
+                    ),
+                    ("adopt_member", json!({"train": train, "member": past})),
+                ];
+                for (entry, req) in others {
+                    let r = req.to_string();
+                    let f: fn(&str) -> Result<String, String> = match entry {
+                        "relieve_case" => relieve_case_impl,
+                        _ => adopt_member_impl,
+                    };
+                    calls.push((format!("{entry} {req}"), Box::new(move || f(&r))));
+                }
+                for target in ["member", "mesh", "body", "axis", "distance", "coupling"] {
+                    let r = json!({"train": train, "at": {target: past}}).to_string();
+                    calls.push((
+                        format!("offers {target} {past}"),
+                        Box::new(move || offers_impl(&r)),
+                    ));
+                }
+                let shape = train["shape"].clone();
+                for just in [
+                    json!({"member": [past, "shift"]}),
+                    json!({"distance": past}),
+                    json!({"clearance": past}),
+                    json!({"overlap": past}),
+                ] {
+                    let r = json!({"shape": shape, "just": just, "figures": [
+                        {"freedom": just, "value": 0.1}
+                    ]})
+                    .to_string();
+                    calls.push((
+                        format!("relieve {just}"),
+                        Box::new(move || relieve_impl(&r)),
+                    ));
+                }
+            }
+        }
+        std::panic::set_hook(Box::new(|_| {}));
+        let mut panics = Vec::new();
+        for (what, call) in &calls {
+            if let Err(e) = catch_unwind(AssertUnwindSafe(call)) {
+                panics.push(format!(
+                    "{what}: {}",
+                    e.downcast_ref::<String>()
+                        .cloned()
+                        .or_else(|| e.downcast_ref::<&str>().map(ToString::to_string))
+                        .unwrap_or_default()
+                ));
+            }
+        }
+        let _ = std::panic::take_hook();
+        assert!(
+            panics.is_empty(),
+            "{} of {} calls panicked:\n{}",
+            panics.len(),
+            calls.len(),
+            panics.join("\n")
+        );
+        assert_eq!(calls.len(), 2 * 4 * (18 * 2 + 3 + 6 + 4));
+        // ...and the malformed insert is refused by the field it names.
+        let r = edit_train_impl(
+            &json!({"train": d["train"], "edit": {"graph": {"insert": {"shape": bad_shape, "at": null}}}})
+                .to_string(),
+        );
+        let note: Note = serde_json::from_str(&r.unwrap_err()).unwrap();
+        assert_eq!(note.values["field"], "edit.graph.insert.shape.meshes.0.b");
     }
 
     /// Every path of `v` at which an object stands, as a JSON pointer.
