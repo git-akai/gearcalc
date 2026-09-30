@@ -224,6 +224,11 @@ caught, test workspace included) and the 130-constant perturbation.
     - a closed-form limit at Σ → 0;
     - tooth stiffness in series, derived from the generated tooth and gated against ISO 6336-1's c′
       and c_γ.
+- 2026-10-01 — settled by the owner's rules after the fifth contact verification:
+  - The matched (hobbed) worm wheel needs a new capped Newton solve, a seed search and a fallback
+    minimiser. It is therefore implemented but not exposed; the involute wheel stays.
+  - The expensive mode refuses an unset tip-edge radius r_e, because the r_e → 0 limit diverges
+    (about r_e^−0.37) and has no finite value. The fast mode is unchanged. The owner may override.
 - 2026-09-30 — owner: the bound that holds a tip off its mate's usable flank (sized by the mesh) is on
   by default for every gear, external and ring alike. One rule: every default design is free of
   interference by construction, and searches shorten external tips where they must.
