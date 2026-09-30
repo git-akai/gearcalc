@@ -12,6 +12,7 @@
     ringDxf,
     ringProfile,
     solveRing,
+    type Bound,
     type GearRequest,
     type RingRequest,
     type Maybe,
@@ -178,7 +179,7 @@
   const ring = $derived(internal ? solveRing(ringRequest) : null);
   /** The pins that seat on the flanks at every position, whichever kind the
    *  tab is, as the bound the pin box is held to. */
-  const pins = $derived<[number, number] | null>(
+  const pinBound = $derived<Bound | null>(
     internal
       ? ring && "ok" in ring
         ? ring.ok.pin_diameter_range
@@ -186,9 +187,6 @@
       : "ok" in result
         ? result.ok.pin_diameter_range
         : null,
-  );
-  const pinBound = $derived(
-    pins ? { min: pins[0], max: pins[1], exclusive_min: false, exclusive_max: false } : null,
   );
 
   /** The kinds this tab may be switched to, and the note under the one it holds.
@@ -501,7 +499,9 @@
           set={(v) => (tab.pinDiameter = v)}
           step="0.05"
           bound={pinBound}
-          note={pins ? t("ui.bound_pin_diameter", { min: n(pins[0]), max: n(pins[1]) }) : null}
+          note={pinBound && pinBound.min !== null && pinBound.max !== null
+            ? t("ui.bound_pin_diameter", { min: n(pinBound.min), max: n(pinBound.max) })
+            : null}
         />
         <em>{t("ui.gear_mm")}</em>
       </label>
@@ -612,7 +612,7 @@
           </dd>
           <dt>{t("ui.gear_smallest_tooth_count")}</dt>
           <dd>
-            {r.smallest_tooth_count}
+            {r.smallest_tooth_count ?? "—"}
             <small>{t("ui.gear_below_this_tip_would_reach_inside")}</small>
           </dd>
         </dl>

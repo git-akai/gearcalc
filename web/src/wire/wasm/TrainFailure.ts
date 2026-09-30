@@ -10,9 +10,8 @@ export type TrainFailure = {
  */
 note: Note, 
 /**
- * Which part could not be built, **numbered from one**, in the order
- * `parts` deals them — the panel names it by its meshes. `None`
- * where the fault is the train's own rather than any one part's — an
- * empty train, say.
+ * Which part could not be built, by its index in `parts` — the panel
+ * names it by its meshes. `None` where the fault is the train's own
+ * rather than any one part's — an empty train, say.
  */
 part: number | null, };

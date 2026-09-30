@@ -13,6 +13,7 @@
 //! the result types carry the space for it so adding the data later is a data
 //! change rather than a redesign.
 
+use crate::auto::Bound;
 use crate::involute::{inv, inv_inverse};
 use crate::tooth::Tooth;
 
@@ -147,6 +148,14 @@ fn space_at(gear: &crate::gear::Gear, i: usize) -> Space {
     }
 }
 
+/// **The pins a range seats, as the bound a pin box is held to**: open at
+/// both ends, each end being a diameter that does not seat
+/// ([`pin_diameter_range`]).
+#[must_use]
+pub fn pin_bound((smallest, largest): (f64, f64)) -> Bound {
+    Bound::strictly(smallest, largest)
+}
+
 /// [`pin_diameter_range`] over every space of an assembled gear — the pins
 /// that measure at **every** position, as one caliper carried round.
 #[must_use]
@@ -168,8 +177,13 @@ pub fn pin_diameter_range_around(gear: &crate::gear::Gear) -> Option<(f64, f64)>
 /// interval, and each of its ends is where the verdict changes — found by
 /// bisection on the verdict itself rather than by a residual per condition,
 /// since which condition binds at each end is exactly what differs between an
-/// external gear, a ring and a helical one. Sixty halvings of a bracket a few
-/// modules wide is the full mantissa, so the ends are as sharp as the map.
+/// external gear, a ring and a helical one. The bisection halves the doubles
+/// themselves — positive doubles order as their bit patterns do — so it closes
+/// on two neighbouring doubles within 64 halvings, whatever the ends'
+/// magnitudes. Each end is the side of that bracket that does **not** seat —
+/// the largest pin too small and the smallest too large — so the interval is
+/// open at both ends and every diameter strictly inside it seats
+/// ([`pin_bound`]).
 #[must_use]
 pub fn pin_diameter_range(space: &Space) -> Option<(f64, f64)> {
     use MeasurementError::{PinTooLarge, PinTooSmall};
@@ -186,23 +200,27 @@ pub fn pin_diameter_range(space: &Space) -> Option<(f64, f64)> {
             return None;
         }
     }
-    let bisect = |mut lo: f64, mut hi: f64, below: fn(Option<MeasurementError>) -> bool| {
-        for _ in 0..64 {
-            let mid = 0.5 * (lo + hi);
-            if below(verdict(mid)) {
+    // Over the bit patterns of `0 ≤ lo < hi`: at most 64 halvings, one a bit.
+    let bisect = |lo: f64, hi: f64, below: fn(Option<MeasurementError>) -> bool| {
+        let (mut lo, mut hi) = (lo.to_bits(), hi.to_bits());
+        while hi - lo > 1 {
+            let mid = lo + (hi - lo) / 2;
+            if below(verdict(f64::from_bits(mid))) {
                 lo = mid;
             } else {
                 hi = mid;
             }
         }
-        0.5 * (lo + hi)
+        (f64::from_bits(lo), f64::from_bits(hi))
     };
+    // The largest pin too small, and the smallest too large: each end is
+    // outside the range. A space nothing is too small for opens at nought.
     let smallest = if verdict(0.0) == Some(PinTooSmall) {
-        bisect(0.0, hi, |v| v == Some(PinTooSmall))
+        bisect(0.0, hi, |v| v == Some(PinTooSmall)).0
     } else {
         0.0
     };
-    let largest = bisect(0.0, hi, |v| v != Some(PinTooLarge));
+    let largest = bisect(0.0, hi, |v| v != Some(PinTooLarge)).1;
     (smallest < largest && space.seat(0.5 * (smallest + largest)).is_ok())
         .then_some((smallest, largest))
 }
@@ -649,6 +667,34 @@ pub fn best_span_around(gear: &crate::gear::Gear) -> Result<(Span, [f64; 2]), Me
 
     best.map(|(s, range, _)| (s, range))
         .ok_or(MeasurementError::NoValidSpan)
+}
+
+/// **Over pins at every position round the gear**, or why one fails.
+///
+/// A caliper is carried round, so every start must seat its pins, by
+/// [`best_span_around`]'s rule: the first start that cannot is the answer,
+/// and a reading some starts refuse is no measurement of the gear. Every
+/// start seats exactly where the pin lies inside every space's range —
+/// inside [`pin_diameter_range_around`], as [`pin_bound`] publishes it.
+///
+/// Returns the reading at the first start and `[smallest, largest]` over
+/// every start, the same bits at both ends for an evenly cut gear.
+///
+/// # Errors
+///
+/// The first start's that fails, as [`over_pins_at`] gives it.
+pub fn over_pins_around(
+    gear: &crate::gear::Gear,
+    pin_diameter: f64,
+    pin_count: PinCount,
+) -> Result<(OverPins, [f64; 2]), MeasurementError> {
+    let first = over_pins_at(gear, pin_diameter, pin_count, 0)?;
+    let mut around = [first.nominal; 2];
+    for start in 1..gear.teeth() {
+        let nominal = over_pins_at(gear, pin_diameter, pin_count, start)?.nominal;
+        around = [around[0].min(nominal), around[1].max(nominal)];
+    }
+    Ok((first, around))
 }
 
 /// Measurement over pins at one angular position, on a gear whose teeth may

@@ -298,8 +298,9 @@ pub struct GearSummary {
     pub over_three_pins: Maybe<PinsOut>,
     /// The pin or ball diameters that seat on the flanks at every position
     /// round the gear — the bound the pin box is held to, as every other input
-    /// has one. `None` where no pin measures this gear at all.
-    pub pin_diameter_range: Option<(f64, f64)>,
+    /// has one, open at both ends ([`metrology::pin_bound`]). `None` where no
+    /// pin measures this gear at all.
+    pub pin_diameter_range: Option<gear_core::auto::Bound>,
 
     /// Classes the standard actually covers for this gear.
     pub available_classes: Vec<ClassRef>,
@@ -355,20 +356,12 @@ fn summarise(ecc: &gear_core::gear::Gear, req: &GearRequest, params: GearParams)
     // reasoning that one number would read as *the* span. That was right, and
     // the answer to it is the range rather than the silence.
     let pins = |count| match req.pin_diameter {
-        Some(d) => Maybe::from(metrology::over_pins_at(ecc, d, count, 0).map(|p| {
-            let mut lo = f64::MAX;
-            let mut hi = f64::MIN;
-            for start in 0..ecc.teeth() {
-                if let Ok(m) = metrology::over_pins_at(ecc, d, count, start) {
-                    lo = lo.min(m.nominal);
-                    hi = hi.max(m.nominal);
-                }
-            }
-            PinsOut {
+        Some(d) => Maybe::from(
+            metrology::over_pins_around(ecc, d, count).map(|(p, around)| PinsOut {
                 nominal: p.nominal,
-                around: [lo, hi],
-            }
-        })),
+                around,
+            }),
+        ),
         None => Maybe::Unavailable {
             unavailable: Note::new("ui.gear_no_pin_diameter"),
         },
@@ -416,7 +409,7 @@ fn summarise(ecc: &gear_core::gear::Gear, req: &GearRequest, params: GearParams)
         })),
         over_two_pins: pins(PinCount::Two),
         over_three_pins: pins(PinCount::Three),
-        pin_diameter_range: metrology::pin_diameter_range_around(ecc),
+        pin_diameter_range: metrology::pin_diameter_range_around(ecc).map(metrology::pin_bound),
         available_classes: available.into_iter().map(ClassRef::from_class).collect(),
         tolerance,
     }
@@ -530,34 +523,28 @@ pub struct RingSummary {
     pub generation_limit: f64,
     /// Whether the tip stays above that limit.
     pub fully_generated: bool,
-    /// The fewest teeth this design could have had and still cleared its own
-    /// base circle: `2 h_a cos β / (1 − cos α_t)`, rounded up.
+    /// The fewest teeth this design could have had and still kept its tip
+    /// off its base circle, `2 (h_a − x) cos β / (1 − cos α_t)` rounded up
+    /// ([`gear_core::ring::smallest_tooth_count`]); `None` where no count
+    /// does.
     ///
     /// Reported because it is the constraint that actually bites on internal
-    /// gears, it moves with the addendum, pressure angle and helix, and a
-    /// designer meeting it by accident should be told which margin they are on.
-    pub smallest_tooth_count: u32,
+    /// gears, it moves with the addendum, shift, pressure angle and helix, and
+    /// a designer meeting it by accident should be told which margin they are
+    /// on.
+    pub smallest_tooth_count: Option<u32>,
     /// Measurement **between** two pins or balls, the internal counterpart of
     /// the gear tab's over-pins. Two pins only, and
     /// [`gear_core::metrology::between_pins`] says why.
     pub between_pins: Maybe<PinsOut>,
     /// The pin or ball diameters that seat in this ring's spaces, as on
     /// [`GearSummary::pin_diameter_range`].
-    pub pin_diameter_range: Option<(f64, f64)>,
+    pub pin_diameter_range: Option<gear_core::auto::Bound>,
     pub clamps: Vec<gear_core::note::Note>,
 }
 
 fn ring_of(req: &RingRequest) -> gear_core::ring::Ring {
     gear_core::ring::Ring::cut_by(&req.params, &req.cutter.to_cutter())
-}
-
-fn smallest_tooth_count(params: &GearParams) -> u32 {
-    let beta = params.helix_angle.to_radians();
-    let alpha_t = (params.pressure_angle.to_radians().tan() / beta.cos()).atan();
-    let threshold = 2.0 * params.addendum * beta.cos() / (1.0 - alpha_t.cos());
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-    let out = threshold.ceil().max(1.0) as u32;
-    out
 }
 
 fn parse_ring(input: &str) -> Result<RingRequest, String> {
@@ -583,7 +570,7 @@ fn solve_ring_impl(input: &str) -> Result<String, String> {
         rim_radius: g.rim_radius(),
         generation_limit: g.generation_limit(),
         fully_generated: g.fully_generated(),
-        smallest_tooth_count: smallest_tooth_count(&req.params),
+        smallest_tooth_count: gear_core::ring::smallest_tooth_count(&req.params),
         between_pins: match req.pin_diameter {
             Some(d) => {
                 Maybe::from(metrology::between_pins(&g, d).map(|p| PinsOut {
@@ -596,7 +583,8 @@ fn solve_ring_impl(input: &str) -> Result<String, String> {
                 unavailable: Note::new("ui.gear_no_pin_diameter"),
             },
         },
-        pin_diameter_range: metrology::pin_diameter_range(&metrology::Space::of_ring(&g)),
+        pin_diameter_range: metrology::pin_diameter_range(&metrology::Space::of_ring(&g))
+            .map(metrology::pin_bound),
         clamps: g.clamps.clone(),
     };
     serde_json::to_string(&summary).map_err(|e| format!("could not encode result: {e}"))
@@ -821,10 +809,9 @@ pub struct TrainOutcome {
 pub struct TrainFailure {
     /// The message, as a key and its already-formatted values.
     pub note: gear_core::note::Note,
-    /// Which part could not be built, **numbered from one**, in the order
-    /// `parts` deals them — the panel names it by its meshes. `None`
-    /// where the fault is the train's own rather than any one part's — an
-    /// empty train, say.
+    /// Which part could not be built, by its index in `parts` — the panel
+    /// names it by its meshes. `None` where the fault is the train's own
+    /// rather than any one part's — an empty train, say.
     pub part: Option<u32>,
 }
 
@@ -892,7 +879,7 @@ fn solve_train_impl(input: &str) -> Result<String, String> {
         },
         Err(e) => {
             let part = match &e {
-                gear_core::train::TrainError::InPart { part, .. } => u32::try_from(*part + 1).ok(),
+                gear_core::train::TrainError::InPart { part, .. } => u32::try_from(*part).ok(),
                 _ => None,
             };
             TrainOutcome {
@@ -2442,6 +2429,81 @@ mod tests {
         );
     }
 
+    /// **Over pins round a gear is served only where every start measures.**
+    /// A caliper is carried round, so a reading that some starts refuse is
+    /// no measurement of the gear: the served value is present exactly when
+    /// every start seats its pins, and its range is every start's. Swept
+    /// over pins across the seating range of eccentric gears (a varying
+    /// shift, a compensated index, a shifted mean) and a concentric one.
+    #[test]
+    fn over_pins_is_served_only_where_every_start_measures() {
+        use gear_core::metrology::{over_pins_at, PinCount};
+        let (mut served_count, mut refused_count) = (0, 0);
+        for (teeth, profile_shift, angular_shift, index_offset) in [
+            (17, 0.0, 0.4, 0.0),
+            (20, 0.0, 1.0, 1.0),
+            (23, 0.2, 0.5, 0.0),
+            (17, 0.0, 0.0, 0.0),
+        ] {
+            let params = GearParams {
+                teeth,
+                profile_shift,
+                angular_shift,
+                index_offset,
+                ..GearParams::default()
+            };
+            let gear = gear_core::gear::Gear::new(params);
+            for d in (0..=60).map(|i| 1.0 + 0.02 * f64::from(i)).chain([1.5236]) {
+                let req = GearRequest {
+                    params,
+                    pin_diameter: Some(d),
+                    tolerance_class: None,
+                    chord_tolerance: None,
+                    reference_circles: None,
+                    working_depth: None,
+                    mate: None,
+                    eccentric_throw: None,
+                };
+                let summary = summarise(&gear, &req, params);
+                for (served, count) in [
+                    (summary.over_two_pins, PinCount::Two),
+                    (summary.over_three_pins, PinCount::Three),
+                ] {
+                    let starts: Vec<_> = (0..gear.teeth())
+                        .map(|s| over_pins_at(&gear, d, count, s))
+                        .collect();
+                    let tag = format!("z{teeth} x{profile_shift} dx{angular_shift} d{d} {count:?}");
+                    match served {
+                        Maybe::Value(p) => {
+                            assert!(
+                                starts.iter().all(Result::is_ok),
+                                "{tag}: served, some refused"
+                            );
+                            let nominals: Vec<f64> =
+                                starts.iter().flatten().map(|p| p.nominal).collect();
+                            let lo = nominals.iter().copied().fold(f64::INFINITY, f64::min);
+                            let hi = nominals.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+                            assert_eq!(p.around, [lo, hi], "{tag}");
+                            served_count += 1;
+                        }
+                        Maybe::Unavailable { .. } => {
+                            assert!(
+                                !starts.iter().all(Result::is_ok),
+                                "{tag}: refused, all seat"
+                            );
+                            refused_count += 1;
+                        }
+                    }
+                }
+            }
+        }
+        assert_eq!(
+            (served_count, refused_count),
+            (280, 216),
+            "readings served and refused"
+        );
+    }
+
     /// **Sizing by the centre-distance throw is the profile read backwards, and
     /// nothing downstream can tell.**
     ///
@@ -2587,8 +2649,6 @@ mod tests {
         );
         assert!(tip < pitch && pitch < root, "a ring's radii run inward");
         assert!(v["junction_radius"].as_f64().unwrap() > tip);
-        // The constraint that actually bites on internal gears, reported.
-        assert_eq!(v["smallest_tooth_count"].as_u64().unwrap(), 34);
 
         // **At the density that was asked for.** `> 200` passed while the
         // outline was collapsing to seven points a tooth, because 60 teeth of
@@ -2662,6 +2722,60 @@ mod tests {
             ring_profile_impl(&shifted, 60).unwrap().len() > 200,
             "a shifted ring still has an outline"
         );
+    }
+
+    /// **The fewest teeth the ring tab serves is where the cut stops
+    /// clamping its tip onto the base circle**, at every shift. The served
+    /// count `n` builds with no base-circle tip clamp and `n − 1` builds
+    /// with one, over shift, addendum, pressure angle and helix; the grid's
+    /// counts stay below the thin-tooth end, whose clamp would hide this
+    /// one.
+    #[test]
+    fn the_served_fewest_ring_teeth_is_where_the_tip_clears_the_base_circle() {
+        use gear_core::note::key;
+        let mut below = 0;
+        for x in [-0.5, -0.3, 0.0, 0.3, 0.5, 0.8] {
+            for addendum in [0.6, 0.8, 1.0] {
+                for alpha in [14.5, 20.0, 25.0] {
+                    for beta in [0.0, 30.0] {
+                        let params = GearParams {
+                            teeth: 60,
+                            profile_shift: x,
+                            addendum,
+                            pressure_angle: alpha,
+                            helix_angle: beta,
+                            ..GearParams::default()
+                        };
+                        let req = serde_json::json!({
+                            "params": params,
+                            "cutter": {"teeth": 20, "addendum": 1.25, "tip_round": 0.2},
+                        });
+                        let v: serde_json::Value =
+                            serde_json::from_str(&solve_ring_impl(&req.to_string()).unwrap())
+                                .unwrap();
+                        let n = u32::try_from(v["smallest_tooth_count"].as_u64().unwrap()).unwrap();
+                        let at_base = |teeth: u32| {
+                            gear_core::ring::Ring::cut_by(
+                                &GearParams { teeth, ..params },
+                                &gear_core::ring::Cutter::default(),
+                            )
+                            .clamps
+                            .iter()
+                            .any(|c| c.is(key::CLAMP_RING_TIP_AT_BASE))
+                        };
+                        let tag = format!("x={x} h_a={addendum} α={alpha} β={beta}: n={n}");
+                        assert!(!at_base(n), "{tag} is clamped onto its base circle");
+                        if n > 1 {
+                            assert!(at_base(n - 1), "{tag}: n − 1 clears its base circle too");
+                            below += 1;
+                        }
+                    }
+                }
+            }
+        }
+        // Every case whose addendum reaches past its shift has a count below
+        // it to fail at: all 108 but the 12 at x = 0.8 with h_a ≤ 0.8.
+        assert_eq!(below, 96, "cases with a count below the fewest");
     }
 
     /// **A planetary stage crosses the boundary with nothing added for it.**
@@ -3438,6 +3552,36 @@ mod tests {
         }
     }
 
+    /// **An axis's carrier crosses in one encoding**: the axis list the
+    /// panel groups by says what the graph says, ground as body 0, on every
+    /// preset — a planet's axis its carrier's body, a fixed axis 0.
+    #[test]
+    fn an_axis_group_is_carried_as_its_axis_is() {
+        let d: serde_json::Value = serde_json::from_str(&defaults_impl().unwrap()).unwrap();
+        let mut carried = 0;
+        for entry in d["presets"].as_array().unwrap() {
+            let mut train = d["train"].clone();
+            train["shape"] = entry["shape"].clone();
+            let req = serde_json::json!({ "train": train }).to_string();
+            let v: serde_json::Value =
+                serde_json::from_str(&solve_train_impl(&req).unwrap()).unwrap();
+            let axes = train["shape"]["axes"].as_array().unwrap();
+            let groups = v["groupings"]["axes"].as_array().unwrap();
+            assert_eq!(groups.len(), axes.len(), "{}", entry["preset"]);
+            for (group, axis) in groups.iter().zip(axes) {
+                assert_eq!(
+                    group["carried_by"], axis["carried_by"],
+                    "{}",
+                    entry["preset"]
+                );
+                carried += usize::from(axis["carried_by"] != 0);
+            }
+        }
+        // The epicyclic presets' planet axes: a planetary's, a Wolfrom's, a
+        // compound set's, a planocentric's and a meshed-planet set's two.
+        assert_eq!(carried, 6, "carried axes over the presets");
+    }
+
     #[test]
     fn a_train_that_cannot_be_solved_says_why() {
         let bad = r#"{"train":{"load_cases": [
@@ -3454,8 +3598,8 @@ mod tests {
         assert_eq!(v["result"]["cases"].as_array().unwrap().len(), 3);
         assert_eq!(v["result"]["cases"][0]["solved"], false);
 
-        // ...and where a part is to blame, it is named — numbered from one,
-        // so the reader is not left counting from zero.
+        // ...and where a part is to blame, it is named by its place in
+        // `parts`, the one numbering every part crosses in.
         let sound: serde_json::Value = serde_json::from_str(&defaults_impl().unwrap()).unwrap();
         let pushed = edit_train_impl(
             &serde_json::json!({
@@ -3475,7 +3619,12 @@ mod tests {
             v["result"].is_null(),
             "a mesh at no distance is not a train"
         );
-        assert_eq!(v["failure"]["part"], 2, "the second part is the one to fix");
+        let part = usize::try_from(v["failure"]["part"].as_u64().unwrap()).unwrap();
+        assert_eq!(
+            v["parts"][part]["distances"],
+            serde_json::json!([1]),
+            "the part named is the one whose distance is at nought: {v}"
+        );
         assert!(
             v["failure"]["note"]["key"]
                 .as_str()

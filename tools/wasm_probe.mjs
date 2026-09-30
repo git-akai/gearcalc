@@ -85,6 +85,29 @@ const out = {
   solve_ring: call("solve_ring", () => JSON.parse(w.solve_ring(ringJson))),
   ring_profile: call("ring_profile", () => Array.from(w.ring_profile(ringJson, 24))),
   export_ring_dxf: call("export_ring_dxf", () => w.export_ring_dxf(ringJson)),
+  // **The fewest teeth a ring could have, with its shift**: the tip clears
+  // the base circle at fewer teeth as the shift moves it out, and at more
+  // as it moves in.
+  ring_fewest_teeth: call("solve_ring", () =>
+    [-0.3, 0, 0.5].map((x) => [
+      x,
+      JSON.parse(w.solve_ring(JSON.stringify({ ...ring, params: { ...ring.params, profile_shift: x } })))
+        .smallest_tooth_count,
+    ]),
+  ),
+  // **Over pins round an eccentric gear, every start or none**: a pin two
+  // starts refuse is no reading of the gear, and the pins every start
+  // seats are the bound its box is held to.
+  eccentric_pins: call("solve_gear", () =>
+    [1.5236, 1.8].map((d) => {
+      const v = JSON.parse(
+        w.solve_gear(
+          JSON.stringify({ params: { ...gear.params, teeth: 17, angular_shift: 0.4 }, pin_diameter: d }),
+        ),
+      );
+      return [d, v.over_two_pins, v.over_three_pins, v.pin_diameter_range];
+    }),
+  ),
   // **Over-determined on purpose, on every kind**, so the answer is the relief
   // rather than a stage that needed none. Every input the kind has is pinned
   // and the first one is declared as the freedom just touched, which is the one

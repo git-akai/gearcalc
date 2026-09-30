@@ -220,12 +220,8 @@ impl Ring {
         crate::testing::work::ring();
         let mut clamps = Vec::new();
         let beta = params.helix_angle.to_radians();
-        // Guarded as `Tooth` guards it: at or below the floor the base circle
-        // meets the pitch circle and the involute degenerates.
-        let alpha_floor = guard::MIN_PRESSURE_ANGLE_DEG.to_radians();
-        let mut alpha_n = params.pressure_angle.to_radians();
-        if alpha_n <= alpha_floor {
-            alpha_n = alpha_floor;
+        let (alpha_n, raised) = cut_pressure_angle(params);
+        if raised {
             clamps.push(Note::new(key::CLAMP_PRESSURE_ANGLE_RAISED).number(
                 "degrees",
                 guard::MIN_PRESSURE_ANGLE_DEG,
@@ -857,6 +853,52 @@ impl Ring {
     }
 }
 
+/// The normal pressure angle a ring is cut at, radians, and whether the
+/// floor raised it. Guarded as `Tooth` guards it: at or below the floor the
+/// base circle meets the pitch circle and the involute degenerates.
+fn cut_pressure_angle(params: &GearParams) -> (f64, bool) {
+    let floor = guard::MIN_PRESSURE_ANGLE_DEG.to_radians();
+    let asked = params.pressure_angle.to_radians();
+    if asked <= floor {
+        (floor, true)
+    } else {
+        (asked, false)
+    }
+}
+
+/// **The fewest teeth this ring could have and keep its tip off its base
+/// circle**: the count from which the cut no longer sets the tip on it
+/// ([`key::CLAMP_RING_TIP_AT_BASE`]). The tip sits at `r − m(h_a − x)` and
+/// the base circle at `r cos α_t`, with `r = z m / (2 cos β)`, so the tip
+/// clears it from
+///
+/// ```text
+/// z ≥ 2 (h_a − x) cos β / (1 − cos α_t)
+/// ```
+///
+/// The module cancels and the shift does not: a shift moves the tool out,
+/// which raises the tip, so fewer teeth clear. One where the addendum is no
+/// taller than the shift, since every count clears then.
+///
+/// The base circle's bound only. A large ring's tooth can come to a point
+/// first ([`key::CLAMP_RING_TIP_RAISED`]), and at these counts the flank
+/// need not be generated to the tip ([`key::CLAMP_RING_FLANK_UNGENERATED`]).
+/// `None` where no count a `u32` holds clears it, or the inputs are not
+/// numbers.
+#[must_use]
+pub fn smallest_tooth_count(params: &GearParams) -> Option<u32> {
+    let beta = params.helix_angle.to_radians();
+    let alpha_t = crate::plane::transverse_pressure_angle(cut_pressure_angle(params).0, beta);
+    let fewest = (2.0 * (params.addendum - params.profile_shift) * beta.cos()
+        / (1.0 - alpha_t.cos()))
+    .ceil();
+    if fewest <= 1.0 {
+        return Some(1);
+    }
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    (fewest <= f64::from(u32::MAX)).then_some(fewest as u32)
+}
+
 /// The largest addendum, in modules, at which a ring's tooth is at least
 /// `min_tip_width` wide at its tip: [`crate::auto::addendum_for_tip_width`]
 /// read on a ring, whose tooth narrows inward, so that its tip is where it is
@@ -1385,67 +1427,105 @@ mod tests {
 
     /// **The smallest ring is a function of the design, not a number.**
     ///
-    /// A ring's tip sits at `r − h_a` and its base circle at `r cos α_t`, so the
-    /// tip clears the base circle only while
+    /// A ring's tip sits at `r − m(h_a − x)` and its base circle at
+    /// `r cos α_t`, so the tip clears the base circle only while
     ///
     /// ```text
-    /// z > 2 h_a cos β / (1 − cos α_t)
+    /// z ≥ 2 (h_a − x) cos β / (1 − cos α_t)
     /// ```
     ///
-    /// Three things move it and one does not. A **shallower tooth** allows far
-    /// fewer teeth; a **larger pressure angle** allows fewer, because the base
-    /// circle drops away from the pitch circle; a **helix** allows fewer, since
-    /// the transverse module grows with it. The **module cancels**, which is
-    /// right — this is a statement about tooth counts.
+    /// Four things move it and one does not. A **shallower tooth** allows far
+    /// fewer teeth; a **positive shift** allows fewer, since it moves the tool
+    /// and so the tip outward; a **larger pressure angle** allows fewer,
+    /// because the base circle drops away from the pitch circle; a **helix**
+    /// allows fewer, since the transverse module grows with it. The **module
+    /// cancels**, which is right — this is a statement about tooth counts.
     ///
-    /// The familiar "internal gears need at least about 34 teeth" is the single
-    /// row of this table at a full addendum and 20°, and quoting it as a rule
-    /// would have been wrong for every other row.
+    /// The familiar "internal gears need at least about 34 teeth" is the
+    /// single row of this table at a full addendum, no shift and 20°, and
+    /// quoting it as a rule would have been wrong for every other row.
     #[test]
     fn the_smallest_ring_follows_the_design_rather_than_a_rule_of_thumb() {
         let cases = [
-            // addendum, α_n°, β°, the count the geometry gives
-            (1.0, 20.0, 0.0, 34u32),
-            (0.8, 20.0, 0.0, 27),
-            (0.6, 20.0, 0.0, 20),
-            (1.0, 25.0, 0.0, 22),
-            (1.0, 14.5, 0.0, 63),
-            (1.0, 20.0, 30.0, 23),
+            // addendum, shift, α_n°, β°, the count the geometry gives
+            (1.0, 0.0, 20.0, 0.0, 34u32),
+            (0.8, 0.0, 20.0, 0.0, 27),
+            (0.6, 0.0, 20.0, 0.0, 20),
+            (1.0, 0.0, 25.0, 0.0, 22),
+            (1.0, 0.0, 14.5, 0.0, 63),
+            (1.0, 0.0, 20.0, 30.0, 23),
+            (1.0, 0.5, 20.0, 0.0, 17),
+            (1.0, -0.3, 20.0, 0.0, 44),
+            (1.0, 0.8, 20.0, 0.0, 7),
+            (0.8, 0.8, 20.0, 0.0, 1),
         ];
-        for (addendum, alpha_deg, beta_deg, expected) in cases {
-            let beta = f64::to_radians(beta_deg);
-            let alpha_t = crate::plane::transverse_pressure_angle(f64::to_radians(alpha_deg), beta);
-            let threshold = 2.0 * addendum * beta.cos() / (1.0 - alpha_t.cos());
-            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-            let smallest = threshold.ceil() as u32;
-            assert_eq!(
-                smallest, expected,
-                "a={addendum} α={alpha_deg} β={beta_deg}: the formula gives {threshold}"
-            );
-
-            let build = |teeth: u32| {
-                Ring::cut_by(
-                    &GearParams {
-                        teeth,
-                        addendum,
-                        pressure_angle: alpha_deg,
-                        helix_angle: beta_deg,
-                        ..Default::default()
-                    },
-                    &Cutter::default(),
-                )
+        for (addendum, profile_shift, pressure_angle, helix_angle, expected) in cases {
+            let p = GearParams {
+                addendum,
+                profile_shift,
+                pressure_angle,
+                helix_angle,
+                ..Default::default()
             };
-            let clamped = |r: &Ring| r.clamps.iter().any(|c| c.is(key::CLAMP_RING_TIP_AT_BASE));
-            assert!(
-                !clamped(&build(smallest)),
-                "a={addendum} α={alpha_deg} β={beta_deg}: z={smallest} should fit"
-            );
-            assert!(
-                clamped(&build(smallest - 1)),
-                "a={addendum} α={alpha_deg} β={beta_deg}: z={} should not",
-                smallest - 1
+            assert_eq!(
+                smallest_tooth_count(&p),
+                Some(expected),
+                "h_a={addendum} x={profile_shift} α={pressure_angle} β={helix_angle}"
             );
         }
+    }
+
+    /// **The fewest ring teeth is where the cut stops setting the tip on the
+    /// base circle**: at the count, no base-circle clamp; one fewer, the
+    /// clamp. Over shift, addendum, pressure angle and helix, at counts
+    /// below the thin-tooth end, whose clamp would stand in for this one.
+    #[test]
+    fn the_fewest_ring_teeth_is_where_the_cut_stops_clamping_the_tip() {
+        let at_base = |p: GearParams| {
+            Ring::cut_by(&p, &Cutter::default())
+                .clamps
+                .iter()
+                .any(|c| c.is(key::CLAMP_RING_TIP_AT_BASE))
+        };
+        let mut below = 0;
+        for profile_shift in [-0.5, -0.3, 0.0, 0.3, 0.5, 0.8] {
+            for addendum in [0.6, 0.8, 1.0] {
+                for pressure_angle in [14.5, 20.0, 25.0] {
+                    for helix_angle in [0.0, 30.0] {
+                        let p = GearParams {
+                            profile_shift,
+                            addendum,
+                            pressure_angle,
+                            helix_angle,
+                            ..Default::default()
+                        };
+                        let n = smallest_tooth_count(&p).expect("a count");
+                        let tag = format!(
+                            "x={profile_shift} h_a={addendum} α={pressure_angle} β={helix_angle}: n={n}"
+                        );
+                        assert!(!at_base(GearParams { teeth: n, ..p }), "{tag}");
+                        if n > 1 {
+                            assert!(at_base(GearParams { teeth: n - 1, ..p }), "{tag}");
+                            below += 1;
+                        }
+                    }
+                }
+            }
+        }
+        // All 108 but the 12 at x = 0.8 with h_a ≤ 0.8, whose every count clears.
+        assert_eq!(below, 96);
+        // The floor on the pressure angle is the cut's: at nought the count is
+        // the one the floor gives, not a division by nought.
+        let flat = GearParams {
+            pressure_angle: 0.0,
+            ..Default::default()
+        };
+        let floor = GearParams {
+            pressure_angle: guard::MIN_PRESSURE_ANGLE_DEG,
+            ..Default::default()
+        };
+        assert_eq!(smallest_tooth_count(&flat), smallest_tooth_count(&floor));
+        assert!(smallest_tooth_count(&flat).is_some());
     }
 
     /// **The flank and the fillet actually meet.** That is what the phase buys:

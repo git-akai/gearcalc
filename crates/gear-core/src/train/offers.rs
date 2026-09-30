@@ -429,7 +429,7 @@ mod tests {
     #[test]
     fn a_gear_meshing_in_two_frames_is_refused() {
         let t = cased(vec![Preset::Spur.build(), Preset::Planetary.build()]);
-        let sun = t.member(1, 0);
+        let sun = t.member(1, 0).expect("a set's sun");
         let edit = Edit::AddGear {
             mate: sun,
             on: Place::Body(1),

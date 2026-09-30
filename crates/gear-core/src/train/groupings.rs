@@ -43,8 +43,10 @@ pub struct Centre {
 )]
 pub struct AxisGroup {
     pub axis: usize,
-    /// The body that carries it round, where one does — a planet's axis.
-    pub carried_by: Option<usize>,
+    /// The body that carries it round — a planet's axis's carrier — or
+    /// ground, 0, where none does: the graph's own encoding
+    /// ([`super::shape::Axis::carried_by`]).
+    pub carried_by: usize,
     /// How many copies stand round the carrier.
     pub count: u32,
     /// The bodies on it, in the graph's order.
@@ -120,7 +122,7 @@ impl Train {
         let axes = (0..s.axes.len())
             .map(|a| AxisGroup {
                 axis: a,
-                carried_by: (s.axes[a].carried_by != GROUND).then_some(s.axes[a].carried_by),
+                carried_by: s.axes[a].carried_by,
                 count: s.axes[a].count,
                 bodies: s
                     .bodies

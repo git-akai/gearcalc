@@ -6,9 +6,11 @@ import type { AxisBody } from "./AxisBody";
  */
 export type AxisGroup = { axis: number, 
 /**
- * The body that carries it round, where one does — a planet's axis.
+ * The body that carries it round — a planet's axis's carrier — or
+ * ground, 0, where none does: the graph's own encoding
+ * ([`super::shape::Axis::carried_by`]).
  */
-carried_by: number | null, 
+carried_by: number, 
 /**
  * How many copies stand round the carrier.
  */

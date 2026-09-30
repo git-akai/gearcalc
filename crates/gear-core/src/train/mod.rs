@@ -12452,6 +12452,34 @@ mod tests {
     }
 }
 
+/// **A part's member by the graph's index, where the train has it**: every
+/// member of every part of a chain, and nothing past the end of a part or
+/// of the parts — an index the train lacks is `None`, not a panic.
+#[cfg(test)]
+#[test]
+fn a_parts_member_is_the_graphs_where_it_has_one() {
+    use arrangements::Preset;
+    let t = Train::chained(
+        vec![Preset::Spur.build(), Preset::Planetary.build()],
+        |_| Vec::new(),
+    );
+    let parts = t.parts();
+    let mut found = 0;
+    for (k, part) in parts.iter().enumerate() {
+        for (j, &member) in part.members.iter().enumerate() {
+            assert_eq!(t.member(k, j), Some(member));
+            found += 1;
+        }
+        assert_eq!(t.member(k, part.members.len()), None);
+    }
+    assert_eq!(
+        found,
+        2 + 3,
+        "a pair's two gears and a set's sun, planet and ring"
+    );
+    assert_eq!(t.member(parts.len(), 0), None);
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod a_path_is_what_it_crosses {

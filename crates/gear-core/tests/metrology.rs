@@ -1269,3 +1269,50 @@ fn every_tool_has_a_tip_and_every_space_a_smallest_pin() {
         }
     }
 }
+
+/// **Over pins round a gear reads exactly where its published bound
+/// admits.** A caliper is carried round, so `over_pins_around` reads only
+/// where every start seats its pins, and those pins are the open interval
+/// the bound publishes: at each end the end itself is refused and the next
+/// double in is read, every diameter between is read, and each outside is
+/// refused — for eccentric gears (a varying shift, a compensated index, a
+/// shifted mean) and concentric ones, over two pins and three. A bound that
+/// closed on the bisection's midpoint would admit one of its own ends.
+#[test]
+fn over_pins_around_reads_exactly_where_its_bound_admits() {
+    use gear_core::gear::Gear;
+    use gear_core::metrology::{
+        over_pins_around, over_pins_at, pin_bound, pin_diameter_range_around,
+    };
+    let mut asked = 0;
+    for (teeth, profile_shift, angular_shift, index_offset) in [
+        (17, 0.0, 0.4, 0.0),
+        (20, 0.0, 1.0, 1.0),
+        (23, 0.2, 0.5, 0.0),
+        (17, 0.0, 0.0, 0.0),
+        (40, -0.3, 0.0, 0.0),
+    ] {
+        let gear = Gear::new(GearParams {
+            teeth,
+            profile_shift,
+            angular_shift,
+            index_offset,
+            ..GearParams::default()
+        });
+        let bound = pin_bound(pin_diameter_range_around(&gear).expect("a pin seats"));
+        let (lo, hi) = (bound.min.unwrap(), bound.max.unwrap());
+        let inside = (1..20).map(|i| lo + (hi - lo) * f64::from(i) / 20.0);
+        let ends = [lo, lo.next_up(), hi.next_down(), hi, 0.9 * lo, 1.1 * hi];
+        for d in inside.chain(ends) {
+            for count in [PinCount::Two, PinCount::Three] {
+                let read = over_pins_around(&gear, d, count);
+                let every = (0..gear.teeth()).all(|s| over_pins_at(&gear, d, count, s).is_ok());
+                let tag = format!("z{teeth} x{profile_shift} dx{angular_shift} d={d:e} {count:?}");
+                assert_eq!(read.is_ok(), bound.admits(d), "{tag}");
+                assert_eq!(read.is_ok(), every, "{tag}");
+                asked += 1;
+            }
+        }
+    }
+    assert_eq!(asked, 5 * 25 * 2);
+}

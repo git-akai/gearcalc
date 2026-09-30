@@ -1526,7 +1526,12 @@ deeper in a ring's — so every failure is off one end of that map: sinking
 toward the root is a pin too *small*, riding past the tip one too *large*, and
 the diameters that seat are one interval. That interval is read off the same
 verdict by bisection (`metrology::pin_diameter_range`, the intersection over
-every space of an eccentric gear) and is the bound the pin box shows.
+every space of an eccentric gear), each end the neighbouring diameter that
+does not seat, and is the bound the pin box shows, open at both ends
+(`metrology::pin_bound`). An eccentric gear is measured round the revolution
+only where every start seats its pins (`metrology::over_pins_around`) — a
+caliper is carried round — which is exactly where the pin is inside that
+bound; elsewhere the reading is refused with the first start's reason.
 Three pins are external only — inside a bore neither the odd-count problem nor
 the datum problem arises.
 
@@ -1689,11 +1694,18 @@ gives `fillet: None` and every consumer answers it.
 ### Limits
 
 ```text
-smallest ring       z > 2 h_a cos β / (1 − cos α_t)
+smallest ring       z ≥ 2 (h_a − x) cos β / (1 − cos α_t)
 generation limit    deepest generated radius = √(r_b² + (a sin α_t)²)
 space closes        inv α = π/z − ψ_b          root truncated at r_b/cos α
 tooth runs out      inv α = −ψ_b               tip raised to r_b/cos α
 ```
+
+The first is the base circle's bound alone (`ring::smallest_tooth_count`,
+which the ring tab shows): below it the tip is set on the base circle. A
+positive shift moves the tool and the tip outward, so it lowers the count —
+34 teeth at a full addendum and 20° unshifted, 17 at `x = 0.5`, 44 at
+`x = −0.3`. At that count the tooth may still run out at a large `z`, and the
+flank need not be generated to the tip.
 
 The last two are one guard at the two ends of a ring's tooth, and both are the
 external gear's pointed-tooth cap read on a ring. Its **tooth** narrows inward,

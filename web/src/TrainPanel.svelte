@@ -538,7 +538,7 @@
              power and so has no row of its own in the flow, and this line
              is where the flow says it is, so it is where its workspace, and
              its Release, are reached from. -->
-        {#each axes.filter((a) => a.carried_by !== null) as a (a.axis)}
+        {#each axes.filter((a) => a.carried_by !== 0) as a (a.axis)}
           {#each a.bodies as b (b.body)}
             <button class="line" class:sel={isSelected({ body: b.body })} onclick={() => select({ body: b.body })}>
               {t("ui.train_junction_planets", { body: bodyName(b.body), count: String(a.count) })} · {bodyInCase(b.body)}
@@ -586,7 +586,7 @@
   {#each result.groupings.axes as a (a.axis)}
     <button class="axishead" class:sel={isSelected({ axis: a.axis })} onclick={() => select({ axis: a.axis })}>
       <span class="name">{axisLabel(a.axis)}</span>
-      {#if a.carried_by !== null}<span class="chip">{t("ui.train_carried_by_body", { body: bodyName(a.carried_by) })}</span>{/if}
+      {#if a.carried_by !== 0}<span class="chip">{t("ui.train_carried_by_body", { body: bodyName(a.carried_by) })}</span>{/if}
       {#if a.count > 1}<span class="chip">{t("ui.train_axis_count", { count: String(a.count) })}</span>{/if}
     </button>
     {#each a.bodies as b (b.body)}
@@ -832,7 +832,7 @@
   {@const axis = graph.axes[a]}
   {@const group = result.groupings.axes[a]}
   <h4 class="section-heading">{axisLabel(a)}</h4>
-  {#if group?.carried_by != null}
+  {#if group !== undefined && group.carried_by !== 0}
     <div class="grid shared">
       <label>
         <span>{t("ui.train_planets")}</span>
@@ -2198,7 +2198,7 @@
           {#if failure}
             <li class="warn">
               {#if failure.part !== null}
-                <button class="link" onclick={() => showPart(failure.part! - 1)}>{partName(failure.part - 1)}</button>:
+                <button class="link" onclick={() => showPart(failure.part!)}>{partName(failure.part)}</button>:
               {/if}
               {note(failure.note)}
             </li>

@@ -237,10 +237,11 @@ impl Train {
     }
 
     /// **A part's member by the graph's index** — how a fixture changes a
-    /// part's gear, the train being one list of them.
+    /// part's gear, the train being one list of them — where the train has
+    /// that part and the part that member.
     #[must_use]
-    pub fn member(&self, part: usize, member: usize) -> usize {
-        self.parts()[part].members[member]
+    pub fn member(&self, part: usize, member: usize) -> Option<usize> {
+        self.parts().get(part)?.members.get(member).copied()
     }
 
     /// The largest body number anything in the train names — the graph, a
