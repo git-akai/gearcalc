@@ -74,8 +74,7 @@ fn form_factor_converges_to_the_rack_limit() {
         }
 
         // At four thousand teeth the gear is a rack to within a fraction of a
-        // percent, and every ingredient must match, not just the result:
-        // the axial term too.
+        // percent, and every ingredient must match, not just the result.
         let g = Tooth::new(GearParams {
             teeth: 4000,
             pressure_angle: alpha,
@@ -98,16 +97,6 @@ fn form_factor_converges_to_the_rack_limit() {
             (sec.form_factor - want_y).abs() < 5e-3,
             "α={alpha}: Y_F {} vs rack {want_y}",
             sec.form_factor
-        );
-        // The axial term: the along-tooth part of the normal load
-        // `F_t / cos α_n`, which leans `α` at the rack's tip corner, spread
-        // over the chord.
-        let a = alpha.to_radians();
-        let want_axial = a.sin() / (want_s * a.cos());
-        assert!(
-            (sec.axial_compression - want_axial).abs() < 5e-3,
-            "α={alpha}: axial {} vs rack {want_axial}",
-            sec.axial_compression
         );
         println!(
             "α={alpha:>5} ρ={rho}: Y_F {:.6} vs rack limit {want_y:.6}",
@@ -959,13 +948,36 @@ fn each_curve_offers_its_least_and_the_highest_rated_governs() {
     use gear_core::ring::{Cutter, Ring};
     use gear_core::strength::{root_section_with, root_sections, RootStressModel, ToothOutline};
 
-    /// The least of `x²/(y_v − y)` on one curve, its dips and ends, and the
-    /// largest coordinate seen.
-    fn least(curve: &dyn Fn(f64) -> [f64; 2], lo: f64, hi: f64, vertex: f64) -> (Option<f64>, f64) {
+    /// The least of `x²/(y_v − y)` on one curve, its dips and ends; the
+    /// largest coordinate seen; and whether the least lies beside the vertex's
+    /// height.
+    ///
+    /// A point at or above the vertex has no section, and the measure grows
+    /// without bound as a point on the curve rises to it (`x` stays positive
+    /// there). So such a point stands for an unbounded measure, not for no
+    /// value: a least between the last point below the vertex and the vertex
+    /// itself is bracketed on that side by construction, however few samples
+    /// fall under the vertex. A point on or past the centreline has no chord
+    /// and is no candidate. A dip is closed by golden section, where an
+    /// unbounded measure is simply the larger.
+    fn least(
+        curve: &dyn Fn(f64) -> [f64; 2],
+        lo: f64,
+        hi: f64,
+        vertex: f64,
+    ) -> (Option<f64>, f64, bool) {
         let ratio = |p: f64| {
             let q = curve(p);
-            (q[1] < vertex && q[0] > 0.0).then(|| q[0] * q[0] / (vertex - q[1]))
+            (q[0] > 0.0).then(|| {
+                if q[1] < vertex {
+                    q[0] * q[0] / (vertex - q[1])
+                } else {
+                    f64::INFINITY
+                }
+            })
         };
+        // For the golden section: a point with no chord is no least either.
+        let unbounded = |p: f64| ratio(p).unwrap_or(f64::INFINITY);
         let n = 800;
         let at = |i: usize| lo + (hi - lo) * i as f64 / n as f64;
         let mut scale = 0.0_f64;
@@ -978,31 +990,42 @@ fn each_curve_offers_its_least_and_the_highest_rated_governs() {
             .collect();
         // Both ends; the flank's tip end is under the vertex only by rounding,
         // and the caller asserts it is not.
-        let mut out = vec![vals[0], vals[n]];
+        let mut out: Vec<(f64, bool)> = [vals[0], vals[n]]
+            .into_iter()
+            .flatten()
+            .map(|v| (v, false))
+            .collect();
         for i in 1..n {
             let (Some(a), Some(b), Some(c)) = (vals[i - 1], vals[i], vals[i + 1]) else {
                 continue;
             };
-            if !(b <= a && b <= c) || (b == a && b == c) {
+            // A dip: finite, no higher than either neighbour, and not flat.
+            if !b.is_finite() || b > a || b > c || (b == a && b == c) {
                 continue;
             }
             let g = (5.0_f64.sqrt() - 1.0) / 2.0;
             let (mut l, mut h) = (at(i - 1), at(i + 1));
             while h - l > f64::EPSILON.sqrt() * l.abs().max(h.abs()).max(1e-3) {
                 let (x1, x2) = (h - g * (h - l), l + g * (h - l));
-                if ratio(x1) <= ratio(x2) {
+                if unbounded(x1) <= unbounded(x2) {
                     h = x2;
                 } else {
                     l = x1;
                 }
             }
-            out.push(ratio(0.5 * (l + h)));
+            let beside_vertex = a.is_infinite() || c.is_infinite();
+            out.push((unbounded(0.5 * (l + h)), beside_vertex));
         }
-        (out.into_iter().flatten().reduce(f64::min), scale)
+        let best = out
+            .into_iter()
+            .filter(|(v, _)| v.is_finite())
+            .reduce(|p, q| if q.0 < p.0 { q } else { p });
+        (best.map(|b| b.0), scale, best.is_some_and(|b| b.1))
     }
 
     let model = RootStressModel::DolanBroghamer;
     let (mut checked, mut rings, mut flank_governs, mut at_an_end, mut dropped) = (0, 0, 0, 0, 0);
+    let (mut beside_vertex, mut apex) = (0, 0);
     let mut members: Vec<(String, Box<dyn ToothOutline>)> = Vec::new();
     for teeth in [6_u32, 9, 12, 20, 30, 40, 150] {
         for (x, alpha, h_a, rho) in [
@@ -1021,6 +1044,23 @@ fn each_curve_offers_its_least_and_the_highest_rated_governs() {
                     pressure_angle: alpha,
                     addendum: h_a,
                     root_radius: rho,
+                    ..Default::default()
+                })),
+            ));
+        }
+    }
+    // Tips whose land is closing: tip-loaded, the flank's least sits within
+    // the last few hundredths of a percent of the flank under the vertex (z 9
+    // x 0.505 rates 15.44 there and 0.508 rates 69.6), where a search that
+    // stops short of the vertex reads the fillet's instead.
+    for teeth in [9_u32, 12] {
+        for x in [0.505_f64, 0.508] {
+            members.push((
+                format!("z{teeth} x{x} 25° h_a1 ρ0.38"),
+                Box::new(Tooth::new(GearParams {
+                    teeth,
+                    profile_shift: x,
+                    pressure_angle: 25.0,
                     ..Default::default()
                 })),
             ));
@@ -1056,12 +1096,13 @@ fn each_curve_offers_its_least_and_the_highest_rated_governs() {
             let (load_point, dir) = g.load_at(roll);
             let vertex = load_point[1] + (-load_point[0] / dir[0]) * dir[1];
             let (flo, fhi) = g.fillet_bracket();
-            let (fillet, c1) = least(&|p| g.fillet_at(p).0, flo, fhi, vertex);
+            let (fillet, c1, _) = least(&|p| g.fillet_at(p).0, flo, fhi, vertex);
             // `ρ_f`, the fillet's least radius of curvature, by brute force.
             let rho_f = (0..=800_u32)
                 .map(|i| g.fillet_curvature(flo + (fhi - flo) * f64::from(i) / 800.0))
                 .fold(f64::INFINITY, f64::min);
-            let (flank, c2) = least(&|p| g.flank_at(p).0, ulo, uhi, vertex);
+            let (flank, c2, under_vertex) = least(&|p| g.flank_at(p).0, ulo, uhi, vertex);
+            beside_vertex += usize::from(under_vertex);
             // The flank's tip is never strictly below the vertex, so its
             // measure there is none, and a least there is rounding's.
             let (tq, _) = g.flank_at(tip);
@@ -1070,6 +1111,8 @@ fn each_curve_offers_its_least_and_the_highest_rated_governs() {
                 "{label} at {frac}: the tip stands {} below the vertex",
                 vertex - tq[1]
             );
+            // A pointed tip loaded at its point: the vertex is the apex.
+            let pointed_at_point = frac == 0.0 && tq[0].abs() <= 256.0 * f64::EPSILON * tq[1].abs();
             let found = root_sections(g.as_ref(), roll, CriticalSection::LewisParabola);
             let measure = |s: &gear_core::strength::RootSection| {
                 s.root_chord * s.root_chord / (4.0 * s.moment_arm)
@@ -1088,11 +1131,20 @@ fn each_curve_offers_its_least_and_the_highest_rated_governs() {
                     * f64::EPSILON
                     * c1.max(c2)
                     * (4.0 / got.root_chord + 1.0 / got.moment_arm);
-                assert!(
-                    (measure(got) - want).abs() <= tol * want,
-                    "{label} at {frac}: the {name} offers {}, its least is {want}",
-                    measure(got)
-                );
+                if on_flank && pointed_at_point {
+                    // The measure falls to nought at a pointed apex loaded at
+                    // its point and has no least there: the apex is no
+                    // section, and the flank offers its end at the fillet.
+                    let root = if g.tip_at_high_roll() { ulo } else { uhi };
+                    assert_eq!(got.s, root, "{label}: a pointed tip loaded at its point");
+                    apex += 1;
+                } else {
+                    assert!(
+                        (measure(got) - want).abs() <= tol * want,
+                        "{label} at {frac}: the {name} offers {}, its least is {want}",
+                        measure(got)
+                    );
+                }
                 // The notch factor is the curve's: AGMA's fit to Dolan and
                 // Broghamer on the fillet, none on the smooth flank.
                 let notch = got.stress_correction(model).unwrap();
@@ -1156,10 +1208,16 @@ fn each_curve_offers_its_least_and_the_highest_rated_governs() {
         checked > 100 && rings >= 24,
         "checked {checked}, rings {rings}"
     );
+    eprintln!(
+        "{checked} load points, {rings} on rings; the flank governs {flank_governs}, an end \
+         {at_an_end}, dropped {dropped}, beside the vertex {beside_vertex}, a pointed apex {apex}"
+    );
     assert!(
-        flank_governs > 0 && at_an_end > 0 && dropped > 0,
+        flank_governs > 0 && at_an_end > 0 && dropped > 0 && beside_vertex > 0 && apex > 0,
         "the flank governs {flank_governs} times, a curve's end is its least {at_an_end}, \
-         a compressed candidate is dropped {dropped}: the law must reach each"
+         a compressed candidate is dropped {dropped}, the flank's least lies beside the \
+         vertex {beside_vertex}, a pointed apex is loaded at its point {apex}: the law must \
+         reach each"
     );
 }
 
@@ -1354,7 +1412,8 @@ fn the_rating_is_continuous_where_its_section_changes_curve_or_ends() {
 /// itself — three points where the plane meets the cylinder, their
 /// circumcircle, extrapolated in the spacing — sharing nothing with how the
 /// crate sizes the virtual gear, which is a spur gear of the normal module and
-/// pressure angle. External teeth and rings, both of which carry their own.
+/// pressure angle. External teeth and rings; a ring's cutter is sectioned
+/// with it, since the two generate the virtual ring together.
 ///
 /// The section's points are taken relative to the pitch point, so each is
 /// good to its own rounding; the cross product's axial component cancels
@@ -1431,6 +1490,15 @@ fn a_helical_members_virtual_spur_is_its_normal_section() {
                 v.r
             );
             assert!((v.alpha_t - ring.alpha_n).abs() <= 4.0 * f64::EPSILON);
+            // ...and the cutter that generates it is the real cutter's normal
+            // section too: the two roll in the normal plane together.
+            let want = section_radius(ring.cut.cutter_radius, beta_deg.to_radians());
+            assert!(
+                (v.cut.cutter_radius - want).abs() <= tol * want,
+                "ring z {teeth} β {beta_deg}: the virtual cutter's pitch radius {}, the \
+                 section's {want}",
+                v.cut.cutter_radius
+            );
             checked += 1;
         }
     }
@@ -1542,4 +1610,303 @@ fn a_path_short_of_the_tip_loads_where_more_contact_would() {
         }
     }
     assert!(checked >= 40, "{checked} paths checked");
+}
+
+/// ISO 6336-3:2006 Method B for an external spur gear cut by a rack with no
+/// protuberance, loaded at the outer point of single-pair contact:
+/// `(s_Fn, h_Fe, ρ_F, α_Fen, Y_F, Y_S)`, lengths in modules. Written from the
+/// standard (6.2, 7.2), with its 30° tangent as `π/3` in `H` and the fit for
+/// `Y_S`; nothing here reads the crate.
+#[allow(clippy::too_many_arguments)]
+fn method_b(z: f64, alpha: f64, x: f64, h_a: f64, h_fp: f64, rho_fp: f64, eps: f64) -> [f64; 6] {
+    use std::f64::consts::PI;
+    let inv = |a: f64| a.tan() - a;
+    let (d, d_b) = (z, z * alpha.cos());
+    let d_a = d + 2.0 * (h_a + x);
+    let e = PI / 4.0 - h_fp * alpha.tan() - (1.0 - alpha.sin()) * rho_fp / alpha.cos();
+    let g = rho_fp - h_fp + x;
+    let h = 2.0 / z * (PI / 2.0 - e) - PI / 3.0;
+    // θ = (2G/z) tan θ − H, a contraction from π/6 (Formula 11).
+    let mut theta = PI / 6.0;
+    let mut steps = 0;
+    loop {
+        let next = 2.0 * g / z * theta.tan() - h;
+        steps += 1;
+        if (next - theta).abs() <= 4.0 * f64::EPSILON || steps == 100 {
+            theta = next;
+            break;
+        }
+        theta = next;
+    }
+    assert!(steps < 100, "z {z}: θ did not settle");
+    let s_fn = z * (PI / 3.0 - theta).sin() + 3f64.sqrt() * (g / theta.cos() - rho_fp);
+    let rho_f = rho_fp + 2.0 * g * g / (theta.cos() * (z * theta.cos().powi(2) - 2.0 * g));
+    let p_bn = PI * alpha.cos();
+    let d_en = 2.0
+        * f64::hypot(
+            ((d_a / 2.0).powi(2) - (d_b / 2.0).powi(2)).sqrt() - p_bn * (eps - 1.0),
+            d_b / 2.0,
+        );
+    let alpha_en = (d_b / d_en).acos();
+    let gamma_e = (PI / 2.0 + 2.0 * x * alpha.tan()) / z + inv(alpha) - inv(alpha_en);
+    let alpha_fen = alpha_en - gamma_e;
+    let h_fe = 0.5
+        * ((gamma_e.cos() - gamma_e.sin() * alpha_fen.tan()) * d_en
+            - z * (PI / 3.0 - theta).cos()
+            - g / theta.cos()
+            + rho_fp);
+    let y_f = 6.0 * h_fe * alpha_fen.cos() / (s_fn * s_fn * alpha.cos());
+    let (l, q) = (s_fn / h_fe, s_fn / (2.0 * rho_f));
+    let y_s = (1.2 + 0.13 * l) * q.powf(1.0 / (1.21 + 2.3 / l));
+    [s_fn, h_fe, rho_f, alpha_fen, y_f, y_s]
+}
+
+/// **The ISO set is ISO 6336-3's Method B.** The instrument's reading — the
+/// 30° tangent section at the outer point of single-pair contact, measured
+/// off the generated tooth, and ISO's `Y_S` of it — against Method B in
+/// closed form, which is that construction solved for a rack-cut tooth:
+/// the chord, the arm, the notch radius, the load angle, `Y_F` and `Y_S`.
+/// External spur teeth, shifted and not, at three pressure angles and two
+/// contact ratios, every one inside the fit's range of `q_s`.
+///
+/// The two sides meet only through rounding. Every length is a coordinate,
+/// or a difference of two, of a point as far out as the tip, so it carries
+/// `2⁸ε·r_a` (the tangency and the θ iteration both settle to rounding);
+/// each figure is held to that over the figure's own size, times a
+/// conditioning of ten for the arm's difference of two such coordinates and
+/// the powers in `Y_F` and `Y_S`.
+#[test]
+fn the_iso_set_is_method_b_in_closed_form() {
+    use gear_core::strength::{bending_section_by, RootStressModel, NOTCH_PARAMETER_RANGE};
+    let mut checked = 0;
+    for (alpha_deg, rho) in [(14.5_f64, 0.38_f64), (20.0, 0.38), (25.0, 0.25)] {
+        for teeth in [17_u32, 25, 40, 80] {
+            for x in [0.0_f64, 0.3] {
+                for eps in [1.3_f64, 1.7] {
+                    let g = Tooth::new(GearParams {
+                        teeth,
+                        pressure_angle: alpha_deg,
+                        profile_shift: x,
+                        root_radius: rho,
+                        ..Default::default()
+                    });
+                    assert_eq!(g.rho, rho, "the round {rho} fits the rack");
+                    let s = bending_section_by(&g, eps, CriticalSection::TangentAngle)
+                        .expect("a 30° section");
+                    let want = method_b(
+                        f64::from(teeth),
+                        alpha_deg.to_radians(),
+                        x,
+                        g.params.addendum,
+                        g.params.dedendum,
+                        rho,
+                        eps,
+                    );
+                    let m = g.params.module;
+                    let y_s = s.stress_correction(RootStressModel::Iso6336).unwrap();
+                    assert!(NOTCH_PARAMETER_RANGE.contains(&s.notch_parameter));
+                    let got = [
+                        s.root_chord / m,
+                        s.moment_arm / m,
+                        s.fillet_curvature / m,
+                        s.load_angle,
+                        s.form_factor,
+                        y_s,
+                    ];
+                    let rounding = 256.0 * f64::EPSILON * (g.ra / m);
+                    for (k, name) in ["s_Fn", "h_Fe", "ρ_F", "α_Fen", "Y_F", "Y_S"]
+                        .iter()
+                        .enumerate()
+                    {
+                        let tol = 10.0 * rounding * want[k].abs().max(1.0);
+                        assert!(
+                            (got[k] - want[k]).abs() <= tol,
+                            "z {teeth} α {alpha_deg} x {x} ε {eps}: {name} {} against Method B's \
+                             {} ({:.1e} of {tol:.1e})",
+                            got[k],
+                            want[k],
+                            (got[k] - want[k]).abs()
+                        );
+                    }
+                    checked += 1;
+                }
+            }
+        }
+    }
+    assert_eq!(checked, 3 * 4 * 2 * 2);
+}
+
+/// **The beam's two terms are the load's own statics.** The normal load is
+/// set by the torque: its line is the base tangent, so its moment about the
+/// axis is `F_n · d`, `d` the line's distance from the axis, and that is the
+/// torque `F_t · r` — `F_n = F_t r / d`, read off the load's point and
+/// direction rather than from a pressure angle. Its component across the
+/// tooth at the arm `h_Fe` bends the section and its component along the
+/// tooth presses on it, so over `F_t / (b m)`:
+///
+/// ```text
+/// Y_F = 6 (r/d) |n_x| (h/m) / (s/m)²,    axial = (r/d) |n_y| / (s/m)
+/// ```
+///
+/// Finite teeth, where the load leans off the pressure angle (at the rack
+/// the two coincide, and a term read with one for the other is invisible),
+/// at load points up the flank, shifted and not. Each side is a few products
+/// of coordinates as far out as `r_a`, so they agree to `2⁸ε·r_a/d`.
+#[test]
+fn the_beams_terms_are_the_loads_own_statics() {
+    use gear_core::strength::{root_section, ToothOutline};
+    let mut checked = 0;
+    for teeth in [9_u32, 17, 40] {
+        for alpha in [14.5_f64, 20.0, 25.0] {
+            for x in [0.0_f64, 0.4] {
+                let g = Tooth::new(GearParams {
+                    teeth,
+                    pressure_angle: alpha,
+                    profile_shift: x,
+                    root_radius: 0.25,
+                    ..Default::default()
+                });
+                let (lo, hi) = g.flank_bracket();
+                for frac in [0.0_f64, 0.2, 0.4] {
+                    let roll = hi - frac * (hi - lo);
+                    let Some(s) = root_section(&g, roll) else {
+                        continue;
+                    };
+                    let (p, n) = g.load_at(roll);
+                    let d = (p[0] * n[1] - p[1] * n[0]).abs();
+                    let (m, lever) = (g.params.module, g.r / d);
+                    let (chord, arm) = (s.root_chord / m, s.moment_arm / m);
+                    let tol = 256.0 * f64::EPSILON * g.ra / d;
+                    for (name, got, want) in [
+                        (
+                            "Y_F",
+                            s.form_factor,
+                            6.0 * lever * n[0].abs() * arm / (chord * chord),
+                        ),
+                        ("axial", s.axial_compression, lever * n[1].abs() / chord),
+                    ] {
+                        assert!(
+                            (got - want).abs() <= tol * want,
+                            "z {teeth} α {alpha} x {x} at {frac}: {name} {got}, the statics {want}"
+                        );
+                    }
+                    checked += 1;
+                }
+            }
+        }
+    }
+    assert!(checked >= 50, "{checked} sections checked");
+}
+
+/// **`ρ_f`, the notch radius Dolan and Broghamer read, is the rolling's closed
+/// form at the root.** The tool's corner round is carried by the tool as it
+/// rolls on the workpiece, so its centre traces a roulette and the fillet is
+/// that path offset by the round. At the root the centre stands on the line of
+/// centres, a distance `b` past the tool's rolling circle into the material,
+/// and the path turns there on the Euler–Savary radius, the fillet on that
+/// plus the round:
+///
+/// - a rack (rolling line) on an external gear's rolling circle `r`:
+///   `ρ_f = ρ + b²/(r + b)` — AGMA 908-B89's minimum fillet radius;
+/// - a shaper of rolling radius `r_c` inside a ring's `R`:
+///   `ρ_f = ρ + (R − r_c) b² / (r_c R + b (R − r_c))`, the hypotrochoid's
+///   apex, which is the rack's as `R → ∞` with the roles swapped.
+///
+/// Each read off the cut's setup alone — its depth, its rolling radii, its
+/// round — and held to the section's `ρ_f` and to the curve's own radius at its
+/// root. A ring whose fillets meet before mid-space has no such root and is
+/// skipped (and counted). `b` is a difference of radii as large as `R`, so
+/// the closed form carries `2⁸ε·R/b` of itself.
+#[test]
+fn the_fillets_least_radius_is_the_rollings_closed_form() {
+    use gear_core::ring::{Cutter, Ring};
+    use gear_core::strength::{root_section, ToothOutline};
+    let check = |label: &str, g: &dyn ToothOutline, want: f64, tol: f64| {
+        let (lo, hi) = g.flank_bracket();
+        let roll = if g.tip_at_high_roll() { hi } else { lo };
+        let s = root_section(g, roll).expect("a section");
+        for (what, got) in [
+            ("the section's ρ_f", s.min_fillet_curvature),
+            (
+                "the fillet's root radius",
+                g.fillet_curvature(g.fillet_root()),
+            ),
+        ] {
+            assert!(
+                (got - want).abs() <= tol * want,
+                "{label}: {what} {got}, the rolling's {want}"
+            );
+        }
+    };
+    let (mut external, mut rings, mut meeting) = (0, 0, 0);
+    for teeth in [9_u32, 17, 40, 150] {
+        for x in [-0.3_f64, 0.0, 0.5] {
+            for rho in [0.2_f64, 0.38] {
+                let g = Tooth::new(GearParams {
+                    teeth,
+                    profile_shift: x,
+                    root_radius: rho,
+                    ..Default::default()
+                });
+                let m = g.params.module;
+                assert_eq!(g.rho, rho * m, "the round {rho} fits the rack");
+                let r = f64::from(teeth) * m / 2.0;
+                let b = m * (g.params.dedendum - x) - g.rho;
+                let want = g.rho + b * b / (r + b);
+                check(
+                    &format!("z{teeth} x{x} ρ{rho}"),
+                    &g,
+                    want,
+                    256.0 * f64::EPSILON * r / b,
+                );
+                external += 1;
+            }
+        }
+    }
+    for teeth in [40_u32, 60, 90] {
+        for x in [0.0_f64, 0.4] {
+            for cutter in [
+                Cutter::default(),
+                Cutter {
+                    teeth: 20,
+                    addendum: 1.25,
+                    tip_round: 0.3,
+                },
+            ] {
+                let ring = Ring::cut_by(
+                    &GearParams {
+                        teeth,
+                        profile_shift: x,
+                        ..Default::default()
+                    },
+                    &cutter,
+                );
+                if ring.fillet.is_none_or(|f| f.phi_root != 0.0) {
+                    meeting += 1;
+                    continue;
+                }
+                let c = &ring.cut;
+                let (big, small) = (c.workpiece_operating_radius, c.cutter_operating_radius);
+                // The corner's centre, from the cutter's own tip circle.
+                let m = ring.params.module;
+                let corner = c.cutter_radius + m * cutter.addendum - m * cutter.tip_round;
+                assert!((c.corner_radius - corner).abs() <= 256.0 * f64::EPSILON * corner);
+                assert!((c.tip_round - m * cutter.tip_round).abs() <= f64::EPSILON * c.tip_round);
+                let b = corner - small;
+                let want = c.tip_round + (big - small) * b * b / (small * big + b * (big - small));
+                check(
+                    &format!("ring z{teeth} x{x} cutter ρ{}", cutter.tip_round),
+                    &ring,
+                    want,
+                    256.0 * f64::EPSILON * big / b,
+                );
+                rings += 1;
+            }
+        }
+    }
+    assert_eq!(external, 4 * 3 * 2);
+    assert!(
+        rings >= 8,
+        "{rings} rings checked, {meeting} with meeting fillets"
+    );
 }

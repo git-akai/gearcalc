@@ -1118,4 +1118,80 @@ mod tests {
             "κ 1e-3: {last} against the line's {line}"
         );
     }
+
+    /// **`C` is the reciprocal peak of the closed-form fields' equivalent
+    /// stress**, end to end, at three Poisson ratios. Under a circle the axis
+    /// has `σ_r = σ_θ`, so von Mises is the principal difference
+    /// `|σ_r − σ_z|` of Johnson's closed form (3.45); under a line it is
+    /// `√(3J₂)` of the plane-strain field, the deviator's own norm. Each peak
+    /// is found here by golden section to rounding and read with its
+    /// curvature `f″`. (At `ν ≤ 0.1` the line's peak leaves the depths the
+    /// crate searches, `[0.1, 2]`, and it has no `C` there; the materials'
+    /// range is well above.)
+    ///
+    /// The crate reads the circle's field off a quadrature the circle's law
+    /// above holds to `10⁻⁹` of the closed form, and stops its search within
+    /// `x_tol = 10⁻⁷` of the peak, where the peak is flat to `½|f″|x_tol²`.
+    /// A peak moved by `δ` moves `C = 1/peak` by `C²δ`.
+    #[test]
+    fn the_first_yield_factor_is_the_peak_of_the_closed_fields() {
+        fn peak(f: &dyn Fn(f64) -> f64) -> (f64, f64) {
+            let g = (5.0_f64.sqrt() - 1.0) / 2.0;
+            let (mut l, mut h) = (0.1_f64, 2.0_f64);
+            let mut steps = 0;
+            while h - l > 1e-12 {
+                let (a, b) = (h - g * (h - l), l + g * (h - l));
+                if f(a) >= f(b) {
+                    h = b;
+                } else {
+                    l = a;
+                }
+                steps += 1;
+            }
+            assert!(steps < 100);
+            let z = 0.5 * (l + h);
+            let step = 1e-3;
+            let curvature = (f(z + step) - 2.0 * f(z) + f(z - step)) / (step * step);
+            (f(z), curvature.abs())
+        }
+        const X_TOL: f64 = 1e-7;
+        let mut checked = 0;
+        for nu in [0.2, 0.3, 0.45] {
+            let circle = |z: f64| {
+                let r = -(1.0 + nu) * (1.0 - z * (1.0 / z).atan()) + 0.5 / (1.0 + z * z);
+                (r + 1.0 / (1.0 + z * z)).abs()
+            };
+            let line = |z: f64| {
+                let s = axis_stress(0.0, nu, z);
+                let mean = (s[0] + s[1] + s[2]) / 3.0;
+                (1.5 * s.iter().map(|v| (v - mean).powi(2)).sum::<f64>()).sqrt()
+            };
+            for (kappa, field, quadrature) in [
+                (1.0, &circle as &dyn Fn(f64) -> f64, 2e-9),
+                (0.0, &line as &dyn Fn(f64) -> f64, 0.0),
+            ] {
+                let (top, curvature) = peak(field);
+                let want = 1.0 / top;
+                let got = first_yield_factor(kappa, nu).unwrap();
+                let slack = quadrature + 0.5 * curvature * X_TOL * X_TOL + 256.0 * f64::EPSILON;
+                let tol = want * want * slack;
+                assert!(
+                    (got - want).abs() <= tol,
+                    "κ {kappa} ν {nu}: C {got}, the closed field's {want} ({:.1e} of {tol:.1e})",
+                    (got - want).abs()
+                );
+                checked += 1;
+            }
+        }
+        assert_eq!(checked, 6);
+    }
+
+    /// **The reversed-bending fraction is ISO's published figure**: ISO
+    /// 6336-3:2006, Annex B, the mean stress factor `Y_M = 0.7` for an idler
+    /// (fully reversed) gear of steel. A convention, not a derivation, so a
+    /// canary: it may change, and not by accident.
+    #[test]
+    fn the_reversed_bending_fraction_is_isos_idler_factor() {
+        assert_eq!(crate::material::REVERSED_BENDING_FRACTION, 0.7);
+    }
 }
