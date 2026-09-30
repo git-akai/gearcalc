@@ -224,6 +224,10 @@ caught, test workspace included) and the 130-constant perturbation.
     - a closed-form limit at Σ → 0;
     - tooth stiffness in series, derived from the generated tooth and gated against ISO 6336-1's c′
       and c_γ.
+- 2026-10-02 — orchestrator's call, from rule 5: a cycle of carried axes is refused only when its loop
+  fails to close geometrically (a numeric residual with a derived tolerance, T10.2). A structural
+  rule would refuse buildable layouts: a bridge idler between planets, or a planet loop that closes
+  exactly.
 - 2026-10-01 — owner: research singular stress fields (sharp corners and notches) as a lower-priority
   parallel track. A geometrically sharp corner gives infinite stress as the mesh is refined, while in
   reality local yielding and relief dominate. The same mechanics governs notch stresses in bending.
