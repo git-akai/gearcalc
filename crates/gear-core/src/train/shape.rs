@@ -3532,6 +3532,393 @@ impl Indexed<'_> {
         }
         Ok(out)
     }
+    /// **Every loop of distances on a carrier closes** (audit T10.2): in
+    /// each carrier's frame — its own axis and the axes it carries — the
+    /// running distances among them have a placement, every distance at its
+    /// value. A loop is refused only where none exists: a bridge idler
+    /// between two planets stands wherever its two meshes reach, and a loop
+    /// whose staggers add up closes; what describes a shape is never
+    /// refused (rule 5). Read once the distances run, after
+    /// [`Self::staggers`] has placed or refused every triangle through the
+    /// carrier's axis.
+    ///
+    /// Two steps, each exact but for rounding:
+    ///
+    /// - **Reduction.** An axis with at most two distances in the frame is
+    ///   placed wherever those allow, so it is taken out: one with a single
+    ///   distance stands anywhere on its circle; one between two axes asks
+    ///   only that their distance lie between the difference and the sum of
+    ///   its two, which replaces it by that range ([`Span`]) — intersected
+    ///   with whatever else joins the two. A range left empty is a loop no
+    ///   placement closes. This decides every frame whose distances form no
+    ///   more than a series-parallel graph: a chain, a bridge, a triangle.
+    /// - **Closure.** What is left has every axis in three distances or
+    ///   more. Where that is the carrier's axis with the rest each at a
+    ///   stated radius from it, each distance between two of them fixes the
+    ///   angle between them up to its sign ([`Arc`]), and the loop closes
+    ///   where some choice of signs puts every angle where its distance
+    ///   says. The angles are compared with their rounding carried
+    ///   ([`Closure`]), so a loop that closes exactly passes and one that
+    ///   misses by more than its operands' rounding is refused. Any other
+    ///   remainder — a loop among axes with no radius, each in three
+    ///   distances — no preset or edit builds, and it is not refused.
+    ///
+    /// # Errors
+    ///
+    /// [`TrainError::AxesLoopOpen`], naming the loop's last-stated distance.
+    pub(crate) fn frames_close(&self, running: &[Option<f64>]) -> Result<Vec<Closure>, TrainError> {
+        let mut closures = Vec::new();
+        let mut carriers: Vec<usize> = self
+            .axes
+            .iter()
+            .map(|a| a.carried_by)
+            .filter(|&c| c != GROUND)
+            .collect();
+        carriers.sort_unstable();
+        carriers.dedup();
+        for carrier in carriers {
+            let Some(centre) = self.axis_of_slot(self.slot(carrier)) else {
+                continue;
+            };
+            // The frame's axes, the carrier's own first.
+            let axes: Vec<usize> = std::iter::once(centre)
+                .chain((0..self.axes.len()).filter(|&a| self.axes[a].carried_by == carrier))
+                .collect();
+            let local = |a: usize| axes.iter().position(|&x| x == a);
+            let n = axes.len();
+            let mut span: Vec<Vec<Option<Span>>> = vec![vec![None; n]; n];
+            for (d, x) in self.distances.iter().enumerate() {
+                let (Some(i), Some(j), Some(value)) = (
+                    local(x.axes[0]),
+                    local(x.axes[1]),
+                    running.get(d).copied().flatten(),
+                ) else {
+                    continue;
+                };
+                if i != j {
+                    span[i][j] = Some(Span::exact(value, d));
+                    span[j][i] = span[i][j];
+                }
+            }
+            // Reduction: each pass takes one axis out, so `n` passes reach
+            // the core whatever the order.
+            let mut alive = vec![true; n];
+            let joined = |span: &[Vec<Option<Span>>], alive: &[bool], v: usize| -> Vec<usize> {
+                (0..n)
+                    .filter(|&w| alive[w] && span[v][w].is_some())
+                    .collect()
+            };
+            for _ in 0..n {
+                let Some(v) = (0..n).find(|&v| alive[v] && joined(&span, &alive, v).len() <= 2)
+                else {
+                    break;
+                };
+                if let [u, w] = joined(&span, &alive, v)[..] {
+                    let (Some(a), Some(b)) = (span[v][u], span[v][w]) else {
+                        continue;
+                    };
+                    let through = a.series(b);
+                    let both = match span[u][w] {
+                        Some(e) => e.parallel(through),
+                        None => Some(through),
+                    }
+                    .ok_or(TrainError::AxesLoopOpen {
+                        distance: through.distance.max(span[u][w].map_or(0, |e| e.distance)),
+                    })?;
+                    span[u][w] = Some(both);
+                    span[w][u] = Some(both);
+                }
+                alive[v] = false;
+            }
+            let core: Vec<usize> = (1..n).filter(|&v| alive[v]).collect();
+            if core.is_empty() {
+                continue;
+            }
+            // Closure: the carrier's axis in the core, every other axis in
+            // it at a stated radius.
+            let radius = |v: usize| span[0][v].filter(|s| s.exact).map(|s| s.lo);
+            if !alive[0] || core.iter().any(|&v| radius(v).is_none()) {
+                continue;
+            }
+            let mut arcs: Vec<Vec<Option<Arc>>> = vec![vec![None; n]; n];
+            let mut last = 0;
+            for &i in &core {
+                for &j in &core {
+                    let Some(s) = span[i][j].filter(|_| i < j) else {
+                        continue;
+                    };
+                    last = last.max(s.distance);
+                    let (Some(ri), Some(rj)) = (radius(i), radius(j)) else {
+                        continue;
+                    };
+                    let arc = Arc::between(ri, rj, s).ok_or(TrainError::AxesLoopOpen {
+                        distance: s.distance,
+                    })?;
+                    arcs[i][j] = Some(arc);
+                    arcs[j][i] = Some(arc);
+                }
+            }
+            closures
+                .extend(close(&core, &arcs).ok_or(TrainError::AxesLoopOpen { distance: last })?);
+        }
+        Ok(closures)
+    }
+}
+
+/// **How far a running distance is taken to be from its value in
+/// reals**, relative: four rounding units — what [`Indexed::staggers`]
+/// admits a triangle to, `4ε(r1 + r2 + d12)`, which takes in the two ulp a
+/// closed sum carries and the one rounding of forming a sum or a
+/// difference; so every triangle `staggers` stands, the closure stands too.
+const RUNNING_ALLOWANCE: f64 = 4.0 * f64::EPSILON;
+
+/// **What a distance between two axes of one frame allows**: its value,
+/// taken to within [`RUNNING_ALLOWANCE`] (`exact`), or a range an axis
+/// taken out between them leaves ([`Span::series`]) — and the last-stated
+/// distance it comes from, which a loop that does not close is named by.
+#[derive(Clone, Copy, Debug)]
+struct Span {
+    lo: f64,
+    hi: f64,
+    exact: bool,
+    distance: usize,
+}
+
+impl Span {
+    fn exact(value: f64, distance: usize) -> Self {
+        Self {
+            lo: value,
+            hi: value,
+            exact: true,
+            distance,
+        }
+    }
+
+    /// The range the distance stands in, its value's allowance taken.
+    fn range(self) -> (f64, f64) {
+        if self.exact {
+            (
+                self.lo * (1.0 - RUNNING_ALLOWANCE),
+                self.hi * (1.0 + RUNNING_ALLOWANCE),
+            )
+        } else {
+            (self.lo, self.hi)
+        }
+    }
+
+    /// **The distances two axes can stand at through a third** placed at
+    /// `self` from one and `other` from the other: from the larger
+    /// difference of the two ranges, or nought, to the sum of their ends —
+    /// each end one rounding, taken as ε of the sum.
+    fn series(self, other: Self) -> Self {
+        let ((a, b), (c, d)) = (self.range(), other.range());
+        let hi = b + d;
+        let rounding = f64::EPSILON * hi;
+        Self {
+            lo: ((a - d).max(c - b) - rounding).max(0.0),
+            hi: hi + rounding,
+            exact: false,
+            distance: self.distance.max(other.distance),
+        }
+    }
+
+    /// **Both at once**: the ranges' intersection, a stated value kept as
+    /// it is where it lies in the other; `None` where they miss.
+    fn parallel(self, other: Self) -> Option<Self> {
+        let ((a, b), (c, d)) = (self.range(), other.range());
+        let (lo, hi) = (a.max(c), b.min(d));
+        let distance = self.distance.max(other.distance);
+        (lo <= hi).then_some(match (self.exact, other.exact) {
+            (true, _) => Self { distance, ..self },
+            (false, true) => Self { distance, ..other },
+            (false, false) => Self {
+                lo,
+                hi,
+                exact: false,
+                distance,
+            },
+        })
+    }
+}
+
+/// **The angle about the carrier's axis between two axes at stated
+/// radii**, from the distance between them: its middle and its half-width,
+/// radians — the range the law of cosines gives over the distance's
+/// [`Span`], widened by the rounding of the radii and of the evaluation.
+#[derive(Clone, Copy, Debug)]
+struct Arc {
+    mid: f64,
+    half: f64,
+    distance: usize,
+}
+
+impl Arc {
+    /// `None` where no angle gives the distance: longer than the two radii
+    /// together, or shorter than their difference.
+    ///
+    /// `c = (r1² + r2² − d²)/(2 r1 r2)` at either end of the distance's
+    /// range. With `S = (r1² + r2² + d²)/(2 r1 r2)` (`S ≥ |c|`), the radii's
+    /// allowance moves `c` by at most `2·RUNNING_ALLOWANCE·S` (each
+    /// radius's term is at most `S`), and its seven roundings (three
+    /// squares, a sum, a difference, a product, a quotient) by `7ε·S`:
+    /// `δ = 15ε·S`, first order. `acos` is the platform's, within an ulp;
+    /// two ulp of π (`4ε`) are allowed on each end.
+    fn between(r1: f64, r2: f64, d: Span) -> Option<Self> {
+        let (lo, hi) = d.range();
+        let c = |d: f64| (r1 * r1 + r2 * r2 - d * d) / (2.0 * r1 * r2);
+        let s = (r1 * r1 + r2 * r2 + hi * hi) / (2.0 * r1 * r2);
+        let delta = 15.0 * f64::EPSILON * s;
+        let (most, least) = (c(lo) + delta, c(hi) - delta);
+        if least > 1.0 || most < -1.0 {
+            return None;
+        }
+        let acos_rounding = 4.0 * f64::EPSILON;
+        let from = (most.min(1.0).acos() - acos_rounding).max(0.0);
+        let to = least.max(-1.0).acos() + acos_rounding;
+        Some(Self {
+            mid: 0.5 * (from + to),
+            half: 0.5 * (to - from) + f64::EPSILON * to,
+            distance: d.distance,
+        })
+    }
+}
+
+/// **A distance a loop's closure checked**: how far the angle its axes
+/// stand at is from the one its distance gives (`residual`), and how far
+/// rounding alone could put it (`tolerance`), radians — what the closure
+/// laws read.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Closure {
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "which distance was checked is the closure laws' question"
+        )
+    )]
+    pub(crate) distance: usize,
+    pub(crate) residual: f64,
+    pub(crate) tolerance: f64,
+}
+
+/// **Whether axes at stated radii stand at the angles their distances
+/// give**, `arcs` between the `core` axes, each group of them joined by
+/// arcs placed on its own: the first at angle nought, each next one from
+/// the one it was reached from at plus or minus its arc — both signs tried,
+/// but the first's, which a reflection gives — and every other arc to an
+/// axis already placed checked on the way, so a sign that fails is dropped
+/// at once. The closures of the placement found, or `None` where no signs
+/// close every arc.
+fn close(core: &[usize], arcs: &[Vec<Option<Arc>>]) -> Option<Vec<Closure>> {
+    let mut groups = super::structure::DisjointSets::new(arcs.len());
+    for &i in core {
+        for &j in core {
+            if arcs[i][j].is_some() {
+                groups.union(i, j);
+            }
+        }
+    }
+    let mut out = Vec::new();
+    let mut theta = vec![0.0; arcs.len()];
+    let mut tol = vec![0.0; arcs.len()];
+    for &root in core {
+        if core
+            .iter()
+            .any(|&v| v < root && groups.find(v) == groups.find(root))
+        {
+            continue;
+        }
+        // Breadth first from the root: each axis and the one it is reached
+        // from.
+        let mut order: Vec<(usize, usize)> = Vec::new();
+        let mut seen = vec![false; arcs.len()];
+        seen[root] = true;
+        let mut at = 0;
+        let mut queue = vec![root];
+        while at < queue.len() {
+            let v = queue[at];
+            at += 1;
+            for &w in core {
+                if !seen[w] && arcs[v][w].is_some() {
+                    seen[w] = true;
+                    queue.push(w);
+                    order.push((w, v));
+                }
+            }
+        }
+        theta[root] = 0.0;
+        tol[root] = 0.0;
+        let mut placed = vec![root];
+        out.extend(place(&order, arcs, &mut theta, &mut tol, &mut placed)?);
+    }
+    Some(out)
+}
+
+/// [`close`]'s placement from `order`'s first axis on, the ones before
+/// standing at `theta` within `tol`.
+fn place(
+    order: &[(usize, usize)],
+    arcs: &[Vec<Option<Arc>>],
+    theta: &mut [f64],
+    tol: &mut [f64],
+    placed: &mut Vec<usize>,
+) -> Option<Vec<Closure>> {
+    let Some((&(v, from), rest)) = order.split_first() else {
+        return Some(Vec::new());
+    };
+    let arc = arcs[v][from]?;
+    // The first placed after the root takes one sign: the other is its
+    // reflection, which closes exactly where this does.
+    let signs: &[f64] = if placed.len() == 1 {
+        &[1.0]
+    } else {
+        &[1.0, -1.0]
+    };
+    for &sign in signs {
+        theta[v] = theta[from] + sign * arc.mid;
+        tol[v] = tol[from] + arc.half + f64::EPSILON * (theta[from].abs() + arc.mid);
+        let checked: Option<Vec<Closure>> = placed
+            .iter()
+            .filter(|&&w| w != from)
+            .filter_map(|&w| arcs[v][w].map(|a| (w, a)))
+            .map(|(w, a)| {
+                let closure = closure(theta[v] - theta[w], tol[v] + tol[w], a);
+                (closure.residual <= closure.tolerance).then_some(closure)
+            })
+            .collect();
+        let Some(mut checked) = checked else {
+            continue;
+        };
+        placed.push(v);
+        if let Some(later) = place(rest, arcs, theta, tol, placed) {
+            checked.extend(later);
+            return Some(checked);
+        }
+        placed.pop();
+    }
+    None
+}
+
+/// **How far two placed axes are from the angle their arc gives**: the
+/// difference between their angles against the arc's, either sign, taken
+/// round whole turns. Its rounding: the difference and the subtraction
+/// one ε each of their operands, and `TAU` short of 2π by at most ε·π per
+/// turn taken — `3ε(|Δθ| + arc + τ)` together, beside what the two angles
+/// and the arc carry (`carried`).
+fn closure(difference: f64, carried: f64, arc: Arc) -> Closure {
+    use std::f64::consts::TAU;
+    let residual = [1.0, -1.0]
+        .iter()
+        .map(|&s| {
+            let r = (difference - s * arc.mid).rem_euclid(TAU);
+            r.min(TAU - r)
+        })
+        .fold(f64::INFINITY, f64::min); // absence: the least of two, from above
+    Closure {
+        distance: arc.distance,
+        residual,
+        tolerance: carried + arc.half + 3.0 * f64::EPSILON * (difference.abs() + arc.mid + TAU),
+    }
 }
 
 /// **A shape cut** ([`Cut`]).
@@ -3563,6 +3950,7 @@ pub fn cut(shape: &Shape, lib: &MaterialLibrary) -> Result<Cut, TrainError> {
     let chosen = shape.chosen_at(&crate::auto::Search::SHIPPED, &helix)?;
     let built = shape.build(&chosen.shifts, &helix, &chosen.held)?;
     let staggers = shape.staggers(&built.running)?;
+    shape.frames_close(&built.running)?;
 
     // ---- materials.
     let materials: Vec<Material> = shape
@@ -7757,5 +8145,538 @@ mod partition_laws {
         }
         assert!(checked > 2000, "only {checked} shapes");
         assert!(searched > 1000, "only {searched} with a search component");
+    }
+}
+
+#[cfg(test)]
+// The determinant is eliminated as the textbook indexes it.
+#[allow(clippy::unwrap_used, clippy::needless_range_loop)]
+mod frame_closure_laws {
+    //! **A loop of distances on a carrier is refused exactly where no
+    //! placement closes it** (`Indexed::frames_close`): against geometry
+    //! that shares nothing with the check — points with integer
+    //! coordinates, whose distances are square roots correctly rounded;
+    //! the Cayley–Menger determinant, which is nought exactly where four
+    //! points lie in a plane; and the polygon inequality, which decides a
+    //! lone loop — and end to end, three sets: a bridge idler between two
+    //! planets and a four-planet loop closing exactly, which solve, and the
+    //! loop a few teeth out, which is refused by name.
+
+    use super::super::sweep::Lcg;
+    use super::*;
+
+    /// A carrier's frame and nothing else: its own axis (0, on body 1)
+    /// and `k` axes it carries (on bodies 2..), with `pairs` as its axis
+    /// distances by axis — what the closure reads.
+    fn frame(k: usize, pairs: &[[usize; 2]]) -> Shape {
+        let template = super::super::arrangements::Preset::Planetary.build();
+        Shape {
+            axes: (0..=k)
+                .map(|a| Axis {
+                    carried_by: if a == 0 { GROUND } else { 1 },
+                    ..template.axes[0]
+                })
+                .collect(),
+            bodies: (0..=k)
+                .map(|a| BodyOn {
+                    body: a + 1,
+                    axis: a,
+                })
+                .collect(),
+            distances: pairs
+                .iter()
+                .map(|&axes| Distance {
+                    axes,
+                    ..template.distances[0]
+                })
+                .collect(),
+            ..Shape::default()
+        }
+    }
+
+    /// The closure of `pairs` at the distances between `points` (axis 0 at
+    /// the origin).
+    fn closure_at(points: &[[i64; 2]], pairs: &[[usize; 2]]) -> Result<Vec<Closure>, TrainError> {
+        let running: Vec<Option<f64>> = pairs
+            .iter()
+            .map(|&[a, b]| {
+                let (p, q) = (points[a], points[b]);
+                let (dx, dy) = (p[0] - q[0], p[1] - q[1]);
+                #[allow(clippy::cast_precision_loss)]
+                Some(((dx * dx + dy * dy) as f64).sqrt())
+            })
+            .collect();
+        frame(points.len() - 1, pairs)
+            .indexed()
+            .frames_close(&running)
+    }
+
+    /// Every radius, then the chords `among` the carried axes 1..=k.
+    fn with_radii(k: usize, among: &[[usize; 2]]) -> Vec<[usize; 2]> {
+        (1..=k)
+            .map(|a| [0, a])
+            .chain(among.iter().copied())
+            .collect()
+    }
+
+    /// The loops the laws are asked of: three axes each joined to each (a
+    /// tetrahedron's edges, one more than a placement needs), four in a
+    /// ring (a wheel), the wheel with a diagonal, and four each joined to
+    /// each.
+    fn loops() -> Vec<(usize, Vec<[usize; 2]>)> {
+        let ring = [[1, 2], [2, 3], [3, 4], [4, 1]];
+        vec![
+            (3, with_radii(3, &[[1, 2], [2, 3], [3, 1]])),
+            (4, with_radii(4, &ring)),
+            (
+                4,
+                with_radii(4, &[ring[0], ring[1], ring[2], ring[3], [1, 3]]),
+            ),
+            (
+                4,
+                with_radii(4, &[[1, 2], [1, 3], [1, 4], [2, 3], [2, 4], [3, 4]]),
+            ),
+        ]
+    }
+
+    /// Integer points about the origin, none at it and no two alike: a
+    /// share of them on a line through the origin or along another's ray,
+    /// where the angles are nought or a half turn and the law of cosines is
+    /// at its worst conditioned.
+    fn points(rng: &mut Lcg, k: usize) -> Vec<[i64; 2]> {
+        let mut out: Vec<[i64; 2]> = vec![[0, 0]];
+        while out.len() <= k {
+            let coord = |rng: &mut Lcg| i64::try_from(rng.pick(2001)).unwrap() - 1000;
+            let p = match rng.pick(4) {
+                // Along an earlier point's ray, or opposite it.
+                0 if out.len() > 1 => {
+                    let q = out[1 + rng.pick(out.len() - 1)];
+                    let t = i64::try_from(rng.pick(3)).unwrap() + 1;
+                    let s = if rng.pick(2) == 0 { 1 } else { -1 };
+                    [s * t * q[0], s * t * q[1]]
+                }
+                _ => [coord(rng), coord(rng)],
+            };
+            if p != [0, 0] && !out.contains(&p) {
+                out.push(p);
+            }
+        }
+        out
+    }
+
+    /// **Law 1: a loop that closes in reals passes**, its distances off by
+    /// rounding alone — every loop at points drawn with a share collinear,
+    /// the closure checking at least one distance of each.
+    #[test]
+    fn a_loop_that_closes_passes_at_rounding() {
+        let mut rng = Lcg(0x00c1_05ed);
+        let mut checked = 0;
+        for _ in 0..500 {
+            for (k, pairs) in loops() {
+                let at = points(&mut rng, k);
+                let closures =
+                    closure_at(&at, &pairs).unwrap_or_else(|e| panic!("{at:?} {pairs:?}: {e:?}"));
+                assert!(!closures.is_empty(), "{at:?} {pairs:?}: nothing checked");
+                checked += closures.len();
+            }
+        }
+        assert!(checked >= 2000, "only {checked} checked");
+    }
+
+    /// **Law 2: a loop ten times its tolerance open is refused**, by its
+    /// last-stated distance: each tetrahedron of law 1, the first distance
+    /// its closure checks moved until its angle is off by ten times that
+    /// check's tolerance. And the tolerance is the derivation's: on a
+    /// well-conditioned loop — radii within a factor of two, every angle's
+    /// sine a tenth or more — no check's tolerance passes [`WELL_BOUND`].
+    #[test]
+    fn a_loop_ten_tolerances_open_is_refused() {
+        let mut rng = Lcg(0x00c1_05ed);
+        let (mut refused, mut bounded) = (0, 0);
+        for _ in 0..500 {
+            let (k, pairs) = loops().swap_remove(0);
+            let at = points(&mut rng, k);
+            let closures = closure_at(&at, &pairs).unwrap();
+            if well_conditioned(&at) {
+                for c in &closures {
+                    assert!(
+                        c.tolerance <= WELL_BOUND,
+                        "{at:?}: a tolerance of {} ε",
+                        c.tolerance / f64::EPSILON
+                    );
+                    bounded += 1;
+                }
+            }
+            let c = closures[0];
+            let [a, b] = pairs[c.distance];
+            let r = |p: [i64; 2]| {
+                #[allow(clippy::cast_precision_loss)]
+                ((p[0] * p[0] + p[1] * p[1]) as f64).sqrt()
+            };
+            let (ra, rb) = (r(at[a]), r(at[b]));
+            let angle = |p: [i64; 2]| {
+                #[allow(clippy::cast_precision_loss)]
+                (p[1] as f64).atan2(p[0] as f64)
+            };
+            let phi = (angle(at[a]) - angle(at[b])).rem_euclid(std::f64::consts::TAU);
+            let phi = phi.min(std::f64::consts::TAU - phi);
+            let moved = if phi < std::f64::consts::FRAC_PI_2 {
+                phi + 10.0 * c.tolerance
+            } else {
+                phi - 10.0 * c.tolerance
+            };
+            let mut running: Vec<Option<f64>> = pairs
+                .iter()
+                .map(|&[p, q]| {
+                    let (dx, dy) = (at[p][0] - at[q][0], at[p][1] - at[q][1]);
+                    #[allow(clippy::cast_precision_loss)]
+                    Some(((dx * dx + dy * dy) as f64).sqrt())
+                })
+                .collect();
+            running[c.distance] = Some((ra * ra + rb * rb - 2.0 * ra * rb * moved.cos()).sqrt());
+            let got = frame(k, &pairs).indexed().frames_close(&running);
+            assert_eq!(
+                got.map(|_| ()),
+                Err(TrainError::AxesLoopOpen {
+                    distance: pairs.len() - 1
+                }),
+                "{at:?}: distance {} moved {} tolerances",
+                c.distance,
+                10
+            );
+            refused += 1;
+        }
+        assert_eq!(refused, 500);
+        assert!(bounded >= 50, "only {bounded} well-conditioned checks");
+    }
+
+    /// **The most a tetrahedron's check may allow when it is well
+    /// conditioned**, radians. With radii within a factor of two and each
+    /// distance at most their sum, `S = (r1² + r2² + d²)/(2 r1 r2) ≤ 7`;
+    /// the cosine's range is then `23ε·S` about it at most (the distance's
+    /// own `2·4ε·S`, and `δ = 15ε·S`), so an angle whose sine is a tenth or
+    /// more is within `1610ε`, and with `acos`'s `4ε` and its middle's
+    /// rounding an arc's half-width is under `1620ε`. A check carries three
+    /// arcs and its sums' roundings, under `60ε`: `5000ε`.
+    const WELL_BOUND: f64 = 5000.0 * f64::EPSILON;
+
+    /// Whether a tetrahedron's carried axes (1..=3) are within a factor of
+    /// two in radius and every angle between two of them has a sine of a
+    /// tenth or more.
+    fn well_conditioned(at: &[[i64; 2]]) -> bool {
+        #[allow(clippy::cast_precision_loss)]
+        let f = |p: [i64; 2]| (p[0] as f64, p[1] as f64);
+        let radii: Vec<f64> = at[1..].iter().map(|&p| f(p).0.hypot(f(p).1)).collect();
+        let (lo, hi) = radii
+            .iter()
+            .fold((f64::INFINITY, 0.0_f64), |(l, h), &r| (l.min(r), h.max(r))); // absence: least and most of three, from outside
+        let angle = |p: [i64; 2]| f(p).1.atan2(f(p).0);
+        let sines =
+            (1..4).all(|i| (i + 1..4).all(|j| (angle(at[i]) - angle(at[j])).sin().abs() >= 0.1));
+        hi <= 2.0 * lo && sines
+    }
+
+    /// A distance moved `ulps` units in the last place, up or down.
+    fn nudged(value: f64, ulps: i32) -> f64 {
+        (0..ulps.abs()).fold(
+            value,
+            |v, _| if ulps > 0 { v.next_up() } else { v.next_down() },
+        )
+    }
+
+    /// A frame's carried axes, its distances, their lengths, and which is
+    /// the longest.
+    type Limit = (usize, Vec<[usize; 2]>, Vec<f64>, usize);
+
+    /// **Collinear loops at their limit**, each distance at integer points
+    /// along a ray (so correctly rounded): the triangle of the carrier's
+    /// axis and two axes on one ray, the longest side the sum of the other
+    /// two; and a bridge folded flat along one ray, the carrier's axis, one
+    /// axis, the bridge and the other axis in that order. Each as its
+    /// frame, its distances, and the longest's index.
+    fn limits(rng: &mut Lcg) -> Vec<Limit> {
+        let mut out = Vec::new();
+        for _ in 0..500 {
+            let u = loop {
+                let c = |rng: &mut Lcg| i64::try_from(rng.pick(61)).unwrap() - 30;
+                let u = [c(rng), c(rng)];
+                if u != [0, 0] {
+                    break u;
+                }
+            };
+            #[allow(clippy::cast_precision_loss)]
+            let length = |t: i64| ((t * t * (u[0] * u[0] + u[1] * u[1])) as f64).sqrt();
+            let step = |rng: &mut Lcg| i64::try_from(rng.pick(40)).unwrap() + 1;
+            let (a, b) = (step(rng), step(rng));
+            // The triangle: axes at a·u and (a + b)·u.
+            out.push((
+                2,
+                vec![[0, 1], [0, 2], [1, 2]],
+                vec![length(a), length(a + b), length(b)],
+                1,
+            ));
+            // The bridge: axes 1 and 2 at a·u and (a + b + c)·u, the bridge
+            // (axis 3) at (a + b)·u.
+            let c = step(rng);
+            out.push((
+                3,
+                vec![[0, 1], [0, 2], [1, 3], [3, 2]],
+                vec![length(a), length(a + b + c), length(b), length(c)],
+                1,
+            ));
+        }
+        out
+    }
+
+    /// **Law 1b: a collinear loop two ulp out passes** — every distance of
+    /// each limit moved the two units in the last place a running distance
+    /// may carry, the longest up and the rest down.
+    #[test]
+    fn a_collinear_loop_two_ulp_out_passes() {
+        let mut rng = Lcg(0x0011_ae55);
+        let mut checked = 0;
+        for (k, pairs, lengths, longest) in limits(&mut rng) {
+            let running: Vec<Option<f64>> = lengths
+                .iter()
+                .enumerate()
+                .map(|(e, &v)| Some(nudged(v, if e == longest { 2 } else { -2 })))
+                .collect();
+            let got = frame(k, &pairs).indexed().frames_close(&running);
+            assert!(got.is_ok(), "{pairs:?} at {running:?}: {got:?}");
+            checked += 1;
+        }
+        assert_eq!(checked, 1000);
+    }
+
+    /// **Law 2b: a collinear loop ten times its tolerance open is
+    /// refused** — each limit's longest distance moved out by ten times
+    /// what the reduction allows it: every distance of the loop the `4ε`
+    /// a triangle is admitted to ([`Indexed::staggers`]), and each range
+    /// formed on the way one rounding of its sum, `ε` of every distance but
+    /// the longest.
+    #[test]
+    fn a_collinear_loop_ten_tolerances_open_is_refused() {
+        let mut rng = Lcg(0x0011_ae55);
+        let mut refused = 0;
+        for (k, pairs, lengths, longest) in limits(&mut rng) {
+            let sum: f64 = lengths.iter().sum();
+            let rest = sum - lengths[longest];
+            let tolerance = 4.0 * f64::EPSILON * sum + f64::EPSILON * rest;
+            let mut running: Vec<Option<f64>> = lengths.iter().map(|&v| Some(v)).collect();
+            running[longest] = Some(lengths[longest] + 10.0 * tolerance);
+            let got = frame(k, &pairs).indexed().frames_close(&running);
+            assert!(
+                matches!(got, Err(TrainError::AxesLoopOpen { .. })),
+                "{pairs:?} at {running:?}: {got:?}"
+            );
+            refused += 1;
+        }
+        assert_eq!(refused, 1000);
+    }
+
+    /// **The Cayley–Menger determinant of four points**, from their six
+    /// squared distances `d[i][j]`: nought exactly where the four lie in a
+    /// plane (and a placement exists there, each triangle standing).
+    fn cayley_menger(d: &[[f64; 4]; 4]) -> f64 {
+        let mut m = [[0.0; 5]; 5];
+        for i in 0..5 {
+            for j in 0..5 {
+                m[i][j] = match (i, j) {
+                    (0, 0) => 0.0,
+                    (0, _) | (_, 0) => 1.0,
+                    _ => d[i - 1][j - 1],
+                };
+            }
+        }
+        // Gaussian elimination with partial pivoting.
+        let mut det = 1.0;
+        for c in 0..5 {
+            let p = (c..5)
+                .max_by(|&a, &b| m[a][c].abs().total_cmp(&m[b][c].abs()))
+                .unwrap();
+            if p != c {
+                m.swap(p, c);
+                det = -det;
+            }
+            det *= m[c][c];
+            for r in c + 1..5 {
+                let f = m[r][c] / m[c][c];
+                for k in c..5 {
+                    m[r][k] -= f * m[c][k];
+                }
+            }
+        }
+        det
+    }
+
+    /// **The closure agrees with the Cayley–Menger determinant**: the
+    /// tetrahedron's six distances at integer points, half of the draws one
+    /// of them moved by a share drawn up to a fifth of it, refused exactly
+    /// where the determinant says the four points leave the plane (or a triangle
+    /// breaks) — only draws that are clearly one or the other counted.
+    #[test]
+    fn the_closure_is_the_cayley_menger_determinant() {
+        let mut rng = Lcg(0xca1e);
+        let pairs = with_radii(3, &[[1, 2], [2, 3], [3, 1]]);
+        let (mut open, mut closed) = (0, 0);
+        for _ in 0..2000 {
+            let at = points(&mut rng, 3);
+            let mut d = [[0.0; 4]; 4];
+            let mut running: Vec<Option<f64>> = Vec::new();
+            for &[p, q] in &pairs {
+                let (dx, dy) = (at[p][0] - at[q][0], at[p][1] - at[q][1]);
+                #[allow(clippy::cast_precision_loss)]
+                let v = ((dx * dx + dy * dy) as f64).sqrt();
+                running.push(Some(v));
+            }
+            let e = rng.pick(pairs.len());
+            #[allow(clippy::cast_precision_loss)]
+            let share = if rng.pick(2) == 0 {
+                0.0
+            } else {
+                (rng.pick(2001) as f64 - 1000.0) / 5000.0
+            };
+            running[e] = running[e].map(|v| v * (1.0 + share));
+            for (&[p, q], v) in pairs.iter().zip(&running) {
+                d[p][q] = v.unwrap().powi(2);
+                d[q][p] = d[p][q];
+            }
+            let scale = (0..4)
+                .flat_map(|i| (0..4).map(move |j| (i, j)))
+                .fold(0.0, |m: f64, (i, j)| m.max(d[i][j]));
+            let cm = cayley_menger(&d) / scale.powi(3);
+            // How far the most broken triangle is from standing, as a
+            // share of its perimeter: a collinear one stands to rounding.
+            let slack = [[0, 1, 2], [0, 1, 3], [0, 2, 3], [1, 2, 3]]
+                .iter()
+                .map(|t| {
+                    let s = |a: usize, b: usize| d[t[a]][t[b]].sqrt();
+                    let (x, y, z) = (s(0, 1), s(1, 2), s(0, 2));
+                    (x + y + z - 2.0 * x.max(y).max(z)) / (x + y + z)
+                })
+                .fold(f64::INFINITY, f64::min); // absence: the least of four, from above
+            let triangles = slack > -1e-12;
+            let verdict = frame(3, &pairs).indexed().frames_close(&running).is_ok();
+            if triangles && cm.abs() < 1e-12 {
+                assert!(verdict, "{at:?} moved {share} at {e}: planar, refused");
+                closed += 1;
+            } else if slack < -1e-9 || cm.abs() > 1e-6 {
+                assert!(!verdict, "{at:?} moved {share} at {e}: not planar, closed");
+                open += 1;
+            }
+        }
+        // Half the draws are unmoved, and a drawn share of nought or one
+        // landing on the mirror placement is planar too.
+        assert!(open > 800 && closed > 800, "{open} open, {closed} closed");
+    }
+
+    /// **A lone loop closes exactly where the polygon inequality holds**:
+    /// the carrier's axis, two axes at radii and one or two idlers bridging
+    /// them with no radius of their own, every length drawn at random and
+    /// one of them a share drawn between a half and one and a half of the
+    /// rest together — flexible loops, which the reduction decides.
+    #[test]
+    fn a_lone_loop_closes_where_the_polygon_does() {
+        let mut rng = Lcg(0x9017);
+        let (mut open, mut closed) = (0, 0);
+        for _ in 0..3000 {
+            let bridges = 1 + rng.pick(2);
+            // Axes: 0 the carrier's, 1 and 2 at radii, then the bridges.
+            let k = 2 + bridges;
+            let mut path: Vec<usize> = vec![1];
+            path.extend(3..=k);
+            path.push(2);
+            let mut pairs: Vec<[usize; 2]> = vec![[0, 1], [0, 2]];
+            pairs.extend(path.windows(2).map(|w| [w[0], w[1]]));
+            #[allow(clippy::cast_precision_loss)]
+            let mut lengths: Vec<f64> = pairs
+                .iter()
+                .map(|_| 1.0 + rng.pick(10_000) as f64 / 100.0)
+                .collect();
+            let e = rng.pick(lengths.len());
+            #[allow(clippy::cast_precision_loss)]
+            let share = 0.5 + rng.pick(10_000) as f64 / 10_000.0;
+            lengths[e] = share * (lengths.iter().sum::<f64>() - lengths[e]);
+            let longest = lengths.iter().copied().fold(0.0, f64::max);
+            let rest: f64 = lengths.iter().sum::<f64>() - longest;
+            let running: Vec<Option<f64>> = lengths.iter().map(|&v| Some(v)).collect();
+            let verdict = frame(k, &pairs).indexed().frames_close(&running).is_ok();
+            if longest < rest * (1.0 - 1e-9) {
+                assert!(verdict, "{lengths:?}: a polygon, refused");
+                closed += 1;
+            } else if longest > rest * (1.0 + 1e-9) {
+                assert!(!verdict, "{lengths:?}: no polygon, closed");
+                open += 1;
+            }
+        }
+        // The drawn share is below one for half the draws.
+        assert!(open > 1000 && closed > 1000, "{open} open, {closed} closed");
+    }
+
+    /// **End to end**: a bridge idler between the sun's planet and the
+    /// ring's, at no radius of its own, solves; a loop of four planets,
+    /// each meshing the next and each at a radius — two suns and two rings
+    /// — its distances given where the loop closes exactly (radius 20.5,
+    /// each planet a quarter turn on, 20.5√2 apart), solves; and a loop of
+    /// four planets of 18 at radii of 21, 21, 15 and 18 (suns of 24 and 12,
+    /// rings of 60 and 54), whose four angles no choice of signs brings
+    /// nearer than 4.8° to a whole turn, is refused by name. (A loop whose
+    /// angles are all alike always closes, folded flat: two planets that
+    /// do not mesh stand at one place, which is their clearance's question,
+    /// not the loop's.)
+    #[test]
+    fn a_bridge_and_a_closed_loop_solve_and_an_open_one_is_refused() {
+        use super::super::arrangements::{epicyclic, Central};
+        use crate::note::Explain;
+        let solve = |s: &Shape| super::super::testing::try_alone(s);
+        // The bridge: the builder states a distance from the carrier's
+        // axis to every planet axis; the bridge's carries no mesh, so it
+        // goes.
+        let mut bridge = epicyclic(
+            3,
+            &[&[18], &[18], &[18]],
+            &[
+                Central::Sun { on: 0, teeth: 24 },
+                Central::Carrier,
+                Central::Ring { on: 1, teeth: 60 },
+            ],
+            &[(0, 2), (2, 1)],
+        );
+        let (centre, idler) = (bridge.distances[0].axes[0], bridge.axes.len() - 1);
+        bridge.distances.retain(|d| d.axes != [centre, idler]);
+        solve(&bridge).unwrap_or_else(|e| panic!("the bridge: {e:?}"));
+
+        let four = |planet: i32, centrals: [Central; 4]| {
+            let [a, b, c, d] = centrals;
+            epicyclic(
+                1,
+                &[&[planet], &[planet], &[planet], &[planet]],
+                &[a, Central::Carrier, b, c, d],
+                &[(0, 1), (1, 2), (2, 3), (3, 0)],
+            )
+        };
+        let sun = |on, teeth| Central::Sun { on, teeth };
+        let ring = |on, teeth| Central::Ring { on, teeth };
+        let mut closed = four(29, [sun(0, 12), ring(1, 70), sun(2, 12), ring(3, 70)]);
+        let centre = closed.distances[0].axes[0];
+        let radius = 20.5;
+        for d in &mut closed.distances {
+            let value = if d.axes.contains(&centre) {
+                radius
+            } else {
+                radius * std::f64::consts::SQRT_2
+            };
+            d.distance = Auto::fixed(value);
+            d.clearance = Auto::fixed(d.clearance.manual);
+        }
+        solve(&closed).unwrap_or_else(|e| panic!("the closed loop: {e:?}"));
+
+        let open = four(18, [sun(0, 24), ring(1, 60), sun(2, 12), ring(3, 54)]);
+        match solve(&open) {
+            Err(e @ TrainError::AxesLoopOpen { .. }) => {
+                assert_eq!(e.note().key, "error.train_axes_loop_open");
+            }
+            other => panic!("the open loop: {:?}", other.err()),
+        }
     }
 }

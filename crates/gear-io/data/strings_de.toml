@@ -138,13 +138,13 @@ train_file_format = "diese Datei hat das Format {found}, und dieses Werkzeug lie
 train_size_over_constrained = "Eingriffe {first} und {second}: ihre vorgegebenen Achsabstände verlangen bei festgelegten Profilverschiebungen zwei verschiedene Größen ihrer Räder — eine Verschiebung, einen Abstand oder die Größe freigeben"
 train_axes_too_close = "Achsabstand {distance}: die beiden Achsen, die er auf einem Träger verbindet, liegen zu nah beieinander, um bei ihren Abständen zur Trägerachse zu stehen"
 train_axes_too_far = "Achsabstand {distance}: die beiden Achsen, die er auf einem Träger verbindet, liegen zu weit auseinander, um bei ihren Abständen zur Trägerachse zu stehen"
+train_axes_loop_open = "Achsabstand {distance}: er schließt eine Schleife von Abständen zwischen den Achsen eines Trägers, und keine Anordnung der Achsen um die Trägerachse erfüllt jeden Abstand darin"
 train_malformed = "der Graph des Getriebes ist nicht wohlgeformt"
 train_malformed_carried_by = "Achse {axis}: ihr carried_by nennt keinen Körper auf einer anderen Achse"
 train_malformed_carried_by_cycle = "Achse {axis}: ihr carried_by führt sie über ihre Träger zu sich selbst zurück"
 train_malformed_distance_twice = "Achsabstand {distance}: zwischen seinen beiden Achsen ist ein weiterer Abstand angegeben, und ein Achsenpaar hat einen"
 train_malformed_ring_first = "Eingriff {mesh}: sein erstes Glied ist ein Hohlrad, und ein Eingriff führt sein Hohlrad an zweiter Stelle"
 train_malformed_distance_off_frame = "Achsabstand {distance}: seine beiden Achsen stehen in keinem gemeinsamen Bezugssystem still — weder von einem Körper getragen noch die eine die Achse, um die sich der Träger der anderen dreht; eine Linie, um die sich ein Träger dreht, ist eine Achse, wie viele Körper sich auch um sie drehen"
-train_malformed_carried_cycle = "Achsabstand {distance}: er schließt eine Schleife von Abständen zwischen den Achsen eines Trägers, die kein Dreieck durch die Trägerachse festlegt"
 train_malformed_number_gap = "Körper {body}: nichts nennt diese Nummer, und ein Getriebe nummeriert seine Körper lückenlos ab 1"
 
 [ui]

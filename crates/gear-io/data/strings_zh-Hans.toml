@@ -134,13 +134,13 @@ train_file_format = "此文件为格式 {found}，本工具读取格式 {current
 train_size_over_constrained = "啮合 {first} 与 {second}：在所有变位都固定时，它们给定的轴间距要求齿轮具有两个不同的尺寸——请放开一个变位、一个轴间距或尺寸"
 train_axes_too_close = "轴间距 {distance}：它连接的同一行星架上的两根轴相距太近，无法在各自到行星架轴线的距离处放置"
 train_axes_too_far = "轴间距 {distance}：它连接的同一行星架上的两根轴相距太远，无法在各自到行星架轴线的距离处放置"
+train_axes_loop_open = "轴间距 {distance}：它在同一行星架所承载的轴之间闭合了一个轴间距回路，而绕行星架轴线的任何轴布置都无法同时满足回路中的每个轴间距"
 train_malformed = "轮系的图结构不完整"
 train_malformed_carried_by = "轴 {axis}：其 carried_by 未指向另一轴上的任何体"
 train_malformed_carried_by_cycle = "轴 {axis}：其 carried_by 经由各级行星架又回到自身"
 train_malformed_distance_twice = "轴间距 {distance}：其两根轴之间还给出了另一个轴间距，而一对轴只有一个轴间距"
 train_malformed_ring_first = "啮合 {mesh}：其第一个成员是内齿圈，而啮合应将内齿圈列为第二个成员"
 train_malformed_distance_off_frame = "轴间距 {distance}：其两根轴不在同一坐标系中静止——既不由同一个体承载，也不是一根为另一根的行星架所绕的轴；行星架所绕的同一条线只是一根轴，无论多少个体绕它转动"
-train_malformed_carried_cycle = "轴间距 {distance}：它在同一行星架所承载的轴之间闭合了一个轴间距回路，而经过行星架轴线的任何三角形都无法确定其位置"
 train_malformed_number_gap = "第 {body} 号体：没有任何对象使用此编号，而轮系的体应从 1 起连续编号"
 
 [ui]

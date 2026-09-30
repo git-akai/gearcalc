@@ -298,8 +298,8 @@ pub mod key {
     /// `error.train_malformed_distance_off_frame`
     pub const ERROR_TRAIN_MALFORMED_DISTANCE_OFF_FRAME: &str =
         "error.train_malformed_distance_off_frame";
-    /// `error.train_malformed_carried_cycle`
-    pub const ERROR_TRAIN_MALFORMED_CARRIED_CYCLE: &str = "error.train_malformed_carried_cycle";
+    /// `error.train_axes_loop_open`
+    pub const ERROR_TRAIN_AXES_LOOP_OPEN: &str = "error.train_axes_loop_open";
     /// `error.train_malformed_number_gap`
     pub const ERROR_TRAIN_MALFORMED_NUMBER_GAP: &str = "error.train_malformed_number_gap";
     /// `error.train_tips_unclearable`
@@ -421,7 +421,7 @@ pub mod key {
         ERROR_TRAIN_MALFORMED_DISTANCE_TWICE,
         ERROR_TRAIN_MALFORMED_RING_FIRST,
         ERROR_TRAIN_MALFORMED_DISTANCE_OFF_FRAME,
-        ERROR_TRAIN_MALFORMED_CARRIED_CYCLE,
+        ERROR_TRAIN_AXES_LOOP_OPEN,
         ERROR_TRAIN_MALFORMED_NUMBER_GAP,
     ];
 }

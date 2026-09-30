@@ -20,7 +20,7 @@
 //! every distance carries a mesh, and a carrier's body is never removed.
 
 use super::shape::{Member, Shape};
-use super::structure::{CarrierTree, DisjointSets, Hang};
+use super::structure::{CarrierTree, Hang};
 use super::MemberGear;
 use crate::kinematics::GROUND;
 use crate::params::Auto;
@@ -889,9 +889,6 @@ pub enum Invariant {
     /// An axis distance between two axes that stand still in no one
     /// frame — neither carried by one body nor one turning about the other.
     DistanceOffFrame(usize),
-    /// An axis distance closing a cycle of distances among the axes one
-    /// carrier carries that no triangle through the carrier's axis places.
-    CarriedCycle(usize),
     /// An axis with no body and no distance.
     AxisWithNothing(usize),
     /// A carried axis whose carrier is on no other axis.
@@ -1015,65 +1012,14 @@ impl Shape {
         Ok(())
     }
 
-    /// **Every cycle of distances on a carrier is placed by triangles
-    /// through its axis**, which is what the stagger checks
-    /// ([`staggers`](super::incidence::Indexed::staggers), audit T10.2): each carried axis
-    /// stands at its distance from the carrier's axis, and a distance
-    /// between two that both do fixes the angle between them. So, in each
-    /// carrier's frame, the distances between its carried axes make no
-    /// cycle — a cycle among them over-determines the angles, or, with no
-    /// radius under it, is a polygon nothing places — and a distance from
-    /// an axis at no radius closes no cycle through the carrier's axis. A
-    /// chain hanging off a placed axis stands at any angle and is kept.
-    fn carried_cycles(&self) -> Result<(), Invariant> {
-        let mut seen: Vec<usize> = Vec::new();
-        for carrier in self.axes.iter().map(|a| a.carried_by) {
-            if carrier == GROUND || seen.contains(&carrier) {
-                continue;
-            }
-            seen.push(carrier);
-            let Some(centre) = self.axis_of_body(carrier) else {
-                continue;
-            };
-            let carried: Vec<usize> = (0..self.axes.len())
-                .filter(|&a| self.axes[a].carried_by == carrier)
-                .collect();
-            let local = |a: usize| carried.iter().position(|&x| x == a);
-            let at_radius = |a: usize| {
-                self.distances
-                    .iter()
-                    .any(|d| d.axes == [centre, a] || d.axes == [a, centre])
-            };
-            // The carried axes joined by distances among them, and the
-            // same over the star of radii from the carrier's axis (the last).
-            let n = carried.len();
-            let mut chords = DisjointSets::new(n);
-            let mut placed = DisjointSets::new(n + 1);
-            for (i, &a) in carried.iter().enumerate() {
-                if at_radius(a) {
-                    placed.union(i, n);
-                }
-            }
-            for (d, x) in self.distances.iter().enumerate() {
-                let (Some(i), Some(j)) = (local(x.axes[0]), local(x.axes[1])) else {
-                    continue;
-                };
-                let triangle = at_radius(x.axes[0]) && at_radius(x.axes[1]);
-                if !chords.union(i, j) || (!triangle && !placed.union(i, j)) {
-                    return Err(Invariant::CarriedCycle(d));
-                }
-            }
-        }
-        Ok(())
-    }
-
     /// **What a graph must satisfy before anything reads it** — the one
     /// set of the graph's invariants input can break, read where input
     /// enters ([`Self::validate`]) and by every edit's check
     /// ([`super::Train::check`]): the carriers a tree rooted at ground
     /// ([`Self::carriers`]), one distance per pair of axes, a ring its
-    /// mesh's second member, every distance held in one frame, and every
-    /// cycle of distances on a carrier one its triangles place.
+    /// mesh's second member, and every distance held in one frame. Whether
+    /// a loop of distances on a carrier closes is a question of their
+    /// values, asked once they are known (`Indexed::frames_close`).
     ///
     /// # Errors
     ///
@@ -1082,8 +1028,7 @@ impl Shape {
         self.carriers()?;
         self.distances_once()?;
         self.rings_second()?;
-        self.distances_in_a_frame()?;
-        self.carried_cycles()
+        self.distances_in_a_frame()
     }
 
     /// **[`Self::invariants`], as the solve refuses** — before anything
@@ -1257,17 +1202,15 @@ mod tests {
     /// [`solve_train`]'s [`Train::validate`] with its own catalogue key, and
     /// beside each the near miss that stands: a carrier cycle of three
     /// axes; an axis distance stated twice, the same way round and the
-    /// other; a mesh listing its ring first; three axes on one carrier
-    /// joined in a cycle, and a cycle through the carrier's axis past an
-    /// axis at no distance from it (the cycles no triangle through the
-    /// carrier's axis places, which T10.2 left), beside meshed planets and
-    /// a planet hanging off another; a sun on an axis entry of its own that
-    /// the carrier does not turn about — two entries for one line — beside
-    /// the set as built; and a body number skipped.
+    /// other; a mesh listing its ring first; a sun on an axis entry of its
+    /// own that the carrier does not turn about — two entries for one line
+    /// — beside the set as built and meshed planets; and a body number
+    /// skipped. A loop of distances on a carrier is no fault of the graph's
+    /// shape: whether it closes is its values' (`frame_closure` in
+    /// `shape.rs`).
     #[test]
     fn malformed_graphs_are_refused_where_they_enter_by_name() {
         use crate::note::Explain;
-        use arr::{epicyclic, Central};
         let lib = library();
         let train = |shape: Shape, load_cases: Vec<LoadCase>| Train {
             load_cases,
@@ -1331,51 +1274,9 @@ mod tests {
         checked += 1;
         stands("a set", &train(Preset::Planetary.build(), Vec::new()));
 
-        // Three planet axes on one carrier, each meshing the next; and a
-        // bridge between two planets the sun and the ring mesh, at no
-        // distance from the carrier's axis — the builder states one from
-        // the carrier's axis to every planet axis, which goes where no
-        // central member meshes the axis.
-        let planets: [&[i32]; 3] = [&[18], &[18], &[18]];
-        let centrals = [
-            Central::Sun { on: 0, teeth: 24 },
-            Central::Carrier,
-            Central::Ring { on: 1, teeth: 60 },
-        ];
-        let unmeshed = |mut s: Shape| {
-            let bridge = s.axes.len() - 1;
-            let centre = s.distances[0].axes[0];
-            s.distances.retain(|d| d.axes != [centre, bridge]);
-            s
-        };
-        for (name, meshes) in [
-            (
-                "three carried axes in a cycle",
-                &[(0, 1), (1, 2), (2, 0)][..],
-            ),
-            (
-                "a cycle through the carrier's axis past a bridge",
-                &[(0, 2), (2, 1)][..],
-            ),
-        ] {
-            let s = unmeshed(epicyclic(3, &planets, &centrals, meshes));
-            refused(
-                name,
-                &train(s, Vec::new()),
-                "error.train_malformed_carried_cycle",
-            );
-            checked += 1;
-        }
         stands(
             "meshed planets",
             &train(Preset::MeshedPlanets.build(), Vec::new()),
-        );
-        stands(
-            "a planet hanging off another",
-            &train(
-                unmeshed(epicyclic(3, &planets, &centrals, &[(0, 2)])),
-                Vec::new(),
-            ),
         );
 
         // A sun on an axis entry of its own, the same line as the carrier's
@@ -1429,7 +1330,7 @@ mod tests {
             ),
         );
 
-        assert_eq!(checked, 8);
+        assert_eq!(checked, 6);
     }
 
     /// **Every train an edit makes validates, and so does every part of
@@ -1585,88 +1486,6 @@ mod tests {
         );
         assert_eq!(held + moved, total * AXES * (AXES - 1) / 2);
         assert!(held > 100 && moved > 100, "{held} held, {moved} moved");
-    }
-
-    /// **The carried-cycle rule is the cycles it names**, against every
-    /// simple cycle of every frame: an axis fixed in ground with a carrier
-    /// on it and up to four axes it carries, every set of distances among
-    /// the five. A frame is refused exactly where some cycle of its
-    /// distances runs among the carried axes alone, or through the
-    /// carrier's axis past an axis at no distance from it; and the distance
-    /// named closes such a cycle.
-    #[test]
-    fn a_carried_cycle_is_refused_exactly_where_no_triangle_places_it() {
-        // Vertex 0 is the carrier's axis; every cycle of `edges`, as its
-        // vertices, found by extending paths from their least vertex.
-        fn cycles(n: usize, edges: &[[usize; 2]]) -> Vec<Vec<usize>> {
-            let joined = |a: usize, b: usize| edges.iter().any(|e| *e == [a, b] || *e == [b, a]);
-            let mut out = Vec::new();
-            let mut stack: Vec<Vec<usize>> = (0..n).map(|v| vec![v]).collect();
-            while let Some(path) = stack.pop() {
-                let (first, last) = (path[0], path[path.len() - 1]);
-                for next in first..n {
-                    if !joined(last, next) {
-                        continue;
-                    }
-                    if next == first && path.len() >= 3 && path[1] < last {
-                        out.push(path.clone());
-                    } else if next > first && !path.contains(&next) {
-                        let mut longer = path.clone();
-                        longer.push(next);
-                        stack.push(longer);
-                    }
-                }
-            }
-            out
-        }
-        let (mut frames_seen, mut refused) = (0, 0);
-        for m in 1..=4usize {
-            let n = m + 1;
-            let pairs: Vec<[usize; 2]> = (0..n)
-                .flat_map(|a| (a + 1..n).map(move |b| [a, b]))
-                .collect();
-            // The carrier is body 1 on axis 0; axis a > 0 is on body a + 1.
-            let carried_by: Vec<usize> = (0..n).map(|a| if a == 0 { GROUND } else { 1 }).collect();
-            let bodies: Vec<(usize, usize)> = (0..n).map(|a| (a + 1, a)).collect();
-            for mask in 0u32..1 << pairs.len() {
-                let chosen: Vec<[usize; 2]> = pairs
-                    .iter()
-                    .enumerate()
-                    .filter(|(k, _)| (mask >> k) & 1 == 1)
-                    .map(|(_, &p)| p)
-                    .collect();
-                let at_radius = |v: usize| chosen.contains(&[0, v]);
-                let bad =
-                    |c: &Vec<usize>| !c.contains(&0) || c.iter().any(|&v| v != 0 && !at_radius(v));
-                let found = cycles(n, &chosen);
-                let s = frames(&carried_by, &bodies, &chosen);
-                match s.invariants() {
-                    Err(Invariant::CarriedCycle(d)) => {
-                        let [a, b] = chosen[d];
-                        let on_a_bad_cycle = found.iter().filter(|c| bad(c)).any(|c| {
-                            (0..c.len()).any(|i| {
-                                let (x, y) = (c[i], c[(i + 1) % c.len()]);
-                                [x, y] == [a, b] || [y, x] == [a, b]
-                            })
-                        });
-                        assert!(
-                            on_a_bad_cycle,
-                            "{chosen:?}: distance {d} closes no cycle it should"
-                        );
-                        refused += 1;
-                    }
-                    Ok(()) => assert!(
-                        !found.iter().any(bad),
-                        "{chosen:?}: a cycle no triangle places stood: {found:?}"
-                    ),
-                    other => panic!("{chosen:?}: {other:?}"),
-                }
-                frames_seen += 1;
-            }
-        }
-        // 2^1 + 2^3 + 2^6 + 2^10 sets of distances.
-        assert_eq!(frames_seen, 2 + 8 + 64 + 1024);
-        assert!(refused > 500, "only {refused} refused");
     }
 
     /// An edit on a shape outside any train: what it adds is numbered after

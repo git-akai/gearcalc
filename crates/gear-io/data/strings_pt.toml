@@ -139,13 +139,13 @@ train_file_format = "este ficheiro é do formato {found}, e esta ferramenta lê 
 train_size_over_constrained = "engrenamentos {first} e {second}: as suas distâncias dadas, com todos os deslocamentos fixados, pedem às suas engrenagens dois tamanhos diferentes — liberte um deslocamento, uma distância ou o tamanho"
 train_axes_too_close = "distância {distance}: os dois eixos que liga num mesmo portador estão demasiado próximos para ficarem às suas distâncias do eixo do portador"
 train_axes_too_far = "distância {distance}: os dois eixos que liga num mesmo portador estão demasiado afastados para ficarem às suas distâncias do eixo do portador"
+train_axes_loop_open = "distância {distance}: fecha um ciclo de distâncias entre os eixos que um portador leva, e nenhuma disposição dos eixos em torno do eixo do portador cumpre todas as distâncias dele"
 train_malformed = "o grafo do trem não está bem formado"
 train_malformed_carried_by = "eixo {axis}: o seu carried_by não nomeia nenhum corpo noutro eixo"
 train_malformed_carried_by_cycle = "eixo {axis}: o seu carried_by leva-o, pelos seus portadores, de volta a si próprio"
 train_malformed_distance_twice = "distância {distance}: os seus dois eixos têm outra distância indicada entre eles, e um par de eixos tem uma"
 train_malformed_ring_first = "engrenamento {mesh}: o seu primeiro membro é uma coroa, e um engrenamento indica a coroa em segundo lugar"
 train_malformed_distance_off_frame = "distância {distance}: os seus dois eixos não ficam parados num mesmo referencial — nem levados por um mesmo corpo, nem um deles o eixo em torno do qual roda o portador do outro; uma linha em torno da qual um portador roda é um só eixo, quantos corpos rodem em torno dela"
-train_malformed_carried_cycle = "distância {distance}: fecha um ciclo de distâncias entre os eixos que um portador leva que nenhum triângulo pelo eixo do portador posiciona"
 train_malformed_number_gap = "corpo {body}: nada nomeia este número, e um trem numera os seus corpos a partir de 1 sem lacunas"
 
 [ui]

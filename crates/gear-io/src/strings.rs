@@ -1486,7 +1486,6 @@ mod tests {
                     Invariant::DistanceTwice(0),
                     Invariant::RingFirst(1),
                     Invariant::DistanceOffFrame(2),
-                    Invariant::CarriedCycle(3),
                     Invariant::NumberGap(2),
                     Invariant::BodyOnNoAxis(1),
                 ] {
@@ -1514,6 +1513,32 @@ mod tests {
                 match out {
                     Err(e @ TrainError::AxesCannotBePlaced { .. }) => err(e.note()),
                     other => panic!("the axes cannot be placed: {:?}", other.err()),
+                }
+            }
+            // **A loop of four planets that does not close**: each meshing
+            // the next, at radii of 21, 21, 15 and 18, whose angles no choice
+            // of signs brings within 4.8° of a whole turn.
+            {
+                use gear_core::train::arrangements::{epicyclic, Central};
+                let open = epicyclic(
+                    1,
+                    &[&[18], &[18], &[18], &[18]],
+                    &[
+                        Central::Sun { on: 0, teeth: 24 },
+                        Central::Carrier,
+                        Central::Ring { on: 1, teeth: 60 },
+                        Central::Sun { on: 2, teeth: 12 },
+                        Central::Ring { on: 3, teeth: 54 },
+                    ],
+                    &[(0, 1), (1, 2), (2, 3), (3, 0)],
+                );
+                let out = gear_core::train::solve_alone(
+                    &gear_core::train::Train::alone(&open, 2.0, 3000.0),
+                    &lib,
+                );
+                match out {
+                    Err(e @ TrainError::AxesLoopOpen { .. }) => err(e.note()),
+                    other => panic!("the loop does not close: {:?}", other.err()),
                 }
             }
             // **Two given distances asking one group two sizes**: a line of

@@ -1746,6 +1746,11 @@ pub enum TrainError {
     /// Zero-based, as the distances are indexed; the front end numbers
     /// from 1.
     AxesCannotBePlaced { distance: usize, too_close: bool },
+    /// **A loop of distances on one carrier does not close**: no placement
+    /// of the axes about the carrier's axis stands at every distance in it
+    /// (`Indexed::frames_close`). The loop's last-stated distance,
+    /// zero-based; the front end numbers from 1.
+    AxesLoopOpen { distance: usize },
     /// **Two given distances ask one mesh group two sizes**: each with both
     /// its mesh's shifts pinned decides the group's helix, and they decide
     /// it differently ([`resolved_helices`](incidence::Indexed::resolved_helices)). The mesh that
@@ -1853,6 +1858,9 @@ impl crate::note::Explain for TrainError {
                 key::ERROR_TRAIN_AXES_TOO_FAR
             })
             .count("distance", u32::try_from(*distance + 1).unwrap_or(u32::MAX)),
+            Self::AxesLoopOpen { distance } => {
+                Note::new(key::ERROR_TRAIN_AXES_LOOP_OPEN).count("distance", numbered(*distance))
+            }
             // Each field a refusal can name has its own key; the axis is
             // numbered from one, as the panel numbers axes.
             Self::Malformed(Invariant::CarriedByNothing(axis)) => {
@@ -1871,9 +1879,6 @@ impl crate::note::Explain for TrainError {
             Self::Malformed(Invariant::DistanceOffFrame(d)) => {
                 Note::new(key::ERROR_TRAIN_MALFORMED_DISTANCE_OFF_FRAME)
                     .count("distance", numbered(*d))
-            }
-            Self::Malformed(Invariant::CarriedCycle(d)) => {
-                Note::new(key::ERROR_TRAIN_MALFORMED_CARRIED_CYCLE).count("distance", numbered(*d))
             }
             // A body is numbered as the train numbers it, ground 0.
             Self::Malformed(Invariant::NumberGap(body)) => {
@@ -1991,6 +1996,13 @@ impl std::fmt::Display for TrainError {
                  at their distances from the carrier's axis",
                 distance + 1,
                 if *too_close { "close" } else { "far apart" }
+            ),
+            Self::AxesLoopOpen { distance } => write!(
+                f,
+                "distance {}: it closes a loop of distances among the axes one carrier \
+                 carries, and no placement of the axes about the carrier's axis stands at \
+                 every distance in it",
+                distance + 1
             ),
             Self::Malformed(Invariant::CarriedByNothing(axis)) => write!(
                 f,
