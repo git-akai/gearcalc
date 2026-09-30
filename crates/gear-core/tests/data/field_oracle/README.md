@@ -77,6 +77,28 @@ held to `compliance.json`. The state inputs add `T` (N·mm) on member `on` (1 or
 A port that reproduces a record beyond its tolerance has found either its own defect or a Python one; both are
 answered by the record's `fn` and the gates in the porting plan's table of steps, never by widening the tolerance.
 
+## What the port found in the prototype
+
+The records keep the prototype's values; the port is held to the physics and to methods that share nothing with
+the prototype, never widened to a flaw. What each step found:
+
+- **P2 (`kernel.py`).**
+  - `G` below its table (`r < e^−28`) is linear in `r`, `G(r₀) r/r₀`, where `G` is `(4/π) r ln(4/r)`: 38 % low at
+    `r = 1e-20`. Under `1e-12` absolute, so no record reaches it; the port takes the small-`r` form, and the
+    law that holds `G` to its definition plants the linear tail.
+  - The line-limit check (`t_kernel.py`; `kernel.py`'s docstring says "checked to 1e-9") summed panels over
+    `±10⁵ h` and read the `3.1e-12` left as agreement; that residual is the omitted tail beyond `±L`,
+    `(1 + ν) ν h²/(2π E L²)`, exactly. The port's law adds the tail in closed form and holds the rest to
+    rounding.
+  - `shape_C` clamps a curvature ratio outside `[0, 1]` into it; the port refuses one.
+  - Absence carried as a number: `dG(0) = inf`, the bare half-space as `h = inf`, and `n_width` returning its
+    cap for `h/b` not `> 0`. The port types each (`None`; a panel with no depth; a panel refused).
+  - `G_direct` is exact only in absolute terms at small `r` (a few `1e-16`, where `G` is `~ r ln(1/r)`): it
+    subtracts the `ln sin θ` singularity over the whole range. The port keeps the method and states the limit:
+    a panel `2e-3 b` long on the point still holds `1e-13` of itself (the panel law), the relative error grows
+    as one over the length below that, and no panel of a solve is near that short.
+  - This README's "34 cases" for `kernel/panel`: the file holds 35.
+
 ## Provenance of this copy
 
 Copied from `~/.cache/gearcalc-work/contact-proto/oracle/` (the prototype's tree, outside the repository): **version 2**,

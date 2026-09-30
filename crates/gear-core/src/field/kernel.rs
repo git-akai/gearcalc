@@ -52,13 +52,14 @@ const TABLE_FROM: f64 = -28.0;
 /// whose remainder, `O(r⁻⁴)`, is below `1e-24` there.
 const TABLE_TO: f64 = 14.0;
 
-/// The table's step in `u = ln r`. Cubic Hermite with the exact slope errs `step⁴ G⁗/384` at a
-/// cell's middle: the prototype's step (round seven), equal to [`g_direct`] to `4e-14`
-/// (the oracle's `G` basis); the step before it, `0.02`, erred `7.9e-11`.
+/// The table's step in `u = ln r`. Cubic Hermite with the exact slope errs at most
+/// `step⁴ max|∂⁴G/∂u⁴| / 384` in a cell; `max|∂⁴G/∂u⁴| = 0.205`, at `u ≈ −0.95` (`G`'s
+/// derivatives in `u` decay at both ends), so `2.1e-14` here.
 const TABLE_STEP: f64 = 0.0025;
 
-/// Gauss–Legendre nodes per cell of [`g_direct`]: 16 equal a tanh-sinh reference of the
-/// definition to `2e-14` (the oracle's basis; 8 left `7.8e-13`).
+/// Gauss–Legendre nodes per cell of [`g_direct`]. Each cell's rule converges as `ρ⁻³²`, `ρ ≥ 4.3`
+/// the Bernstein ellipse through the integrand's nearest branch point, `θ = i asinh r`
+/// (`4.3⁻³² ≈ 4e-21`), so the sum is exact to rounding.
 const CELL_NODES: usize = 16;
 
 /// The width rule's bound: `n` Gauss–Chebyshev nodes integrate the depth term to `O(E⁻²ⁿ)`, `E`
@@ -122,11 +123,15 @@ impl HalfSpace {
     }
 
     /// An infinite uniform line of unit load (N/mm) and half-width `b`, relative to depth `h`:
-    /// `2(1 − ν²)/(π E) [asinh(h/b) − ν/(1 − ν) · h/(√(h² + b²) + h)]`, mm²/N. For `b, h > 0`.
-    pub fn line_limit(self, half_width: f64, depth: f64) -> f64 {
+    /// `2(1 − ν²)/(π E) [asinh(h/b) − ν/(1 − ν) · h/(√(h² + b²) + h)]`, mm²/N. `None` unless `b`
+    /// and `h` are finite lengths `> 0`.
+    pub fn line_limit(self, half_width: f64, depth: f64) -> Option<f64> {
         let (b, h, nu) = (half_width, depth, self.poisson);
-        2.0 * (1.0 - nu * nu) / (PI * self.modulus)
-            * ((h / b).asinh() - nu / (1.0 - nu) * h / (h.hypot(b) + h))
+        let length = |v: f64| v.is_finite() && v > 0.0;
+        (length(b) && length(h)).then(|| {
+            2.0 * (1.0 - nu * nu) / (PI * self.modulus)
+                * ((h / b).asinh() - nu / (1.0 - nu) * h / (h.hypot(b) + h))
+        })
     }
 }
 
@@ -177,12 +182,6 @@ impl Panel {
         } else {
             Route::Near
         }
-    }
-
-    /// The width rule's node count for this panel's depth term ([`width_rule`]). `None` for the
-    /// bare half-space, which has no depth term.
-    pub fn width_nodes(&self) -> Option<usize> {
-        self.depth.map(|h| width_rule(self.half_width, h))
     }
 }
 
@@ -456,6 +455,7 @@ mod tests {
     use crate::elliptic::r_f;
     use crate::field::oracle::{self, miss, num, Worst};
     use crate::field::wide::Wide;
+    use crate::hertz::elliptical_contact;
     use serde_json::Value;
 
     const EPS: f64 = f64::EPSILON;
@@ -469,7 +469,26 @@ mod tests {
         HalfSpace::new(206_000.0, 0.3).expect("a half-space")
     }
 
+    /// The width rule's node count for a panel's depth term; `None` for the bare half-space.
+    fn nodes_of(p: &Panel) -> Option<usize> {
+        p.depth.map(|h| width_rule(p.half_width, h))
+    }
+
     // ---------------------------------------------------------------- the oracle
+    //
+    // The prototype's records, and the laws on them, go with the prototype. What holds each
+    // record's function then shares neither code nor method with it:
+    // - G, G_direct, G′: `g_is_its_definitions_quadrature` (double-double, in x = r sinh v) and
+    //   `the_table_is_g`;
+    // - Carlson's R_F and R_D: `elliptic.rs`'s laws (each definition's quadrature; the complete
+    //   integrals against the arithmetic–geometric mean);
+    // - the line limit: `the_kernel_sums_to_the_line_limit` and
+    //   `the_line_limit_deep_in_the_tooth_is_weber_and_banascheks`;
+    // - the panels, their routes and node counts: `every_panel_is_its_definitions_quadrature`,
+    //   `the_forms_agree_at_the_switch` and `the_width_rule_holds_its_bound`;
+    // - C and the aspect: `the_shape_factor_is_the_ellipses_peak_over_the_lines`,
+    //   `the_shape_factor_runs_from_the_line_to_the_circle`,
+    //   `the_hertz_ellipse_converges_at_second_order`, and `hertz.rs`'s aspect laws.
 
     /// The README's rules for this step's records, written out: each record states its own, and
     /// [`reproduce`] asserts it is this one.
@@ -646,7 +665,7 @@ mod tests {
                     assert_eq!(cases.len(), 3);
                     for (k, c) in cases.iter().enumerate() {
                         let body = HalfSpace::new(num(&c[3]), num(&c[2])).expect("a half-space");
-                        let port = body.line_limit(num(&c[0]), num(&c[1]));
+                        let port = body.line_limit(num(&c[0]), num(&c[1])).expect("a strip");
                         check(
                             format!("line{c}"),
                             port,
@@ -676,7 +695,7 @@ mod tests {
                             .map(|n| usize::try_from(n).expect("fits"));
                         seen.exact += 2;
                         seen.differ += usize::from(route_name(p.route()) != route)
-                            + usize::from(p.width_nodes() != width);
+                            + usize::from(nodes_of(&p) != width);
                     }
                 }
                 "kernel/shape_C" => {
@@ -794,90 +813,406 @@ mod tests {
         assert!(six_rule > 0);
     }
 
-    // ---------------------------------------------------------------- the 50-digit reference
+    // ---------------------------------------------------------------- the double-double references
 
-    /// The panel's definition, surface minus depth with `η` integrated in closed form, over the
-    /// strip's width by tanh-sinh at step `hs` in double-double (the prototype's
-    /// `oracle-fix/check_panel_dec.py`, in 50 digits there): shares no code with the kernel.
-    /// Returns the two terms, `(surface, depth)`; the panel is their difference.
-    fn reference_terms(p: &Panel, body: HalfSpace, hs: f64) -> (Wide, Wide) {
-        let w = Wide::of;
-        let (e1, e2, b) = (w(p.from), w(p.to), w(p.half_width));
-        let (nu, e) = (w(body.poisson), w(body.modulus));
-        let pi = Wide::pi();
-        let one = w(1.0);
-        let cs = (one - nu * nu) / (pi * e);
-        let cd = (one + nu) / (w(2.0) * pi * e);
-        let surface = |x: Wide| cs * ((e2 / x).asinh() - (e1 / x).asinh());
-        let depth = |x: Wide| {
-            p.depth.map_or(w(0.0), |h| {
-                let h = w(h);
-                let r2 = x * x + h * h;
-                let rho = r2.sqrt();
-                let (d1, d2) = ((r2 + e1 * e1).sqrt(), (r2 + e2 * e2).sqrt());
-                cd * (w(2.0) * (one - nu) * ((e2 / rho).asinh() - (e1 / rho).asinh())
-                    + h * h * (e2 / (r2 * d2) - e1 / (r2 * d1)))
-            })
-        };
-        // x on [0, b] (the integrand is even in x): x = b/(1 + e^{−2u}), u = (π/2) sinh t,
-        // dx = (b/2)(π/2) cosh t / cosh² u dt; |t| ≤ 4.2, where the weight is below 1e-43.
+    /// How far along `t` tanh-sinh reaches: at `|t| = 4.2` its weight is below `1e-43`.
+    const REACH: f64 = 4.2;
+
+    /// `∫₀^len f` by tanh-sinh at step `hs` in double-double: `x = len/(1 + e^{−2u})`,
+    /// `u = (π/2) sinh t`. `f` is handed `x` and `len − x`, each without cancellation, so an
+    /// integrable singularity at either end costs nothing.
+    fn tanh_sinh(len: Wide, hs: f64, f: impl Fn(Wide, Wide) -> Wide) -> Wide {
+        let (one, two) = (Wide::of(1.0), Wide::of(2.0));
+        let half_pi = Wide::pi() * Wide::of(0.5);
         #[expect(clippy::cast_possible_truncation, reason = "a node count")]
-        let reach = (4.2 / hs) as i32;
-        let (mut s, mut d) = (w(0.0), w(0.0));
+        let reach = (REACH / hs) as i32;
+        let mut sum = Wide::of(0.0);
         for k in -reach..=reach {
-            let t = w(f64::from(k)) * w(hs);
-            let u = pi * w(0.5) * t.sinh();
-            let e2u = (w(2.0) * u).exp();
-            let from_zero = b / (one + one / e2u);
-            let from_b = b / (e2u + one);
-            if from_zero.hi == 0.0 || from_b.hi == 0.0 {
+            let t = Wide::of(f64::from(k) * hs);
+            let u = half_pi * t.sinh();
+            let e2u = (two * u).exp();
+            let (from_zero, to_end) = (len / (one + one / e2u), len / (e2u + one));
+            if from_zero.hi == 0.0 || to_end.hi == 0.0 {
                 continue;
             }
             let cu = u.cosh();
-            let weight = pi * w(0.5) * t.cosh() / (cu * cu);
-            let phi = w(2.0) / (pi * b) * (from_b * (w(2.0) * b - from_b)).sqrt() / b;
-            s = s + weight * phi * surface(from_zero);
-            d = d + weight * phi * depth(from_zero);
+            sum = sum + half_pi * t.cosh() / (cu * cu) * f(from_zero, to_end);
         }
-        let factor = b * w(hs);
-        (s * factor, d * factor)
+        sum * len * Wide::of(0.5 * hs)
     }
 
-    fn reference(p: &Panel, body: HalfSpace, hs: f64) -> Wide {
-        let (s, d) = reference_terms(p, body, hs);
-        s - d
+    /// `∫ φ(x) g(|x|) dx` across a strip of half-width `b`, `φ(x) = (2/(π b²)) √(b² − x²)`.
+    fn strip(b: Wide, hs: f64, g: impl Fn(Wide) -> Wide) -> Wide {
+        let two = Wide::of(2.0);
+        let phi = |x: Wide, to_b: Wide| two / (Wide::pi() * b * b) * (to_b * (b + x)).sqrt();
+        two * tanh_sinh(b, hs, |x, to_b| phi(x, to_b) * g(x))
     }
 
-    /// Every oracle panel against the double-double quadrature of its definition, to `1e-13` of
-    /// its scale (the porting plan's gate; the records themselves are within `3.3e-14` of the
-    /// prototype's 50-digit one). The reference at steps 1/32 and 1/64 agrees with itself far
-    /// below that. Its plants: version 1's port (the near form everywhere) and round six's `G`
-    /// table, each missing some panel; the round-six width rule on the near panels.
+    /// A panel's definition in its three parts, each across the strip in double-double with its
+    /// factor and `η` integrated in closed form: the surface term `S`, and the depth term's two,
+    /// `D_ρ` (its `asinh`s) and `D_h` (its `h²` term). The panel is `S − D_ρ − D_h`. Shares no
+    /// code with the kernel (the prototype's `oracle-fix/check_panel_dec.py` did this in 50
+    /// digits).
+    struct Terms {
+        surface: Wide,
+        asinh: Wide,
+        h2: Wide,
+    }
+
+    impl Terms {
+        fn value(&self) -> Wide {
+            self.surface - self.asinh - self.h2
+        }
+
+        /// The larger of the two terms the form `route` subtracts: the near form's surface and
+        /// depth; the separated form's `S − D_ρ` (its `asinh` difference) and `D_h`. An exact
+        /// evaluation by that form errs a few roundings of it.
+        fn scale(&self, route: Route) -> f64 {
+            let (a, b) = match route {
+                Route::Near => (self.surface, self.asinh + self.h2),
+                Route::Separated => (self.surface - self.asinh, self.h2),
+            };
+            a.abs().to_f64().max(b.abs().to_f64())
+        }
+    }
+
+    fn reference_terms(p: &Panel, body: HalfSpace, hs: f64) -> Terms {
+        let w = Wide::of;
+        let (e1, e2, b) = (w(p.from), w(p.to), w(p.half_width));
+        let (nu, e) = (w(body.poisson), w(body.modulus));
+        let (one, two, pi) = (w(1.0), w(2.0), Wide::pi());
+        let cs = (one - nu * nu) / (pi * e);
+        let cd = (one + nu) / (two * pi * e);
+        let surface = strip(b, hs, |x| cs * ((e2 / x).asinh() - (e1 / x).asinh()));
+        let Some(h) = p.depth else {
+            return Terms {
+                surface,
+                asinh: w(0.0),
+                h2: w(0.0),
+            };
+        };
+        let h = w(h);
+        let asinh = strip(b, hs, |x| {
+            let rho = (x * x + h * h).sqrt();
+            cd * two * (one - nu) * ((e2 / rho).asinh() - (e1 / rho).asinh())
+        });
+        let h2 = strip(b, hs, |x| {
+            let r2 = x * x + h * h;
+            let (d1, d2) = ((r2 + e1 * e1).sqrt(), (r2 + e2 * e2).sqrt());
+            cd * h * h * (e2 / (r2 * d2) - e1 / (r2 * d1))
+        });
+        Terms { surface, asinh, h2 }
+    }
+
+    /// `(G(r), G′(r))`, `r > 0`, by their definitions in double-double, in `v = asinh(x/r)` so
+    /// that the scale `r` is the variable's own at every `r`:
+    ///
+    /// ```text
+    /// G(r)  = 2 ∫₀¹ φ(x) asinh(r/x) dx  = 2r ∫₀^V φ(r sinh v) asinh(1/sinh v) cosh v dv,
+    /// G′(r) = 2 ∫₀¹ φ(x) dx/√(x² + r²) = 2  ∫₀^V φ(r sinh v) dv,     V = asinh(1/r),
+    /// ```
+    ///
+    /// `φ(x) = (2/π) √(1 − x²)`. Shares neither code nor variable with [`g_direct`] (θ, cells of
+    /// Gauss–Legendre), the table or [`g_slope`] (Carlson's `R_D`).
+    fn g_reference(r: f64, hs: f64) -> (Wide, Wide) {
+        let (r, one, two) = (Wide::of(r), Wide::of(1.0), Wide::of(2.0));
+        let phi = |v: Wide| {
+            let x = r * v.sinh();
+            two / Wide::pi() * (one - x * x).sqrt()
+        };
+        let end = (one / r).asinh();
+        let g = tanh_sinh(end, hs, |v, _| phi(v) * (one / v.sinh()).asinh() * v.cosh());
+        let slope = tanh_sinh(end, hs, |v, _| phi(v));
+        (two * r * g, two * slope)
+    }
+
+    // ---------------------------------------------------------------- G
+
+    /// `max |∂⁴G/∂u⁴|` over the table, `u = ln r`: `0.205` at `u ≈ −0.95`, rounded up.
+    /// [`the_table_is_g`] holds it against the third differences of the table's exact slope.
+    const G4_MAX: f64 = 0.21;
+
+    /// Cubic Hermite with the exact slope, at `step` in `u`: `step⁴ max|∂⁴G/∂u⁴| / 384`.
+    fn hermite(step: f64) -> f64 {
+        step.powi(4) * G4_MAX / 384.0
+    }
+
+    /// [`g_direct`]'s rounding at `r`, `G(r) = g`. Its `m = 16 · cells` node terms sum with at
+    /// most `m ε Σ|terms|`; each term carries a few roundings of its own, and the logarithm an
+    /// absolute `ε` where its argument is near 1 (`Σ w cos²θ = π/4`); `Σ|terms| ≤ (π/4)(ln 2 +
+    /// 1/2 + g)`, since `|ln(r + √(r² + sin²θ))| ≤ |ln sin θ| + asinh(r/sin θ)`; the constant
+    /// added in closed form is `(π/4)(ln 2 + 1/2)`. Times `4/π`: `(m + 16) ε (ln 4 + 2 + g)`,
+    /// with at most `2 + log₂(π/(2 min(r, π/4)))` cells.
+    fn direct_rounding(r: f64, g: f64) -> f64 {
+        let cells = 2.0 + (FRAC_PI_2 / r.min(FRAC_PI_4)).log2();
+        (CELL_NODES as f64 * cells + 16.0) * EPS * (4.0_f64.ln() + 2.0 + g.abs())
+    }
+
+    /// What `G` is held to at `r`: each of its three forms to what that form guarantees. Beyond
+    /// the table's ends, the outer forms, whose remainders are below `1e-24` there, to their few
+    /// roundings (`8 ε |G|`: relative, as the forms are); in the table, the Hermite bound, the
+    /// nodes' rounding, and the interpolant's own (`24 ε |G|`).
+    fn g_bound(r: f64, g: f64) -> f64 {
+        let u = r.ln();
+        if u >= TABLE_TO || u <= TABLE_FROM {
+            8.0 * EPS * g.abs()
+        } else {
+            hermite(TABLE_STEP) + direct_rounding(r, g) + 24.0 * EPS * g.abs()
+        }
+    }
+
+    /// The radii the `G` laws run over: four to a decade, from `1.3e-14`, below the table, to
+    /// `1.3e6`, above it; none of them the oracle's (`10^{k/2}`).
+    fn radii() -> Vec<f64> {
+        (-56..=24)
+            .map(|k| 10f64.powf(f64::from(k) / 4.0 + 0.125))
+            .collect()
+    }
+
+    /// `G′`'s closed form with its leading constant `4/(3π)` typed to 11 digits.
+    fn slope_typed(r: f64) -> f64 {
+        let r2 = r * r;
+        0.424_413_181_58 * (1.0 + r2) * r_d(0.0, r2, 1.0 + r2).expect("R_D")
+    }
+
+    /// Each radius with its reference `(G, G′)`, at steps 1/64 and 1/32.
+    struct GCase {
+        r: f64,
+        g: Wide,
+        slope: Wide,
+        coarse: (Wide, Wide),
+    }
+
+    fn g_cases() -> Vec<GCase> {
+        radii()
+            .into_iter()
+            .map(|r| {
+                let (g, slope) = g_reference(r, 1.0 / 64.0);
+                GCase {
+                    r,
+                    g,
+                    slope,
+                    coarse: g_reference(r, 1.0 / 32.0),
+                }
+            })
+            .collect()
+    }
+
+    /// Which of `G`'s evaluations: the table (with its outer forms), [`g_direct`], [`g_slope`].
+    const TABLE: usize = 0;
+    const DIRECT: usize = 1;
+    const SLOPE: usize = 2;
+
+    /// Each value's own bound at `r`, its reference `x`: `G` by [`g_bound`], [`g_direct`] by
+    /// [`direct_rounding`], `G′` by the closed-form rule (`1e-13`: a few dozen roundings of
+    /// Carlson's duplication).
+    fn g_rule(k: usize, r: f64, x: f64) -> f64 {
+        match k {
+            TABLE => g_bound(r, x),
+            DIRECT => direct_rounding(r, x),
+            _ => CLOSED_REL * x.abs(),
+        }
+    }
+
+    /// The three evaluations, the port's or a plant's, at `r`.
+    type Evaluations<'a> = [&'a dyn Fn(f64) -> f64; 3];
+
+    /// A bound on one evaluation, by its index, `r` and its reference.
+    type GBound<'a> = &'a dyn Fn(usize, f64, f64) -> f64;
+
+    /// How many of each evaluation miss the reference by more than `bound` allows, and the worst
+    /// ratio of each; `perturb` moves a value first (by its index and reference).
+    fn g_missed(
+        cases: &[GCase],
+        at: Evaluations,
+        perturb: impl Fn(usize, &GCase, f64) -> f64,
+        bound: impl Fn(usize, f64, f64) -> f64,
+    ) -> ([usize; 3], [f64; 3]) {
+        let (mut missed, mut worst) = ([0; 3], [0.0_f64; 3]);
+        for c in cases {
+            for (k, f) in at.iter().enumerate() {
+                let reference = if k == SLOPE { c.slope } else { c.g };
+                let port = perturb(k, c, f(c.r));
+                let off = (Wide::of(port) - reference).abs().to_f64();
+                let ratio = off / bound(k, c.r, reference.to_f64());
+                missed[k] += usize::from(ratio > 1.0 || ratio.is_nan());
+                worst[k] = worst[k].max(ratio);
+            }
+        }
+        (missed, worst)
+    }
+
+    /// **`G`, `G_direct` and `G′` are their definitions' quadratures**: at 81 radii from below the
+    /// table to above it, the table (and its outer forms), [`g_direct`] and [`g_slope`] each
+    /// equal a double-double quadrature of the definition, in a variable none of them uses, to
+    /// the bound its own form guarantees; the reference at steps 1/32 and 1/64 agrees with
+    /// itself to `1e-20`. The tolerance's two laws: every value a few roundings off passes, ten
+    /// times its bound off misses everywhere.
+    ///
+    /// Plants, each missing somewhere and each passing the looser gate beside it (asserted):
+    /// the prototype's tail below the table, linear in `r` (`G(r₀) r/r₀`: under `1e-12`
+    /// absolute); round six's table step, `0.02` (under `1e-10` absolute); [`g_direct`] at 8
+    /// nodes a cell (`1.7e-12` at worst, under `1e-10` absolute); `G′` with `4/(3π)` typed to 11
+    /// digits (under `1e-10` relative).
+    #[test]
+    fn g_is_its_definitions_quadrature() {
+        let kernel = Kernel::shared();
+        let cases = g_cases();
+        assert_eq!(cases.len(), 81);
+        let rel = |a: Wide, b: Wide| ((a - b) / a).abs().to_f64();
+        let self_worst = cases
+            .iter()
+            .map(|c| rel(c.g, c.coarse.0).max(rel(c.slope, c.coarse.1)))
+            .fold(0.0_f64, f64::max);
+        assert!(self_worst < 1e-20, "the reference: {self_worst:e}");
+
+        let table = |r: f64| kernel.g(r);
+        let slope = |r: f64| g_slope(r).expect("G′ at r > 0");
+        let port: Evaluations = [&table, &g_direct, &slope];
+        let as_is = |_: usize, _: &GCase, x: f64| x;
+        let (missed, worst) = g_missed(&cases, port, as_is, g_rule);
+        eprintln!(
+            "G: 81 radii, worst of the bound: table {:.3}, direct {:.3}, slope {:.3} (the \
+             reference's own step change {self_worst:.1e})",
+            worst[0], worst[1], worst[2]
+        );
+        assert_eq!(missed, [0; 3]);
+
+        let rounded = |_: usize, _: &GCase, x: f64| x * (1.0 + 4.0 * EPS);
+        assert_eq!(g_missed(&cases, port, rounded, g_rule).0, [0; 3]);
+        let ten_times = |k: usize, c: &GCase, x: f64| {
+            let reference = if k == SLOPE { c.slope } else { c.g };
+            x + 10.0 * g_rule(k, c.r, reference.to_f64())
+        };
+        assert_eq!(g_missed(&cases, port, ten_times, g_rule).0, [81; 3]);
+
+        let r0 = TABLE_FROM.exp();
+        let linear = |r: f64| {
+            if r < r0 {
+                kernel.g(r0) * r / r0
+            } else {
+                kernel.g(r)
+            }
+        };
+        let coarse = Kernel::with_step(0.02);
+        let coarse_table = |r: f64| coarse.g(r);
+        let eight = |r: f64| g_direct_with(r, &gauss_legendre::<8>());
+        let absolute = |a: f64| move |_: usize, _: f64, _: f64| a;
+        // (the evaluations, which of them is planted, the looser gate it passes)
+        let plants: [(Evaluations, usize, GBound); 4] = [
+            ([&linear, &g_direct, &slope], TABLE, &absolute(1e-12)),
+            ([&coarse_table, &g_direct, &slope], TABLE, &absolute(1e-10)),
+            ([&table, &eight, &slope], DIRECT, &absolute(1e-10)),
+            ([&table, &g_direct, &slope_typed], SLOPE, &|_, _, x: f64| {
+                1e-10 * x.abs()
+            }),
+        ];
+        let (mut caught, mut largest) = ([0; 4], [0.0; 4]);
+        for (k, (at, planted, looser)) in plants.into_iter().enumerate() {
+            let (missed, _) = g_missed(&cases, at, as_is, g_rule);
+            assert_eq!(
+                missed.iter().sum::<usize>(),
+                missed[planted],
+                "plant {k} moves only what it plants"
+            );
+            caught[k] = missed[planted];
+            largest[k] = g_missed(&cases, at, as_is, absolute(1.0)).1[planted];
+            let (near_miss, _) = g_missed(&cases, at, as_is, looser);
+            assert_eq!(near_miss[planted], 0, "plant {k} passes the looser gate");
+        }
+        eprintln!(
+            "G plants missing (tail, step 0.02, 8 nodes, 11 digits): {caught:?}, largest \
+             errors {:?}",
+            largest.map(|x: f64| format!("{x:.1e}"))
+        );
+        assert!(caught.iter().all(|&m| m > 0), "{caught:?}");
+    }
+
+    // ---------------------------------------------------------------- the panels
+
+    /// The panels the definition's quadrature is held on, in half-widths (`b = 0.05`): at depths
+    /// from a third of the width to a thousand widths, panels over the point, starting at it,
+    /// ending just short of it, a thousandth of a width long on it, either side of the separated
+    /// form's threshold, beside it, and far out (to 2000 widths, where the near form's terms
+    /// cancel to `1e4` times the value and more); two on the bare half-space. The bodies turn
+    /// with the cases, `ν` from 0 to 1/2.
+    fn panel_cases() -> Vec<(Panel, HalfSpace)> {
+        let b = 0.05;
+        let bodies = [
+            (206_000.0, 0.3),
+            (96_500.0, 0.32),
+            (190_000.0, 0.29),
+            (1.0, 0.5),
+            (200_000.0, 0.0),
+        ];
+        let spans = [
+            (-0.2, 0.2),
+            (0.0, 2.0),
+            (-1.2, 1e-3),
+            (-1e-3, 1e-3),
+            (0.4999, 0.9),
+            (0.5, 0.9),
+            (-0.9, -0.5),
+            (1.1, 1.8),
+            (-4.06, -4.01),
+            (21.7, 35.9),
+            (-153.2, -152.9),
+            (-693.0, -691.0),
+            (-2000.0, -1980.0),
+        ];
+        let depths = [Some(0.3), Some(1.0), Some(4.0), Some(30.0), Some(1000.0)];
+        let cases = depths
+            .into_iter()
+            .flat_map(|d| spans.map(|s| (s, d)))
+            .chain([((-2.0, 2.0), None), ((0.5, 3.0), None)]);
+        cases
+            .enumerate()
+            .map(|(k, ((from, to), depth))| {
+                let (e, nu) = bodies[k % bodies.len()];
+                let panel = Panel::new(from * b, to * b, b, depth.map(|h: f64| h * b));
+                (
+                    panel.expect("a panel"),
+                    HalfSpace::new(e, nu).expect("a half-space"),
+                )
+            })
+            .collect()
+    }
+
+    /// The gate: a panel within `1e-13` of its form's scale ([`Terms::scale`]) of the
+    /// definition's quadrature.
+    const PANEL_GATE: f64 = 1e-13;
+
+    /// **Every panel is its definition's quadrature**: on 67 panels ([`panel_cases`]), the
+    /// kernel's value is the double-double quadrature of the definition to `1e-13` of the scale
+    /// of the form it takes (the porting plan's gate), and the reference at steps 1/32 and 1/64
+    /// agrees with itself to `1e-20` of it. The tolerance's two laws: a value a few roundings off
+    /// passes, ten times the gate off misses on every panel.
+    ///
+    /// Plants, each missing some panel: version 1's port (the near form everywhere), which
+    /// the far panels' cancellation fails; round six's `G` table (step 0.02); round six's width
+    /// rule (`1e-10`) on the near panels.
     #[test]
     fn every_panel_is_its_definitions_quadrature() {
-        const GATE: f64 = 1e-13;
-        let file = oracle_file();
-        let rec = oracle::records(&file)
-            .into_iter()
-            .find(|r| r.id == "kernel/panel")
-            .expect("panel");
-        let cases = rec.inputs["cases"].as_array().expect("cases");
-        let scales = rec.outputs["scale"].as_array().expect("scales");
         let kernel = Kernel::shared();
         let coarse = Kernel::with_step(0.02);
-        let (mut worst, mut self_worst, mut compared) = (0.0_f64, 0.0_f64, 0);
+        let (mut worst, mut self_worst, mut cancels) = (0.0_f64, 0.0_f64, 0.0_f64);
+        let (mut compared, mut rounded, mut tenfold) = (0, 0, 0);
         let (mut v1_missed, mut six_missed, mut rule_missed) = (0, 0, 0);
-        for (c, s) in cases.iter().zip(scales) {
-            let (p, body) = case_of(c);
-            let scale = num(s);
-            let fine = reference(&p, body, 1.0 / 64.0);
-            let half = reference(&p, body, 1.0 / 32.0);
+        for (p, body) in panel_cases() {
+            let terms = reference_terms(&p, body, 1.0 / 64.0);
+            let (fine, scale) = (terms.value(), terms.scale(p.route()));
+            let half = reference_terms(&p, body, 1.0 / 32.0).value();
             self_worst = self_worst.max((fine - half).abs().to_f64() / scale);
+            let near_scale = terms.scale(Route::Near);
+            cancels = cancels.max(near_scale / fine.abs().to_f64());
             let off = |v: f64| (Wide::of(v) - fine).abs().to_f64() / scale;
-            worst = worst.max(off(kernel.panel(&p, body)));
+            let port = kernel.panel(&p, body);
+            worst = worst.max(off(port));
             compared += 1;
-            v1_missed += usize::from(off(kernel.near(&p, body)) > GATE);
-            six_missed += usize::from(off(coarse.panel(&p, body)) > GATE);
+            rounded += usize::from(off(port * (1.0 + 4.0 * EPS)) <= PANEL_GATE);
+            tenfold += usize::from(off(port + 10.0 * PANEL_GATE * scale) > PANEL_GATE);
+            v1_missed += usize::from(off(kernel.near(&p, body)) > PANEL_GATE);
+            six_missed += usize::from(off(coarse.panel(&p, body)) > PANEL_GATE);
             if let (Some(h), Route::Near) = (p.depth, p.route()) {
                 let r = h / p.half_width;
                 let n = nodes(r + (1.0 + r * r).sqrt(), 1e-10);
@@ -886,20 +1221,22 @@ mod tests {
                 let v = surface
                     - body.interior()
                         * depth_term(p.from, p.to, p.half_width, h, body.poisson, kernel.rule(n));
-                rule_missed += usize::from(off(v) > GATE);
+                rule_missed += usize::from(off(v) > PANEL_GATE);
             }
         }
         eprintln!(
             "{compared} panels against the double-double reference: worst {worst:.2e} of scale \
-             (the reference's own step change {self_worst:.1e}); plants missing: v1 {v1_missed}, \
-             step 0.02 {six_missed}, width 1e-10 {rule_missed}"
+             (the reference's own step change {self_worst:.1e}; the near form's terms reach \
+             {cancels:.1e} times the value); plants missing: v1 {v1_missed}, step 0.02 \
+             {six_missed}, width 1e-10 {rule_missed}"
         );
-        assert_eq!(compared, 35);
+        assert_eq!(compared, 67);
         assert!(
             self_worst < 1e-20,
             "the reference has not converged: {self_worst}"
         );
-        assert!(worst <= GATE, "worst {worst}");
+        assert!(worst <= PANEL_GATE, "worst {worst}");
+        assert_eq!((rounded, tenfold), (67, 67));
         assert!(v1_missed > 0 && six_missed > 0 && rule_missed > 0);
     }
 
@@ -940,7 +1277,7 @@ mod tests {
         let surface = body.surface() * (kernel.g(l / b) - kernel.g(-l / b));
         let depth = body.interior() * depth_term(-l, l, b, h, body.poisson, kernel.rule(rule));
         let tail = if tail { line_tail(b, h, body) } else { 0.0 };
-        let residual = surface - depth - body.line_limit(b, h) - tail;
+        let residual = surface - depth - body.line_limit(b, h).expect("a strip") - tail;
         let bound = (rule as f64 + 16.0) * EPS * (surface.abs() + depth.abs());
         (residual.abs(), bound)
     }
@@ -966,7 +1303,10 @@ mod tests {
             let n = width_rule(b, h);
             let (res, bound) = line_residual(kernel, s, n, true);
             assert_eq!(
-                (kernel.panel(&p, body) - body.line_limit(b, h) - line_tail(b, h, body)).abs(),
+                (kernel.panel(&p, body)
+                    - body.line_limit(b, h).expect("a strip")
+                    - line_tail(b, h, body))
+                .abs(),
                 res,
                 "the residual is the kernel's own panel's"
             );
@@ -987,6 +1327,61 @@ mod tests {
         assert_eq!(ran, 15);
         assert_eq!(missed[..2], [15, 15]);
         assert!(missed[2] > 0, "{missed:?}");
+    }
+
+    /// **Deep in the tooth, the line limit is Weber and Banaschek's**: for `b ≪ h` the plane's
+    /// depth-referenced line compliance is the classical `2(1 − ν²)/(π E) [ln(2h/b) − ν/(2(1 −
+    /// ν))]` (Weber and Banaschek, 1953; the contact term of the tooth-stiffness literature),
+    /// derived apart from the kernel. The line limit's exact form exceeds it by
+    /// `2(1 − ν²)/(π E) (b/h)² [1/4 + ν/(8(1 − ν))]` (from `asinh(1/ε) = ln(2/ε) + ε²/4 + O(ε⁴)`
+    /// and `1/(√(1 + ε²) + 1) = 1/2 − ε²/8 + O(ε⁴)`, `ε = b/h`), to a remainder below
+    /// `0.2 ε⁴` of the factor (`3/32 + ν/(16(1 − ν))`, `ν ≤ 1/2`) and the roundings of the two
+    /// values: on five bodies (`ν` 0 to 1/2) at `b/h` from 0.1 to 0.003.
+    ///
+    /// Plants: `ν/(1 − ν)` read as `ν`, which misses everywhere but at `ν = 0`; the exact tail
+    /// `h/(√(h² + b²) + h)` taken at its deep limit `1/2`, which misses wherever `ν > 0` and
+    /// passes a check that the two agree to `1e-3` (asserted).
+    #[test]
+    fn the_line_limit_deep_in_the_tooth_is_weber_and_banascheks() {
+        let bodies = [
+            (206_000.0, 0.3),
+            (96_500.0, 0.32),
+            (190_000.0, 0.29),
+            (1.0, 0.5),
+            (200_000.0, 0.0),
+        ];
+        let limit = |b: f64, h: f64, nu: f64, e: f64, tail: fn(f64, f64) -> f64, ratio: f64| {
+            2.0 * (1.0 - nu * nu) / (PI * e) * ((h / b).asinh() - ratio * tail(b, h))
+        };
+        let exact: fn(f64, f64) -> f64 = |b, h| h / (h.hypot(b) + h);
+        let deep: fn(f64, f64) -> f64 = |_, _| 0.5;
+        let (mut ran, mut slip, mut halved, mut loose) = (0, 0, 0, 0);
+        for (e, nu) in bodies {
+            let body = HalfSpace::new(e, nu).expect("a half-space");
+            let k = 2.0 * (1.0 - nu * nu) / (PI * e);
+            let coefficient = 0.25 + nu / (8.0 * (1.0 - nu));
+            for eps in [0.1, 0.03, 0.01, 0.003] {
+                let (b, h): (f64, f64) = (eps, 1.0);
+                let classical = k * ((2.0 * h / b).ln() - nu / (2.0 * (1.0 - nu)));
+                let held = |line: f64| {
+                    let excess = (line - classical) / (k * eps * eps);
+                    let rounding = 16.0 * EPS * (line.abs() + classical.abs()) / (k * eps * eps);
+                    (excess - coefficient).abs() <= 0.2 * eps * eps + rounding
+                };
+                let line = body.line_limit(b, h).expect("a strip");
+                let same = limit(b, h, nu, e, exact, nu / (1.0 - nu));
+                assert!((line - same).abs() <= 4.0 * EPS * line.abs());
+                assert!(held(line), "{e} {nu} {eps}");
+                ran += 1;
+                slip += usize::from(!held(limit(b, h, nu, e, exact, nu)));
+                let half = limit(b, h, nu, e, deep, nu / (1.0 - nu));
+                halved += usize::from(!held(half));
+                loose += usize::from((half - line).abs() > 1e-3 * line.abs());
+            }
+        }
+        eprintln!("Weber–Banaschek: {ran} strips; plants missing: ν for ν/(1 − ν) {slip}, the deep tail {halved}");
+        assert_eq!(ran, 20);
+        assert_eq!((slip, halved, loose), (16, 16, 0));
     }
 
     // ---------------------------------------------------------------- the width rule
@@ -1051,8 +1446,9 @@ mod tests {
         let (mut worst, mut ran) = (0.0_f64, 0);
         let (mut six_missed, mut short_missed, mut margin_missed) = (0, 0, 0);
         for p in width_cases() {
-            let reference = reference_terms(&p, steel(), 1.0 / 64.0).1;
-            let n = p.width_nodes().expect("a depth");
+            let terms = reference_terms(&p, steel(), 1.0 / 64.0);
+            let reference = terms.asinh + terms.h2;
+            let n = nodes_of(&p).expect("a depth");
             assert_eq!(n as f64, uncapped(p.half_width, 1.0).max(2.0), "{p:?}");
             let (error, bound) = width_error(&p, kernel.rule(n), reference);
             assert!(error <= bound, "{p:?}: {error:e} > {bound:e}");
@@ -1347,6 +1743,7 @@ mod tests {
                 ..THE_LINE
             },
         ];
+        let mut failed = 0;
         for (k, plant) in plants.into_iter().enumerate() {
             let o = orders(plant);
             let last = o.last().expect("an order").1;
@@ -1355,6 +1752,7 @@ mod tests {
                 o.iter().map(|o| o.0).collect::<Vec<_>>()
             );
             assert!(!second(&o), "plant {k} passes");
+            failed += 1;
             if k == 1 {
                 assert!(
                     last.abs() < 1e-4,
@@ -1362,35 +1760,49 @@ mod tests {
                 );
             }
         }
+        assert_eq!(failed, 3);
     }
 
     // ---------------------------------------------------------------- G, and the shape factor
 
     /// **`G`'s table is its quadrature**: at every cell's middle across the table, where cubic
-    /// Hermite errs most, the table equals [`g_direct`] to `G`'s oracle tolerance (`1e-12`; the
-    /// prototype measured `4e-14`); at each end it meets its outer form to rounding (`8ε` of `G`,
-    /// both forms exact there); `G` is odd and `G(0) = 0`; `G′` is the table's slope, and
-    /// `None` at 0. Plant: round six's step, 0.02, which a `1e-10` gate passes (asserted).
+    /// Hermite errs most, the table equals [`g_direct`] to the Hermite bound and both sides'
+    /// rounding; at each end it meets its outer form to rounding (`8ε` of `G`, both forms exact
+    /// there); `G` is odd and `G(0) = 0`, and `G′` is `None` at 0. The Hermite bound's
+    /// `max|∂⁴G/∂u⁴|` ([`G4_MAX`]) bounds every third difference of the table's exact slope
+    /// `dG/du` over `step³` (each is `∂⁴G/∂u⁴` somewhere in its three cells), and is within 5 % of
+    /// the largest. Plant: round six's step, 0.02, which a `1e-10` gate passes (asserted).
     #[test]
     fn the_table_is_g() {
-        let midpoints = |k: &Kernel| -> (usize, f64) {
+        let midpoints = |k: &Kernel| -> (usize, f64, f64) {
             let cells = k.table.len() - 1;
-            let worst = (0..cells)
-                .map(|i| {
-                    let r = (TABLE_FROM + (i as f64 + 0.5) * k.step).exp();
-                    (k.g(r) - g_direct(r)).abs()
-                })
-                .fold(0.0_f64, f64::max);
-            (cells, worst)
+            let (mut worst, mut largest) = (0.0_f64, 0.0_f64);
+            for i in 0..cells {
+                let r = (TABLE_FROM + (i as f64 + 0.5) * k.step).exp();
+                let (g, direct) = (k.g(r), g_direct(r));
+                let bound =
+                    hermite(TABLE_STEP) + 2.0 * direct_rounding(r, direct) + 24.0 * EPS * g.abs();
+                worst = worst.max((g - direct).abs() / bound);
+                largest = largest.max((g - direct).abs());
+            }
+            (cells, worst, largest)
         };
         let kernel = Kernel::shared();
-        let (cells, worst) = midpoints(kernel);
-        eprintln!("G: {cells} cells, worst {worst:.1e} from the quadrature");
+        let (cells, worst, largest) = midpoints(kernel);
+        eprintln!("G: {cells} cells, worst {worst:.3} of the bound ({largest:.1e})");
         assert_eq!(cells, 16_800);
-        assert!(worst <= G_ABS, "{worst:e}");
-        let (_, six) = midpoints(&Kernel::with_step(0.02));
-        eprintln!("round six's step: worst {six:.1e}");
-        assert!(six > G_ABS && six < 1e-10);
+        assert!(worst <= 1.0, "{worst}");
+        let (_, six, six_largest) = midpoints(&Kernel::with_step(0.02));
+        eprintln!("round six's step: worst {six:.1e} of the bound ({six_largest:.1e})");
+        assert!(six > 1.0 && six_largest < 1e-10);
+
+        let third = kernel
+            .table
+            .windows(4)
+            .map(|w| (w[3].1 - 3.0 * w[2].1 + 3.0 * w[1].1 - w[0].1).abs() / kernel.step.powi(3))
+            .fold(0.0_f64, f64::max);
+        eprintln!("max |∂⁴G/∂u⁴| over the table's third differences: {third:.4}");
+        assert!(third <= G4_MAX && G4_MAX <= 1.05 * third, "{third}");
 
         for end in [TABLE_FROM, TABLE_TO] {
             let r = end.exp();
@@ -1440,9 +1852,65 @@ mod tests {
         }
     }
 
+    /// `C` read as its closed form at an aspect `κ`: `√(3/(κ² R_D(0, 1, κ²)))`.
+    fn c_at(kappa: f64) -> f64 {
+        let s = kappa * kappa;
+        (3.0 / (s * r_d(0.0, 1.0, s).expect("R_D"))).sqrt()
+    }
+
+    /// **The shape factor is the Hertz ellipse's peak over the line's**, by its definition and
+    /// through `hertz.rs`'s elliptical contact rather than `C`'s closed form: for curvatures
+    /// `k_L = q k_A`, the ellipse's peak `p₀` and its semi-axis across, `c`, carry a line load
+    /// at the centre `q₀ = (π/2) p₀ c`, which a line contact of curvature `k_A` presses with
+    /// `p_line = √(q₀ E* k_A/π)`; `C = p₀/p_line`. The two readings share the aspect `κ`, and
+    /// part by exactly `√(q/g(κ))`, `g(κ) = R_D(κ², 0, 1)/R_D(1, 0, κ²)` the curvature ratio
+    /// `κ` belongs to, which the aspect's root makes `q` to its stopping tolerance. The gate is
+    /// ten times that part, as the root left it at each `q`, and both readings' roundings
+    /// (`32 ε`), on `q` from `1e-16` to 1.
+    ///
+    /// Plants: `C` at an aspect `1e-11` off (a root stopped early), which misses wherever `C`
+    /// moves with `κ` and passes the ellipse gate's reach (`1e-6`, asserted); the switch to 1
+    /// at `s = 1e-12` rather than [`SHAPE_ONE`], which misses where `s` lies between.
+    #[test]
+    fn the_shape_factor_is_the_ellipses_peak_over_the_lines() {
+        let (load, e_star, k_a) = (1000.0, 113_000.0, 0.5);
+        let qs: Vec<f64> = (0..=32)
+            .map(|k| 10f64.powf(-f64::from(k) / 2.0))
+            .chain((1..20).map(|k| f64::from(k) / 20.0))
+            .collect();
+        let (mut ran, mut worst, mut early, mut switch, mut reach) = (0, 0.0_f64, 0, 0, 0);
+        for &q in &qs {
+            let patch = elliptical_contact(q * k_a, k_a, load, e_star).expect("an ellipse");
+            let (p0, across) = (patch.max_pressure, patch.semi_y);
+            let centre = FRAC_PI_2 * p0 * across;
+            let hertz = p0 / (centre * e_star * k_a / PI).sqrt();
+            let kappa = patch_aspect(q, 1.0).expect("an aspect");
+            let k2 = kappa * kappa;
+            let g = r_d(k2, 0.0, 1.0).expect("R_D") / r_d(1.0, 0.0, k2).expect("R_D");
+            let c = shape_factor(q).expect("q in [0, 1]");
+            let bound = 10.0 * (0.5 * (q / g).ln().abs() + 32.0 * EPS) * c;
+            assert!((hertz - c).abs() <= bound, "q {q}: {hertz} vs {c}");
+            worst = worst.max((hertz - c).abs() / bound);
+            ran += 1;
+            let planted = c_at(kappa * (1.0 + 1e-11));
+            early += usize::from((hertz - planted).abs() > bound);
+            reach += usize::from((hertz - planted).abs() > 1e-6 * c);
+            let switched = if k2 < 1e-12 { 1.0 } else { c };
+            switch += usize::from((hertz - switched).abs() > bound);
+        }
+        eprintln!(
+            "C by the ellipse: {ran} ratios, worst {worst:.3} of the bound; plants missing: an \
+             aspect 1e-11 off {early}, the switch at 1e-12 {switch}"
+        );
+        assert_eq!(ran, 52);
+        assert!(early > 0 && switch > 0 && reach == 0);
+    }
+
     /// What is no panel and no half-space is refused: a panel with an end not a number, a width
     /// not a finite length `> 0`, or a depth not one (`None` is the bare half-space, not a depth
-    /// of `∞`); a modulus not a finite positive one, a Poisson's ratio outside `(−1, 1/2]`.
+    /// of `∞`); a modulus not a finite positive one, a Poisson's ratio outside `(−1, 1/2]`; a
+    /// line limit on a width or depth not a finite length `> 0`. A half-space holds what it was
+    /// given.
     #[test]
     fn what_is_no_panel_is_refused() {
         let good = Panel::new(-0.1, 0.2, 0.05, Some(0.5));
@@ -1461,7 +1929,10 @@ mod tests {
         for (from, to, b, h) in refused {
             assert_eq!(Panel::new(from, to, b, h), None, "{from} {to} {b} {h:?}");
         }
-        assert!(HalfSpace::new(206_000.0, 0.5).is_some() && HalfSpace::new(1.0, -0.99).is_some());
+        for (e, nu) in [(206_000.0, 0.5), (1.0, -0.99), (96_500.0, 0.32)] {
+            let body = HalfSpace::new(e, nu).expect("a half-space");
+            assert_eq!((body.modulus(), body.poisson()), (e, nu));
+        }
         for (e, nu) in [
             (0.0, 0.3),
             (-1.0, 0.3),
@@ -1472,6 +1943,21 @@ mod tests {
             (1.0, f64::NAN),
         ] {
             assert_eq!(HalfSpace::new(e, nu), None, "{e} {nu}");
+        }
+        let body = steel();
+        assert!(body.line_limit(0.05, 0.5).is_some());
+        let no_strip = [
+            (0.0, 0.5),
+            (-0.05, 0.5),
+            (f64::NAN, 0.5),
+            (f64::INFINITY, 0.5),
+            (0.05, 0.0),
+            (0.05, -0.5),
+            (0.05, f64::INFINITY),
+            (0.05, f64::NAN),
+        ];
+        for (b, h) in no_strip {
+            assert_eq!(body.line_limit(b, h), None, "{b} {h}");
         }
     }
 }
