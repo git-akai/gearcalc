@@ -20,6 +20,7 @@
 //! axes were its own.
 
 use super::shape::{Axis, BodyOn, Shape};
+use super::structure::DisjointSets;
 use super::GROUND;
 
 /// **Where one stage's pieces landed in the graph**, each by the graph's
@@ -60,15 +61,7 @@ pub fn graph_of(stages: &[Shape], next: usize) -> Graph {
         })
         .collect();
     let total: usize = stages.iter().map(|s| s.axes.len()).sum();
-    let mut parent: Vec<usize> = (0..total).collect();
-    fn find(parent: &mut [usize], i: usize) -> usize {
-        let mut r = i;
-        while parent[r] != r {
-            r = parent[r];
-        }
-        parent[i] = r;
-        r
-    }
+    let mut lines = DisjointSets::new(total);
     let fixed = |k: usize, a: usize| stages[k].axes[a].carried_by == GROUND;
 
     // Each stage's name for each of its bodies in the graph, and the
@@ -85,11 +78,7 @@ pub fn graph_of(stages: &[Shape], next: usize) -> Graph {
                     b.body
                 }
                 Some((k0, a0)) if fixed(k0, a0) && fixed(k, b.axis) => {
-                    let (x, y) = (
-                        find(&mut parent, offset[k0] + a0),
-                        find(&mut parent, offset[k] + b.axis),
-                    );
-                    parent[y] = x;
+                    lines.union(offset[k0] + a0, offset[k] + b.axis);
                     b.body
                 }
                 Some(_) => {
@@ -116,10 +105,11 @@ pub fn graph_of(stages: &[Shape], next: usize) -> Graph {
     let mut pieces: Vec<Pieces> = vec![Pieces::default(); stages.len()];
     // Axes, in the order they are first met; a merged one takes the
     // first stage's reading of it, which on fixed axes is every stage's.
+    let line = lines.labels();
     let mut graph_axis: Vec<Option<usize>> = vec![None; total];
     for (k, stage) in stages.iter().enumerate() {
         for (a, axis) in stage.axes.iter().enumerate() {
-            let root = find(&mut parent, offset[k] + a);
+            let root = line[offset[k] + a];
             let g = match graph_axis[root] {
                 Some(g) => g,
                 None => {
@@ -230,45 +220,23 @@ impl Shape {
     #[must_use]
     pub fn parts(&self) -> Vec<Part> {
         let n = self.members.len();
-        let mut parent: Vec<usize> = (0..n).collect();
-        fn find(parent: &mut [usize], i: usize) -> usize {
-            let mut r = i;
-            while parent[r] != r {
-                r = parent[r];
-            }
-            parent[i] = r;
-            r
-        }
-        let mut union = |a: usize, b: usize| {
-            let (x, y) = (find(&mut parent, a), find(&mut parent, b));
-            parent[y] = x;
-        };
+        let mut joined = DisjointSets::new(n);
         for m in &self.meshes {
-            union(m.a, m.b);
+            joined.union(m.a, m.b);
         }
         for d in 0..self.distances.len() {
             let on = self.meshes_on(d);
             for w in on.windows(2) {
-                union(self.meshes[w[0]].a, self.meshes[w[1]].a);
+                joined.union(self.meshes[w[0]].a, self.meshes[w[1]].a);
             }
         }
-        let mut roots: Vec<usize> = Vec::new();
-        let mut of: Vec<usize> = Vec::with_capacity(n);
-        for i in 0..n {
-            let r = find(&mut parent, i);
-            of.push(match roots.iter().position(|&x| x == r) {
-                Some(p) => p,
-                None => {
-                    roots.push(r);
-                    roots.len() - 1
-                }
-            });
-        }
+        // Each member's part, the parts numbered by their first member.
+        let of = joined.labels();
         let axis_of_body =
             |body: usize| self.bodies.iter().find(|b| b.body == body).map(|b| b.axis);
         let mut taken_axes: Vec<Option<usize>> = vec![None; self.axes.len()];
         let mut parts = Vec::new();
-        for p in 0..roots.len() {
+        for p in 0..joined.count() {
             let members: Vec<usize> = (0..n).filter(|&i| of[i] == p).collect();
             let meshes: Vec<usize> = (0..self.meshes.len())
                 .filter(|&k| of[self.meshes[k].a] == p)

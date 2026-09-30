@@ -64,6 +64,7 @@ mod preview;
 #[cfg(test)]
 mod rating_laws;
 pub mod shape;
+mod structure;
 pub mod sweep;
 #[cfg(test)]
 mod testing;

@@ -35,6 +35,7 @@
 //! members is one — the sign of a mesh is derived from its members, never
 //! stated.
 
+use super::structure::DisjointSets;
 use super::wiring::{BodyLabel, MeshSpec, Mount, Wiring};
 use super::{
     ContactRatios, Freedom, FreedomGroup, GearResult, Loading, MemberFacts, MemberFreedom,
@@ -1122,29 +1123,11 @@ impl Shape {
     /// for and writes to every member of.
     #[must_use]
     pub fn mesh_groups(&self) -> Vec<Vec<usize>> {
-        let n = self.members.len();
-        let mut group: Vec<usize> = (0..n).collect();
-        let find = |group: &Vec<usize>, mut i: usize| {
-            while group[i] != i {
-                i = group[i];
-            }
-            i
-        };
+        let mut groups = DisjointSets::new(self.members.len());
         for m in &self.meshes {
-            let (a, b) = (find(&group, m.a), find(&group, m.b));
-            if a != b {
-                group[a.max(b)] = a.min(b);
-            }
+            groups.union(m.a, m.b);
         }
-        let mut out: Vec<Vec<usize>> = Vec::new();
-        for i in 0..n {
-            let root = find(&group, i);
-            match out.iter_mut().find(|g| find(&group, g[0]) == root) {
-                Some(g) => g.push(i),
-                None => out.push(vec![i]),
-            }
-        }
-        out
+        groups.components()
     }
 
     /// The parameters a member builds at, at a shift: the addendum held to
@@ -1755,16 +1738,24 @@ impl Shape {
         Ok((held, bound_by))
     }
 
+    /// **The plan the closure starts from**: every stated distance held,
+    /// then every automatic one the tips size held where they size it
+    /// ([`Self::sized`]) — and per distance the mesh whose tips did.
+    fn sized_plan(&self, helix: &[f64]) -> Result<(Plan, Vec<Option<usize>>), TrainError> {
+        let plan = self.plan(helix);
+        let (held, bound_by) = self.sized(helix, &plan, &[])?;
+        if held == plan.held {
+            return Ok((plan, bound_by));
+        }
+        Ok((self.plan_held(helix, held), bound_by))
+    }
+
     /// **The shifts the shape settles on**: closed where nothing is searched,
     /// searched for efficiency over the free ones where that was asked —
     /// and, first, every automatic distance the tips size opened out to
     /// where they clear ([`Self::sized`]).
     fn chosen_at(&self, search: &crate::auto::Search, helix: &[f64]) -> Result<Chosen, TrainError> {
-        let mut plan = self.plan(helix);
-        let (held, mut bound_by) = self.sized(helix, &plan, &[])?;
-        if held != plan.held {
-            plan = self.plan_held(helix, held);
-        }
+        let (mut plan, mut bound_by) = self.sized_plan(helix)?;
         let settled: Vec<f64> = plan.asked.iter().map(|a| a.settled).collect();
         // **Where nothing was searched, the closure is the answer** — and
         // where it has none, what that means depends on what failed. A sum
@@ -1799,7 +1790,8 @@ impl Shape {
         // none of whose meshes asks keeps its undercut shift; the rest are
         // searched as ever. Every mesh asking, or none, is what one switch on
         // the stage used to mean, and both come out as they did.
-        let asking = self.asking_members(&plan);
+        let partition = self.search_partition(&plan);
+        let asking = self.asking_members(&partition);
         let free: Vec<usize> = (0..self.members.len())
             .filter(|&i| plan.role[i] == Role::Free && asking[i])
             .collect();
@@ -1859,7 +1851,7 @@ impl Shape {
         // the work. Meshes on an automatic distance with more than one mesh
         // are one component, an absorber carrying any member's move across
         // it; and an axis that touches two meshes joins them.
-        let components = self.search_components(&plan, &axes, &free);
+        let components = self.search_components(&partition, &axes, &free);
         // **A sized distance and the divisions chosen at it settle
         // together.** The division a search chooses moves the tips a
         // little, so a distance the tips size is sized again at what was
@@ -2036,31 +2028,19 @@ impl Shape {
         axes
     }
 
-    /// **Which members a search may move**: those in a component — meshes
-    /// sharing a free member, or on one automatic distance an absorber ties
-    /// together, as [`Self::search_components`] reads them — where at least
-    /// one mesh asks to be searched.
-    fn asking_members(&self, plan: &Plan) -> Vec<bool> {
+    /// **The search's partition of the meshes**, each mesh labelled by its
+    /// component ([`DisjointSets::labels`]): two meshes are one where a free
+    /// member is in both, or where both are on a distance nothing holds —
+    /// an absorber carrying any member's move across it. Which members a
+    /// search may move ([`Self::asking_members`]) and how its coordinates
+    /// group ([`Self::search_components`]) are both read off it.
+    fn search_partition(&self, plan: &Plan) -> Vec<usize> {
         let n = self.meshes.len();
-        let mut parent: Vec<usize> = (0..n).collect();
-        fn find(parent: &mut [usize], i: usize) -> usize {
-            let mut r = i;
-            while parent[r] != r {
-                r = parent[r];
-            }
-            r
-        }
-        let mut union = |a: usize, b: usize| {
-            let (ra, rb) = (find(&mut parent, a), find(&mut parent, b));
-            if ra != rb {
-                parent[ra] = rb;
-            }
-        };
+        let mut joined = DisjointSets::new(n);
         for d in 0..self.distances.len() {
             if plan.held[d].is_none() {
-                let on = self.meshes_on(d);
-                for w in on.windows(2) {
-                    union(w[0], w[1]);
+                for w in self.meshes_on(d).windows(2) {
+                    joined.union(w[0], w[1]);
                 }
             }
         }
@@ -2072,102 +2052,73 @@ impl Shape {
                 .filter(|&k| self.meshes[k].a == i || self.meshes[k].b == i)
                 .collect();
             for w in mine.windows(2) {
-                union(w[0], w[1]);
+                joined.union(w[0], w[1]);
             }
         }
-        let asks: Vec<bool> = {
-            let mut asks = vec![false; n];
-            for k in 0..n {
-                if self.meshes[k].search {
-                    let r = find(&mut parent, k);
-                    asks[r] = true;
-                }
+        joined.labels()
+    }
+
+    /// **Which members a search may move**: those in a component of the
+    /// search's `partition` ([`Self::search_partition`]) where at least one
+    /// mesh asks to be searched.
+    fn asking_members(&self, partition: &[usize]) -> Vec<bool> {
+        let mut asks = vec![false; partition.len()];
+        for (k, m) in self.meshes.iter().enumerate() {
+            if m.search {
+                asks[partition[k]] = true;
             }
-            asks
-        };
+        }
         (0..self.members.len())
             .map(|i| {
-                (0..n).any(|k| {
-                    (self.meshes[k].a == i || self.meshes[k].b == i) && asks[find(&mut parent, k)]
-                })
+                self.meshes
+                    .iter()
+                    .enumerate()
+                    .any(|(k, m)| (m.a == i || m.b == i) && asks[partition[k]])
             })
             .collect()
     }
 
-    /// **The search's axes grouped by the meshes they can move**: two axes
-    /// are one component where they touch one mesh, or two meshes on an
-    /// automatic distance that an absorber ties together. Each component is
-    /// its axis indices and the meshes they score.
+    /// **The search's axes grouped by the meshes they can move** — the
+    /// components of the search's `partition` ([`Self::search_partition`])
+    /// that an axis touches, in the order of their first axis: every mesh
+    /// of a free member's is in one component, and so are the two members
+    /// of a sum or a division, which share a mesh. Each component is its
+    /// axis indices and its meshes.
     fn search_components(
         &self,
-        plan: &Plan,
+        partition: &[usize],
         axes: &[Coordinate],
         free: &[usize],
     ) -> Vec<(Vec<usize>, Vec<usize>)> {
-        let n_meshes = self.meshes.len();
-        // Union-find over meshes, then over axes through the meshes they touch.
-        let mut parent: Vec<usize> = (0..n_meshes + axes.len()).collect();
-        fn find(parent: &mut [usize], i: usize) -> usize {
-            let mut r = i;
-            while parent[r] != r {
-                r = parent[r];
-            }
-            let mut i = i;
-            while parent[i] != r {
-                let next = parent[i];
-                parent[i] = r;
-                i = next;
-            }
-            r
-        }
-        let union = |parent: &mut Vec<usize>, a: usize, b: usize| {
-            let (ra, rb) = (find(parent, a), find(parent, b));
-            if ra != rb {
-                parent[ra] = rb;
+        let first_member = |c: &Coordinate| match *c {
+            Coordinate::Own(j) | Coordinate::Sum(j, _, _) | Coordinate::Division(j, _, _) => {
+                free[j]
             }
         };
-        for d in 0..self.distances.len() {
-            if plan.held[d].is_none() {
-                let on = self.meshes_on(d);
-                for w in on.windows(2) {
-                    union(&mut parent, w[0], w[1]);
-                }
-            }
-        }
-        let members_of = |c: &Coordinate| -> Vec<usize> {
-            match *c {
-                Coordinate::Own(j) => vec![free[j]],
-                Coordinate::Sum(pa, pb, _) | Coordinate::Division(pa, pb, _) => {
-                    vec![free[pa], free[pb]]
-                }
-            }
-        };
+        // Which component each axis is in; a component's place in the list.
+        let mut place: Vec<Option<usize>> = vec![None; partition.len()];
+        let mut out: Vec<(Vec<usize>, Vec<usize>)> = Vec::new();
         for (k, axis) in axes.iter().enumerate() {
-            for i in members_of(axis) {
-                for (m, mesh) in self.meshes.iter().enumerate() {
-                    if mesh.a == i || mesh.b == i {
-                        union(&mut parent, n_meshes + k, m);
+            let i = first_member(axis);
+            let touched = self.meshes.iter().position(|m| m.a == i || m.b == i);
+            match touched.map(|m| partition[m]) {
+                Some(c) => match place[c] {
+                    Some(p) => out[p].0.push(k),
+                    None => {
+                        place[c] = Some(out.len());
+                        out.push((vec![k], Vec::new()));
                     }
-                }
+                },
+                // A member in no mesh moves nothing, alone.
+                None => out.push((vec![k], Vec::new())),
             }
         }
-        let mut out: Vec<(usize, Vec<usize>, Vec<usize>)> = Vec::new();
-        for k in 0..axes.len() {
-            let root = find(&mut parent, n_meshes + k);
-            match out.iter_mut().find(|(r, _, _)| *r == root) {
-                Some((_, list, _)) => list.push(k),
-                None => out.push((root, vec![k], Vec::new())),
+        for (m, &c) in partition.iter().enumerate() {
+            if let Some(p) = place[c] {
+                out[p].1.push(m);
             }
         }
-        for m in 0..n_meshes {
-            let root = find(&mut parent, m);
-            if let Some((_, _, meshes)) = out.iter_mut().find(|(r, _, _)| *r == root) {
-                meshes.push(m);
-            }
-        }
-        out.into_iter()
-            .map(|(_, axes, meshes)| (axes, meshes))
-            .collect()
+        out
     }
 
     /// The shifts the closure settles on, or why it could not — what the
@@ -2430,11 +2381,7 @@ impl Shape {
 
     /// [`Self::structure`]'s closure, as [`Self::chosen_at`] builds it.
     fn closure_structure(&self, helix: &[f64]) -> Result<ClosureStructure, TrainError> {
-        let mut plan = self.plan(helix);
-        let (held, _) = self.sized(helix, &plan, &[])?;
-        if held != plan.held {
-            plan = self.plan_held(helix, held);
-        }
+        let (plan, _) = self.sized_plan(helix)?;
         let mut every = self.clone();
         every.set_search(true);
         Ok(ClosureStructure {
@@ -2449,12 +2396,13 @@ impl Shape {
 
     /// What a search at `plan` moves, as [`Self::chosen_at`] reads it.
     fn search_structure(&self, plan: &Plan) -> SearchStructure {
-        let asking = self.asking_members(plan);
+        let partition = self.search_partition(plan);
+        let asking = self.asking_members(&partition);
         let free: Vec<usize> = (0..self.members.len())
             .filter(|&i| plan.role[i] == Role::Free && asking[i])
             .collect();
         let coordinates = self.search_coordinates(&free);
-        let components = self.search_components(plan, &coordinates, &free);
+        let components = self.search_components(&partition, &coordinates, &free);
         SearchStructure {
             asking,
             free,
@@ -7608,5 +7556,169 @@ pub(super) mod tip_hold {
             planted += 1;
         }
         assert!(planted > 0, "nothing held to plant on");
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod partition_laws {
+    //! **Every grouping the graph is read by is its connected components**
+    //! (audit T14.7) — the mesh groups, the parts and what a search moves
+    //! together — each against a breadth-first search that shares no code
+    //! with the disjoint sets that answer it, over every preset and every
+    //! train the seeded walk visits.
+
+    use super::super::sweep;
+    use super::*;
+
+    /// **The components of `0..n` under `adjacent`**, by breadth-first
+    /// search, each ascending and listed in order of its first element.
+    fn components(n: usize, adjacent: impl Fn(usize, usize) -> bool) -> Vec<Vec<usize>> {
+        let mut seen = vec![false; n];
+        let mut out = Vec::new();
+        for start in 0..n {
+            if seen[start] {
+                continue;
+            }
+            seen[start] = true;
+            let mut queue = std::collections::VecDeque::from([start]);
+            let mut component = Vec::new();
+            while let Some(i) = queue.pop_front() {
+                component.push(i);
+                for (j, seen) in seen.iter_mut().enumerate() {
+                    if !*seen && adjacent(i, j) {
+                        *seen = true;
+                        queue.push_back(j);
+                    }
+                }
+            }
+            component.sort_unstable();
+            out.push(component);
+        }
+        out
+    }
+
+    /// Every shape the laws read: each walk train's parts, which is what
+    /// the solve reads, and each train's whole graph.
+    fn shapes() -> Vec<(String, Shape)> {
+        sweep::visited()
+            .into_iter()
+            .flat_map(|(walk, steps, t)| {
+                let name = format!("{walk}: {steps:?}");
+                let parts: Vec<(String, Shape)> = t
+                    .parts()
+                    .into_iter()
+                    .enumerate()
+                    .map(|(p, part)| (format!("{name}, part {p}"), part.shape))
+                    .collect();
+                std::iter::once((name, t.shape)).chain(parts)
+            })
+            .collect()
+    }
+
+    /// **The mesh groups are the members joined by meshes, and the parts
+    /// the members joined by meshes and by sharing a distance.**
+    #[test]
+    fn mesh_groups_and_parts_are_connected_components() {
+        let mut checked = 0;
+        for (name, s) in shapes() {
+            let meshed = |i: usize, j: usize| {
+                s.meshes
+                    .iter()
+                    .any(|m| (m.a, m.b) == (i, j) || (m.a, m.b) == (j, i))
+            };
+            let n = s.members.len();
+            assert_eq!(s.mesh_groups(), components(n, meshed), "{name}");
+            // Two members are one part where a mesh joins them or their
+            // meshes are on one distance.
+            let distance_of = |i: usize| -> Vec<Option<usize>> {
+                (0..s.meshes.len())
+                    .filter(|&k| s.meshes[k].a == i || s.meshes[k].b == i)
+                    .map(|k| s.distance_of(k))
+                    .collect()
+            };
+            let parted = |i: usize, j: usize| {
+                meshed(i, j) || {
+                    let (di, dj) = (distance_of(i), distance_of(j));
+                    di.iter().any(|d| d.is_some() && dj.contains(d))
+                }
+            };
+            let parts: Vec<Vec<usize>> = s.parts().into_iter().map(|p| p.members).collect();
+            assert_eq!(parts, components(n, parted), "{name}");
+            checked += 1;
+        }
+        assert!(checked > 1000, "only {checked} shapes");
+    }
+
+    /// **What a search moves together is one component of the meshes**
+    /// joined by a free member and by a distance nothing holds, and each
+    /// search component is exactly one such component that asks — as the
+    /// meshes ask, and with every mesh asking.
+    #[test]
+    fn a_search_component_is_one_asking_component() {
+        let (mut checked, mut searched) = (0, 0);
+        for (name, shape) in shapes() {
+            let shape = shape.shared();
+            let (helix, conflict) = shape.resolved_helices();
+            if conflict.is_some() {
+                continue;
+            }
+            let Ok((plan, _)) = shape.sized_plan(&helix) else {
+                continue;
+            };
+            let mut every = shape.clone();
+            every.set_search(true);
+            for s in [&shape, &every] {
+                let on = |k: usize, i: usize| s.meshes[k].a == i || s.meshes[k].b == i;
+                let joined = |k: usize, q: usize| {
+                    (0..s.members.len()).any(|i| plan.role[i] == Role::Free && on(k, i) && on(q, i))
+                        || s.distance_of(k)
+                            .is_some_and(|d| plan.held[d].is_none() && s.distance_of(q) == Some(d))
+                };
+                let groups = components(s.meshes.len(), joined);
+                let asks = |g: &Vec<usize>| g.iter().any(|&k| s.meshes[k].search);
+                let free: Vec<usize> = (0..s.members.len())
+                    .filter(|&i| {
+                        plan.role[i] == Role::Free
+                            && groups
+                                .iter()
+                                .any(|g| asks(g) && g.iter().any(|&k| on(k, i)))
+                    })
+                    .collect();
+                let partition = s.search_partition(&plan);
+                let asking = s.asking_members(&partition);
+                let got_free: Vec<usize> = (0..s.members.len())
+                    .filter(|&i| plan.role[i] == Role::Free && asking[i])
+                    .collect();
+                assert_eq!(got_free, free, "{name}: free members");
+                let axes = s.search_coordinates(&free);
+                let found = s.search_components(&partition, &axes, &free);
+                // Each component: the axes whose members are in it, and all
+                // of its meshes, in the order of their first axis.
+                let member_of = |c: &Coordinate| match *c {
+                    Coordinate::Own(j)
+                    | Coordinate::Sum(j, _, _)
+                    | Coordinate::Division(j, _, _) => free[j],
+                };
+                let mut expected: Vec<(Vec<usize>, Vec<usize>)> = Vec::new();
+                for (k, axis) in axes.iter().enumerate() {
+                    let i = member_of(axis);
+                    let g = groups.iter().find(|g| g.iter().any(|&m| on(m, i))).unwrap();
+                    assert!(
+                        asks(g),
+                        "{name}: a free member in a component that asks nothing"
+                    );
+                    match expected.iter_mut().find(|(_, meshes)| meshes == g) {
+                        Some((list, _)) => list.push(k),
+                        None => expected.push((vec![k], g.clone())),
+                    }
+                }
+                assert_eq!(found, expected, "{name}: search components");
+                searched += usize::from(!found.is_empty());
+                checked += 1;
+            }
+        }
+        assert!(checked > 2000, "only {checked} shapes");
+        assert!(searched > 1000, "only {searched} with a search component");
     }
 }
