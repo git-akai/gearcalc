@@ -572,3 +572,34 @@ fn a_sweep_with_no_entry_to_follow_is_unset_and_said() {
     assert!(says(&r.cases[0], "train.duty_unset"), "{:?}", r.cases[0]);
     assert!(r.members.iter().all(|m| m.cases[0].cycles.is_none()));
 }
+
+/// **A fresh case's figures are what their basis says** (audit T13.6):
+/// the ultimate case a stall torque, positive and finite, at a running
+/// speed, positive and finite; the fatigue case a fifth of that torque —
+/// a running load rather than the peak — at the same speed; and
+/// `LoadCase::fresh` builds each kind at its figures, switched on, loaded
+/// at its input and reacted at its output, the sweep measured there.
+#[test]
+fn a_fresh_cases_figures_are_their_basis() {
+    use super::{CaseKind, Load, LoadRole};
+    let (stall, speed) = CaseKind::Ultimate.fresh_figures();
+    let (running, same) = CaseKind::Fatigue.fresh_figures();
+    assert!(stall > 0.0 && stall.is_finite(), "{stall}");
+    assert!(speed > 0.0 && speed.is_finite(), "{speed}");
+    assert_eq!(running, stall / 5.0, "a fifth of the stall");
+    assert_eq!(same, speed, "one speed");
+    for kind in CaseKind::BOTH {
+        let (torque, speed) = kind.fresh_figures();
+        let c = LoadCase::fresh(kind, 1, 2);
+        assert_eq!(c.kind, kind);
+        assert!(c.enabled);
+        assert_eq!(
+            c.loads,
+            vec![
+                Load::given(1, torque, speed),
+                Load::declared(2, LoadRole::Reacted)
+            ]
+        );
+        assert_eq!(c.duty, Duty::intermittent(Some(2)));
+    }
+}
