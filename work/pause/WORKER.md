@@ -56,3 +56,6 @@ The audit tasks you cite are in /home/user/gearcalc/audit/workstreams/Tnn-*.md; 
   different parser). A same-method mirror in another language only checks language consistency. It
   carries its own upkeep and passes its flaws on. Do not add mirrors; prefer conventional laws. When
   porting from a prototype, never loosen the port to match a prototype flaw: decide from the physics.
+- Never wait with `until ! pgrep -f "<pattern>"` where the pattern appears in the waiting shell's own
+  command line: the loop matches itself and never exits. Run the command in the background and wait
+  on its completion notification instead.
