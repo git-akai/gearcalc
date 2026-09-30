@@ -2769,6 +2769,24 @@ mod tests {
         assert_eq!(note.values["field"], "edit.graph.insert.shape.meshes.0.b");
     }
 
+    /// **A panic's words are kept for the front end to say**: nothing before
+    /// the hook has seen one; after it, the message and where it was raised,
+    /// as `last_panic` reads them — what a trap in the browser loses.
+    #[test]
+    fn a_panic_is_kept_by_the_hook_start_installs() {
+        assert_eq!(last_panic(), "");
+        start();
+        let caught = std::panic::catch_unwind(|| {
+            let teeth: Vec<u32> = Vec::new();
+            teeth[3]
+        });
+        assert!(caught.is_err());
+        let said = last_panic();
+        assert!(said.contains("index out of bounds"), "{said}");
+        assert!(said.contains("lib.rs"), "{said}");
+        let _ = std::panic::take_hook();
+    }
+
     /// Every path of `v` at which an object stands, as a JSON pointer.
     fn object_paths(v: &serde_json::Value, at: &str, out: &mut Vec<String>) {
         match v {

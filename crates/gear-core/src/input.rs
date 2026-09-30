@@ -669,11 +669,11 @@ pub fn interval(b: &Bound) -> String {
         }
     }
     let lo = b.min.map_or_else(
-        || "(−∞".to_owned(),
+        || "(−∞".to_owned(), // absence: an unbounded side is its infinity
         |x| format!("{}{}", if b.exclusive_min { "(" } else { "[" }, figure(x)),
     );
     let hi = b.max.map_or_else(
-        || "∞)".to_owned(),
+        || "∞)".to_owned(), // absence: an unbounded side is its infinity
         |x| format!("{}{}", figure(x), if b.exclusive_max { ")" } else { "]" }),
     );
     format!("{lo}, {hi}")
@@ -1090,5 +1090,103 @@ mod tests {
         assert_eq!(e.note().values["field"], "dedendum");
         assert_eq!(interval(&HELIX_ANGLE), "(-90, 90)");
         assert_eq!(interval(&POISSONS_RATIO), "(-1, 0.5]");
+        // A list of one admits its one index, and says so; of none, nothing.
+        assert_eq!(interval(&index(1)), "[0, 0]");
+        assert!(index(1).admits(0.0) && !index(1).admits(1.0));
+    }
+
+    /// **A member's material, its replacements laid over the library's, is
+    /// held to a cyclic allowable no more than the static one** — and the
+    /// replacement that moved it is named: a fatigue figure raised past the
+    /// library's ultimate names the fatigue figure; an ultimate lowered under
+    /// the library's fatigue figure names the ultimate; both raised together
+    /// stand, as does the library as it is.
+    #[test]
+    fn a_replaced_allowable_is_held_to_its_static_one_and_named() {
+        use crate::train::{solve_train, test_library, Train};
+        let lib = test_library();
+        let at = "shape.members.0.gear.material_overrides";
+        let solve = |o: Overrides| {
+            let mut s = crate::train::arrangements::pair([17, 43]);
+            s.members[0].gear.material_overrides = o;
+            solve_train(&Train::alone(&s, 2.0, 100.0), &lib)
+        };
+        let material = lib
+            .get(&crate::train::MemberGear::default().material)
+            .unwrap();
+        let (ultimate, fatigue) = (
+            material.ultimate_allowable.value,
+            material.fatigue_allowable.value,
+        );
+        let refused = |o: Overrides| match solve(o) {
+            Err(crate::train::TrainError::Input(r)) => r,
+            other => panic!("{o:?}: refused, not {:?}", other.map(|_| ())),
+        };
+        let r = refused(Overrides {
+            fatigue_allowable: Some(ultimate * 1.01),
+            ..Overrides::default()
+        });
+        assert_eq!(r.field, format!("{at}.fatigue_allowable"));
+        assert_eq!(r.bound, Some(cyclic(ultimate)));
+        let r = refused(Overrides {
+            ultimate_allowable: Some(fatigue * 0.99),
+            ..Overrides::default()
+        });
+        assert_eq!(r.field, format!("{at}.ultimate_allowable"));
+        assert_eq!(r.value, fatigue * 0.99);
+        assert!(solve(Overrides {
+            ultimate_allowable: Some(ultimate * 2.0),
+            fatigue_allowable: Some(ultimate * 1.5),
+            ..Overrides::default()
+        })
+        .is_ok());
+        assert!(solve(Overrides {
+            fatigue_allowable: Some(ultimate),
+            ..Overrides::default()
+        })
+        .is_ok());
+        assert!(solve(Overrides::default()).is_ok());
+    }
+
+    /// **Two refusals of one value at one field are one refusal** — a
+    /// not-a-number included, which no `==` on doubles calls equal — and a
+    /// refusal at another field, of another value or against another bound
+    /// is another. What lets a train's error, which carries one, be compared.
+    #[test]
+    fn a_refusal_is_its_field_its_value_and_its_bound() {
+        let at = |p: GearParams| p.check().unwrap_err();
+        let nan = GearParams {
+            module: f64::NAN,
+            ..GearParams::default()
+        };
+        assert_eq!(at(nan), at(nan));
+        let zero = GearParams {
+            module: 0.0,
+            ..GearParams::default()
+        };
+        assert_eq!(at(zero), at(zero));
+        assert_ne!(at(zero), at(nan));
+        assert_ne!(
+            at(zero),
+            at(GearParams {
+                module: -1.0,
+                ..GearParams::default()
+            })
+        );
+        assert_ne!(at(zero), at(zero).within("params"));
+        let other_bound = Refused {
+            bound: Some(POSITIVE),
+            ..at(GearParams {
+                teeth: 0,
+                ..GearParams::default()
+            })
+        };
+        assert_ne!(
+            other_bound,
+            at(GearParams {
+                teeth: 0,
+                ..GearParams::default()
+            })
+        );
     }
 }

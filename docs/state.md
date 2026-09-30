@@ -1229,6 +1229,12 @@ driving input across **1.1 million** combinations, which
 `planetary::tests::a_driving_input_always_has_a_flow` still holds for the flow
 every path and case asks.
 
+`clamp.flank_unsolved` left the list when the input table's fuzz
+(`gear-io/tests/every_value.rs`) reached it with finite input the boundary
+admits: a module of 1e154 mm on 17 teeth squares its radii past the largest
+double, and the flank's junction has no number to be. The tooth says so
+rather than guess one.
+
 One more used to be listed here — `ring_addendum_clamped`, on the reading that
 a set solves its own ring addendum — and it fires on 441 of the 1 482 sets a
 sweep can solve ([corrections](corrections.md)). The sweep that was cited had
@@ -1564,6 +1570,26 @@ Not a queue with a head; this is what a next session would pick from.
   Step M12 of `work/design-graph.md` — a part as an index view over the
   train's one incidence rather than a copied shape — removes them, and is
   taken only where a count shows the copies cost.
+- **What the input table leaves** (`gear_core::input`, Stage 2's V). Every
+  number that enters has a row and is refused by its field or held and
+  said; what is not yet asked of it:
+  - **a count has no upper bound.** A gear of four billion teeth is a count
+    the table admits and a drawing no 32-bit memory holds: its seat list's
+    capacity overflows, which the browser sees as a trap. The hook the
+    module installs at start says the panic's words (`last_panic`) and the
+    next call is answered; re-instantiating the module after a trap is not
+    possible through this wasm-bindgen's glue (`initSync` returns the
+    instance it already has). A bound on a count needs a derivation from the
+    drawing's memory, which a panel's box would then show;
+  - **the panel's train boxes do not read the table's bounds yet** (T01.8's
+    mesh ranges): a friction box still takes −0.1 and the solve refuses it
+    by its field. The rows are the bounds to cross; the refusal's field is
+    a path (`train.shape.meshes.0.sliding_friction`), which the panel could
+    name as it names a number that will not cross (`boundary.ts`);
+  - **a line contact's efficiency floored at nought** (µ ≳ 4.8 on the spur)
+    is said by nothing, where a point contact says it locks;
+  - **the core's `Train::edit` trusts a shape laid in** — its callers lay in
+    presets; the wasm entry reads an inserted shape through the table.
 - **Further UI work**, as it is asked for.
 - **The two panels' remaining differences of style**, catalogued when their
   top bars were made one (`app.css`, *the bar at the top of a tab*) and
