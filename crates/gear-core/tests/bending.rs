@@ -74,7 +74,8 @@ fn form_factor_converges_to_the_rack_limit() {
         }
 
         // At four thousand teeth the gear is a rack to within a fraction of a
-        // percent, and every ingredient must match, not just the result.
+        // percent, and every ingredient must match, not just the result:
+        // the axial term too.
         let g = Tooth::new(GearParams {
             teeth: 4000,
             pressure_angle: alpha,
@@ -97,6 +98,16 @@ fn form_factor_converges_to_the_rack_limit() {
             (sec.form_factor - want_y).abs() < 5e-3,
             "α={alpha}: Y_F {} vs rack {want_y}",
             sec.form_factor
+        );
+        // The axial term: the along-tooth part of the normal load
+        // `F_t / cos α_n`, which leans `α` at the rack's tip corner, spread
+        // over the chord.
+        let a = alpha.to_radians();
+        let want_axial = a.sin() / (want_s * a.cos());
+        assert!(
+            (sec.axial_compression - want_axial).abs() < 5e-3,
+            "α={alpha}: axial {} vs rack {want_axial}",
+            sec.axial_compression
         );
         println!(
             "α={alpha:>5} ρ={rho}: Y_F {:.6} vs rack limit {want_y:.6}",
@@ -925,8 +936,9 @@ fn a_rating_is_taken_at_a_point_on_the_tooth() {
 ///   least over the whole curve below the vertex — an interior tangency, or
 ///   one of the curve's ends — found here by brute force from the curves
 ///   alone (sampled, each dip closed by golden section, the ends compared);
-/// - the fillet's is rated with the fillet's notch factor, the smooth flank's
-///   with none (1);
+/// - the fillet's is rated with the fillet's notch factor, read with the
+///   fillet's least radius of curvature wherever the section is (a brute-force
+///   minimum here), the smooth flank's with none (1);
 /// - the governing section is the readable one that rates highest, and one
 ///   the model cannot read never masks one it can.
 ///
@@ -1045,6 +1057,10 @@ fn each_curve_offers_its_least_and_the_highest_rated_governs() {
             let vertex = load_point[1] + (-load_point[0] / dir[0]) * dir[1];
             let (flo, fhi) = g.fillet_bracket();
             let (fillet, c1) = least(&|p| g.fillet_at(p).0, flo, fhi, vertex);
+            // `ρ_f`, the fillet's least radius of curvature, by brute force.
+            let rho_f = (0..=800_u32)
+                .map(|i| g.fillet_curvature(flo + (fhi - flo) * f64::from(i) / 800.0))
+                .fold(f64::INFINITY, f64::min);
             let (flank, c2) = least(&|p| g.flank_at(p).0, ulo, uhi, vertex);
             // The flank's tip is never strictly below the vertex, so its
             // measure there is none, and a least there is rounding's.
@@ -1089,6 +1105,13 @@ fn each_curve_offers_its_least_and_the_highest_rated_governs() {
                     (notch - want).abs() <= 4.0 * f64::EPSILON * want,
                     "{label} at {frac}: the {name}'s section carries a notch factor of {notch}, \
                      not {want}"
+                );
+                // ...read with the fillet's least radius wherever the section is.
+                assert!(
+                    (got.min_fillet_curvature - rho_f).abs() <= 4.0 * f64::EPSILON * rho_f,
+                    "{label} at {frac}: the {name}'s section reads ρ_f {}, the fillet's least \
+                     radius is {rho_f}",
+                    got.min_fillet_curvature
                 );
                 let (lo, hi) = if on_flank { (ulo, uhi) } else { (flo, fhi) };
                 at_an_end += usize::from(got.s == lo || got.s == hi);
@@ -1321,4 +1344,202 @@ fn the_rating_is_continuous_where_its_section_changes_curve_or_ends() {
         "{between_curves} changes of the governing curve, {to_an_end} of tangency and end: \
          the sweep must cross both"
     );
+}
+
+/// **A helical member bends as the spur gear its normal section is.** The
+/// tooth bends in the plane normal to its trace, and its virtual spur gear's
+/// pitch circle is the osculating circle of the pitch cylinder cut by that
+/// plane at the pitch point: ISO 6336-3:2006's count `z_n = z / cos³β` is the
+/// same geometry read as a number of teeth. Found here from the section
+/// itself — three points where the plane meets the cylinder, their
+/// circumcircle, extrapolated in the spacing — sharing nothing with how the
+/// crate sizes the virtual gear, which is a spur gear of the normal module and
+/// pressure angle. External teeth and rings, both of which carry their own.
+///
+/// The section's points are taken relative to the pitch point, so each is
+/// good to its own rounding; the cross product's axial component cancels
+/// exactly by symmetry, leaving `ε` against a size `h`, so the radius is good
+/// to `ε/h`, and the extrapolation leaves `O(h⁴)`. Both are below 1e-12 at
+/// `h = 1e-3`; allowed a hundred times that. ISO 6336-3:2019's count,
+/// `z / (cos²β_b cos β)`, the base cylinder's section instead, differs by
+/// 3.6e-3 at 10°.
+#[test]
+fn a_helical_members_virtual_spur_is_its_normal_section() {
+    use gear_core::ring::{Cutter, Ring};
+    use gear_core::strength::ToothOutline;
+
+    fn section_radius(r: f64, beta: f64) -> f64 {
+        // The tooth trace at the pitch point (r, 0, 0) leans β off the axis.
+        let trace = [0.0, beta.sin(), beta.cos()];
+        // A point of the cylinder at angle φ, relative to the pitch point,
+        // lifted along the axis onto the plane normal to the trace.
+        let at = |phi: f64| {
+            let (x, y) = (-2.0 * r * (phi / 2.0).sin().powi(2), r * phi.sin());
+            [x, y, -y * trace[1] / trace[2]]
+        };
+        let sub = |a: [f64; 3], b: [f64; 3]| [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+        let norm = |a: [f64; 3]| (a[0] * a[0] + a[1] * a[1] + a[2] * a[2]).sqrt();
+        let circumradius = |h: f64| {
+            let (a, b) = (at(-h), at(h));
+            let c = sub(b, a);
+            let cross = [
+                a[1] * b[2] - a[2] * b[1],
+                a[2] * b[0] - a[0] * b[2],
+                a[0] * b[1] - a[1] * b[0],
+            ];
+            norm(a) * norm(b) * norm(c) / (2.0 * norm(cross))
+        };
+        let h = 1e-3;
+        (4.0 * circumradius(h / 2.0) - circumradius(h)) / 3.0
+    }
+
+    let tol = 1e-10;
+    let mut checked = 0;
+    for beta_deg in [10.0_f64, 20.0, 30.0, 40.0] {
+        for teeth in [9_u32, 17, 40] {
+            let g = Tooth::new(GearParams {
+                teeth,
+                helix_angle: beta_deg,
+                ..Default::default()
+            });
+            let v = ToothOutline::virtual_spur(&g);
+            let want = section_radius(g.r, g.beta);
+            assert!(
+                (v.r - want).abs() <= tol * want,
+                "z {teeth} β {beta_deg}: the virtual gear's pitch radius {}, the section's {want}",
+                v.r
+            );
+            assert_eq!(v.params.helix_angle, 0.0);
+            assert_eq!(v.params.module, g.params.module);
+            assert!((v.alpha_t - g.alpha_n).abs() <= 4.0 * f64::EPSILON);
+            checked += 1;
+        }
+        for teeth in [40_u32, 72] {
+            let ring = Ring::cut_by(
+                &GearParams {
+                    teeth,
+                    helix_angle: beta_deg,
+                    ..Default::default()
+                },
+                &Cutter::default(),
+            );
+            let v = ToothOutline::virtual_spur(&ring);
+            let want = section_radius(ring.r, beta_deg.to_radians());
+            assert!(
+                (v.r - want).abs() <= tol * want,
+                "ring z {teeth} β {beta_deg}: the virtual ring's pitch radius {}, the section's {want}",
+                v.r
+            );
+            assert!((v.alpha_t - ring.alpha_n).abs() <= 4.0 * f64::EPSILON);
+            checked += 1;
+        }
+    }
+    assert_eq!(checked, 4 * 5);
+}
+
+/// **The load angle is the roll off the half base angle, to rounding.** At
+/// roll `u` on an involute flank the load acts along the base tangent, which
+/// leans `|u − ψ_b|` off the across-tooth direction: the involute's geometry in
+/// closed form. Near a load square across the tooth that angle is small, and
+/// read through an arccosine of the direction's component it is flat to `√ε`
+/// there — a corner of the rated factor off by 1e-8. A section, and a section
+/// with its load moved there (`RootSection::loaded_at`, which the ramp's sweep
+/// reads), both carry it to the direction's own rounding: the direction is a
+/// difference of two points as far out as `r`, a roll `r_b·u` apart, so its
+/// angle is good to `ε·r/(r_b·u)`; allowed `2⁸` of that.
+#[test]
+fn the_load_angle_is_the_roll_off_the_half_base_angle() {
+    use gear_core::strength::{root_section, ToothOutline};
+    let mut checked = 0;
+    for teeth in [6_u32, 7, 9, 12, 17] {
+        for alpha in [14.5_f64, 20.0, 25.0] {
+            for x in [-0.3_f64, 0.0, 0.5, 0.8] {
+                let g = Tooth::new(GearParams {
+                    teeth,
+                    pressure_angle: alpha,
+                    profile_shift: x,
+                    ..Default::default()
+                });
+                let (lo, hi) = g.flank_bracket();
+                let level = g.psi_b;
+                // The level load is on the flank, a percent of room each side.
+                if !(g.is_usable() && lo < 0.99 * level && 1.01 * level < hi) {
+                    continue;
+                }
+                let Some(held) = root_section(&g, 1.01 * level) else {
+                    continue;
+                };
+                for k in 3..=12 {
+                    for side in [-1.0, 1.0] {
+                        let u = level * (1.0 + side * 10f64.powi(-k));
+                        let want = (u - level).abs();
+                        let tol = 256.0 * f64::EPSILON * f64::hypot(1.0, u) / u;
+                        let moved = held.loaded_at(&g, u).unwrap();
+                        let here = root_section(&g, u);
+                        for (what, got) in [
+                            ("moved", Some(moved.load_angle)),
+                            ("found", here.map(|s| s.load_angle)),
+                        ] {
+                            let Some(got) = got else { continue };
+                            assert!(
+                                (got - want).abs() <= tol,
+                                "z {teeth} α {alpha} x {x} u {u} ({what}): {got} against {want}"
+                            );
+                            checked += 1;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    assert!(checked >= 200, "{checked} load angles checked");
+}
+
+/// **A path cut short of the tip loads where one with that much more contact
+/// does.** Unshared, the load sits at the highest point of single-pair
+/// contact, `ε − 1` base pitches back from the far end of the path, and a far
+/// end `s` pitches below the tip puts it `ε − 1 + s` back from the tip: the
+/// same point as a path reaching the tip with a contact ratio of `ε + s`. Both
+/// are transverse lengths along the line of action, so they reach the normal
+/// plane a helical member bends in by the same factor, `1/cos²β_b`, and the
+/// identity holds there too. The two load rolls differ by the rounding of one
+/// division, and each section is solved to rounding: the factors agree to
+/// `2⁸ε` of their size.
+#[test]
+fn a_path_short_of_the_tip_loads_where_more_contact_would() {
+    use gear_core::contact::LoadSharing;
+    use gear_core::strength::{bending_section_on_path, RootStressModel};
+    let factor = |g: &Tooth, eps: f64, short: f64| {
+        bending_section_on_path(g, eps, short, LoadSharing::None)
+            .ok()
+            .and_then(|(s, _)| s.bending_factor(RootStressModel::DolanBroghamer))
+    };
+    let mut checked = 0;
+    for teeth in [12_u32, 25, 60] {
+        for helix_angle in [0.0_f64, 15.0, 30.0] {
+            for x in [0.0_f64, 0.4] {
+                let g = Tooth::new(GearParams {
+                    teeth,
+                    helix_angle,
+                    profile_shift: x,
+                    ..Default::default()
+                });
+                for (eps, short) in [(1.3_f64, 0.1_f64), (1.5, 0.25), (1.2, 0.4)] {
+                    let (Some(cut), Some(more)) =
+                        (factor(&g, eps, short), factor(&g, eps + short, 0.0))
+                    else {
+                        continue;
+                    };
+                    assert!(
+                        (cut - more).abs() <= 256.0 * f64::EPSILON * more,
+                        "z {teeth} β {helix_angle} x {x}: ε {eps} short {short} rates {cut}, \
+                         ε {} to the tip {more}",
+                        eps + short
+                    );
+                    checked += 1;
+                }
+            }
+        }
+    }
+    assert!(checked >= 40, "{checked} paths checked");
 }

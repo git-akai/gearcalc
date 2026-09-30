@@ -2293,7 +2293,9 @@ mod tests {
     /// **The swept maximum is the greatest over the cycle.** Under the ramp
     /// a rating is the greatest `(Y_F − axial)·K_f · share` on the cycle the
     /// flank carries, so no load point on it may rate higher: checked against
-    /// 20,000 even points and the flank's own end. The best of the 204 samples
+    /// 20,000 even points and the flank's own end, loaded at its own roll
+    /// (a count of base pitches read back as a roll can round it off the
+    /// flank, which is how the sweep once missed it). The best of the 204 samples
     /// the sweep used to take fell short of this by up to 1.4e-3, and missed
     /// the flank's end where it governs (ε 1.7 among them), so the law also
     /// asserts that some answers lie beyond what those samples reach, and some
@@ -2303,7 +2305,7 @@ mod tests {
     #[test]
     fn the_swept_maximum_is_the_greatest_over_the_cycle() {
         let model = LoadSharing::LinearRamp;
-        let (mut checked, mut off_single_pair, mut beyond_samples) = (0, 0, 0);
+        let (mut checked, mut off_single_pair, mut beyond_samples, mut ends) = (0, 0, 0, 0);
         for teeth in [9_u32, 12, 17, 25, 40, 70, 150] {
             for (profile_shift, pressure_angle, addendum) in [
                 (0.0_f64, 20.0_f64, 1.0_f64),
@@ -2345,11 +2347,20 @@ mod tests {
                             let far = (hi - lo) * v.rb
                                 / crate::plane::base_pitch(v.transverse_module(), v.alpha_t)
                                 - short / (cos_bb * cos_bb);
+                            // The flank's end, loaded at its own roll: `d → roll`
+                            // can round it off the flank.
+                            let far_roll = if v.tip_at_high_roll() { lo } else { hi };
+                            let end = (far <= en)
+                                .then(|| held.loaded_at(&v, far_roll))
+                                .flatten()
+                                .and_then(|x| x.bending_factor(RootStressModel::DolanBroghamer))
+                                .map(|f| f * crate::contact::load_share(far, en, model));
+                            ends += usize::from(end.is_some());
                             let n = 20_000;
                             let fine = (0..=n)
                                 .map(|i| en * f64::from(i) / f64::from(n))
-                                .chain([far])
                                 .filter_map(w)
+                                .chain(end)
                                 .fold(got, f64::max);
                             assert!(
                                 fine <= got * (1.0 + 256.0 * f64::EPSILON),
@@ -2373,9 +2384,9 @@ mod tests {
         }
         assert!(checked > 300, "checked {checked}");
         assert!(
-            off_single_pair > 0 && beyond_samples > 0,
-            "off the single-pair point {off_single_pair}, beyond 204 samples {beyond_samples}: \
-             the law does not reach where the sweep differs"
+            off_single_pair > 0 && beyond_samples > 0 && ends > 0,
+            "off the single-pair point {off_single_pair}, beyond 204 samples {beyond_samples}, \
+             the flank's end on the cycle {ends}: the law does not reach where the sweep differs"
         );
     }
 

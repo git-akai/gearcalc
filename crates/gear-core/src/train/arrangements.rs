@@ -1925,4 +1925,73 @@ mod hula {
             opened.meshes[binding].tips
         );
     }
+
+    /// **A hula's speeds are what no slip at its two pitch points gives**,
+    /// exactly, on every arrangement at one and two teeth of difference about
+    /// 18. Derived here from the velocities of the two material points at
+    /// each pitch point, sharing nothing with the graph's rows: the
+    /// fixed-axis gear `F` at the origin, the wobble gear `W` on the crank at
+    /// `C = e·u`, the pitch point at `s·r_F·u` (`s = +1` where `F` is the
+    /// ring, `−1` where `W` is), so `P − C = s·r_W·u` and
+    ///
+    /// ```text
+    /// ω_F · s · r_F = ω_c · e + ω_W · s · r_W
+    /// ```
+    ///
+    /// Mesh A with the grounded gear still gives the wobble body's speed;
+    /// mesh B then gives the output's. A locked arrangement (`z₂z₄ = z₁z₃`)
+    /// leaves the output still on both sides.
+    #[test]
+    fn a_hulas_speeds_are_its_pitch_points_rolling_without_slip() {
+        use crate::ratio::Ratio;
+        let half = |z: u32| Ratio::new(i128::from(z), 2).unwrap();
+        let signed = |s: i64, x: Ratio| Ratio::whole(s).checked_mul(x).unwrap();
+        let (mut checked, mut locked) = (0, 0);
+        for step in [1_i64, 2] {
+            let offsets = [-step, 0, step];
+            let pairs: Vec<(i64, i64)> = offsets
+                .iter()
+                .flat_map(|&a| offsets.iter().map(move |&b| (a, b)))
+                .filter(|(a, b)| (a - b).abs() == step)
+                .collect();
+            for &(a, b) in &pairs {
+                for &(c, d) in &pairs {
+                    let z = [a, b, c, d].map(|o| u32::try_from(18 + o).unwrap());
+                    // No slip, at one module: only the radii's ratios matter.
+                    let r = z.map(half);
+                    let s_a = if z[0] > z[1] { 1 } else { -1 };
+                    let s_b = if z[3] > z[2] { 1 } else { -1 };
+                    let e = signed(s_a, r[0].checked_sub(r[1]).unwrap());
+                    assert_eq!(
+                        e,
+                        signed(s_b, r[3].checked_sub(r[2]).unwrap()),
+                        "z {z:?}: equal differences share one crank offset"
+                    );
+                    let wobble = e
+                        .checked_neg()
+                        .and_then(|n| n.checked_div(signed(s_a, r[1])))
+                        .unwrap();
+                    let output = wobble
+                        .checked_mul(signed(s_b, r[2]))
+                        .and_then(|w| w.checked_add(e))
+                        .and_then(|v| v.checked_div(signed(s_b, r[3])))
+                        .unwrap();
+                    // The crate, per turn of the crank with the grounded gear
+                    // held. Bodies: crank 1, grounded 2, output 3, wobble 4.
+                    let motion = crate::train::Train::alone(&hula(z, [1.0, 1.0]), 2.0, 1.0)
+                        .arranged(&[2], 1, 3)
+                        .motion()
+                        .unwrap_or_else(|e| panic!("z {z:?}: {e:?}"));
+                    assert_eq!(motion.speeds[1], Ratio::ONE, "z {z:?}: the crank");
+                    assert_eq!(motion.speeds[2], Ratio::ZERO, "z {z:?}: grounded");
+                    assert_eq!(motion.speeds[4], wobble, "z {z:?}: the wobble body");
+                    assert_eq!(motion.speeds[3], output, "z {z:?}: the output");
+                    locked += usize::from(output.is_zero());
+                    checked += 1;
+                }
+            }
+        }
+        assert_eq!(checked, 32, "every arrangement at one and two teeth");
+        assert!(locked > 0, "a locked arrangement is among them");
+    }
 }

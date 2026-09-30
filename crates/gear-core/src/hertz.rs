@@ -1048,6 +1048,51 @@ mod tests {
         }
     }
 
+    /// **The line's field is Flamant's line load summed over the strip.** A
+    /// normal load `P` per unit length at `s` on a half-plane puts
+    /// `σ_x = −2P s² z / (π ρ⁴)` and `σ_z = −2P z³ / (π ρ⁴)`, `ρ² = s² + z²`,
+    /// on the axis at depth `z` (Johnson 2.15). Summed over Hertz's pressure
+    /// `√(1 − s²)` (peak and half-width 1) by Gauss–Chebyshev of the second
+    /// kind, whose weight is that square root, it reproduces McEwen's closed
+    /// form the rating reads for `κ = 0`: the line's coefficients and signs
+    /// held against a result derived another way, as the circle's are above.
+    ///
+    /// The integrand's poles sit at `s = ±iz`, so the rule converges as
+    /// `(z + √(1 + z²))^(−2n)`: below `e^(−70)` at `z = 0.1` and 400 nodes.
+    /// What is left is rounding, a sum of 400 terms of at most the field's
+    /// size, `400·ε ≈ 1e-13`; allowed ten times that.
+    #[test]
+    fn the_line_field_is_flamants_load_summed_over_the_strip() {
+        const NODES: u32 = 400;
+        let tol = 10.0 * f64::from(NODES) * f64::EPSILON;
+        let step = PI / f64::from(NODES + 1);
+        let mut checked = 0;
+        for nu in [0.0, 0.3, 0.45] {
+            for z in [0.1, 0.3, 0.5, 0.786, 1.0, 1.5, 2.0] {
+                let (mut sx, mut sz) = (0.0, 0.0);
+                for i in 1..=NODES {
+                    let t = step * f64::from(i);
+                    let (s, weight) = (t.cos(), step * t.sin() * t.sin());
+                    let rho2 = s * s + z * z;
+                    let load = -2.0 / PI * weight / (rho2 * rho2);
+                    sx += load * s * s * z;
+                    sz += load * z * z * z;
+                }
+                let [x, y, zz] = axis_stress(0.0, nu, z);
+                for (what, got, want) in [("σ_x", x, sx), ("σ_z", zz, sz)] {
+                    assert!(
+                        (got - want).abs() <= tol,
+                        "z {z}: {what} {got}, Flamant's {want}"
+                    );
+                }
+                // Plane strain: no strain along the contact line.
+                assert!((y - nu * (x + zz)).abs() <= tol, "ν {nu} z {z}: σ_y {y}");
+                checked += 1;
+            }
+        }
+        assert_eq!(checked, 3 * 7);
+    }
+
     /// **`C` at its two published values, and continuous between them.**
     /// 1.79 for a line and 1.60 for a circle at `ν = 0.3` (Johnson 4.2,
     /// von Mises); from the circle towards the line it moves monotonically and
