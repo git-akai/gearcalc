@@ -148,6 +148,14 @@ pub enum EditRefused {
     /// **A ring across crossed shafts**: the screw model has no internal
     /// kind.
     RingCrossed,
+    /// **A gear that locks the train**: its mesh asks two bodies to turn
+    /// at a ratio the meshes they are already in contradict — a ring on a
+    /// pair's second gear's body, a gear on a planet's body meshing a
+    /// central member the planet already turns against — so the train
+    /// loses a degree of freedom and no body it drove can turn. Decided off
+    /// the graph's kinematics, without a solve; a twin at the same ratio
+    /// locks nothing and is made.
+    Locks,
     /// A body not on the member's axis.
     NotOnTheAxis,
     /// No member of that kind fits at the radius the axis runs at: a sun
@@ -192,6 +200,7 @@ impl EditRefused {
             Self::RingToRing => "ui.train_edit_refused_ring_to_ring",
             Self::OrbitingMate => "ui.train_edit_refused_orbiting_mate",
             Self::RingCrossed => "ui.train_edit_refused_ring_crossed",
+            Self::Locks => "ui.train_edit_refused_locks",
             Self::NotOnTheAxis => "ui.train_edit_refused_axis",
             Self::NoRoom => "ui.train_edit_refused_no_room",
             Self::CarriesAnAxis => "ui.train_edit_refused_carrier",
@@ -216,6 +225,7 @@ impl std::fmt::Display for EditRefused {
             Self::RingToRing => "two rings do not mesh",
             Self::OrbitingMate => "that gear meshes riding a carrier",
             Self::RingCrossed => "a ring does not mesh across crossed shafts",
+            Self::Locks => "that gear would lock the train",
             Self::NotOnTheAxis => "not a body on the member's axis",
             Self::NoRoom => "nothing of that kind fits at this radius",
             Self::CarriesAnAxis => "that body carries an axis",
@@ -448,7 +458,11 @@ impl Shape {
     /// **The count a sun or a ring on planet gear `mate` takes**: sized to
     /// the radius its axis runs at, a few teeth of difference where nothing
     /// sets it yet — and on a body of its own (`fresh`), moved off a count
-    /// that would turn as one with another.
+    /// that would turn as one with another. Refused as [`EditRefused::NoRoom`]
+    /// where the count it comes to cannot close at the carrier radius: its
+    /// mesh's operating angle, `cos α_w = a₀ cos α / a` with `a₀` its
+    /// reference span and `a` the radius, the solve's own test
+    /// ([`crate::mesh::Mesh::pressure_angle_at`]), outside `(0, 1)`.
     fn central_teeth(&self, mate: usize, ring: bool, fresh: bool) -> Result<u32, EditRefused> {
         let planet_axis = self
             .axis_of_slot(self.slot_of_member(mate))
@@ -459,8 +473,12 @@ impl Shape {
         );
         let radius = self.carrier_radius(planet_axis);
         let fit = radius.map(|r| (2.0 * r / module).round());
+        // A ring one tooth larger than its planet is the least internal
+        // mesh there is — a planocentric's; a sun of fewer than four teeth
+        // is refused as ever (the floors are T15.15's to derive).
+        let floor = if ring { f64::from(zp) + 1.0 } else { 4.0 };
         let mut teeth = match (ring, fit) {
-            (true, Some(f)) => (f + f64::from(zp)).max(f64::from(zp) + 2.0),
+            (true, Some(f)) => (f + f64::from(zp)).max(floor),
             (true, None) => f64::from(zp) + 2.0,
             (false, Some(f)) if f - f64::from(zp) < 4.0 => return Err(EditRefused::NoRoom),
             (false, Some(f)) => f - f64::from(zp),
@@ -474,7 +492,6 @@ impl Shape {
         // some six per cent, and a planocentric's carrier radius is a few
         // teeth, so a ring a tooth *larger* at that radius has nowhere to
         // close; a tooth smaller always has.
-        let floor = if ring { f64::from(zp) + 2.0 } else { 4.0 };
         let at = self.indexed();
         let taken = |z: f64| {
             (0..self.members.len())
@@ -492,6 +509,18 @@ impl Shape {
         }
         while fresh && taken(teeth) {
             teeth += 1.0;
+        }
+        if let Some(a) = radius {
+            let span = if ring {
+                teeth - f64::from(zp)
+            } else {
+                teeth + f64::from(zp)
+            };
+            let alpha = self.members[mate].normal_pressure_angle().to_radians();
+            let cos_w = span * module / 2.0 * alpha.cos() / a;
+            if !(cos_w > 0.0 && cos_w < 1.0) {
+                return Err(EditRefused::NoRoom);
+            }
         }
         #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
         Ok(teeth as u32)
@@ -1610,9 +1639,10 @@ mod tests {
     /// form or material copied. The train it leaves solves, or its cases
     /// say the load divides by stiffness, or a part says by name why its
     /// geometry does not close; never a gear that cannot mesh its mate
-    /// (`Mesh(Incompatible)`, which a copied given helix gave), nor a
-    /// wiring that is no mechanism. A preset that does not solve before the
-    /// edit is skipped: its failure is not the gear's.
+    /// (`Mesh(Incompatible)`, which a copied given helix gave), nor a lock
+    /// (refused as `Locks`), nor a wiring that is no mechanism. A preset
+    /// that does not solve before the edit is skipped: its failure is not
+    /// the gear's.
     #[test]
     fn every_gear_a_preset_offers_is_its_own() {
         use super::super::testing::cased;
@@ -1678,7 +1708,6 @@ mod tests {
                             {
                                 said += 1;
                             }
-                            Err(TrainError::Overdetermined { .. }) => said += 1,
                             other => failures.push(format!("{context}: {other:?}")),
                         }
                     }
@@ -1694,6 +1723,101 @@ mod tests {
         assert!(
             solved > 50 && said > 0 && skipped < Preset::ALL.len(),
             "solved {solved}, said {said}, skipped {skipped}"
+        );
+    }
+
+    /// **No gear a train offers is a certain dead end** (audit T13.9): on
+    /// every preset, and on planocentrics at one and two teeth of
+    /// difference (18/19, 20/21, 30/31, 30/32, 18/20), cased, every
+    /// `AddGear` offered unrefused solves, or ends with its load divided by
+    /// stiffness (`load_shared`: an equal-ratio twin the model cannot
+    /// share). A gear whose mesh contradicts the motion its bodies already
+    /// have — a lock — is refused as `Locks` without a solve, and a ring
+    /// round a planet that no count can close at the carrier radius as
+    /// `NoRoom`: at one tooth of difference the only count that closes is
+    /// the ring's own. At two, the count a tooth below the ring's closes,
+    /// is offered and solves — which a floor of two teeth over the planet
+    /// refused. The twins stay offered: a rule refusing every second mesh
+    /// between two geared bodies fails here.
+    #[test]
+    fn no_gear_a_train_offers_is_a_dead_end() {
+        use super::super::testing::cased;
+        use crate::note::key;
+        let lib = library();
+        let shapes = Preset::ALL
+            .into_iter()
+            .map(|p| (format!("{p:?}"), p.build()))
+            .map(|(name, shape)| (name, shape, None))
+            .chain(
+                [(18, 19), (20, 21), (30, 31), (30, 32), (18, 20)].map(|(p, r)| {
+                    let name = format!("planocentric {p}/{r}");
+                    (name, arr::planocentric(p, r), Some(r - p))
+                }),
+            );
+        let (mut solved, mut twins, mut locks, mut rings) = (0, 0, 0, 0);
+        let mut failures: Vec<String> = Vec::new();
+        for (name, shape, difference) in shapes {
+            let t = cased(vec![shape]);
+            assert!(solve_train(&t, &lib).is_ok(), "{name} solves as laid in");
+            let mut seen: Vec<String> = Vec::new();
+            for at in super::super::sweep::targets(&t) {
+                for o in t.offers(at) {
+                    let Edit::AddGear { .. } = o.edit else {
+                        continue;
+                    };
+                    let named = format!("{:?}", o.edit);
+                    if seen.contains(&named) {
+                        continue;
+                    }
+                    seen.push(named.clone());
+                    if o.refused
+                        .as_ref()
+                        .is_some_and(|n| n.key == "ui.train_edit_refused_locks")
+                    {
+                        locks += 1;
+                    }
+                    // A second ring round a planocentric's planet.
+                    if let (
+                        Some(d),
+                        Edit::AddGear {
+                            mate: 0,
+                            on: Place::NewBody(_),
+                            ring: true,
+                        },
+                    ) = (difference, &o.edit)
+                    {
+                        let offered = o.refused.is_none();
+                        assert_eq!(offered, d == 2, "{name}: {named} offered {offered}");
+                        rings += usize::from(offered);
+                    }
+                    if o.refused.is_some() {
+                        continue;
+                    }
+                    let mut u = t.clone();
+                    u.edit(o.edit.clone()).unwrap();
+                    match solve_train(&u, &lib) {
+                        Ok(r) if r.cases.iter().all(|c| c.solved) => solved += 1,
+                        Ok(r)
+                            if r.cases
+                                .iter()
+                                .all(|c| c.notes.iter().any(|n| n.is(key::TRAIN_LOAD_SHARED))) =>
+                        {
+                            twins += 1;
+                        }
+                        other => failures.push(format!("{name}, {named}: {other:?}")),
+                    }
+                }
+            }
+        }
+        assert!(
+            failures.is_empty(),
+            "{} dead ends offered:\n{}",
+            failures.len(),
+            failures.join("\n")
+        );
+        assert!(
+            solved > 50 && twins > 0 && locks > 0 && rings == 2,
+            "solved {solved}, twins {twins}, locks {locks}, rings {rings}"
         );
     }
 

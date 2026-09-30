@@ -1404,6 +1404,15 @@ impl Train {
         Ok(())
     }
 
+    /// **The train's degrees of freedom**, holds apart: how many bodies'
+    /// turns its meshes and couplings leave to be given
+    /// ([`crate::kinematics::System::mobility`]); `None` for a train whose
+    /// system does not build, which an edit's own refusals say.
+    fn freedom(&self) -> Option<usize> {
+        let system = self.system().ok()?;
+        system.mobility().map(|m| m.degrees)
+    }
+
     /// Whether the graph lists `body` — ground never, being no body a hold
     /// or a release can name.
     fn lists(&self, body: usize) -> bool {
@@ -1441,7 +1450,16 @@ impl Train {
             Edit::Insert { shape, at } => self.insert(shape, at),
             edit => {
                 let next = self.max_body() + 1;
+                let freedom = self.freedom();
                 self.shape.apply(&edit, next)?;
+                // **A gear whose mesh contradicts the motion its bodies
+                // already have locks the train**: the new row is
+                // independent of the rows before it with no new body to
+                // take it up, so the train has one degree of freedom
+                // fewer. A twin at the same ratio adds a dependent row.
+                if matches!(edit, super::Edit::AddGear { .. }) && self.freedom() < freedom {
+                    return Err(super::EditRefused::Locks);
+                }
                 // An empty graph lists nothing: its cases wait by number
                 // for the next preset laid in ([`Self::chain_on`]).
                 if self.shape.members.is_empty() {

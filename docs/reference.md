@@ -2441,7 +2441,8 @@ a refused edit changes nothing.
 **gear** meshing any gear, on a body the
 train has, a new body of an axis it has or a new axis fixed in ground
 (`AddGear`) — sized to the distance between the two axes where they have
-one, a sun or a ring on a planet gear to the radius the planet runs at, and
+one, a sun or a ring on a planet gear to the radius the planet runs at
+(refused where no count of that kind closes at that radius), and
 on a new axis its mate's count or a ring twice it; the crate's default gear
 at that count, its module, pressure angle and helix following its mesh and
 nothing of its mate's given helix, form or material copied — and refused
@@ -2461,10 +2462,15 @@ would leave a load or a reaction on a body held, cut off from the gears or
 taken off the train — or joined to another the same case names — is refused
 (`ui.train_edit_refused_loaded`), a free entry there is dropped, and only
 the removal that empties the train leaves its cases waiting by number for
-the next preset laid in. A lock by construction — a ring on the second gear's body of a pair,
-two ratios across one pair of shafts — is made, and the train names it at
-the body as it names a lock by holds; the edit's to say is only whether the
-graph it leaves hangs together. A refusal crosses the boundary as its
+the next preset laid in. **A gear added that would lock the train** — a ring
+on the second gear's body of a pair, a gear on a planet's body meshing a
+central member the planet already turns against — is refused
+(`ui.train_edit_refused_locks`), decided off the graph's kinematics without
+a solve: its mesh leaves the train a degree of freedom short. A twin at the
+same ratio locks nothing and is made, the case saying the load divides by
+stiffness; and a lock a move makes — two ratios across one pair of shafts,
+the transient of engaging a layshaft's other ratio — is made, and the train
+names it at the body as it names a lock by holds. A refusal crosses the boundary as its
 catalogue key, which is what the panel says beside the entry.
 
 **What a piece offers** (`Train::offers`) is every one of those edits that

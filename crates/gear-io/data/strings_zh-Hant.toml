@@ -502,6 +502,7 @@ train_edit_refused_central_axis = "有行星架繞該軸線轉動：它所承載
 train_edit_refused_ring_to_ring = "兩個內齒圈不能嚙合：內齒圈與外齒輪嚙合"
 train_edit_refused_orbiting_mate = "該齒輪隨行星架嚙合，而固定在機架上的軸線不共享其參考系：請讓它在行星架所承載或所繞的軸線上的體上嚙合"
 train_edit_refused_ring_crossed = "內齒圈不能在交錯軸之間嚙合：螺旋模型沒有內嚙合類型"
+train_edit_refused_locks = "該齒輪會鎖死輪系：它的嚙合要求兩個體以某一傳動比轉動，而它們已有的嚙合與之矛盾"
 train_edit_refused_axis = "不是該齒輪軸線上的體"
 train_edit_refused_no_room = "該半徑下放不下此類構件"
 train_edit_refused_carrier = "該體承載一條軸線：齒輪固定在其所嚙合行星的行星架上會鎖死該行星組"

@@ -507,6 +507,7 @@ train_edit_refused_central_axis = "um porta-planetas gira em torno desse eixo: o
 train_edit_refused_ring_to_ring = "duas coroas não engrenam: uma coroa engrena uma engrenagem externa"
 train_edit_refused_orbiting_mate = "essa engrenagem engrena a girar com um porta-planetas, e nenhum eixo fixo na base partilha o seu referencial: engrene-a num corpo de um eixo que o porta-planetas transporta ou em torno do qual gira"
 train_edit_refused_ring_crossed = "uma coroa não engrena entre eixos cruzados: o modelo de parafuso não tem tipo interno"
+train_edit_refused_locks = "essa engrenagem bloquearia o trem: o seu engrenamento pede a dois corpos uma relação que os engrenamentos em que já estão contradizem"
 train_edit_refused_axis = "não é um corpo no eixo desta engrenagem"
 train_edit_refused_no_room = "nada desse tipo cabe neste raio"
 train_edit_refused_carrier = "esse corpo transporta um eixo: uma engrenagem fixa ao porta-planetas que engrena bloqueia o conjunto"

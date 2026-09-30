@@ -3629,23 +3629,23 @@
    "ok": [
     [
      "en",
-     582
+     583
     ],
     [
      "de",
-     582
+     583
     ],
     [
      "pt",
-     582
+     583
     ],
     [
      "zh-Hans",
-     582
+     583
     ],
     [
      "zh-Hant",
-     582
+     583
     ]
    ]
   },
@@ -29354,7 +29354,7 @@
          "ring": true
         }
        },
-       "refused": null
+       "refused": "ui.train_edit_refused_locks"
       },
       {
        "edit": {
@@ -29426,7 +29426,7 @@
          "ring": true
         }
        },
-       "refused": null
+       "refused": "ui.train_edit_refused_locks"
       },
       {
        "edit": {

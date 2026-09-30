@@ -530,14 +530,20 @@ mod tests {
     /// kept solving or refused by a named reason other than a wiring that
     /// describes no mechanism; every flow saying each body and mesh once;
     /// every fatigue case counting its cycles or saying why not; a fresh
-    /// case fitting it; and the train the same after a trip through JSON.
-    fn laws(t: &Train, solved: bool) -> Result<bool, String> {
+    /// case fitting it; a gear added (`step`, as the walk logs it) never
+    /// locking a train that turned; and the train the same after a trip
+    /// through JSON.
+    fn laws(t: &Train, solved: bool, step: &str) -> Result<bool, String> {
         let lib = test_library();
         t.check().map_err(|e| format!("check: {e:?}"))?;
         let _ = t.offers(Target::Train);
         let r = solve_train(t, &lib);
         match &r {
             Err(e) if solved && wiring(e) => return Err(format!("solved, then {e:?}")),
+            // A gear offered never locks a train that turned (audit T13.9).
+            Err(e @ TrainError::Overdetermined { .. }) if solved && step.starts_with("AddGear") => {
+                return Err(format!("solved, then a gear locked it: {e:?}"));
+            }
             Ok(r) => {
                 super::super::groupings::says_everything_once(t, r)?;
                 super::super::rating_laws::held_tips_reach_past_nothing(t, r)?;
@@ -582,7 +588,8 @@ mod tests {
                 let made = catch_unwind(AssertUnwindSafe(|| {
                     let u = step(&t, &mut rng, &mut steps)?
                         .unwrap_or_else(|e| panic!("an offered edit refused: {e:?}"));
-                    Some((laws(&u, solved), u))
+                    let last = steps.last().cloned().unwrap_or_default();
+                    Some((laws(&u, solved, &last), u))
                 }));
                 match made {
                     Ok(None) => {}
