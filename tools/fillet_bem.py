@@ -7,8 +7,9 @@ rates there.
     python3 tools/fillet_bem.py --run [JOBS] # re-solve every tooth and rewrite the record (by hand)
     python3 tools/fillet_bem.py --tooth KIND Z ALPHA X RHO MATE   # one tooth, three meshes
 
-**An analysis, run by hand, whose conclusions are gated.** A tooth takes about
-ten seconds to solve, the record two minutes on twelve cores; the answer, the
+**An analysis, run by hand, whose conclusions are gated.** A tooth takes ten
+to thirty seconds to solve (a whole pinion the longest), the record about nine
+minutes on twelve cores; the answer, the
 peak, depends on the tooth's geometry alone and is kept in
 `tools/fillet_bem.txt` beside the figures of the geometry it was solved on.
 The default mode reads that record, asks `gear-cli fillet grid` for what the
@@ -31,8 +32,10 @@ elimination replaced by LAPACK's and its assembly vectorised.
 
 It reads only the tooth's outline, which `gear-cli fillet ... outline` prints
 sampled on the crate's exact curves with their tangents, and interpolates
-between samples by cubic Hermite segments. Five teeth stand on a rim `RIM`
-modules deep, its far arc and its two cuts held; the load is a smooth `cos²`
+between samples by cubic Hermite segments. The body is five teeth on a rim
+`RIM` modules deep, its far arc and its two cuts held; or, on a pinion small
+enough that such a rim would reach a shaft of `BORE` of its root radius (z
+12 and 17 here), the whole gear held on that shaft. The load is a smooth `cos²`
 traction of half-width 0.05 m along the crate's load direction, centred on
 the crate's load point, the highest point of single-pair contact (the tip,
 below a contact ratio of one: the patch then straddles the corner), and
@@ -49,11 +52,14 @@ Each held to `TOL`, the research round's pre-registered 0.5 %:
 - **Golovin**: a curved bar in pure bending, exact, with a held end — the
   finite, mixed problem the hole canaries are not.
 - **Four stepped flat bars** in in-plane bending, against a second solver
-  that shares nothing with this one but the elasticity (`SHOULDER_TREFFTZ`).
+  that shares nothing with this one but the elasticity
+  (`tools/shoulder_trefftz.py`, whose recorded answers these are).
 - **The research round's canary tooth**, as its instrument solved it, to that
-  instrument's own resolution; and the model a solid gear: a rim twice as
-  deep, or seven teeth, moves the peak of a pinion and of a ring by less than
-  `TOL`.
+  instrument's own resolution.
+- **The body**: a shaft half as large under a whole pinion, a rim twice as
+  deep or seven teeth in a sector (external and ring), and a sector against
+  the whole gear at z 30, just past the switch, each move the peak by less
+  than `TOL`.
 
 **Peterson's shoulder**, the canary the research pre-registered — Chart 3.4
 of Pilkey and Pilkey, *Peterson's Stress Concentration Factors*, 3rd ed.
@@ -77,12 +83,17 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "tools"))
 RECORD = ROOT / "tools" / "fillet_bem.txt"
-# The rim under the teeth, modules: deep enough that twice as much moves the
-# peak by less than the pre-registered tolerance on the pinion and the ring
-# that move most (`--self-test` holds it; at five modules a 40-tooth ring
-# moved 1.1 %).
+# The rim under a sector's teeth, modules: deep enough that twice as much
+# moves the peak by less than the tolerance (`--self-test` holds it; at five
+# modules a 40-tooth ring moved 1.1 %).
 RIM = 10.0
+# The shaft a small pinion is held on, as a fraction of its root radius: where
+# a rim of `RIM` modules would reach it, the whole gear is modelled on it
+# (`body_of`). Half as large moves the peak by less than the tolerance
+# (`--self-test` holds it).
+BORE = 0.25
 # The gate every canary is held to: pre-registered by the research round
 # (`work/notch-research.md`, next round P3, item 1), and fine enough to resolve the
 # biases it exists to measure, which run from a few to tens of percent.
@@ -726,14 +737,21 @@ def rot(p, f):
     return (p[0] * c + p[1] * s, p[1] * c - p[0] * s)
 
 
-def tooth_model(c, h_tip, hot, grade=0.1, h_far=0.25, h_rest=0.5, rim=RIM, c_p=0.05, nb=2,
-                E=206000.0, nu=0.3, cuts="u", fault=None):
-    """The BEM model of `2 nb + 1` teeth on a rim, the centre tooth loaded on
-    its `+x` flank. Returns the solved model and the loaded side's root,
-    fillet and flank elements in order along the outline."""
+def tooth_model(c, h_tip, hot, grade=0.1, h_far=0.25, h_rest=0.5, rim=RIM, bore=BORE, c_p=0.05,
+                nb=2, E=206000.0, nu=0.3, whole=None, cuts="u", fault=None):
+    """The BEM model of the member `c`, the centre tooth loaded on its `+x`
+    flank. Returns the solved model and the loaded side's root, fillet and
+    flank elements in order along the outline.
+
+    The body (`body_of`): a sector of `2 nb + 1` teeth on a rim `rim`
+    modules deep, its far arc and its two cuts held; or, where such a rim
+    would reach a shaft of radius `bore · r_f` (a small pinion), the whole
+    gear, every tooth, held on that shaft. A ring's rim is outside its teeth
+    and never reaches anything."""
     ring = c["kind"] == "ring"
     hp = c["half_pitch"]
     rf = c["r_f"]
+    whole = body_of(c, rim, bore) == "whole" if whole is None else whole
     half = [(name, Curve(pts)) for name, pts in c["pieces"]]
     load_point = (c["load"]["x"], c["load"]["y"])
     load_dir = (c["load"]["dx"], c["load"]["dy"])
@@ -753,21 +771,23 @@ def tooth_model(c, h_tip, hot, grade=0.1, h_far=0.25, h_rest=0.5, rim=RIM, c_p=0
     def size_rest(x, y):
         return min(h_rest, h_tip + grade * math.dist((x, y), hot))
 
-    # One tooth, -x mid-space to +x mid-space: the mirrored half reversed,
-    # then the half as printed.
+    # Tooth by tooth, each from its -x mid-space to its +x one: the mirrored
+    # half reversed, then the half as printed. The whole gear has every
+    # tooth, and its last tooth ends where its first began.
+    teeth = range(-(c["z"] // 2), c["z"] - c["z"] // 2) if whole else range(-nb, nb + 1)
     path = []
-    for k in range(-nb, nb + 1):
+    for k in teeth:
         f = 2 * k * hp
         centre = k == 0
         sz = size_loaded if centre else size_rest
         for name, cv in reversed(half):
             path.append((lambda q, cv=cv, f=f: rot((-cv(q)[0], cv(q)[1]), f), cv.length, 0.0,
-                         sz, (name + "-") if centre else "", None))
+                         sz, (name + "-") if centre else "", None, "t"))
         for name, cv in half:
             tv = load_t if centre and name in ("flank", "tip") else None
             path.append((lambda q, cv=cv, f=f: rot(cv(q), f), 0.0, cv.length, sz,
-                         (name + "+") if centre else "", tv))
-    th = (2 * nb + 1) * hp
+                         (name + "+") if centre else "", tv, "t"))
+    th = len(teeth) * hp
 
     def radial(a, r0, r1):
         return lambda s: ((r0 + (r1 - r0) * s) * math.sin(a), (r0 + (r1 - r0) * s) * math.cos(a))
@@ -775,25 +795,36 @@ def tooth_model(c, h_tip, hot, grade=0.1, h_far=0.25, h_rest=0.5, rim=RIM, c_p=0
     def circle(r):
         return lambda a: (r * math.sin(a), r * math.cos(a))
 
+    # Each loop keeps the body on its left: the outline of an external gear
+    # counter-clockwise, a ring's bore and a gear's shaft clockwise.
+    loops = []
     if ring:
         ro = rf + rim
-        loop = [(f, p0, p1, sz, tag, tv, "t") for f, p0, p1, sz, tag, tv in path]
-        loop += [(radial(th, rf, ro), 0.0, 1.0, size_rest, "cutR", None, cuts),
-                 (circle(ro), th, -th, size_rest, "far", None, "u"),
-                 (radial(-th, ro, rf), 0.0, 1.0, size_rest, "cutL", None, cuts)]
+        loops.append(path + [(radial(th, rf, ro), 0.0, 1.0, size_rest, "cutR", None, cuts),
+                             (circle(ro), th, -th, size_rest, "far", None, "u"),
+                             (radial(-th, ro, rf), 0.0, 1.0, size_rest, "cutL", None, cuts)])
     else:
-        ri = rf - rim
-        loop = [(f, p1, p0, sz, tag, tv, "t") for f, p0, p1, sz, tag, tv in reversed(path)]
-        loop += [(radial(-th, rf, ri), 0.0, 1.0, size_rest, "cutL", None, cuts),
-                 (circle(ri), -th, th, size_rest, "far", None, "u"),
-                 (radial(th, ri, rf), 0.0, 1.0, size_rest, "cutR", None, cuts)]
+        outline = [(f, p1, p0, sz, tag, tv, bc) for f, p0, p1, sz, tag, tv, bc in reversed(path)]
+        if whole:
+            rs = bore * rf
+            loops.append(outline)
+            loops.append([(circle(rs), 0.0, math.pi, size_rest, "shaft", None, "u"),
+                          (circle(rs), math.pi, 2 * math.pi, size_rest, "shaft", None, "u")])
+        else:
+            ri = rf - rim
+            if ri <= 0:
+                raise ValueError(f"a rim of {rim} modules crosses the axis at r_f {rf}")
+            loops.append(outline + [(radial(-th, rf, ri), 0.0, 1.0, size_rest, "cutL", None, cuts),
+                                    (circle(ri), -th, th, size_rest, "far", None, "u"),
+                                    (radial(th, ri, rf), 0.0, 1.0, size_rest, "cutR", None, cuts)])
     M = BEM(E, nu, fault=fault)
-    first = prev = None
-    for k, (f, p0, p1, sz, tag, tv, bc) in enumerate(loop):
-        last = first if k == len(loop) - 1 else None
-        fa, fb = M.add_curve(f, p0, p1, sz, bc=bc, tval=tv, first=prev, last=last, tag=tag)
-        first = fa if first is None else first
-        prev = fb
+    for loop in loops:
+        first = prev = None
+        for k, (f, p0, p1, sz, tag, tv, bc) in enumerate(loop):
+            last = first if k == len(loop) - 1 else None
+            fa, fb = M.add_curve(f, p0, p1, sz, bc=bc, tval=tv, first=prev, last=last, tag=tag)
+            first = fa if first is None else first
+            prev = fb
     # The patch's resultant, as the elements carry it interpolated, made F_n.
     np = M.np
     xg, wg = M.GL[16]
@@ -813,6 +844,14 @@ def tooth_model(c, h_tip, hot, grade=0.1, h_far=0.25, h_rest=0.5, rim=RIM, c_p=0
     M.solve()
     side = [e for e in M.elems if e["tag"] in ("root+", "fillet+", "flank+")]
     return M, side
+
+
+def body_of(c, rim=RIM, bore=BORE):
+    """`sector` or `whole`: whether a rim `rim` modules deep under an
+    external member's teeth stays clear of a shaft `bore · r_f` in radius."""
+    if c["kind"] == "ring" or c["r_f"] - rim >= bore * c["r_f"]:
+        return "sector"
+    return "whole"
 
 
 def rho_ref(c):
@@ -891,8 +930,9 @@ def run(jobs):
         solved = pool.map(_solve_one, [key_of(c) for c in cases], chunksize=1)
     lines = [
         "# tools/fillet_bem.py --run: the exact elastic peak at each tooth's loaded fillet,",
-        "# sigma / (F_t / (b m)); five teeth on a rim of RIM modules, far arc and cuts held;",
-        f"# RIM {RIM}; passes {' '.join(f'{k}/{g}' for k, g in PASSES)} (rho_ref / k, growth g).",
+        "# sigma / (F_t / (b m)); five teeth on a rim of RIM modules, far arc and cuts held,",
+        "# or the whole gear on a shaft of BORE r_f where that rim would reach it;",
+        f"# RIM {RIM}; BORE {BORE}; passes {' '.join(f'{k}/{g}' for k, g in PASSES)} (rho_ref / k, growth g).",
     ]
     for c, peaks in solved:
         head = " ".join(str(v) for v in key_of(c))
@@ -901,7 +941,8 @@ def run(jobs):
             continue
         fp = " ".join(f"{v!r}" for v in fingerprint(c))
         lines.append(f"{head} | peak {' '.join(f'{p:.6e}' for p, _ in peaks)}"
-                     f" | elements {' '.join(str(n) for _, n in peaks)} | fingerprint {fp}")
+                     f" | elements {' '.join(str(n) for _, n in peaks)} | body {body_of(c)}"
+                     f" | fingerprint {fp}")
     lines += shoulder_lines()
     RECORD.write_text("\n".join(lines) + "\n")
     print(f"{len(solved)} teeth -> {RECORD.relative_to(ROOT)}")
@@ -930,7 +971,8 @@ def read_record():
             continue
         rec[key] = dict(peaks=[float(v) for v in parts[1][1:]],
                         elements=[int(v) for v in parts[2][1:]],
-                        fingerprint=[None if v == "None" else float(v) for v in parts[3][1:]])
+                        body=parts[3][1],
+                        fingerprint=[None if v == "None" else float(v) for v in parts[4][1:]])
     return rec
 
 
@@ -1014,25 +1056,24 @@ def _stats(v):
     return v[0], med, v[-1], n, sum(1 for x in v if x < 0)
 
 
-def _row(label, v):
+def _row(label, model, v):
+    """One table row: the set, the model, and the bias over it."""
     if not v:
-        return f"{label:44s}  none"
+        return f"{label} | {model} | none"
     lo, med, hi, n, under = _stats(v)
-    return (f"{label:44s} n {n:3d}  {100 * lo:+6.1f} / {100 * med:+6.1f} / {100 * hi:+6.1f} %"
-            f"  under {100 * under / n:3.0f} %")
+    return (f"{label} | {model} | n {n} | {100 * lo:+.1f} | {100 * med:+.1f} | {100 * hi:+.1f}"
+            f" | under {round(100 * under / n)} %")
+
+
+# The models a row is read under: the default, the default without its
+# axial term, ISO's set, and ISO's `Y_S` continued past its `q_s = 8` clamp.
+MODELS = [("db", "DB"), ("db_bending", "DB without the axial term"), ("iso", "ISO"),
+          ("iso_continued", "ISO, Y_S continued past its clamp")]
 
 
 def summary():
     rec = read_record()
     now = parse_cases(harness("fillet", "grid"))
-    print("The canary: a stepped flat bar in in-plane bending, K_t = sigma_max / (6M / t d^2);")
-    print("Chart 3.4's fit (Pilkey, 3rd ed.) against the BEM and the Trefftz solver.")
-    for D, r, kt in SHOULDER_TREFFTZ:
-        bem = rec[("shoulder", D, r)]
-        chart = peterson_shoulder_kt(D, 1.0, r)
-        print(f"  D/d {D:g} r/d {r:g} h/r {(D - 1) / 2 / r:g}: chart {chart:.4f}, BEM {bem:.4f}, Trefftz {kt:.4f};"
-              f" BEM against Trefftz {100 * (bem / kt - 1):+.2f} %, the chart against both {100 * (chart / kt - 1):+.2f} %")
-    print()
     rows = []
     stale = []
     for c in now:
@@ -1062,7 +1103,7 @@ def summary():
             row["iso"] = iso["factor"] / peak - 1
             row["q_s"] = iso["q_s"]
             l = iso["s_Fn"] / iso["h_Fe"]
-            row["iso_unclamped"] = iso["Y_F"] * y_s(l, iso["q_s"]) / peak - 1
+            row["iso_continued"] = iso["Y_F"] * y_s(l, max(iso["q_s"], 1.0)) / peak - 1
         rows.append(row)
     if stale:
         print("the record is not of these teeth; solve them again (--run):")
@@ -1075,88 +1116,92 @@ def summary():
 
     ext = lambda r: r["kind"] == "external"  # noqa: E731
     ring = lambda r: r["kind"] == "ring"  # noqa: E731
-    ordinary = lambda r: r.get("fillet", 0) >= 0.1  # noqa: E731
-    middle = lambda r: 0.02 <= r.get("fillet", 0) < 0.1  # noqa: E731
-    tight = lambda r: r.get("fillet", 1) < 0.02  # noqa: E731
+    bands = [("every fillet", lambda r: True),
+             ("ordinary fillet", lambda r: r.get("fillet", 0) >= 0.1),
+             ("middle fillet", lambda r: 0.02 <= r.get("fillet", 0) < 0.1),
+             ("tight fillet", lambda r: r.get("fillet", 1) < 0.02)]
+    ordinary = bands[1][1]
+
+    print("The canary: a stepped flat bar in in-plane bending, K_t = sigma_max / (6M / t d^2);")
+    print("Chart 3.4's fit (Pilkey, 3rd ed.), the BEM, the Trefftz solver, and each against the Trefftz solver, %.")
+    for D, r, kt in SHOULDER_TREFFTZ:
+        bem = rec[("shoulder", D, r)]
+        chart = peterson_shoulder_kt(D, 1.0, r)
+        print(f"canary D/d {D:g} r/d {r:g} | chart {chart:.4f} | BEM {bem:.4f} | Trefftz {kt:.4f}"
+              f" | BEM {100 * (bem / kt - 1):+.2f} | chart {100 * (chart / kt - 1):+.2f}")
+    print()
     for kind in ("external", "ring"):
         keys = [r["key"] for r in rows if r["kind"] == kind]
         axis = lambda i: " ".join(f"{v:g}" for v in sorted({k[i] for k in keys}))  # noqa: E731
         print(f"{kind}: z {axis(1)}; alpha {axis(2)}; x {axis(3)}; tool round {axis(4)}; mate {axis(5)}")
-    print(f"the solve's gates (--self-test): tolerance {100 * TOL:g} %; ISO 6336-3's Y_S, its support and surface")
-    print("factors from IACS UR M56 3.11 and 3.12")
+    whole = sorted({r["key"][1] for r in rows if rec[r["key"]]["body"] == "whole"})
+    print(f"the whole gear on its shaft at z {' '.join(map(str, whole))}; a sector elsewhere")
+    print("fillets: ordinary rho_f/s_Fn >= 0.1, middle 0.02 to 0.1, tight below 0.02")
+    print(f"record {RECORD.relative_to(ROOT)}: {len(rows)} teeth | mesh convergence, the last two passes:"
+          f" median {100 * _stats([r['conv'] for r in rows])[1]:.3f} % | worst {100 * max(r['conv'] for r in rows):.3f} %"
+          f" | the gate of every canary and body check (--self-test) {100 * TOL:g} %")
     print()
-    print("The default rating and ISO's against the exact elastic peak (BEM), fit / peak - 1;")
-    print("min / median / max, and the share of teeth rated under the peak (unconservative).")
-    print(f"record {RECORD.relative_to(ROOT)}: {len(rows)} teeth; mesh convergence (last two passes) "
-          f"median {100 * _stats([r['conv'] for r in rows])[1]:.3f} %, worst {100 * max(r['conv'] for r in rows):.3f} %")
-    print()
+    print("Rated over the exact elastic peak, less one, %: set | model | teeth | min | median | max | under the peak")
     for kind, kp in (("external", ext), ("ring", ring)):
-        for name, fp in (("every fillet", lambda r: True), ("ordinary, rho_f/s_Fn >= 0.1", ordinary),
-                         ("middle, 0.02 <= rho_f/s_Fn < 0.1", middle), ("tight, rho_f/s_Fn < 0.02", tight)):
-            both = lambda r, kp=kp, fp=fp: kp(r) and fp(r)  # noqa: E731
-            print(_row(f"DB   {kind} {name}", sel(both, "db")))
-            print(_row(f"  without the axial term", sel(both, "db_bending")))
-            print(_row(f"ISO  {kind} {name}", sel(both, "iso")))
-    print()
+        for band, bp in bands:
+            for key, model in MODELS:
+                print(_row(f"bias {kind}, {band}", model,
+                           sel(lambda r, kp=kp, bp=bp: kp(r) and bp(r), key)))
     for kind, kp in (("external", ext), ("ring", ring)):
-        print(_row(f"ISO  {kind} in its band, q_s < 8", sel(lambda r, kp=kp: kp(r) and r.get("q_s", 0) < 8, "iso")))
-        print(_row(f"ISO  {kind} past its clamp, q_s >= 8", sel(lambda r, kp=kp: kp(r) and r.get("q_s", 0) >= 8, "iso")))
-        print(_row(f"  the same, Y_S continued past it", sel(lambda r, kp=kp: kp(r) and r.get("q_s", 0) >= 8, "iso_unclamped")))
-    print()
+        for band, bp in (("q_s below 8", lambda r: r.get("q_s", 0) < 8),
+                         ("q_s 8 and above", lambda r: r.get("q_s", 0) >= 8)):
+            for key, model in MODELS[2:]:
+                print(_row(f"bias {kind}, {band}", model, sel(lambda r, kp=kp, bp=bp: kp(r) and bp(r), key)))
     for a in (14.5, 20.0, 25.0):
-        f = lambda r, a=a: ext(r) and ordinary(r) and r["key"][2] == a  # noqa: E731
-        print(_row(f"DB   external ordinary at {a:g} deg", sel(f, "db")))
+        for key, model in MODELS:
+            print(_row(f"bias external, ordinary fillet at {a:g} deg", model,
+                       sel(lambda r, a=a: ext(r) and ordinary(r) and r["key"][2] == a, key)))
     for z in sorted({r["key"][1] for r in rows if ext(r)}):
-        f = lambda r, z=z: ext(r) and ordinary(r) and r["key"][1] == z  # noqa: E731
-        print(_row(f"DB   external ordinary at z {z}", sel(f, "db")))
+        print(_row(f"bias external, ordinary fillet at z {z}", "DB",
+                   sel(lambda r, z=z: ext(r) and ordinary(r) and r["key"][1] == z, "db")))
     # Dolan and Broghamer's specimens held no undercut tooth.
     for label, under in (("undercut", True), ("not undercut", False)):
-        f = lambda r, u=under: ext(r) and ordinary(r) and r["undercut"] == u  # noqa: E731
-        print(_row(f"DB   external ordinary, {label}", sel(f, "db")))
-        print(_row(f"ISO  external ordinary, {label}", sel(f, "iso")))
+        for key, model in (MODELS[0], MODELS[2]):
+            print(_row(f"bias external, ordinary fillet, {label}", model,
+                       sel(lambda r, u=under: ext(r) and ordinary(r) and r["undercut"] == u, key)))
     shares = sel(lambda r: ext(r) and ordinary(r), "axial_share")
-    print(f"the axial term's share of Y_F, external ordinary: median {100 * _stats(shares)[1]:.1f} %")
+    print(f"the axial term's share of Y_F, external ordinary fillets: median {100 * _stats(shares)[1]:.1f} %")
     print()
 
-    # By material class: what the root feels is the peak over the notch
-    # support, against the coupon's endurance times the surface's factor.
-    print("By material class, external ordinary fillets: rated / felt - 1 = (1 + fit/peak - 1) n k_s - 1,")
-    print("n ISO's notch support, k_s the root's surface against the polished coupon; min / median / max.")
+    # By material: what the root feels is the peak over the notch support,
+    # against the coupon's endurance times the surface's factor.
+    print("By material, external ordinary fillets: rated over felt, less one, %: (1 + bias) n k_s - 1,")
+    print("n ISO's notch support, k_s the root's surface against the polished coupon.")
     for st in library_steels():
         rho_p = slip_layer(st["yield_"])
         strong = st["uts"] >= STRONG_STEEL
         k_s = surface_relative(RZ_REFERENCE, strong) / surface_relative(RZ_POLISHED, strong)
-        for fit, name in (("db", "DB"), ("iso", "ISO"), ("db_bending", "DB without the axial term")):
-            for label, with_ks in (("support", 1.0), (f"support, hobbed Rz {RZ_REFERENCE:g}", k_s)):
-                v = [(1 + r[fit]) * notch_support(rho_p, r["q_s"]) * with_ks - 1
-                     for r in rows if ext(r) and ordinary(r) and fit in r and "q_s" in r]
-                print(_row(f"{name}: {st['name']}, {label}", v))
+        for label, with_ks in (("support", 1.0), (f"support and a hobbed root, Rz {RZ_REFERENCE:g}", k_s)):
+            for key, model in MODELS[:3]:
+                v = [(1 + r[key]) * notch_support(rho_p, r["q_s"]) * with_ks - 1
+                     for r in rows if ext(r) and ordinary(r) and key in r and "q_s" in r]
+                print(_row(f"{st['name']}, {label}", model, v))
         n = _stats([notch_support(rho_p, r["q_s"]) - 1 for r in rows if ext(r) and ordinary(r) and "q_s" in r])
-        print(f"  {st['name']}: notch support n - 1 {100 * n[0]:.1f} / {100 * n[1]:.1f} / {100 * n[2]:.1f} %")
-        print(f"  {st['name']}: rho' {rho_p:.4f} mm; polished coupon over a hobbed root (Rz {RZ_REFERENCE:g}): "
-              f"{1 / k_s:.3f}; Marin at sigma_u {st['uts']:g}: "
-              + ", ".join(f"{fin} {a * st['uts'] ** b:.3f}" for fin, (a, b) in MARIN.items()))
-    print("  brass, POM and the polyamides: no support and no surface figure in ISO; the n = 1 rows stand.")
+        marin = " | ".join(f"Marin {fin} {a * st['uts'] ** b:.3f}" for fin, (a, b) in MARIN.items())
+        print(f"factors {st['name']} | slip layer {rho_p:.4f} mm | notch support, median {100 * n[1]:.1f} %"
+              f" | the coupon over a hobbed root {1 / k_s:.3f} | sigma_u {st['uts']:g} | {marin}")
+    print("brass, POM and the polyamides: no support and no surface figure in ISO; the elastic-peak rows are theirs")
     print()
     print("Hardness / 3 (Tabor) against the library's own yield and ultimate:")
     for st in library_steels():
         h3 = st["hv"] * HV_MPA / 3
-        print(f"  {st['name']}: HV {st['hv']:g}, H/3 {h3:.0f} MPa; yield {st['yield_']:g} ({100 * (h3 / st['yield_'] - 1):+.0f} %),"
-              f" ultimate {st['uts']:g} ({100 * (h3 / st['uts'] - 1):+.0f} %)")
+        print(f"hardness {st['name']} | HV {st['hv']:g} | H/3 {h3:.0f} MPa | yield {st['yield_']:g}"
+              f" | {100 * (h3 / st['yield_'] - 1):+.0f} % | ultimate {st['uts']:g} | {100 * (h3 / st['uts'] - 1):+.0f} %")
 
 
 # --------------------------------------------------------------------------
 # The self-test
 # --------------------------------------------------------------------------
 
-# The stepped bar by a second, independent solver: the notch research's
-# Kolosov–Muskhelishvili lightning solver (`~/.cache/gearcalc-work/
-# trefftz-proto/t_shoulder*.py`: holomorphic potentials with poles clustered
-# at every corner, fitted to the boundary conditions by least squares; no
-# boundary integral anywhere), at degree 60 or 100 with the boundary
-# residual below 2.2e-5, where the degree before moved it by at most 5e-4.
-# `(D/d, r/d, K_t)`.
-SHOULDER_TREFFTZ = [(1.5, 0.05, 2.38677), (1.5, 0.1, 1.89742), (2.0, 0.1, 1.94162), (2.0, 0.2, 1.57280)]
+# The stepped bar by a second, independent solver with no boundary integral
+# in it (`tools/shoulder_trefftz.py`, which solves them again and holds its
+# answer to these): `(D/d, r/d, K_t)`.
+SHOULDER_TREFFTZ = __import__("shoulder_trefftz").RECORDED
 # The research round's canary pinion (17/43, 20°, rack round 0.38) as its
 # instrument solved it — three teeth, a three-module rim, cuts free, two
 # passes (`notch-proto/t_fillet_canary.json`, every digit).
@@ -1175,31 +1220,85 @@ def canaries(fault=None, quick=False):
     if quick:
         return out
     c = crate_tooth("external", 17, 20, 0, 0.38, 43)
-    old = solve_tooth(c, passes=PASSES[:2], nb=1, rim=3.0, cuts="t", fault=fault)
+    old = solve_tooth(c, passes=PASSES[:2], nb=1, rim=3.0, whole=False, cuts="t", fault=fault)
     # A port may differ from its original by no more than the original
     # resolves: the change between its own two meshes.
     resolves = abs(RESEARCH_CANARY[1] / RESEARCH_CANARY[0] - 1)
     for (p, _), ref in zip(old, RESEARCH_CANARY):
         out.append(("the research instrument's canary tooth", p / ref - 1, resolves))
-    for member in (c, crate_tooth("ring", 40, 20, 0, 0.1, 17)):
-        base = solve_tooth(member, fault=fault)[-1][0]
-        deep = solve_tooth(member, rim=2 * RIM, fault=fault)[-1][0]
-        wide = solve_tooth(member, nb=3, fault=fault)[-1][0]
-        z = f"{member['kind']} z {member['z']}"
-        out.append((f"the model a solid gear: {z}, rim twice as deep", deep / base - 1, TOL))
-        out.append((f"the model a solid gear: {z}, seven teeth", wide / base - 1, TOL))
+    # The body: each form checked where the record uses it, on a member of
+    # each kind, and the two forms against each other across the switch.
+    whole = [c, crate_tooth("external", 12, 25, 0.5, 0.1, 43)]
+    assert all(body_of(m) == "whole" for m in whole)
+    for m in whole:
+        base = solve_tooth(m, fault=fault)[-1][0]
+        thin = solve_tooth(m, bore=BORE / 2, fault=fault)[-1][0]
+        out.append((f"the body: external z {m['z']}, whole, its shaft half as large", thin / base - 1, TOL))
+    sectors = [crate_tooth("external", 60, 20, 0, 0.38, 43), crate_tooth("ring", 40, 20, 0, 0.1, 17)]
+    assert all(body_of(m) == body_of(m, rim=2 * RIM) == "sector" for m in sectors)
+    for m in sectors:
+        base = solve_tooth(m, fault=fault)[-1][0]
+        deep = solve_tooth(m, rim=2 * RIM, fault=fault)[-1][0]
+        wide = solve_tooth(m, nb=3, fault=fault)[-1][0]
+        z = f"{m['kind']} z {m['z']}"
+        out.append((f"the body: {z}, sector, its rim twice as deep", deep / base - 1, TOL))
+        out.append((f"the body: {z}, sector, seven teeth", wide / base - 1, TOL))
+    # z 30 is the grid's first sector above the switch.
+    near = crate_tooth("external", 30, 20, 0, 0.38, 43)
+    assert body_of(near) == "sector"
+    sector = solve_tooth(near, fault=fault)[-1][0]
+    gear = solve_tooth(near, whole=True, fault=fault)[-1][0]
+    out.append(("the body: external z 30, sector against the whole gear", sector / gear - 1, TOL))
     return out
+
+
+def figures_law():
+    """Every figure `docs/state.md` quotes from this tool, moved one unit in
+    its last digit, fails `tools/check_figures.py`'s rule for its block: the
+    tables are matched row by row against one printed line each, where a list
+    or a paragraph is matched as a bag against everything printed. Returns
+    (figures moved, those that still passed)."""
+    import contextlib
+    import io
+    import re
+
+    import check_figures as cf
+
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        summary()
+    out = buf.getvalue()
+    number = re.compile(r"(?<![\w./])[-−+]?\d+(?:\.\d+)?(?![\w/])")
+    moved = passed = 0
+    blocks = [b for b in cf.blocks(ROOT / "docs" / "state.md") if b[1] == ["tools/fillet_bem.py"]]
+    for verb, commands, _, text in blocks:
+        assert not cf.check_block(verb, commands, text, lambda _c: out)[0], "the document has drifted"
+        for m in number.finditer(text):
+            raw = m.group(0)
+            dec = len(raw.split(".")[1]) if "." in raw else 0
+            v = float(raw.replace("−", "-"))
+            w = v + (1 if v >= 0 else -1) * 10 ** -dec
+            new = (f"{w:+.{dec}f}" if raw[0] in "+−-" else f"{w:.{dec}f}").replace("-", "−")
+            planted = text[:m.start()] + new + text[m.end():]
+            moved += 1
+            passed += not cf.check_block(verb, commands, planted, lambda _c: out)[0]
+    return len(blocks), moved, passed
 
 
 def self_test():
     failed = []
+    tables, moved, passed = figures_law()
+    print(f"  {'ok  ' if moved and not passed else 'FAIL'} state.md's {tables} tables from this tool:"
+          f" {moved} figures each moved one unit, {passed} still pass")
+    if not moved or passed:
+        failed.append("a figure state.md quotes moves unseen")
     gates = canaries()
     for name, err, tol in gates:
         ok = abs(err) <= tol
         print(f"  {'ok  ' if ok else 'FAIL'} {name}: {err:+.2e} (tolerance {tol:g})")
         if not ok:
             failed.append(name)
-    assert len(gates) == 3 + len(SHOULDER_TREFFTZ) + 2 + 4, len(gates)
+    assert len(gates) == 3 + len(SHOULDER_TREFFTZ) + 2 + 2 + 4 + 1, len(gates)
     print("Peterson's Chart 3.4, the pre-registered canary, reported: the chart's fit against the two solvers")
     for D, r, kt in SHOULDER_TREFFTZ:
         chart = peterson_shoulder_kt(D, 1.0, r)
