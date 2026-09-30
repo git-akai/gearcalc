@@ -21,6 +21,7 @@
 
 mod bendgrid;
 mod diagram;
+mod fillet;
 mod graph;
 mod identity;
 mod kinematics;
@@ -454,6 +455,14 @@ const COMMANDS: &[Command] = &[
         summary: "the default bending rating over a grid of tooth counts, shifts, pressure angles, helices and contact ratios, at full precision, for `tools/bending_gate.py`",
         run: |_| bendgrid::run(),
         record: Record::Cases(&["bendgrid"]),
+        slow: false
+    },
+    Command {
+        name: "fillet",
+        args: "grid | <external|ring> z alpha x rho mate [outline]",
+        summary: "one member's root under both bending sets at the single-pair point, and with `outline` its half tooth on its exact curves, for `tools/fillet_bem.py`; `grid` rates every tooth the BEM record holds",
+        run: fillet::run,
+        record: Record::Cases(&["fillet grid", "fillet external 17 20 0 0.38 43", "fillet ring 60 20 0 0.2 17"]),
         slow: false
     },
     Command {
