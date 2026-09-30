@@ -186,6 +186,7 @@ The checks, by what each catches. `nix flake check` is **not** all of them.
 | `tools/check_wasm.sh` | **the payload, executed** — everything else checks the boundary's shape or `gear-core`'s values, and nothing ran the `.wasm` the browser downloads. Asserts a law (optimising it changes no answer), records what it answers, and fails if an entry point has no probe | yes |
 | `python3 tools/validate_dxf.py` | an export read back by a parser that shares no code with the writer | yes |
 | `python3 tools/train_kinematics.py` · `python3 tools/train_kinematics.py --self-test` · `python3 tools/hula_kinematics.py` · `python3 tools/breakaway.py` · `python3 tools/crossed_path.py` | **the crate's recorded output against derivations that share no code with it** — each reads `tools/golden/` and exits non-zero on a disagreement, so a defect in the crate that reaches the corpus fails here | yes |
+| `python3 tools/bending_gate.py` · `python3 tools/bending_gate.py --self-test` | **the default bending rating's values** — `Y_F`, the Lewis section, `K_f`, the stress, under both sharings — over 1,424 teeth of finite count, shift, pressure angle and helix (`gear-cli bendgrid`), rebuilt from the rack by a generator, a brute-force parabola and AGMA's `K_f` that share no code with `strength.rs`, each figure to a tolerance derived per row; the self-test holds a record off by rounding passing and one ten tolerances off failing, and plants the held section searched afresh, `H` and `L` off by 1e-7, the notch radius at the section, 199 sweep samples and the 2019 virtual count | yes |
 | `tools/worm_flank_curvature.py` · `tools/helical_measurement.py` · `tools/first_yield.py` | the crate against derivations that share no code with it, compared by eye | no — by hand |
 | `tools/iso_6336_3_stack.py` | an **analysis**, not a check: where the ratings stand against ISO 6336-2/-3, after reproducing the tool's own ISO set | no — by hand |
 | `tools/check_identity.sh <base-rev>` | **any float that moved by a bit** since `<base-rev>`, across every preset, arrangement and a gear grid (`gear-cli identity`) — for a refactor meant to move nothing | no — by hand |
@@ -202,6 +203,9 @@ Perturbing five of the rating model's cited constants — `K_f`'s `H` and `L`,
 ISO's `Y_S`, the tangent angle, the reversed-bending fraction — leaves the
 **entire test suite silent**, and the corpus catches every one. A `nextest` run
 is not evidence that the strength model is the one that was there yesterday.
+`tools/bending_gate.py` holds the default model's values — `H` and `L` among
+them — to a rebuild that shares no code with it, which the corpus, a change
+detector, cannot.
 
 ---
 

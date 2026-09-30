@@ -19,6 +19,7 @@
     reason = "a harness fixture that does not build is the harness's defect, and says so by stopping"
 )]
 
+mod bendgrid;
 mod diagram;
 mod graph;
 mod identity;
@@ -445,6 +446,14 @@ const COMMANDS: &[Command] = &[
         summary: "what holding the bending section at the single-pair point costs under load sharing, against a section searched afresh",
         run: |_| sharing_bias_report(),
         record: Record::Cases(&["sharingbias"]),
+        slow: false
+    },
+    Command {
+        name: "bendgrid",
+        args: "",
+        summary: "the default bending rating over a grid of tooth counts, shifts, pressure angles, helices and contact ratios, at full precision, for `tools/bending_gate.py`",
+        run: |_| bendgrid::run(),
+        record: Record::Cases(&["bendgrid"]),
         slow: false
     },
     Command {

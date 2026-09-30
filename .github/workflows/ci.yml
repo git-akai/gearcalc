@@ -82,8 +82,10 @@ jobs:
       # harness recorded in tools/golden/ (which check_golden.sh holds to the
       # harness): the train's speeds from rigid-body motion, the hula ratio
       # from the no-slip condition, the flow's efficiencies from the
-      # carrier-frame closed form, and the crossed pair's zone off its
-      # surfaces. A defect in the crate reaches the corpus and fails here.
+      # carrier-frame closed form, the crossed pair's zone off its surfaces,
+      # and the default bending rating rebuilt from the tooth's proportions
+      # over a grid of finite teeth (with its planted faults). A defect in the
+      # crate reaches the corpus and fails here.
       - name: Independent derivations agree with the recorded crate
         run: |
           nix develop --command bash -c '
@@ -93,6 +95,8 @@ jobs:
             python3 tools/hula_kinematics.py
             python3 tools/breakaway.py
             python3 tools/crossed_path.py
+            python3 tools/bending_gate.py
+            python3 tools/bending_gate.py --self-test
           '
 
       # Everything CI needs to check: build, clippy --deny warnings, fmt, tests.
