@@ -1695,13 +1695,14 @@ fn worst_over_cycle<T: ToothOutline + ?Sized>(
     // they scale every candidate alike and cannot move which one wins.
     let weighted = |d: f64| rated(d).map(|(_, f)| f * crate::contact::load_share(d, eps_n, model));
 
-    // The part of the cycle the flank carries, and every corner inside it.
+    // The part of the cycle the flank carries, and every corner inside it:
+    // the single-pair zone's two ends (the first is the highest point of
+    // single-pair contact), the ramps' meeting above `ε_n = 2`, the level load.
     let end = far.min(eps_n);
     let mut cuts: Vec<f64> = [
         Some(0.0),
         Some(end),
         Some(highest_single_pair(eps_n)),
-        Some(eps_n - 1.0),
         Some(1.0),
         Some(eps_n / 2.0),
         level,
