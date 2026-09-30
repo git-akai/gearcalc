@@ -236,6 +236,9 @@ caught, test workspace included) and the 130-constant perturbation.
     limit. Measured factors such as ΔK_th, cyclic constants, notch sensitivities and slip layers are
     rarely available across materials. They can bring more error or false confidence than a method
     that ignores the issue.
+  - Owner: the existing measured factors (ISO Y_S and notch sensitivity, K_f data, ΔK_th and
+    critical-distance data, FKM, IIW) are the validation set for any general method. Each method is
+    scored by how well it reproduces them, with size and sign; they are not its inputs.
 - 2026-10-01 — Stage 1 closed (`stage1-exit.md`). Stage 1 met the audit's Phase 1 exit except for two
   items: the four flow-rule mutants (T16.28) and the survivor re-run. A 149-mutant sample of Stage 1's
   own lines caught 91.6 % of the non-equivalent mutants.
