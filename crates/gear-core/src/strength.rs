@@ -3151,6 +3151,10 @@ mod tests {
             "the apex's half-width {} is a length",
             apex[0]
         );
+        // The criterion scales with the point's radius: half of it at this
+        // radius is rounding, ten times it a length.
+        assert!(scale > 2.0, "a radius that tells a product from a quotient");
+        assert!(!beyond_rounding(0.5 * COORDINATE_ROUNDING * scale, scale));
         assert!(beyond_rounding(10.0 * COORDINATE_ROUNDING * scale, scale));
         let found = root_sections(&g, g.u_tip, CriticalSection::LewisParabola);
         assert_eq!(found.len(), 2, "{found:?}");

@@ -1092,6 +1092,14 @@ fn each_curve_offers_its_least_and_the_highest_rated_governs() {
                 );
                 let (lo, hi) = if on_flank { (ulo, uhi) } else { (flo, fhi) };
                 at_an_end += usize::from(got.s == lo || got.s == hi);
+                // The parabola drawn is the one through the section's point:
+                // `p = x²/(4(y_v − y))`, tangent there or through an end.
+                let p = got.parabola_p.unwrap();
+                let through = got.root_chord * got.root_chord / (16.0 * got.moment_arm);
+                assert!(
+                    (p - through).abs() <= tol * through,
+                    "{label} at {frac}: the {name}'s parabola p {p}, through its point {through}"
+                );
             }
             // The governing section: the readable candidate rating highest.
             let rated: Vec<f64> = found
