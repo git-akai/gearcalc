@@ -224,6 +224,13 @@ caught, test workspace included) and the 130-constant perturbation.
     - a closed-form limit at Σ → 0;
     - tooth stiffness in series, derived from the generated tooth and gated against ISO 6336-1's c′
       and c_γ.
+- 2026-10-01 — owner: research singular stress fields (sharp corners and notches) as a lower-priority
+  parallel track. A geometrically sharp corner gives infinite stress as the mesh is refined, while in
+  reality local yielding and relief dominate. The same mechanics governs notch stresses in bending.
+  - Survey the state of the art, and develop new approaches where it helps, that remove the
+    convergence failure.
+  - This stays a parallel path unless it proves able to replace the existing models fully. Output:
+    `work/notch-research.md`.
 - 2026-10-01 — Stage 1 closed (`stage1-exit.md`). Stage 1 met the audit's Phase 1 exit except for two
   items: the four flow-rule mutants (T16.28) and the survivor re-run. A 149-mutant sample of Stage 1's
   own lines caught 91.6 % of the non-equivalent mutants.
