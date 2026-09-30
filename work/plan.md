@@ -232,6 +232,15 @@ caught, test workspace included) and the 130-constant perturbation.
   - Refined the same day: each curve contributes its constrained extremum of the Lewis measure — an
     interior tangency, or the curve's end where it has none. Otherwise a ring's fillet, which has no
     interior tangency, would drop out, and rings would lose their notch factor, rated about 60 % low.
+- 2026-10-03 — owner, after the bending-mechanics research:
+  1. Tabulate every option's error against a named baseline: the exact elastic fillet peak (BEM,
+     cross-checked by FEM and Trefftz).
+  2. Avoid structured errors where their size is substantial. Judge case by case, but they misrepresent
+     comparisons between dissimilar designs, which is exactly what the tool is for.
+  3. Research further: separate the stress into components, as stress theory does, each with its own
+     mechanics.
+  4. The fast exact solve (P2's BEM) goes into the expensive mode only. Caching would make the UX
+     inconsistent.
 - 2026-10-03 — owner (general principle): independent checking code is useful during development only
   unless it applies a fundamentally different method.
   - A same-method mirror in another language only confirms the language is consistent. It carries its
