@@ -15,13 +15,13 @@ a: number, b: number, sliding_friction: number, static_friction: number,
  * under an automatic face width, or, with every width of its mesh
  * group given, the thing that decides the group's helix (the group's
  * first mesh's is the reading; the rest of the group carry the same
- * number, written by the panel). Absent in a file, automatic at one.
+ * number, written by the panel).
  */
 overlap: Auto<number>, 
 /**
  * **The transverse contact ratio the efficiency search may not take
- * this mesh below** ([`super::DEFAULT_MIN_CONTACT_RATIO`] where a file
- * gives none) — each mesh's own, since a pair that must stay
+ * this mesh below** ([`super::DEFAULT_MIN_CONTACT_RATIO`] as a preset
+ * lays it in) — each mesh's own, since a pair that must stay
  * continuous by more than its neighbour should not have its neighbour
  * held to the same. Bounds the optimiser only.
  */
@@ -29,8 +29,7 @@ min_contact_ratio: number,
 /**
  * **How the load is shared between tooth pairs in contact** on this
  * mesh — a model of one contact, so a mesh's own: two meshes on one
- * member can be rated under different ones. Absent in a file, none,
- * which is what every file written before it meant.
+ * member can be rated under different ones.
  */
 load_sharing: LoadSharing, 
 /**
@@ -44,7 +43,6 @@ load_sharing: LoadSharing,
  * a planet's shift moves both its meshes. So a component is searched
  * where *any* of its meshes asks, and a component none of whose
  * meshes asks keeps its undercut shifts. What is given constrains the
- * search rather than being overruled by it. Absent in a file, not
- * asked.
+ * search rather than being overruled by it.
  */
 search: boolean, };

@@ -23,8 +23,7 @@ body: number, gear: MemberGear,
 module: Auto<number>, 
 /**
  * **Normal pressure angle, degrees**, by the module's rule — a tooth is
- * cut at one angle, so a mesh group has one. Absent in a file,
- * following its group at 20°. Read through
+ * cut at one angle, so a mesh group has one. Read through
  * [`Member::normal_pressure_angle`].
  */
 pressure_angle: Auto<number>, 

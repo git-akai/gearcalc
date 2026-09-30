@@ -1134,31 +1134,6 @@ impl AddendumAsked {
     }
 }
 
-/// A shift clears undercut unless it is told not to — and a document written
-/// before the question was asked separately meant exactly that.
-#[cfg(feature = "serde")]
-const fn yes() -> bool {
-    true
-}
-/// A coefficient that used to be an `Auto` and is now a number.
-///
-/// Read either shape: a document written before the addendum's bound was split
-/// from its value holds `{ auto, manual }`, and the number it meant is the
-/// `manual` one — with `auto` on, it meant "and hold it to the tip width",
-/// which [`MemberGear::no_sharp_tip`] says now and defaults to.
-#[cfg(feature = "serde")]
-fn coefficient<'de, D: serde::Deserializer<'de>>(d: D) -> Result<f64, D::Error> {
-    #[derive(serde::Deserialize)]
-    #[serde(untagged)]
-    enum Either {
-        Number(f64),
-        WasAuto { manual: f64 },
-    }
-    Ok(match <Either as serde::Deserialize>::deserialize(d)? {
-        Either::Number(v) | Either::WasAuto { manual: v } => v,
-    })
-}
-
 // -------------------------------------------------- the shared member ---
 //
 // `MemberGear` is what every member of the train is described with, so it lives
@@ -1210,7 +1185,6 @@ pub struct MemberGear {
     /// **On a ring it asks the ring's reading**: its flank generated all the
     /// way to its tip ([`crate::ring::minimum_profile_shift`]), the edge its
     /// shaper leaves where a rack leaves undercut.
-    #[cfg_attr(feature = "serde", serde(default = "yes"))]
     pub no_undercut: bool,
     /// Depth, in modules, at which the undercut question is asked.
     ///
@@ -1227,7 +1201,6 @@ pub struct MemberGear {
     /// Plain, because the only thing an automatic addendum ever computed was
     /// the tallest tooth that keeps a tip [`Self::min_tip_width`] wide — which
     /// is a **bound on the number**, not a source for it, and now says so.
-    #[cfg_attr(feature = "serde", serde(deserialize_with = "coefficient"))]
     pub addendum: f64,
     /// **The tooth may not be taller than its tip is wide.**
     ///
@@ -1238,7 +1211,6 @@ pub struct MemberGear {
     /// tooth could come to a point and nothing said so.
     ///
     /// Off, the addendum stands as asked and the tip is whatever it is.
-    #[cfg_attr(feature = "serde", serde(default = "yes"))]
     pub no_sharp_tip: bool,
     /// Minimum transverse tooth tip width, mm.
     pub min_tip_width: f64,
@@ -1255,8 +1227,8 @@ pub struct MemberGear {
     /// (`crate::ring::mesh_with`): the bound meets it exactly, rather than a
     /// fixed shorter addendum that is right for one pair of counts.
     ///
-    /// **On for every gear**, a ring and an external gear alike, and in a
-    /// document that does not say. On an internal pair at full depth it is
+    /// **On for every gear**, a ring and an external gear alike. On an
+    /// internal pair at full depth it is
     /// what keeps the ring off its planet's form circle; on an external pair
     /// it tops a tip a search or a designer has pushed past its mate's
     /// flank, where without it the search held the shifts off that wall — at
@@ -1264,7 +1236,6 @@ pub struct MemberGear {
     ///
     /// Off, the addendum stands as asked and a tip that reaches too far is
     /// said on the mesh (`mesh.flank_interference`).
-    #[cfg_attr(feature = "serde", serde(default = "yes"))]
     pub no_tip_past_mate_flank: bool,
     pub dedendum: f64,
     pub root_radius: f64,
@@ -1303,14 +1274,12 @@ pub struct MemberGear {
     /// It reaches bending alone. A rim under the teeth has nothing to do with
     /// the pressure between two flanks, so no contact rating reads it. The
     /// panel has no field for it yet and carries it back unread, on purpose
-    /// (docs/state.md#worth-doing-next).
-    #[cfg_attr(feature = "serde", serde(default))]
+    /// (docs/state.md#worth-doing-next). Left out of a file where `None`.
     pub rim_thickness: Option<f64>,
     /// Name of a material in the library.
     pub material: String,
     /// Properties replaced for this gear only. Empty means "as the library
     /// says" — see [`Overrides`].
-    #[cfg_attr(feature = "serde", serde(default))]
     pub material_overrides: Overrides,
 }
 
@@ -3113,10 +3082,8 @@ pub struct LoadCase {
     /// machines add to the torque entered, by the designer's judgement of
     /// them. Every stress is rated under the entered torque times it, so
     /// bending scales by `K_A` and a line contact by `√K_A`; the torques and
-    /// the flow are reported as entered. 1 where nothing is said, which is
-    /// every file written before it existed. Below 1, or not a number, it is
+    /// the flow are reported as entered. Below 1, or not a number, it is
     /// held at 1 and the case says so: `K_A ≥ 1` by definition.
-    #[cfg_attr(feature = "serde", serde(default = "unit_factor"))]
     pub application_factor: f64,
 }
 
@@ -3167,7 +3134,6 @@ pub struct Load {
     /// and kept while the port is reacted or free for the reason
     /// [`Auto::manual`] is kept while automatic: switching back finds them
     /// where they were.
-    #[cfg_attr(feature = "serde", serde(default))]
     pub role: LoadRole,
     /// N·m, given or derived from the other loads through the flow.
     pub torque: Auto<f64>,
@@ -3874,7 +3840,6 @@ pub struct Train {
     /// convention that multiplies a stress — so the train asks rather than
     /// assumes, and says where reversal is present and uncorrected. See
     /// [`Reversal`].
-    #[cfg_attr(feature = "serde", serde(default))]
     pub reversed_bending: bool,
     /// **The train as one graph** — its axes, the bodies on them, the gears
     /// on those, the meshes and the distances between axes that mesh, and
@@ -3888,7 +3853,6 @@ pub struct Train {
     /// this says, and released by taking it out. It was a list of
     /// constraints laid over each stage's conventions, which held what
     /// nobody had written and needed a *free* to say otherwise.
-    #[cfg_attr(feature = "serde", serde(default))]
     pub held: Vec<usize>,
 }
 

@@ -46,9 +46,11 @@ const preset = (name) => structuredClone(defaults.presets.find((e) => e.preset =
 const library = JSON.parse(w.default_materials());
 
 // A plain external gear: the tab's own default, with the eccentric throw
-// dropped, since a throw is a question about a mate and this is one gear.
+// dropped, since a throw is a question about a mate and this is one gear,
+// and the cutter, which is a ring's.
 const gear = { ...defaults.gear };
 delete gear.eccentric_throw;
+delete gear.cutter;
 const gearJson = JSON.stringify(gear);
 
 // An internal gear, cut by the shaper the same defaults name.
@@ -152,7 +154,7 @@ const out = {
   // between the ends, their duties switched.
   edit_train: call("edit_train", () => {
     const edit = (train, e) => JSON.parse(w.edit_train(JSON.stringify({ train, edit: e })));
-    const parts = () => JSON.parse(w.solve_train(JSON.stringify({ train: t, library }))).parts;
+    const parts = () => JSON.parse(w.solve_train(JSON.stringify({ train: t, materials: library }))).parts;
     const body = (k, slot) => parts()[k].shape.bodies[slot - 1].body;
     const member = (k, j) => parts()[k].members[j];
     const axis = (k, a) => parts()[k].axes[a];
@@ -285,8 +287,8 @@ const out = {
       ),
     );
     return [
-      ["default", JSON.parse(w.solve_train(JSON.stringify({ train: t, library })))],
-      ["chained", JSON.parse(w.solve_train(JSON.stringify({ train: chained, library })))],
+      ["default", JSON.parse(w.solve_train(JSON.stringify({ train: t, materials: library })))],
+      ["chained", JSON.parse(w.solve_train(JSON.stringify({ train: chained, materials: library })))],
     ];
   }),
   // **Over-determined on purpose**: the default train's first case with its
@@ -299,7 +301,7 @@ const out = {
     const given = (v) => ({ auto: false, manual: v });
     train.load_cases[0].loads[1] = { at: 2, role: "load", torque: given(1), speed: given(100) };
     const just = { load: 1, which: "speed" };
-    return JSON.parse(w.relieve_case(JSON.stringify({ train, library, case: 0, just })));
+    return JSON.parse(w.relieve_case(JSON.stringify({ train, materials: library, case: 0, just })));
   }),
   export_train: call("export_train", () => w.export_train(JSON.stringify(trainDoc))),
   import_train: call("import_train", () =>
@@ -322,6 +324,11 @@ const out = {
       ),
     };
   })(),
+  // **A misspelt field is refused, naming it**, rather than read past: a
+  // library sent as `materails` rated the train against the shipped one.
+  misspelt: call("solve_train", () =>
+    JSON.parse(w.solve_train(JSON.stringify({ train: defaults.train, materails: library }))),
+  ),
   export_materials: call("export_materials", () => w.export_materials(JSON.stringify(library))),
   import_materials: call("import_materials", () =>
     JSON.parse(w.import_materials(w.export_materials(JSON.stringify(library)))),

@@ -45,6 +45,7 @@ dependencies = [
  "gear-core",
  "serde",
  "toml",
+ "ts-rs",
 ]
 
 [[package]]

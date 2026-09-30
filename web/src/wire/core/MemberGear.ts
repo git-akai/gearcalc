@@ -94,8 +94,8 @@ min_tip_width: number,
  * (`crate::ring::mesh_with`): the bound meets it exactly, rather than a
  * fixed shorter addendum that is right for one pair of counts.
  *
- * **On for every gear**, a ring and an external gear alike, and in a
- * document that does not say. On an internal pair at full depth it is
+ * **On for every gear**, a ring and an external gear alike. On an
+ * internal pair at full depth it is
  * what keeps the ring off its planet's form circle; on an external pair
  * it tops a tip a search or a designer has pushed past its mate's
  * flank, where without it the search held the shifts off that wall — at
@@ -147,7 +147,7 @@ face_sources: FaceSources,
  * It reaches bending alone. A rim under the teeth has nothing to do with
  * the pressure between two flanks, so no contact rating reads it. The
  * panel has no field for it yet and carries it back unread, on purpose
- * (docs/state.md#worth-doing-next).
+ * (docs/state.md#worth-doing-next). Left out of a file where `None`.
  */
 rim_thickness: number | null, 
 /**

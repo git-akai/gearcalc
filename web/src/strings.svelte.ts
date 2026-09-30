@@ -10,23 +10,14 @@
 // real text had arrived. Holding it in `$state` makes every `t()` call a
 // reactive read, and the labels fill themselves in when the core is ready.
 
+import type { LanguageOption, Note } from "./wire";
+
 /** The catalogue, keyed `section.key`. Empty until the core has loaded. */
 let catalogue = $state<Record<string, string>>({});
 
 /** Called by `loadCore`, and again whenever the language changes. */
 export function setCatalogue(messages: Record<string, string>) {
   catalogue = messages;
-}
-
-/** A language this build can be read in. The list comes from Rust — see
- *  `gear_wasm::languages` for why it is not written down here as well. */
-export interface LanguageOption {
-  code: string;
-  /** The language's name in itself — what a reader looks for. */
-  name: string;
-  /** ...and in English, so a reader stranded in a script they cannot read has
-   *  something they can recognise. */
-  english: string;
 }
 
 // **Which words is the same kind of fact as the words**, and arrives at the same
@@ -69,17 +60,6 @@ export function t(key: string, values: Record<string, string> = {}): string {
   return template.replace(/\{(\w+)\}/g, (whole, name: string) =>
     name in values ? values[name] : whole,
   );
-}
-
-/** A note the core wants read: what happened, and the values it happened with.
- *
- *  The core sends this rather than a sentence — see `gear_core::note` — because
- *  the words are a display decision and the numbers are not. Everything in
- *  `values` is **already formatted**: how many decimals a quantity deserves is
- *  a judgement about the quantity, made where the model is. */
-export interface Note {
-  key: string;
-  values: Record<string, string>;
 }
 
 /** Render a note from the core. */

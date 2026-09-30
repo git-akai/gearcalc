@@ -1481,6 +1481,12 @@ mod tests {
                 }
                 err(TrainError::Malformed(Invariant::NumberGap(3)).note());
             }
+            // **A file of no format, and one of another**, refused where it
+            // enters and pointed at the converter.
+            for src in ["name = \"x\"", "format = 999\nname = \"x\""] {
+                let e = crate::train::from_toml(src).expect_err("a file of another format");
+                err(e.note().expect("a format's refusal has a note"));
+            }
             // **Two planet axes that cannot stand where their distances put
             // them**: a meshed-planet set one ring tooth past collinear, its
             // planet axes too close; and one whose large planet reaches past

@@ -27,8 +27,8 @@ trap 'rm -rf "$scratch"' EXIT
 
 TS_RS_EXPORT_DIR="$scratch" cargo test \
   --manifest-path "$root/Cargo.toml" \
-  -p gear-core -p gear-wasm \
-  --features gear-core/typescript,gear-wasm/typescript \
+  -p gear-core -p gear-io -p gear-wasm \
+  --features gear-core/typescript,gear-io/typescript,gear-wasm/typescript \
   export_bindings >/dev/null
 
 # The barrel is generated too — an added type nobody re-exported is as invisible
@@ -46,7 +46,7 @@ TS_RS_EXPORT_DIR="$scratch" cargo test \
 // level up, and the last place the project still had it.
 
 HEADER
-  for sub in core wasm; do
+  for sub in core io wasm; do
     for f in "$scratch/$sub"/*.ts; do
       n="$(basename "$f" .ts)"
       echo "export type { $n } from \"./$sub/$n\";"

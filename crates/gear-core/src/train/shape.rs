@@ -66,11 +66,7 @@ pub struct Axis {
     /// The body whose frame this axis stands still in: a carrier, or
     /// **ground** (body 0) for an axis fixed in it — a spur pair's axes
     /// are carried by ground, which is what makes a pair the epicyclic
-    /// family with its carrier held. A train body, not a slot. Absent in a
-    /// file, ground — and `null`
-    /// too, which is how a browser's stored train wrote it when this was an
-    /// `Option`, so that state keeps loading.
-    #[cfg_attr(feature = "serde", serde(default, deserialize_with = "ground_if_null"))]
+    /// family with its carrier held. A train body, not a slot.
     pub carried_by: Body,
     /// How many times this axis, its bodies and their gears are replicated
     /// about the axis it is carried round — `N` planets. One elsewhere.
@@ -80,22 +76,12 @@ pub struct Axis {
     /// closest pair of this axis's planets (`LayoutReport`). An axis's own
     /// since two planet axes on one carrier can run at different radii and
     /// be allowed different gaps; it was the stage's until the stage went.
-    /// Absent in a file, three tenths of a millimetre.
-    #[cfg_attr(feature = "serde", serde(default = "default_planet_clearance"))]
     pub min_planet_clearance: f64,
 }
 
-/// The gap a replicated axis a file does not give one is held to.
+/// The gap a preset's replicated axis is laid in at, mm.
 pub(crate) fn default_planet_clearance() -> f64 {
     0.3
-}
-
-/// The crate's pressure angle, for a member a file does not give one:
-/// [`GearParams`]'s, said once — and followed from its group rather than
-/// stated, since a file that says nothing states nothing.
-#[cfg(feature = "serde")]
-fn default_pressure_angle() -> Auto<f64> {
-    Auto::automatic(GearParams::default().pressure_angle)
 }
 
 impl Member {
@@ -113,14 +99,6 @@ impl Member {
     pub fn normal_pressure_angle(&self) -> f64 {
         self.pressure_angle.manual
     }
-}
-
-/// `carried_by` as a stored train wrote it while it was an `Option`: `null`
-/// reads as ground.
-#[cfg(feature = "serde")]
-fn ground_if_null<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Body, D::Error> {
-    let s: Option<Body> = serde::Deserialize::deserialize(d)?;
-    Ok(s.unwrap_or(GROUND))
 }
 
 /// A body of the train on one of the shape's axes. The `i`th listed is
@@ -164,10 +142,8 @@ pub struct Member {
     /// through [`Member::normal_module`].
     pub module: Auto<f64>,
     /// **Normal pressure angle, degrees**, by the module's rule — a tooth is
-    /// cut at one angle, so a mesh group has one. Absent in a file,
-    /// following its group at 20°. Read through
+    /// cut at one angle, so a mesh group has one. Read through
     /// [`Member::normal_pressure_angle`].
-    #[cfg_attr(feature = "serde", serde(default = "default_pressure_angle"))]
     pub pressure_angle: Auto<f64>,
     /// Tooth-thickness coefficient, `k`: above 1 this gear's teeth thicken.
     /// **Given on one member of a mesh and automatic on the other**, which
@@ -202,21 +178,17 @@ pub struct MeshInput {
     /// under an automatic face width, or, with every width of its mesh
     /// group given, the thing that decides the group's helix (the group's
     /// first mesh's is the reading; the rest of the group carry the same
-    /// number, written by the panel). Absent in a file, automatic at one.
-    #[cfg_attr(feature = "serde", serde(default = "default_overlap"))]
+    /// number, written by the panel).
     pub overlap: Auto<f64>,
     /// **The transverse contact ratio the efficiency search may not take
-    /// this mesh below** ([`super::DEFAULT_MIN_CONTACT_RATIO`] where a file
-    /// gives none) — each mesh's own, since a pair that must stay
+    /// this mesh below** ([`super::DEFAULT_MIN_CONTACT_RATIO`] as a preset
+    /// lays it in) — each mesh's own, since a pair that must stay
     /// continuous by more than its neighbour should not have its neighbour
     /// held to the same. Bounds the optimiser only.
-    #[cfg_attr(feature = "serde", serde(default = "default_min_contact_ratio"))]
     pub min_contact_ratio: f64,
     /// **How the load is shared between tooth pairs in contact** on this
     /// mesh — a model of one contact, so a mesh's own: two meshes on one
-    /// member can be rated under different ones. Absent in a file, none,
-    /// which is what every file written before it meant.
-    #[cfg_attr(feature = "serde", serde(default))]
+    /// member can be rated under different ones.
     pub load_sharing: LoadSharing,
     /// **Choose this mesh's automatic shifts for efficiency** rather than
     /// for undercut, the undercut shift then a floor rather than the answer
@@ -228,19 +200,17 @@ pub struct MeshInput {
     /// a planet's shift moves both its meshes. So a component is searched
     /// where *any* of its meshes asks, and a component none of whose
     /// meshes asks keeps its undercut shifts. What is given constrains the
-    /// search rather than being overruled by it. Absent in a file, not
-    /// asked.
-    #[cfg_attr(feature = "serde", serde(default))]
+    /// search rather than being overruled by it.
     pub search: bool,
 }
 
-/// The floor a mesh a file does not give one is held to by the search.
+/// The floor a preset's mesh is laid in with for the search.
 pub(crate) fn default_min_contact_ratio() -> f64 {
     super::DEFAULT_MIN_CONTACT_RATIO
 }
 
-/// The overlap a mesh a file does not give one runs at: asked for
-/// automatically, at one.
+/// The overlap a preset's mesh is laid in with: asked for automatically, at
+/// one.
 pub(crate) fn default_overlap() -> Auto<f64> {
     Auto::automatic(1.0)
 }
@@ -278,7 +248,6 @@ pub struct Distance {
     /// automatic distance is what the shifts leave *or* what the tips need,
     /// whichever is larger, and the shifts then reach it. A given distance
     /// leaves whatever gap it leaves, reported and not asked for.
-    #[cfg_attr(feature = "serde", serde(default))]
     pub tip_clearance: f64,
     pub tolerance_plus: f64,
     pub tolerance_minus: f64,
@@ -313,7 +282,6 @@ pub struct Shape {
     /// the flow. What lets an orbiting body drive a shaft that does not
     /// orbit, and never what a shape has to have: one is added and taken
     /// away like a step ([`super::Edit::Couple`], and a removal).
-    #[cfg_attr(feature = "serde", serde(default))]
     pub couplings: Vec<[usize; 2]>,
 }
 

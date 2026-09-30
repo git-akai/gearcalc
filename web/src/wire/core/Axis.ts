@@ -9,10 +9,7 @@ export type Axis = {
  * The body whose frame this axis stands still in: a carrier, or
  * **ground** (body 0) for an axis fixed in it — a spur pair's axes
  * are carried by ground, which is what makes a pair the epicyclic
- * family with its carrier held. A train body, not a slot. Absent in a
- * file, ground — and `null`
- * too, which is how a browser's stored train wrote it when this was an
- * `Option`, so that state keeps loading.
+ * family with its carrier held. A train body, not a slot.
  */
 carried_by: number, 
 /**
@@ -26,6 +23,5 @@ count: number,
  * closest pair of this axis's planets (`LayoutReport`). An axis's own
  * since two planet axes on one carrier can run at different radii and
  * be allowed different gaps; it was the stage's until the stage went.
- * Absent in a file, three tenths of a millimetre.
  */
 min_planet_clearance: number, };

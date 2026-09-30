@@ -20,268 +20,30 @@
 //! kept at the top of the file rather than recovered from the filename, which a
 //! browser download and a subsequent rename would both destroy.
 //!
-//! # The shape can change, and a file written before it does will be refused
+//! # The format
 //!
-//! Loudly, by the parser, naming the field and the line — which is the only
-//! behaviour worth having: a document read with a field quietly defaulted is a
-//! document that describes a different gearbox. Two changes so far:
+//! A document states its format at its root, `format = 1` ([`FORMAT`]),
+//! then its `name`, then `[train]`: `load_cases`, `reversed_bending`, `held`
+//! and `[train.shape]`, the train's one graph — `axes`, `bodies`,
+//! `members`, `meshes`, `distances` and `couplings`, each table what the
+//! core's type of that name holds. Every field is required, and the writer
+//! writes every one. An optional input — a ring's cutter, a rim thickness,
+//! a replaced material figure — is written where it is given and left out
+//! where it is not, TOML having no null. A field the format does not have
+//! is refused by name, and so is one it has that a file leaves out: a
+//! document read with a field quietly filled in describes a gearbox nobody
+//! wrote down.
 //!
-//! - `working_depth` became `Auto` (`{ auto, manual }`) when its default moved
-//!   from a fixed module to the gear's own dedendum. A file written before that
-//!   has `working_depth = 1.0`; `working_depth = { auto = false, manual = 1.0 }`
-//!   preserves what it meant, and `{ auto = true, manual = 1.0 }` takes the new
-//!   behaviour.
-//! - A worm stage gained `thickness_mod`, which a pre-existing file will not
-//!   have. `thickness_mod = 1.0` is the standard tooth.
-//! - A spur stage gained `load_sharing`, which a pre-existing file will not
-//!   have. It is the one shape change so far that **defaults rather than
-//!   refusing**, and deliberately: `load_sharing = "none"` is both the default
-//!   and what every file written before it meant, so there is no reading of an
-//!   older document that this gets wrong. A field whose absence is unambiguous
-//!   is not a document describing a different gearbox.
-//! - `friction` became `sliding_friction`, and every stage gained a
-//!   `static_friction` beside it (`static_friction_sun_planet` and
-//!   `static_friction_planet_ring` on a planetary set). Rename the field and add
-//!   `static_friction = 0.16` — or the sliding value, to keep a pre-existing
-//!   file's answers, since one coefficient throughout is what it used to mean.
-//!
-//! - **A worm stage became a pair.** `kind = "worm"` now carries exactly the
-//!   fields a `kind = "spur"` stage does — `gears` with the full member inputs
-//!   in place of `worm`/`wheel`, `gears[0].teeth` for `starts` and
-//!   `gears[1].teeth` for `wheel_teeth` — plus `axial_clearance`, which every
-//!   pair now has (`0.0` on a spur stage means what its absence meant). A
-//!   spur stage's `additional_helix = 15.0` became one reading of the sizing,
-//!   `sizing = { auto = false, manual = { additional_helix = 15.0 } }`, beside
-//!   the worm's `helix_angle` and `pitch_diameter` readings. A worm file
-//!   written before this had no shifts or addenda to carry; `profile_shift =
-//!   { auto = false, manual = 0.0 }` on the worm and automatic on the wheel is
-//!   the convention it meant.
-//! - **The train's loads became a list.** `input_speed`, `input_torque`,
-//!   `back_driving_torque`, `operating_torque` and `actuation` are gone, and
-//!   `[[train.load_cases]]` holds any number of loads, each with a `kind`
-//!   (`ultimate` or `fatigue`), `enabled`, a `port` (`start` or `end`), whether
-//!   it is `reacted` at the far end, its `torque` and `speed` at that port, and
-//!   a `duty` a fatigue case is counted over. What a pre-existing file meant is
-//!   three cases: `kind = "ultimate"`, `port = "start"`, `reacted = true` at
-//!   the input torque and speed; `kind = "ultimate"`, `port = "end"`,
-//!   `reacted = false` at the back-driving torque; and `kind = "fatigue"`,
-//!   `port = "start"`, `reacted = true` at the operating torque, with the
-//!   actuation as its `duty` — an intermittent one gaining `at = "end"`, the
-//!   port its range was always measured at, and a continuous one losing its
-//!   `operating_speed` to the case's own `speed`.
-//! - **The helix moved onto the members.** A pair's `sizing` — one of three
-//!   readings of its size — is gone; every member of every stage carries
-//!   `helix_angle = { auto, manual }`, a pair carries `pitch_diameter =
-//!   { auto, manual }` for its first member, and a planetary set's and a hula
-//!   stage's stage-level `helix_angle` went with it. At most one reading is
-//!   given: `sizing = { auto = false, manual = { helix_angle = 45.0 } }` is
-//!   `helix_angle = { auto = false, manual = 45.0 }` on the first member, an
-//!   `additional_helix = a` is `Σ/2 + a` there, and a `pitch_diameter = d` is
-//!   the stage's `pitch_diameter`; a set's `helix_angle = β` is
-//!   `helix_angle = { auto = false, manual = β }` on its sun. Every reading
-//!   automatic shares the shaft angle evenly, which at zero is a spur pair.
-//!   Every stage with a line contact also gained `overlap = { auto, manual }`,
-//!   the axial contact ratio; `{ auto = true, manual = 1.0 }` is what an
-//!   older file meant.
-//!
-//! - **A planetary set's `arrangement` moved onto the train.** Which shaft is
-//!   held and which driven is a fact about how the train is wired, so the
-//!   stage no longer carries `arrangement = { input, fixed }` and a file that
-//!   still does is refused by name. It is `[[train.constraints]]` now — one
-//!   per shaft, `at = { kind = "of", stage = 0, shaft = 1 }` with
-//!   `constraint = "driven"`, `"held"` or `"free"` — where a set's shafts are
-//!   numbered sun 1, carrier 2, ring 3 in its wiring. A file with no
-//!   constraints at all means what it always meant: each stage's conventions,
-//!   with the first stage's input driven. So `{ input = "sun", fixed =
-//!   "ring" }` is nothing to write, and `{ input = "sun", fixed = "carrier" }`
-//!   is one line, shaft 2 held: a hold the train writes on a stage replaces
-//!   the stage's conventional holds on that stage, so holding the carrier
-//!   *instead of* the ring needs no word about the ring. (For a while it
-//!   needed three lines — the ring written free as well — and a file that
-//!   still says so means the same thing.) A drive replaces the conventional
-//!   drive the same way. `[[train.couplings]]` arrived beside it, empty
-//!   meaning the chain.
-//! - **The stage kinds are one shape.** `kind = "spur"`, `"worm"` and
-//!   `"planetary"` are gone and a file that still says one is refused by
-//!   name; every such stage is `kind = "shape"` now, and says what it is
-//!   made of: `[[train.stages.axes]]` (each `count = N`, and `carried_by =
-//!   <shaft>` where a carrier carries it — ground, 0, where none does,
-//!   and absent means ground), `[[train.stages.shafts]]` (each
-//!   `axis = i`, numbered from one as the constraints number them),
-//!   `[[train.stages.members]]` (each with its `shaft`, `module`,
-//!   `thickness_mod`, its `gear` table, a `ring` table naming the cutter
-//!   where it is one, and a `pitch_diameter` reading), `[[train.stages.
-//!   meshes]]` (`a`, `b`, and the two frictions) and `[[train.stages.
-//!   distances]]` (`axes = [i, j]`, `angle`, `worm`, `distance`, `clearance`,
-//!   the tolerances and `axial_clearance`). A spur pair is two ground axes
-//!   with one mesh; a set is a central axis with a planet axis carried by
-//!   its second shaft, `count` planets, two meshes and one distance; a worm
-//!   is a pair whose distance is at `angle = 90` with `worm = true`. The
-//!   panel writes these from its presets, and a person can write any shape
-//!   the graph admits. (The hula stage became a preset of the same shape
-//!   since.)
-//! - **A member's `thickness_mod` is `{ auto, manual }`.** It was a plain
-//!   number per member with nothing tying a mesh's two together; it is
-//!   given on one member of each mesh and automatic on the other, which
-//!   follows the mesh's rule — the two sum to 2 across an external mesh, a
-//!   ring takes its pinion's — and relief keeps at most one of a mesh's two
-//!   given. A file that writes a plain number is refused; one that writes
-//!   both members of a mesh given has one relieved on load.
-//! - **A distance carries `tip_clearance`**, the least far-side tip gap an
-//!   internal mesh on it may run at, mm: an automatic distance is what the
-//!   shifts leave or what the tips need, whichever is larger. Absent means
-//!   zero — the tips must not cross and nothing more — so a file written
-//!   before it reads as it did.
-//! - **A load case's `port` may name a shaft.** `"start"` and `"end"` still
-//!   mean the chain's two ends — the first stage's input and the last
-//!   stage's output under the constraints in force — and a third spelling,
-//!   `port = { at = { kind = "of", stage = 1, shaft = 2 } }`, names any
-//!   shaft a stage lists as a port, in the same reference a constraint uses.
-//!   A duty's `at` takes the same three. Nothing an older file wrote
-//!   changed meaning.
-//! - **A load case is a list of loads.** Its `port`, `reacted`, `torque` and
-//!   `speed` are gone, and `loads = [{ at, torque = { auto, manual }, speed =
-//!   { auto, manual } }, ...]` holds one load per open port the case loads,
-//!   `at` spelt as `port` was. A given figure is `auto = false`; an
-//!   automatic one is derived from the others, and the file carries what it
-//!   last came to. The chain's two ends are reacted where the case does not
-//!   load them; every other open port it does not load is free. What a
-//!   pre-existing case meant: `port = "start"`, `reacted = true` is one load
-//!   at `start` with both figures given; `port = "end"`, `reacted = false`
-//!   is a load at `end` with both given and a second at `start` with a
-//!   torque of nought given and its speed automatic. A file that writes the
-//!   old four fields is refused by name, and one that gives more figures
-//!   than the train can honour is relieved on the way in, as a stage is.
-//! - **A load carries a `role`**: `"load"`, `"reacted"` or `"free"`, absent
-//!   meaning `"load"`, so a file written before it reads as it did. A port
-//!   the case does not mention is free, and an entry says otherwise, its
-//!   figures kept while it is not a load.
-//! - **A port is a shaft, and a train lists its couplings.** `"start"` and
-//!   `"end"` are gone: a load's `at` and a duty's `at` are a shaft by
-//!   reference, `{ kind = "of", stage, shaft }`, and a file that writes a
-//!   name is refused. `"driven"` is gone from the constraints — a
-//!   constraint is `"held"` or `"free"`, and what drives is a load. And a
-//!   file lists every coupling it has: a chain that listed none used to be
-//!   coupled by a rule on the way in, and is a train of isolated stages now,
-//!   each its own body, until it says which shaft turns which.
-//! - **The pressure angle moved onto the members.** A stage's
-//!   `pressure_angle` is gone and a file that still writes one is refused;
-//!   every member carries `pressure_angle` beside its `module`, and two
-//!   members in mesh must agree, as they must on the module — so a stage
-//!   whose meshes do not all join, a layshaft's pairs, may run at two. A
-//!   member that omits it is at 20°, which is what every older file meant.
-//! - **The axial contact ratio moved onto the meshes.** A stage's `overlap`
-//!   is gone and a file that still writes one is refused; every mesh
-//!   carries `overlap = { auto, manual }`, and the meshes a run joins carry
-//!   one number — the panel writes the group's meshes together, the core
-//!   reads the group's first as the size reading and each mesh's as a floor
-//!   under its own automatic widths. A mesh that omits it is `{ auto =
-//!   true, manual = 1.0 }`, which is what every older file meant.
-//! - **The search's contact-ratio floor moved onto the meshes.** A stage's
-//!   `optimisation.min_contact_ratio` is gone and a file that still writes
-//!   one is refused; every mesh carries `min_contact_ratio`, the panel
-//!   writing a mesh group's together, so a pair that must stay continuous
-//!   by more than its neighbour does not hold its neighbour to the same. A
-//!   mesh that omits it is at 1.2, which is what every older file meant.
-//! - **A shaft is a body of the train.** `[[train.stages.shafts]]` is gone
-//!   and `[[train.stages.bodies]]` stands in its place, each `body = n,
-//!   axis = i` — a body numbered **across the train**, ground 0 and the
-//!   rest from one, rather than within the stage — and a member's `shaft`
-//!   is its `body`, an axis's `carried_by` a body's number. A body two
-//!   stages list is what `[[train.couplings]]` said, so the couplings are
-//!   gone; a constraint is `body = n, constraint = "held"`; a load's `at`
-//!   and a duty's `at` are the body's number. A file that writes any of
-//!   the old spellings — a `shafts` table, a member's `shaft`, a
-//!   `couplings` table, a `{ kind = "of", stage, shaft }` reference — is
-//!   refused by name.
-//! - **A stage is a shape, and says so by what it is made of.** `kind =
-//!   "shape"` is gone from `[[train.stages]]` and a file that still writes
-//!   one is refused by name: there was one kind, so the tag said nothing a
-//!   reader or a parser could act on, and the enum it tagged — one variant
-//!   over the shape — went with it. Nothing else about a stage's table
-//!   changed. (The tag could have been kept on the struct itself, and was
-//!   measured: serde writes it but will not read it back beside
-//!   `deny_unknown_fields`, and without that a file's stale field is
-//!   accepted in silence — which is the one thing this format refuses to
-//!   do.)
-//! - **What was a stage's is the piece's.** A stage's `optimisation`,
-//!   `load_sharing` and `min_planet_clearance` are gone, and a file that
-//!   still writes any is refused by name. Every mesh carries `search` and
-//!   `load_sharing` of its own, and every axis `min_planet_clearance` —
-//!   read where it is replicated. `optimisation = { enabled = true }` is
-//!   `search = true` on each of the stage's meshes (a component is searched
-//!   where any of its meshes asks, so one is enough where they share a
-//!   gear); `load_sharing = "linear_ramp"` is the same on each mesh; and a
-//!   stage's clearance is each replicated axis's. A mesh that omits them is
-//!   not searched and shares nothing, and an axis that omits its gap is at
-//!   0.3 mm — which is what every older file meant where it wrote none.
-//! - **A module and a pressure angle are stated once per mesh group.**
-//!   `module` and `pressure_angle` are `{ auto, manual }` on every member:
-//!   the members a run of meshes joins are cut at one of each, stated on
-//!   one member and followed by the rest, which is the helix's rule. A file
-//!   that writes a plain number is refused by name. What a pre-existing
-//!   file meant is `{ auto = false, manual = m }` on each group's first
-//!   member and `{ auto = true, manual = m }` on the rest; a member that
-//!   omits `pressure_angle` follows its group at 20°.
-//! - **Every hold is stated.** `[[train.constraints]]` is gone, and a file
-//!   that still writes it is refused by name. `held = [..]` lists the bodies
-//!   the train holds, and nothing else is held: a stage no longer holds its
-//!   first ring by convention, so there is no `"free"` to write against
-//!   one. What an older file meant is the body of every `"held"` entry, and
-//!   — for each stage none of whose bodies it held — the body its
-//!   convention held (a set's or a Wolfrom's first ring, a hula's grounded
-//!   gear, a planocentric's ring) unless an entry wrote that body `"free"`.
-//! - **A stage may couple two bodies.** `couplings` lists pairs of bodies
-//!   that turn as one through an offset coupling — a cycloidal disc's
-//!   output pins, an Oldham coupling — `[[3, 4]]` on a planocentric,
-//!   whose output is now a shaft on the centre line coupled to its planet
-//!   rather than the planet itself. A stage that omits it couples nothing,
-//!   which is what every older file meant: an older planocentric still
-//!   reads, its output the planet's own body as it was.
-//! - **The train is one graph.** `[[train.stages]]` is gone, and a file that
-//!   still writes it is refused by name. `[train.shape]` holds every axis,
-//!   body, member, mesh, distance and coupling of the train once — its
-//!   `[[train.shape.axes]]`, `[[train.shape.bodies]]` and the rest, each
-//!   table what a stage's was — and what a stage was is a part the tool
-//!   reads off it: the pieces that close apart. A body two stages listed is
-//!   listed once, on one axis, the two stages' axes it turned about being
-//!   one line; a body listed on an axis a carrier turns in one stage and
-//!   another in the next is two bodies turned as one by a coupling. That
-//!   is not a thing to do by hand: `gear-cli convert <file>` reads a file
-//!   written as stages and writes the one graph ([`convert`]), and the
-//!   converted train is the train a chain of the same stages builds now,
-//!   figure for figure.
-//! - **A load case carries `application_factor`**, `K_A`, which a
-//!   pre-existing file will not have. Like `load_sharing` it **defaults
-//!   rather than refusing**: 1 is the default and what every file written
-//!   before it meant — the torque entered rated as it stands.
-//! - **A member's `material_overrides` may carry `fatigue_load_ratio`,
-//!   `fatigue_specimen` and `contact_fatigue_allowable`**, which a
-//!   pre-existing file will not have. Each **defaults to absent**: the
-//!   library's figure stands, as it did. What a file meant does move in one
-//!   place — its contact fatigue is now judged against the library's flank
-//!   figure, not its root figure — and that is the correction, not a reading.
-//! - A member's gear gained `no_tip_past_mate_flank`, which **defaults
-//!   rather than refusing**: absent is `true`, the tip held off its mates'
-//!   usable flanks, which is what every gear the tool lays in now does. A
-//!   file written before it builds a tip that reached past a mate's flank
-//!   shorter than it did; `no_tip_past_mate_flank = false` on that gear keeps
-//!   the tip as typed. `gear-cli convert` names the field where a converted
-//!   file differs only by it.
-//!
-//! No compatibility shim, deliberately. Accepting both shapes means carrying two
-//! readers for one format and testing both forever, and the thing that would go
-//! wrong — a file loading with a field defaulted rather than read — is exactly
-//! what a refusal prevents.
-//!
-//! **And the refusal is enforced, not assumed.** For a while this note promised
-//! it and the parser delivered only half: a field that went *missing* was
-//! refused, but serde reads past an *unknown* field by default, so a field that
-//! had been **removed** from the shape would have been dropped in silence and
-//! the file would have loaded describing a different gearbox — the very fault
-//! above. Every struct the document is made of says `deny_unknown_fields`
-//! now, and `a_field_the_shape_no_longer_has_is_refused_and_named` holds it
-//! from both ends (`docs/corrections.md`).
+//! A file of another format, or one that states none, is refused by the
+//! format it names and pointed at `gear-cli convert` ([`convert`]). That
+//! reads a file written before the format was numbered — its train as
+//! stages or as one graph — once, at what such a file meant, and writes
+//! the current format. Each change the format has been through, and what a
+//! file written before it meant, is a row of
+//! `docs/reference.md#geartrain-file-formats`. One reader for the current
+//! format and one frozen converter for the files before it, rather than a
+//! reader for every format: two readers for one format is two to test for
+//! ever.
 //!
 //! # What *is* adjusted on import
 //!
@@ -307,45 +69,106 @@
 //! alternative — refusing the import — would lose a whole train over one
 //! material that a library import could supply a moment later.
 
-use gear_core::train::{LoadCase, Shape, Train};
+use gear_core::note::{key, Note};
+use gear_core::train::{Shape, Train};
 use serde::{Deserialize, Serialize};
 
-/// A geartrain as it is exchanged: a name, and the train's inputs.
+mod unversioned;
+
+/// **The format this tool writes and reads**, stated at a document's root.
+/// A change to what a file means takes the next number, and [`convert`] the
+/// step from the one before.
+pub const FORMAT: u32 = 1;
+
+/// A geartrain as it is exchanged: a name, and the train's inputs. The
+/// format it is written at is the file's, stated by [`to_toml`] and held by
+/// [`from_toml`], and not a field of the document.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "io/")
+)]
 pub struct TrainDocument {
     /// The tab's name. Not unique, per the specification.
     pub name: String,
     pub train: Train,
 }
 
-/// What went wrong reading a geartrain document.
+/// A document as the file holds it: its format, then the document.
+#[derive(Serialize)]
+struct Written<'a> {
+    format: u32,
+    name: &'a str,
+    train: &'a Train,
+}
+
+/// A document of the current format as the reader takes it: the format is
+/// held before this is read, and is a field of nothing after.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Read {
+    #[allow(dead_code)]
+    format: serde::de::IgnoredAny,
+    name: String,
+    train: Train,
+}
+
+/// What went wrong reading or writing a geartrain document.
 #[derive(Debug)]
-pub enum TrainError {
+pub enum DocumentError {
     /// The document is not valid TOML, or does not match the geartrain schema.
     Parse(toml::de::Error),
     /// The document could not be written back out.
     Serialise(toml::ser::Error),
+    /// The document states a format other than [`FORMAT`] — the one it
+    /// names — or none, having been written before the format was numbered.
+    Format(Option<i64>),
     /// The document parses but describes no train: its graph breaks an
     /// invariant input must keep ([`Train::validate`]). Carries the core's
     /// refusal, whose note names the field.
     Malformed(gear_core::train::TrainError),
 }
 
-impl std::fmt::Display for TrainError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl DocumentError {
+    /// The catalogue's note, where the refusal has one: a file of another
+    /// format, or a graph that describes no train. A parse error is the
+    /// parser's own words, which name the line.
+    #[must_use]
+    pub fn note(&self) -> Option<Note> {
+        use gear_core::note::Explain;
+        let current = FORMAT.to_string();
         match self {
-            Self::Parse(e) => write!(f, "geartrain file is not valid: {e}"),
-            Self::Serialise(e) => write!(f, "geartrain could not be written: {e}"),
-            Self::Malformed(e) => {
-                use gear_core::note::Explain;
-                let words = crate::strings::Catalogue::english().render(&e.note());
-                write!(f, "geartrain file is not valid: {words}")
+            Self::Format(None) => {
+                Some(Note::new(key::ERROR_TRAIN_FILE_UNVERSIONED).text("current", current))
             }
+            Self::Format(Some(found)) => Some(
+                Note::new(key::ERROR_TRAIN_FILE_FORMAT)
+                    .text("found", found.to_string())
+                    .text("current", current),
+            ),
+            Self::Malformed(e) => Some(e.note()),
+            Self::Parse(_) | Self::Serialise(_) => None,
         }
     }
 }
 
-impl std::error::Error for TrainError {}
+impl std::fmt::Display for DocumentError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match (self, self.note()) {
+            (Self::Parse(e), _) => write!(f, "geartrain file is not valid: {e}"),
+            (Self::Serialise(e), _) => write!(f, "geartrain could not be written: {e}"),
+            (_, Some(note)) => {
+                let words = crate::strings::Catalogue::english().render(&note);
+                write!(f, "geartrain file is not valid: {words}")
+            }
+            (_, None) => write!(f, "geartrain file is not valid"),
+        }
+    }
+}
+
+impl std::error::Error for DocumentError {}
 
 /// The header written above an exported geartrain.
 ///
@@ -367,6 +190,11 @@ const HEADER: &str = "\
 /// What reading a geartrain came to: the document, and whether reading it
 /// changed it.
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "io/")
+)]
 pub struct Imported {
     pub document: TrainDocument,
     /// Whether the train was relieved on the way in — a toggle the file had
@@ -376,18 +204,35 @@ pub struct Imported {
     pub adjusted: bool,
 }
 
+/// The format a document states at its root, `None` where it states none.
+/// Every other field is left for the reader, which knows that format.
+fn format_of(src: &str) -> Result<Option<i64>, DocumentError> {
+    #[derive(Deserialize)]
+    struct Header {
+        format: Option<i64>,
+    }
+    toml::from_str::<Header>(src)
+        .map(|h| h.format)
+        .map_err(DocumentError::Parse)
+}
+
 /// Parse a geartrain from TOML, relieved of anything it asks for that the
 /// graph cannot honour.
 ///
 /// # Errors
 ///
-/// [`TrainError::Parse`] if the document is not a geartrain, and
-/// [`TrainError::Malformed`] if its graph describes none. An empty train
+/// [`DocumentError::Format`] if the document is not of the current format,
+/// [`DocumentError::Parse`] if it is not a geartrain, and
+/// [`DocumentError::Malformed`] if its graph describes none. An empty train
 /// is a train — its cases wait for a preset — and reads as written.
-pub fn from_toml(src: &str) -> Result<Imported, TrainError> {
-    let document: TrainDocument = toml::from_str(src).map_err(TrainError::Parse)?;
-    document.train.validate().map_err(TrainError::Malformed)?;
-    Ok(relieved(document))
+pub fn from_toml(src: &str) -> Result<Imported, DocumentError> {
+    match format_of(src)? {
+        Some(found) if found == i64::from(FORMAT) => {}
+        found => return Err(DocumentError::Format(found)),
+    }
+    let Read { name, train, .. } = toml::from_str(src).map_err(DocumentError::Parse)?;
+    train.validate().map_err(DocumentError::Malformed)?;
+    Ok(relieved(TrainDocument { name, train }))
 }
 
 /// A document read, relieved of anything it asks for that nothing can
@@ -414,78 +259,84 @@ fn relieved(mut document: TrainDocument) -> Imported {
     Imported { document, adjusted }
 }
 
-/// **A train as a file wrote it before it was one graph**: its stages, each
-/// a shape whose bodies are the train's numbers, a body two stages share
-/// listed on both — the document's old `train` table, read to be converted
-/// and never written.
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct Staged {
-    load_cases: Vec<LoadCase>,
-    #[serde(default)]
-    reversed_bending: bool,
-    stages: Vec<Shape>,
-    #[serde(default)]
-    held: Vec<usize>,
-}
-
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct StagedDocument {
-    name: String,
-    train: Staged,
-}
-
-/// **A file written as stages, read as the one graph** — what `gear-cli
-/// convert` does, once, to a file [`from_toml`] refuses by name. The stages
-/// become the graph ([`gear_core::train::graph::graph_of`]), a body a join
-/// could not make coaxial numbered after every body the file names, and
-/// what the file held and loaded is kept as written; the document is then
-/// relieved as any other is.
+/// **A file written before the format was numbered, read as the current
+/// format** — what `gear-cli convert` does, once, to a file [`from_toml`]
+/// refuses as unnumbered. Its train is stages or one graph; stages become
+/// the graph ([`gear_core::train::graph::graph_of`]), a body a join could
+/// not make coaxial numbered after every body the file names. What the file
+/// leaves out is read at what such a file meant ([`unversioned`]), and what
+/// it held and loaded is kept as written; the document is then relieved as
+/// any other is. A file of the current format reads as [`from_toml`] reads
+/// it.
 ///
 /// # Errors
 ///
-/// [`TrainError::Parse`] if the document is not a geartrain written as
-/// stages, and [`TrainError::Malformed`] if the graph they make describes
-/// none.
-pub fn convert(src: &str) -> Result<Imported, TrainError> {
-    let old: StagedDocument = toml::from_str(src).map_err(TrainError::Parse)?;
+/// [`DocumentError::Format`] if the document states a format other than the
+/// current one, [`DocumentError::Parse`] if it is not a geartrain of its
+/// time — or holds its train both as stages and as one graph, or neither —
+/// and [`DocumentError::Malformed`] if the graph describes none.
+pub fn convert(src: &str) -> Result<Imported, DocumentError> {
+    match format_of(src)? {
+        None => {}
+        Some(found) if found == i64::from(FORMAT) => return from_toml(src),
+        found => return Err(DocumentError::Format(found)),
+    }
+    let old: unversioned::Document = toml::from_str(src).map_err(DocumentError::Parse)?;
     let train = old.train;
-    let named = train
-        .load_cases
-        .iter()
-        .flat_map(|c| {
-            c.loads.iter().map(|l| l.at).chain(match c.duty {
-                gear_core::train::Duty::Intermittent { at, .. } => Some(at),
-                gear_core::train::Duty::Continuous { .. } => None,
-            })
-        })
-        .chain(train.held.iter().copied())
-        .chain(train.stages.iter().map(Shape::max_body))
-        .max()
-        .unwrap_or(0);
-    let graph = gear_core::train::graph::graph_of(&train.stages, named + 1);
+    let load_cases: Vec<gear_core::train::LoadCase> =
+        train.load_cases.into_iter().map(Into::into).collect();
+    let shape = match (train.stages, train.shape) {
+        (Some(stages), None) => {
+            let stages: Vec<Shape> = stages.into_iter().map(Into::into).collect();
+            // Every body the file names, so a body the graph adds is past them.
+            let named = load_cases
+                .iter()
+                .flat_map(|c| {
+                    c.loads.iter().map(|l| l.at).chain(match c.duty {
+                        gear_core::train::Duty::Intermittent { at, .. } => Some(at),
+                        gear_core::train::Duty::Continuous { .. } => None,
+                    })
+                })
+                .chain(train.held.iter().copied())
+                .chain(stages.iter().map(Shape::max_body))
+                .max()
+                .unwrap_or(0); // absence: a file naming no body names ground
+            gear_core::train::graph::graph_of(&stages, named + 1).shape
+        }
+        (None, Some(shape)) => shape.into(),
+        _ => {
+            return Err(DocumentError::Parse(serde::de::Error::custom(
+                "a train holds `stages` or `shape`, one of the two",
+            )))
+        }
+    };
     let train = Train {
-        load_cases: train.load_cases,
+        load_cases,
         reversed_bending: train.reversed_bending,
-        shape: graph.shape,
+        shape,
         held: train.held,
     };
-    train.validate().map_err(TrainError::Malformed)?;
+    train.validate().map_err(DocumentError::Malformed)?;
     Ok(relieved(TrainDocument {
         name: old.name,
         train,
     }))
 }
 
-/// Write a geartrain as TOML, in the same shape the reader accepts.
+/// Write a geartrain as TOML, at the current format, in the shape the
+/// reader accepts.
 ///
 /// # Errors
 ///
-/// [`TrainError::Serialise`] if the document cannot be encoded, which would be a
-/// defect rather than a runtime condition.
-pub fn to_toml(doc: &TrainDocument) -> Result<String, TrainError> {
-    let body = toml::to_string_pretty(doc).map_err(TrainError::Serialise)?;
+/// [`DocumentError::Serialise`] if the document cannot be encoded, which would
+/// be a defect rather than a runtime condition.
+pub fn to_toml(doc: &TrainDocument) -> Result<String, DocumentError> {
+    let written = Written {
+        format: FORMAT,
+        name: &doc.name,
+        train: &doc.train,
+    };
+    let body = toml::to_string_pretty(&written).map_err(DocumentError::Serialise)?;
     Ok(format!("{HEADER}\n{body}"))
 }
 
@@ -647,10 +498,10 @@ mod tests {
         assert_eq!(back.train.load_cases.len(), doc.train.load_cases.len());
     }
 
-    /// **A file written as stages is refused by name, and converts to the
-    /// train a chain builds now.** The file is one the tool wrote before the
-    /// train was one graph — the harness's elevation drive, a pair, a worm
-    /// and a set — and the reader names what it no longer reads rather than
+    /// **A file written as stages is refused as unnumbered, and converts to
+    /// the train a chain builds now.** The file is one the tool wrote before
+    /// the train was one graph — the harness's elevation drive, a pair, a
+    /// worm and a set — and the reader points at the converter rather than
     /// loading a different gearbox. Converted, it is three parts, holds and
     /// loads what it did, reads back unchanged, and turns at the ratio the
     /// tool recorded of it then (`tools/golden/trainfile.txt` at the time).
@@ -658,7 +509,9 @@ mod tests {
     fn a_file_written_as_stages_is_refused_by_name_and_converts() {
         let old = include_str!("../tests/data/elevation_drive_staged.toml");
         match from_toml(old) {
-            Err(TrainError::Parse(e)) => assert!(e.to_string().contains("stages"), "{e}"),
+            Err(e @ DocumentError::Format(None)) => {
+                assert!(e.to_string().contains("gear-cli convert"), "{e}");
+            }
             other => panic!("a file of stages must be refused, not {other:?}"),
         }
         let converted = convert(old).unwrap();
@@ -673,6 +526,21 @@ mod tests {
             vec![2, 2, 3]
         );
         assert_eq!(train.held, vec![5], "the set's ring, as the file held it");
+        // What the file never wrote is what a file of its time meant: each
+        // case at `K_A` = 1, each tip held off its mates' flanks.
+        assert_eq!(
+            train
+                .load_cases
+                .iter()
+                .map(|c| c.application_factor)
+                .collect::<Vec<_>>(),
+            vec![1.0; 4]
+        );
+        assert!(train
+            .shape
+            .members
+            .iter()
+            .all(|m| m.gear.no_tip_past_mate_flank));
         let text = to_toml(&converted.document).unwrap();
         assert_eq!(text, to_toml(&from_toml(&text).unwrap().document).unwrap());
         let r = gear_core::train::solve_train(train, &crate::default_library()).unwrap();
@@ -715,7 +583,7 @@ mod tests {
             ),
         ] {
             match from_toml(&spur(carriers)) {
-                Err(TrainError::Malformed(e)) => {
+                Err(DocumentError::Malformed(e)) => {
                     assert_eq!(e.note().key, key, "{carriers:?}");
                     assert_eq!(
                         e,
@@ -732,7 +600,7 @@ mod tests {
             1,
         );
         match convert(&staged) {
-            Err(TrainError::Malformed(e)) => {
+            Err(DocumentError::Malformed(e)) => {
                 assert_eq!(e.note().key, "error.train_malformed_carried_by");
             }
             other => panic!("a self-carried stage must be refused, not {other:?}"),
@@ -758,7 +626,7 @@ mod tests {
         // the case this starts from.
         let stale = text.replacen("[train.shape]", "[train.shape]\nsomething_old = 1.0", 1);
         match from_toml(&stale) {
-            Err(TrainError::Parse(e)) => {
+            Err(DocumentError::Parse(e)) => {
                 assert!(e.to_string().contains("something_old"), "{e}")
             }
             other => panic!("a stale field must be a parse error, not {other:?}"),
@@ -773,7 +641,7 @@ mod tests {
         ] {
             let stale = text.replacen("[train.shape]", &format!("[train.shape]\n{line}"), 1);
             match from_toml(&stale) {
-                Err(TrainError::Parse(e)) => assert!(e.to_string().contains(field), "{e}"),
+                Err(DocumentError::Parse(e)) => assert!(e.to_string().contains(field), "{e}"),
                 other => panic!("a stage's old {field} must be a parse error, not {other:?}"),
             }
         }
@@ -782,7 +650,7 @@ mod tests {
         let mut value: toml::Value = toml::from_str(&text).unwrap();
         value["train"]["shape"]["members"][0]["module"] = toml::Value::Float(1.0);
         match from_toml(&toml::to_string(&value).unwrap()) {
-            Err(TrainError::Parse(e)) => assert!(e.to_string().contains("module"), "{e}"),
+            Err(DocumentError::Parse(e)) => assert!(e.to_string().contains("module"), "{e}"),
             other => panic!("a plain module must be a parse error, not {other:?}"),
         }
         // ...and on the train itself.
@@ -792,9 +660,164 @@ mod tests {
             1,
         );
         match from_toml(&stale) {
-            Err(TrainError::Parse(e)) => assert!(e.to_string().contains("an_old_flag"), "{e}"),
+            Err(DocumentError::Parse(e)) => assert!(e.to_string().contains("an_old_flag"), "{e}"),
             other => panic!("a stale field must be a parse error, not {other:?}"),
         }
+    }
+
+    /// Every key any table of `v` holds.
+    fn keys(v: &toml::Value, out: &mut std::collections::BTreeSet<String>) {
+        match v {
+            toml::Value::Table(t) => {
+                for (k, x) in t {
+                    out.insert(k.clone());
+                    keys(x, out);
+                }
+            }
+            toml::Value::Array(a) => a.iter().for_each(|x| keys(x, out)),
+            _ => {}
+        }
+    }
+
+    /// `key` taken out of every table of `v` where `keep` says it may go.
+    fn strip(v: &mut toml::Value, key: &str, goes: &dyn Fn(&toml::Value) -> bool) {
+        match v {
+            toml::Value::Table(t) => {
+                if t.get(key).is_some_and(goes) {
+                    t.remove(key);
+                }
+                t.iter_mut().for_each(|(_, x)| strip(x, key, goes));
+            }
+            toml::Value::Array(a) => a.iter_mut().for_each(|x| strip(x, key, goes)),
+            _ => {}
+        }
+    }
+
+    /// **Every field the writer writes, the reader requires.** A field a file
+    /// leaves out is refused by name rather than filled in: a filled-in field
+    /// is a document describing a gearbox nobody wrote down. Each key the
+    /// written document holds is taken out of every table it is in, and the
+    /// read must fail naming it. An `Option` is written by its absence —
+    /// TOML has no null — so a ring's cutter is not asked, and nor is a
+    /// duty's variant, whose absence the parser names as the duty.
+    #[test]
+    fn a_document_missing_any_field_is_refused_and_named() {
+        let text = to_toml(&document()).unwrap();
+        let value: toml::Value = toml::from_str(&text).unwrap();
+        let mut all = std::collections::BTreeSet::new();
+        keys(&value, &mut all);
+        let by_absence = ["ring", "intermittent", "continuous"];
+        let mut read_past = Vec::new();
+        let mut asked = 0;
+        for key in all.iter().filter(|k| !by_absence.contains(&k.as_str())) {
+            let mut v = value.clone();
+            strip(&mut v, key, &|_| true);
+            asked += 1;
+            match from_toml(&toml::to_string(&v).unwrap()) {
+                Err(e) if e.to_string().contains(key.as_str()) => {}
+                Err(e) => read_past.push(format!("{key}: refused, not naming it: {e}")),
+                Ok(_) => read_past.push(format!("{key}: read")),
+            }
+        }
+        assert!(
+            read_past.is_empty(),
+            "fields a file may leave out:\n{}",
+            read_past.join("\n")
+        );
+        // Every key the written document holds, but the three above.
+        assert_eq!(asked, 74, "fields asked");
+    }
+
+    /// **An addendum is a number.** It was `{ auto, manual }` once, and the
+    /// reader that still took that table took any key beside `manual` too.
+    #[test]
+    fn an_addendum_written_as_a_table_is_refused() {
+        let text = to_toml(&document()).unwrap();
+        for table in [
+            "{ auto = true, manual = 1.0 }",
+            "{ manual = 1.0, anything = 3 }",
+        ] {
+            let stale = text.replacen("addendum = 1.0", &format!("addendum = {table}"), 1);
+            assert_ne!(stale, text);
+            match from_toml(&stale) {
+                Err(e) => assert!(e.to_string().contains("addendum"), "{e}"),
+                Ok(_) => panic!("an addendum of {table} must be refused"),
+            }
+        }
+    }
+
+    /// **A document says its format, and the reader holds a file to it.** A
+    /// file that states none, or states another, is refused by the version
+    /// it names and pointed at `gear-cli convert`, rather than read as if
+    /// the fields it has meant what they mean now.
+    #[test]
+    fn a_document_of_another_format_is_refused_and_pointed_at_convert() {
+        let text = to_toml(&document()).unwrap();
+        let line = text
+            .lines()
+            .find(|l| l.starts_with("format = "))
+            .expect("the writer writes its format");
+        for (stale, names) in [
+            (text.replacen(&format!("{line}\n"), "", 1), "format"),
+            (text.replacen(line, "format = 999", 1), "999"),
+        ] {
+            match from_toml(&stale) {
+                Err(e) => {
+                    let e = e.to_string();
+                    assert!(e.contains(names) && e.contains("gear-cli convert"), "{e}");
+                }
+                Ok(_) => panic!("a file without the current format must be refused"),
+            }
+        }
+    }
+
+    /// **A file written as stages converts by what a file of its time
+    /// meant, not by today's defaults.** Each field such a file could leave
+    /// out is taken out wherever it stands at the value every file that
+    /// left it out meant; the file converts to the train the full one does.
+    /// The values are the converter's own, written down once: a default the
+    /// tool moves later does not move what an old file said.
+    #[test]
+    fn a_staged_file_leaving_out_what_it_could_converts_as_the_full_one() {
+        let full = include_str!("../tests/data/elevation_drive_staged.toml");
+        let mut sparse: toml::Value = toml::from_str(full).unwrap();
+        let auto = |manual: f64| {
+            let mut t = toml::Table::new();
+            t.insert("auto".into(), true.into());
+            t.insert("manual".into(), manual.into());
+            toml::Value::Table(t)
+        };
+        let mut left_out = 0;
+        for (key, meant) in [
+            ("carried_by", toml::Value::Integer(0)),
+            ("min_planet_clearance", 0.3.into()),
+            ("pressure_angle", auto(20.0)),
+            ("overlap", auto(1.0)),
+            ("min_contact_ratio", 1.2.into()),
+            ("load_sharing", "none".into()),
+            ("search", false.into()),
+            ("tip_clearance", 0.0.into()),
+            ("couplings", toml::Value::Array(Vec::new())),
+            ("no_undercut", true.into()),
+            ("no_sharp_tip", true.into()),
+            ("material_overrides", toml::Value::Table(toml::Table::new())),
+            ("role", "load".into()),
+            ("reversed_bending", false.into()),
+        ] {
+            let before = toml::to_string(&sparse).unwrap();
+            strip(&mut sparse, key, &|v| *v == meant);
+            left_out += usize::from(toml::to_string(&sparse).unwrap() != before);
+        }
+        assert_eq!(left_out, 14, "fields the file leaves out");
+        let sparse = toml::to_string(&sparse).unwrap();
+        let written = |src: &str| to_toml(&convert(src).unwrap().document).unwrap();
+        let (sparse, full) = (written(&sparse), written(full));
+        let moved: Vec<_> = sparse
+            .lines()
+            .zip(full.lines())
+            .filter(|(a, b)| a != b)
+            .collect();
+        assert!(sparse == full, "converted apart: {moved:?}");
     }
 
     /// Nonsense is refused with the parser's own message rather than a panic or
@@ -803,10 +826,13 @@ mod tests {
     fn a_document_that_is_not_a_geartrain_is_refused() {
         for src in [
             "this is not toml",
-            "name = \"no train in here\"",
-            "[train]\nload_cases = \"heavy\"",
+            "format = 1\nname = \"no train in here\"",
+            "format = 1\n[train]\nload_cases = \"heavy\"",
         ] {
-            assert!(matches!(from_toml(src), Err(TrainError::Parse(_))), "{src}");
+            assert!(
+                matches!(from_toml(src), Err(DocumentError::Parse(_))),
+                "{src}"
+            );
         }
     }
 

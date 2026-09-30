@@ -489,18 +489,14 @@ pub struct Overrides {
     /// The load ratio a replaced fatigue figure was measured at. A replaced
     /// figure does not inherit the library's: `None` here, with the figure
     /// replaced, is a figure whose ratio nobody stated.
-    #[cfg_attr(feature = "serde", serde(default))]
     pub fatigue_load_ratio: Option<LoadRatio>,
     /// What a replaced fatigue figure was measured on, likewise.
-    #[cfg_attr(feature = "serde", serde(default))]
     pub fatigue_specimen: Option<Specimen>,
     /// A flank's contact endurance, replacing the library's or standing where
     /// it has none.
-    #[cfg_attr(feature = "serde", serde(default))]
     pub contact_fatigue_allowable: Option<f64>,
     /// The quality grade a hardness estimate is read at, in place of the
     /// library's.
-    #[cfg_attr(feature = "serde", serde(default))]
     pub contact_grade: Option<QualityGrade>,
 }
 

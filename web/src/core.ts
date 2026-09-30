@@ -3,15 +3,19 @@
 // Project rule: no engineering calculation lives on this side of the boundary.
 // Everything here either forwards inputs to Rust or formats what Rust returned.
 
-import {
-  setCatalogue,
-  setLanguages,
-  setCurrentLanguage,
-  t,
-  type LanguageOption,
-  type Note,
-} from "./strings.svelte";
+import { setCatalogue, setLanguages, setCurrentLanguage, t, note } from "./strings.svelte";
 import type {
+  LanguageOption,
+  Note,
+  TrainDocument,
+  Imported,
+  TrainEdit,
+  EditRequest,
+  PreviewRequest,
+  OffersRequest,
+  AdoptRequest,
+  RelieveRequest,
+  RelieveCaseRequest,
   Figure,
   Freedom,
   CaseKind,
@@ -89,6 +93,11 @@ import type {
 } from "./wire";
 export type { CaseKind, LoadCase };
 export type {
+  LanguageOption,
+  Note,
+  TrainDocument,
+  Imported,
+  TrainEdit,
   Duty,
   LoadRatio,
   Specimen,
@@ -577,23 +586,6 @@ export function ringDxf(req: RingRequest): { ok: string } | { error: string } {
   }
 }
 
-/** A geartrain as it is exchanged: the tab's name, and the train's inputs.
- *
- *  The name is in the document because a `Train` has none and a tab does, and
- *  recovering it from the filename would lose it to any rename. */
-export interface TrainDocument {
-  name: string;
-  train: Train;
-}
-
-/** What reading a geartrain came to: the document, and whether Rust adjusted
- *  it on the way in — a toggle the file had given that nothing can honour,
- *  turned back automatic with its number kept. */
-export interface Imported {
-  document: TrainDocument;
-  adjusted: boolean;
-}
-
 /** Parse an exported geartrain. The TOML never touches TypeScript: the file is
  *  handed to Rust as text, so exactly one parser exists. */
 export function importTrain(
@@ -602,8 +594,21 @@ export function importTrain(
   try {
     return { ok: JSON.parse(import_train(tomlText)) as Imported };
   } catch (e) {
-    return { error: e instanceof Error ? e.message : String(e) };
+    return { error: said(e instanceof Error ? e.message : String(e)) };
   }
+}
+
+/** A refusal that crossed as a note — a file of another format, a graph
+ *  that describes no train — in the catalogue's words; a parser's
+ *  complaint, which names the line, as it came. */
+function said(message: string): string {
+  try {
+    const n = JSON.parse(message) as Note;
+    if (typeof n?.key === "string") return note(n);
+  } catch {
+    // Not a note: the parser's own words.
+  }
+  return message;
 }
 
 export function exportTrain(
@@ -681,7 +686,8 @@ export function exportLibrary(
 export function relieveTrain(train: Train, just: Freedom | null, figures: Figure[] = []): Note | null {
   let corrected: Shape;
   try {
-    corrected = JSON.parse(relieve(wire({ shape: train.shape, just, figures }))) as Shape;
+    const req: RelieveRequest = { shape: train.shape, just, figures };
+    corrected = JSON.parse(relieve(wire(req))) as Shape;
   } catch (e) {
     return boundaryFailure(e);
   }
@@ -713,8 +719,8 @@ export function relieveCase(
   if (!c) return null;
   let corrected: LoadCase;
   try {
-    const library = materials ?? defaultLibrary();
-    corrected = JSON.parse(relieve_case(wire({ train, library, case: index, just }))) as LoadCase;
+    const req: RelieveCaseRequest = { train, materials, case: index, just };
+    corrected = JSON.parse(relieve_case(wire(req))) as LoadCase;
   } catch (e) {
     return boundaryFailure(e);
   }
@@ -751,8 +757,8 @@ export function adoptMember(
   materials?: MaterialLibrary,
 ): AdoptOutcome | { error: string } {
   try {
-    const body = wire({ train, materials: materials ?? null, member });
-    return JSON.parse(adopt_member(body)) as AdoptOutcome;
+    const req: AdoptRequest = { train, materials, member };
+    return JSON.parse(adopt_member(wire(req))) as AdoptOutcome;
   } catch (e) {
     return { error: failed(e) };
   }
@@ -799,23 +805,22 @@ export function isHeld(train: Train, body: number): boolean {
 
 /** **One edit to a train, by the core's rules** — one of the graph's own
  *  edits (`Edit`: what the core offers at a piece, `offersAt`), or a case
- *  added or its duty switched. Each is a rule about what else has to change
- *  — a join turns a reaction into a take-off, a body taken off the graph
- *  leaves the train with every case entry and hold at it — and the rules
- *  are the core's, so this side hands the train over and copies the answer
- *  back. A train that will not cross the boundary is left as it stands. */
-export type TrainEdit =
-  | { graph: Edit }
-  | { add_case: CaseKind }
-  | { duty: { case: number; intermittent: boolean } };
-/** The train edited by the core's rules, in place. An edit the core
+ *  added or its duty switched (`TrainEdit`). Each is a rule about what else
+ *  has to change — a join turns a reaction into a take-off, a body taken off
+ *  the graph leaves the train with every case entry and hold at it — and the
+ *  rules are the core's, so this side hands the train over and copies the
+ *  answer back. A train that will not cross the boundary is left as it
+ *  stands.
+ *
+ *  The train edited by the core's rules, in place. An edit the core
  *  refuses leaves the train as it was and comes back as the note of the
  *  reason, for the panel to say; a train that would not cross comes back as
  *  `boundaryFailure`'s. */
 export function editTrain(train: Train, edit: TrainEdit): Note | null {
   let edited: Train;
   try {
-    edited = JSON.parse(edit_train(wire({ train, edit }))) as Train;
+    const req: EditRequest = { train, edit };
+    edited = JSON.parse(edit_train(wire(req))) as Train;
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     return message.startsWith("ui.") ? { key: message, values: {} } : boundaryFailure(e);
@@ -833,9 +838,8 @@ export function editTrain(train: Train, edit: TrainEdit): Note | null {
  *  the edited train is said to be unsolved, with `boundaryFailure`'s note. */
 export function previewEdit(train: Train, edit: TrainEdit, materials?: MaterialLibrary): Preview {
   try {
-    return JSON.parse(
-      preview_edit(wire({ train, materials: materials ?? null, edit })),
-    ) as Preview;
+    const req: PreviewRequest = { train, materials, edit };
+    return JSON.parse(preview_edit(wire(req))) as Preview;
   } catch (e) {
     return { refused: null, changes: [], paths: [], unsolved: boundaryFailure(e) };
   }
@@ -848,7 +852,8 @@ export function previewEdit(train: Train, edit: TrainEdit, materials?: MaterialL
  *  with `boundaryFailure`'s note, where the call failed. */
 export function offersAt(train: Train, at: Target): { offers: Offer[]; failure: Note | null } {
   try {
-    return { offers: JSON.parse(wasm_offers(wire({ train, at }))) as Offer[], failure: null };
+    const req: OffersRequest = { train, at };
+    return { offers: JSON.parse(wasm_offers(wire(req))) as Offer[], failure: null };
   } catch (e) {
     return { offers: [], failure: boundaryFailure(e) };
   }
@@ -858,4 +863,3 @@ export function offersAt(train: Train, at: Target): { offers: Offer[]; failure: 
 // the catalogue arrives after the first render. Re-exported here so a component
 // still reaches everything through one door.
 export { t, note, languages, language } from "./strings.svelte";
-export type { Note, LanguageOption } from "./strings.svelte";

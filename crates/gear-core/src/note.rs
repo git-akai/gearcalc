@@ -293,6 +293,11 @@ pub mod key {
         "error.train_malformed_carried_by_cycle";
     /// `error.train_tips_unclearable`
     pub const ERROR_TRAIN_TIPS_UNCLEARABLE: &str = "error.train_tips_unclearable";
+    /// `error.train_file_unversioned`: a geartrain file that states no
+    /// format (read by `gear_io::train`).
+    pub const ERROR_TRAIN_FILE_UNVERSIONED: &str = "error.train_file_unversioned";
+    /// `error.train_file_format`: a geartrain file of another format.
+    pub const ERROR_TRAIN_FILE_FORMAT: &str = "error.train_file_format";
 
     /// Every key above, for the catalogue coverage tests.
     pub const ALL: &[&str] = &[
@@ -394,6 +399,8 @@ pub mod key {
         ERROR_TRAIN_OVERFLOW,
         ERROR_TRAIN_LOAD_PORT,
         ERROR_TRAIN_TIPS_UNCLEARABLE,
+        ERROR_TRAIN_FILE_UNVERSIONED,
+        ERROR_TRAIN_FILE_FORMAT,
         ERROR_TRAIN_SIZE_OVER_CONSTRAINED,
         ERROR_TRAIN_AXES_TOO_CLOSE,
         ERROR_TRAIN_AXES_TOO_FAR,

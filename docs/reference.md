@@ -3193,13 +3193,59 @@ that does not rebuild what it is missing is asked to open the file. See
 
 **Geartrains and the material library**, TOML, the same shape as the input
 structs. **Inputs only**, so files stay small and cannot go stale. A geartrain
-document is `{ name, train }`, and its train is the one graph — `[train.shape]`,
-with its axes, bodies, members, meshes, distances and couplings — beside its
-holds and its load cases; an unknown material is not an import failure, and a
-train with nothing in it reads as written, its cases waiting for a preset. A
-file written before the train was one graph lists `[[train.stages]]`, and is
-refused by name; `gear-cli convert <file>` rewrites it once as the graph a
-chain of the same stages builds now, figure for figure.
+document is `format = 1`, then `{ name, train }`, and its train is the one
+graph — `[train.shape]`, with its axes, bodies, members, meshes, distances and
+couplings — beside its holds and its load cases. Every field is required and
+written, an optional input being written where it is given; an unknown
+material is not an import failure, and a train with nothing in it reads as
+written, its cases waiting for a preset.
+
+### Geartrain file formats
+
+A file states its format at its root, and the reader takes the current one
+only: a file of another, or of none, is refused by the format it names
+(`error.train_file_format`, `error.train_file_unversioned`) and pointed at
+`gear-cli convert <file>`. That reads a file written before the format was
+numbered — its train as stages or as one graph — at what such a file meant,
+each such value a literal in the converter rather than today's default, and
+writes the current format; the stages become the graph a chain of the same
+stages builds now, figure for figure. A change to what a file means takes the
+next number, and the converter the step from the one before.
+
+Format 0 is every file that states none, through every change below; the
+converter reads the last of them, from *every hold is stated* on.
+
+| Format | Change | A file written before it meant |
+|---|---|---|
+| 0 | `working_depth` became `{ auto, manual }`, its default the gear's dedendum | `working_depth = 1.0` is `{ auto = false, manual = 1.0 }` |
+| 0 | A worm stage gained `thickness_mod` | 1, the standard tooth |
+| 0 | A spur stage gained `load_sharing` | `"none"` |
+| 0 | `friction` became `sliding_friction`, with `static_friction` beside it | one coefficient throughout |
+| 0 | A worm stage became a pair: `gears`, `axial_clearance`, and the pair's `sizing` readings | the worm unshifted and the wheel's shift automatic |
+| 0 | The train's loads became `[[train.load_cases]]`, each with a `kind`, a `port`, `reacted`, a `torque`, a `speed` and a `duty` | three cases: the input peak, the back-driving load, the fatigue load |
+| 0 | The helix moved onto the members (`helix_angle`, `pitch_diameter`); lines gained `overlap` | `{ auto = true, manual = 1.0 }` for the overlap |
+| 0 | A set's `arrangement` became `[[train.constraints]]`, with `[[train.couplings]]` | each stage's conventions |
+| 0 | The stage kinds became one shape: `axes`, `shafts`, `members`, `meshes`, `distances` | a pair two ground axes; a set a carried planet axis |
+| 0 | A member's `thickness_mod` became `{ auto, manual }` | a plain number is refused |
+| 0 | A distance gained `tip_clearance` | 0 |
+| 0 | A load case's `port` may name a shaft | nothing changed meaning |
+| 0 | A load case became a list of `loads`, each a torque and a speed given or derived | a given load at the port, and a reaction at the far end |
+| 0 | A load gained `role` | `"load"` |
+| 0 | A port is a shaft: `"start"`, `"end"` and `"driven"` went; a file lists its couplings | a name is refused |
+| 0 | The pressure angle moved onto the members | 20°, following its group |
+| 0 | The axial contact ratio moved onto the meshes | `{ auto = true, manual = 1.0 }` |
+| 0 | The search's contact-ratio floor moved onto the meshes (`min_contact_ratio`) | 1.2 |
+| 0 | A shaft became a body numbered across the train: `bodies`, a member's `body`; couplings went | the old spellings are refused |
+| 0 | A stage's `kind = "shape"` went | it is refused |
+| 0 | A stage's `optimisation`, `load_sharing` and `min_planet_clearance` became each mesh's `search` and `load_sharing` and each axis's `min_planet_clearance` | not searched, none, 0.3 mm |
+| 0 | `module` and `pressure_angle` became `{ auto, manual }`, stated once per mesh group | a plain number is refused |
+| 0 | Every hold is stated: `held = [..]` replaced `[[train.constraints]]` | the holds written, and each stage's conventional hold |
+| 0 | A stage may couple two bodies (`couplings`) | none |
+| 0 | The train is one graph: `[train.shape]` replaced `[[train.stages]]` | the graph the stages chain into |
+| 0 | A load case gained `application_factor` | 1 |
+| 0 | A member's `material_overrides` gained `fatigue_load_ratio`, `fatigue_specimen` and `contact_fatigue_allowable` | none, the library's figures |
+| 0 | A member's gear gained `no_tip_past_mate_flank` | on, which shortens a tip that reached past a mate's flank |
+| 1 | The format is stated at the root, and every field is required: nothing read is filled in. An addendum is a number | what format 0 meant, row by row above, which `gear-cli convert` writes |
 
 ---
 
