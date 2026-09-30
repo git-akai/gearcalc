@@ -1988,7 +1988,7 @@ fn train_report(mode: Option<&str>) {
                     duty: if mode == Some("toggles") {
                         Duty::Intermittent {
                             range_degrees: 90.0,
-                            at: end,
+                            at: Some(end),
                             actuations: 600_000,
                             reversing: true,
                         }
@@ -2089,7 +2089,7 @@ fn print_train_cases(train: &gear_core::train::Train, r: &gear_core::train::Trai
                 },
             ) => format!(
                 "   {range_degrees} deg at {} x {actuations}{}",
-                port(at),
+                at.map_or_else(|| "unset".to_string(), port),
                 if reversing { ", reversing" } else { "" }
             ),
             (CaseKind::Fatigue, Duty::Continuous { runtime_hours }) => {

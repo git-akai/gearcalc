@@ -6373,7 +6373,7 @@ mod tests {
             let input = train.load_cases[1].loads[0].at;
             train.load_cases[1].duty = crate::train::Duty::Intermittent {
                 range_degrees: 360.0,
-                at: input,
+                at: Some(input),
                 actuations: 1,
                 reversing,
             };

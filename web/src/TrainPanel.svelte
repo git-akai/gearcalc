@@ -910,7 +910,15 @@
           </label>
           <label>
             <span>{t("ui.train_actuation_range_at")}</span>
-            <select value={String(act.at)} onchange={(e) => (act.at = Number(e.currentTarget.value))}>
+            <!-- An unset sweep — a case with no entry to measure it at —
+                 shows as such until a body is chosen. -->
+            <select
+              value={act.at === null ? "" : String(act.at)}
+              onchange={(e) => (act.at = e.currentTarget.value === "" ? null : Number(e.currentTarget.value))}
+            >
+              {#if act.at === null}
+                <option value="">{t("ui.train_actuation_range_at_unset")}</option>
+              {/if}
               {#each portOptionsNow as p (p.body)}
                 <option value={String(p.body)}>{bodyName(p.body)}</option>
               {/each}

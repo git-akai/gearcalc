@@ -2454,7 +2454,12 @@ else is on it, though a shaft an offset coupling turns stays with its
 coupling; a distance left with no mesh; an axis left with nothing on it —
 refused where a planet would be left meeting nothing on its carrier's axis,
 whose radius it runs at. Each is made on a copy and kept whole or refused
-whole. A lock by construction — a ring on the second gear's body of a pair,
+whole. **No edit drops or moves a case's load or reaction**: one that
+would leave a load or a reaction on a body held, cut off from the gears or
+taken off the train — or joined to another the same case names — is refused
+(`ui.train_edit_refused_loaded`), a free entry there is dropped, and only
+the removal that empties the train leaves its cases waiting by number for
+the next preset laid in. A lock by construction — a ring on the second gear's body of a pair,
 two ratios across one pair of shafts — is made, and the train names it at
 the body as it names a lock by holds; the edit's to say is only whether the
 graph it leaves hangs together. A refusal crosses the boundary as its
@@ -3105,6 +3110,16 @@ this body per turn of that port)`, the quotient taken exactly off the graph
 and the float multiplied in last. Continuous: `rpm × 60 × hours` at
 each body's own speed, from the case's speed at its port through the same
 ratios. An ultimate case counts nothing: it is survived once.
+A sweep is measured at an **open port** of a case that states entries, or
+the case is refused by name (`error.train_duty_port`); a sweep at a body
+that neither turns in the case nor would under its impending motion counts
+nothing and says so (`train.duty_at_still`), and so does a sweep with no
+body — **unset**, what a case with no entry to measure it at is given, and
+where a sweep goes when an edit takes its body and its case has no
+reaction or entry to follow (`train.duty_unset`). Two entries of one case
+at one body are refused (`error.train_duplicate_entry`); a case switched
+off that would be refused is unsolved, its refusal its note, and the train
+solves without it.
 
 Then engagements, and **one rule covers every arrangement here**: a member's
 teeth are engaged once per revolution *relative to the carrier of its mesh*,
@@ -3308,6 +3323,7 @@ converter reads the last of them, from *every hold is stated* on.
 | 0 | A member's `material_overrides` gained `fatigue_load_ratio`, `fatigue_specimen` and `contact_fatigue_allowable` | none, the library's figures |
 | 0 | A member's gear gained `no_tip_past_mate_flank` | on, which shortens a tip that reached past a mate's flank |
 | 1 | The format is stated at the root, and every field is required: nothing read is filled in. An addendum is a number | what format 0 meant, row by row above, which `gear-cli convert` writes |
+| 1 | A duty's `at` may be left out: the sweep is unset | nothing changed meaning: every file of format 1 states it |
 
 ---
 

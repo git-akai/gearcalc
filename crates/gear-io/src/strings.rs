@@ -1619,6 +1619,52 @@ mod tests {
                     }
                 }
             }
+            // **A fatigue case that names a body twice, measures its sweep
+            // at ground, at no body, or at a body its case holds still** —
+            // each fired from the model on a pair loaded at 1 and reacted at
+            // 2, and a set whose released ring its case gives no speed.
+            {
+                use gear_core::params::Auto;
+                use gear_core::train::{Duty, Edit, Load, LoadCase, LoadRole, Train};
+                let fatigue = LoadCase::fatigue(1, 2, 2.0, 3000.0);
+                let pair =
+                    |case: LoadCase| Train::chained(vec![arr::pair([17, 43])], |_| vec![case]);
+                let twice = LoadCase {
+                    loads: vec![
+                        Load::given(1, 2.0, 3000.0),
+                        Load::given(1, 2.0, 3000.0),
+                        Load::declared(2, LoadRole::Reacted),
+                    ],
+                    ..fatigue.clone()
+                };
+                let at = |at: Option<usize>| LoadCase {
+                    duty: Duty::intermittent(at),
+                    ..fatigue.clone()
+                };
+                for case in [twice, at(Some(gear_core::kinematics::GROUND)), at(None)] {
+                    match gear_core::train::solve_train(&pair(case), &lib) {
+                        Err(e) => err(e.note()),
+                        Ok(r) => r.every_note().into_iter().for_each(&mut err),
+                    }
+                }
+                let mut set = Train::chained(vec![arr::planetary(12, 30, 72, 3)], |_| Vec::new());
+                set.edit(Edit::Release(3)).expect("the set's ring is held");
+                set.load_cases = vec![LoadCase {
+                    loads: vec![
+                        Load::given(1, 2.0, 3000.0),
+                        Load {
+                            speed: Auto::fixed(0.0),
+                            ..Load::derived(3)
+                        },
+                        Load::declared(2, LoadRole::Reacted),
+                    ],
+                    duty: Duty::intermittent(Some(3)),
+                    ..LoadCase::fatigue(1, 2, 2.0, 3000.0)
+                }];
+                if let Ok(r) = gear_core::train::solve_train(&set, &lib) {
+                    r.every_note().into_iter().for_each(&mut err);
+                }
+            }
             // **Every way the train's own conditions can fail to give one
             // motion**, each fired from the model on a set whose bodies are
             // sun 1, carrier 2, ring 3: the carrier and the ring both held
@@ -1696,12 +1742,13 @@ mod tests {
         // What an edit would do, fired through the edits that say each part
         // of it: a gear on a new axis (gears, meshes, axes, bodies,
         // distances, and the path kept), a stage laid in at a body, a
-        // release of nothing held (nothing), a chain's last gear taken
-        // (case entries, and the path lost), a coupling taken off
+        // release of nothing held (nothing), a chain's second pair moved off
+        // its shared shaft (bodies, and the path lost), a shared shaft a case
+        // says is free held (case entries), a coupling taken off
         // (couplings), and a set's ring held (holds, and a path found).
         {
             use gear_core::train::arrangements::Preset;
-            use gear_core::train::{preview, Edit, LoadCase, Piece, Place, Train};
+            use gear_core::train::{preview, Edit, Load, LoadCase, LoadRole, Piece, Place, Train};
             let chain = |n: usize| {
                 Train::chained(vec![Preset::Spur.build(); n], |t| {
                     vec![LoadCase::ultimate(
@@ -1733,7 +1780,18 @@ mod tests {
                 },
             );
             fire(&chain(1), Edit::Release(1));
-            fire(&chain(2), Edit::Remove(Piece::Member(3)));
+            fire(
+                &chain(2),
+                Edit::Move {
+                    member: 2,
+                    to: None,
+                },
+            );
+            let mut free = chain(2);
+            free.load_cases[0]
+                .loads
+                .push(Load::declared(2, LoadRole::Free));
+            fire(&free, Edit::Hold(2));
             let plano = Train::chained(vec![Preset::Planocentric.build()], |_| Vec::new());
             fire(&plano, Edit::Remove(Piece::Coupling(0)));
             let mut set = Train::chained(vec![Preset::Planetary.build()], |_| Vec::new());

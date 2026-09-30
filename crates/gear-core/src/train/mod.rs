@@ -1733,6 +1733,15 @@ pub enum TrainError {
     /// bodies that is not a port — a planet's. Zero-based, as the cases are
     /// indexed; the front end numbers from 1.
     LoadPort { case: usize },
+    /// **A fatigue case's sweep measured at a body that is not an open
+    /// port**: ground, a held body, a planet's, or one the train does not
+    /// have. Zero-based, as the cases are indexed; the front end numbers
+    /// from 1.
+    DutyPort { case: usize, body: usize },
+    /// **Two entries of one case at one body**: two speeds given there
+    /// would be summed and of two torques one would be lost, so the case
+    /// says two things of one body and is refused rather than read.
+    DuplicateEntry { case: usize, body: usize },
     /// **No distance clears the tips of this mesh**: an automatic distance
     /// with an internal mesh on it opened out through the involute domain
     /// and the tips never came clear by what was asked
@@ -1844,6 +1853,11 @@ impl crate::note::Explain for TrainError {
             Self::LoadPort { case } => {
                 Note::new(key::ERROR_TRAIN_LOAD_PORT).text("case", (case + 1).to_string())
             }
+            Self::DutyPort { case, body } => {
+                located(key::ERROR_TRAIN_DUTY_PORT, *body).text("case", (case + 1).to_string())
+            }
+            Self::DuplicateEntry { case, body } => located(key::ERROR_TRAIN_DUPLICATE_ENTRY, *body)
+                .text("case", (case + 1).to_string()),
             Self::SizeOverConstrained { meshes: [a, b] } => {
                 Note::new(key::ERROR_TRAIN_SIZE_OVER_CONSTRAINED)
                     .count("first", u32::try_from(*a + 1).unwrap_or(u32::MAX))
@@ -2021,6 +2035,15 @@ impl std::fmt::Display for TrainError {
                  shaft, or one that is not a port",
                 case + 1
             ),
+            Self::DutyPort { case, body } => write!(
+                f,
+                "load case {}: its sweep is measured at {}, which is not an open port",
+                case + 1,
+                place(*body)
+            ),
+            Self::DuplicateEntry { case, body } => {
+                write!(f, "load case {}: two entries at {}", case + 1, place(*body))
+            }
             Self::InPart { part, cause } => write!(f, "part {}: {cause}", part + 1),
         }
     }
@@ -3025,8 +3048,10 @@ pub enum Duty {
     Intermittent {
         /// Sweep per actuation, degrees, at [`Self::Intermittent::at`].
         range_degrees: f64,
-        /// The body the sweep is measured at.
-        at: usize,
+        /// The body the sweep is measured at — `None` where the case has
+        /// none to follow ([`Train::set_duty`]), which the solve says and
+        /// counts nothing over. Left out of a file where `None`.
+        at: Option<usize>,
         actuations: u32,
         /// Whether the duty reverses between actuations.
         ///
@@ -3045,9 +3070,9 @@ pub enum Duty {
 
 impl Duty {
     /// The default duty: a thousand sweeps of 25° measured at this body —
-    /// the output, on a train's presets.
+    /// the output, on a train's presets — or unset, `None`.
     #[must_use]
-    pub const fn intermittent(at: usize) -> Self {
+    pub const fn intermittent(at: Option<usize>) -> Self {
         Self::Intermittent {
             range_degrees: 25.0,
             at,
@@ -3237,7 +3262,7 @@ impl LoadCase {
                 Load::given(input, torque, speed),
                 Load::declared(output, LoadRole::Reacted),
             ],
-            duty: Duty::intermittent(output),
+            duty: Duty::intermittent(Some(output)),
             application_factor: unit_factor(),
         }
     }
@@ -3267,7 +3292,7 @@ impl LoadCase {
                 Load::given(output, torque, 0.0),
                 Load::declared(input, LoadRole::Reacted),
             ],
-            duty: Duty::intermittent(output),
+            duty: Duty::intermittent(Some(output)),
             application_factor: unit_factor(),
         }
     }
@@ -3464,7 +3489,7 @@ impl Train {
                     ..
                 } => Duty::Intermittent {
                     range_degrees,
-                    at: output,
+                    at: Some(output),
                     actuations,
                     reversing,
                 },
@@ -4518,6 +4543,34 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
     solve_parts(train, &train.parts(), lib).map(|(r, _)| r)
 }
 
+/// **Why a case cannot be read**, where it cannot: an entry at a body
+/// that is not one of the train's open `ports` ([`TrainError::LoadPort`]),
+/// two entries at one body ([`TrainError::DuplicateEntry`]), or a fatigue
+/// sweep with entries to rate measured at a body that is not an open port
+/// ([`TrainError::DutyPort`]). An ultimate case's duty is kept for switching
+/// back and read by nothing, so nothing asks where it is measured.
+fn case_refusal(index: usize, case: &LoadCase, ports: &[Body]) -> Option<TrainError> {
+    if case.loads.iter().any(|l| !ports.contains(&l.at)) {
+        return Some(TrainError::LoadPort { case: index });
+    }
+    let repeat =
+        (1..case.loads.len()).find(|&i| case.loads[..i].iter().any(|x| x.at == case.loads[i].at));
+    if let Some(i) = repeat {
+        return Some(TrainError::DuplicateEntry {
+            case: index,
+            body: case.loads[i].at,
+        });
+    }
+    match case.counted() {
+        Some(&Duty::Intermittent { at: Some(body), .. })
+            if !case.loads.is_empty() && !ports.contains(&body) =>
+        {
+            Some(TrainError::DutyPort { case: index, body })
+        }
+        _ => None,
+    }
+}
+
 /// **The train solved part by part** — each of `parts` closed, sized,
 /// searched and rated on its own, one flow and one motion across them all.
 /// The train's own parts ([`Train::parts`]) — a lone preset being one
@@ -4682,9 +4735,6 @@ fn solve_parts(
                 }
             }
         }
-        if entries.iter().any(|(g, _)| !ports.contains(g)) {
-            return Err(TrainError::LoadPort { case: index });
-        }
         let loaded = |s: Body| loads.iter().any(|(g, _)| *g == s);
         let declared =
             |s: Body, role: LoadRole| entries.iter().any(|(g, l)| *g == s && l.role == role);
@@ -4735,6 +4785,19 @@ fn solve_parts(
                     per_part[k].push(CaseLoad::nothing(index, case.kind, w));
                 }
             };
+        // **What a case names, read before anything it says**: an entry at
+        // a body no load can enter by, two entries at one body, and a sweep
+        // at no open port. A case that is on refuses the train by name; one
+        // that is off is unsolved, the refusal its note, and the train
+        // solves without it.
+        if let Some(e) = case_refusal(index, case, &ports) {
+            if case.enabled {
+                return Err(e);
+            }
+            notes.push(crate::note::Explain::note(&e));
+            nothing(notes, &mut cases, &mut per_part);
+            continue;
+        }
         if loads.is_empty() {
             notes.push(Note::new(key::TRAIN_CASE_NO_LOAD));
             nothing(notes, &mut cases, &mut per_part);
@@ -4871,36 +4934,50 @@ fn solve_parts(
                 continue;
             }
         };
-        // ---- how many times each body comes round over a fatigue duty.
-        let turns: Option<Vec<f64>> = case.counted().map(|duty| match *duty {
-            Duty::Intermittent {
+        // ---- how many times each body comes round over a fatigue duty —
+        // counted over nothing where the sweep is unset, or measured at a
+        // body that neither turns in this case nor would, which the case
+        // says rather than counting nought.
+        let turns: Option<Vec<f64>> = match case.counted() {
+            None => None,
+            Some(&Duty::Continuous { runtime_hours }) => Some(
+                (0..shafts)
+                    .map(|s| speeds[s] * 60.0 * runtime_hours)
+                    .collect(),
+            ),
+            Some(&Duty::Intermittent { at: None, .. }) => {
+                notes.push(Note::new(key::TRAIN_DUTY_UNSET));
+                None
+            }
+            Some(&Duty::Intermittent {
                 range_degrees,
-                at: sweep_at,
+                at: Some(port),
                 actuations,
                 ..
-            } => {
-                let port = sweep_at;
+            }) => {
                 // **A sweep is a magnitude**, stated at a port; every body's
                 // share of it is the ratio of the two speeds, which the
-                // impending motion has where a held load's speed does not. The
-                // turns are **signed** here, so a member's turns against
+                // impending motion has where a held load's speed does not.
+                // The turns are **signed** here, so a member's turns against
                 // its carrier are a difference of two, taken as a magnitude
                 // where they are counted.
                 let per = if speeds[port] != 0.0 { &speeds } else { &still };
-                (0..shafts)
-                    .map(|s| {
-                        if per[port] == 0.0 {
-                            0.0
-                        } else {
-                            (per[s] / per[port]) * (range_degrees / 360.0) * f64::from(actuations)
-                        }
-                    })
-                    .collect()
+                if per[port] == 0.0 {
+                    notes.push(located(key::TRAIN_DUTY_AT_STILL, port));
+                    None
+                } else {
+                    Some(
+                        (0..shafts)
+                            .map(|s| {
+                                (per[s] / per[port])
+                                    * (range_degrees / 360.0)
+                                    * f64::from(actuations)
+                            })
+                            .collect(),
+                    )
+                }
             }
-            Duty::Continuous { runtime_hours } => (0..shafts)
-                .map(|s| speeds[s] * 60.0 * runtime_hours)
-                .collect(),
-        });
+        };
         let reversing_actuations = case.counted().and_then(|d| match *d {
             Duty::Intermittent {
                 actuations,
@@ -7440,8 +7517,8 @@ mod tests {
                 }
             }
             if let Duty::Intermittent { at, .. } = &mut c.duty {
-                if *at == was {
-                    *at = end;
+                if *at == Some(was) {
+                    *at = Some(end);
                 }
             }
         }
@@ -7940,7 +8017,7 @@ mod tests {
         let c = &t.load_cases[0];
         assert_eq!((c.loads[0].at, c.loads[0].role), (at(1), LoadRole::Load));
         assert_eq!((c.loads[1].at, c.loads[1].role), (at(2), LoadRole::Reacted));
-        assert!(matches!(c.duty, Duty::Intermittent { at: d, .. } if d == at(2)));
+        assert!(matches!(c.duty, Duty::Intermittent { at: d, .. } if d == Some(at(2))));
         // The back-driving case is still from the output, held at the input.
         let b = &t.load_cases[1];
         assert_eq!((b.loads[0].at, b.loads[0].role), (at(2), LoadRole::Load));
@@ -9784,7 +9861,7 @@ mod tests {
             for l in &mut c.loads {
                 carry(&mut l.at);
             }
-            if let Duty::Intermittent { at, .. } = &mut c.duty {
+            if let Duty::Intermittent { at: Some(at), .. } = &mut c.duty {
                 carry(at);
             }
         }
@@ -9795,7 +9872,7 @@ mod tests {
     /// once, and the cases at whatever bodies the ends come to.
     fn train_of(stages: Vec<Shape>) -> Train {
         let mut t = Train::chained(stages, |_| Vec::new());
-        let duty = Duty::intermittent(end_of(&t));
+        let duty = Duty::intermittent(Some(end_of(&t)));
         t.load_cases = classic(&t, 3000.0, 2.0, 0.0, 2.0, 3000.0, duty);
         t
     }
@@ -10231,7 +10308,7 @@ mod tests {
         let mut t = two_pairs();
         t.load_cases[CYCLIC].duty = Duty::Intermittent {
             range_degrees: 360.0,
-            at: end_of(&t),
+            at: Some(end_of(&t)),
             actuations: 100,
             reversing: false,
         };
@@ -10289,7 +10366,7 @@ mod tests {
         // per actuation, and every count is the total ratio smaller.
         let start = start_of(&t);
         if let Duty::Intermittent { at, .. } = &mut t.load_cases[CYCLIC].duty {
-            *at = start;
+            *at = Some(start);
         }
         let r = solve_train(&t, &library()).unwrap();
         assert_eq!(cycles(&spur(&r.by_part[0]).members[0]).bending, 100.0);
@@ -11464,7 +11541,7 @@ mod tests {
                     3000.0,
                     Duty::Intermittent {
                         range_degrees: 25.0,
-                        at: end_of(&t),
+                        at: Some(end_of(&t)),
                         actuations: 1000,
                         reversing: false,
                     },
@@ -11476,7 +11553,7 @@ mod tests {
                     3000.0,
                     Duty::Intermittent {
                         range_degrees: 25.0,
-                        at: end_of(&t),
+                        at: Some(end_of(&t)),
                         actuations: 1000,
                         reversing: true,
                     },

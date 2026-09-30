@@ -201,10 +201,12 @@ const out = {
     out.push(["chain_grown", structuredClone(t)]);
     graph({ remove: { axis: t.shape.axes.length - 1 } });
     out.push(["chain_cut", structuredClone(t)]);
-    // **A coupling taken off a planocentric and put back**: its shaft goes
-    // with the coupling where nothing else names it, and the planet coupled
-    // again drives a new one.
-    graph({ insert: { shape: preset("planocentric"), at: null } });
+    // **A coupling taken off a planocentric and put back**: laid in at the
+    // train's input shaft, its output shaft goes with the coupling where
+    // nothing else names it, and the planet coupled again drives a new one.
+    // (Laid on at the chain's end its output carries the cases' reaction,
+    // and the coupling's removal is refused: `graph_refused` below.)
+    graph({ insert: { shape: preset("planocentric"), at: 1 } });
     const plano = parts().length - 1;
     graph({ remove: { coupling: parts()[plano].couplings[0] } });
     out.push(["uncoupled", structuredClone(t)]);
@@ -232,10 +234,24 @@ const out = {
         return String(x.message ?? x);
       }
     };
+    // A planocentric laid on at the default train's output, whose coupled
+    // shaft the cases react at: taking the coupling would drop the reaction.
+    const reacted = edit(structuredClone(defaults.train), {
+      graph: { insert: { shape: preset("planocentric"), at: null } },
+    });
+    const dropping = () => {
+      try {
+        edit(reacted, { graph: { remove: { coupling: reacted.shape.couplings.length - 1 } } });
+        return null;
+      } catch (x) {
+        return String(x.message ?? x);
+      }
+    };
     out.push(["graph_refused", [
       refusal({ join: { a: 1, b: 2 } }),
       refusal({ add_gear: { mate: 0, on: { new_body: 0 }, ring: false } }),
       refusal({ remove: { axis: 9999 } }),
+      dropping(),
     ]]);
     return out;
   }),

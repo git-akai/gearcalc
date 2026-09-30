@@ -1150,7 +1150,7 @@ impl super::Train {
                         return Err(Invariant::EntryTwice { case: c, body });
                     }
                 }
-                if let super::Duty::Intermittent { at, .. } = case.duty {
+                if let super::Duty::Intermittent { at: Some(at), .. } = case.duty {
                     if !case.loads.is_empty() && !open.contains(&at) {
                         return Err(Invariant::SweepNotOpen { case: c, body: at });
                     }
@@ -1158,12 +1158,10 @@ impl super::Train {
             }
         }
         let named = |b: usize| {
-            axis_of(b).is_some()
-                || self.held.contains(&b)
-                || self.load_cases.iter().any(|c| {
-                    c.loads.iter().any(|l| l.at == b)
-                        || matches!(c.duty, super::Duty::Intermittent { at, .. } if at == b)
-                })
+            axis_of(b).is_some() || self.held.contains(&b) || self.load_cases.iter().any(|c| {
+                c.loads.iter().any(|l| l.at == b)
+                    || matches!(c.duty, super::Duty::Intermittent { at: Some(at), .. } if at == b)
+            })
         };
         if let Some(b) = (1..=self.max_body()).find(|&b| !named(b)) {
             return Err(Invariant::NumberGap(b));

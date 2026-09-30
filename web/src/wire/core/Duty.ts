@@ -10,9 +10,11 @@ export type Duty = { "intermittent": {
  */
 range_degrees: number, 
 /**
- * The body the sweep is measured at.
+ * The body the sweep is measured at — `None` where the case has
+ * none to follow ([`Train::set_duty`]), which the solve says and
+ * counts nothing over. Left out of a file where `None`.
  */
-at: number, actuations: number, 
+at: number | null, actuations: number, 
 /**
  * Whether the duty reverses between actuations.
  *

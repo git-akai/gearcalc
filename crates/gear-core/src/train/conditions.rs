@@ -251,7 +251,7 @@ impl Train {
         let graph = std::iter::once(self.shape.max_body());
         let cases = self.load_cases.iter().flat_map(|c| {
             c.loads.iter().map(|l| l.at).chain(match c.duty {
-                super::Duty::Intermittent { at, .. } => Some(at),
+                super::Duty::Intermittent { at, .. } => at,
                 super::Duty::Continuous { .. } => None,
             })
         });
@@ -291,8 +291,9 @@ impl Train {
             for l in &mut case.loads {
                 l.at = to(l.at);
             }
+            // A sweep at a body given up is unset, never moved to ground.
             if let super::Duty::Intermittent { at, .. } = &mut case.duty {
-                *at = to(*at);
+                *at = at.and_then(|b| if b == GROUND { Some(GROUND) } else { map(b) });
             }
         }
     }
@@ -309,7 +310,7 @@ impl Train {
                     || self.held.contains(&b)
                     || self.load_cases.iter().any(|c| {
                         c.loads.iter().any(|l| l.at == b)
-                            || matches!(c.duty, super::Duty::Intermittent { at, .. } if at == b)
+                            || matches!(c.duty, super::Duty::Intermittent { at: Some(at), .. } if at == b)
                     })
             })
             .collect();
@@ -333,11 +334,14 @@ impl Train {
         map
     }
 
-    /// **What a case or a hold names that the graph has not**, dropped: a
-    /// body that left the train with the member that was alone on it. A
-    /// hold goes whatever is left, since it holds nothing; a case's entries
-    /// wait on an empty train for the first preset laid in to take them up
-    /// ([`Self::chain_on`]).
+    /// **What a case or a hold names that the graph has not**: a body that
+    /// left the train with the member that was alone on it. A hold goes
+    /// whatever is left, since it holds nothing; so does a free entry,
+    /// which says what saying nothing says. A load or a reaction stays, for
+    /// [`Self::keeps_its_loads`] to refuse the edit that cut it off; a
+    /// sweep measured there follows the case's reaction ([`sweep_body`]).
+    /// On an empty train every entry waits for the first preset laid in to
+    /// take it up ([`Self::chain_on`]).
     fn drop_orphans(&mut self) {
         let listed = |b: usize| b == GROUND || self.shape.bodies.iter().any(|x| x.body == b);
         self.held.retain(|&b| listed(b));
@@ -345,11 +349,12 @@ impl Train {
             return;
         }
         for case in &mut self.load_cases {
-            case.loads.retain(|l| listed(l.at));
+            case.loads
+                .retain(|l| listed(l.at) || l.role != super::LoadRole::Free);
             let reaction = sweep_body(&case.loads);
             if let super::Duty::Intermittent { at, .. } = &mut case.duty {
-                if !listed(*at) {
-                    *at = reaction.unwrap_or(*at);
+                if at.is_some_and(|b| !listed(b)) {
+                    *at = reaction;
                 }
             }
         }
@@ -1083,10 +1088,9 @@ impl Train {
     /// **The one way a hold is written**: the body held, every case entry
     /// at it dropped — a free one, since every edit that holds a body
     /// refuses where a case loads or reacts there — and a sweep measured
-    /// there moved to the case's
-    /// reaction by [`sweep_body`]'s rule — a case with no entry left keeps
-    /// its sweep where it was, having nothing to rate. Every edit that
-    /// leaves a body held ends here.
+    /// there moved to the case's reaction by [`sweep_body`]'s rule, unset
+    /// where the case has no entry left. Every edit that leaves a body held
+    /// ends here.
     fn settle_held(&mut self, body: usize) {
         if body == GROUND {
             return;
@@ -1098,8 +1102,8 @@ impl Train {
             case.loads.retain(|l| l.at != body);
             let reaction = sweep_body(&case.loads);
             if let super::Duty::Intermittent { at, .. } = &mut case.duty {
-                if *at == body {
-                    *at = reaction.unwrap_or(*at);
+                if *at == Some(body) {
+                    *at = reaction;
                 }
             }
         }
@@ -1165,8 +1169,8 @@ impl Train {
             case.loads.retain(|l| open.contains(&l.at));
             let reaction = sweep_body(&case.loads);
             if let super::Duty::Intermittent { at, .. } = &mut case.duty {
-                if !open.contains(at) {
-                    *at = reaction.unwrap_or(GROUND);
+                if at.is_some_and(|b| !open.contains(&b)) {
+                    *at = reaction;
                 }
             }
         }
@@ -1186,7 +1190,7 @@ impl Train {
             self.held.contains(&body)
                 || self.load_cases.iter().any(|c| {
                     c.loads.iter().any(|l| l.at == body)
-                        || matches!(c.duty, super::Duty::Intermittent { at, .. } if at == body)
+                        || matches!(c.duty, super::Duty::Intermittent { at: Some(at), .. } if at == body)
                 })
         };
         let s = &self.shape.indexed();
@@ -1208,13 +1212,13 @@ impl Train {
     /// **A case's duty switched**, to intermittent or continuous, seeded from
     /// the same numbers a fresh case starts with: a thousand sweeps of 25°,
     /// measured at the case's reaction — its first reacted entry, else its
-    /// first entry of any kind, else ground — or a thousand hours. A body
+    /// first entry of any kind, else unset — or a thousand hours. A body
     /// only the old sweep named is given up, and the numbers close up.
     pub fn set_duty(&mut self, case: usize, intermittent: bool) {
         let Some(c) = self.load_cases.get_mut(case) else {
             return;
         };
-        let at = sweep_body(&c.loads).unwrap_or(GROUND);
+        let at = sweep_body(&c.loads);
         c.duty = if intermittent {
             super::Duty::intermittent(at)
         } else {
@@ -1278,8 +1282,8 @@ impl Train {
                     }
                 }
                 if let super::Duty::Intermittent { at, .. } = &mut case.duty {
-                    if *at == from {
-                        *at = output;
+                    if *at == Some(from) {
+                        *at = Some(output);
                     }
                 }
             }
@@ -1358,17 +1362,19 @@ impl Train {
     }
 
     /// **No case's load or reaction left where no load can enter**: an
-    /// edit that leaves a body a case loads or reacts at listed but no
-    /// open port — held, or in no part — is refused, since the load would
-    /// be grounded or cut off and a load is never moved to a guessed body.
-    /// A free entry there is dropped: it says what saying nothing says.
+    /// edit that leaves a body a case loads or reacts at no open port —
+    /// held, in no part, or off the train — is refused, since the load
+    /// would be grounded or cut off, and a load is never dropped or moved
+    /// to a guessed body (plan decision 6). A free entry there is dropped:
+    /// it says what saying nothing says; and a sweep there follows the
+    /// case's reaction ([`sweep_body`]), unset where it has none. An empty
+    /// train's cases wait by number.
     fn keeps_its_loads(&mut self) -> Result<(), super::EditRefused> {
         if self.shape.members.is_empty() {
             return Ok(());
         }
         let open: Vec<usize> = self.open_ports().iter().map(|p| p.body).collect();
-        let listed = |b: usize| self.shape.bodies.iter().any(|x| x.body == b);
-        let stranded = |l: &super::Load| listed(l.at) && !open.contains(&l.at);
+        let stranded = |l: &super::Load| !open.contains(&l.at);
         let said = |l: &super::Load| l.role != super::LoadRole::Free;
         if self
             .load_cases
@@ -1379,6 +1385,12 @@ impl Train {
         }
         for case in &mut self.load_cases {
             case.loads.retain(|l| !stranded(l));
+            let reaction = sweep_body(&case.loads);
+            if let super::Duty::Intermittent { at, .. } = &mut case.duty {
+                if at.is_some_and(|b| !open.contains(&b)) {
+                    *at = reaction;
+                }
+            }
         }
         Ok(())
     }

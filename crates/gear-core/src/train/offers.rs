@@ -446,12 +446,42 @@ mod tests {
         }
     }
 
+    /// **Every fatigue case that solves counts every gear's cycles, or says
+    /// why it counts none** — its sweep unset, or at a body that does not
+    /// turn — and never both (audit T13.5).
+    fn counts_or_says_why(t: &Train, r: &super::super::TrainResult) -> Result<(), String> {
+        use crate::note::key;
+        for (i, c) in r.cases.iter().enumerate() {
+            let case = &t.load_cases[i];
+            if !c.solved || !case.enabled || case.counted().is_none() {
+                continue;
+            }
+            let said = c
+                .notes
+                .iter()
+                .any(|n| n.is(key::TRAIN_DUTY_UNSET) || n.is(key::TRAIN_DUTY_AT_STILL));
+            let counted = r.members.iter().all(|m| {
+                m.cases
+                    .iter()
+                    .find(|g| g.case == i)
+                    .is_some_and(|g| g.cycles.is_some())
+            });
+            if said == counted {
+                return Err(format!(
+                    "case {i}: counts {counted} and says why not {said}"
+                ));
+            }
+        }
+        Ok(())
+    }
+
     /// What a walk asserts of the train after every step, `solved` saying
     /// whether the train before it solved: the train well formed; offers
     /// at the train and a solve that do not panic; a train that solved
     /// kept solving or refused by a named reason other than a wiring that
     /// describes no mechanism; every flow saying each body and mesh once;
-    /// and the train the same after a trip through JSON.
+    /// every fatigue case counting its cycles or saying why not; and the
+    /// train the same after a trip through JSON.
     fn laws(t: &Train, solved: bool) -> Result<bool, String> {
         let lib = test_library();
         t.check().map_err(|e| format!("check: {e:?}"))?;
@@ -462,6 +492,7 @@ mod tests {
             Ok(r) => {
                 super::super::groupings::says_everything_once(t, r)?;
                 super::super::rating_laws::held_tips_reach_past_nothing(t, r)?;
+                counts_or_says_why(t, r)?;
             }
             Err(_) => {}
         }
@@ -506,11 +537,10 @@ mod tests {
                     Ok(None) => {}
                     Ok(Some((held, u))) => match held {
                         Ok(s) => {
-                            // A load or a reaction goes only with a
-                            // removal.
+                            // No step drops a load or a reaction: an edit
+                            // that would is refused (plan decision 6).
                             let (was, now) = (stated(&t), stated(&u));
-                            let removal = steps.last().is_some_and(|x| x.starts_with("Remove"));
-                            if !removal && was.iter().zip(&now).any(|(a, b)| b < a) {
+                            if was.iter().zip(&now).any(|(a, b)| b < a) {
                                 failures.push(format!(
                                     "walk {walk}, {name}: {steps:?}: an entry dropped: {was:?} -> {now:?}"
                                 ));
@@ -577,24 +607,26 @@ mod tests {
 
     /// **An emptied train lists nothing, and the next preset takes its
     /// cases up as a fresh train of it would have them.** Every preset,
-    /// emptied by the removals it offers in two orders: the train offers
-    /// its presets without panicking, and every preset laid in holds what
-    /// it holds alone, reads its cases load in and reaction out, and
-    /// solves them as it does alone — wherever the removals kept both of
-    /// a case's entries. A removal that takes the body an entry is at
-    /// drops the entry, which is a rule of its own (audit T13.4); there
-    /// the preset laid in is only held well formed.
+    /// emptied by the removals it offers in two orders: every case keeps
+    /// both its entries — a removal that would take one away is refused
+    /// (plan decision 6), and the one that empties the train parks them —
+    /// the train offers its presets without panicking, and every preset
+    /// laid in holds what it holds alone, reads its cases load in and
+    /// reaction out, and solves them as it does alone.
     #[test]
     fn an_emptied_train_takes_the_next_preset_as_it_would_come() {
         let lib = test_library();
-        let mut whole = 0;
+        let mut laid = 0;
         for p in Preset::ALL {
             for last in [false, true] {
                 let t = emptied(cased(vec![p.build()]), last);
                 assert!(t.shape.bodies.is_empty(), "{p:?}: {:?}", t.shape.bodies);
                 assert!(!t.offers(Target::Train).is_empty());
-                let kept = t.load_cases.iter().all(|c| c.loads.len() == 2);
-                whole += usize::from(kept);
+                assert!(
+                    t.load_cases.iter().all(|c| c.loads.len() == 2),
+                    "{p:?} emptied (last {last}): {:?}",
+                    t.load_cases
+                );
                 for q in Preset::ALL {
                     let mut u = t.clone();
                     u.edit(Edit::Insert {
@@ -603,9 +635,7 @@ mod tests {
                     })
                     .unwrap();
                     u.check().unwrap();
-                    if !kept {
-                        continue;
-                    }
+                    laid += 1;
                     let fresh = cased(vec![q.build()]);
                     let context = format!("{p:?} emptied (last {last}), then {q:?}");
                     assert_eq!(u.held, fresh.held, "{context}");
@@ -619,7 +649,7 @@ mod tests {
                 }
             }
         }
-        assert!(whole >= Preset::ALL.len(), "only {whole} emptied whole");
+        assert_eq!(laid, 2 * Preset::ALL.len() * Preset::ALL.len());
     }
 
     /// **A hold leaves no case anything to say of the body.** A set's
@@ -634,10 +664,10 @@ mod tests {
         let ring = t.port(0, 3);
         let reaction = t.load_cases[1].loads[1].at;
         t.edit(Edit::Release(ring)).unwrap();
-        t.load_cases[1].duty = super::super::Duty::intermittent(ring);
+        t.load_cases[1].duty = super::super::Duty::intermittent(Some(ring));
         t.edit(Edit::Hold(ring)).unwrap();
         assert!(
-            matches!(t.load_cases[1].duty, super::super::Duty::Intermittent { at, .. } if at == reaction)
+            matches!(t.load_cases[1].duty, super::super::Duty::Intermittent { at, .. } if at == Some(reaction))
         );
         let r = solve_train(&t, &lib).unwrap();
         for m in &r.members {
@@ -695,5 +725,95 @@ mod tests {
         let t = cased(vec![Preset::Spur.build()]);
         refused(&t, Target::Body(1), Edit::Hold(1));
         refused(&t, Target::Body(2), Edit::Hold(2));
+    }
+
+    /// **A removal never drops or moves a load, and an insert undoes**
+    /// (audit T13.4, plan decision 6). A cased pair with each preset laid on
+    /// at its output — the reaction carried to the preset's output — and
+    /// every removal offered anywhere: made, it keeps every load and
+    /// reaction each case states; where it would take one away, it is
+    /// refused whole under `Loaded`. Then the reaction moved back to the
+    /// pair's output, and the preset's gears removed through what is
+    /// offered: the pair comes back, its cases field for field, and every
+    /// case solves.
+    #[test]
+    fn a_removal_never_drops_a_load_and_an_insert_undoes() {
+        let lib = test_library();
+        let stated = |t: &Train| -> Vec<usize> {
+            t.load_cases
+                .iter()
+                .map(|c| c.loads.iter().filter(|l| l.role != LoadRole::Free).count())
+                .collect()
+        };
+        let (mut refused, mut kept) = (0, 0);
+        for p in Preset::ALL {
+            let pair = cased(vec![Preset::Spur.build()]);
+            let mut t = pair.clone();
+            t.edit(Edit::Insert {
+                shape: p.build(),
+                at: None,
+            })
+            .unwrap();
+            for at in targets(&t) {
+                for o in t.offers(at) {
+                    if !matches!(o.edit, Edit::Remove(_)) {
+                        continue;
+                    }
+                    let mut u = t.clone();
+                    let made = u.edit(o.edit.clone());
+                    let context = format!("{p:?} on a pair, {:?}", o.edit);
+                    match made {
+                        Ok(()) if u.shape.members.is_empty() => {}
+                        Ok(()) => {
+                            assert_eq!(stated(&u), stated(&t), "{context}: a load dropped");
+                            kept += 1;
+                        }
+                        Err(super::super::EditRefused::Loaded) => {
+                            assert_eq!(format!("{u:?}"), format!("{t:?}"), "{context}");
+                            refused += 1;
+                        }
+                        Err(_) => {}
+                    }
+                }
+            }
+            // The reaction back at the pair's output, then the preset's
+            // gears taken off one offered removal at a time.
+            let output = pair.chain_ends().unwrap().1;
+            let moved = t.chain_ends().unwrap().1;
+            for c in &mut t.load_cases {
+                for l in &mut c.loads {
+                    if l.at == moved {
+                        l.at = output;
+                    }
+                }
+                if let super::super::Duty::Intermittent { at, .. } = &mut c.duty {
+                    if *at == Some(moved) {
+                        *at = Some(output);
+                    }
+                }
+            }
+            let n = pair.shape.members.len();
+            while t.shape.members.len() > n {
+                let offered = |i: usize| {
+                    let removal = format!("{:?}", Edit::Remove(Piece::Member(i)));
+                    t.offers(Target::Member(i))
+                        .iter()
+                        .any(|o| o.refused.is_none() && format!("{:?}", o.edit) == removal)
+                };
+                let i = (n..t.shape.members.len())
+                    .find(|&i| offered(i))
+                    .unwrap_or_else(|| panic!("{p:?}: no removal of its gears offered"));
+                t.edit(Edit::Remove(Piece::Member(i))).unwrap();
+            }
+            assert_eq!(
+                format!("{:?}", t.shape),
+                format!("{:?}", pair.shape),
+                "{p:?}"
+            );
+            assert_eq!(t.load_cases, pair.load_cases, "{p:?}: the cases");
+            let r = solve_train(&t, &lib).unwrap();
+            assert!(r.cases.iter().all(|c| c.solved), "{p:?}: {:?}", r.cases);
+        }
+        assert!(refused > 0 && kept > 0, "refused {refused}, kept {kept}");
     }
 }

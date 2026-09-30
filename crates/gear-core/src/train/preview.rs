@@ -251,9 +251,11 @@ mod tests {
     }
 
     /// **A path an edit takes is said to go, and one it makes to appear.**
-    /// A chain's last gear removed takes its mate and the output body the
-    /// case reacted at, and the case walks no path; a set with nothing held
-    /// is a family and walks none, and its ring held gives it one.
+    /// A chain's second pair moved off the shaft it shared onto one of its
+    /// own leaves the case's ends apart, and the case walks no path — a
+    /// removal of the output the case reacts at being refused (plan
+    /// decision 6); a set with nothing held is a family and walks none, and
+    /// its ring held gives it one.
     #[test]
     fn a_path_goes_and_a_path_appears() {
         let lib = test_library();
@@ -261,10 +263,18 @@ mod tests {
             vec![LoadCase::ultimate(t.port(0, 1), t.port(1, 2), 1.0, 1000.0)]
         });
         let mut u = t.clone();
-        u.edit(Edit::Remove(Piece::Member(3))).unwrap();
+        assert_eq!(
+            u.edit(Edit::Remove(Piece::Member(3))),
+            Err(super::super::EditRefused::Loaded)
+        );
+        u.edit(Edit::Move {
+            member: 2,
+            to: None,
+        })
+        .unwrap();
         let p = preview(&t, Ok(&u), &lib);
         assert_eq!(keys(&p.paths), [key::PREVIEW_PATH_GONE]);
-        assert!(keys(&p.changes).contains(&key::PREVIEW_CASE_ENTRIES));
+        assert_eq!(keys(&p.changes), [key::PREVIEW_BODIES]);
 
         let set = Preset::Planetary.build();
         let (sun, carrier, ring) = (1, 2, 3);

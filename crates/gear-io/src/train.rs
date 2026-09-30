@@ -293,7 +293,7 @@ pub fn convert(src: &str) -> Result<Imported, DocumentError> {
                 .iter()
                 .flat_map(|c| {
                     c.loads.iter().map(|l| l.at).chain(match c.duty {
-                        gear_core::train::Duty::Intermittent { at, .. } => Some(at),
+                        gear_core::train::Duty::Intermittent { at, .. } => at,
                         gear_core::train::Duty::Continuous { .. } => None,
                     })
                 })
@@ -390,7 +390,7 @@ mod tests {
                         ],
                         duty: Duty::Intermittent {
                             range_degrees: 90.0,
-                            at: start,
+                            at: Some(start),
                             actuations: 50,
                             reversing: true,
                         },
@@ -483,6 +483,44 @@ mod tests {
         assert!(text.contains("load_cases = []"), "{text}");
         let back = from_toml(&text).unwrap().document;
         assert!(back.train.load_cases.is_empty());
+    }
+
+    /// **A sweep written at a body the train does not have is refused by
+    /// name, never read as one** (audit T13.5): a fatigue case's sweep at
+    /// body 99 is refused where the file is read, naming its field, or
+    /// where it is solved, as a sweep at no open port — and nothing panics,
+    /// where the count read the speed of body 99. An unset sweep, left out
+    /// of the file, reads back unset.
+    #[test]
+    fn a_sweep_at_no_body_is_refused_by_name() {
+        use gear_core::train::TrainError;
+        let mut doc = document();
+        let fatigue = 3;
+        doc.train.load_cases[fatigue].duty = Duty::intermittent(Some(99));
+        let text = to_toml(&doc).unwrap();
+        match from_toml(&text) {
+            Err(e) => assert!(e.to_string().contains("at"), "{e}"),
+            Ok(read) => {
+                let lib = crate::default_library();
+                let solved = std::panic::catch_unwind(|| {
+                    gear_core::train::solve_train(&read.document.train, &lib)
+                });
+                assert_eq!(
+                    solved.expect("no panic").err(),
+                    Some(TrainError::DutyPort {
+                        case: fatigue,
+                        body: 99
+                    })
+                );
+            }
+        }
+        doc.train.load_cases[fatigue].duty = Duty::intermittent(None);
+        let text = to_toml(&doc).unwrap();
+        let back = from_toml(&text).unwrap().document;
+        assert_eq!(
+            back.train.load_cases[fatigue].duty,
+            Duty::intermittent(None)
+        );
     }
 
     /// A train with no stages is a train, and round-trips as one: a designer
@@ -699,7 +737,8 @@ mod tests {
     /// written document holds is taken out of every table it is in, and the
     /// read must fail naming it. An `Option` is written by its absence —
     /// TOML has no null — so a ring's cutter is not asked, and nor is a
-    /// duty's variant, whose absence the parser names as the duty.
+    /// duty's variant, whose absence the parser names as the duty; a
+    /// sweep's `at` is asked, since a load's `at` shares its name.
     #[test]
     fn a_document_missing_any_field_is_refused_and_named() {
         let text = to_toml(&document()).unwrap();

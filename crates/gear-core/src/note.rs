@@ -197,6 +197,10 @@ pub mod key {
     pub const TRAIN_STRESSES_NOMINAL: &str = "train.stresses_nominal";
     /// `train.application_factor_held`
     pub const TRAIN_APPLICATION_FACTOR_HELD: &str = "train.application_factor_held";
+    /// `train.duty_at_still`
+    pub const TRAIN_DUTY_AT_STILL: &str = "train.duty_at_still";
+    /// `train.duty_unset`
+    pub const TRAIN_DUTY_UNSET: &str = "train.duty_unset";
 
     // ---- a preview ------------------------------------------------ //
     //
@@ -280,6 +284,10 @@ pub mod key {
     pub const ERROR_TRAIN_OVERFLOW: &str = "error.train_overflow";
     /// `error.train_load_port`
     pub const ERROR_TRAIN_LOAD_PORT: &str = "error.train_load_port";
+    /// `error.train_duty_port`
+    pub const ERROR_TRAIN_DUTY_PORT: &str = "error.train_duty_port";
+    /// `error.train_duplicate_entry`
+    pub const ERROR_TRAIN_DUPLICATE_ENTRY: &str = "error.train_duplicate_entry";
     /// `error.train_size_over_constrained`
     pub const ERROR_TRAIN_SIZE_OVER_CONSTRAINED: &str = "error.train_size_over_constrained";
     /// `error.train_axes_too_close`
@@ -390,6 +398,8 @@ pub mod key {
         TRAIN_FLOW_TOO_MANY_MESHES,
         TRAIN_STRESSES_NOMINAL,
         TRAIN_APPLICATION_FACTOR_HELD,
+        TRAIN_DUTY_AT_STILL,
+        TRAIN_DUTY_UNSET,
         ERROR_MESH_INCOMPATIBLE,
         ERROR_MESH_RING_TOO_SMALL,
         ERROR_MESH_OUTSIDE_INVOLUTE_DOMAIN,
@@ -412,6 +422,8 @@ pub mod key {
         ERROR_TRAIN_NO_SUCH_BODY,
         ERROR_TRAIN_OVERFLOW,
         ERROR_TRAIN_LOAD_PORT,
+        ERROR_TRAIN_DUTY_PORT,
+        ERROR_TRAIN_DUPLICATE_ENTRY,
         ERROR_TRAIN_TIPS_UNCLEARABLE,
         ERROR_TRAIN_FILE_UNVERSIONED,
         ERROR_TRAIN_FILE_FORMAT,

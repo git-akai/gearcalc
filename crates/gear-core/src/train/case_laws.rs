@@ -30,7 +30,7 @@ fn with_mirror_cases(t: &mut Train) {
     };
     let intermittent = |reversing: bool| Duty::Intermittent {
         range_degrees: 25.0,
-        at: b,
+        at: Some(b),
         actuations: 1000,
         reversing,
     };
@@ -241,7 +241,7 @@ fn an_intermittent_sweep_counts_what_running_through_it_counts() {
         let swept = LoadCase {
             duty: Duty::Intermittent {
                 range_degrees: RANGE_DEG,
-                at: b,
+                at: Some(b),
                 actuations: ACTUATIONS,
                 reversing: false,
             },
@@ -370,4 +370,205 @@ fn a_paths_figures_are_the_case_through_it() {
         reversed > grid().len() / 2,
         "only {reversed} paths reversed"
     );
+}
+
+// ------------------------------------------------ what a case must say ---
+
+/// Whether a case's notes carry `key`.
+fn says(c: &super::TrainCase, key: &str) -> bool {
+    c.notes.iter().any(|n| n.key == key)
+}
+
+/// A train with one case, a fatigue load between its chain's two ends.
+fn one_fatigue_case(mut t: Train) -> Train {
+    let (a, b) = t.chain_ends().unwrap();
+    t.load_cases = vec![LoadCase::fatigue(a, b, TORQUE_NM, SPEED_RPM)];
+    t
+}
+
+/// A set with its ring released and held still by its case — a load
+/// given no speed and no torque at the ring, the sun driven, the carrier
+/// reacted: the ring is an open port no motion of the case turns.
+fn ring_held_by_its_case() -> Train {
+    use super::arrangements::Preset;
+    use super::testing::cased;
+    use super::{Edit, Load, LoadRole};
+    let mut t = cased(vec![Preset::Planetary.build()]);
+    let (sun, carrier, ring) = (t.port(0, 1), t.port(0, 2), t.port(0, 3));
+    t.edit(Edit::Release(ring)).unwrap();
+    t.load_cases = vec![LoadCase {
+        loads: vec![
+            Load::given(sun, TORQUE_NM, SPEED_RPM),
+            Load {
+                speed: crate::params::Auto::fixed(0.0),
+                ..Load::derived(ring)
+            },
+            Load::declared(carrier, LoadRole::Reacted),
+        ],
+        ..LoadCase::fatigue(sun, carrier, TORQUE_NM, SPEED_RPM)
+    }];
+    t
+}
+
+/// **A sweep is measured at an open port that turns, or the case says
+/// why** (audit T13.5). Every preset, cased between its chain's two ends,
+/// and a set whose ring its case holds still ([`ring_held_by_its_case`]),
+/// its fatigue sweep put at every body — ground and one past the last
+/// included: the solve refuses the case by the key that names a sweep at
+/// no open port, or the case says its sweep stands still, or every member
+/// counts cycles. It never panics, and each of the three is met.
+#[test]
+fn a_sweep_at_any_body_counts_refuses_or_says_why() {
+    use super::arrangements::Preset;
+    use super::testing::cased;
+    let lib = test_library();
+    let (mut refused, mut still, mut counted) = (0, 0, 0);
+    let mut failures: Vec<String> = Vec::new();
+    let trains = Preset::ALL
+        .into_iter()
+        .map(|p| (format!("{p:?}"), one_fatigue_case(cased(vec![p.build()]))))
+        .chain([(
+            "a ring held by its case".to_owned(),
+            ring_held_by_its_case(),
+        )]);
+    for (p, base) in trains {
+        for at in 0..=base.max_body() + 1 {
+            let mut t = base.clone();
+            t.load_cases[0].duty = Duty::intermittent(Some(at));
+            let solved = std::panic::catch_unwind(|| solve_train(&t, &lib));
+            let context = format!("{p}, sweep at {at}");
+            match solved {
+                Err(_) => failures.push(format!("{context}: panicked")),
+                Ok(Err(e)) => {
+                    let key = crate::note::Explain::note(&e).key;
+                    if key == "error.train_duty_port" {
+                        refused += 1;
+                    } else {
+                        failures.push(format!("{context}: refused as {key}"));
+                    }
+                }
+                Ok(Ok(r)) if says(&r.cases[0], "train.duty_at_still") => {
+                    if r.members.iter().any(|m| m.cases[0].cycles.is_some()) {
+                        failures.push(format!("{context}: still, yet counted"));
+                    }
+                    still += 1;
+                }
+                Ok(Ok(r)) => {
+                    if !r.cases[0].solved {
+                        continue;
+                    }
+                    let zero = r
+                        .members
+                        .iter()
+                        .any(|m| m.cases[0].cycles.is_none_or(|c| c.bending <= 0.0));
+                    if zero {
+                        failures.push(format!("{context}: a member counts nothing, unsaid"));
+                    }
+                    counted += 1;
+                }
+            }
+        }
+    }
+    assert!(
+        failures.is_empty(),
+        "{} failures:\n{}",
+        failures.len(),
+        failures.join("\n")
+    );
+    assert!(
+        refused > 0 && still > 0 && counted > Preset::ALL.len(),
+        "refused {refused}, still {still}, counted {counted}"
+    );
+}
+
+/// **Two entries of one case at one body are refused** by the key that
+/// names the body (audit T13.5): two given speeds at one shaft summed to
+/// twice either, and of two torques the last silently won.
+#[test]
+fn two_entries_of_one_case_at_one_body_are_refused() {
+    use super::arrangements::Preset;
+    use super::testing::cased;
+    use super::{Load, LoadRole};
+    let lib = test_library();
+    let mut t = cased(vec![Preset::Spur.build()]);
+    t.load_cases = vec![LoadCase {
+        loads: vec![
+            Load::given(1, TORQUE_NM, SPEED_RPM),
+            Load::given(1, TORQUE_NM, SPEED_RPM),
+            Load::declared(2, LoadRole::Reacted),
+        ],
+        ..LoadCase::ultimate(1, 2, TORQUE_NM, SPEED_RPM)
+    }];
+    let key = solve_train(&t, &lib)
+        .map(|_| ())
+        .map_err(|e| crate::note::Explain::note(&e));
+    assert!(
+        matches!(&key, Err(n) if n.key == "error.train_duplicate_entry"
+            && n.values.get("body").map(String::as_str) == Some("1")),
+        "{key:?}"
+    );
+    // One entry fewer is the case it was meant to be.
+    t.load_cases[0].loads.remove(1);
+    assert!(solve_train(&t, &lib).unwrap().cases[0].solved);
+}
+
+/// **A case switched off fails alone** (audit T13.5): an entry at a body
+/// no load can enter by — ground — in a case that is off leaves it
+/// unsolved with the refusal as its note, and the train and its other
+/// case solve as they did; switched on, it refuses the train by name.
+#[test]
+fn a_switched_off_case_at_no_port_fails_alone() {
+    use super::arrangements::Preset;
+    use super::testing::cased;
+    use super::Load;
+    let lib = test_library();
+    let t = cased(vec![Preset::Spur.build()]);
+    let alone = solve_train(&t, &lib).unwrap();
+    let mut u = t.clone();
+    u.load_cases.push(LoadCase {
+        enabled: false,
+        loads: vec![Load::given(crate::kinematics::GROUND, TORQUE_NM, SPEED_RPM)],
+        ..LoadCase::ultimate(1, 2, TORQUE_NM, SPEED_RPM)
+    });
+    let r = solve_train(&u, &lib).unwrap_or_else(|e| panic!("the train refused: {e}"));
+    let off = &r.cases[t.load_cases.len()];
+    assert!(!off.solved && says(off, "error.train_load_port"), "{off:?}");
+    for (x, y) in alone.cases.iter().zip(&r.cases) {
+        assert_eq!(
+            format!("{x:?}"),
+            format!("{y:?}"),
+            "a case that is off moved another"
+        );
+    }
+    u.load_cases.last_mut().unwrap().enabled = true;
+    assert!(solve_train(&u, &lib).is_err(), "switched on, it refuses");
+}
+
+/// **A sweep with no entry to follow is unset, and the case says so**
+/// (audit T13.5): a case with no entries switched to an intermittent duty,
+/// then given a load and a reaction, counts no cycles and says its sweep
+/// is unset — where it was measured at ground and counted nought, saying
+/// nothing.
+#[test]
+fn a_sweep_with_no_entry_to_follow_is_unset_and_said() {
+    use super::arrangements::Preset;
+    use super::testing::cased;
+    use super::{Load, LoadRole};
+    let lib = test_library();
+    let mut t = cased(vec![Preset::Spur.build()]);
+    t.load_cases = vec![LoadCase {
+        loads: Vec::new(),
+        duty: Duty::Continuous {
+            runtime_hours: 1000.0,
+        },
+        ..LoadCase::fatigue(1, 2, TORQUE_NM, SPEED_RPM)
+    }];
+    t.set_duty(0, true);
+    t.load_cases[0].loads = vec![
+        Load::given(1, TORQUE_NM, SPEED_RPM),
+        Load::declared(2, LoadRole::Reacted),
+    ];
+    let r = solve_train(&t, &lib).unwrap();
+    assert!(says(&r.cases[0], "train.duty_unset"), "{:?}", r.cases[0]);
+    assert!(r.members.iter().all(|m| m.cases[0].cycles.is_none()));
 }
