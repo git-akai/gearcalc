@@ -121,6 +121,7 @@ python3 tools/crossed_path.py                      # the crossed path, from the 
 python3 tools/hula_kinematics.py                   # the hula ratio, from the no-slip condition
 python3 tools/train_kinematics.py                  # every topology's speeds and torques, from rigid-body velocities
 python3 tools/breakaway.py                         # whether a preset breaks away, each way, with the sign kept
+python3 tools/bending_gate.py                      # the default bending rating, rebuilt from the rack (gear-cli bendgrid)
 python3 tools/iso_6336_3_stack.py                  # where this tool stands against ISO 6336-3, factor by factor
 python3 tools/line_census.py                       # the prose-to-code ratio, at this tree or between two
 ```

@@ -193,10 +193,13 @@ python3 tools/crossed_path.py                  # a crossed pair's path of contac
 python3 tools/helical_measurement.py           # a helical ball's and span's contact, from the flank surface
 python3 tools/hula_kinematics.py               # a hula stage's ratio, from the rolling circles
 python3 tools/train_kinematics.py              # any topology's speeds and torques, from rigid-body velocities
+python3 tools/bending_gate.py                  # the default bending rating, rebuilt from the rack
 python3 tools/iso_6336_3_stack.py              # where this tool stands against ISO 6336-3, factor by factor
 
 python3 tools/check_strings.py                 # every UI message is used, and every used one exists
 python3 tools/check_doc_links.py               # every pointer into the documents resolves
+python3 tools/check_literals.py                # a tolerance below 1e-3 in gear-core is a named const
+python3 tools/check_absence.py                 # a number standing for none says why
 ```
 
 `worm_flank_curvature.py` also answers a design question — what choosing a ZI,

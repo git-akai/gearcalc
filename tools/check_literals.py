@@ -5,9 +5,10 @@ production code is a tolerance, a floor or a nudge, and it has to be a named
 
 The recurring fault it guards is a tolerance set by feel: an idle `1e-9`, a
 `1e-12` guard, a `1e-4` margin, each written where it was needed and argued
-nowhere (work/stage1-exit.md §3 B). A literal inside a `const` item's
-initializer is named; one anywhere else fails, unless it is listed in
-`tools/allow_literals.txt` with the stage that empties the list.
+nowhere (pattern B of the Stage 1 exit review, work/stage1-exit.md). A
+literal inside a `const` item's initializer is named; one anywhere else
+fails, unless it is listed in `tools/allow_literals.txt` with the stage that
+empties the list.
 
     tools/check_literals.py              # exits non-zero on an unnamed one
     tools/check_literals.py --found      # every site, in the list's format

@@ -5,10 +5,10 @@ through a closure (`unwrap_or_else(|| <literal>)`, `map_or_else(|| <literal>,
 …)`), and `f64::INFINITY`, `NEG_INFINITY` or `NAN` used at all — unless the
 line says why, with a comment `// absence: <why>`.
 
-Each of these has put a wrong number in a report (work/stage1-exit.md §3 C):
-an `unwrap_or(0.0)` read as a length, `past = ∞` driving an addendum to
-−2.4985, efficiency 0.00 for a flow that was refused. An `Option` says the
-same thing and cannot be added to.
+Each of these has put a wrong number in a report (pattern C of the Stage 1
+exit review, work/stage1-exit.md): an `unwrap_or(0.0)` read as a length,
+`past = ∞` driving an addendum to −2.4985, efficiency 0.00 for a flow that
+was refused. An `Option` says the same thing and cannot be added to.
 
     tools/check_absence.py              # exits non-zero on a new site
     tools/check_absence.py --found      # every site, in the list's format
