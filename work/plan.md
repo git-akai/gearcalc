@@ -229,6 +229,9 @@ caught, test workspace included) and the 130-constant perturbation.
   - The governing section is the one with the highest rated stress, not the highest Y_F.
   - An unreadable candidate never masks a readable one.
   - A continuity law runs across the flank/fillet switch.
+  - Refined the same day: each curve contributes its constrained extremum of the Lewis measure — an
+    interior tangency, or the curve's end where it has none. Otherwise a ring's fillet, which has no
+    interior tangency, would drop out, and rings would lose their notch factor, rated about 60 % low.
 - 2026-10-02 — owner's idea, researched at low priority: the tooth geometry is known exactly, so
   exact-geometry solvers may beat mesh methods for notch stresses. Candidates: IGA and IGA-BEM, and
   Trefftz / MFS / particular solutions with Williams corner functions in the basis.
