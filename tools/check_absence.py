@@ -46,13 +46,20 @@ WHY = re.compile(r"//\s*absence:\s*\S")
 
 NUMBER = r"\d[\d_]*(?:\.(?:\d[\d_]*)?)?(?:[eE][+-]?\d[\d_]*)?(?:_?[fiu](?:8|16|32|64|128|size))?"
 NUMERIC_TYPE = r"(?:f32|f64|u8|u16|u32|u64|u128|usize|i8|i16|i32|i64|i128|isize)"
-CONSTANT = rf"(?:(?:std|core)\s*::\s*)?{NUMERIC_TYPE}\s*::\s*[A-Z_]+"
+CONSTANT = rf"(?:(?:std|core)\s*::\s*)?<?\s*{NUMERIC_TYPE}\s*>?\s*::\s*[A-Z_]+"
 ATOM = re.compile(rf"{CONSTANT}|{NUMBER}")
 # What may sit between atoms in a literal: signs, arithmetic, grouping.
 GLUE = re.compile(r"^[\s()\[\],+\-*/]*$")
-CLOSURE = re.compile(r"^\s*(?:move\s+)?\|[^|]*\|\s*(?:\{\s*(?P<block>[^{}]*?)\s*\}|(?P<expr>.*?))\s*$", re.S)
+# A closure's body: a block, or an expression; a return type needs a block.
+CLOSURE = re.compile(
+    r"^\s*(?:move\s+)?\|[^|]*\|\s*"
+    r"(?:(?:->\s*[^{]+?\s*)?\{\s*(?P<block>[^{}]*?)\s*\}|(?P<expr>[^{].*?))\s*$",
+    re.S,
+)
 CALL = re.compile(r"\.\s*(unwrap_or|map_or|unwrap_or_else|map_or_else)\s*\(")
-SENTINEL = re.compile(r"(?<![\w:])(?:(?:std|core)\s*::\s*)?(?:f(?:32|64)\s*::\s*)?(INFINITY|NEG_INFINITY|NAN)\b")
+# Any use of the three, however it is reached: `f64::NAN`, `std::f64::NAN`,
+# `<f64>::NAN`, or a bare `NAN` brought in by a `use`.
+SENTINEL = re.compile(r"(?<![\w.])(INFINITY|NEG_INFINITY|NAN)\b")
 
 
 def is_literal(text):
@@ -230,6 +237,9 @@ fn near_misses(a: Option<usize>, b: Option<f64>, c: Result<f64, ()>) -> f64 {
     let p = b.unwrap_or(1e-3 / 4.0);
     let q = b.unwrap_or(0.0) + b.unwrap_or(f64::NAN); // absence: one reason, two sites
     let r = a.unwrap_or(u32::try_from(7).unwrap_or(0) as usize);
+    let s = b.unwrap_or_else(|| -> f64 { 0.0 });
+    let t = <f64>::INFINITY;
+    let u = b.unwrap_or(<f64>::NAN);
     k
 }
 '''
@@ -246,6 +256,8 @@ WANT = sorted([
     ("near_misses", "unwrap_or_else(0.0)"), ("near_misses", "map_or_else(-1.0)"),
     ("near_misses", "unwrap_or(1e-3/4.0)"), ("near_misses", "unwrap_or(0.0)"),
     ("near_misses", "unwrap_or(f64::NAN)"), ("near_misses", "unwrap_or(0)"),
+    ("near_misses", "unwrap_or_else(0.0)"), ("near_misses", "INFINITY"),
+    ("near_misses", "unwrap_or(<f64>::NAN)"),
 ])
 
 
@@ -284,12 +296,14 @@ def self_test():
         ("near_misses", "map_or_else(-1.0)", "a closure over the error, `|_|`"),
         ("near_misses", "unwrap_or(f64::NAN)", "two sites on a line with one reason"),
         ("near_misses", "unwrap_or(0)", "a site inside another's argument"),
+        ("near_misses", "INFINITY", "a constant reached as `<f64>::`"),
+        ("near_misses", "unwrap_or(<f64>::NAN)", "a default reached as `<f64>::`"),
     ):
         expect(f"found: {why}", (fn, site) in got)
     expect("not found: a variable, a boolean, a computed closure, a reason, the default, a predicate",
            all(fn != "fine" for fn, _ in got))
-    expect("found: `|| { 0.0 }` and `|_| 0.0` both",
-           sum(1 for fn, site in got if (fn, site) == ("near_misses", "unwrap_or_else(0.0)")) == 2)
+    expect("found: `|| { 0.0 }`, `|_| 0.0` and `|| -> f64 { 0.0 }`",
+           sum(1 for fn, site in got if (fn, site) == ("near_misses", "unwrap_or_else(0.0)")) == 3)
     expect("not found: test code or prose", all(fn not in ("inside",) for fn, _ in got))
     listed = {k: (n, "Stage 2 (Q3)") for k, n in counted(found).items()}
     expect("every site listed passes", compare(found, listed) == [])

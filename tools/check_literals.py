@@ -18,10 +18,11 @@ Read: every float literal (a decimal point, an exponent or an `f32`/`f64`
 suffix; underscores allowed) in production code, as `tools/rust_source.py`
 reads it — comments and strings blanked, `#[cfg(test)]` items and test-only
 module files left out. Exactly zero is not a tolerance and is not read. So is
-**a run of literals joined by `*` or `/`**, `1e-3 / 4.0` or `x / 2.0 /
-1000.0`, which is one constant however it is spelt: its value is taken left
-to right, inverted where the run follows a `/`, and it is read where no
-literal in it is small on its own. A lone divisor (`x / 1000.0`) is a unit
+**a constant expression of literals** with a `*` or `/` in it, grouped or
+not — `1e-3 / 4.0`, `(1.0/3.0)*1e-3`, `x / 2.0 / 1000.0` — which is one
+constant however it is spelt: evaluated, inverted where it follows a `/`, and
+read where no literal in it is small on its own; and **a literal raised to a
+literal power**, `10f64.powi(-12)`. A lone divisor (`x / 1000.0`) is a unit
 and is not read.
 
 The list is keyed by file, function and literal, with a count, and must match
@@ -80,24 +81,56 @@ def named_spans(code):
     return out
 
 
-# A run of numeric literals joined by `*` or `/`: one constant, however it is
-# spelt.
+# A constant expression: numeric literals joined by arithmetic, grouped by
+# parentheses, is one constant however it is spelt.
 LITERAL = r"\d[\d_]*(?:\.\d[\d_]*)?(?:[eE][+-]?\d[\d_]*)?(?:_?f(?:32|64))?"
-RUN = re.compile(rf"(?<![\w.])(?P<pre>/\s*)?(?P<run>{LITERAL}(?:\s*[*/]\s*{LITERAL})+)(?![\w.])")
+EXPR_CHARS = re.compile(r"[\d._eEf()\s*/+\-]+")
+# ...and a literal raised to a literal power, `10f64.powi(-12)`.
+POWER = re.compile(rf"(?<![\w.])(?P<base>{LITERAL})\s*\.\s*pow[if]\s*\(\s*(?P<exp>-?\s*{LITERAL})\s*\)")
 
 
-def run_value(run, divided):
-    """What a run multiplies by, evaluated left to right as Rust does, and
-    inverted where the run itself follows a `/`."""
-    parts = re.split(r"\s*([*/])\s*", run)
-    ops = ["/" if divided else "*"] + parts[1::2]
-    v = 1.0
-    for op, lit in zip(ops, parts[0::2]):
-        x = value(lit)
-        if x == 0 and op == "/":
-            return None
-        v = v * x if op == "*" else v / x
-    return v
+def expression_value(text, divisor=False):
+    """The factor a constant expression of literals is, or `None` where `text`
+    is not one: Python's arithmetic on the same tokens, each literal read as a
+    float; after a `/` it divides, so `x / 2.0 / 1000.0` is `x` times
+    `1 / 2.0 / 1000.0`."""
+    lits = re.findall(LITERAL, text)
+    glue = re.sub(LITERAL, "", text)
+    if len(lits) < 2 or not any(is_float(x) for x in lits):
+        return None
+    if not re.fullmatch(r"[\s()*/+\-]*", glue) or not re.search(r"[*/]", glue):
+        return None
+    py = re.sub(LITERAL, lambda m: repr(value(m.group(0))), text)
+    try:
+        v = eval(("1/" if divisor else "") + py, {"__builtins__": {}}, {})  # noqa: S307 - digits, operators, parentheses
+    except (SyntaxError, ZeroDivisionError, TypeError, NameError):
+        return None
+    return v if isinstance(v, float) else None
+
+
+def shown(text):
+    """An expression as the list shows it: spaced round `*` and `/`."""
+    return re.sub(r"\s*([*/])\s*", r" \1 ", re.sub(r"\s+", "", text))
+
+
+def expressions(code):
+    """`(start, text, divisor)` of every maximal constant expression: a run
+    of literals, arithmetic and parentheses, trimmed to balance and to begin
+    and end on a literal or a parenthesis, `divisor` where a `/` precedes it."""
+    for m in EXPR_CHARS.finditer(code):
+        text, start = m.group(0), m.start()
+        # Trim to a literal or a parenthesis at each end, then to balance.
+        lead = re.match(r"[\s*/+\-]*", text).end()
+        text, start = text[lead:], start + lead
+        text = text.rstrip(" \t\n*/+-")
+        while text.count("(") > text.count(")") and text.startswith("("):
+            text, start = text[1:].lstrip(), start + 1 + (len(text[1:]) - len(text[1:].lstrip()))
+        while text.count(")") > text.count("(") and text.endswith(")"):
+            text = text[:-1].rstrip()
+        if not text or not re.search(LITERAL, text):
+            continue
+        before = code[:start].rstrip()
+        yield start, text, before.endswith("/") and not before.endswith("//")
 
 
 def sites(sources):
@@ -117,18 +150,22 @@ def sites(sources):
                 continue
             if unnamed(m.start()):
                 out.append((s.rel, s.function(m.start()), text, s.line(m.start())))
-        for m in RUN.finditer(s.code):
-            run = m.group("run")
-            lits = re.split(r"\s*[*/]\s*", run)
-            if not any(is_float(x) for x in lits) or any(0 < value(x) < BELOW for x in lits):
+        for start, text, divisor in expressions(s.code):
+            lits = re.findall(LITERAL, text)
+            if any(is_float(x) and 0 < value(x) < BELOW for x in lits):
                 continue
-            v = run_value(run, bool(m.group("pre")))
+            v = expression_value(text, divisor)
             if v is None or v == 0 or abs(v) >= BELOW:
                 continue
-            at = m.start("run")
-            if unnamed(at):
-                text = ("/ " if m.group("pre") else "") + re.sub(r"\s*([*/])\s*", r" \1 ", run)
-                out.append((s.rel, s.function(at), text, s.line(at)))
+            if unnamed(start):
+                out.append((s.rel, s.function(start), ("/ " if divisor else "") + shown(text), s.line(start)))
+        for m in POWER.finditer(s.code):
+            try:
+                v = value(m.group("base")) ** value(m.group("exp").replace(" ", ""))
+            except (OverflowError, ZeroDivisionError):
+                continue
+            if 0 < abs(v) < BELOW and unnamed(m.start()):
+                out.append((s.rel, s.function(m.start()), " ".join(m.group(0).split()), s.line(m.start())))
     return out
 
 
@@ -218,6 +255,8 @@ fn after_the_tests() { let _ = 1e-11; }
 fn with_array(pair: &dyn Fn([f64; 2]) -> f64) -> f64 { 1e-5 }
 fn generic<const N: usize>(x: f64) -> f64 { let y = x * 1e-7; y }
 fn arithmetic(x: f64) -> f64 { x * 1e-3/4.0 + x * 0.5 * 0.001 + x / 2.0 / 1000.0 + x / 1000.0 + 2.0 * 3.0 + 1e3 * 1e-4 }
+fn grouped(x: f64) -> f64 { x * (1.0/3.0)*1e-3 + x * (1.0 - 0.5) * 2.0 }
+fn powered(x: f64) -> f64 { x * 10f64.powi(-12) + x * 2.0_f64.powf(-3.0) + x * 10.0_f64.powi(2) }
 const RANGE: Range<f64> = 3e-6..1.0;
 #[cfg(test)]
 fn test_only() { let _ = 1e-12; }
@@ -229,7 +268,7 @@ WANT = sorted([
     ("lifetimes", "1e-6"), ("not_a_const_item", "1e-8"), ("looks_named", "1e-10"),
     ("after_the_tests", "1e-11"), ("with_array", "1e-5"), ("generic", "1e-7"),
     ("arithmetic", "1e-3 / 4.0"), ("arithmetic", "0.5 * 0.001"), ("arithmetic", "/ 2.0 / 1000.0"),
-    ("arithmetic", "1e-4"),
+    ("arithmetic", "1e-4"), ("grouped", "(1.0 / 3.0) * 1e-3"), ("powered", "10f64.powi(-12)"),
 ])
 
 
@@ -265,6 +304,8 @@ def self_test():
         ("arithmetic", "1e-3 / 4.0", "a quotient of literals none of which is small"),
         ("arithmetic", "0.5 * 0.001", "a product of literals at and above 1e-3"),
         ("arithmetic", "/ 2.0 / 1000.0", "a run that divides, after a `/`"),
+        ("grouped", "(1.0 / 3.0) * 1e-3", "a parenthesized quotient scaled small"),
+        ("powered", "10f64.powi(-12)", "a small power of ten"),
     ):
         expect(f"found: {why}", (fn, lit) in got)
     for lit, why in (("1e-12", "test code"), ("1e-3", "1e-3 itself"), ("2e-5", "a const struct literal"),
