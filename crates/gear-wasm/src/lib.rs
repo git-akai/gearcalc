@@ -860,12 +860,14 @@ pub struct TrainFailure {
     pub part: Option<u32>,
 }
 
-/// **A graph as it enters**, refused by the catalogue key of the invariant
-/// it breaks ([`gear_core::train::Shape::validate`]) before anything walks
-/// it — the key crosses, as an edit's refusal does.
-fn entering(shape: &gear_core::train::Shape) -> Result<(), String> {
+/// **A train as it enters**, refused by the catalogue key of the invariant
+/// it breaks ([`gear_core::train::Train::validate`]: its graph and its
+/// numbering) before anything walks it — the key crosses, as an edit's
+/// refusal does. Every entry that takes a train reads it through this; the
+/// solve's own refusal is the same validation, said as the train's failure.
+fn entering(train: &gear_core::train::Train) -> Result<(), String> {
     use gear_core::note::Explain;
-    shape.validate().map_err(|e| e.note().key)
+    train.validate().map_err(|e| e.note().key)
 }
 
 fn solve_train_impl(input: &str) -> Result<String, String> {
@@ -1486,7 +1488,7 @@ pub struct AdoptOutcome {
 
 fn adopt_member_impl(input: &str) -> Result<String, String> {
     let req: AdoptRequest = read(input)?;
-    entering(&req.train.shape)?;
+    entering(&req.train)?;
     // A member the train does not have, or a worm, is a defect on the other
     // side of the boundary — the panel lists what can be adopted — so each
     // is a refusal rather than an outcome.
@@ -1577,7 +1579,12 @@ pub struct RelieveRequest {
 
 fn relieve_impl(input: &str) -> Result<String, String> {
     let req: RelieveRequest = read(input)?;
-    entering(&req.shape)?;
+    // A graph relief is asked of alone, with no train round it: its own
+    // invariants, the numbering being a train's.
+    req.shape.validate().map_err(|e| {
+        use gear_core::note::Explain;
+        e.note().key
+    })?;
     serde_json::to_string(&req.shape.relieved_from(req.just, &req.figures))
         .map_err(|e| e.to_string())
 }
@@ -1628,7 +1635,7 @@ pub struct RelieveCaseRequest {
 
 fn relieve_case_impl(input: &str) -> Result<String, String> {
     let mut req: RelieveCaseRequest = read(input)?;
-    entering(&req.train.shape)?;
+    entering(&req.train)?;
     let lib = req
         .materials
         .take()
@@ -1709,7 +1716,7 @@ pub struct EditRequest {
 
 fn edit_train_impl(input: &str) -> Result<String, String> {
     let EditRequest { mut train, edit } = read(input)?;
-    entering(&train.shape)?;
+    entering(&train)?;
     // **A refusal crosses as its catalogue key**, which is what the panel
     // says beside the verb; its `Display` is English for a log.
     apply_edit(&mut train, edit).map_err(|e| e.key().to_string())?;
@@ -1782,7 +1789,7 @@ fn preview_edit_impl(input: &str) -> Result<String, String> {
         materials,
         edit,
     } = read(input)?;
-    entering(&train.shape)?;
+    entering(&train)?;
     let lib = materials.unwrap_or_else(gear_io::default_library);
     let mut after = train.clone();
     let made = apply_edit(&mut after, edit);
@@ -1826,7 +1833,7 @@ pub struct OffersRequest {
 
 fn offers_impl(input: &str) -> Result<String, String> {
     let OffersRequest { train, at } = read(input)?;
-    entering(&train.shape)?;
+    entering(&train)?;
     serde_json::to_string(&train.offers(at)).map_err(|e| e.to_string())
 }
 
@@ -1967,6 +1974,46 @@ mod tests {
                 "{field}: a stage member says {a}, the gear tab says {b} — \
                  the same gear, bounded two ways"
             );
+        }
+    }
+
+    /// **A body number skipped is refused at every entry that takes a
+    /// train**, by its key, as a carrier cycle is: a pair whose second body
+    /// is numbered 3, its case from 1 to 3 — every train entry reading the
+    /// train through one validation (`entering`), and a solve saying so as
+    /// the train's failure.
+    #[test]
+    fn a_body_number_skipped_is_refused_at_every_train_entry() {
+        use gear_core::train::{LoadCase, Preset, Train};
+        const KEY: &str = "error.train_malformed_number_gap";
+        // Laid in, then renumbered: laying a preset in numbers it densely.
+        let mut t = Train::chained(vec![Preset::Spur.build()], |_| Vec::new());
+        t.shape.renumber_bodies(|b| if b == 2 { 3 } else { b });
+        t.load_cases = vec![LoadCase::ultimate(1, 3, 2.0, 3000.0)];
+        let train = serde_json::to_value(&t).unwrap();
+        let lib = serde_json::to_value(gear_io::default_library()).unwrap();
+        let solved: serde_json::Value = serde_json::from_str(
+            &solve_train_impl(&serde_json::json!({ "train": train }).to_string()).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(solved["failure"]["note"]["key"], KEY);
+        let refused = [
+            edit_train_impl(
+                &serde_json::json!({ "train": train, "edit": { "add_case": "ultimate" } })
+                    .to_string(),
+            ),
+            preview_edit_impl(
+                &serde_json::json!({ "train": train, "edit": { "add_case": "ultimate" } })
+                    .to_string(),
+            ),
+            offers_impl(&serde_json::json!({ "train": train, "at": "train" }).to_string()),
+            relieve_case_impl(
+                &serde_json::json!({ "train": train, "materials": lib, "case": 0 }).to_string(),
+            ),
+            adopt_member_impl(&serde_json::json!({ "train": train, "member": 0 }).to_string()),
+        ];
+        for (i, r) in refused.into_iter().enumerate() {
+            assert_eq!(r, Err(KEY.to_string()), "entry {i}");
         }
     }
 

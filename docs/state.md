@@ -1245,6 +1245,18 @@ future reader knows it was read and set aside rather than missed.
 
 Not a queue with a head; this is what a next session would pick from.
 
+- **The train's own readings each index the graph afresh.** A part is
+  solved through one incidence (`train/incidence.rs`): its cut builds it,
+  and its rating and every candidate its search scores read that one —
+  `a_part_is_solved_through_one_incidence` holds the cut to one and the
+  rating to none. What reads the train as a whole — its motion, each
+  part's wiring, its ports, its groupings, its members' names — builds its
+  own each time, on each part's copied shape: 12 to 16 incidences per solve
+  of an arrangement alone, and 24 for the worm and pair's two parts
+  (`testing::work`, counted 2026-09-30). Each is one pass over the lists.
+  Step M12 of `work/design-graph.md` — a part as an index view over the
+  train's one incidence rather than a copied shape — removes them, and is
+  taken only where a count shows the copies cost.
 - **Further UI work**, as it is asked for.
 - **The two panels' remaining differences of style**, catalogued when their
   top bars were made one (`app.css`, *the bar at the top of a tab*) and

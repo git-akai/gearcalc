@@ -4,8 +4,9 @@
 //! together, which hangs from which — has a textbook answer that is used
 //! here rather than re-derived at each site that needs it.
 //!
-//! Integers and indices only: nothing here compares a float, so nothing
-//! here has a tolerance. Each structure is held by its tests to a
+//! Integers and indices only — an edge's label is the caller's, combined by
+//! the caller's rules — so nothing here compares a float, and nothing here
+//! has a tolerance. Each structure is held by its tests to a
 //! brute-force oracle that shares no code with it.
 
 /// **Disjoint sets** over `0..n` (union–find): union by rank and full path
@@ -220,6 +221,124 @@ impl CarrierTree {
     }
 }
 
+/// **One tree of a breadth-first spanning forest**: its root, then every
+/// other vertex of its component with the vertex it was first reached
+/// from, in the order reached.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Tree {
+    pub root: usize,
+    pub reached: Vec<(usize, usize)>,
+}
+
+/// **A breadth-first spanning forest** of the graph on `vertices` whose
+/// edges `adjacent` says (Moore, "The shortest path through a maze",
+/// *Proc. Int. Symp. Theory of Switching* (1959); Cormen, Leiserson,
+/// Rivest & Stein, *Introduction to Algorithms*, "Breadth-first search"):
+/// one [`Tree`] per
+/// connected component, in the order of each component's first vertex in
+/// `vertices`, neighbours taken in that order too. Each vertex comes after
+/// the one it was reached from, at its fewest edges from the root.
+pub fn breadth_first_forest(
+    vertices: &[usize],
+    adjacent: impl Fn(usize, usize) -> bool,
+) -> Vec<Tree> {
+    let mut seen = vec![false; vertices.len()];
+    let mut forest = Vec::new();
+    for start in 0..vertices.len() {
+        if seen[start] {
+            continue;
+        }
+        seen[start] = true;
+        let mut queue = vec![start];
+        let mut reached = Vec::new();
+        let mut at = 0;
+        while let Some(&v) = queue.get(at) {
+            at += 1;
+            for w in 0..vertices.len() {
+                if !seen[w] && adjacent(vertices[v], vertices[w]) {
+                    seen[w] = true;
+                    queue.push(w);
+                    reached.push((vertices[w], vertices[v]));
+                }
+            }
+        }
+        forest.push(Tree {
+            root: vertices[start],
+            reached,
+        });
+    }
+    forest
+}
+
+/// **Two edges a parallel reduction could not make one**: `kept`, the edge
+/// already between `at`, and `through`, the one a vertex taken out left
+/// between them.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Conflict<E> {
+    pub at: [usize; 2],
+    pub kept: E,
+    pub through: E,
+}
+
+/// **Series-parallel reduction** of a graph given as a symmetric matrix of
+/// edge labels (Duffin, "Topology of series-parallel networks", *J. Math.
+/// Anal. Appl.* 10 (1965) 303–318; the reduction rules of Arnborg &
+/// Proskurowski, "Characterization and recognition of partial k-trees",
+/// *SIAM J. Alg. Disc. Meth.* 7 (1986) 305–314, for k = 2): a vertex with
+/// at most two neighbours is taken out, with its edges — alone or on a
+/// single edge, as it is; between two, its two edges made one by `series`
+/// and that one laid beside any edge already joining the two by
+/// `parallel`. Repeated until
+/// every vertex left has three neighbours or more, which leaves nothing
+/// exactly where the graph has no `K4` minor. Each pass takes one vertex,
+/// so there are at most as many passes as vertices.
+///
+/// The vertices left (`true`), `edges` left holding only the edges among
+/// them, or the first two edges `parallel` refuses.
+///
+/// # Errors
+///
+/// The [`Conflict`] `parallel` met.
+pub fn series_parallel<E: Copy>(
+    edges: &mut [Vec<Option<E>>],
+    series: impl Fn(E, E) -> E,
+    parallel: impl Fn(E, E) -> Option<E>,
+) -> Result<Vec<bool>, Conflict<E>> {
+    let n = edges.len();
+    let mut alive = vec![true; n];
+    let neighbours = |edges: &[Vec<Option<E>>], alive: &[bool], v: usize| -> Vec<usize> {
+        (0..n)
+            .filter(|&w| w != v && alive[w] && edges[v][w].is_some())
+            .collect()
+    };
+    for _ in 0..n {
+        let Some(v) = (0..n).find(|&v| alive[v] && neighbours(edges, &alive, v).len() <= 2) else {
+            break;
+        };
+        if let [u, w] = neighbours(edges, &alive, v)[..] {
+            if let (Some(a), Some(b)) = (edges[u][v], edges[v][w]) {
+                let through = series(a, b);
+                let both = match edges[u][w] {
+                    Some(kept) => parallel(kept, through).ok_or(Conflict {
+                        at: [u, w],
+                        kept,
+                        through,
+                    })?,
+                    None => through,
+                };
+                edges[u][w] = Some(both);
+                edges[w][u] = Some(both);
+            }
+        }
+        edges[v].fill(None);
+        for row in edges.iter_mut() {
+            row[v] = None;
+        }
+        alive[v] = false;
+    }
+    Ok(alive)
+}
+
 #[cfg(test)]
 mod tests {
     //! Each structure against a brute-force oracle sharing no code with it.
@@ -280,9 +399,10 @@ mod tests {
     }
 
     /// Checks one sequence of unions against the oracle, and the structure's
-    /// own invariants after it: every element points at its root once found
-    /// (full compression), and no root is taller than its set allows (union
-    /// by rank). Returns how many checks ran.
+    /// own invariants after it: no element deeper than `log₂` of its set's
+    /// size, every element pointing at its root once found (full
+    /// compression), and no root's rank above what its set allows (union by
+    /// rank). Returns how many checks ran.
     fn holds(n: usize, pairs: &[(usize, usize)]) -> usize {
         let mut sets = DisjointSets::new(n);
         let mut merged = 0;
@@ -290,6 +410,20 @@ mod tests {
             merged += usize::from(sets.union(a, b));
         }
         let reach = closure(n, pairs);
+        // Union by rank keeps every tree within `log₂` of its set's size,
+        // read before a query's find compresses a path.
+        for i in 0..n {
+            let (mut at, mut depth) = (i, 0u32);
+            while sets.parent[at] != at {
+                at = sets.parent[at];
+                depth += 1;
+            }
+            let size = (0..n).filter(|&j| reach[i][j]).count();
+            assert!(
+                depth <= size.ilog2(),
+                "n {n}, unions {pairs:?}: {i} at depth {depth} in a set of {size}"
+            );
+        }
         let labels = oracle_labels(&reach);
         // A set per element that reaches no element before it.
         let count = (0..n).filter(|&i| (0..i).all(|j| !reach[i][j])).count();
@@ -440,6 +574,239 @@ mod tests {
         }
         // (n + 2)^(n − 1) lists for n = 1..=5.
         assert_eq!(lists, 1 + 4 + 25 + 216 + 2401);
+    }
+
+    /// Shortest path lengths by Floyd–Warshall over `adjacent` on
+    /// `0..n`, `None` where there is no path.
+    fn distances(n: usize, adjacent: &dyn Fn(usize, usize) -> bool) -> Vec<Vec<Option<usize>>> {
+        let mut d = vec![vec![None; n]; n];
+        for i in 0..n {
+            d[i][i] = Some(0);
+            for j in 0..n {
+                if i != j && adjacent(i, j) {
+                    d[i][j] = Some(1);
+                }
+            }
+        }
+        for k in 0..n {
+            for i in 0..n {
+                for j in 0..n {
+                    if let (Some(a), Some(b)) = (d[i][k], d[k][j]) {
+                        if d[i][j].is_none_or(|c| a + b < c) {
+                            d[i][j] = Some(a + b);
+                        }
+                    }
+                }
+            }
+        }
+        d
+    }
+
+    /// Every simple graph on `n` vertices, as its edge lists.
+    fn graphs(n: usize) -> Vec<Vec<(usize, usize)>> {
+        let pairs = all_pairs(n);
+        (0u32..1 << pairs.len())
+            .map(|mask| {
+                pairs
+                    .iter()
+                    .enumerate()
+                    .filter(|(k, _)| (mask >> k) & 1 == 1)
+                    .map(|(_, &p)| p)
+                    .collect()
+            })
+            .collect()
+    }
+
+    /// **The forest is breadth first**, against Floyd–Warshall: every graph
+    /// on up to five vertices and seeded ones on up to nine, the vertices
+    /// labelled out of order — one tree per component, rooted at its first
+    /// vertex; every vertex once; every step an edge; each vertex after its
+    /// parent, at one more than its parent's depth, which is its fewest
+    /// edges from the root.
+    #[test]
+    fn a_breadth_first_forest_reaches_each_vertex_by_its_fewest_edges() {
+        let check = |n: usize, edges: &[(usize, usize)]| {
+            let adjacent = |a: usize, b: usize| edges.contains(&(a, b)) || edges.contains(&(b, a));
+            // Labels: the vertices in reverse, to show the forest reads labels.
+            let label = |v: usize| 10 * (n - v);
+            let unlabel = |l: usize| n - l / 10;
+            let vertices: Vec<usize> = (0..n).map(label).collect();
+            let forest = breadth_first_forest(&vertices, |a, b| adjacent(unlabel(a), unlabel(b)));
+            let d = distances(n, &adjacent);
+            let mut seen = vec![false; n];
+            for tree in &forest {
+                let root = unlabel(tree.root);
+                assert!(!seen[root], "{edges:?}: {root} twice");
+                assert!(
+                    (0..root).all(|v| d[root][v].is_none()),
+                    "{edges:?}: a tree rooted after its component's first vertex"
+                );
+                seen[root] = true;
+                let mut depth = vec![None; n];
+                depth[root] = Some(0);
+                let mut last = 0;
+                for &(v, from) in &tree.reached {
+                    let (v, from) = (unlabel(v), unlabel(from));
+                    assert!(adjacent(v, from), "{edges:?}: {v} from {from} is no edge");
+                    assert!(!seen[v], "{edges:?}: {v} twice");
+                    seen[v] = true;
+                    let at = depth[from].unwrap() + 1;
+                    assert_eq!(Some(at), d[root][v], "{edges:?}: {v}'s depth");
+                    assert!(at >= last, "{edges:?}: reached out of breadth order");
+                    last = at;
+                    depth[v] = Some(at);
+                }
+                let component = (0..n).filter(|&v| d[root][v].is_some()).count();
+                assert_eq!(
+                    tree.reached.len() + 1,
+                    component,
+                    "{edges:?}: a tree's reach"
+                );
+            }
+            assert!(seen.iter().all(|&s| s), "{edges:?}: a vertex in no tree");
+        };
+        let mut checked = 0;
+        for n in 0..=5 {
+            for edges in graphs(n) {
+                check(n, &edges);
+                checked += 1;
+            }
+        }
+        let mut rng = super::super::sweep::Lcg(0xb_f5);
+        for n in 6..=9 {
+            for _ in 0..300 {
+                let edges: Vec<(usize, usize)> = (0..rng.pick(2 * n))
+                    .map(|_| (rng.pick(n), rng.pick(n)))
+                    .filter(|(a, b)| a != b)
+                    .collect();
+                check(n, &edges);
+                checked += 1;
+            }
+        }
+        assert_eq!(checked, 1 + 1 + 2 + 8 + 64 + 1024 + 4 * 300);
+    }
+
+    /// **Whether a graph has a `K4` minor**, by brute force: some four
+    /// disjoint connected sets of vertices, each two joined by an edge.
+    fn has_k4_minor(n: usize, edges: &[(usize, usize)]) -> bool {
+        let adjacent = |a: usize, b: usize| edges.contains(&(a, b)) || edges.contains(&(b, a));
+        // Each vertex in one of the four sets, or in none (4).
+        let total = 5usize.pow(u32::try_from(n).unwrap());
+        (0..total).any(|code| {
+            let mut rest = code;
+            let set: Vec<usize> = (0..n)
+                .map(|_| {
+                    let s = rest % 5;
+                    rest /= 5;
+                    s
+                })
+                .collect();
+            let members = |s: usize| -> Vec<usize> { (0..n).filter(|&v| set[v] == s).collect() };
+            let connected = |m: &[usize]| {
+                let Some(&first) = m.first() else {
+                    return false;
+                };
+                let mut reached = vec![first];
+                let mut at = 0;
+                while let Some(&v) = reached.get(at) {
+                    at += 1;
+                    for &w in m {
+                        if !reached.contains(&w) && adjacent(v, w) {
+                            reached.push(w);
+                        }
+                    }
+                }
+                reached.len() == m.len()
+            };
+            let sets: Vec<Vec<usize>> = (0..4).map(members).collect();
+            sets.iter().all(|m| connected(m))
+                && (0..4).all(|s| {
+                    (s + 1..4).all(|t| {
+                        sets[s]
+                            .iter()
+                            .any(|&v| sets[t].iter().any(|&w| adjacent(v, w)))
+                    })
+                })
+        })
+    }
+
+    /// **Series-parallel reduction leaves nothing exactly where the graph
+    /// has no `K4` minor** (Duffin 1965), against brute force: every graph
+    /// on up to five vertices and seeded ones on six.
+    #[test]
+    fn series_parallel_reduction_empties_exactly_the_graphs_with_no_k4_minor() {
+        let check = |n: usize, edges: &[(usize, usize)]| -> bool {
+            let mut matrix: Vec<Vec<Option<()>>> = vec![vec![None; n]; n];
+            for &(a, b) in edges {
+                matrix[a][b] = Some(());
+                matrix[b][a] = Some(());
+            }
+            let alive = series_parallel(&mut matrix, |(), ()| (), |(), ()| Some(())).unwrap();
+            for (a, row) in matrix.iter().enumerate() {
+                for (b, e) in row.iter().enumerate() {
+                    assert!(
+                        e.is_none() || (alive[a] && alive[b]),
+                        "{edges:?}: {a}-{b} left"
+                    );
+                }
+            }
+            let emptied = alive.iter().all(|&a| !a);
+            assert_eq!(emptied, !has_k4_minor(n, edges), "{edges:?}");
+            emptied
+        };
+        let (mut emptied, mut cores) = (0, 0);
+        for n in 0..=5 {
+            for edges in graphs(n) {
+                if check(n, &edges) {
+                    emptied += 1;
+                } else {
+                    cores += 1;
+                }
+            }
+        }
+        let mut rng = super::super::sweep::Lcg(0x5e_71e5);
+        for _ in 0..300 {
+            let edges: Vec<(usize, usize)> = all_pairs(6)
+                .into_iter()
+                .filter(|_| rng.pick(3) != 0)
+                .collect();
+            if check(6, &edges) {
+                emptied += 1;
+            } else {
+                cores += 1;
+            }
+        }
+        assert_eq!(emptied + cores, 1 + 1 + 2 + 8 + 64 + 1024 + 300);
+        assert!(
+            cores > 100 && emptied > 500,
+            "{cores} cores, {emptied} emptied"
+        );
+    }
+
+    /// **The reduction combines what it says it does**: labels as path
+    /// lengths, `series` their sum and `parallel` refusing two that differ.
+    /// A triangle of 1, 1 and 2 reduces to nothing; one of 1, 1 and 3
+    /// refuses at the pair the taken-out vertex joined, the edge kept and
+    /// the one through it as they were.
+    #[test]
+    fn series_parallel_reduction_refuses_where_parallel_does() {
+        let triangle = |third: u32| {
+            let mut m: Vec<Vec<Option<u32>>> = vec![vec![None; 3]; 3];
+            for (a, b, l) in [(0, 1, 1), (0, 2, 1), (1, 2, third)] {
+                m[a][b] = Some(l);
+                m[b][a] = Some(l);
+            }
+            series_parallel(&mut m, |a, b| a + b, |a, b| (a == b).then_some(a))
+        };
+        assert_eq!(triangle(2), Ok(vec![false, false, false]));
+        assert_eq!(
+            triangle(3),
+            Err(Conflict {
+                at: [1, 2],
+                kept: 3,
+                through: 2
+            })
+        );
     }
 
     /// **The sets are numbered by their first element, not by the element

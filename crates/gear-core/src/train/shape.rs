@@ -36,7 +36,7 @@
 //! stated.
 
 use super::incidence::{Incidence, Indexed};
-use super::structure::DisjointSets;
+use super::structure::{breadth_first_forest, series_parallel, DisjointSets};
 use super::wiring::{BodyLabel, MeshSpec, Mount, Wiring};
 use super::{
     ContactRatios, Freedom, FreedomGroup, GearResult, Loading, MemberFacts, MemberFreedom,
@@ -3552,20 +3552,25 @@ impl Indexed<'_> {
     ///   with whatever else joins the two. A range left empty is a loop no
     ///   placement closes. This decides every frame whose distances form no
     ///   more than a series-parallel graph: a chain, a bridge, a triangle.
+    ///   The reduction is [`series_parallel`]'s; each [`Span`] carries the
+    ///   last-stated distance of what it stands for.
     /// - **Closure.** What is left has every axis in three distances or
-    ///   more. Where that is the carrier's axis with the rest each at a
-    ///   stated radius from it, each distance between two of them fixes the
-    ///   angle between them up to its sign ([`Arc`]), and the loop closes
-    ///   where some choice of signs puts every angle where its distance
-    ///   says. The angles are compared with their rounding carried
-    ///   ([`Closure`]), so a loop that closes exactly passes and one that
-    ///   misses by more than its operands' rounding is refused. Any other
-    ///   remainder — a loop among axes with no radius, each in three
-    ///   distances — no preset or edit builds, and it is not refused.
+    ///   more. Where the carrier's axis is among them, each distance between
+    ///   two axes at a stated radius from it fixes the angle between them up
+    ///   to its sign ([`Arc`]), and the loop they make closes where some
+    ///   choice of signs puts every angle where its distance says. The
+    ///   angles are compared with their rounding carried ([`Closure`]), so a
+    ///   loop that closes exactly passes and one that misses by more than its
+    ///   operands' rounding is refused. A loop of those closing is needed
+    ///   for the whole to, so the check is sound with any other axis left
+    ///   in; what it leaves unchecked is what runs through an axis with no
+    ///   stated radius, or a core without the carrier's axis — which no
+    ///   preset or edit builds, and which is not refused.
     ///
     /// # Errors
     ///
-    /// [`TrainError::AxesLoopOpen`], naming the loop's last-stated distance.
+    /// [`TrainError::AxesLoopOpen`], naming the last-stated distance of the
+    /// loop that does not close.
     pub(crate) fn frames_close(&self, running: &[Option<f64>]) -> Result<Vec<Closure>, TrainError> {
         let mut closures = Vec::new();
         let mut carriers: Vec<usize> = self
@@ -3600,66 +3605,32 @@ impl Indexed<'_> {
                     span[j][i] = span[i][j];
                 }
             }
-            // Reduction: each pass takes one axis out, so `n` passes reach
-            // the core whatever the order.
-            let mut alive = vec![true; n];
-            let joined = |span: &[Vec<Option<Span>>], alive: &[bool], v: usize| -> Vec<usize> {
-                (0..n)
-                    .filter(|&w| alive[w] && span[v][w].is_some())
-                    .collect()
-            };
-            for _ in 0..n {
-                let Some(v) = (0..n).find(|&v| alive[v] && joined(&span, &alive, v).len() <= 2)
-                else {
-                    break;
-                };
-                if let [u, w] = joined(&span, &alive, v)[..] {
-                    let (Some(a), Some(b)) = (span[v][u], span[v][w]) else {
-                        continue;
-                    };
-                    let through = a.series(b);
-                    let both = match span[u][w] {
-                        Some(e) => e.parallel(through),
-                        None => Some(through),
-                    }
-                    .ok_or(TrainError::AxesLoopOpen {
-                        distance: through.distance.max(span[u][w].map_or(0, |e| e.distance)),
-                    })?;
-                    span[u][w] = Some(both);
-                    span[w][u] = Some(both);
+            // Reduction: what is left is the core, every axis in it in three
+            // distances or more, and `span` holds only its distances.
+            series_parallel(&mut span, Span::series, Span::parallel).map_err(|c| {
+                TrainError::AxesLoopOpen {
+                    distance: c.kept.distance.max(c.through.distance),
                 }
-                alive[v] = false;
-            }
-            let core: Vec<usize> = (1..n).filter(|&v| alive[v]).collect();
-            if core.is_empty() {
-                continue;
-            }
-            // Closure: the carrier's axis in the core, every other axis in
-            // it at a stated radius.
+            })?;
+            // Closure: the core's axes at a stated radius from the carrier's
+            // axis — none where the carrier's axis left the core — a loop
+            // among which closes or no placement of the whole does.
             let radius = |v: usize| span[0][v].filter(|s| s.exact).map(|s| s.lo);
-            if !alive[0] || core.iter().any(|&v| radius(v).is_none()) {
-                continue;
-            }
+            let placed: Vec<usize> = (1..n).filter(|&v| radius(v).is_some()).collect();
             let mut arcs: Vec<Vec<Option<Arc>>> = vec![vec![None; n]; n];
-            let mut last = 0;
-            for &i in &core {
-                for &j in &core {
-                    let Some(s) = span[i][j].filter(|_| i < j) else {
+            for &i in &placed {
+                for &j in &placed {
+                    let (Some(s), Some(ri), Some(rj)) = (span[i][j], radius(i), radius(j)) else {
                         continue;
                     };
-                    last = last.max(s.distance);
-                    let (Some(ri), Some(rj)) = (radius(i), radius(j)) else {
-                        continue;
-                    };
-                    let arc = Arc::between(ri, rj, s).ok_or(TrainError::AxesLoopOpen {
+                    arcs[i][j] = Some(Arc::between(ri, rj, s).ok_or(TrainError::AxesLoopOpen {
                         distance: s.distance,
-                    })?;
-                    arcs[i][j] = Some(arc);
-                    arcs[j][i] = Some(arc);
+                    })?);
                 }
             }
-            closures
-                .extend(close(&core, &arcs).ok_or(TrainError::AxesLoopOpen { distance: last })?);
+            closures.extend(
+                close(&placed, &arcs).map_err(|distance| TrainError::AxesLoopOpen { distance })?,
+            );
         }
         Ok(closures)
     }
@@ -3723,19 +3694,20 @@ impl Span {
     }
 
     /// **Both at once**: the ranges' intersection, a stated value kept as
-    /// it is where it lies in the other; `None` where they miss.
+    /// it is — its own distance's, since the loop the other stood for
+    /// closed and narrowed nothing — where it lies in the other; `None`
+    /// where they miss.
     fn parallel(self, other: Self) -> Option<Self> {
         let ((a, b), (c, d)) = (self.range(), other.range());
         let (lo, hi) = (a.max(c), b.min(d));
-        let distance = self.distance.max(other.distance);
         (lo <= hi).then_some(match (self.exact, other.exact) {
-            (true, _) => Self { distance, ..self },
-            (false, true) => Self { distance, ..other },
+            (true, _) => self,
+            (false, true) => other,
             (false, false) => Self {
                 lo,
                 hi,
                 exact: false,
-                distance,
+                distance: self.distance.max(other.distance),
             },
         })
     }
@@ -3802,56 +3774,41 @@ pub(crate) struct Closure {
 }
 
 /// **Whether axes at stated radii stand at the angles their distances
-/// give**, `arcs` between the `core` axes, each group of them joined by
-/// arcs placed on its own: the first at angle nought, each next one from
-/// the one it was reached from at plus or minus its arc — both signs tried,
-/// but the first's, which a reflection gives — and every other arc to an
-/// axis already placed checked on the way, so a sign that fails is dropped
-/// at once. The closures of the placement found, or `None` where no signs
-/// close every arc.
-fn close(core: &[usize], arcs: &[Vec<Option<Arc>>]) -> Option<Vec<Closure>> {
-    let mut groups = super::structure::DisjointSets::new(arcs.len());
-    for &i in core {
-        for &j in core {
-            if arcs[i][j].is_some() {
-                groups.union(i, j);
-            }
-        }
-    }
+/// give**, `arcs` between the `placed` axes, each group of them joined by
+/// arcs placed on its own along a breadth-first tree
+/// ([`breadth_first_forest`]): its root at angle nought, each next axis
+/// from the one it was reached from at plus or minus its arc — both signs
+/// tried, but the first's, which a reflection gives — and every other arc
+/// to an axis already placed checked on the way, so a sign that fails is
+/// dropped at once. The closures of the placement found.
+///
+/// # Errors
+///
+/// The last-stated distance among the arcs of a group no signs close.
+fn close(placed: &[usize], arcs: &[Vec<Option<Arc>>]) -> Result<Vec<Closure>, usize> {
     let mut out = Vec::new();
     let mut theta = vec![0.0; arcs.len()];
     let mut tol = vec![0.0; arcs.len()];
-    for &root in core {
-        if core
-            .iter()
-            .any(|&v| v < root && groups.find(v) == groups.find(root))
-        {
-            continue;
-        }
-        // Breadth first from the root: each axis and the one it is reached
-        // from.
-        let mut order: Vec<(usize, usize)> = Vec::new();
-        let mut seen = vec![false; arcs.len()];
-        seen[root] = true;
-        let mut at = 0;
-        let mut queue = vec![root];
-        while at < queue.len() {
-            let v = queue[at];
-            at += 1;
-            for &w in core {
-                if !seen[w] && arcs[v][w].is_some() {
-                    seen[w] = true;
-                    queue.push(w);
-                    order.push((w, v));
-                }
-            }
-        }
-        theta[root] = 0.0;
-        tol[root] = 0.0;
-        let mut placed = vec![root];
-        out.extend(place(&order, arcs, &mut theta, &mut tol, &mut placed)?);
+    for tree in breadth_first_forest(placed, |i, j| arcs[i][j].is_some()) {
+        theta[tree.root] = 0.0;
+        tol[tree.root] = 0.0;
+        let mut at = vec![tree.root];
+        let Some(closures) = place(&tree.reached, arcs, &mut theta, &mut tol, &mut at) else {
+            let group: Vec<usize> = std::iter::once(tree.root)
+                .chain(tree.reached.iter().map(|&(v, _)| v))
+                .collect();
+            let last = group
+                .iter()
+                .flat_map(|&i| group.iter().filter_map(move |&j| arcs[i][j]))
+                .map(|a| a.distance)
+                .max();
+            // A group no signs close has an arc.
+            debug_assert!(last.is_some(), "a group with no arc closes");
+            return Err(last.unwrap_or_default()); // absence: none, asserted above
+        };
+        out.extend(closures);
     }
-    Some(out)
+    Ok(out)
 }
 
 /// [`close`]'s placement from `order`'s first axis on, the ones before
@@ -8472,6 +8429,157 @@ mod frame_closure_laws {
             refused += 1;
         }
         assert_eq!(refused, 1000);
+    }
+
+    /// **A refusal names the last-stated distance of the loop that does not
+    /// close**, not of a loop that closed beside it: each open loop with a
+    /// closed triangle hanging off it stated after it, taken out before the
+    /// open loop is reached. Through the reduction: the carrier's axis (0)
+    /// and axes A (2) and B (3) at radii 10 and 1, a bridge X (4) a unit from
+    /// each, which no quadrilateral closes (10 > 1 + 1 + 1), and Y (1) six
+    /// from the carrier's axis and from A. Through the closure: four axes at
+    /// radii 21, 21, 15 and 18, each 18 from the next — no signs close
+    /// their angles — and Y (5) ten from the first two.
+    #[test]
+    fn a_refusal_names_the_open_loop_and_not_a_closed_one_beside_it() {
+        let cases: [Limit; 2] = [
+            (
+                4,
+                vec![[0, 2], [0, 3], [2, 4], [3, 4], [0, 1], [2, 1]],
+                vec![10.0, 1.0, 1.0, 1.0, 6.0, 6.0],
+                3,
+            ),
+            (
+                5,
+                vec![
+                    [0, 1],
+                    [0, 2],
+                    [0, 3],
+                    [0, 4],
+                    [1, 2],
+                    [2, 3],
+                    [3, 4],
+                    [4, 1],
+                    [5, 1],
+                    [5, 2],
+                ],
+                vec![21.0, 21.0, 15.0, 18.0, 18.0, 18.0, 18.0, 18.0, 10.0, 10.0],
+                7,
+            ),
+        ];
+        for (k, pairs, lengths, named) in cases {
+            let running: Vec<Option<f64>> = lengths.iter().map(|&v| Some(v)).collect();
+            let got = frame(k, &pairs).indexed().frames_close(&running);
+            assert_eq!(
+                got.map(|_| ()),
+                Err(TrainError::AxesLoopOpen { distance: named }),
+                "{pairs:?}"
+            );
+        }
+    }
+
+    /// **What the closure leaves unchecked is not refused, and what it
+    /// checks is checked with it there**: four axes a unit from each other
+    /// and none at a radius — a regular tetrahedron, which no plane holds —
+    /// stand; a closing loop of three axes at radii (integer points, a
+    /// unit square's corners scaled by five) with an axis X at no radius a
+    /// unit from each of them, which nothing places, stands; and the same
+    /// loop opened by a tenth of a distance, X still there, is refused.
+    #[test]
+    fn the_unchecked_remainder_stands_and_the_rest_is_still_checked() {
+        let tetrahedron: Vec<[usize; 2]> = vec![[1, 2], [1, 3], [1, 4], [2, 3], [2, 4], [3, 4]];
+        let running = vec![Some(1.0); tetrahedron.len()];
+        assert!(frame(4, &tetrahedron)
+            .indexed()
+            .frames_close(&running)
+            .is_ok());
+        // Axes 1, 2, 3 at (5, 0), (0, 5), (−5, 0); X is axis 4.
+        let wheel: Vec<[usize; 2]> = vec![
+            [0, 1],
+            [0, 2],
+            [0, 3],
+            [1, 2],
+            [2, 3],
+            [3, 1],
+            [4, 1],
+            [4, 2],
+            [4, 3],
+        ];
+        let lengths = [
+            5.0,
+            5.0,
+            5.0,
+            50f64.sqrt(),
+            50f64.sqrt(),
+            10.0,
+            1.0,
+            1.0,
+            1.0,
+        ];
+        let running: Vec<Option<f64>> = lengths.iter().map(|&v| Some(v)).collect();
+        assert!(frame(4, &wheel).indexed().frames_close(&running).is_ok());
+        let mut open = running;
+        open[3] = open[3].map(|v| 1.1 * v);
+        assert!(matches!(
+            frame(4, &wheel).indexed().frames_close(&open),
+            Err(TrainError::AxesLoopOpen { .. })
+        ));
+    }
+
+    /// **A span through an axis encloses every distance its two ends allow,
+    /// and no more than rounding past them**, exactly: two stated distances
+    /// `a ≥ b` (integers up to 2^20, `b` often within three of `a`, where
+    /// the difference is small and its rounding shows), each within
+    /// [`RUNNING_ALLOWANCE`] (`2^-50`), give the span from
+    /// `a − b − 2^-50 (a + b)` to `(a + b)(1 + 2^-50)`, compared in integers
+    /// scaled by 2^60 — the span's ends within an ulp outside, and within
+    /// `3ε(a + b)` of them.
+    #[test]
+    fn a_span_through_an_axis_encloses_what_its_ends_allow() {
+        let mut rng = Lcg(0x5_ba7);
+        let scale = 2f64.powi(60);
+        let scaled = |x: f64| -> i128 {
+            #[allow(clippy::cast_possible_truncation)]
+            let v = (x * scale) as i128;
+            v
+        };
+        let mut checked = 0;
+        for _ in 0..5000 {
+            let a = i128::try_from(1024 + rng.pick((1 << 20) - 1024)).unwrap();
+            let b = if rng.pick(2) == 0 {
+                a - 1 - i128::try_from(rng.pick(3)).unwrap()
+            } else {
+                1 + i128::try_from(rng.pick(usize::try_from(a).unwrap() - 1)).unwrap()
+            };
+            #[allow(clippy::cast_precision_loss)]
+            let span = Span::exact(a as f64, 0).series(Span::exact(b as f64, 1));
+            let lo = ((a - b) << 60) - ((a + b) << 10);
+            let hi = ((a + b) << 60) + ((a + b) << 10);
+            let near = 3 * ((a + b) << 8);
+            let ulp = |x: f64| scaled(x.next_up()) - scaled(x);
+            assert!(
+                scaled(span.lo) <= lo + ulp(span.lo),
+                "{a}, {b}: {} above",
+                span.lo
+            );
+            assert!(
+                scaled(span.lo) >= lo - near,
+                "{a}, {b}: {} far below",
+                span.lo
+            );
+            assert!(
+                scaled(span.hi) >= hi - ulp(span.hi),
+                "{a}, {b}: {} below",
+                span.hi
+            );
+            assert!(
+                scaled(span.hi) <= hi + near,
+                "{a}, {b}: {} far above",
+                span.hi
+            );
+            checked += 1;
+        }
+        assert_eq!(checked, 5000);
     }
 
     /// **The Cayley–Menger determinant of four points**, from their six

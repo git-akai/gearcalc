@@ -312,18 +312,35 @@ mod tests {
         assert!(compared > 50_000, "only {compared} answers compared");
     }
 
-    /// **One incidence per part solved**: a cut builds one, and its rating
-    /// and every candidate its search scores read that one — a search on
-    /// builds no more than the same solve with it off, however many
-    /// candidates it scores.
+    /// **One incidence per part solved**: a cut builds one, its rating
+    /// builds none — it reads the cut's — and every candidate its search
+    /// scores reads the cut's too: a search on builds no more than the same
+    /// solve with it off, however many candidates it scores.
     #[test]
     fn a_part_is_solved_through_one_incidence() {
         use crate::testing::work;
         let lib = super::super::test_library();
         let mut searched = 0;
         for (name, shape) in sweep::arrangements() {
-            let (cut, _) = work::of(|| super::super::shape::cut(&shape, &lib));
-            assert_eq!(cut.incidences, 1, "{name}: a cut built {}", cut.incidences);
+            let (built, cut) = work::of(|| super::super::shape::cut(&shape, &lib));
+            assert_eq!(
+                built.incidences, 1,
+                "{name}: a cut built {}",
+                built.incidences
+            );
+            let cut = cut.unwrap_or_else(|e| panic!("{name}: {e:?}"));
+            let loads = [super::super::CaseLoad::nothing(
+                0,
+                super::super::CaseKind::Ultimate,
+                &shape.shared().wiring(),
+            )];
+            let reversal = super::super::Reversal { correct: false };
+            let (rated, _) = work::of(|| super::super::shape::rate(&cut, &loads, reversal));
+            assert_eq!(
+                rated.incidences, 0,
+                "{name}: a rating built {}",
+                rated.incidences
+            );
             let solve = |search: bool| {
                 let mut s = shape.clone();
                 s.set_search(search);
