@@ -491,24 +491,32 @@ fn two_entries_of_one_case_at_one_body_are_refused() {
     use super::{Load, LoadRole};
     let lib = test_library();
     let mut t = cased(vec![Preset::Spur.build()]);
-    t.load_cases = vec![LoadCase {
-        loads: vec![
-            Load::given(1, TORQUE_NM, SPEED_RPM),
-            Load::given(1, TORQUE_NM, SPEED_RPM),
-            Load::declared(2, LoadRole::Reacted),
-        ],
-        ..LoadCase::ultimate(1, 2, TORQUE_NM, SPEED_RPM)
-    }];
-    let key = solve_train(&t, &lib)
-        .map(|_| ())
-        .map_err(|e| crate::note::Explain::note(&e));
-    assert!(
-        matches!(&key, Err(n) if n.key == "error.train_duplicate_entry"
-            && n.values.get("body").map(String::as_str) == Some("1")),
-        "{key:?}"
+    let (given, reacted) = (
+        Load::given(1, TORQUE_NM, SPEED_RPM),
+        Load::declared(2, LoadRole::Reacted),
     );
+    // The two entries side by side, and apart with another between — a
+    // check of neighbours alone sees only the first.
+    let mut refused = 0;
+    for loads in [vec![given, given, reacted], vec![given, reacted, given]] {
+        t.load_cases = vec![LoadCase {
+            loads,
+            ..LoadCase::ultimate(1, 2, TORQUE_NM, SPEED_RPM)
+        }];
+        let key = solve_train(&t, &lib)
+            .map(|_| ())
+            .map_err(|e| crate::note::Explain::note(&e));
+        assert!(
+            matches!(&key, Err(n) if n.key == "error.train_duplicate_entry"
+                && n.values.get("body").map(String::as_str) == Some("1")),
+            "{:?}: {key:?}",
+            t.load_cases[0].loads
+        );
+        refused += 1;
+    }
+    assert_eq!(refused, 2);
     // One entry fewer is the case it was meant to be.
-    t.load_cases[0].loads.remove(1);
+    t.load_cases[0].loads.remove(2);
     assert!(solve_train(&t, &lib).unwrap().cases[0].solved);
 }
 

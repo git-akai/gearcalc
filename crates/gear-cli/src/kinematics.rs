@@ -285,10 +285,12 @@ pub(crate) fn fixtures() -> Vec<(String, Train)> {
     // shared body and leaves by the ring.
     out.push(("set-then-pair".to_string(), {
         let mut t = Train::chained(vec![set(), pair(17, 43, 0.0)], |_| Vec::new());
+        // The pair's end is split off first: held while the pair is on
+        // it, the carrier would stop the pair (`Locks`).
         let (ring, carrier) = (t.port(0, 3), t.port(0, 2));
         edit(&mut t, Edit::Release(ring));
-        edit(&mut t, Edit::Hold(carrier));
         t.split(1, carrier);
+        edit(&mut t, Edit::Hold(carrier));
         let (a, b) = (t.port(0, 3), t.port(1, 1));
         edit(&mut t, Edit::Join { a, b });
         t.load_cases = loads(t.port(0, 1), t.port(1, 2));

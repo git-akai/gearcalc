@@ -62,6 +62,20 @@ From Q9, to Stage 4 (the audit's T16.31 and the survivor re-run are there):
   - the unshared rating is taken at the highest point of single-pair contact, which on some
     small teeth is not the model's worst: up to 3.17 % low (state.md).
 
+From Q5, to Q6:
+- **A gear's default face width depends on where it was born.** The core's `MemberGear::default()`
+  is a fixed 10 mm; the panel's presets are automatic, seeded at 5 mm (`defaults_impl`'s UI seed);
+  a gear an edit adds is automatic, seeded from its mate's box (5 mm on a panel's train, 10 on the
+  core's). A default is a rule per gear (WORKER rule 5), so one default is wanted. With it, item 3:
+  an automatic width on a mesh no case loads comes to its seed, and a seed of 0 gives `NoContact`.
+- **The deep walk** (`a_deeper_walk_keeps_the_train_whole`, by hand; `WALK_SEEDS`, `WALK_DEPTH`):
+  0..3600 at depth 8 fails 3 walks at 2642279 (walks 755, 1090, 2196) and none at Q5's head.
+  All three were the tip law's (`held_tips_reach_past_nothing`), which built the graph at the plan's
+  distances rather than where the tips opened them out: "solved, but its graph does not build".
+  Q5 made it build what the solve builds (`Shape::built`). The flow-law failures after a Join that
+  the checker saw at base did not recur at head in 0..3600, 10000..10800 or 50000..50800; not
+  reproduced here.
+
 ## Added 2026-10-03: validators classified by method (owner's principle)
 - **Q11: every independent check in the repo, classified.** Covers tools/*.py, tools/golden-backed
   scripts, the tests' oracles and gear-cli instruments. Each is either:

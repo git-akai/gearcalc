@@ -22,6 +22,7 @@
 use super::shape::{Member, Shape};
 use super::structure::{CarrierTree, Hang};
 use crate::kinematics::GROUND;
+use crate::params::Auto;
 
 /// **What a designer does to a train's graph** — the one set of edits,
 /// every index the graph's own: a member, a mesh, a distance, an axis or a
@@ -148,13 +149,16 @@ pub enum EditRefused {
     /// **A ring across crossed shafts**: the screw model has no internal
     /// kind.
     RingCrossed,
-    /// **A gear that locks the train**: its mesh asks two bodies to turn
-    /// at a ratio the meshes they are already in contradict — a ring on a
-    /// pair's second gear's body, a gear on a planet's body meshing a
-    /// central member the planet already turns against — so the train
-    /// loses a degree of freedom and no body it drove can turn. Decided off
-    /// the graph's kinematics, without a solve; a twin at the same ratio
-    /// locks nothing and is made.
+    /// **An edit that locks the train**: after it, a body stands still
+    /// under the train's meshes, couplings and holds that turned before it
+    /// or that it added, and that the train does not hold — read from the
+    /// motion before and after, each body followed through the edit's
+    /// renumbering. A ring on a pair's second gear's body, a gear on a
+    /// planet's body meshing a central member the planet already turns
+    /// against, a join of two shafts one chain turns at different speeds,
+    /// a move that leaves a gear meshing two gears on one body, a preset
+    /// laid in on a held shaft. Decided without a solve; a twin at the same
+    /// ratio forces nothing still, and is made.
     Locks,
     /// A body not on the member's axis.
     NotOnTheAxis,
@@ -225,7 +229,7 @@ impl std::fmt::Display for EditRefused {
             Self::RingToRing => "two rings do not mesh",
             Self::OrbitingMate => "that gear meshes riding a carrier",
             Self::RingCrossed => "a ring does not mesh across crossed shafts",
-            Self::Locks => "that gear would lock the train",
+            Self::Locks => "that would force a body that turns to stand still",
             Self::NotOnTheAxis => "not a body on the member's axis",
             Self::NoRoom => "nothing of that kind fits at this radius",
             Self::CarriesAnAxis => "that body carries an axis",
@@ -578,13 +582,16 @@ impl Shape {
     /// crate's defaults — a ring cut by the default pinion cutter — its
     /// count the one thing the edit decides; its module, pressure angle and
     /// helix automatic, so the mesh it joins gives it the group's and the
-    /// hand its mesh needs, and its shift and thickness automatic, so a
-    /// second central at one carrier radius is closed by its shift. It reads
-    /// nothing of its mate but the module its automatic box is seeded at:
-    /// a gear never copies another's given helix, form or material.
+    /// hand its mesh needs; its shift and thickness automatic, so a second
+    /// central at one carrier radius is closed by its shift; and its face
+    /// width automatic, as every gear the panel lays in is. It reads nothing
+    /// of its mate but the seeds of its automatic module and width boxes: a
+    /// gear never copies another's given helix, form or material.
     fn push_follower(&mut self, mate: usize, body: usize, teeth: u32, ring: bool) {
         let module = self.members[mate].normal_module();
+        let width = self.members[mate].gear.face_width.manual;
         let new = self.push_member(body, teeth, module, ring.then(Default::default));
+        self.members[new].gear.face_width = Auto::automatic(width);
         self.push_mesh(new, mate);
     }
 
@@ -731,20 +738,21 @@ impl Shape {
         }
     }
 
-    /// **`gears` taken off `axis`**, with what goes with them: every body
-    /// left on it bare ([`Self::is_bare`]), every distance left with no
-    /// mesh, and the axis where nothing is left on it — the axes after it
-    /// numbered down. A shaft a coupling turns stays, and its axis with it.
+    /// **`gears` taken off `axis`, and the axis with them**: every body on
+    /// it — a shaft a coupling turns too, with its coupling, since the axis
+    /// it stands on is what was asked to go — every distance left with no
+    /// mesh, and the axis, the axes after it numbered down. A body a case
+    /// loads, reacts or sweeps at keeps the removal from being made
+    /// ([`super::Train::edit`]).
     fn clear_axis(&mut self, axis: usize, gears: Vec<usize>) {
-        let before: Vec<usize> = self
+        let on: Vec<usize> = self
             .bodies
             .iter()
             .filter(|b| b.axis == axis)
             .map(|b| b.body)
             .collect();
         self.cascade(gears);
-        let bare: Vec<usize> = before.into_iter().filter(|&b| self.is_bare(b)).collect();
-        self.drop_bodies(&bare);
+        self.drop_bodies(&on);
         self.tidy();
     }
 
@@ -1386,8 +1394,10 @@ mod tests {
                 parts += 1;
             }
         }
+        // Each walk's start and, on average, more than three of its steps.
+        let least = super::super::sweep::WALKS * 4;
         assert!(
-            visited.len() > 900 && parts > 1000,
+            visited.len() > least && parts > least,
             "{} trains, {parts} parts",
             visited.len()
         );
@@ -1638,8 +1648,9 @@ mod tests {
     /// given (20°), every `AddGear` offered unrefused adds the crate's
     /// default gear at the count the edit sizes — its helix, module and
     /// pressure angle automatic, so the mesh gives it the group's and the
-    /// hand it needs, and nothing of its mate's given helix, pitch diameter,
-    /// form or material copied. The train it leaves solves, or its cases
+    /// hand it needs, its face width automatic at its mate's seed, and
+    /// nothing of its mate's given helix, pitch diameter, form or material
+    /// copied. The train it leaves solves, or its cases
     /// say the load divides by stiffness, or a part says by name why its
     /// geometry does not close; never a gear that cannot mesh its mate
     /// (`Mesh(Incompatible)`, which a copied given helix gave), nor a lock
@@ -1664,7 +1675,7 @@ mod tests {
                 let mut seen: Vec<String> = Vec::new();
                 for at in super::super::sweep::targets(&t) {
                     for o in t.offers(at) {
-                        let Edit::AddGear { .. } = o.edit else {
+                        let Edit::AddGear { mate, .. } = o.edit else {
                             continue;
                         };
                         let named = format!("{:?}", o.edit);
@@ -1676,8 +1687,10 @@ mod tests {
                         let mut u = t.clone();
                         u.edit(o.edit.clone()).unwrap();
                         let new = u.shape.members.last().unwrap();
+                        let seed = t.shape.members[mate].gear.face_width.manual;
                         let own = MemberGear {
                             teeth: new.gear.teeth,
+                            face_width: crate::params::Auto::automatic(seed),
                             ..MemberGear::default()
                         };
                         if format!("{:?}", new.gear) != format!("{own:?}")
@@ -2177,10 +2190,14 @@ mod tests {
     /// again. Dropping it took the shaft and the case with it: a layshaft's
     /// output moved to an idler left the next stage joined to nothing.
     ///
-    /// It is given up where nothing names it, so a stage asked about alone
-    /// keeps no numbers it has no use for. And engaging another ratio is
-    /// the two moves it is on the machine: the other gear onto the output,
-    /// this one off to a body of its own.
+    /// Engaging another ratio is the two moves it is on the machine, in the
+    /// order that locks nothing: this gear off to a body of its own —
+    /// neutral — then the other onto the output. The other order passes
+    /// through two ratios on one pair of shafts, which locks every shaft of
+    /// the layshaft, and is refused (`Locks`), as is the move of the
+    /// engaged gear onto the idler's body. It is given up where nothing
+    /// names it, so a stage asked about alone keeps no numbers it has no
+    /// use for.
     #[test]
     fn a_gear_moved_off_a_shaft_does_not_take_the_shaft_with_it() {
         let lay = || arr::layshaft((17, 43), &[(41, 19), (29, 31)], 1);
@@ -2209,13 +2226,34 @@ mod tests {
             .next()
             .expect("the other pair's gear idles on a body of its own");
 
-        // **The destructive move, which is not destructive now**: the
-        // engaged gear onto the idler's body. The output keeps its number
-        // and the spur's gear on it, and nothing of the layshaft's is on
-        // it: neutral.
+        // **Two ratios on one pair of shafts lock them**: the engaged gear
+        // onto the idler's body, and the idle gear onto the output while
+        // the engaged one is still there, each refused whole.
+        for locking in [
+            Edit::Move {
+                member: engaged,
+                to: Some(idler),
+            },
+            Edit::Move {
+                member: idle,
+                to: Some(output),
+            },
+        ] {
+            let before = t.clone();
+            assert_eq!(
+                t.edit(locking.clone()),
+                Err(EditRefused::Locks),
+                "{locking:?}"
+            );
+            assert_eq!(debug(&t), debug(&before), "{locking:?} refused whole");
+        }
+
+        // **Neutral**: the engaged gear off to a body of its own. The
+        // output keeps its number and the spur's gear on it, and nothing
+        // of the layshaft's is on it.
         t.edit(Edit::Move {
             member: engaged,
-            to: Some(idler),
+            to: None,
         })
         .unwrap();
         assert!(
@@ -2231,16 +2269,11 @@ mod tests {
             "the spur's, and nothing is engaged: neutral"
         );
 
-        // ...and the other ratio engaged: the idle gear on, this one off —
-        // which it may be now, since it shares.
+        // ...and the other ratio engaged: the idle gear onto the output,
+        // the body it idled on given up with nothing to name it.
         t.edit(Edit::Move {
             member: idle,
             to: Some(output),
-        })
-        .unwrap();
-        t.edit(Edit::Move {
-            member: engaged,
-            to: None,
         })
         .unwrap();
         assert_eq!(t.part_shapes()[0].members_on_body(output), vec![idle]);
@@ -2248,24 +2281,27 @@ mod tests {
         assert_eq!(t.port(0, 2), output, "...where it was");
 
         // **A bare body nothing names is given up**: the same first move on
-        // a stage of its own, with no train to mean the shaft to be there.
+        // a stage of its own, with no train to mean the shaft to be there —
+        // one body given up for the one the gear moves to.
         let mut alone = Train::chained(vec![lay()], |_| Vec::new());
-        let was = alone.part_shapes()[0].bodies.len();
-        let (on, to) = {
-            let stages = alone.part_shapes();
-            let s = &stages[0];
-            (s.members_on_body(alone.port(0, 2))[0], s.members[idle].body)
-        };
+        let was = alone.shape.bodies.len();
+        let on = alone.shape.members_on_body(alone.port(0, 2))[0];
         alone
             .edit(Edit::Move {
                 member: on,
-                to: Some(to),
+                to: None,
             })
             .unwrap();
-        assert_eq!(
-            alone.part_shapes()[0].bodies.len(),
-            was - 1,
-            "the shaft nothing named is given up"
+        alone.check().unwrap();
+        assert_eq!(alone.shape.bodies.len(), was, "one given up, one added");
+        assert!(
+            alone
+                .shape
+                .bodies
+                .iter()
+                .all(|b| !alone.shape.is_bare(b.body)),
+            "the shaft nothing named is given up: {:?}",
+            alone.shape.bodies
         );
     }
 
@@ -2319,18 +2355,16 @@ mod tests {
         }
     }
 
-    /// **One rule for a bare body** (audit T13.12), where the removal of an
-    /// axis asked otherwise. A body is given up — by the shape, and by the
-    /// train where nothing names it — when no gear is on it, it carries no
-    /// axis, and no coupling holds it on a fixed axis
-    /// ([`Shape::is_bare`]). The removal of an axis took a shaft a coupling
-    /// turns, with the coupling — a join the designer made, undone unasked;
-    /// a shaft on a fixed axis a coupling turns is a port, and stays. An
-    /// uncoupled planocentric with a pair after it joined to the planet by
-    /// a coupling: the pair's input axis removed takes its gears and leaves
-    /// the shaft, its coupling and the axis it stands on.
+    /// **An axis removed goes, with everything on it** (audit T13.12,
+    /// orchestrator's decision (d)): a shaft a coupling turns and the
+    /// coupling with it — the axis it stands on is what was asked to go, and
+    /// a removal that took the gears and left the axis made a second removal
+    /// of it an Ok that changed nothing. Where a case reacts at that shaft,
+    /// the removal is refused whole under `Loaded` (plan decision 6). An
+    /// uncoupled planocentric with a pair after it, joined to the planet by
+    /// a coupling: the pair's input axis removed.
     #[test]
-    fn removing_an_axis_leaves_a_shaft_a_coupling_turns() {
+    fn removing_an_axis_takes_the_shaft_a_coupling_turns() {
         let uncoupled = arr::epicyclic(
             1,
             &[&[arr::external(30)]],
@@ -2344,19 +2378,33 @@ mod tests {
         let (planet, end) = (3, t.port(1, 1));
         assert_eq!(t.shape.couplings, vec![[planet, end]]);
         let axis = t.shape.bodies.iter().find(|b| b.body == end).unwrap().axis;
+        let removal = Edit::Remove(Piece::Axis(axis));
         let mut u = t.clone();
-        u.edit(Edit::Remove(Piece::Axis(axis))).unwrap();
+        u.edit(removal.clone()).unwrap();
         u.check().unwrap();
-        assert!(
-            u.shape
-                .bodies
-                .iter()
-                .any(|b| b.body == end && b.axis == axis),
-            "the coupled shaft stays on its axis: {:?}",
+        assert!(u.shape.couplings.is_empty(), "{:?}", u.shape.couplings);
+        // The axis goes, with the pair's other axis, whose gear the removal
+        // left meshing nothing.
+        assert_eq!(
+            (u.shape.axes.len(), u.shape.bodies.len()),
+            (t.shape.axes.len() - 2, t.shape.bodies.len() - 2),
+            "the axes and the shafts go: {:?}",
             u.shape.bodies
         );
-        assert_eq!(u.shape.couplings, vec![[planet, end]], "with its coupling");
-        assert!(u.shape.members_on_body(end).is_empty(), "its gears gone");
+        // Asked again, it names another axis or none: never an Ok that
+        // changes nothing.
+        let mut v = u.clone();
+        let again = v.edit(removal.clone());
+        assert!(
+            again.is_err() || debug(&v) != debug(&u),
+            "a second removal: {again:?}"
+        );
+        // Cased at the shaft, refused whole.
+        let mut cased = t.clone();
+        cased.load_cases = vec![LoadCase::ultimate(1, end, 1.0, 1000.0)];
+        let mut w = cased.clone();
+        assert_eq!(w.edit(removal), Err(EditRefused::Loaded));
+        assert_eq!(debug(&w), debug(&cased), "refused whole");
     }
 
     /// **One rule for a bare body** (audit T13.12), where the train's own

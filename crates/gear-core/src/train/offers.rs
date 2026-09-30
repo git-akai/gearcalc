@@ -552,9 +552,9 @@ mod tests {
     /// kept solving or refused by a named reason other than a wiring that
     /// describes no mechanism; every flow saying each body and mesh once;
     /// every fatigue case counting its cycles or saying why not; a fresh
-    /// case fitting it; a gear added (`step`, as the walk logs it) never
-    /// locking a train that turned; no body bare and named by nothing; and
-    /// the train the same after a trip through JSON.
+    /// case fitting it; no step (`step`, as the walk logs it) locking a
+    /// train that turned; no body bare and named by nothing; and the train
+    /// the same after a trip through JSON.
     fn laws(t: &Train, solved: bool, step: &str) -> Result<bool, String> {
         let lib = test_library();
         t.check().map_err(|e| format!("check: {e:?}"))?;
@@ -562,9 +562,9 @@ mod tests {
         let r = solve_train(t, &lib);
         match &r {
             Err(e) if solved && wiring(e) => return Err(format!("solved, then {e:?}")),
-            // A gear offered never locks a train that turned (audit T13.9).
-            Err(e @ TrainError::Overdetermined { .. }) if solved && step.starts_with("AddGear") => {
-                return Err(format!("solved, then a gear locked it: {e:?}"));
+            // No step locks a train that turned (audit T13.9, `Locks`).
+            Err(e @ TrainError::Overdetermined { .. }) if solved => {
+                return Err(format!("solved, then {step} locked it: {e:?}"));
             }
             Ok(r) => {
                 super::super::groupings::says_everything_once(t, r)?;
@@ -584,56 +584,95 @@ mod tests {
         Ok(r.is_ok())
     }
 
-    /// **A seeded walk over cased trains** — every start in [`trains`],
-    /// [`WALKS`] walks of [`DEPTH`] steps each ([`step`]) — the train
-    /// held to [`laws`] after every step, and the steps that led to any
-    /// failure printed. A walk crosses what one edit on a fresh preset
-    /// never reaches: an emptied train given a preset, a hold on a body a
-    /// case names, a join onto a held body.
-    #[test]
-    fn a_walk_of_offered_edits_keeps_the_train_whole() {
+    /// **What each case states, where**: its loads and reactions, figures
+    /// and all, and its sweep — each body read through `map`, the number
+    /// a body had before an edit to the one it has after.
+    fn stated(t: &Train, map: &dyn Fn(usize) -> Option<usize>) -> Vec<String> {
+        t.load_cases
+            .iter()
+            .map(|c| {
+                let said: Vec<_> = c
+                    .loads
+                    .iter()
+                    .filter(|l| l.role != LoadRole::Free)
+                    .map(|l| (map(l.at), l.role, l.torque, l.speed))
+                    .collect();
+                let sweep = match c.duty {
+                    super::super::Duty::Intermittent { at, .. } => at.map(map),
+                    super::super::Duty::Continuous { .. } => None,
+                };
+                format!("{said:?} sweep {sweep:?}")
+            })
+            .collect()
+    }
+
+    /// **No edit drops or moves what a case states** (plan decision 6):
+    /// every load, reaction and sweep of every case stands, after the edit,
+    /// at the body its body became — the edit's own renumbering, so a
+    /// figure moved to another body, or dropped, fails here where a count
+    /// of them would not. A preset laid on at the chain's end carries the
+    /// entries at the end it joins to its own output, which is the insert's
+    /// stated rule (`Train::chain_on`), and an emptied train's first preset
+    /// takes its parked cases up: those two are held to the count alone.
+    fn keeps_what_it_states(
+        before: &Train,
+        after: &Train,
+        map: &[Option<usize>],
+        step: &str,
+    ) -> Result<(), String> {
+        let followed = |b: usize| map.get(b).copied().flatten();
+        let (was, now) = (stated(before, &followed), stated(after, &|b| Some(b)));
+        let carried = step.starts_with("Insert") && step.contains("at None")
+            || before.shape.members.is_empty();
+        let count = |t: &Train| -> Vec<usize> {
+            t.load_cases
+                .iter()
+                .map(|c| c.loads.iter().filter(|l| l.role != LoadRole::Free).count())
+                .collect()
+        };
+        if carried && count(before) == count(after) || was == now {
+            Ok(())
+        } else {
+            Err(format!(
+                "a stated figure moved or dropped: {was:?} -> {now:?}"
+            ))
+        }
+    }
+
+    /// **The walks `seeds`, `depth` steps each**, the train held to
+    /// [`laws`] after every step and to [`keeps_what_it_states`] after
+    /// every edit: each failure, with the walk's start and the steps that
+    /// led to it.
+    fn walk_failures(seeds: std::ops::Range<usize>, depth: usize) -> Vec<String> {
         let starts = trains();
         let mut failures: Vec<String> = Vec::new();
-        for walk in 0..WALKS {
+        for walk in seeds {
             let (name, start) = &starts[walk % starts.len()];
             let mut rng = Lcg(walk as u64);
             let mut t = start.clone();
             let mut steps: Vec<String> = Vec::new();
             let mut solved = solve_train(&t, &test_library()).is_ok();
-            // Every load and reaction a case states, case by case.
-            let stated = |t: &Train| -> Vec<usize> {
-                t.load_cases
-                    .iter()
-                    .map(|c| c.loads.iter().filter(|l| l.role != LoadRole::Free).count())
-                    .collect()
-            };
-            for _ in 0..DEPTH {
+            for _ in 0..depth {
                 let made = catch_unwind(AssertUnwindSafe(|| {
                     let u = step(&t, &mut rng, &mut steps)?
                         .unwrap_or_else(|e| panic!("an offered edit refused: {e:?}"));
                     let last = steps.last().cloned().unwrap_or_default();
-                    Some((laws(&u, solved, &last), u))
+                    let held = laws(&u.train, solved, &last).and_then(|s| {
+                        match &u.renumbered {
+                            Some(map) => keeps_what_it_states(&t, &u.train, map, &last),
+                            None => Ok(()),
+                        }
+                        .map(|()| s)
+                    });
+                    Some((held, u.train))
                 }));
                 match made {
                     Ok(None) => {}
-                    Ok(Some((held, u))) => match held {
-                        Ok(s) => {
-                            // No step drops a load or a reaction: an edit
-                            // that would is refused (plan decision 6).
-                            let (was, now) = (stated(&t), stated(&u));
-                            if was.iter().zip(&now).any(|(a, b)| b < a) {
-                                failures.push(format!(
-                                    "walk {walk}, {name}: {steps:?}: an entry dropped: {was:?} -> {now:?}"
-                                ));
-                                break;
-                            }
-                            (t, solved) = (u, s);
-                        }
-                        Err(e) => {
-                            failures.push(format!("walk {walk}, {name}: {steps:?}: {e}"));
-                            break;
-                        }
-                    },
+                    Ok(Some((Ok(s), u))) => (t, solved) = (u, s),
+                    Ok(Some((Err(e), _))) => {
+                        failures.push(format!("walk {walk}, {name}: {steps:?}: {e}"));
+                        break;
+                    }
                     Err(panic) => {
                         let what = panic
                             .downcast_ref::<String>()
@@ -647,9 +686,46 @@ mod tests {
                 }
             }
         }
+        failures
+    }
+
+    /// **A seeded walk over cased trains** — every start in [`trains`],
+    /// [`WALKS`] walks of [`DEPTH`] steps each ([`step`]) — the train
+    /// held to [`laws`] after every step, and the steps that led to any
+    /// failure printed. A walk crosses what one edit on a fresh preset
+    /// never reaches: an emptied train given a preset, a hold on a body a
+    /// case names, a join onto a held body.
+    #[test]
+    fn a_walk_of_offered_edits_keeps_the_train_whole() {
+        let failures = walk_failures(0..WALKS, DEPTH);
         assert!(
             failures.is_empty(),
             "{} of {WALKS} walks failed:\n{}",
+            failures.len(),
+            failures.join("\n")
+        );
+    }
+
+    /// **The walk, deeper and wider**, by hand: `WALK_SEEDS=from..to` and
+    /// `WALK_DEPTH=n` (depth 8 where unset) — what a checker runs to look
+    /// past the default walk's reach, e.g. `WALK_SEEDS=0..3600 cargo
+    /// nextest run --run-ignored only -E 'test(a_deeper_walk)'`. Without
+    /// `WALK_SEEDS` it walks nothing: CI's serial run of the ignored tests
+    /// is for the timing canaries.
+    #[test]
+    #[ignore = "by hand, with WALK_SEEDS set: minutes"]
+    fn a_deeper_walk_keeps_the_train_whole() {
+        let Ok(seeds) = std::env::var("WALK_SEEDS") else {
+            return;
+        };
+        let (from, to) = seeds.split_once("..").expect("WALK_SEEDS=from..to");
+        let depth: usize = std::env::var("WALK_DEPTH").map_or(8, |d| d.parse().unwrap());
+        let seeds = from.parse().unwrap()..to.parse().unwrap();
+        let count = seeds.len();
+        let failures = walk_failures(seeds, depth);
+        assert!(
+            failures.is_empty(),
+            "{} of {count} walks failed:\n{}",
             failures.len(),
             failures.join("\n")
         );
@@ -733,40 +809,36 @@ mod tests {
         assert_eq!(laid, 2 * Preset::ALL.len() * Preset::ALL.len());
     }
 
-    /// **A hold leaves no case anything to say of the body.** A set's
-    /// fatigue sweep measured at its ring, the ring then held: the sweep
-    /// moves to the case's reaction and the set counts cycles, where it
-    /// counted none, saying nothing. A join that would hold a body a case
-    /// reacts at is refused — it once left the reaction on ground.
+    /// **A sweep is a stated figure, never moved** (plan decision 6, the
+    /// orchestrator's decision (a)): a set's fatigue sweep measured at its
+    /// released ring, the ring then held, is refused under `Loaded` — it
+    /// moved the sweep to the case's reaction, a body the designer did not
+    /// name — the train unchanged. A join that would hold a body a case
+    /// reacts at is refused too: it once left the reaction on ground.
     #[test]
-    fn a_hold_moves_the_sweep_and_a_join_does_not_ground_a_reaction() {
-        let lib = test_library();
+    fn a_hold_keeps_the_sweep_and_a_join_does_not_ground_a_reaction() {
         let mut t = cased(vec![Preset::Planetary.build()]);
         let ring = t.port(0, 3);
-        let reaction = t.load_cases[1].loads[1].at;
         t.edit(Edit::Release(ring)).unwrap();
         t.load_cases[1].duty = super::super::Duty::intermittent(Some(ring));
-        t.edit(Edit::Hold(ring)).unwrap();
-        assert!(
-            matches!(t.load_cases[1].duty, super::super::Duty::Intermittent { at, .. } if at == Some(reaction))
-        );
-        let r = solve_train(&t, &lib).unwrap();
-        for m in &r.members {
-            let cycles = m.cases[1].cycles.unwrap();
-            assert!(cycles.bending > 0.0, "{cycles:?}");
-        }
-        // A pair chained on a pair at its input, its far end held, then
-        // that end joined to the first pair's reacted output.
-        let mut t = cased(vec![Preset::Spur.build()]);
-        t.edit(Edit::Insert {
-            shape: Preset::Spur.build(),
-            at: Some(1),
-        })
-        .unwrap();
-        t.edit(Edit::Hold(3)).unwrap();
         let before = format!("{t:?}");
         assert_eq!(
-            t.edit(Edit::Join { a: 2, b: 3 }),
+            t.edit(Edit::Hold(ring)),
+            Err(super::super::EditRefused::Loaded)
+        );
+        assert_eq!(format!("{t:?}"), before, "refused whole");
+        // A set's held ring joined to the output of a pair after it, which
+        // the case reacts at.
+        let mut t = cased(vec![Preset::Planetary.build(), Preset::Spur.build()]);
+        let (ring, output) = (t.port(0, 3), t.port(1, 2));
+        assert!(t.held.contains(&ring));
+        assert!(t.load_cases[0]
+            .loads
+            .iter()
+            .any(|l| l.at == output && l.role == LoadRole::Reacted));
+        let before = format!("{t:?}");
+        assert_eq!(
+            t.edit(Edit::Join { a: ring, b: output }),
             Err(super::super::EditRefused::Loaded)
         );
         assert_eq!(format!("{t:?}"), before, "refused whole");
@@ -811,21 +883,16 @@ mod tests {
     /// **A removal never drops or moves a load, and an insert undoes**
     /// (audit T13.4, plan decision 6). A cased pair with each preset laid on
     /// at its output — the reaction carried to the preset's output — and
-    /// every removal offered anywhere: made, it keeps every load and
-    /// reaction each case states; where it would take one away, it is
-    /// refused whole under `Loaded`. Then the reaction moved back to the
-    /// pair's output, and the preset's gears removed through what is
-    /// offered: the pair comes back, its cases field for field, and every
-    /// case solves.
+    /// every removal offered anywhere: made, every load, reaction and sweep
+    /// each case states stands at the body its body became, read through
+    /// the removal's own renumbering ([`stated`]); where it would take one
+    /// away, it is refused whole under `Loaded`. Then the reaction moved
+    /// back to the pair's output, and the preset's gears removed through
+    /// what is offered: the pair comes back, its cases field for field, and
+    /// every case solves.
     #[test]
     fn a_removal_never_drops_a_load_and_an_insert_undoes() {
         let lib = test_library();
-        let stated = |t: &Train| -> Vec<usize> {
-            t.load_cases
-                .iter()
-                .map(|c| c.loads.iter().filter(|l| l.role != LoadRole::Free).count())
-                .collect()
-        };
         let (mut refused, mut kept) = (0, 0);
         for p in Preset::ALL {
             let pair = cased(vec![Preset::Spur.build()]);
@@ -841,12 +908,17 @@ mod tests {
                         continue;
                     }
                     let mut u = t.clone();
-                    let made = u.edit(o.edit.clone());
+                    let made = u.edit_renumbered(o.edit.clone());
                     let context = format!("{p:?} on a pair, {:?}", o.edit);
                     match made {
-                        Ok(()) if u.shape.members.is_empty() => {}
-                        Ok(()) => {
-                            assert_eq!(stated(&u), stated(&t), "{context}: a load dropped");
+                        Ok(_) if u.shape.members.is_empty() => {}
+                        Ok(map) => {
+                            let followed = |b: usize| map.get(b).copied().flatten();
+                            assert_eq!(
+                                stated(&u, &|b| Some(b)),
+                                stated(&t, &followed),
+                                "{context}: a stated figure moved or dropped"
+                            );
                             kept += 1;
                         }
                         Err(super::super::EditRefused::Loaded) => {
@@ -923,6 +995,104 @@ mod tests {
         assert!(
             endless > 0 && checked > 0,
             "{endless} of {checked} without ends"
+        );
+    }
+
+    /// **Which bodies can be driven** — each, alone, driven at one turn
+    /// under the train's holds: one whose drive the conditions refuse is
+    /// forced still. By the number, ground first; `None` where the system
+    /// does not build or its arithmetic overflows. A reading of what turns
+    /// that shares nothing with `Train::turning`'s basis of free motions.
+    fn drivable(t: &Train) -> Option<Vec<bool>> {
+        use crate::kinematics::{Condition, Refusal};
+        let system = t.system().ok()?;
+        let held = t.conditions(system.bodies()).ok()?;
+        (0..system.bodies())
+            .map(|b| {
+                if held[b] == Condition::Ground {
+                    return Some(false);
+                }
+                let mut c = held.clone();
+                c[b] = Condition::Drive(crate::ratio::Ratio::ONE);
+                match system.motion(&c) {
+                    Ok(_) => Some(true),
+                    Err(Refusal::Conflicts(_)) => Some(false),
+                    Err(_) => None,
+                }
+            })
+            .collect()
+    }
+
+    /// Whether `after` — `before` edited, its bodies renumbered by `map` —
+    /// has a body standing still that turned before or is new, and that it
+    /// does not hold ([`drivable`]).
+    fn stops(before: &Train, after: &Train, map: &[Option<usize>]) -> Option<bool> {
+        let (was, now) = (drivable(before)?, drivable(after)?);
+        Some((1..now.len()).any(|n| {
+            let from: Vec<usize> = (0..map.len()).filter(|&o| map[o] == Some(n)).collect();
+            let could = from.is_empty() || from.iter().any(|&o| was.get(o) == Some(&true));
+            !now[n] && could && !after.held.contains(&n)
+        }))
+    }
+
+    /// **An edit is refused as a lock exactly where it stops a body that
+    /// could turn** (audit T13.9, the orchestrator's rule): on every start
+    /// of the walk, a set released beside a pair after it (which still
+    /// turns whatever meshes are added), three pairs in a chain, uncased,
+    /// and every train the walks from seeds 10481, 50045 and 50568 visit —
+    /// every offer at every piece not refused for another reason is made by
+    /// its own rule, unchecked, and it is refused as `Locks` if and only if
+    /// the train it makes has a body standing still, read by driving each
+    /// body alone ([`drivable`]), that turned before or is new and is not
+    /// held. The mobility of the meshes without the holds, which the rule
+    /// first read, misses a lock on a held set and refuses gears on a
+    /// released one that still turns; both fail here.
+    #[test]
+    fn a_lock_is_refused_exactly_where_a_body_that_turned_stops() {
+        let locks = Some(Note::new(super::super::EditRefused::Locks.key()));
+        let mut released = cased(vec![Preset::Planetary.build(), Preset::Spur.build()]);
+        let ring = released.port(0, 3);
+        released.edit(Edit::Release(ring)).unwrap();
+        let pairs = Train::chained(vec![Preset::Spur.build(); 3], |_| Vec::new());
+        let walked = [10481, 50045, 50568].into_iter().flat_map(|seed| {
+            super::super::sweep::walked(seed..seed + 1, 8)
+                .into_iter()
+                .map(|(name, steps, t)| (format!("{name}: {steps:?}"), t))
+        });
+        let fixtures = [
+            ("a released set, a pair after it".to_owned(), released),
+            ("three pairs".to_owned(), pairs),
+        ];
+        let (mut refused, mut made) = (0, 0);
+        for (name, t) in trains().into_iter().chain(fixtures).chain(walked) {
+            for at in targets(&t) {
+                for o in t.offers(at) {
+                    if o.refused.is_some() && o.refused != locks {
+                        continue;
+                    }
+                    let mut u = t.clone();
+                    let context = format!("{name}: at {at:?}, {:?}", o.edit);
+                    let map = u
+                        .make(o.edit.clone())
+                        .unwrap_or_else(|e| panic!("{context}: {e:?}"));
+                    // One entry per number the train had: a body the edit
+                    // adds is the image of none of them.
+                    assert_eq!(map.len(), t.max_body() + 1, "{context}: {map:?}");
+                    let Some(stops) = stops(&t, &u, &map) else {
+                        continue;
+                    };
+                    assert_eq!(o.refused == locks, stops, "{context}");
+                    if stops {
+                        refused += 1;
+                    } else {
+                        made += 1;
+                    }
+                }
+            }
+        }
+        assert!(
+            refused > 100 && made > 1000,
+            "{refused} refused, {made} made"
         );
     }
 }

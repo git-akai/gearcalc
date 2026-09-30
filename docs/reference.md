@@ -2458,23 +2458,27 @@ a shaft an offset coupling turns stays with its coupling and a planet body
 with nothing on it goes with its coupling (`Shape::is_bare`, the one rule
 wherever a body is given up; the train keeps one a hold or a case names,
 and a release gives up one only its hold named); a distance left with no
-mesh; an axis left with nothing on it — refused where a planet would be
-left meeting nothing on its carrier's axis, whose radius it runs at. Each is made on a copy and kept whole or refused
-whole. **No edit drops or moves a case's load or reaction**: one that
-would leave a load or a reaction on a body held, cut off from the gears or
-taken off the train — or joined to another the same case names — is refused
-(`ui.train_edit_refused_loaded`), a free entry there is dropped, and only
-the removal that empties the train leaves its cases waiting by number for
-the next preset laid in. **A gear added that would lock the train** — a ring
-on the second gear's body of a pair, a gear on a planet's body meshing a
-central member the planet already turns against — is refused
-(`ui.train_edit_refused_locks`), decided off the graph's kinematics without
-a solve: its mesh leaves the train a degree of freedom short. A twin at the
-same ratio locks nothing and is made, the case saying the load divides by
-stiffness; and a lock a move makes — two ratios across one pair of shafts,
-the transient of engaging a layshaft's other ratio — is made, and the train
-names it at the body as it names a lock by holds. A refusal crosses the boundary as its
-catalogue key, which is what the panel says beside the entry.
+mesh; an axis left with nothing on it, and an axis removed with every body
+on it, a coupled shaft and its coupling too — refused where a planet would
+be left meeting nothing on its carrier's axis, whose radius it runs at. Each is made on a copy and kept whole or refused
+whole. **No edit drops or moves what a case states**: one that would leave
+a load or a reaction on a body held, cut off from the gears or taken off the
+train — or joined to another the same case names — or take a sweep off the
+open port it is measured at, is refused (`ui.train_edit_refused_loaded`); a
+free entry there is dropped, and only the removal that empties the train
+leaves its cases waiting by number for the next preset laid in. **No edit
+locks the train**: read from the motion the meshes, couplings and holds
+leave, before the edit and after, each body followed through the edit's
+renumbering, a body that stands still after it must have stood still before
+or be held — one that turned, or that the edit added, standing still is a
+lock, and the edit is refused (`ui.train_edit_refused_locks`), a gear, a
+join, a move, a hold or a preset laid in alike: a ring on the second gear's
+body of a pair, two ratios across one pair of shafts (so a layshaft's other
+ratio is engaged by moving the engaged gear to neutral first), a preset laid
+in on a held shaft. A twin at the same ratio forces nothing still and is
+made, the case saying the load divides by stiffness. A refusal crosses the
+boundary as its catalogue key, which is what the panel says beside the
+entry.
 
 **What a piece offers** (`Train::offers`) is every one of those edits that
 applies there, read off the graph by the rule each states and tried on a
@@ -3125,9 +3129,9 @@ A sweep is measured at an **open port** of a case that states entries, or
 the case is refused by name (`error.train_duty_port`); a sweep at a body
 that neither turns in the case nor would under its impending motion counts
 nothing and says so (`train.duty_at_still`), and so does a sweep with no
-body — **unset**, what a case with no entry to measure it at is given, and
-where a sweep goes when an edit takes its body and its case has no
-reaction or entry to follow (`train.duty_unset`). Two entries of one case
+body — **unset**, what a case with no entry to measure it at is given
+(`train.duty_unset`). A sweep is a stated figure: an edit that would take
+the body it is measured at, or hold it, is refused, never moved. Two entries of one case
 at one body are refused (`error.train_duplicate_entry`); a case switched
 off that would be refused is unsolved, its refusal its note, and the train
 solves without it.

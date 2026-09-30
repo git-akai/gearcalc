@@ -13661,9 +13661,7 @@
        ],
        "couplings": []
       },
-      "held": [
-       4
-      ]
+      "held": []
      }
     ],
     [
@@ -14265,9 +14263,7 @@
        ],
        "couplings": []
       },
-      "held": [
-       4
-      ]
+      "held": []
      }
     ],
     [
@@ -14947,9 +14943,7 @@
        ],
        "couplings": []
       },
-      "held": [
-       4
-      ]
+      "held": []
      }
     ],
     [
@@ -15626,9 +15620,7 @@
        ],
        "couplings": []
       },
-      "held": [
-       4
-      ]
+      "held": []
      }
     ],
     [
@@ -16243,8 +16235,8 @@
            "manual": 0
           },
           "face_width": {
-           "auto": false,
-           "manual": 10
+           "auto": true,
+           "manual": 5
           },
           "face_sources": {
            "bending": {
@@ -16316,8 +16308,8 @@
            "manual": 0
           },
           "face_width": {
-           "auto": false,
-           "manual": 10
+           "auto": true,
+           "manual": 5
           },
           "face_sources": {
            "bending": {
@@ -17101,8 +17093,8 @@
            "manual": 0
           },
           "face_width": {
-           "auto": false,
-           "manual": 10
+           "auto": true,
+           "manual": 5
           },
           "face_sources": {
            "bending": {
@@ -17174,8 +17166,8 @@
            "manual": 0
           },
           "face_width": {
-           "auto": false,
-           "manual": 10
+           "auto": true,
+           "manual": 5
           },
           "face_sources": {
            "bending": {
@@ -17657,8 +17649,8 @@
            "manual": 0
           },
           "face_width": {
-           "auto": false,
-           "manual": 10
+           "auto": true,
+           "manual": 5
           },
           "face_sources": {
            "bending": {
@@ -18525,8 +18517,8 @@
            "manual": 0
           },
           "face_width": {
-           "auto": false,
-           "manual": 10
+           "auto": true,
+           "manual": 5
           },
           "face_sources": {
            "bending": {
@@ -18598,8 +18590,8 @@
            "manual": 0
           },
           "face_width": {
-           "auto": false,
-           "manual": 10
+           "auto": true,
+           "manual": 5
           },
           "face_sources": {
            "bending": {
@@ -19860,8 +19852,8 @@
            "manual": 0
           },
           "face_width": {
-           "auto": false,
-           "manual": 10
+           "auto": true,
+           "manual": 5
           },
           "face_sources": {
            "bending": {
@@ -19933,8 +19925,8 @@
            "manual": 0
           },
           "face_width": {
-           "auto": false,
-           "manual": 10
+           "auto": true,
+           "manual": 5
           },
           "face_sources": {
            "bending": {
@@ -21376,8 +21368,8 @@
            "manual": 0
           },
           "face_width": {
-           "auto": false,
-           "manual": 10
+           "auto": true,
+           "manual": 5
           },
           "face_sources": {
            "bending": {
@@ -21449,8 +21441,8 @@
            "manual": 0
           },
           "face_width": {
-           "auto": false,
-           "manual": 10
+           "auto": true,
+           "manual": 5
           },
           "face_sources": {
            "bending": {
@@ -22906,8 +22898,8 @@
            "manual": 0
           },
           "face_width": {
-           "auto": false,
-           "manual": 10
+           "auto": true,
+           "manual": 5
           },
           "face_sources": {
            "bending": {
@@ -22979,8 +22971,8 @@
            "manual": 0
           },
           "face_width": {
-           "auto": false,
-           "manual": 10
+           "auto": true,
+           "manual": 5
           },
           "face_sources": {
            "bending": {
@@ -23604,8 +23596,8 @@
            "manual": 0
           },
           "face_width": {
-           "auto": false,
-           "manual": 10
+           "auto": true,
+           "manual": 5
           },
           "face_sources": {
            "bending": {
@@ -24529,8 +24521,8 @@
            "manual": 0
           },
           "face_width": {
-           "auto": false,
-           "manual": 10
+           "auto": true,
+           "manual": 5
           },
           "face_sources": {
            "bending": {
@@ -24602,8 +24594,8 @@
            "manual": 0
           },
           "face_width": {
-           "auto": false,
-           "manual": 10
+           "auto": true,
+           "manual": 5
           },
           "face_sources": {
            "bending": {
@@ -26054,8 +26046,8 @@
            "manual": 0
           },
           "face_width": {
-           "auto": false,
-           "manual": 10
+           "auto": true,
+           "manual": 5
           },
           "face_sources": {
            "bending": {
@@ -26127,8 +26119,8 @@
            "manual": 0
           },
           "face_width": {
-           "auto": false,
-           "manual": 10
+           "auto": true,
+           "manual": 5
           },
           "face_sources": {
            "bending": {
@@ -27747,8 +27739,8 @@
            "manual": 0
           },
           "face_width": {
-           "auto": false,
-           "manual": 10
+           "auto": true,
+           "manual": 5
           },
           "face_sources": {
            "bending": {
@@ -27820,8 +27812,8 @@
            "manual": 0
           },
           "face_width": {
-           "auto": false,
-           "manual": 10
+           "auto": true,
+           "manual": 5
           },
           "face_sources": {
            "bending": {
@@ -29037,7 +29029,8 @@
       "ui.train_edit_refused_geared",
       "ui.train_edit_refused_no_distance",
       "ui.train_edit_refused_no_such",
-      "ui.train_edit_refused_loaded"
+      "ui.train_edit_refused_loaded",
+      "ui.train_edit_refused_locks"
      ]
     ]
    ]

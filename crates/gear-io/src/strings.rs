@@ -1743,7 +1743,7 @@ mod tests {
         // of it: a gear on a new axis (gears, meshes, axes, bodies,
         // distances, and the path kept), a stage laid in at a body, a
         // release of nothing held (nothing), a chain's second pair moved off
-        // its shared shaft (bodies, and the path lost), a shared shaft a case
+        // its shared shaft (bodies, and the path lost), a set's ring a case
         // says is free held (case entries), a coupling taken off
         // (couplings), and a set's ring held (holds, and a path found).
         {
@@ -1787,11 +1787,14 @@ mod tests {
                     to: None,
                 },
             );
-            let mut free = chain(2);
+            // A set's released ring, which its case says is free, held.
+            let mut free = Train::chained(vec![Preset::Planetary.build()], |_| Vec::new());
+            free.edit(Edit::Release(3)).expect("the set's ring is held");
+            free.load_cases = vec![LoadCase::ultimate(1, 2, 1.0, 1000.0)];
             free.load_cases[0]
                 .loads
-                .push(Load::declared(2, LoadRole::Free));
-            fire(&free, Edit::Hold(2));
+                .push(Load::declared(3, LoadRole::Free));
+            fire(&free, Edit::Hold(3));
             let plano = Train::chained(vec![Preset::Planocentric.build()], |_| Vec::new());
             fire(&plano, Edit::Remove(Piece::Coupling(0)));
             let mut set = Train::chained(vec![Preset::Planetary.build()], |_| Vec::new());

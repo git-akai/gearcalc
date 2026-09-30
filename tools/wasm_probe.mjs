@@ -148,10 +148,10 @@ const out = {
   // by slot, and its member by its own index. A set inserted at the
   // default pair's output, joined to it by its sun, its cases carried to
   // the new end, the carrier; the ring released and held again (the
-  // carrier, which the cases react at, is refused a hold); the
-  // pair's second gear moved off the sun's shaft and its shaft joined to
-  // the set's ring instead, then back; and a case of each kind added
-  // between the ends, their duties switched.
+  // carrier, which the cases react at, is refused a hold); the ring
+  // released, the pair's second gear moved off the sun's shaft and its
+  // shaft joined to the set's ring instead, then back; and a case of each
+  // kind added between the ends, their duties switched.
   edit_train: call("edit_train", () => {
     const edit = (train, e) => JSON.parse(w.edit_train(JSON.stringify({ train, edit: e })));
     const parts = () => JSON.parse(w.solve_train(JSON.stringify({ train: t, materials: library }))).parts;
@@ -166,6 +166,11 @@ const out = {
     out.push(["release", structuredClone(t)]);
     graph({ hold: body(1, 3) });
     out.push(["hold", structuredClone(t)]);
+    // Joined to the held ring, the pair would stand still (`locks`): the
+    // ring is released first, and the pair turns it.
+    const held = structuredClone(t);
+    const [heldRing, pairGear] = [body(1, 3), member(0, 1)];
+    graph({ release: body(1, 3) });
     graph({ move: { member: member(0, 1), to: null } });
     graph({ join: { a: body(0, 2), b: body(1, 3) } });
     out.push(["move_join", structuredClone(t)]);
@@ -247,11 +252,23 @@ const out = {
         return String(x.message ?? x);
       }
     };
+    // The pair's gear moved off the sun's shaft and its shaft joined to the
+    // set's held ring: the pair would stand still.
+    const locking = () => {
+      const moved = edit(held, { graph: { move: { member: pairGear, to: null } } });
+      try {
+        edit(moved, { graph: { join: { a: moved.shape.members[pairGear].body, b: heldRing } } });
+        return null;
+      } catch (x) {
+        return String(x.message ?? x);
+      }
+    };
     out.push(["graph_refused", [
       refusal({ join: { a: 1, b: 2 } }),
       refusal({ add_gear: { mate: 0, on: { new_body: 0 }, ring: false } }),
       refusal({ remove: { axis: 9999 } }),
       dropping(),
+      locking(),
     ]]);
     return out;
   }),

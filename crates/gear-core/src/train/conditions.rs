@@ -301,7 +301,7 @@ impl Train {
     /// **The bodies numbered densely**, in order, every number nothing
     /// names given up — what every remove ends with, so a body's number is
     /// its place in the list as a gear's is.
-    fn prune(&mut self) -> Vec<Option<usize>> {
+    fn prune(&mut self) -> Renumbering {
         let max = self.max_body();
         let named: Vec<bool> = (0..=max)
             .map(|b| {
@@ -337,11 +337,10 @@ impl Train {
     /// **What a case or a hold names that the graph has not**: a body that
     /// left the train with the member that was alone on it. A hold goes
     /// whatever is left, since it holds nothing; so does a free entry,
-    /// which says what saying nothing says. A load or a reaction stays, for
-    /// [`Self::keeps_its_loads`] to refuse the edit that cut it off; a
-    /// sweep measured there follows the case's reaction ([`sweep_body`]).
-    /// On an empty train every entry waits for the first preset laid in to
-    /// take it up ([`Self::chain_on`]).
+    /// which says what saying nothing says. A load, a reaction and a sweep
+    /// stay where they were stated, for [`Self::keeps_its_loads`] to refuse
+    /// the edit that cut them off. On an empty train every entry waits for
+    /// the first preset laid in to take it up ([`Self::chain_on`]).
     fn drop_orphans(&mut self) {
         let listed = |b: usize| b == GROUND || self.shape.bodies.iter().any(|x| x.body == b);
         self.held.retain(|&b| listed(b));
@@ -351,12 +350,6 @@ impl Train {
         for case in &mut self.load_cases {
             case.loads
                 .retain(|l| listed(l.at) || l.role != super::LoadRole::Free);
-            let reaction = sweep_body(&case.loads);
-            if let super::Duty::Intermittent { at, .. } = &mut case.duty {
-                if at.is_some_and(|b| !listed(b)) {
-                    *at = reaction;
-                }
-            }
         }
     }
 
@@ -870,9 +863,10 @@ impl Train {
     /// axis distance from each other are refused, as is a part with both —
     /// each by the key that says why ([`super::Edit::Join`], the one way in
     /// from outside the crate).
-    pub(crate) fn join(&mut self, a: usize, b: usize) -> Result<(), super::EditRefused> {
+    pub(crate) fn join(&mut self, a: usize, b: usize) -> Result<Renumbering, super::EditRefused> {
+        let unmoved = unmoved(self.max_body());
         if a == b {
-            return Ok(());
+            return Ok(unmoved);
         }
         let named = |x: usize| x != GROUND && x <= self.max_body();
         if !named(a) || !named(b) {
@@ -917,7 +911,7 @@ impl Train {
                 {
                     self.shape.couplings.push([a, b]);
                 }
-                return Ok(());
+                return Ok(unmoved);
             }
             let apart = |d: &super::shape::Distance| d.axes == [x, y] || d.axes == [y, x];
             if x != y && self.shape.distances.iter().any(apart) {
@@ -933,8 +927,7 @@ impl Train {
             case.loads
                 .retain(|l| !((l.at == a || l.at == b) && l.role == super::LoadRole::Free));
         }
-        let _ = self.merge(a, b);
-        Ok(())
+        Ok(self.merge(a, b))
     }
 
     /// Everything that named `b` names `a`, once, and `b`'s number is given
@@ -945,7 +938,8 @@ impl Train {
     /// and distance on the later moved to the earlier, whose reading stands
     /// ([`Shape::merge_axes`]) — and the body is listed once, where it was
     /// first listed, so each part keeps the order it numbers its bodies in.
-    fn merge(&mut self, a: usize, b: usize) -> impl Fn(usize) -> usize {
+    fn merge(&mut self, a: usize, b: usize) -> Renumbering {
+        let before = self.max_body();
         self.keep_orders(a, b);
         let axis =
             |s: &Shape, body: usize| s.bodies.iter().find(|x| x.body == body).map(|x| x.axis);
@@ -978,10 +972,9 @@ impl Train {
             self.settle_held(a);
         }
         let map = self.prune();
-        move |x: usize| {
-            let x = if x == b { a } else { x };
-            map.get(x).copied().flatten().unwrap_or(x)
-        }
+        (0..=before)
+            .map(|x| map.get(if x == b { a } else { x }).copied().flatten())
+            .collect()
     }
 
     /// **Every part keeps the order it numbers its bodies in** through a
@@ -1084,12 +1077,11 @@ impl Train {
         self.settle_held(body);
     }
 
-    /// **The one way a hold is written**: the body held, every case entry
-    /// at it dropped — a free one, since every edit that holds a body
-    /// refuses where a case loads or reacts there — and a sweep measured
-    /// there moved to the case's reaction by [`sweep_body`]'s rule, unset
-    /// where the case has no entry left. Every edit that leaves a body held
-    /// ends here.
+    /// **The one way a hold is written**: the body held, and every case
+    /// entry at it dropped — a free one, since an edit that leaves a load,
+    /// a reaction or a sweep on a held body is refused
+    /// ([`Self::keeps_its_loads`]). Every edit that leaves a body held ends
+    /// here.
     fn settle_held(&mut self, body: usize) {
         if body == GROUND {
             return;
@@ -1099,12 +1091,6 @@ impl Train {
         }
         for case in &mut self.load_cases {
             case.loads.retain(|l| l.at != body);
-            let reaction = sweep_body(&case.loads);
-            if let super::Duty::Intermittent { at, .. } = &mut case.duty {
-                if *at == Some(body) {
-                    *at = reaction;
-                }
-            }
         }
     }
 
@@ -1246,6 +1232,12 @@ impl Train {
     /// shape laid in takes up the parked cases** at its conventional input
     /// and output.
     pub fn chain_on(&mut self, shape: Shape) {
+        let _ = self.laid_on(shape);
+    }
+
+    /// [`Self::chain_on`], saying where the train's bodies went.
+    fn laid_on(&mut self, shape: Shape) -> Renumbering {
+        let mut map = unmoved(self.max_body());
         let parts = self.parts();
         let k = parts.len();
         let open = self.open_ports();
@@ -1273,12 +1265,14 @@ impl Train {
             // through the first and the parked list read afresh.
             let mut output = output;
             if let Some(&a) = self.parked().first() {
-                output = self.merge(input, a)(output);
+                let merged = self.merge(input, a);
+                output = merged.get(output).copied().flatten().unwrap_or(output);
+                map = then(&map, &merged);
             }
             if let Some(&b) = self.parked().first() {
-                let _ = self.merge(output, b);
+                map = then(&map, &self.merge(output, b));
             }
-            return;
+            return map;
         }
         if let Some(from) = onward {
             for case in &mut self.load_cases {
@@ -1295,9 +1289,12 @@ impl Train {
             }
             // The chain's open output and a body just laid in: neither
             // held, loaded or geared to the other, so nothing refuses.
-            let joined = self.join(from, input);
-            debug_assert!(joined.is_ok(), "{joined:?}");
+            match self.join(from, input) {
+                Ok(joined) => map = then(&map, &joined),
+                Err(e) => debug_assert!(false, "{e:?}"),
+            }
         }
+        map
     }
 
     /// **A shape laid into the graph beside what is there**: its bodies
@@ -1324,19 +1321,23 @@ impl Train {
     /// conventional input made one with `at` — the shaft it runs on —
     /// where given, and chained on from the last part's open output
     /// otherwise ([`Self::chain_on`]).
-    fn insert(&mut self, shape: Shape, at: Option<usize>) -> Result<(), super::EditRefused> {
+    fn insert(
+        &mut self,
+        shape: Shape,
+        at: Option<usize>,
+    ) -> Result<Renumbering, super::EditRefused> {
         let Some(at) = at else {
-            self.chain_on(shape);
-            return Ok(());
+            return Ok(self.laid_on(shape));
         };
         if !self.shape.bodies.iter().any(|b| b.body == at) {
             return Err(super::EditRefused::NoSuchIndex);
         }
         let mut t = self.clone();
+        let laid = unmoved(t.max_body());
         let (input, _) = t.lay(shape);
-        t.join(at, input)?;
+        let joined = t.join(at, input)?;
         *self = t;
-        Ok(())
+        Ok(then(&laid, &joined))
     }
 
     /// **One edit to the train's graph** ([`super::Edit`]), made whole or
@@ -1355,10 +1356,27 @@ impl Train {
     ///
     /// [`super::EditRefused`], the train unchanged.
     pub fn edit(&mut self, edit: super::Edit) -> Result<(), super::EditRefused> {
+        self.edit_renumbered(edit).map(|_| ())
+    }
+
+    /// [`Self::edit`], saying where the train's bodies went
+    /// ([`Renumbering`]).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::edit`].
+    pub(crate) fn edit_renumbered(
+        &mut self,
+        edit: super::Edit,
+    ) -> Result<Renumbering, super::EditRefused> {
         // An edit keeps a well-formed train well formed ([`Self::check`]).
         let asked = (cfg!(debug_assertions) && self.check().is_ok()).then(|| edit.clone());
         let before = self.clone();
-        let made = self.make(edit).and_then(|()| self.keeps_its_loads());
+        let made = self.make(edit).and_then(|map| {
+            self.keeps_its_loads(&before)?;
+            self.locks_nothing(&before, &map)?;
+            Ok(map)
+        });
         if made.is_err() {
             *self = before;
         }
@@ -1370,47 +1388,89 @@ impl Train {
         made
     }
 
-    /// **No case's load or reaction left where no load can enter**: an
-    /// edit that leaves a body a case loads or reacts at no open port —
-    /// held, in no part, or off the train — is refused, since the load
-    /// would be grounded or cut off, and a load is never dropped or moved
-    /// to a guessed body (plan decision 6). A free entry there is dropped:
-    /// it says what saying nothing says; and a sweep there follows the
-    /// case's reaction ([`sweep_body`]), unset where it has none. An empty
-    /// train's cases wait by number.
-    fn keeps_its_loads(&mut self) -> Result<(), super::EditRefused> {
+    /// **No case's load, reaction or sweep left where no load can enter**
+    /// (plan decision 6: a stated figure is never dropped, nor moved to a
+    /// guessed body). An edit that leaves a body a case loads or reacts at
+    /// no open port — held, in no part, or off the train — is refused, and
+    /// so is one that takes a sweep off the open port it was measured at;
+    /// a free entry there is dropped: it says what saying nothing says. An
+    /// empty train's cases wait by number.
+    fn keeps_its_loads(&mut self, before: &Self) -> Result<(), super::EditRefused> {
         if self.shape.members.is_empty() {
             return Ok(());
         }
         let open: Vec<usize> = self.open_ports().iter().map(|p| p.body).collect();
+        let was_open: Vec<usize> = before.open_ports().iter().map(|p| p.body).collect();
         let stranded = |l: &super::Load| !open.contains(&l.at);
         let said = |l: &super::Load| l.role != super::LoadRole::Free;
-        if self
+        let sweep = |c: &super::LoadCase| match c.duty {
+            super::Duty::Intermittent { at, .. } => at,
+            super::Duty::Continuous { .. } => None,
+        };
+        let swept_off = before
             .load_cases
             .iter()
-            .any(|c| c.loads.iter().any(|l| stranded(l) && said(l)))
+            .zip(&self.load_cases)
+            .any(|(b, c)| {
+                sweep(b).is_some_and(|x| was_open.contains(&x))
+                    && !sweep(c).is_some_and(|x| open.contains(&x))
+            });
+        if swept_off
+            || self
+                .load_cases
+                .iter()
+                .any(|c| c.loads.iter().any(|l| stranded(l) && said(l)))
         {
             return Err(super::EditRefused::Loaded);
         }
         for case in &mut self.load_cases {
             case.loads.retain(|l| !stranded(l));
-            let reaction = sweep_body(&case.loads);
-            if let super::Duty::Intermittent { at, .. } = &mut case.duty {
-                if at.is_some_and(|b| !open.contains(&b)) {
-                    *at = reaction;
-                }
-            }
         }
         Ok(())
     }
 
-    /// **The train's degrees of freedom**, holds apart: how many bodies'
-    /// turns its meshes and couplings leave to be given
-    /// ([`crate::kinematics::System::mobility`]); `None` for a train whose
-    /// system does not build, which an edit's own refusals say.
-    fn freedom(&self) -> Option<usize> {
+    /// **No edit forces still a body that could turn** — read from the
+    /// motion the train's meshes, couplings and holds leave it, before the
+    /// edit and after ([`Self::turning`]), each body followed through the
+    /// edit's renumbering. After the edit, a body with no motion at all is
+    /// ground, one the train holds (a hold, or a join to a held body, holds
+    /// it by statement), or one that had none before; any other — one that
+    /// turned, or one the edit added — has been locked, and the edit is
+    /// refused whole ([`super::EditRefused::Locks`]): a gear, a join, a
+    /// move or a hold that locks, alike. A twin at the same ratio, or a
+    /// mesh that takes a freedom a load could have given, forces nothing
+    /// still. `None` from either reading — a graph whose system does not
+    /// build, or an exact ratio past `i128` — is the solve's to name, and
+    /// refuses nothing here.
+    fn locks_nothing(&self, before: &Self, map: &Renumbering) -> Result<(), super::EditRefused> {
+        let (Some(was), Some(now)) = (before.turning(), self.turning()) else {
+            return Ok(());
+        };
+        let locked = now.iter().enumerate().skip(1).any(|(n, &turns)| {
+            let mut from = (0..map.len()).filter(|&o| map[o] == Some(n)).peekable();
+            let could = from.peek().is_none() || from.any(|o| was.get(o) == Some(&true));
+            !turns && could && !self.held.contains(&n)
+        });
+        if locked {
+            return Err(super::EditRefused::Locks);
+        }
+        Ok(())
+    }
+
+    /// **Which bodies can turn** under what the train is — its meshes, its
+    /// couplings and its holds — by number, ground first: a body some motion
+    /// they leave free moves ([`crate::kinematics::Solution::residual`]),
+    /// with nothing driven. `None` where the system does not build or its
+    /// exact arithmetic overflows.
+    fn turning(&self) -> Option<Vec<bool>> {
         let system = self.system().ok()?;
-        system.mobility().map(|m| m.degrees)
+        let conditions = self.conditions(system.bodies()).ok()?;
+        let motion = system.motion(&conditions).ok()?;
+        Some(
+            (0..system.bodies())
+                .map(|b| motion.residual.iter().any(|r| !r.direction[b].is_zero()))
+                .collect(),
+        )
     }
 
     /// Whether the graph lists `body` — ground never, being no body a hold
@@ -1419,9 +1479,25 @@ impl Train {
         body != GROUND && self.shape.bodies.iter().any(|b| b.body == body)
     }
 
-    /// [`Self::edit`], unchecked: each edit's own rule.
-    fn make(&mut self, edit: super::Edit) -> Result<(), super::EditRefused> {
+    /// [`Self::edit`], unchecked: each edit's own rule, and not the
+    /// train's — no load kept ([`Self::keeps_its_loads`]), no lock refused
+    /// ([`Self::locks_nothing`]). For a law that reads what an edit would
+    /// make, and a fixture that builds what no checked edit reaches.
+    pub(crate) fn make(&mut self, edit: super::Edit) -> Result<Renumbering, super::EditRefused> {
+        // One entry per number the train had, and no more: a body the edit
+        // adds is found by no number before it.
+        let numbers = self.max_body() + 1;
+        self.rule(edit).map(|mut map| {
+            map.resize(numbers, None);
+            map
+        })
+    }
+
+    /// [`Self::make`]'s edit, by its own rule: where every number the
+    /// train had went, and any it adds.
+    fn rule(&mut self, edit: super::Edit) -> Result<Renumbering, super::EditRefused> {
         use super::Edit;
+        let unmoved = unmoved(self.max_body());
         match edit {
             Edit::Join { a, b } => self.join(a, b),
             Edit::Hold(body) => {
@@ -1438,7 +1514,7 @@ impl Train {
                     return Err(super::EditRefused::Loaded);
                 }
                 self.hold(body);
-                Ok(())
+                Ok(unmoved)
             }
             Edit::Release(body) => {
                 if !self.lists(body) {
@@ -1448,22 +1524,12 @@ impl Train {
                 // A bare body its hold was all that named goes, as any
                 // edit's does ([`Self::drop_bare`]).
                 self.drop_bare();
-                self.prune();
-                Ok(())
+                Ok(self.prune())
             }
             Edit::Insert { shape, at } => self.insert(shape, at),
             edit => {
                 let next = self.max_body() + 1;
-                let freedom = self.freedom();
                 self.shape.apply(&edit, next)?;
-                // **A gear whose mesh contradicts the motion its bodies
-                // already have locks the train**: the new row is
-                // independent of the rows before it with no new body to
-                // take it up, so the train has one degree of freedom
-                // fewer. A twin at the same ratio adds a dependent row.
-                if matches!(edit, super::Edit::AddGear { .. }) && self.freedom() < freedom {
-                    return Err(super::EditRefused::Locks);
-                }
                 // An empty graph lists nothing: its cases wait by number
                 // for the next preset laid in ([`Self::chain_on`]).
                 if self.shape.members.is_empty() {
@@ -1471,11 +1537,31 @@ impl Train {
                 }
                 self.drop_bare();
                 self.drop_orphans();
-                self.prune();
-                Ok(())
+                // Nothing before renumbers, and what the shape added is
+                // numbered after every body the train had.
+                Ok(self.prune())
             }
         }
     }
+}
+
+/// **Where each body an edit found went**: by the number a body had before
+/// the edit, the number it has after, `None` where the edit gave it up.
+/// Ground is 0 both sides.
+pub(crate) type Renumbering = Vec<Option<usize>>;
+
+/// Every body up to `max` where it was.
+fn unmoved(max: usize) -> Renumbering {
+    (0..=max).map(Some).collect()
+}
+
+/// `first`, then `second`: where each body `first` found went once both
+/// had renumbered.
+fn then(first: &Renumbering, second: &Renumbering) -> Renumbering {
+    first
+        .iter()
+        .map(|x| x.and_then(|y| second.get(y).copied().flatten()))
+        .collect()
 }
 
 /// **Where a case's sweep is measured by default**: its first reacted

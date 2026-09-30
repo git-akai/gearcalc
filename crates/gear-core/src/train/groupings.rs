@@ -527,7 +527,9 @@ mod tests {
     /// repro: a Wolfrom laid in at a Wolfrom's held ring, then one of its
     /// meshes taken out. Both cases solve, and the flow once dropped the
     /// second part's remaining mesh, since every body it reaches is held
-    /// or orbits.
+    /// or orbits. The lay-in locks the second Wolfrom, which an edit now
+    /// refuses (`Locks`), so the train is built as code builds one: the
+    /// insert's own rule, unchecked.
     #[test]
     fn a_part_with_every_end_held_is_said() {
         let lib = test_library();
@@ -535,11 +537,15 @@ mod tests {
             let (a, b) = t.chain_ends().unwrap();
             vec![LoadCase::ultimate(a, b, 1.0, 1000.0)]
         });
-        t.edit(super::super::Edit::Insert {
+        let insert = super::super::Edit::Insert {
             shape: Preset::Wolfrom.build(),
             at: Some(2),
-        })
-        .unwrap();
+        };
+        assert_eq!(
+            t.clone().edit(insert.clone()),
+            Err(super::super::EditRefused::Locks)
+        );
+        t.make(insert).unwrap();
         t.edit(super::super::Edit::Remove(super::super::Piece::Mesh(3)))
             .unwrap();
         let r = solve_train(&t, &lib).unwrap();

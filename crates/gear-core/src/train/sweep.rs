@@ -212,25 +212,50 @@ impl Lcg {
     }
 }
 
+/// **One step of a walk**, as the panel asks it, said in `log`: what it
+/// made, and where the train's bodies went where it was an edit of the
+/// graph's ([`Train::edit`]) — `None` for a case added or its duty
+/// switched, which renumber nothing a case states.
+pub struct Stepped {
+    pub train: Train,
+    /// By the number a body had before the step, the number it has after,
+    /// `None` where the step gave it up.
+    pub renumbered: Option<Vec<Option<usize>>>,
+}
+
 /// One step of a walk: a case added or its duty switched, a hold, a
 /// release or a join at a body, or any offer the graph makes at any
 /// piece — each as the panel asks it, and said in `log`. `None` where the
 /// choice made has nothing to offer; the edit's refusal where an offered
 /// edit is not made, which the walk's laws call a failure.
-pub fn step(t: &Train, rng: &mut Lcg, log: &mut Vec<String>) -> Option<Result<Train, EditRefused>> {
+pub fn step(
+    t: &Train,
+    rng: &mut Lcg,
+    log: &mut Vec<String>,
+) -> Option<Result<Stepped, EditRefused>> {
     let mut u = t.clone();
+    let edited = |mut u: Train, edit: Edit| {
+        u.edit_renumbered(edit).map(|map| Stepped {
+            train: u,
+            renumbered: Some(map),
+        })
+    };
+    let case = |train: Train| Stepped {
+        train,
+        renumbered: None,
+    };
     match rng.pick(8) {
         0 => {
             let kind = [CaseKind::Ultimate, CaseKind::Fatigue][rng.pick(2)];
             log.push(format!("fresh_case({kind:?})"));
-            let case = u.fresh_case(kind, TORQUE_NM, SPEED_RPM);
-            u.load_cases.push(case);
-            Some(Ok(u))
+            let fresh = u.fresh_case(kind, TORQUE_NM, SPEED_RPM);
+            u.load_cases.push(fresh);
+            Some(Ok(case(u)))
         }
         1 if !u.load_cases.is_empty() => {
-            let (case, intermittent) = (rng.pick(u.load_cases.len()), rng.pick(2) == 0);
-            log.push(format!("set_duty({case}, {intermittent})"));
-            Some(u.set_duty(case, intermittent).map(|()| u))
+            let (c, intermittent) = (rng.pick(u.load_cases.len()), rng.pick(2) == 0);
+            log.push(format!("set_duty({c}, {intermittent})"));
+            Some(u.set_duty(c, intermittent).map(|()| case(u)))
         }
         2 | 3 if !u.shape.bodies.is_empty() => {
             let b = u.shape.bodies[rng.pick(u.shape.bodies.len())].body;
@@ -243,7 +268,7 @@ pub fn step(t: &Train, rng: &mut Lcg, log: &mut Vec<String>) -> Option<Result<Tr
                 .collect();
             let edit = open.get(rng.pick(open.len()))?.clone();
             log.push(format!("{edit:?}"));
-            Some(u.edit(edit).map(|()| u))
+            Some(edited(u, edit))
         }
         _ => {
             let at = targets(t);
@@ -259,7 +284,7 @@ pub fn step(t: &Train, rng: &mut Lcg, log: &mut Vec<String>) -> Option<Result<Tr
                 e => format!("{e:?}"),
             };
             log.push(format!("{named} @ {at:?}"));
-            Some(u.edit(offer.edit.clone()).map(|()| u))
+            Some(edited(u, offer.edit.clone()))
         }
     }
 }
@@ -271,20 +296,31 @@ pub fn step(t: &Train, rng: &mut Lcg, log: &mut Vec<String>) -> Option<Result<Tr
 /// walk's laws take the same steps from the same seeds.
 #[must_use]
 pub fn visited() -> Vec<(String, Vec<String>, Train)> {
+    walked(0..WALKS, DEPTH)
+}
+
+/// [`visited`], over the walks `seeds` — walk `w` from start `w mod n` with
+/// seed `w` — of `depth` steps each.
+#[must_use]
+pub fn walked(seeds: std::ops::Range<usize>, depth: usize) -> Vec<(String, Vec<String>, Train)> {
     let starts = starts();
     let mut out = Vec::new();
-    for walk in 0..WALKS {
+    for walk in seeds {
         let (name, start) = &starts[walk % starts.len()];
         let mut rng = Lcg(walk as u64);
         let mut t = start.clone();
         let mut steps: Vec<String> = Vec::new();
         out.push((format!("walk {walk}, {name}"), steps.clone(), t.clone()));
-        for _ in 0..DEPTH {
+        for _ in 0..depth {
             match step(&t, &mut rng, &mut steps) {
                 None => {}
                 Some(Ok(u)) => {
-                    out.push((format!("walk {walk}, {name}"), steps.clone(), u.clone()));
-                    t = u;
+                    out.push((
+                        format!("walk {walk}, {name}"),
+                        steps.clone(),
+                        u.train.clone(),
+                    ));
+                    t = u.train;
                 }
                 Some(Err(_)) => break,
             }

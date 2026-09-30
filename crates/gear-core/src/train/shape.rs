@@ -519,6 +519,18 @@ impl Shape {
             .unwrap_or_else(|_| s.asked(&helix).iter().map(|a| a.settled).collect())
     }
 
+    /// **What the solve builds** ([`cut`]): every member at its group's
+    /// module and pressure angle, at the shifts the shape settles on, and
+    /// each distance at the running distance its tips hold it to.
+    #[cfg(test)]
+    pub(crate) fn built(&self) -> Result<Built, TrainError> {
+        let shared = self.shared();
+        let s = shared.indexed();
+        let helix = s.helix_angles();
+        let chosen = s.chosen_at(&crate::auto::Search::SHIPPED, &helix)?;
+        s.build(&chosen.shifts, &helix, &chosen.held)
+    }
+
     /// Every member cut and every mesh at its running distance, at these
     /// shifts, the helices as the readings decide.
     #[cfg(test)]

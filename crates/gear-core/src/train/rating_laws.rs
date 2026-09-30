@@ -483,17 +483,20 @@ fn the_canary_says_its_flank_is_past_its_allowable() {
 }
 
 /// **A tip asked to be held reaches past nothing, exactly, and is never cut
-/// into a negative tooth**: the train's graph built at the shifts it
-/// settles on, each held tip compared with the conjugate of its mate's
+/// into a negative tooth**: the train's graph built as the solve builds it
+/// (`Shape::built`: the shifts it settles on, each distance where its tips
+/// hold it), each held tip compared with the conjugate of its mate's
 /// junction directly (`shape::tip_hold::tips_check`), and every member held
-/// by its mates at a positive addendum.
+/// by its mates at a positive addendum. (It built at the plan's distances,
+/// not the ones the tips opened out, and a train that solved then read as
+/// one whose graph does not build.)
 pub(super) fn held_tips_reach_past_nothing(
     t: &Train,
     r: &super::TrainResult,
 ) -> Result<(), String> {
-    let shape = &t.shape;
+    let shape = &t.shape.shared();
     let built = shape
-        .build_at(&shape.shifts())
+        .built()
         .map_err(|e| format!("solved, but its graph does not build: {e}"))?;
     let found = super::shape::tip_hold::tips_check(shape, &built);
     if !found.is_empty() {
