@@ -26,6 +26,22 @@ pub enum MaterialError {
     Empty,
     /// Two materials share a name, so a selection by name would be ambiguous.
     DuplicateName(String),
+    /// A figure no material has — not finite, or outside its row
+    /// ([`gear_core::input::MATERIAL`]) — named by its path in the file.
+    Implausible(gear_core::input::Refused),
+}
+
+impl MaterialError {
+    /// The catalogue's note, where the refusal has one: a figure no
+    /// material has. The rest are the parser's words or this module's.
+    #[must_use]
+    pub fn note(&self) -> Option<gear_core::note::Note> {
+        use gear_core::note::Explain;
+        match self {
+            Self::Implausible(r) => Some(r.note()),
+            _ => None,
+        }
+    }
 }
 
 impl std::fmt::Display for MaterialError {
@@ -37,6 +53,7 @@ impl std::fmt::Display for MaterialError {
             Self::DuplicateName(n) => {
                 write!(f, "material library contains two materials named {n:?}")
             }
+            Self::Implausible(r) => write!(f, "material library is not valid: {r}"),
         }
     }
 }
@@ -47,9 +64,12 @@ impl std::error::Error for MaterialError {}
 ///
 /// Rejects an empty library and duplicate names rather than accepting them:
 /// both would surface much later as a material that cannot be selected, or one
-/// that silently shadows another.
+/// that silently shadows another. Every figure is read against its row
+/// ([`MaterialLibrary::check`]), named by its path in the file where it
+/// describes no material.
 pub fn from_toml(src: &str) -> Result<MaterialLibrary, MaterialError> {
     let lib: MaterialLibrary = toml::from_str(src).map_err(MaterialError::Parse)?;
+    lib.check().map_err(MaterialError::Implausible)?;
 
     if lib.is_empty() {
         return Err(MaterialError::Empty);
@@ -215,26 +235,109 @@ mod tests {
         assert_eq!(lib, back);
     }
 
+    /// **Every shipped material is one the boundary admits** — the rows a
+    /// file's are read against ([`MaterialLibrary::check`]) — and sits
+    /// inside the band real engineering materials do: a Poisson's ratio
+    /// from 0.2, and a cyclic allowable strictly below the static one. The
+    /// band is a sanity check of this library's data, not a physical limit,
+    /// so it is the test's and not the reader's.
     #[test]
     fn every_material_carries_physically_sane_values() {
-        for m in &default_library().materials {
+        let lib = default_library();
+        lib.check().unwrap();
+        for m in &lib.materials {
             let name = &m.name;
-            assert!(m.density.value > 0.0, "{name}: density");
-            assert!(m.elastic_modulus.value > 0.0, "{name}: modulus");
-
-            // Outside (-1, 0.5) a material has a negative bulk or shear
-            // modulus. Real engineering materials sit well inside that.
             let nu = m.poissons_ratio.value;
             assert!((0.2..0.5).contains(&nu), "{name}: Poisson's ratio {nu}");
-
-            // A cyclic allowable at or above the peak allowable would mean
-            // fatigue never governs, which is never true.
             assert!(
                 m.fatigue_allowable.value < m.ultimate_allowable.value,
                 "{name}: fatigue allowable is not below ultimate"
             );
-            assert!(m.fatigue_allowable.value > 0.0, "{name}: fatigue allowable");
         }
+    }
+
+    /// **A figure no material has is refused by its path in the file**, and
+    /// the same figure given as a member's replacement is refused by its
+    /// path in the train: for every shipped material and every figure, nought,
+    /// minus one, not a number, and a Poisson's ratio at 0.7 — past the
+    /// incompressible limit, where the shear modulus goes negative — each
+    /// refused naming the field; the limit itself, ν = ½, admitted in both.
+    #[test]
+    fn a_figure_no_material_has_is_refused_by_its_field() {
+        use gear_core::input::Refused;
+        use gear_core::material::Overrides;
+        use gear_core::train::arrangements as arr;
+        use gear_core::train::{solve_train, Train, TrainError};
+        type Figure = (
+            &'static str,
+            fn(&mut gear_core::Material) -> &mut f64,
+            fn(&mut Overrides) -> &mut Option<f64>,
+        );
+        let figures: [Figure; 5] = [
+            ("density", |m| &mut m.density.value, |o| &mut o.density),
+            (
+                "elastic_modulus",
+                |m| &mut m.elastic_modulus.value,
+                |o| &mut o.elastic_modulus,
+            ),
+            (
+                "poissons_ratio",
+                |m| &mut m.poissons_ratio.value,
+                |o| &mut o.poissons_ratio,
+            ),
+            (
+                "ultimate_allowable",
+                |m| &mut m.ultimate_allowable.value,
+                |o| &mut o.ultimate_allowable,
+            ),
+            (
+                "fatigue_allowable",
+                |m| &mut m.fatigue_allowable.value,
+                |o| &mut o.fatigue_allowable,
+            ),
+        ];
+        let shipped = default_library();
+        let mut refused = 0;
+        for (i, material) in shipped.materials.iter().enumerate() {
+            for (name, in_library, in_overrides) in figures {
+                let wrong: &[f64] = if name == "poissons_ratio" {
+                    &[-1.0, f64::NAN, 0.7]
+                } else {
+                    &[0.0, -1.0, f64::NAN]
+                };
+                for &x in wrong {
+                    // In the file.
+                    let mut lib = shipped.clone();
+                    *in_library(&mut lib.materials[i]) = x;
+                    let text = to_toml(&lib).unwrap();
+                    match from_toml(&text) {
+                        Err(MaterialError::Implausible(Refused { field, .. })) => {
+                            assert_eq!(field, format!("material.{i}.{name}.value"), "{x}");
+                        }
+                        other => panic!("{name} = {x}: refused by its field, not {other:?}"),
+                    }
+                    // As a member's replacement, on a pair of this material.
+                    let mut s = arr::pair([17, 43]);
+                    s.members[0].gear.material.clone_from(&material.name);
+                    *in_overrides(&mut s.members[0].gear.material_overrides) = Some(x);
+                    let t = Train::alone(&s, 2.0, 100.0);
+                    match solve_train(&t, &shipped) {
+                        Err(TrainError::Input(Refused { field, .. })) => assert_eq!(
+                            field,
+                            format!("shape.members.0.gear.material_overrides.{name}"),
+                            "{x}"
+                        ),
+                        other => panic!("override {name} = {x}: refused, not {:?}", other.err()),
+                    }
+                    refused += 2;
+                }
+            }
+            // The incompressible limit is a solid.
+            let mut lib = shipped.clone();
+            lib.materials[i].poissons_ratio.value = 0.5;
+            assert!(from_toml(&to_toml(&lib).unwrap()).is_ok());
+        }
+        assert_eq!(refused, shipped.len() * figures.len() * 3 * 2);
     }
 
     /// Every entry describes one state, and says which. That is what replaced

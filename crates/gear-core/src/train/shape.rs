@@ -745,7 +745,7 @@ impl Indexed<'_> {
         let eff = |i: usize| shifts[i] + self.base_params(i, helix).thickness_shift();
         Screw::new(&ScrewParams {
             normal_module: module,
-            normal_pressure_angle_rad: pressure_angle.to_radians(),
+            normal_pressure_angle_rad: self.base_params(m.a, helix).normal_pressure_angle_rad().0,
             shaft_angle_rad: self.shaft_angle_of(mesh).to_radians(),
             starts: self.members[m.a].gear.teeth,
             wheel_teeth: self.members[m.b].gear.teeth,
@@ -1339,7 +1339,7 @@ impl Indexed<'_> {
         let m = self.meshes[mesh];
         BasicRack::new(
             self.members[m.a].normal_module(),
-            self.members[m.a].normal_pressure_angle(),
+            self.base_params(m.a, helix).normal_pressure_angle_deg().0,
             helix[m.a].abs(),
         )
     }
@@ -4330,7 +4330,7 @@ pub fn rate(
         match &bm.contact {
             BuiltContact::Line(l) => {
                 let rack = shape.rack_of(k, helix);
-                let alpha_n = shape.members[m.a].normal_pressure_angle().to_radians();
+                let (alpha_n, _) = shape.base_params(m.a, helix).normal_pressure_angle_rad();
                 let bb = crate::plane::base_helix_angle(helix[m.a].to_radians(), alpha_n);
                 let slide = axial * bb.sin().abs();
                 let p_bn = std::f64::consts::PI * rack.mn * alpha_n.cos();

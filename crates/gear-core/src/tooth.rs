@@ -381,10 +381,7 @@ impl Tooth {
     pub fn tool_wanted_by(params: &GearParams) -> (Rack, Vec<Note>) {
         let z = f64::from(params.teeth.max(1));
         let m = params.module;
-        let an = params
-            .pressure_angle
-            .to_radians()
-            .max(guard::MIN_PRESSURE_ANGLE_DEG.to_radians());
+        let (an, _) = params.normal_pressure_angle_rad();
         let beta = params.helix_angle.to_radians();
         let alpha_t = crate::plane::transverse_pressure_angle(an, beta);
         let r = m / beta.cos() * z / 2.0;
@@ -423,12 +420,11 @@ impl Tooth {
         let x = params.profile_shift;
 
         // ---- pressure angle, guarded -----------------------------------
-        let mut an = params.pressure_angle.to_radians();
-        if an <= guard::MIN_PRESSURE_ANGLE_DEG.to_radians() {
-            an = guard::MIN_PRESSURE_ANGLE_DEG.to_radians();
+        let (an, raised) = params.normal_pressure_angle_rad();
+        if raised {
             clamps.push(Note::new(key::CLAMP_PRESSURE_ANGLE_RAISED).number(
                 "degrees",
-                guard::MIN_PRESSURE_ANGLE_DEG,
+                an.to_degrees(),
                 1,
             ));
         }
@@ -555,10 +551,17 @@ impl Tooth {
         };
 
         let junction = g.solve_junction();
-        // Unreachable for finite inputs (see `solve_junction`), and every test
-        // build asks; were it reached, the tooth is read as having no flank,
-        // which no rating uses, and says so rather than guess a junction.
-        debug_assert!(junction.is_some(), "unsolved flank junction: {params:?}");
+        // Unreachable for input the boundary admits (`GearParams::check`) at
+        // a scale whose squares are normal doubles — the involute's roll is
+        // `√(r² − r_b²)`, which past `√f64::MAX` or below
+        // `√f64::MIN_POSITIVE` is no number at all (see `solve_junction`) —
+        // and every test build asks. Reached, the tooth is read as having no
+        // flank, which no rating uses, and says so rather than guess a
+        // junction: a module of 1e154 mm on 17 teeth does.
+        debug_assert!(
+            junction.is_some() || params.check().is_err() || !(g.ra * g.ra).is_normal(),
+            "unsolved flank junction: {params:?}"
+        );
         match junction {
             None => {
                 g.u_j = g.u_tip;

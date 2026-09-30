@@ -7,7 +7,8 @@
 // numbering and roles (`members.ts`), the field by its label — so the refusal
 // says which box, not which JSON leaf.
 
-import { t } from "./strings.svelte";
+import { note, t } from "./strings.svelte";
+import type { Note } from "./wire";
 import { bodyName, gearLabel } from "./members";
 import { FIELDS, solveTrain, type Train } from "./core";
 
@@ -167,8 +168,23 @@ function pieceName(train: Train, path: Path): string | null {
   return null;
 }
 
+/** **A refusal that crossed as a note** — a file of another format, a graph
+ *  that describes no train, a value the core's table refuses by the field it
+ *  names — in the catalogue's words; a parser's complaint, which names the
+ *  line, as it came. */
+export function said(message: string): string {
+  try {
+    const n = JSON.parse(message) as Note;
+    if (typeof n?.key === "string") return note(n);
+  } catch {
+    // Not a note: the parser's own words.
+  }
+  return message;
+}
+
 /** **Why a call into the core failed**, as the catalogue says it: a number
- *  that would not cross, named; any other failure, as it came. */
+ *  that would not cross, named; a refusal that crossed as a note, in its
+ *  words; any other failure, as it came. */
 export function failureDetail(e: unknown): string {
   if (e instanceof NotFinite) {
     const train = trainOf(e.root);
@@ -178,5 +194,5 @@ export function failureDetail(e: unknown): string {
     const named = [piece, field].filter((x) => x !== null).join(" · ");
     return t("ui.boundary_not_finite", { field: named || t("ui.boundary_an_input") });
   }
-  return e instanceof Error ? e.message : String(e);
+  return said(e instanceof Error ? e.message : String(e));
 }

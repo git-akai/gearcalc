@@ -620,13 +620,16 @@ impl Gear {
                 let (r, th) = g.half_profile((per_tooth / 2).max(8));
                 let mut r_full: Vec<f64> = r.iter().rev().copied().collect();
                 let mut th_full: Vec<f64> = th.iter().rev().map(|t| -t).collect();
-                r_full.extend_from_slice(&r[1..]);
-                th_full.extend_from_slice(&th[1..]);
+                // The tip centre is shared by the two halves; a half with no
+                // point (a tooth refused at the boundary, built anyway) draws
+                // nothing rather than indexing one.
+                r_full.extend(r.iter().skip(1));
+                th_full.extend(th.iter().skip(1));
                 (r_full, th_full)
             })
             .collect();
 
-        let mut out = Vec::with_capacity(halves[0].0.len() * self.which.len() + 1);
+        let mut out = Vec::new();
         for (k, &i) in self.which.iter().enumerate() {
             let (r_full, th_full) = &halves[i];
             let base = self.seat[k];

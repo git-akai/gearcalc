@@ -356,16 +356,39 @@ enum Record {
     Elsewhere(&'static str),
 }
 
-/// A positional argument, or its default. Written out forty times before this
-/// existed, which made adding one a matter of copying the incantation.
+/// A positional argument, or its default where it is absent. Written out
+/// forty times before this existed, which made adding one a matter of
+/// copying the incantation. **An argument given that is not the number asked
+/// for is refused**, naming its place: read past, it was the default in
+/// silence — `show 0x11` a 17-tooth gear.
 fn arg<T: std::str::FromStr>(args: &[String], n: usize, default: T) -> T {
-    args.get(n).and_then(|s| s.parse().ok()).unwrap_or(default)
+    opt(args, n).unwrap_or(default)
 }
 
 /// ...and one that is genuinely optional, where absent is not a default value
 /// but a different question.
 fn opt<T: std::str::FromStr>(args: &[String], n: usize) -> Option<T> {
-    args.get(n).and_then(|s| s.parse().ok())
+    args.get(n).map(|s| {
+        s.parse().unwrap_or_else(|_| {
+            refuse(&format!("argument {n}, {s:?}, is not a number of its kind"))
+        })
+    })
+}
+
+/// **Refused**: what was asked describes nothing, said, and the harness stops
+/// with a non-zero status rather than answering something else.
+fn refuse(why: &dyn std::fmt::Display) -> ! {
+    eprintln!("refused: {why}");
+    std::process::exit(2)
+}
+
+/// **A gear as the harness is asked it**, read against the table every entry
+/// reads it through (`gear_core::input::GEAR`): refused naming the field.
+fn asked(p: GearParams) -> GearParams {
+    if let Err(e) = p.check() {
+        refuse(&e);
+    }
+    p
 }
 
 const COMMANDS: &[Command] = &[
@@ -2307,16 +2330,16 @@ fn strength_report(
     };
 
     // Meshing helical gears have equal and opposite hands.
-    let g1 = Tooth::new(GearParams {
+    let g1 = Tooth::new(asked(GearParams {
         teeth: z1,
         helix_angle: helix,
         ..Default::default()
-    });
-    let g2 = Tooth::new(GearParams {
+    }));
+    let g2 = Tooth::new(asked(GearParams {
         teeth: z2,
         helix_angle: -helix,
         ..Default::default()
-    });
+    }));
     let Ok(mesh) = Mesh::new(&g1, &g2, MeshKind::External) else {
         eprintln!("z={z1}/{z2} cannot mesh");
         return;
@@ -2506,13 +2529,13 @@ fn iso_report(z: [u32; 2], alpha: f64, helix: f64, x: [f64; 2], face: f64, torqu
         return;
     };
     let gear = |i: usize, hand: f64| {
-        Tooth::new(GearParams {
+        Tooth::new(asked(GearParams {
             teeth: z[i],
             pressure_angle: alpha,
             helix_angle: hand * helix,
             profile_shift: x[i],
             ..Default::default()
-        })
+        }))
     };
     let g = [gear(0, 1.0), gear(1, -1.0)];
     let (Ok(mesh), Ok(back)) = (
@@ -2764,7 +2787,7 @@ fn materials() {
 }
 
 fn show(p: GearParams) {
-    let g = Tooth::new(p);
+    let g = Tooth::new(asked(p));
     println!(
         "module {}  z {}  alpha {}  x {:+}  beta {}  k {}",
         p.module, p.teeth, p.pressure_angle, p.profile_shift, p.helix_angle, p.thickness_mod
@@ -2948,12 +2971,13 @@ fn verify(limit: usize) {
 
 /// Write a DXF to stdout, for inspecting or importing into CAD.
 fn dxf(teeth: u32, x: f64, tol: f64, angular_shift: f64) {
-    let g = gear_core::gear::Gear::new(GearParams {
+    let g = gear_core::gear::Gear::new(asked(GearParams {
         teeth,
         profile_shift: x,
         angular_shift,
         ..Default::default()
-    });
+    }));
+    chord(tol);
     print!(
         "{}",
         gear_io::gear_to_dxf(
@@ -2969,13 +2993,14 @@ fn dxf(teeth: u32, x: f64, tol: f64, angular_shift: f64) {
 /// A ring's bore, cut by the default shaper, as a DXF on stdout.
 fn dxf_ring(teeth: u32, x: f64, tol: f64) {
     let ring = gear_core::ring::Ring::cut_by(
-        &GearParams {
+        &asked(GearParams {
             teeth,
             profile_shift: x,
             ..Default::default()
-        },
+        }),
         &gear_core::ring::Cutter::default(),
     );
+    chord(tol);
     print!(
         "{}",
         gear_io::ring_to_dxf(
@@ -2986,6 +3011,13 @@ fn dxf_ring(teeth: u32, x: f64, tol: f64) {
             }
         )
     );
+}
+
+/// A drawing's chord tolerance, read against its row.
+fn chord(tol: f64) {
+    if let Err(e) = gear_core::input::asked(&gear_core::input::CHORD_TOLERANCE, Some(tol), "") {
+        refuse(&e);
+    }
 }
 
 /// Emit an HTML page showing the bending construction, for visual checking.

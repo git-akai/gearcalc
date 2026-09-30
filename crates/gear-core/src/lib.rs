@@ -22,6 +22,7 @@ pub mod contact;
 pub mod elliptic;
 pub mod gear;
 pub mod hertz;
+pub mod input;
 
 pub mod involute;
 pub mod jgma;

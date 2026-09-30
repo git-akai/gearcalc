@@ -11,6 +11,7 @@ import {
   editTrain,
   offersAt,
   previewEdit,
+  profile,
   relieveCase,
   relieveTrain,
   solve,
@@ -66,4 +67,38 @@ test("the gear tab's solve, export and adopt say it in the same words", () => {
   expect(dxf(req)).toEqual({ error: sentence });
   const { train, sentence: member } = broken();
   expect(adoptMember(train, 0)).toEqual({ error: t(KEY, { detail: member }) });
+});
+
+// **A value the core's table refuses is said by the field it names**, in the
+// catalogue's words — on the gear tab's solve, its drawing and its export,
+// and a train's edit — never a raw note or nothing.
+test("a value that describes nothing is refused in the catalogue's words", () => {
+  const d = defaults().gear;
+  const req: GearRequest = { params: { ...d.params, module: 0 }, chord_tolerance: d.chord_tolerance, reference_circles: false };
+  const sentence = t(KEY, {
+    detail: t("error.input_out_of_range", { field: "params.module", value: "0", bound: "(0, ∞)" }),
+  });
+  expect(solve(req)).toEqual({ error: sentence });
+  expect(dxf(req)).toEqual({ error: sentence });
+  expect(profile(req, 600)).toEqual({ error: sentence });
+  const train = defaultTrain();
+  train.shape.members[0].gear.teeth = 0;
+  const edited = editTrain(train, { add_case: "ultimate" });
+  expect(edited?.values.detail).toBe(
+    t("error.input_out_of_range", { field: "train.shape.members.0.gear.teeth", value: "0", bound: "[1, ∞)" }),
+  );
+});
+
+// **A trap is said with the words its panic had, and the core answers the
+// next call.** A gear of four billion teeth is a count the table admits and
+// a drawing no 32-bit memory holds: the seat list's capacity overflows, a
+// panic the browser sees only as "unreachable".
+test("a trap is said, not swallowed, and the next call is answered", () => {
+  const d = defaults().gear;
+  const huge: GearRequest = { params: { ...d.params, teeth: 4_000_000_000 }, chord_tolerance: d.chord_tolerance, reference_circles: false };
+  const r = profile(huge, 8);
+  expect("error" in r && r.error).toContain("capacity overflow");
+  const good: GearRequest = { params: d.params, chord_tolerance: d.chord_tolerance, reference_circles: false };
+  expect("ok" in solve(good)).toBe(true);
+  expect("ok" in profile(good, 600)).toBe(true);
 });

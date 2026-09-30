@@ -26,7 +26,7 @@
 //! deletes the containment test, which was the least trustworthy step in the
 //! suite.
 
-use crate::params::{guard, GearParams};
+use crate::params::GearParams;
 use crate::tooth::{Rack, Tooth};
 
 /// The generating rack, rebuilt from the basic-rack inputs and the settled tool
@@ -69,10 +69,7 @@ impl BasicRack {
     pub fn new(p: &GearParams, tool: Rack) -> Self {
         use std::f64::consts::PI;
         let m = p.module;
-        let an = p
-            .pressure_angle
-            .to_radians()
-            .max(guard::MIN_PRESSURE_ANGLE_DEG.to_radians());
+        let (an, _) = p.normal_pressure_angle_rad();
         let beta = p.helix_angle.to_radians();
         let alpha_t = crate::plane::transverse_pressure_angle(an, beta);
         let mt = m / beta.cos();

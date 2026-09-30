@@ -1076,36 +1076,59 @@ impl Shape {
         self.distances_in_a_frame()
     }
 
-    /// **[`Self::invariants`], as the solve refuses** — before anything
-    /// reads the graph, so a carrier cycle cannot send a walk down it round
-    /// for ever and a graph that describes no train is refused by name, not
-    /// by the symptom a later reading meets.
+    /// **Every number in the graph read against its row
+    /// ([`crate::input::shape`]), then [`Self::invariants`], as the solve
+    /// refuses** — before anything reads the graph, so an index past its
+    /// list cannot be followed, a carrier cycle cannot send a walk down it
+    /// round for ever, and a graph that describes no train is refused by
+    /// name, not by the symptom a later reading meets.
     ///
     /// # Errors
     ///
-    /// [`super::TrainError::Malformed`], naming the invariant and its field.
+    /// [`super::TrainError::Input`], naming the field, or
+    /// [`super::TrainError::Malformed`], naming the invariant and its piece.
     pub fn validate(&self) -> Result<(), super::TrainError> {
+        crate::input::shape(self).map_err(super::TrainError::Input)?;
         self.invariants().map_err(super::TrainError::Malformed)
     }
 }
 
 impl super::Train {
-    /// **What input must satisfy before anything reads it** — its graph's
-    /// ([`Shape::validate`]). Called where a train enters: the solve, a
-    /// file read, and every wasm entry point.
+    /// **What input must satisfy before anything reads it** — every number
+    /// in it read against its row ([`crate::input::train`]: its graph's,
+    /// its holds' and its cases'), then its graph's invariants
+    /// ([`Shape::invariants`]) and its numbering. Called where a train
+    /// enters: the solve, a file read, and every wasm entry point.
     ///
     /// # Errors
     ///
-    /// [`super::TrainError::Malformed`], naming the invariant and its field.
+    /// [`super::TrainError::Input`], naming the field, or
+    /// [`super::TrainError::Malformed`], naming the invariant and its piece.
     pub fn validate(&self) -> Result<(), super::TrainError> {
-        self.shape.validate()?;
+        self.validate_graph()?;
+        crate::input::figures(self).map_err(super::TrainError::Input)
+    }
+
+    /// **What reading the train's graph needs**: every index in it naming
+    /// something ([`crate::input::graph`]), its graph's invariants
+    /// ([`Shape::invariants`]) and its numbering — what its parts, ports
+    /// and names are read off, whatever its figures hold.
+    ///
+    /// # Errors
+    ///
+    /// [`super::TrainError::Input`], naming the field, or
+    /// [`super::TrainError::Malformed`], naming the invariant and its piece.
+    pub fn validate_graph(&self) -> Result<(), super::TrainError> {
+        crate::input::graph(self).map_err(super::TrainError::Input)?;
+        self.shape
+            .invariants()
+            .map_err(super::TrainError::Malformed)?;
         // **The graph's bodies numbered from 1 without a gap**, the number
-        // every part, case and hold names a body by. A hold or a case at a
-        // number past the graph's is the solve's to name (a body the train
-        // does not have); a gap in the graph's own numbering is no body at
-        // all.
+        // every part, case and hold names a body by. Every number the graph
+        // lists is one of its `n` (the rows read it), so a number of those
+        // `n` that nothing names is one the list holds twice: no body at all.
         let s = &self.shape;
-        match (1..=s.max_body()).find(|&b| s.slot_if_any(b).is_none()) {
+        match (1..=s.bodies.len()).find(|&b| s.slot_if_any(b).is_none()) {
             Some(b) => Err(super::TrainError::Malformed(Invariant::NumberGap(b))),
             None => Ok(()),
         }
@@ -1355,13 +1378,24 @@ mod tests {
         );
         checked += 1;
 
-        // A body number skipped: a pair's second body numbered 3.
+        // A body number skipped: a pair's second body numbered 3 — past the
+        // two the graph lists, so its own field names it (`crate::input`).
         let mut gap = Preset::Spur.build();
         gap.renumber_bodies(|b| if b == 2 { 3 } else { b });
         let cases = vec![LoadCase::ultimate(1, 3, 2.0, 3000.0)];
         refused(
             "a body number skipped",
             &train(gap, cases),
+            "error.input_out_of_range",
+        );
+        checked += 1;
+        // ...and one listed twice, which leaves a number inside the list
+        // that nothing names: the gap.
+        let mut twice = Preset::Spur.build();
+        twice.renumber_bodies(|_| 1);
+        refused(
+            "a body number listed twice",
+            &train(twice, Vec::new()),
             "error.train_malformed_number_gap",
         );
         checked += 1;
@@ -1373,7 +1407,7 @@ mod tests {
             ),
         );
 
-        assert_eq!(checked, 6);
+        assert_eq!(checked, 7);
     }
 
     /// **Every train an edit makes validates, and so does every part of

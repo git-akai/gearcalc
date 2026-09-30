@@ -710,10 +710,12 @@ pub fn crossed(teeth: [u32; 2], shaft_angle: f64) -> Shape {
 #[must_use]
 pub fn worm(starts: u32, wheel_teeth: u32) -> Shape {
     let mut shape = crossed([starts, wheel_teeth], 90.0);
-    // The helix boxes hold what 7 mm on one start gives — `cos β₁ = m/d₁`,
+    // The helix boxes hold what 7 mm on one start gives — `cos β₁ = z₁m/d₁`,
     // and the wheel's is the rest of the right angle — so a reading pinned
     // by relief stands where the diameter had it rather than at a zero.
-    let helix = (f64::from(starts) / 7.0).acos().to_degrees();
+    // Where 7 mm cannot hold the starts, `z₁m ≥ d₁`, no helix reads it and
+    // the box holds straight teeth, the nearest: never a not-a-number.
+    let helix = (f64::from(starts) / 7.0).min(1.0).acos().to_degrees();
     shape.distances[0].worm = true;
     shape.distances[0].axial_clearance = 0.04;
     shape.members[0].pitch_diameter = Auto::fixed(7.0);

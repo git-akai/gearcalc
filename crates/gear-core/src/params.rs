@@ -104,11 +104,34 @@ impl GearParams {
     pub fn thickness_shift(&self) -> f64 {
         // The guarded angle every other reader takes: at 0° the raw one made
         // this `0 · ∞`, and the whole tooth NaN.
-        let an = self
-            .pressure_angle
-            .to_radians()
-            .max(guard::MIN_PRESSURE_ANGLE_DEG.to_radians());
+        let (an, _) = self.normal_pressure_angle_rad();
         std::f64::consts::PI * (self.thickness_mod - 1.0) / (4.0 * an.tan())
+    }
+
+    /// **The normal pressure angle a tooth is cut at, degrees, and whether
+    /// the floor raised it** — the one reading of it every generator,
+    /// search and mesh takes. Below [`guard::MIN_PRESSURE_ANGLE_DEG`] the
+    /// base circle nears the pitch circle and the involute degenerates, so
+    /// the angle is held there and the tooth says so
+    /// (`clamp.pressure_angle_raised`, rule 5: nearly a tooth); at the floor
+    /// it is the angle asked, and nothing is said. Nought and below
+    /// describe no tooth, and are refused where input enters
+    /// ([`crate::input::PRESSURE_ANGLE`]).
+    #[must_use]
+    pub fn normal_pressure_angle_deg(&self) -> (f64, bool) {
+        let floor = guard::MIN_PRESSURE_ANGLE_DEG;
+        if self.pressure_angle < floor {
+            (floor, true)
+        } else {
+            (self.pressure_angle, false)
+        }
+    }
+
+    /// [`Self::normal_pressure_angle_deg`], in radians.
+    #[must_use]
+    pub fn normal_pressure_angle_rad(&self) -> (f64, bool) {
+        let (deg, raised) = self.normal_pressure_angle_deg();
+        (deg.to_radians(), raised)
     }
 
     /// Whether these two gears were cut by the same rack, so that they *could*

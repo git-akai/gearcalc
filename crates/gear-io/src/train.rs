@@ -125,9 +125,10 @@ pub enum DocumentError {
     /// The document states a format other than [`FORMAT`] — the one it
     /// names — or none, having been written before the format was numbered.
     Format(Option<i64>),
-    /// The document parses but describes no train: its graph breaks an
-    /// invariant input must keep ([`Train::validate`]). Carries the core's
-    /// refusal, whose note names the field.
+    /// The document parses but describes no train: a number in it no field
+    /// holds, or a graph that breaks an invariant input must keep
+    /// ([`Train::validate`]). Carries the core's refusal, whose note names
+    /// the field by its path in the file, or the piece.
     Malformed(gear_core::train::TrainError),
 }
 
@@ -231,8 +232,20 @@ pub fn from_toml(src: &str) -> Result<Imported, DocumentError> {
         found => return Err(DocumentError::Format(found)),
     }
     let Read { name, train, .. } = toml::from_str(src).map_err(DocumentError::Parse)?;
-    train.validate().map_err(DocumentError::Malformed)?;
+    validated(&train)?;
     Ok(relieved(TrainDocument { name, train }))
+}
+
+/// **A train as a file holds it, validated** ([`Train::validate`]): a
+/// refused value named by its path in the file, under `train`.
+fn validated(train: &Train) -> Result<(), DocumentError> {
+    use gear_core::train::TrainError;
+    train.validate().map_err(|e| {
+        DocumentError::Malformed(match e {
+            TrainError::Input(r) => TrainError::Input(r.within("train")),
+            other => other,
+        })
+    })
 }
 
 /// A document read, relieved of anything it asks for that nothing can
@@ -316,7 +329,7 @@ pub fn convert(src: &str) -> Result<Imported, DocumentError> {
         shape,
         held: train.held,
     };
-    train.validate().map_err(DocumentError::Malformed)?;
+    validated(&train)?;
     Ok(relieved(TrainDocument {
         name: old.name,
         train,

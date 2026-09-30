@@ -636,10 +636,11 @@ mod tests {
             }
         }
 
-        // A pressure angle below the floor, which nothing above reaches.
+        // A pressure angle below the floor, which nothing above reaches (the
+        // floor itself is the angle asked, and says nothing).
         record(
             &Tooth::new(GearParams {
-                pressure_angle: 0.5,
+                pressure_angle: 0.3,
                 ..Default::default()
             })
             .clamps
@@ -1278,9 +1279,11 @@ mod tests {
                     }
                 }
             }
-            // An automatic face width with every rating switched off.
+            // An automatic face width with every rating switched off: it
+            // stands at its box, which a box of nought would not (a face of
+            // nothing is refused where it enters).
             let no_source = gear_core::train::MemberGear {
-                face_width: gear_core::params::Auto::automatic(0.0),
+                face_width: gear_core::params::Auto::automatic(10.0),
                 face_sources: gear_core::train::FaceSources {
                     bending: gear_core::train::ByKind {
                         ultimate: false,
@@ -1422,21 +1425,49 @@ mod tests {
             // section left to rate, and no stages at all.
             use gear_core::train::{Train, TrainError};
             err(TrainError::NoContact.note());
-            // **...and a member with no teeth**, which is the one refusal a
-            // wiring has that a *design* can reach: `teeth` is a `u32` and
-            // nothing stops a designer typing zero. It was answered with "the
-            // tooth is too undercut to have a root section", which describes a
-            // tooth that exists.
+            // **...and a member with no teeth**, which `teeth` being a `u32`
+            // lets a designer type: refused where it enters, by its field
+            // (`gear_core::input`). It was answered with "the tooth is too
+            // undercut to have a root section", which describes a tooth that
+            // exists, and then as a wiring that is no mechanism. A module that
+            // is not a number is refused the same way, as not finite.
+            for (field, set) in [
+                (
+                    "shape.members.1.gear.teeth",
+                    (|m| m.gear.teeth = 0) as fn(&mut gear_core::train::shape::Member),
+                ),
+                ("shape.members.0.module.manual", |m| {
+                    m.module.manual = f64::NAN
+                }),
+            ] {
+                let mut st = arr::pair([17, 43]);
+                let i = usize::from(field.contains("members.1"));
+                set(&mut st.members[i]);
+                let out = gear_core::train::solve_alone(
+                    &gear_core::train::Train::alone(&st, 1.0, 0.0),
+                    &lib,
+                );
+                match out {
+                    Err(TrainError::Input(r)) => {
+                        assert_eq!(r.field, field);
+                        err(TrainError::Input(r).note());
+                    }
+                    other => panic!("{field}: refused where it enters, not {:?}", other.err()),
+                }
+            }
+            // **...and a mesh across no distance**: two gears on axes that
+            // stand still in no one frame together are no mechanism.
             {
                 let mut st = arr::pair([17, 43]);
-                st.members[1].gear.teeth = 0;
+                st.distances.clear();
                 let out = gear_core::train::solve_alone(
                     &gear_core::train::Train::alone(&st, 1.0, 0.0),
                     &lib,
                 );
                 assert!(
                     matches!(out, Err(TrainError::Wiring(_))),
-                    "a member with no teeth is no mechanism, whatever else is wrong"
+                    "a mesh across no distance is no mechanism: {:?}",
+                    out.err()
                 );
                 if let Err(e) = out {
                     err(e.note());
@@ -1602,12 +1633,17 @@ mod tests {
                         }]
                     })
                 };
-                // A load on ground is refused by name; one on the shared
-                // body, held at both ends, is a case that says so.
-                let out = gear_core::train::solve_train(&at(gear_core::kinematics::GROUND), &lib);
+                // A load on a body that is no port — a planet's — is
+                // refused by name (ground, past every body, is refused
+                // where it enters, by its field); one on the shared body,
+                // held at both ends, is a case that says so.
+                let mut planet = Train::alone(&arr::planetary(12, 30, 72, 3), 1.0, 3000.0);
+                let planet_body = planet.shape.members[1].body;
+                planet.load_cases[0].loads[0].at = planet_body;
+                let out = gear_core::train::solve_train(&planet, &lib);
                 assert!(
                     matches!(out, Err(TrainError::LoadPort { case: 0 })),
-                    "a load at ground is refused by name, not solved: {out:?}"
+                    "a load on a planet is refused by name, not solved: {out:?}"
                 );
                 if let Err(e) = out {
                     err(e.note());
@@ -1694,11 +1730,29 @@ mod tests {
                         .collect(),
                     |t| vec![LoadCase::ultimate(t.port(0, 1), t.port(5, 2), 2.0, 3000.0)],
                 );
-                let trains = [
-                    (set(vec![2, 3]), "overdetermined"),
-                    (set(vec![7]), "no such body"),
-                    (wide, "overflow"),
-                ];
+                // A hold on a body no stage has is refused where it enters,
+                // by its field; a preset asked alone with nothing in it has
+                // no body to drive at all.
+                let missing = gear_core::train::solve_train(&set(vec![7]), &lib);
+                assert!(
+                    matches!(&missing, Err(TrainError::Input(r)) if r.field == "held.0"),
+                    "{missing:?}"
+                );
+                let empty = Train {
+                    load_cases: Vec::new(),
+                    reversed_bending: false,
+                    shape: gear_core::train::Shape::default(),
+                    held: Vec::new(),
+                };
+                let nothing = gear_core::train::solve_alone(&empty, &lib)
+                    .map(|_| ())
+                    .expect_err("nothing to drive");
+                assert!(
+                    matches!(nothing, TrainError::NoSuchBody { .. }),
+                    "{nothing:?}"
+                );
+                err(nothing.note());
+                let trains = [(set(vec![2, 3]), "overdetermined"), (wide, "overflow")];
                 for (train, what) in trains {
                     let e = gear_core::train::solve_train(&train, &lib).expect_err(what);
                     assert!(
@@ -1909,10 +1963,13 @@ mod tests {
     ///
     /// `clamp.flank_unsolved` is a solver's failure, not a geometry: every
     /// solve in `Tooth::solve_junction` runs on a bracket whose signs it has
-    /// checked, so only a non-finite input reaches it, and a debug build
-    /// asserts it never does. The whole of `cargo nextest run` builds teeth
-    /// with that assertion on (it found the α = 0° thickness shift, fixed
-    /// 2026-09-29), and none has reached it since.
+    /// checked, so only input the table (`gear_core::input`) refuses reaches
+    /// it — a non-finite figure, or a gear whose radii square past the
+    /// doubles (a module of 1e154 mm on 17 teeth did, before the table bound
+    /// a module by its gear's outer radius) — and a debug build asserts it
+    /// never does. The whole of `cargo nextest run` builds teeth with that
+    /// assertion on (it found the α = 0° thickness shift, fixed 2026-09-29),
+    /// and none has reached it since.
     const UNFIRED: &[&str] = &[
         "clamp.ring_fully_filleted",
         "clamp.flank_unsolved",

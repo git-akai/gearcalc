@@ -314,6 +314,13 @@ pub mod key {
     pub const ERROR_TRAIN_MALFORMED_NUMBER_GAP: &str = "error.train_malformed_number_gap";
     /// `error.train_tips_unclearable`
     pub const ERROR_TRAIN_TIPS_UNCLEARABLE: &str = "error.train_tips_unclearable";
+    /// `error.input_not_finite`: a number that is not finite, where a value
+    /// enters ([`crate::input`]).
+    pub const ERROR_INPUT_NOT_FINITE: &str = "error.input_not_finite";
+    /// `error.input_out_of_range`: a number outside its field's bound, or
+    /// an index naming nothing in its list, where a value enters
+    /// ([`crate::input`]).
+    pub const ERROR_INPUT_OUT_OF_RANGE: &str = "error.input_out_of_range";
     /// `error.train_file_unversioned`: a geartrain file that states no
     /// format (read by `gear_io::train`).
     pub const ERROR_TRAIN_FILE_UNVERSIONED: &str = "error.train_file_unversioned";
@@ -427,6 +434,8 @@ pub mod key {
         ERROR_TRAIN_TIPS_UNCLEARABLE,
         ERROR_TRAIN_FILE_UNVERSIONED,
         ERROR_TRAIN_FILE_FORMAT,
+        ERROR_INPUT_NOT_FINITE,
+        ERROR_INPUT_OUT_OF_RANGE,
         ERROR_TRAIN_SIZE_OVER_CONSTRAINED,
         ERROR_TRAIN_AXES_TOO_CLOSE,
         ERROR_TRAIN_AXES_TOO_FAR,

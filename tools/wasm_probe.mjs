@@ -372,10 +372,68 @@ const out = {
   ].map((edit) =>
     call("edit_train", () => JSON.parse(w.edit_train(JSON.stringify({ train: defaults.train, edit })))),
   ),
+  // **A value that describes nothing, refused where it enters, by the note
+  // that names it** (`gear_core::input`): a gear of module nought and one of
+  // no teeth; a drawing asked −1 points a tooth (`u32::MAX` on the wire),
+  // 2³¹ and 2¹⁶ + 1, with 1 drawn; a ring cut by a cutter of no teeth; a
+  // train whose first gear has none, solved and edited; and a library
+  // whose first material has a Poisson's ratio of 0.7, written and read.
+  refused_values: {
+    solve_gear: [{ module: 0 }, { teeth: 0 }].map((p) =>
+      call("solve_gear", () => w.solve_gear(JSON.stringify({ ...gear, params: { ...gear.params, ...p } }))),
+    ),
+    gear_profile: [-1, 2 ** 31, 2 ** 16 + 1, 1].map((n) =>
+      call("gear_profile", () => w.gear_profile(gearJson, n).length),
+    ),
+    ring_profile: [-1, 2 ** 31].map((n) => call("ring_profile", () => w.ring_profile(ringJson, n).length)),
+    solve_ring: call("solve_ring", () =>
+      w.solve_ring(JSON.stringify({ ...ring, cutter: { ...ring.cutter, teeth: 0 } })),
+    ),
+    ...(() => {
+      const train = structuredClone(defaults.train);
+      train.shape.members[0].gear.teeth = 0;
+      return {
+        solve_train: call("solve_train", () =>
+          JSON.parse(w.solve_train(JSON.stringify({ train, materials: library }))).failure,
+        ),
+        edit_train: call("edit_train", () => w.edit_train(JSON.stringify({ train, edit: { add_case: "ultimate" } }))),
+      };
+    })(),
+    export_materials: call("export_materials", () => {
+      const bad = structuredClone(library);
+      bad.material[0].poissons_ratio.value = 0.7;
+      return w.export_materials(JSON.stringify(bad));
+    }),
+    import_materials: call("import_materials", () =>
+      w.import_materials(
+        w
+          .export_materials(JSON.stringify(library))
+          .replace(`value = ${library.material[0].poissons_ratio.value}`, "value = 0.7"),
+      ),
+    ),
+  },
   export_materials: call("export_materials", () => w.export_materials(JSON.stringify(library))),
   import_materials: call("import_materials", () =>
     JSON.parse(w.import_materials(w.export_materials(JSON.stringify(library)))),
   ),
+  // **A trap said, and the core answering after it** — the hook `start`
+  // installs, read back by `last_panic`. A gear of four billion teeth is a
+  // count the table admits and a drawing no 32-bit memory holds: its seat
+  // list's capacity overflows, a panic the caller sees only as a trap. What
+  // is recorded is whether the words name the overflow, the location being
+  // a path that differs by checkout.
+  trap: (() => {
+    call("start", () => w.start());
+    const before = call("last_panic", () => w.last_panic());
+    const huge = JSON.stringify({ ...gear, params: { ...gear.params, teeth: 4_000_000_000 } });
+    const trapped = call("gear_profile", () => w.gear_profile(huge, 8).length);
+    return {
+      before,
+      trapped: "refused" in trapped,
+      said: call("last_panic", () => w.last_panic().includes("capacity overflow")),
+      after: call("solve_gear", () => JSON.parse(w.solve_gear(gearJson)).pitch_radius),
+    };
+  })(),
 };
 
 console.log(JSON.stringify({ entries: called.sort(), out }, exact, 1));

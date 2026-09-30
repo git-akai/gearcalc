@@ -220,11 +220,11 @@ impl Ring {
         crate::testing::work::ring();
         let mut clamps = Vec::new();
         let beta = params.helix_angle.to_radians();
-        let (alpha_n, raised) = cut_pressure_angle(params);
+        let (alpha_n, raised) = params.normal_pressure_angle_rad();
         if raised {
             clamps.push(Note::new(key::CLAMP_PRESSURE_ANGLE_RAISED).number(
                 "degrees",
-                guard::MIN_PRESSURE_ANGLE_DEG,
+                alpha_n.to_degrees(),
                 1,
             ));
         }
@@ -835,7 +835,9 @@ impl Ring {
         let half = self.half_profile((per_tooth / 2).max(8));
 
         let mut full: Vec<(f64, f64)> = half.iter().rev().map(|&(r, t)| (r, -t)).collect();
-        full.extend_from_slice(&half[1..]);
+        // The tip centre is shared by the two halves; a half with no point
+        // (a ring refused at the boundary, built anyway) draws nothing.
+        full.extend(half.iter().skip(1));
 
         let z = self.teeth;
         let mut out = Vec::with_capacity(full.len() * z as usize + 1);
@@ -850,19 +852,6 @@ impl Ring {
             out.push(first);
         }
         out
-    }
-}
-
-/// The normal pressure angle a ring is cut at, radians, and whether the
-/// floor raised it. Guarded as `Tooth` guards it: at or below the floor the
-/// base circle meets the pitch circle and the involute degenerates.
-fn cut_pressure_angle(params: &GearParams) -> (f64, bool) {
-    let floor = guard::MIN_PRESSURE_ANGLE_DEG.to_radians();
-    let asked = params.pressure_angle.to_radians();
-    if asked <= floor {
-        (floor, true)
-    } else {
-        (asked, false)
     }
 }
 
@@ -888,7 +877,8 @@ fn cut_pressure_angle(params: &GearParams) -> (f64, bool) {
 #[must_use]
 pub fn smallest_tooth_count(params: &GearParams) -> Option<u32> {
     let beta = params.helix_angle.to_radians();
-    let alpha_t = crate::plane::transverse_pressure_angle(cut_pressure_angle(params).0, beta);
+    let alpha_t =
+        crate::plane::transverse_pressure_angle(params.normal_pressure_angle_rad().0, beta);
     let fewest = (2.0 * (params.addendum - params.profile_shift) * beta.cos()
         / (1.0 - alpha_t.cos()))
     .ceil();

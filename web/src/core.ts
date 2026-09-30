@@ -203,8 +203,30 @@ import init, {
   offers as wasm_offers,
   edit_train,
   adopt_member,
+  last_panic,
 } from "./wasm/gear_wasm.js";
-import { failureDetail, wire } from "./boundary";
+import { failureDetail, said, wire } from "./boundary";
+
+/** **A call into the core, its trap said.** A panic in Rust is a trap here —
+ *  a `WebAssembly.RuntimeError` saying only "unreachable" — so the words the
+ *  panic had are read back (`last_panic`, which the hook the module installs
+ *  at start keeps) and thrown on in its place, for the caller's
+ *  `boundaryFailure` to say. Every entry goes through this one wrapper, so
+ *  none says less. */
+function core<T>(call: () => T): T {
+  try {
+    return call();
+  } catch (e) {
+    if (!(e instanceof WebAssembly.RuntimeError)) throw e;
+    let words = "";
+    try {
+      words = last_panic();
+    } catch {
+      // The instance could not even say: the trap's own words stand.
+    }
+    throw new Error(words || e.message);
+  }
+}
 
 /** **A call into the core that failed**, as the catalogue words it: the
  *  front end's own key, since nothing in Rust can emit it — it means the call
@@ -532,7 +554,7 @@ export function solve(
   req: GearRequest,
 ): { ok: GearSummary } | { error: string } {
   try {
-    return { ok: JSON.parse(solve_gear(wire(req))) as GearSummary };
+    return { ok: JSON.parse(core(() => solve_gear(wire(req)))) as GearSummary };
   } catch (e) {
     return { error: failed(e) };
   }
@@ -541,17 +563,17 @@ export function solve(
 export function profile(
   req: GearRequest,
   pointsPerTooth: number,
-): Float64Array | null {
+): { ok: Float64Array } | { error: string } {
   try {
-    return gear_profile(wire(req), pointsPerTooth);
-  } catch {
-    return null;
+    return { ok: core(() => gear_profile(wire(req), pointsPerTooth)) };
+  } catch (e) {
+    return { error: failed(e) };
   }
 }
 
 export function dxf(req: GearRequest): { ok: string } | { error: string } {
   try {
-    return { ok: export_dxf(wire(req)) };
+    return { ok: core(() => export_dxf(wire(req))) };
   } catch (e) {
     return { error: failed(e) };
   }
@@ -561,7 +583,7 @@ export function solveRing(
   req: RingRequest,
 ): { ok: RingSummary } | { error: string } {
   try {
-    return { ok: JSON.parse(solve_ring(wire(req))) as RingSummary };
+    return { ok: JSON.parse(core(() => solve_ring(wire(req)))) as RingSummary };
   } catch (e) {
     return { error: failed(e) };
   }
@@ -570,17 +592,17 @@ export function solveRing(
 export function ringProfile(
   req: RingRequest,
   pointsPerTooth: number,
-): Float64Array | null {
+): { ok: Float64Array } | { error: string } {
   try {
-    return ring_profile(wire(req), pointsPerTooth);
-  } catch {
-    return null;
+    return { ok: core(() => ring_profile(wire(req), pointsPerTooth)) };
+  } catch (e) {
+    return { error: failed(e) };
   }
 }
 
 export function ringDxf(req: RingRequest): { ok: string } | { error: string } {
   try {
-    return { ok: export_ring_dxf(wire(req)) };
+    return { ok: core(() => export_ring_dxf(wire(req))) };
   } catch (e) {
     return { error: failed(e) };
   }
@@ -592,30 +614,17 @@ export function importTrain(
   tomlText: string,
 ): { ok: Imported } | { error: string } {
   try {
-    return { ok: JSON.parse(import_train(tomlText)) as Imported };
+    return { ok: JSON.parse(core(() => import_train(tomlText))) as Imported };
   } catch (e) {
     return { error: said(e instanceof Error ? e.message : String(e)) };
   }
-}
-
-/** A refusal that crossed as a note — a file of another format, a graph
- *  that describes no train — in the catalogue's words; a parser's
- *  complaint, which names the line, as it came. */
-function said(message: string): string {
-  try {
-    const n = JSON.parse(message) as Note;
-    if (typeof n?.key === "string") return note(n);
-  } catch {
-    // Not a note: the parser's own words.
-  }
-  return message;
 }
 
 export function exportTrain(
   doc: TrainDocument,
 ): { ok: string } | { error: string } {
   try {
-    return { ok: export_train(wire(doc)) };
+    return { ok: core(() => export_train(wire(doc))) };
   } catch (e) {
     return { error: failureDetail(e) };
   }
@@ -635,9 +644,9 @@ export function importLibrary(
   tomlText: string,
 ): { ok: MaterialLibrary } | { error: string } {
   try {
-    return { ok: JSON.parse(import_materials(tomlText)) as MaterialLibrary };
+    return { ok: JSON.parse(core(() => import_materials(tomlText))) as MaterialLibrary };
   } catch (e) {
-    return { error: e instanceof Error ? e.message : String(e) };
+    return { error: said(e instanceof Error ? e.message : String(e)) };
   }
 }
 
@@ -645,7 +654,7 @@ export function exportLibrary(
   lib: MaterialLibrary,
 ): { ok: string } | { error: string } {
   try {
-    return { ok: export_materials(wire(lib)) };
+    return { ok: core(() => export_materials(wire(lib))) };
   } catch (e) {
     return { error: failureDetail(e) };
   }
@@ -687,7 +696,7 @@ export function relieveTrain(train: Train, just: Freedom | null, figures: Figure
   let corrected: Shape;
   try {
     const req: RelieveRequest = { shape: train.shape, just, figures };
-    corrected = JSON.parse(relieve(wire(req))) as Shape;
+    corrected = JSON.parse(core(() => relieve(wire(req)))) as Shape;
   } catch (e) {
     return boundaryFailure(e);
   }
@@ -720,7 +729,7 @@ export function relieveCase(
   let corrected: LoadCase;
   try {
     const req: RelieveCaseRequest = { train, materials, case: index, just };
-    corrected = JSON.parse(relieve_case(wire(req))) as LoadCase;
+    corrected = JSON.parse(core(() => relieve_case(wire(req)))) as LoadCase;
   } catch (e) {
     return boundaryFailure(e);
   }
@@ -758,7 +767,7 @@ export function adoptMember(
 ): AdoptOutcome | { error: string } {
   try {
     const req: AdoptRequest = { train, materials, member };
-    return JSON.parse(adopt_member(wire(req))) as AdoptOutcome;
+    return JSON.parse(core(() => adopt_member(wire(req)))) as AdoptOutcome;
   } catch (e) {
     return { error: failed(e) };
   }
@@ -781,7 +790,7 @@ export function defaultTrain(): Train {
 export function solveTrain(train: Train, materials?: MaterialLibrary): TrainOutcome {
   try {
     const req: TrainRequest = { train, materials };
-    return JSON.parse(solve_train(wire(req))) as TrainOutcome;
+    return JSON.parse(core(() => solve_train(wire(req)))) as TrainOutcome;
   } catch (e) {
     return {
       result: null,
@@ -820,7 +829,7 @@ export function editTrain(train: Train, edit: TrainEdit): Note | null {
   let edited: Train;
   try {
     const req: EditRequest = { train, edit };
-    edited = JSON.parse(edit_train(wire(req))) as Train;
+    edited = JSON.parse(core(() => edit_train(wire(req)))) as Train;
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     return message.startsWith("ui.") ? { key: message, values: {} } : boundaryFailure(e);
@@ -839,7 +848,7 @@ export function editTrain(train: Train, edit: TrainEdit): Note | null {
 export function previewEdit(train: Train, edit: TrainEdit, materials?: MaterialLibrary): Preview {
   try {
     const req: PreviewRequest = { train, materials, edit };
-    return JSON.parse(preview_edit(wire(req))) as Preview;
+    return JSON.parse(core(() => preview_edit(wire(req)))) as Preview;
   } catch (e) {
     return { refused: null, changes: [], paths: [], unsolved: boundaryFailure(e) };
   }
@@ -853,7 +862,7 @@ export function previewEdit(train: Train, edit: TrainEdit, materials?: MaterialL
 export function offersAt(train: Train, at: Target): { offers: Offer[]; failure: Note | null } {
   try {
     const req: OffersRequest = { train, at };
-    return { offers: JSON.parse(wasm_offers(wire(req))) as Offer[], failure: null };
+    return { offers: JSON.parse(core(() => wasm_offers(wire(req)))) as Offer[], failure: null };
   } catch (e) {
     return { offers: [], failure: boundaryFailure(e) };
   }

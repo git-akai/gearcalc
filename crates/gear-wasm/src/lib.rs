@@ -22,6 +22,33 @@ use gear_core::{GearParams, Tooth};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
+thread_local! {
+    /// **The last panic's message and where it was raised**, kept by the
+    /// hook [`start`] installs: in the browser a panic is a trap, which
+    /// carries neither.
+    static LAST_PANIC: std::cell::RefCell<String> = const { std::cell::RefCell::new(String::new()) };
+}
+
+/// **Run once, as the module starts**: every panic's words kept for
+/// [`last_panic`] before the trap that follows loses them. Defence in depth:
+/// the input table (`gear_core::input`) refuses what used to panic, and
+/// what is left — memory a request asks for and no instance has — traps
+/// without a panic at all.
+#[wasm_bindgen(start)]
+pub fn start() {
+    std::panic::set_hook(Box::new(|info| {
+        LAST_PANIC.with(|p| *p.borrow_mut() = info.to_string());
+    }));
+}
+
+/// **What the last panic said, and where** — empty where none has — for the
+/// front end to read after a trap and say, rather than a bare "unreachable".
+#[wasm_bindgen]
+#[must_use]
+pub fn last_panic() -> String {
+    LAST_PANIC.with(|p| p.borrow().clone())
+}
+
 /// Everything the UI asks about one gear.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -592,7 +619,19 @@ fn ring_of(req: &RingRequest) -> gear_core::ring::Ring {
 }
 
 fn parse_ring(input: &str) -> Result<RingRequest, String> {
-    read(input).map_err(|e| format!("bad ring request: {e}"))
+    let req: RingRequest = read(input).map_err(|e| format!("bad ring request: {e}"))?;
+    let checked = || -> Result<(), gear_core::input::Refused> {
+        use gear_core::input::{self, asked};
+        req.params.check().map_err(|e| e.within("params"))?;
+        req.cutter
+            .to_cutter()
+            .check()
+            .map_err(|e| e.within("cutter"))?;
+        asked(&input::PIN_DIAMETER, req.pin_diameter, "")?;
+        asked(&input::CHORD_TOLERANCE, req.chord_tolerance, "")
+    };
+    checked().map_err(|e| refusal(&e.note()))?;
+    Ok(req)
 }
 
 fn solve_ring_impl(input: &str) -> Result<String, String> {
@@ -634,13 +673,10 @@ fn solve_ring_impl(input: &str) -> Result<String, String> {
     serde_json::to_string(&summary).map_err(|e| format!("could not encode result: {e}"))
 }
 
-fn ring_profile_impl(input: &str, points_per_tooth: usize) -> Result<Vec<f64>, String> {
+fn ring_profile_impl(input: &str, points_per_tooth: u32) -> Result<Vec<f64>, String> {
     let req = parse_ring(input)?;
-    Ok(ring_of(&req)
-        .profile(points_per_tooth)
-        .into_iter()
-        .flatten()
-        .collect())
+    let n = points(points_per_tooth)?;
+    Ok(ring_of(&req).profile(n).into_iter().flatten().collect())
 }
 
 fn export_ring_dxf_impl(input: &str) -> Result<String, String> {
@@ -658,8 +694,46 @@ fn export_ring_dxf_impl(input: &str) -> Result<String, String> {
     ))
 }
 
+/// **A gear request as it enters**: its gear read against the table
+/// ([`gear_core::input::GEAR`], under `params`), and each figure it asks
+/// beside the gear against its own row — refused naming the field.
 fn parse(input: &str) -> Result<GearRequest, String> {
-    read(input).map_err(|e| format!("bad gear request: {e}"))
+    let req: GearRequest = read(input).map_err(|e| format!("bad gear request: {e}"))?;
+    let checked = || -> Result<(), gear_core::input::Refused> {
+        use gear_core::input::{self, asked};
+        req.params.check().map_err(|e| e.within("params"))?;
+        asked(&input::PIN_DIAMETER, req.pin_diameter, "")?;
+        asked(&input::CHORD_TOLERANCE, req.chord_tolerance, "")?;
+        asked(&input::WORKING_DEPTH, req.working_depth, "")?;
+        asked(&input::ECCENTRIC_THROW, req.eccentric_throw, "")?;
+        if let Some(mate) = &req.mate {
+            asked(&input::MATE_TEETH, Some(f64::from(mate.teeth)), "")?;
+            asked(&input::MATE_SHIFT, Some(mate.profile_shift), "")?;
+        }
+        Ok(())
+    };
+    checked().map_err(|e| refusal(&e.note()))?;
+    Ok(req)
+}
+
+/// **A refusal as it crosses**: the catalogue's note, values and all, as
+/// JSON — the field it names included — which the panel renders as it
+/// renders a file's refusal.
+fn refusal(note: &Note) -> String {
+    serde_json::to_string(note).unwrap_or_else(|_| note.key.clone())
+}
+
+/// **A drawing's point count as it enters** ([`gear_core::input::POINTS_PER_TOOTH`]):
+/// JavaScript's `-1` arrives as `u32::MAX` and is refused with the rest past
+/// the bound, rather than wrapping into a drawing no memory holds.
+fn points(points_per_tooth: u32) -> Result<usize, String> {
+    gear_core::input::asked(
+        &gear_core::input::POINTS_PER_TOOTH,
+        Some(f64::from(points_per_tooth)),
+        "",
+    )
+    .map_err(|e| refusal(&e.note()))?;
+    usize::try_from(points_per_tooth).map_err(|e| e.to_string())
 }
 
 /// The mate, built as an ordinary gear from the shared module, pressure angle
@@ -726,10 +800,11 @@ fn solve_gear_impl(input: &str) -> Result<String, String> {
         .map_err(|e| format!("could not encode result: {e}"))
 }
 
-fn gear_profile_impl(input: &str, points_per_tooth: usize) -> Result<Vec<f64>, String> {
+fn gear_profile_impl(input: &str, points_per_tooth: u32) -> Result<Vec<f64>, String> {
     let req = parse(input)?;
+    let n = points(points_per_tooth)?;
     Ok(gear_core::gear::Gear::new(resolved_params(&req)?)
-        .profile(points_per_tooth)
+        .profile(n)
         .into_iter()
         .flat_map(|p| [p[0], p[1]])
         .collect())
@@ -760,7 +835,7 @@ pub fn solve_gear(input: &str) -> Result<String, JsError> {
 /// The closed cross-section as a flat `[x0, y0, x1, y1, ...]` array, ready for
 /// a canvas path. Flat rather than nested to keep the crossing cheap.
 #[wasm_bindgen]
-pub fn gear_profile(input: &str, points_per_tooth: usize) -> Result<Vec<f64>, JsError> {
+pub fn gear_profile(input: &str, points_per_tooth: u32) -> Result<Vec<f64>, JsError> {
     gear_profile_impl(input, points_per_tooth).map_err(|e| JsError::new(&e))
 }
 
@@ -865,21 +940,48 @@ pub struct TrainFailure {
 /// numbering) before anything walks it — the key crosses, as an edit's
 /// refusal does. Every entry that takes a train reads it through this; the
 /// solve's own refusal is the same validation, said as the train's failure.
-fn entering(train: &gear_core::train::Train) -> Result<(), String> {
-    use gear_core::note::Explain;
-    train.validate().map_err(|e| e.note().key)
+fn entering(
+    train: &gear_core::train::Train,
+    materials: Option<&gear_core::MaterialLibrary>,
+) -> Result<(), String> {
+    admitted(train, materials).map_err(|n| refusal(&n))
+}
+
+/// [`entering`]'s answer as a note: the train's refusal, a field it names
+/// placed under `train` as the request holds it, or the library's under
+/// `materials`.
+fn admitted(
+    train: &gear_core::train::Train,
+    materials: Option<&gear_core::MaterialLibrary>,
+) -> Result<(), Note> {
+    train.validate().map_err(|e| in_request(&e))?;
+    if let Some(lib) = materials {
+        lib.check().map_err(|e| e.within("materials").note())?;
+    }
+    Ok(())
+}
+
+/// **A train's refusal as a request names it**: a field placed under
+/// `train`, where the request holds the train.
+fn in_request(e: &gear_core::train::TrainError) -> Note {
+    match e {
+        gear_core::train::TrainError::Input(r) => r.clone().within("train").note(),
+        other => other.note(),
+    }
 }
 
 fn solve_train_impl(input: &str) -> Result<String, String> {
-    use gear_core::note::Explain;
     let req: TrainRequest = read(input).map_err(|e| format!("bad train request: {e}"))?;
-    // A graph that describes no train is the train's failure, with nothing
-    // read off it.
-    if let Err(e) = req.train.validate() {
+    // A graph that describes no train — an index naming nothing, a broken
+    // invariant — is the train's failure, with nothing read off it. A figure
+    // that describes nothing, in the train or its library, is a failure too,
+    // but the graph is still read: the panel goes on naming its gears and
+    // offering its ports while a box is being fixed.
+    if let Err(e) = req.train.validate_graph() {
         let outcome = TrainOutcome {
             result: None,
             failure: Some(TrainFailure {
-                note: e.note(),
+                note: in_request(&e),
                 part: None,
             }),
             figures: Vec::new(),
@@ -896,13 +998,17 @@ fn solve_train_impl(input: &str) -> Result<String, String> {
         return serde_json::to_string(&outcome)
             .map_err(|e| format!("could not encode result: {e}"));
     }
+    let asked = admitted(&req.train, req.materials.as_ref());
     let lib = req.materials.unwrap_or_else(gear_io::default_library);
     let parts = req.train.parts();
     let ports = req.train.bodies();
     let groupings = req.train.groupings();
     let names = req.train.shape.member_names();
     let mesh_groups = req.train.shape.mesh_groups();
-    let outcome = match gear_core::train::solve_train(&req.train, &lib) {
+    let solved = asked
+        .map_err(Err)
+        .and_then(|()| gear_core::train::solve_train(&req.train, &lib).map_err(Ok));
+    let outcome = match solved {
         Ok(result) => TrainOutcome {
             figures: req
                 .train
@@ -923,17 +1029,19 @@ fn solve_train_impl(input: &str) -> Result<String, String> {
             parts,
             ports,
         },
-        Err(e) => {
-            let part = match &e {
-                gear_core::train::TrainError::InPart { part, .. } => u32::try_from(*part).ok(),
-                _ => None,
+        Err(refused) => {
+            // The solve's own failure names a part where it has one; what
+            // the table refused is the request's, and no part's.
+            let (note, part) = match refused {
+                Ok(gear_core::train::TrainError::InPart { part, cause }) => {
+                    (cause.note(), u32::try_from(part).ok())
+                }
+                Ok(e) => (in_request(&e), None),
+                Err(note) => (note, None),
             };
             TrainOutcome {
                 result: None,
-                failure: Some(TrainFailure {
-                    note: e.note(),
-                    part,
-                }),
+                failure: Some(TrainFailure { note, part }),
                 figures: Vec::new(),
                 parts,
                 ports,
@@ -1043,12 +1151,18 @@ fn centre_profile(params: GearParams, req: &GearRequest) -> Maybe<gear_core::gea
 }
 
 fn import_materials_impl(toml_text: &str) -> Result<String, String> {
-    let lib = gear_io::from_toml(toml_text).map_err(|e| e.to_string())?;
+    // A figure no material has crosses as its note, naming it; the rest as
+    // the reader's words, which name the line.
+    let lib = gear_io::from_toml(toml_text).map_err(|e| match e.note() {
+        Some(note) => refusal(&note),
+        None => e.to_string(),
+    })?;
     serde_json::to_string(&lib).map_err(|e| e.to_string())
 }
 
 fn export_materials_impl(library_json: &str) -> Result<String, String> {
     let lib: gear_core::MaterialLibrary = read(library_json)?;
+    lib.check().map_err(|e| refusal(&e.note()))?;
     gear_io::to_toml(&lib).map_err(|e| e.to_string())
 }
 
@@ -1099,7 +1213,7 @@ pub fn solve_ring(input: &str) -> Result<String, JsError> {
 ///
 /// A malformed request.
 #[wasm_bindgen]
-pub fn ring_profile(input: &str, points_per_tooth: usize) -> Result<Vec<f64>, JsError> {
+pub fn ring_profile(input: &str, points_per_tooth: u32) -> Result<Vec<f64>, JsError> {
     ring_profile_impl(input, points_per_tooth).map_err(|e| JsError::new(&e))
 }
 
@@ -1488,7 +1602,7 @@ pub struct AdoptOutcome {
 
 fn adopt_member_impl(input: &str) -> Result<String, String> {
     let req: AdoptRequest = read(input)?;
-    entering(&req.train)?;
+    entering(&req.train, req.materials.as_ref())?;
     // A member the train does not have, or a worm, is a defect on the other
     // side of the boundary — the panel lists what can be adopted — so each
     // is a refusal rather than an outcome.
@@ -1582,8 +1696,10 @@ fn relieve_impl(input: &str) -> Result<String, String> {
     // A graph relief is asked of alone, with no train round it: its own
     // invariants, the numbering being a train's.
     req.shape.validate().map_err(|e| {
-        use gear_core::note::Explain;
-        e.note().key
+        refusal(&match e {
+            gear_core::train::TrainError::Input(r) => r.within("shape").note(),
+            other => other.note(),
+        })
     })?;
     serde_json::to_string(&req.shape.relieved_from(req.just, &req.figures))
         .map_err(|e| e.to_string())
@@ -1635,7 +1751,7 @@ pub struct RelieveCaseRequest {
 
 fn relieve_case_impl(input: &str) -> Result<String, String> {
     let mut req: RelieveCaseRequest = read(input)?;
-    entering(&req.train)?;
+    entering(&req.train, req.materials.as_ref())?;
     let lib = req
         .materials
         .take()
@@ -1716,7 +1832,7 @@ pub struct EditRequest {
 
 fn edit_train_impl(input: &str) -> Result<String, String> {
     let EditRequest { mut train, edit } = read(input)?;
-    entering(&train)?;
+    entering(&train, None)?;
     // **A refusal crosses as its catalogue key**, which is what the panel
     // says beside the verb; its `Display` is English for a log.
     apply_edit(&mut train, edit).map_err(|e| e.key().to_string())?;
@@ -1787,7 +1903,7 @@ fn preview_edit_impl(input: &str) -> Result<String, String> {
         materials,
         edit,
     } = read(input)?;
-    entering(&train)?;
+    entering(&train, materials.as_ref())?;
     let lib = materials.unwrap_or_else(gear_io::default_library);
     let mut after = train.clone();
     let made = apply_edit(&mut after, edit);
@@ -1831,7 +1947,7 @@ pub struct OffersRequest {
 
 fn offers_impl(input: &str) -> Result<String, String> {
     let OffersRequest { train, at } = read(input)?;
-    entering(&train)?;
+    entering(&train, None)?;
     serde_json::to_string(&train.offers(at)).map_err(|e| e.to_string())
 }
 
@@ -2005,26 +2121,24 @@ mod tests {
         }
     }
 
-    /// **A body number skipped is refused at every entry that takes a
-    /// train**, by its key, as a carrier cycle is: a pair whose second body
-    /// is numbered 3, its case from 1 to 3 — every train entry reading the
-    /// train through one validation (`entering`), and a solve saying so as
-    /// the train's failure.
-    #[test]
-    fn a_body_number_skipped_is_refused_at_every_train_entry() {
-        use gear_core::train::{LoadCase, Preset, Train};
-        const KEY: &str = "error.train_malformed_number_gap";
-        // Laid in, then renumbered: laying a preset in numbers it densely.
-        let mut t = Train::chained(vec![Preset::Spur.build()], |_| Vec::new());
-        t.shape.renumber_bodies(|b| if b == 2 { 3 } else { b });
-        t.load_cases = vec![LoadCase::ultimate(1, 3, 2.0, 3000.0)];
-        let train = serde_json::to_value(&t).unwrap();
+    /// **Every entry that takes a train refuses what the solve refuses, by
+    /// the same note** — the refusal crossing as its note, values and all
+    /// ([`refusal`]), so a field it names crosses with it: `train`, as the
+    /// request holds it, and a solve saying so as the train's failure.
+    fn refused_at_every_train_entry(t: &gear_core::train::Train, key: &str, field: Option<&str>) {
+        let train = serde_json::to_value(t).unwrap();
         let lib = serde_json::to_value(gear_io::default_library()).unwrap();
+        let said = |n: &serde_json::Value, at: &str| {
+            assert_eq!(n["key"], key, "{at}: {n}");
+            if let Some(f) = field {
+                assert_eq!(n["values"]["field"], f, "{at}: {n}");
+            }
+        };
         let solved: serde_json::Value = serde_json::from_str(
             &solve_train_impl(&serde_json::json!({ "train": train }).to_string()).unwrap(),
         )
         .unwrap();
-        assert_eq!(solved["failure"]["note"]["key"], KEY);
+        said(&solved["failure"]["note"], "solve_train");
         let refused = [
             edit_train_impl(
                 &serde_json::json!({ "train": train, "edit": { "add_case": "ultimate" } })
@@ -2040,9 +2154,35 @@ mod tests {
             ),
             adopt_member_impl(&serde_json::json!({ "train": train, "member": 0 }).to_string()),
         ];
+        let mut asked = 0;
         for (i, r) in refused.into_iter().enumerate() {
-            assert_eq!(r, Err(KEY.to_string()), "entry {i}");
+            let e = r.expect_err(&format!("entry {i}: refused"));
+            said(&serde_json::from_str(&e).unwrap(), &format!("entry {i}"));
+            asked += 1;
         }
+        assert_eq!(asked, 5);
+    }
+
+    /// **A body number skipped, or listed twice, is refused at every entry
+    /// that takes a train**: a pair whose second body is numbered 3 names
+    /// the field past the two the graph lists; one whose two bodies are both
+    /// numbered 1 leaves 2 named by nothing, the gap.
+    #[test]
+    fn a_body_number_skipped_is_refused_at_every_train_entry() {
+        use gear_core::train::{LoadCase, Preset, Train};
+        // Laid in, then renumbered: laying a preset in numbers it densely.
+        let mut t = Train::chained(vec![Preset::Spur.build()], |_| Vec::new());
+        t.shape.renumber_bodies(|b| if b == 2 { 3 } else { b });
+        t.load_cases = vec![LoadCase::ultimate(1, 3, 2.0, 3000.0)];
+        refused_at_every_train_entry(
+            &t,
+            "error.input_out_of_range",
+            Some("train.shape.bodies.1.body"),
+        );
+        let mut t = Train::chained(vec![Preset::Spur.build()], |_| Vec::new());
+        t.shape.renumber_bodies(|_| 1);
+        t.load_cases = vec![LoadCase::ultimate(1, 1, 2.0, 3000.0)];
+        refused_at_every_train_entry(&t, "error.train_malformed_number_gap", None);
     }
 
     /// **A carrier cycle is refused at every entry that takes a train**, by
@@ -2058,32 +2198,7 @@ mod tests {
         });
         t.shape.axes[0].carried_by = 2;
         t.shape.axes[1].carried_by = 1;
-        let train = serde_json::to_value(&t).unwrap();
-        let lib = serde_json::to_value(gear_io::default_library()).unwrap();
-        let solved: serde_json::Value = serde_json::from_str(
-            &solve_train_impl(&serde_json::json!({ "train": train }).to_string()).unwrap(),
-        )
-        .unwrap();
-        assert_eq!(solved["failure"]["note"]["key"], KEY);
-        let refused = [
-            edit_train_impl(
-                &serde_json::json!({ "train": train, "edit": { "add_case": "ultimate" } })
-                    .to_string(),
-            ),
-            preview_edit_impl(
-                &serde_json::json!({ "train": train, "edit": { "add_case": "ultimate" } })
-                    .to_string(),
-            ),
-            offers_impl(&serde_json::json!({ "train": train, "at": "train" }).to_string()),
-            relieve_case_impl(
-                &serde_json::json!({ "train": train, "materials": lib, "case": 0 }).to_string(),
-            ),
-            relieve_impl(&serde_json::json!({ "shape": train["shape"] }).to_string()),
-            adopt_member_impl(&serde_json::json!({ "train": train, "member": 0 }).to_string()),
-        ];
-        for (i, r) in refused.into_iter().enumerate() {
-            assert_eq!(r, Err(KEY.to_string()), "entry {i}");
-        }
+        refused_at_every_train_entry(&t, KEY, None);
         // A file's refusal crosses as its whole note, values and all.
         let imported = import_train_impl(
             &gear_io::train::to_toml(&gear_io::TrainDocument {
@@ -2336,51 +2451,21 @@ mod tests {
         assert!(classes.iter().any(|c| c["scale"] == "standard"));
     }
 
-    /// **The calls [`degenerate_input_cannot_panic`] finds panicking**, each
-    /// `(entry point, input, task)`, where debug assertions are on (the test
-    /// profile CI runs): the flank junction's `debug_assert!` (tooth.rs) and
-    /// `&r[1..]` on an empty flank (gear.rs, ring.rs). T01.6's
-    /// `GearParams::check` at every boundary removes both.
-    const KNOWN_PANICS_WITH_DEBUG_ASSERTIONS: &[(&str, &str, &str)] = &[
-        ("solve_gear", "teeth 0", "T01.6"),
-        ("gear_profile", "teeth 0", "T01.6"),
-        ("export_dxf", "teeth 0", "T01.6"),
-        ("solve_gear", "module 0", "T01.6"),
-        ("gear_profile", "module 0", "T01.6"),
-        ("export_dxf", "module 0", "T01.6"),
-        ("ring_profile", "module 0", "T01.6"),
-        ("solve_train", "module 0", "T01.6"),
-        ("adopt_member", "module 0", "T01.6"),
-        ("relieve_case", "module 0", "T01.6"),
-        ("preview_edit", "module 0", "T01.6"),
-        ("solve_gear", "module -1", "T01.6"),
-        ("gear_profile", "module -1", "T01.6"),
-        ("export_dxf", "module -1", "T01.6"),
-        ("solve_train", "module -1", "T01.6"),
-        ("adopt_member", "module -1", "T01.6"),
-        ("relieve_case", "module -1", "T01.6"),
-        ("preview_edit", "module -1", "T01.6"),
-        ("gear_profile", "helix 90", "T01.6"),
-    ];
-
-    /// The same where debug assertions are off (`--release`): the calls the
-    /// junction's assertion stopped run on, to an empty flank or to an answer.
-    const KNOWN_PANICS_WITHOUT_DEBUG_ASSERTIONS: &[(&str, &str, &str)] = &[
-        ("gear_profile", "teeth 0", "T01.6"),
-        ("gear_profile", "module 0", "T01.6"),
-        ("ring_profile", "module 0", "T01.6"),
-        ("gear_profile", "helix 90", "T01.6"),
-    ];
-
-    /// **Degenerate input cannot panic, through any entry point.** Every
-    /// entry that takes a gear is sent one with no teeth, a module at or
-    /// below nought, and a right angle for each angle — what JSON can
-    /// carry of `gear-core`'s own degenerate set (`tests/degenerate.rs`),
-    /// which has the not-a-numbers — and every entry that takes a train
-    /// is sent the default train with its first gear so; each returns,
-    /// refused or not. The calls that panic must be exactly the listed
-    /// ones, in the profile's list — a new one fails, and so does a listed
-    /// one that returns — so the lists only shrink.
+    /// **Degenerate input cannot panic, through any entry point, and every
+    /// entry refuses it by the field it changed.** Every entry that takes a
+    /// gear is sent one with no teeth, a module at or below nought, and a
+    /// right angle for each angle — what JSON can carry of `gear-core`'s own
+    /// degenerate set (`tests/degenerate.rs`), which has the not-a-numbers —
+    /// and every entry that takes a train is sent the default train with its
+    /// first gear so. Each returns, refused: a gear's under `params`, a
+    /// train's under `train` (a graph relief is asked of alone, under
+    /// `shape`), a solve's as the train's failure. The list of panics this
+    /// law carried (T16.21) is empty since the table landed (T01.6), in both
+    /// profiles, and gone.
+    ///
+    /// Exporting a train is the one entry that takes one and refuses
+    /// nothing: it writes what the panel holds, half-edited or not, and the
+    /// file is refused where it is read back.
     #[test]
     fn degenerate_input_cannot_panic() {
         use serde_json::{json, Value};
@@ -2395,123 +2480,144 @@ mod tests {
             ("pressure angle 90", "pressure_angle", json!(90.0)),
             ("helix 90", "helix_angle", json!(90.0)),
         ];
-        // An entry point, answering whether it accepted what it was sent.
-        type Asks = fn(&str) -> bool;
-        type Call = Box<dyn Fn() -> bool>;
-        let mut calls: Vec<(&str, &str, Call)> = Vec::new();
+        // An entry point, answering with its refusal's note where it
+        // refused, and nothing where it answered.
+        type Asks = fn(&str) -> Option<Value>;
+        type Call = Box<dyn Fn() -> Option<Value>>;
+        fn thrown(r: Result<String, String>) -> Option<Value> {
+            r.err()
+                .map(|e| serde_json::from_str(&e).unwrap_or(Value::String(e)))
+        }
+        let mut calls: Vec<(&str, &str, String, Call)> = Vec::new();
         for (name, field, value) in degenerate {
             let mut g = gear.clone();
             g["params"][field] = value.clone();
             let g = g.to_string();
             let entries: [(&str, Asks); 6] = [
-                ("solve_gear", |i| solve_gear_impl(i).is_ok()),
-                ("gear_profile", |i| gear_profile_impl(i, 64).is_ok()),
-                ("export_dxf", |i| export_dxf_impl(i).is_ok()),
-                ("solve_ring", |i| solve_ring_impl(i).is_ok()),
-                ("ring_profile", |i| ring_profile_impl(i, 64).is_ok()),
-                ("export_ring_dxf", |i| export_ring_dxf_impl(i).is_ok()),
+                ("solve_gear", |i| thrown(solve_gear_impl(i))),
+                ("gear_profile", |i| {
+                    thrown(gear_profile_impl(i, 64).map(|_| String::new()))
+                }),
+                ("export_dxf", |i| thrown(export_dxf_impl(i))),
+                ("solve_ring", |i| thrown(solve_ring_impl(i))),
+                ("ring_profile", |i| {
+                    thrown(ring_profile_impl(i, 64).map(|_| String::new()))
+                }),
+                ("export_ring_dxf", |i| thrown(export_ring_dxf_impl(i))),
             ];
             for (entry, f) in entries {
                 let g = g.clone();
-                calls.push((entry, name, Box::new(move || f(&g))));
+                calls.push((
+                    entry,
+                    name,
+                    format!("params.{field}"),
+                    Box::new(move || f(&g)),
+                ));
             }
             // The train's first gear so: its teeth on the gear, the rest on
             // the member, where a train states them.
             let mut train = defaults["train"].clone();
             let member = &mut train["shape"]["members"][0];
-            match field {
-                "teeth" => member["gear"]["teeth"] = value.clone(),
-                "helix_angle" => {
-                    member["gear"]["helix_angle"] = json!({"auto": false, "manual": value})
+            let path = match field {
+                "teeth" => {
+                    member["gear"]["teeth"] = value.clone();
+                    "shape.members.0.gear.teeth"
                 }
-                _ => member[field] = json!({"auto": false, "manual": value}),
-            }
-            let requests: [(&str, Asks, Value); 8] = [
+                "helix_angle" => {
+                    member["gear"]["helix_angle"] = json!({"auto": false, "manual": value});
+                    "shape.members.0.gear.helix_angle.manual"
+                }
+                "module" => {
+                    member[field] = json!({"auto": false, "manual": value});
+                    "shape.members.0.module.manual"
+                }
+                _ => {
+                    member[field] = json!({"auto": false, "manual": value});
+                    "shape.members.0.pressure_angle.manual"
+                }
+            };
+            let requests: [(&str, Asks, Value); 7] = [
                 (
                     "solve_train",
-                    |i| solve_train_impl(i).is_ok(),
+                    |i| {
+                        let v: Value = serde_json::from_str(&solve_train_impl(i).unwrap()).unwrap();
+                        v["result"].is_null().then(|| v["failure"]["note"].clone())
+                    },
                     json!({"train": train}),
                 ),
                 (
                     "adopt_member",
-                    |i| adopt_member_impl(i).is_ok(),
+                    |i| thrown(adopt_member_impl(i)),
                     json!({"train": train, "member": 0}),
                 ),
                 (
-                    "relieve",
-                    |i| relieve_impl(i).is_ok(),
-                    json!({"shape": train["shape"], "just": null, "figures": []}),
-                ),
-                (
                     "relieve_case",
-                    |i| relieve_case_impl(i).is_ok(),
+                    |i| thrown(relieve_case_impl(i)),
                     json!({"train": train, "materials": library, "case": 0, "just": null}),
                 ),
                 (
                     "edit_train",
-                    |i| edit_train_impl(i).is_ok(),
+                    |i| thrown(edit_train_impl(i)),
                     json!({"train": train, "edit": {"add_case": "ultimate"}}),
                 ),
                 (
                     "preview_edit",
-                    |i| preview_edit_impl(i).is_ok(),
+                    |i| thrown(preview_edit_impl(i)),
                     json!({"train": train, "edit": {"graph": {"release": 1}}}),
                 ),
                 (
                     "offers",
-                    |i| offers_impl(i).is_ok(),
+                    |i| thrown(offers_impl(i)),
                     json!({"train": train, "at": "train"}),
                 ),
                 (
-                    "export_train",
-                    |i| export_train_impl(i).is_ok(),
-                    json!({"name": "degenerate", "train": train}),
+                    "relieve",
+                    |i| thrown(relieve_impl(i)),
+                    json!({"shape": train["shape"], "just": null, "figures": []}),
                 ),
             ];
             for (entry, f, request) in requests {
                 let r = request.to_string();
-                calls.push((entry, name, Box::new(move || f(&r))));
+                let at = if entry == "relieve" {
+                    path.to_owned()
+                } else {
+                    format!("train.{path}")
+                };
+                calls.push((entry, name, at, Box::new(move || f(&r))));
             }
+            // Exporting writes what it is given.
+            let doc = json!({"name": "degenerate", "train": train}).to_string();
+            assert!(export_train_impl(&doc).is_ok(), "{name}: export writes it");
         }
         std::panic::set_hook(Box::new(|_| {}));
-        let mut panics: Vec<(&str, &str, String)> = Vec::new();
-        let mut answered = 0;
-        for (entry, input, call) in &calls {
+        let mut faults: Vec<String> = Vec::new();
+        for (entry, input, field, call) in &calls {
             match catch_unwind(AssertUnwindSafe(call)) {
-                Ok(accepted) => answered += usize::from(accepted),
-                Err(e) => panics.push((
-                    entry,
-                    input,
+                Ok(Some(note)) => {
+                    if note["values"]["field"] != field.as_str() {
+                        faults.push(format!(
+                            "{entry} at {input}: refused as {note}, not naming {field}"
+                        ));
+                    }
+                }
+                Ok(None) => faults.push(format!("{entry} at {input}: answered")),
+                Err(e) => faults.push(format!(
+                    "{entry} at {input}: panicked: {}",
                     e.downcast_ref::<String>()
                         .cloned()
                         .or_else(|| e.downcast_ref::<&str>().map(ToString::to_string))
-                        .unwrap_or_default(),
+                        .unwrap_or_default()
                 )),
             }
         }
         let _ = std::panic::take_hook();
-        let known = if cfg!(debug_assertions) {
-            KNOWN_PANICS_WITH_DEBUG_ASSERTIONS
-        } else {
-            KNOWN_PANICS_WITHOUT_DEBUG_ASSERTIONS
-        };
-        let listed = |e: &str, i: &str| known.iter().any(|(x, y, _)| (*x, *y) == (e, i));
-        let new: Vec<String> = panics
-            .iter()
-            .filter(|(e, i, _)| !listed(e, i))
-            .map(|(e, i, m)| format!("(\"{e}\", \"{i}\", \"T01.6\"), // {m}"))
-            .collect();
-        let cured: Vec<_> = known
-            .iter()
-            .filter(|(e, i, _)| !panics.iter().any(|(x, y, _)| (*x, *y) == (*e, *i)))
-            .collect();
         assert!(
-            new.is_empty() && cured.is_empty(),
-            "of {} calls ({answered} answered), panicking and not listed:\n{}\nlisted and now returning: {cured:?}",
+            faults.is_empty(),
+            "of {} calls:\n{}",
             calls.len(),
-            new.join("\n")
+            faults.join("\n")
         );
-        assert_eq!(calls.len(), 5 * 14);
+        assert_eq!(calls.len(), 5 * 13);
     }
 
     /// Every path of `v` at which an object stands, as a JSON pointer.
@@ -4004,20 +4110,35 @@ mod tests {
         )
         .unwrap();
         let mut train: serde_json::Value = serde_json::from_str(&pushed).unwrap();
-        // The second part's one distance is the graph's second.
+        // The second part's one distance is the graph's second: at nought
+        // it is no distance, refused by its field before any part is asked...
         train["shape"]["distances"][1]["distance"] =
             serde_json::json!({"auto": false, "manual": 0.0});
         let req = serde_json::json!({ "train": train }).to_string();
         let v: serde_json::Value = serde_json::from_str(&solve_train_impl(&req).unwrap()).unwrap();
+        assert_eq!(
+            v["failure"]["note"]["key"], "error.input_out_of_range",
+            "{v}"
+        );
+        assert_eq!(
+            v["failure"]["note"]["values"]["field"], "train.shape.distances.1.distance.manual",
+            "{v}"
+        );
+        assert!(v["failure"]["part"].is_null(), "{v}");
+        // ...and at a millimetre it is a distance no shift reaches: the part's.
+        train["shape"]["distances"][1]["distance"] =
+            serde_json::json!({"auto": false, "manual": 1.0});
+        let req = serde_json::json!({ "train": train }).to_string();
+        let v: serde_json::Value = serde_json::from_str(&solve_train_impl(&req).unwrap()).unwrap();
         assert!(
             v["result"].is_null(),
-            "a mesh at no distance is not a train"
+            "a mesh at a millimetre is not a train"
         );
         let part = usize::try_from(v["failure"]["part"].as_u64().unwrap()).unwrap();
         assert_eq!(
             v["parts"][part]["distances"],
             serde_json::json!([1]),
-            "the part named is the one whose distance is at nought: {v}"
+            "the part named is the one whose distance is at a millimetre: {v}"
         );
         assert!(
             v["failure"]["note"]["key"]

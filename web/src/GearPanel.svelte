@@ -224,7 +224,7 @@
         ]
       : [],
   );
-  const outline = $derived(
+  const drawn = $derived(
     internal
       ? ring && "ok" in ring
         ? ringProfile(ringRequest, 600)
@@ -233,6 +233,9 @@
         ? profile(request, 600)
         : null,
   );
+  // The drawing, where it drew; where it could not, why is said under it.
+  const outline = $derived(drawn && "ok" in drawn ? drawn.ok : null);
+  const outlineError = $derived(drawn && "error" in drawn ? drawn.error : null);
 
   let confirmingDelete = $state(false);
 
@@ -579,6 +582,7 @@
           rim={r.rim_radius}
           bind:view={tab.view}
         />
+        {#if outlineError}<p class="error">{outlineError}</p>{/if}
         <h2 class="section-heading">{t("ui.gear_geometry")}</h2>
         <dl>
           <dt>{t("ui.gear_transverse_module")}</dt>
@@ -649,6 +653,7 @@
         root={s.root_radius}
         bind:view={tab.view}
       />
+      {#if outlineError}<p class="error">{outlineError}</p>{/if}
 
       <!-- For an eccentric gear undercut/severed are per-tooth: the Eccentricity
            section below names which teeth and where. Only the tool-level clamps

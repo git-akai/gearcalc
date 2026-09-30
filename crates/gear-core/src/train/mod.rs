@@ -1770,6 +1770,10 @@ pub enum TrainError {
     /// that describes no train, refused where it enters
     /// ([`Train::validate`]) before anything reads it.
     Malformed(Invariant),
+    /// **A number that describes nothing**, refused where it enters
+    /// ([`crate::input`]): not finite, outside its field's bound, or an
+    /// index naming nothing in its list — named by its path.
+    Input(crate::input::Refused),
     /// **Which part could not be solved**, wrapped around why.
     ///
     /// A part that fails takes the flow with it: every part the train's one
@@ -1899,6 +1903,7 @@ impl crate::note::Explain for TrainError {
                 located(key::ERROR_TRAIN_MALFORMED_NUMBER_GAP, *body)
             }
             Self::Malformed(_) => Note::new(key::ERROR_TRAIN_MALFORMED),
+            Self::Input(e) => e.note(),
             // Which part it is belongs to the reader rather than to the
             // reason, so the note is the cause's and the part reaches the
             // front end through the error's own shape.
@@ -1990,6 +1995,7 @@ impl std::fmt::Display for TrainError {
                 write!(f, "two conditions cannot both hold at {}", place(*at))
             }
             Self::NoSuchBody { at } => write!(f, "no such body: {}", place(*at)),
+            Self::Input(e) => write!(f, "{e}"),
             Self::Overflow => write!(
                 f,
                 "the tooth counts along the shaft line multiply past what an exact ratio holds"
@@ -3335,7 +3341,7 @@ impl LoadCase {
     /// the factor given is below 1 or not a number.
     #[must_use]
     pub fn applied_factor(&self) -> f64 {
-        if self.application_factor >= 1.0 && self.application_factor.is_finite() {
+        if crate::input::APPLICATION_FACTOR_HELD.admits(self.application_factor) {
             self.application_factor
         } else {
             unit_factor()
@@ -3580,6 +3586,7 @@ pub fn solve_alone(train: &Train, lib: &MaterialLibrary) -> Result<Alone, TrainE
     if train.shape.members.is_empty() {
         return Err(MotionError::Empty.into());
     }
+    entering(train, lib)?;
     let parts = train.parts();
     debug_assert_eq!(parts.len(), 1, "a preset asked alone is one part");
     let (r, mut own) = solve_parts(train, &parts, lib).map_err(|e| match e {
@@ -4573,7 +4580,7 @@ impl TrainResult {
 /// cut or rated. An empty train is no error: it solves to nothing, its
 /// cases waiting.
 pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, TrainError> {
-    train.validate()?;
+    entering(train, lib)?;
     solve_parts(train, &train.parts(), lib).map(|(r, _)| r)
 }
 
@@ -4603,6 +4610,27 @@ fn case_refusal(index: usize, case: &LoadCase, ports: &[Body]) -> Option<TrainEr
         }
         _ => None,
     }
+}
+
+/// **A train and its library as a solve takes them** — the train's graph
+/// and every number in it ([`Train::validate`]), the library's every figure
+/// ([`MaterialLibrary::check`]), and each member's material as it uses it,
+/// its replacements laid over the library's ([`crate::input::resolved`]).
+/// A material the library does not have is the part's to name.
+fn entering(train: &Train, lib: &MaterialLibrary) -> Result<(), TrainError> {
+    train.validate()?;
+    lib.check().map_err(TrainError::Input)?;
+    for (i, m) in train.shape.members.iter().enumerate() {
+        if let Some(material) = lib.get(&m.gear.material) {
+            crate::input::resolved(
+                material,
+                &m.gear.material_overrides,
+                &format!("shape.members.{i}.gear.material_overrides"),
+            )
+            .map_err(TrainError::Input)?;
+        }
+    }
+    Ok(())
 }
 
 /// **The train solved part by part** — each of `parts` closed, sized,
@@ -8462,9 +8490,12 @@ mod tests {
             solve_train(&set(vec![2, 3]), &lib).err(),
             Some(TrainError::Overdetermined { at: 3 })
         );
-        assert_eq!(
-            solve_train(&set(vec![7]), &lib).err(),
-            Some(TrainError::NoSuchBody { at: 7 })
+        // A hold at a body the train does not have is refused where it
+        // enters, by the hold's own field (`crate::input`).
+        let missing = solve_train(&set(vec![7]), &lib).err();
+        assert!(
+            matches!(&missing, Some(TrainError::Input(r)) if r.field == "held.0"),
+            "{missing:?}"
         );
         let huge = |teeth| MemberGear {
             teeth,
@@ -10321,15 +10352,28 @@ mod tests {
             "the default width is the bending pair and nothing else"
         );
 
-        // Nothing enabled asks for nothing, which is a degenerate gear rather
-        // than a divide by zero.
-        assert_eq!(
-            width(FaceSources {
-                bending: off,
-                contact: off
-            }),
-            0.0
-        );
+        // Nothing enabled asks for nothing: the width stands at its box, and
+        // a box of nought is a gear with no face, refused where it enters
+        // by its field rather than rated at a width of nothing.
+        let none = FaceSources {
+            bending: off,
+            contact: off,
+        };
+        let mut s = arr::pair([17, 43]);
+        for g in s.members.iter_mut().map(|m| &mut m.gear) {
+            g.face_width = Auto::automatic(0.0);
+            g.face_sources = none;
+        }
+        match try_alone(&s) {
+            Err(TrainError::Input(r)) => {
+                assert_eq!(r.field, "shape.members.0.gear.face_width.manual");
+            }
+            other => panic!("a face of nought is refused by its field, not {other:?}"),
+        }
+        for g in s.members.iter_mut().map(|m| &mut m.gear) {
+            g.face_width = Auto::automatic(7.0);
+        }
+        assert_eq!(try_alone(&s).unwrap().members[0].face_width, 7.0);
     }
 
     /// An intermittent duty measured at the end port makes upstream gears turn
@@ -11302,9 +11346,11 @@ mod tests {
             "three good stages solve"
         );
 
-        // A centre distance of zero is not a mesh, and it is the middle stage's.
+        // A centre distance of a millimetre is no mesh any shift reaches, and
+        // it is the middle stage's. (Nought is no distance at all, refused
+        // where it enters by its field: `crate::input`.)
         let d = train.parts()[1].distances[0];
-        train.shape.distances[d].distance = Auto::fixed(0.0);
+        train.shape.distances[d].distance = Auto::fixed(1.0);
 
         let e = solve_train(&train, &library()).expect_err("a mesh at no distance is not a train");
         let TrainError::InPart { part, cause } = &e else {
@@ -11466,9 +11512,12 @@ mod tests {
         }
 
         // ...and the reported material says the number came from the user.
+        // Both allowables doubled: a cyclic figure above the static one is no
+        // material, refused where it enters (`crate::input::resolved`).
         let doubled = auto_width(
             FaceSources::default(),
             Overrides {
+                ultimate_allowable: Some(2.0 * 1365.0),
                 fatigue_allowable: Some(2.0 * 750.0),
                 ..Default::default()
             },

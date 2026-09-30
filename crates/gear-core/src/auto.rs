@@ -114,10 +114,7 @@ pub fn minimum_profile_shift(p: &GearParams, working_depth: f64) -> MinimumShift
         ..*p
     };
     let beta = p.helix_angle.to_radians();
-    let alpha_n = p
-        .pressure_angle
-        .to_radians()
-        .max(guard::MIN_PRESSURE_ANGLE_DEG.to_radians());
+    let (alpha_n, _) = p.normal_pressure_angle_rad();
     let alpha_t = crate::plane::transverse_pressure_angle(alpha_n, beta);
     let r = p.module / beta.cos() * f64::from(p.teeth.max(1)) / 2.0;
 
@@ -321,10 +318,7 @@ pub fn admissible_profile_shift(p: &GearParams, working_depth: f64) -> ShiftRang
     use std::f64::consts::PI;
 
     let beta = p.helix_angle.to_radians();
-    let an = p
-        .pressure_angle
-        .to_radians()
-        .max(guard::MIN_PRESSURE_ANGLE_DEG.to_radians());
+    let (an, _) = p.normal_pressure_angle_rad();
     let alpha_t = crate::plane::transverse_pressure_angle(an, beta);
     let mt = p.module / beta.cos();
     let r = mt * f64::from(p.teeth) / 2.0;
@@ -422,10 +416,9 @@ pub struct Bound {
     pub exclusive_max: bool,
 }
 
-/// **The bound on every count**: a gear's or a cutter's teeth, an axis's
-/// planets, a duty's actuations. At least one, since none is no gear, no
-/// tool, no axis and no duty; the wire carries them as `u32`.
-pub const COUNT: Bound = Bound::between(Some(1.0), None);
+/// **The bound on every count** ([`crate::input::COUNT`]); the wire carries
+/// counts as `u32`.
+pub use crate::input::COUNT;
 
 impl Bound {
     /// Inclusive on both sides.
@@ -435,6 +428,17 @@ impl Bound {
             min,
             max,
             exclusive_min: false,
+            exclusive_max: false,
+        }
+    }
+
+    /// Above `min`, exclusive, and unbounded above.
+    #[must_use]
+    pub const fn above(min: f64) -> Self {
+        Self {
+            min: Some(min),
+            max: None,
+            exclusive_min: true,
             exclusive_max: false,
         }
     }
@@ -684,10 +688,7 @@ fn ranges_at_shift(p: &GearParams, working_depth: f64) -> Ranges {
     use std::f64::consts::PI;
 
     let beta = p.helix_angle.to_radians();
-    let an = p
-        .pressure_angle
-        .to_radians()
-        .max(guard::MIN_PRESSURE_ANGLE_DEG.to_radians());
+    let (an, _) = p.normal_pressure_angle_rad();
     let alpha_t = crate::plane::transverse_pressure_angle(an, beta);
     let mt = p.module / beta.cos();
     let r = mt * f64::from(p.teeth) / 2.0;
@@ -713,16 +714,11 @@ fn ranges_at_shift(p: &GearParams, working_depth: f64) -> Ranges {
     Ranges {
         // Invariant bounds. They do not vary, but they live here so that there
         // is exactly one place any input limit is written down.
-        module: Bound {
-            min: Some(0.0),
-            max: None,
-            exclusive_min: true,
-            exclusive_max: false,
-        },
-        pressure_angle: Bound::strictly(0.0, 90.0),
+        module: crate::input::MODULE,
+        pressure_angle: crate::input::PRESSURE_ANGLE,
         teeth: COUNT,
-        helix_angle: Bound::strictly(-90.0, 90.0),
-        thickness_mod: Bound::strictly(0.0, 2.0),
+        helix_angle: crate::input::HELIX_ANGLE,
+        thickness_mod: crate::input::THICKNESS_MOD,
 
         profile_shift: admissible_profile_shift(p, working_depth),
         addendum: Bound::between(Some(above_root), None),
