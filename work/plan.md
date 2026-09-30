@@ -224,6 +224,11 @@ caught, test workspace included) and the 130-constant perturbation.
     - a closed-form limit at Σ → 0;
     - tooth stiffness in series, derived from the generated tooth and gated against ISO 6336-1's c′
       and c_γ.
+- 2026-10-02 — orchestrator's call (bending section rule): the notch factor belongs to the notch.
+  - A section in the fillet carries K_f; a section on the smooth flank carries K_f = 1.
+  - The governing section is the one with the highest rated stress, not the highest Y_F.
+  - An unreadable candidate never masks a readable one.
+  - A continuity law runs across the flank/fillet switch.
 - 2026-10-02 — owner's idea, researched at low priority: the tooth geometry is known exactly, so
   exact-geometry solvers may beat mesh methods for notch stresses. Candidates: IGA and IGA-BEM, and
   Trefftz / MFS / particular solutions with Williams corner functions in the basis.
