@@ -29635,10 +29635,10 @@
            "speed": "-11860.465116279069",
            "speed_against_carrier": "-11860.465116279069",
            "cycles": null,
-           "bending_stress": "97.434729938284747",
+           "bending_stress": "97.434729938284704",
            "contact_stress": "821.68357675559616",
            "min_face_width": {
-            "bending": "0.020823420821798010",
+            "bending": "0.020823420821798000",
             "contact": "0.033327178581922030"
            }
           },
@@ -29649,10 +29649,10 @@
            "speed": 0,
            "speed_against_carrier": 0,
            "cycles": null,
-           "bending_stress": "1155.6212155470980",
+           "bending_stress": "1155.6212155470973",
            "contact_stress": "2829.7982061263888",
            "min_face_width": {
-            "bending": "0.24697545625853448",
+            "bending": "0.24697545625853434",
             "contact": "0.39527583899488911"
            }
           },
@@ -29666,10 +29666,10 @@
             "bending": 70,
             "contact": 70
            },
-           "bending_stress": "19.486945987656945",
+           "bending_stress": "19.486945987656938",
            "contact_stress": "367.46806672413578",
            "min_face_width": {
-            "bending": "0.0075797251791344744",
+            "bending": "0.0075797251791344710",
             "contact": "0.055080519905230052"
            }
           }
@@ -30830,10 +30830,10 @@
            "speed": "-11860.465116279069",
            "speed_against_carrier": "-11860.465116279069",
            "cycles": null,
-           "bending_stress": "698.03043733128141",
+           "bending_stress": "698.03043733128118",
            "contact_stress": "2199.3021254717696",
            "min_face_width": {
-            "bending": "0.020823420821798014",
+            "bending": "0.020823420821798007",
             "contact": "0.033327178581922037"
            }
           },
@@ -30844,10 +30844,10 @@
            "speed": 0,
            "speed_against_carrier": 0,
            "cycles": null,
-           "bending_stress": "1155.6212155470980",
+           "bending_stress": "1155.6212155470976",
            "contact_stress": "2829.7982061263888",
            "min_face_width": {
-            "bending": "0.034474122609805820",
+            "bending": "0.034474122609805806",
             "contact": "0.055174663687792190"
            }
           },
@@ -30861,10 +30861,10 @@
             "bending": 487,
             "contact": 487
            },
-           "bending_stress": "139.60608746625624",
+           "bending_stress": "139.60608746625618",
            "contact_stress": "983.55781112292959",
            "min_face_width": {
-            "bending": "0.0075797251791344753",
+            "bending": "0.0075797251791344718",
             "contact": "0.055080519905230073"
            }
           }
