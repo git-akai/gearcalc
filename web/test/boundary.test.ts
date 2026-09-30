@@ -12,6 +12,7 @@ import {
   offersAt,
   previewEdit,
   profile,
+  guarded,
   relieveCase,
   relieveTrain,
   solve,
@@ -21,6 +22,9 @@ import {
   type Note,
 } from "../src/core";
 import { gearLabel } from "../src/members";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { initSync } from "../src/wasm/gear_wasm.js";
 
 const KEY = "ui.train_boundary_failed";
 
@@ -76,7 +80,11 @@ test("a value that describes nothing is refused in the catalogue's words", () =>
   const d = defaults().gear;
   const req: GearRequest = { params: { ...d.params, module: 0 }, chord_tolerance: d.chord_tolerance, reference_circles: false };
   const sentence = t(KEY, {
-    detail: t("error.input_out_of_range", { field: "params.module", value: "0", bound: "(0, ∞)" }),
+    detail: t("error.input_out_of_range", {
+      field: "params.module",
+      value: "0",
+      bound: "[0.001, 1.7014118346046923e38]",
+    }),
   });
   expect(solve(req)).toEqual({ error: sentence });
   expect(dxf(req)).toEqual({ error: sentence });
@@ -85,20 +93,42 @@ test("a value that describes nothing is refused in the catalogue's words", () =>
   train.shape.members[0].gear.teeth = 0;
   const edited = editTrain(train, { add_case: "ultimate" });
   expect(edited?.values.detail).toBe(
-    t("error.input_out_of_range", { field: "train.shape.members.0.gear.teeth", value: "0", bound: "[1, ∞)" }),
+    t("error.input_out_of_range", { field: "train.shape.members.0.gear.teeth", value: "0", bound: "[1, 4294967295]" }),
   );
 });
 
-// **A trap is said with the words its panic had, and the core answers the
-// next call.** A gear of four billion teeth is a count the table admits and
-// a drawing no 32-bit memory holds: the seat list's capacity overflows, a
-// panic the browser sees only as "unreachable".
-test("a trap is said, not swallowed, and the next call is answered", () => {
+// **Five thousand traps are said, and the core answers the next call.** A
+// trap unwinds nothing, so each leaves the frames it pushed on the module's
+// stack; without the stack put back, a few hundred of them leave no stack
+// and every call after reads out of bounds. The trap is the module's own —
+// an entry handed a string past the end of its memory — since no input a
+// caller can send traps it any more: a huge count is refused by name.
+test("five thousand traps are said, and the next call is answered", () => {
+  const exports = initSync({ module: readFileSync(fileURLToPath(import.meta.resolve("../src/wasm/gear_wasm_bg.wasm"))) });
+  const trap = () => {
+    const retptr = exports.__wbindgen_add_to_stack_pointer(-16);
+    exports.solve_gear(retptr, 0xfffffff0, 64);
+  };
+  let said = 0;
+  for (let i = 0; i < 5000; i++) {
+    expect(() => guarded(trap)).toThrow();
+    said++;
+  }
+  expect(said).toBe(5000);
   const d = defaults().gear;
-  const huge: GearRequest = { params: { ...d.params, teeth: 4_000_000_000 }, chord_tolerance: d.chord_tolerance, reference_circles: false };
-  const r = profile(huge, 8);
-  expect("error" in r && r.error).toContain("capacity overflow");
   const good: GearRequest = { params: d.params, chord_tolerance: d.chord_tolerance, reference_circles: false };
   expect("ok" in solve(good)).toBe(true);
   expect("ok" in profile(good, 600)).toBe(true);
+});
+
+// **A huge count is refused naming it, never trapped**: the drawing of a
+// gear whose every tooth the browser's memory cannot hold.
+test("a drawing past memory is refused by name", () => {
+  const d = defaults().gear;
+  const huge: GearRequest = { params: { ...d.params, teeth: 300_000_000 }, chord_tolerance: d.chord_tolerance, reference_circles: false };
+  const r = profile(huge, 8);
+  expect("error" in r && r.error).toBe(
+    t(KEY, { detail: t("error.input_past_memory", { field: "params.teeth", value: "300000000" }) }),
+  );
+  expect("ok" in solve(huge)).toBe(true);
 });

@@ -206,7 +206,7 @@ fn profile_is_closed_and_has_one_period_per_tooth() {
         },
     ] {
         let g = Tooth::new(p);
-        let pts = Gear::new(p).profile(400);
+        let pts = Gear::new(p).profile(400).unwrap();
         let first = pts.first().unwrap();
         let last = pts.last().unwrap();
         assert!((first[0] - last[0]).abs() < 1e-15 && (first[1] - last[1]).abs() < 1e-15);
@@ -564,7 +564,7 @@ fn a_rings_drawn_profile_is_dense_and_lies_on_its_base_circles_involute() {
                 &cutter,
             );
             let what = format!("z={teeth} tip_round={tip_round}");
-            let pts = ring.profile(PER_TOOTH);
+            let pts = ring.profile(PER_TOOTH).unwrap();
 
             assert!(
                 pts.iter().flatten().all(|v| v.is_finite()),
@@ -1118,7 +1118,7 @@ fn the_outline_is_a_simple_closed_curve() {
         .build()
     {
         let gear = Gear::new(p);
-        let outline = gear.outline(1e-3);
+        let outline = gear.outline(1e-3).unwrap();
         let tag = format!(
             "z={} x={} a={} hf={} k={} rho={}",
             p.teeth, p.profile_shift, p.pressure_angle, p.dedendum, p.thickness_mod, p.root_radius
@@ -1127,7 +1127,7 @@ fn the_outline_is_a_simple_closed_curve() {
             outline.iter().all(|v| v.bulge >= 0.0),
             "an arc runs clockwise on a counter-clockwise outline at {tag}"
         );
-        let profile = gear.profile(120);
+        let profile = gear.profile(120).unwrap();
         let n = common::crossings(&profile[..profile.len() - 1]);
         assert_eq!(n, 0, "{n} crossings in the profile at {tag}");
         let n = common::crossings(&common::flatten(&outline, 8));
@@ -1258,8 +1258,8 @@ fn the_tooth_ends_at_its_tip() {
         );
         let limit = g.ra * (1.0 + 1e-12);
         let (r, _) = g.half_profile(400);
-        let profile = gear.profile(80);
-        let outline = common::flatten(&gear.outline(1e-3), 8);
+        let profile = gear.profile(80).unwrap();
+        let outline = common::flatten(&gear.outline(1e-3).unwrap(), 8);
         for (name, worst) in [
             ("half-profile", r.iter().copied().fold(0.0, f64::max)),
             (

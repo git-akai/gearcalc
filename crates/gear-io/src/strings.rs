@@ -636,6 +636,23 @@ mod tests {
             }
         }
 
+        // **A drawing past the machine's memory**: every tooth a wire's
+        // count can carry, at a point budget whose outline is past what any
+        // address space maps (4.3e9 teeth × 8,193 points × 16 bytes, some
+        // 560 TB) — refused naming the teeth rather than stopping.
+        {
+            use gear_core::note::Explain;
+            let drawn = gear_core::Gear::new(GearParams {
+                teeth: u32::MAX,
+                ..Default::default()
+            })
+            .profile(1 << 13);
+            match drawn {
+                Err(e) => record(&[e.note()]),
+                Ok(_) => panic!("a drawing of 4.3e9 teeth was held"),
+            }
+        }
+
         // A pressure angle below the floor, which nothing above reaches (the
         // floor itself is the angle asked, and says nothing).
         record(

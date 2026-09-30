@@ -13,7 +13,7 @@ run at once. Each is checked adversarially and closes with a proof table (see WO
 | Q3 error model | T02.1–T02.9; absence items 2, 4, 5, 6; refusal keys that name the cause (item 7 and pattern G); T01.12 and T06.3 inside T02.8 | After Q2 (T02.6 and T02.7 follow T01.2/6/8). T02.6's tip bullet is superseded by decision 1 |
 | Q5 cases | T13.4 (refuse, never move a load: decision 6), T13.5, T13.6, T13.7, T13.8, T13.9, T13.12 | |
 | Q6 domain edges | T03.5, T05.5, T05.8, T06.4; items 3 and 8 (a zero automatic face width; MeshedPlanets margin) | T05.4 dropped (decision 4); T07.3 dropped (spike-verify §5) |
-| Q7 UI | T19.3, T19.4, T19.7–T19.12 | |
+| Q7 UI | T19.3, T19.4, T19.7–T19.12; the train panel's unbounded number boxes (T01.8's MeshRanges, from Q2): every box reads its row's bound from the input table (`gear_core::input`), crossed beside the member ranges | |
 | Q8 harness | T20.4, T20.6, T20.13; item 9 (T01's stale NoRootSection bullet is a doc fix) | |
 
 Order: Q1 ∥ Q9 → Q2 ∥ Q4 → Q3 ∥ Q5 → Q6 ∥ Q7 → Q8.

@@ -21,8 +21,12 @@ use super::arrangements::Preset;
 use super::{solve_train, test_library, Duty, LoadCase, Train};
 use crate::params::Auto;
 
-/// The two scales, a decade either side.
-const SCALES: [f64; 2] = [0.1, 10.0];
+/// The scales: a decade either side; the smallest module the input table
+/// admits ([`crate::input::SMALLEST_MODULE`]), where an absolute floor in
+/// the tips' sizing once refused a watch's planocentric; and one whose
+/// torque, `s³` the unscaled one's, stays inside the table's figures
+/// ([`crate::input::CEILING`], 2¹²⁷ ≈ 1.7e38 against 1e36).
+const SCALES: [f64; 4] = [crate::input::SMALLEST_MODULE, 0.1, 10.0, 1e12];
 
 /// **How far a figure may move between the two solves**, in roundings.
 ///
@@ -149,6 +153,7 @@ const CLASSES: &[(&str, Class)] = &[
     ("params/teeth", Class::Power(0)),
     ("ranges/teeth/min", Class::Power(0)),
     ("axes/count/min", Class::Power(0)),
+    ("axes/count/max", Class::Power(0)),
     ("distances/sized_by", Class::Power(0)),
     // The angle between two carried axes, from a triangle of lengths.
     ("distances/stagger", Class::Power(0)),

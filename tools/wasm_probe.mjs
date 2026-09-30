@@ -436,22 +436,25 @@ const out = {
   import_materials: call("import_materials", () =>
     JSON.parse(w.import_materials(w.export_materials(JSON.stringify(library)))),
   ),
-  // **A trap said, and the core answering after it** — the hook `start`
-  // installs, read back by `last_panic`. A gear of four billion teeth is a
-  // count the table admits and a drawing no 32-bit memory holds: its seat
-  // list's capacity overflows, a panic the caller sees only as a trap. What
-  // is recorded is whether the words name the overflow, the location being
-  // a path that differs by checkout.
-  trap: (() => {
+  // **A huge count answered or refused naming it, never trapped** — the
+  // counts that trapped the browser's 4 GB: a concentric gear of 3e8 teeth
+  // is summarised at once (its teeth one tooth); drawing 3e7 of them, even
+  // at a point a tooth, and exporting them are refused naming the teeth,
+  // and so is an eccentric gear of 3e7, whose teeth each differ. The hook
+  // `start` installs has said no panic after them (`last_panic` empty).
+  huge_counts: (() => {
     call("start", () => w.start());
-    const before = call("last_panic", () => w.last_panic());
-    const huge = JSON.stringify({ ...gear, params: { ...gear.params, teeth: 4_000_000_000 } });
-    const trapped = call("gear_profile", () => w.gear_profile(huge, 8).length);
+    const at = (teeth, extra = {}) =>
+      JSON.stringify({ ...gear, params: { ...gear.params, teeth, ...extra } });
     return {
-      before,
-      trapped: "refused" in trapped,
-      said: call("last_panic", () => w.last_panic().includes("capacity overflow")),
-      after: call("solve_gear", () => JSON.parse(w.solve_gear(gearJson)).pitch_radius),
+      summarised: call("solve_gear", () => JSON.parse(w.solve_gear(at(300_000_000))).pitch_radius),
+      drawn: call("gear_profile", () => w.gear_profile(at(30_000_000), 1).length),
+      exported: call("export_dxf", () => w.export_dxf(at(30_000_000)).length),
+      eccentric: call("solve_gear", () => w.solve_gear(at(30_000_000, { angular_shift: 0.1 }))),
+      ring: call("ring_profile", () =>
+        w.ring_profile(JSON.stringify({ ...ring, params: { ...ring.params, teeth: 30_000_000 } }), 1).length,
+      ),
+      panicked: call("last_panic", () => w.last_panic()),
     };
   })(),
 };

@@ -720,8 +720,14 @@ pub fn contact_phase_from_outlines(
 ) -> Option<f64> {
     // Through the assembly, because drawing a whole gear is the assembly's
     // job — a `Tooth` is one tooth's form and no longer pretends otherwise.
-    let o1 = crate::gear::Gear::new(g1.params).profile(per_tooth);
-    let o2 = crate::gear::Gear::new(g2.params).profile(per_tooth);
+    let o1 = crate::gear::Gear::try_new(g1.params)
+        .ok()?
+        .profile(per_tooth)
+        .ok()?;
+    let o2 = crate::gear::Gear::try_new(g2.params)
+        .ok()?
+        .profile(per_tooth)
+        .ok()?;
     // The table's radial resolution is the floor on what this can resolve — a
     // bin is a band of radius over which the half-width is taken as constant,
     // and the flank's slope turns that into an angular error. Tied to the point

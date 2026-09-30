@@ -555,15 +555,14 @@ impl Tooth {
         };
 
         let junction = g.solve_junction();
-        // Unreachable for input the boundary admits (`GearParams::check`) at
-        // a scale whose squares are normal doubles — the involute's roll is
-        // `√(r² − r_b²)`, which past `√f64::MAX` or below
-        // `√f64::MIN_POSITIVE` is no number at all (see `solve_junction`) —
-        // and every test build asks. Reached, the tooth is read as having no
-        // flank, which no rating uses, and says so rather than guess a
-        // junction: a module of 1e154 mm on 17 teeth does.
+        // Unreachable for input the boundary admits (`GearParams::check`,
+        // whose scale keeps every radius's square a normal double — a module
+        // of 1e154 mm on 17 teeth, whose roll `√(r² − r_b²)` is no number,
+        // is refused there), and every test build asks. Reached, the tooth is
+        // read as having no flank, which no rating uses, and says so rather
+        // than guess a junction.
         debug_assert!(
-            junction.is_some() || params.check().is_err() || !(g.ra * g.ra).is_normal(),
+            junction.is_some() || params.check().is_err(),
             "unsolved flank junction: {params:?}"
         );
         match junction {

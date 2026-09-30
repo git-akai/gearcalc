@@ -407,12 +407,12 @@ fn gear(p: &GearParams, opened_by: f64, dxf: Option<&gear_io::DxfOptions>) {
     guarded(&name, || {
         let g = Gear::new(*p);
         println!("{g:#?}");
-        println!("profile {:?}", g.profile(PER_TOOTH));
-        println!("outline {:?}", g.outline(OUTLINE_TOLERANCE));
+        println!("profile {}", drawn(g.profile(PER_TOOTH)));
+        println!("outline {}", drawn(g.outline(OUTLINE_TOLERANCE)));
         println!("admissible {:#?}", auto::admissible_ranges(p, p.dedendum));
         measured(&g);
         if let Some(o) = dxf {
-            println!("dxf\n{}", gear_io::gear_to_dxf(&g, o));
+            println!("dxf\n{}", drawn_text(gear_io::gear_to_dxf(&g, o)));
         }
         let other = Gear::new(GearParams {
             teeth: MATE,
@@ -429,6 +429,17 @@ fn gear(p: &GearParams, opened_by: f64, dxf: Option<&gear_io::DxfOptions>) {
     });
 }
 
+/// A drawing as the record prints it: its points, or the refusal that
+/// stands in for them.
+fn drawn<T: std::fmt::Debug>(r: Result<T, gear_core::input::Refused>) -> String {
+    r.map_or_else(|e| format!("refused: {e}"), |v| format!("{v:?}"))
+}
+
+/// A drawing's text, or the refusal that stands in for it.
+fn drawn_text(r: Result<String, gear_core::input::Refused>) -> String {
+    r.unwrap_or_else(|e| format!("refused: {e}"))
+}
+
 fn ring(p: &GearParams, dxf: Option<&gear_io::DxfOptions>) {
     let name = format!("{p:?}");
     println!("== ring {name}");
@@ -439,10 +450,10 @@ fn ring(p: &GearParams, dxf: Option<&gear_io::DxfOptions>) {
         };
         let r = Ring::cut_by(&rp, &Cutter::default());
         println!("{r:#?}");
-        println!("profile {:?}", r.profile(PER_TOOTH));
-        println!("outline {:?}", r.outline(OUTLINE_TOLERANCE));
+        println!("profile {}", drawn(r.profile(PER_TOOTH)));
+        println!("outline {}", drawn(r.outline(OUTLINE_TOLERANCE)));
         if let Some(o) = dxf {
-            println!("dxf\n{}", gear_io::ring_to_dxf(&r, o));
+            println!("dxf\n{}", drawn_text(gear_io::ring_to_dxf(&r, o)));
         }
         let pinion = Gear::new(*p);
         println!("ring mesh {:#?}", ring::mesh_with(&r, pinion.mean()));

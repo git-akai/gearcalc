@@ -674,7 +674,9 @@ fn a_crossed_mesh_holds_its_tips() {
 /// `(0°, 90°)`: the train either solves, every member's every case a
 /// finite contact stress (nought only on a mesh that carries nothing) and a
 /// finite bending stress or none, where a line contact's member says so
-/// (`gear.bending_unrated`) and a member on point contacts alone has none
+/// (`gear.bending_unrated`, or `gear.bending_unrated_compressed` where the
+/// load compresses the root it would bend) and a member on point contacts
+/// alone has none
 /// by decision; or it is refused, by a catalogue key. The line and point
 /// contacts answer steep flanks alike: a contact rated, a root said.
 #[test]
@@ -711,7 +713,10 @@ fn a_steep_flank_is_rated_or_refused_by_name() {
                     match c.bending_stress {
                         Some(b) => assert!(b.is_finite() && b >= 0.0, "{at}: {b}"),
                         None if line => assert!(
-                            g.notes.iter().any(|n| n.is(key::GEAR_BENDING_UNRATED)),
+                            g.notes.iter().any(|n| {
+                                n.is(key::GEAR_BENDING_UNRATED)
+                                    || n.is(key::GEAR_BENDING_UNRATED_COMPRESSED)
+                            }),
                             "{at}: no bending, and nothing said"
                         ),
                         None => {}
@@ -801,4 +806,43 @@ fn a_mesh_efficiency_is_a_fraction_at_every_friction_admitted() {
         );
     }
     assert!(read > 6 * 2 * super::sweep::arrangements().len());
+}
+
+/// **Ultimate contact is judged on every solid the table admits**, and said
+/// unjudged only for the one true cause, an ultimate figure at break: a
+/// steel pair whose Poisson's ratio is −0.5 (auxetic), 0.05 and 0.17 (the
+/// line's first yield at the surface, which the depth search once began
+/// below) and ½ (the incompressible end, which a second bound on ν once
+/// refused) is rated for contact at its ultimate case and says nothing of
+/// judging it; the same steel read as a figure at break says so.
+#[test]
+fn ultimate_contact_is_judged_on_every_admitted_solid() {
+    use crate::material::{Measure, Overrides};
+    use crate::note::key;
+    let mut lib = test_library();
+    let rated = |lib: &crate::material::MaterialLibrary, nu: f64| {
+        let mut s = pair([17, 43]);
+        for m in &mut s.members {
+            m.gear.material_overrides = Overrides {
+                poissons_ratio: Some(nu),
+                ..Overrides::default()
+            };
+        }
+        let r = solve_train(&Train::alone(&s, 2.0, 100.0), lib).unwrap();
+        r.members.iter().any(|g| {
+            g.notes
+                .iter()
+                .any(|n| n.is(key::GEAR_CONTACT_ULTIMATE_UNJUDGED))
+        })
+    };
+    let mut asked = 0;
+    for nu in [-0.5, 0.05, 0.17, 0.3, 0.5] {
+        assert!(!rated(&lib, nu), "ν {nu}: ultimate contact unjudged");
+        asked += 1;
+    }
+    assert_eq!(asked, 5);
+    for m in &mut lib.materials {
+        m.ultimate_measure = Measure::Break;
+    }
+    assert!(rated(&lib, 0.3), "a figure at break is said unjudged");
 }

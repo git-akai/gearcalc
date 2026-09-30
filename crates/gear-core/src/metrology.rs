@@ -201,7 +201,7 @@ pub fn pin_bound((smallest, largest): (f64, f64)) -> Bound {
 /// that measure at **every** position, as one caliper carried round.
 #[must_use]
 pub fn pin_diameter_range_around(gear: &crate::gear::Gear) -> Option<(f64, f64)> {
-    (0..gear.teeth())
+    (0..positions(gear))
         .map(|i| pin_diameter_range(&space_at(gear, i)))
         .try_fold((0.0_f64, f64::INFINITY), |(lo, hi), r| {
             let (a, b) = r?;
@@ -357,6 +357,66 @@ pub fn best_span(g: &Tooth) -> Result<Span, MeasurementError> {
                 .total_cmp(&(b.contact_radius - g.r).abs())
         })
         .ok_or(MeasurementError::NoValidSpan)
+}
+
+/// **The positions a reading round the revolution is taken at**: every
+/// tooth's, or one where the teeth are one tooth — a concentric gear, whose
+/// every position reads the same number to the bit (the seats' pitch terms
+/// cancel exactly and every `ψ` agrees), so its range is its one reading
+/// and a count of billions costs one.
+fn positions(gear: &crate::gear::Gear) -> usize {
+    if gear.is_concentric() {
+        1
+    } else {
+        gear.teeth()
+    }
+}
+
+/// **The spans worth asking of a gear**: every count on an eccentric gear;
+/// on a concentric one, the counts whose contact lands on usable flank,
+/// found by halving rather than by asking each of `z`.
+///
+/// A concentric gear's span over `k` teeth rolls `2π(k−1)/z + 2ψ_b` round
+/// its base circle, rising with `k`, and is valid while half that roll lies
+/// on usable flank ([`span_over_teeth_at`]); so the valid counts are one
+/// run, found by halving on which side of it a count falls. Every count
+/// outside the run is `None`, as asking it would have been.
+fn span_counts(gear: &crate::gear::Gear) -> std::ops::RangeInclusive<u32> {
+    let z = gear.mean().params.teeth;
+    if !gear.is_concentric() {
+        return 1..=z;
+    }
+    let mean = gear.mean();
+    let bb = mean.base_helix_angle();
+    let roll_at = |radius: f64| crate::involute::roll_at_radius(radius, mean.rb);
+    let (lo, hi) = (roll_at(mean.r_j), roll_at(mean.ra));
+    // Half the roll a span over `k` teeth takes, as `span_over_teeth_at`
+    // reads it at the one tooth.
+    let half_roll = |k: u32| {
+        let sweep =
+            std::f64::consts::TAU * f64::from(k - 1) / f64::from(z) + mean.psi_b + mean.psi_b;
+        transverse_roll(sweep * bb.cos(), bb) / 2.0
+    };
+    // The first count whose half-roll reaches `at`, by halving on `[1, z]`:
+    // `z + 1` where none does.
+    let first_reaching = |at: f64, strict: bool| {
+        let (mut a, mut b) = (1_u32, z.saturating_add(1));
+        while a < b {
+            let mid = a + (b - a) / 2;
+            let h = half_roll(mid);
+            let reaches = if strict { h > at } else { h >= at };
+            if reaches {
+                b = mid;
+            } else {
+                a = mid + 1;
+            }
+        }
+        a
+    };
+    // One count either side, for the rounding of the two routes to agree.
+    let from = first_reaching(lo, false).saturating_sub(1).max(1);
+    let to = first_reaching(hi, true).min(z);
+    from..=to
 }
 
 /// Span over `k` teeth starting at tooth `j`, on a gear whose teeth may differ.
@@ -670,11 +730,11 @@ pub fn over_pins(
 /// that can only be taken at some angular positions is not a measurement of the
 /// gear.
 pub fn best_span_around(gear: &crate::gear::Gear) -> Result<(Span, [f64; 2]), MeasurementError> {
-    let z = gear.teeth();
+    let z = positions(gear);
     let mean = gear.mean();
     let mut best: Option<(Span, [f64; 2], f64)> = None;
 
-    for k in 1..=gear.mean().params.teeth {
+    for k in span_counts(gear) {
         let mut lo = f64::MAX;
         let mut hi = f64::MIN;
         let mut worst_offset = 0.0_f64;
@@ -731,7 +791,7 @@ pub fn over_pins_around(
 ) -> Result<(OverPins, [f64; 2]), MeasurementError> {
     let first = over_pins_at(gear, pin_diameter, pin_count, 0)?;
     let mut around = [first.nominal; 2];
-    for start in 1..gear.teeth() {
+    for start in 1..positions(gear) {
         let nominal = over_pins_at(gear, pin_diameter, pin_count, start)?.nominal;
         around = [around[0].min(nominal), around[1].max(nominal)];
     }

@@ -190,6 +190,9 @@ pub enum MeshError {
     OutsideInvoluteDomain,
     /// The actual centre distance is below the base-circle limit.
     CentreDistanceTooSmall,
+    /// **A list per tooth past the machine's memory**: an eccentric gear's
+    /// centre distance read at every one of its `teeth`.
+    PastMemory { teeth: u32 },
 }
 
 /// A meshing pair, with the derived operating geometry.
@@ -757,6 +760,9 @@ impl crate::note::Explain for MeshError {
             Self::RingTooSmall => key::ERROR_MESH_RING_TOO_SMALL,
             Self::OutsideInvoluteDomain => key::ERROR_MESH_OUTSIDE_INVOLUTE_DOMAIN,
             Self::CentreDistanceTooSmall => key::ERROR_MESH_AXIS_DISTANCE_TOO_SMALL,
+            Self::PastMemory { teeth } => {
+                return crate::input::Refused::past_memory("teeth", f64::from(*teeth)).note()
+            }
         })
     }
 }
@@ -772,6 +778,9 @@ impl std::fmt::Display for MeshError {
                 "no such gear pair: the profile shifts require the base circles to overlap"
             }
             Self::CentreDistanceTooSmall => "the axis distance is below the base-circle limit",
+            Self::PastMemory { teeth } => {
+                return write!(f, "{teeth} teeth: more than this machine's memory holds");
+            }
         };
         f.write_str(s)
     }

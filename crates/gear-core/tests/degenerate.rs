@@ -230,7 +230,10 @@ fn the_pressure_angle_is_read_one_way_and_held_at_its_floor() {
             });
             assert_eq!(t.alpha_n, held.to_radians(), "α {alpha} k {k}");
             assert_eq!(t.st, at.st, "α {alpha} k {k}: thickness");
-            let (a, b) = (Gear::new(p).profile(64), Gear::new(at.params).profile(64));
+            let (a, b) = (
+                Gear::new(p).profile(64).unwrap(),
+                Gear::new(at.params).profile(64).unwrap(),
+            );
             assert!(!a.is_empty() && a.iter().flatten().all(|x| x.is_finite()));
             assert_eq!(a, b, "α {alpha} k {k}: profile");
             let raised = t
@@ -255,7 +258,7 @@ fn the_pressure_angle_is_read_one_way_and_held_at_its_floor() {
         ..GearParams::default()
     });
     assert!(flat.st.is_finite() && flat.ra.is_finite() && flat.r_j.is_finite());
-    assert!(!Gear::new(flat.params).profile(64).is_empty());
+    assert!(!Gear::new(flat.params).profile(64).unwrap().is_empty());
 }
 
 /// **The floor is read in one place**: every source of the crate but the

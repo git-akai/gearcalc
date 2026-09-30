@@ -12,6 +12,7 @@
   "import_materials",
   "import_train",
   "languages",
+  "last_panic",
   "offers",
   "preview_edit",
   "relieve",
@@ -21,6 +22,7 @@
   "solve_gear",
   "solve_ring",
   "solve_train",
+  "start",
   "strings",
   "version"
  ],
@@ -3581,7 +3583,7 @@
     "reverse_loading_coefficient": "0.69999999999999996",
     "count": {
      "min": 1,
-     "max": null,
+     "max": 4294967295,
      "exclusive_min": false,
      "exclusive_max": false
     }
@@ -3629,23 +3631,23 @@
    "ok": [
     [
      "en",
-     583
+     577
     ],
     [
      "de",
-     583
+     577
     ],
     [
      "pt",
-     583
+     577
     ],
     [
      "zh-Hans",
-     583
+     577
     ],
     [
      "zh-Hant",
-     583
+     577
     ]
    ]
   },
@@ -3938,9 +3940,9 @@
    "ok": {
     "ranges": {
      "module": {
-      "min": 0,
-      "max": null,
-      "exclusive_min": true,
+      "min": "0.0010000000000000000",
+      "max": 1.7014118346046923e+38,
+      "exclusive_min": false,
       "exclusive_max": false
      },
      "pressure_angle": {
@@ -3951,7 +3953,7 @@
      },
      "teeth": {
       "min": 1,
-      "max": null,
+      "max": 4294967295,
       "exclusive_min": false,
       "exclusive_max": false
      },
@@ -4045,23 +4047,8 @@
      "coast_index_error": 0
     },
     "per_tooth_clamps": {
-     "teeth": [
-      0,
-      1,
-      2,
-      3,
-      4,
-      5,
-      6,
-      7,
-      8
-     ],
-     "notes": [
-      {
-       "key": "clamp.tooth_undercut",
-       "values": {}
-      }
-     ]
+     "teeth": [],
+     "notes": []
     },
     "centre_profile": {
      "unavailable": {
@@ -13661,7 +13648,9 @@
        ],
        "couplings": []
       },
-      "held": []
+      "held": [
+       4
+      ]
      }
     ],
     [
@@ -14263,7 +14252,9 @@
        ],
        "couplings": []
       },
-      "held": []
+      "held": [
+       4
+      ]
      }
     ],
     [
@@ -14943,7 +14934,9 @@
        ],
        "couplings": []
       },
-      "held": []
+      "held": [
+       4
+      ]
      }
     ],
     [
@@ -15620,7 +15613,9 @@
        ],
        "couplings": []
       },
-      "held": []
+      "held": [
+       4
+      ]
      }
     ],
     [
@@ -17788,8 +17783,8 @@
          "search": false
         },
         {
-         "a": 13,
-         "b": 12,
+         "a": 12,
+         "b": 13,
          "sliding_friction": "0.080000000000000002",
          "static_friction": "0.16000000000000000",
          "overlap": {
@@ -19229,24 +19224,12 @@
            "auto": false,
            "manual": 30000
           }
-         },
-         {
-          "at": 7,
-          "role": "reacted",
-          "torque": {
-           "auto": true,
-           "manual": 0
-          },
-          "speed": {
-           "auto": true,
-           "manual": 0
-          }
          }
         ],
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 7,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -19257,18 +19240,6 @@
         "kind": "ultimate",
         "enabled": true,
         "loads": [
-         {
-          "at": 7,
-          "role": "load",
-          "torque": {
-           "auto": false,
-           "manual": 3
-          },
-          "speed": {
-           "auto": false,
-           "manual": 0
-          }
-         },
          {
           "at": 1,
           "role": "reacted",
@@ -19285,7 +19256,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 7,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -19307,24 +19278,12 @@
            "auto": false,
            "manual": 30000
           }
-         },
-         {
-          "at": 7,
-          "role": "reacted",
-          "torque": {
-           "auto": true,
-           "manual": 0
-          },
-          "speed": {
-           "auto": true,
-           "manual": 0
-          }
          }
         ],
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 7,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -19346,24 +19305,12 @@
            "auto": false,
            "manual": 30000
           }
-         },
-         {
-          "at": 7,
-          "role": "reacted",
-          "torque": {
-           "auto": true,
-           "manual": 0
-          },
-          "speed": {
-           "auto": true,
-           "manual": 0
-          }
          }
         ],
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 7,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -19384,18 +19331,6 @@
           "speed": {
            "auto": false,
            "manual": 30000
-          }
-         },
-         {
-          "at": 7,
-          "role": "reacted",
-          "torque": {
-           "auto": true,
-           "manual": 0
-          },
-          "speed": {
-           "auto": true,
-           "manual": 0
           }
          }
         ],
@@ -19431,7 +19366,7 @@
          "min_planet_clearance": "0.29999999999999999"
         },
         {
-         "carried_by": 1,
+         "carried_by": 7,
          "count": 1,
          "min_planet_clearance": "0.29999999999999999"
         }
@@ -19475,7 +19410,7 @@
         },
         {
          "body": 10,
-         "axis": 0
+         "axis": 1
         },
         {
          "body": 11,
@@ -20696,7 +20631,7 @@
         },
         {
          "axes": [
-          0,
+          1,
           4
          ],
          "angle": 0,
@@ -20741,24 +20676,12 @@
            "auto": false,
            "manual": 30000
           }
-         },
-         {
-          "at": 7,
-          "role": "reacted",
-          "torque": {
-           "auto": true,
-           "manual": 0
-          },
-          "speed": {
-           "auto": true,
-           "manual": 0
-          }
          }
         ],
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 7,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -20769,18 +20692,6 @@
         "kind": "ultimate",
         "enabled": true,
         "loads": [
-         {
-          "at": 7,
-          "role": "load",
-          "torque": {
-           "auto": false,
-           "manual": 3
-          },
-          "speed": {
-           "auto": false,
-           "manual": 0
-          }
-         },
          {
           "at": 1,
           "role": "reacted",
@@ -20797,7 +20708,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 7,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -20819,24 +20730,12 @@
            "auto": false,
            "manual": 30000
           }
-         },
-         {
-          "at": 7,
-          "role": "reacted",
-          "torque": {
-           "auto": true,
-           "manual": 0
-          },
-          "speed": {
-           "auto": true,
-           "manual": 0
-          }
          }
         ],
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 7,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -20858,24 +20757,12 @@
            "auto": false,
            "manual": 30000
           }
-         },
-         {
-          "at": 7,
-          "role": "reacted",
-          "torque": {
-           "auto": true,
-           "manual": 0
-          },
-          "speed": {
-           "auto": true,
-           "manual": 0
-          }
          }
         ],
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 7,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -20896,18 +20783,6 @@
           "speed": {
            "auto": false,
            "manual": 30000
-          }
-         },
-         {
-          "at": 7,
-          "role": "reacted",
-          "torque": {
-           "auto": true,
-           "manual": 0
-          },
-          "speed": {
-           "auto": true,
-           "manual": 0
           }
          }
         ],
@@ -20943,7 +20818,7 @@
          "min_planet_clearance": "0.29999999999999999"
         },
         {
-         "carried_by": 1,
+         "carried_by": 7,
          "count": 1,
          "min_planet_clearance": "0.29999999999999999"
         }
@@ -20987,7 +20862,7 @@
         },
         {
          "body": 10,
-         "axis": 0
+         "axis": 1
         },
         {
          "body": 11,
@@ -20995,7 +20870,7 @@
         },
         {
          "body": 12,
-         "axis": 0
+         "axis": 1
         }
        ],
        "members": [
@@ -22212,7 +22087,7 @@
         },
         {
          "axes": [
-          0,
+          1,
           4
          ],
          "angle": 0,
@@ -22262,24 +22137,12 @@
            "auto": false,
            "manual": 30000
           }
-         },
-         {
-          "at": 7,
-          "role": "reacted",
-          "torque": {
-           "auto": true,
-           "manual": 0
-          },
-          "speed": {
-           "auto": true,
-           "manual": 0
-          }
          }
         ],
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 7,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -22290,18 +22153,6 @@
         "kind": "ultimate",
         "enabled": true,
         "loads": [
-         {
-          "at": 7,
-          "role": "load",
-          "torque": {
-           "auto": false,
-           "manual": 3
-          },
-          "speed": {
-           "auto": false,
-           "manual": 0
-          }
-         },
          {
           "at": 1,
           "role": "reacted",
@@ -22318,7 +22169,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 7,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -22340,24 +22191,12 @@
            "auto": false,
            "manual": 30000
           }
-         },
-         {
-          "at": 7,
-          "role": "reacted",
-          "torque": {
-           "auto": true,
-           "manual": 0
-          },
-          "speed": {
-           "auto": true,
-           "manual": 0
-          }
          }
         ],
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 7,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -22379,24 +22218,12 @@
            "auto": false,
            "manual": 30000
           }
-         },
-         {
-          "at": 7,
-          "role": "reacted",
-          "torque": {
-           "auto": true,
-           "manual": 0
-          },
-          "speed": {
-           "auto": true,
-           "manual": 0
-          }
          }
         ],
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 7,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -22417,18 +22244,6 @@
           "speed": {
            "auto": false,
            "manual": 30000
-          }
-         },
-         {
-          "at": 7,
-          "role": "reacted",
-          "torque": {
-           "auto": true,
-           "manual": 0
-          },
-          "speed": {
-           "auto": true,
-           "manual": 0
           }
          }
         ],
@@ -22464,7 +22279,7 @@
          "min_planet_clearance": "0.29999999999999999"
         },
         {
-         "carried_by": 1,
+         "carried_by": 7,
          "count": 1,
          "min_planet_clearance": "0.29999999999999999"
         },
@@ -22513,7 +22328,7 @@
         },
         {
          "body": 10,
-         "axis": 0
+         "axis": 1
         },
         {
          "body": 11,
@@ -22521,7 +22336,7 @@
         },
         {
          "body": 12,
-         "axis": 0
+         "axis": 1
         },
         {
          "body": 13,
@@ -23624,21 +23439,21 @@
           }
          },
          "module": {
-          "auto": true,
+          "auto": false,
           "manual": 1
          },
          "pressure_angle": {
-          "auto": true,
+          "auto": false,
           "manual": 20
          },
          "thickness_mod": {
-          "auto": true,
+          "auto": false,
           "manual": 1
          },
          "ring": null,
          "pitch_diameter": {
           "auto": true,
-          "manual": 0
+          "manual": 17
          }
         }
        ],
@@ -23748,8 +23563,8 @@
          "search": false
         },
         {
-         "a": 15,
-         "b": 0,
+         "a": 0,
+         "b": 15,
          "sliding_friction": "0.080000000000000002",
          "static_friction": "0.16000000000000000",
          "overlap": {
@@ -23824,7 +23639,7 @@
         },
         {
          "axes": [
-          0,
+          1,
           4
          ],
          "angle": 0,
@@ -23894,24 +23709,12 @@
            "auto": false,
            "manual": 30000
           }
-         },
-         {
-          "at": 7,
-          "role": "reacted",
-          "torque": {
-           "auto": true,
-           "manual": 0
-          },
-          "speed": {
-           "auto": true,
-           "manual": 0
-          }
          }
         ],
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 7,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -23922,18 +23725,6 @@
         "kind": "ultimate",
         "enabled": true,
         "loads": [
-         {
-          "at": 7,
-          "role": "load",
-          "torque": {
-           "auto": false,
-           "manual": 3
-          },
-          "speed": {
-           "auto": false,
-           "manual": 0
-          }
-         },
          {
           "at": 1,
           "role": "reacted",
@@ -23950,7 +23741,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 7,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -23972,24 +23763,12 @@
            "auto": false,
            "manual": 30000
           }
-         },
-         {
-          "at": 7,
-          "role": "reacted",
-          "torque": {
-           "auto": true,
-           "manual": 0
-          },
-          "speed": {
-           "auto": true,
-           "manual": 0
-          }
          }
         ],
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 7,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -24011,24 +23790,12 @@
            "auto": false,
            "manual": 30000
           }
-         },
-         {
-          "at": 7,
-          "role": "reacted",
-          "torque": {
-           "auto": true,
-           "manual": 0
-          },
-          "speed": {
-           "auto": true,
-           "manual": 0
-          }
          }
         ],
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 7,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -24049,18 +23816,6 @@
           "speed": {
            "auto": false,
            "manual": 30000
-          }
-         },
-         {
-          "at": 7,
-          "role": "reacted",
-          "torque": {
-           "auto": true,
-           "manual": 0
-          },
-          "speed": {
-           "auto": true,
-           "manual": 0
           }
          }
         ],
@@ -24096,7 +23851,7 @@
          "min_planet_clearance": "0.29999999999999999"
         },
         {
-         "carried_by": 1,
+         "carried_by": 7,
          "count": 1,
          "min_planet_clearance": "0.29999999999999999"
         }
@@ -24140,7 +23895,7 @@
         },
         {
          "body": 10,
-         "axis": 0
+         "axis": 1
         },
         {
          "body": 11,
@@ -24148,7 +23903,7 @@
         },
         {
          "body": 12,
-         "axis": 0
+         "axis": 1
         }
        ],
        "members": [
@@ -25365,7 +25120,7 @@
         },
         {
          "axes": [
-          0,
+          1,
           4
          ],
          "angle": 0,
@@ -25415,24 +25170,12 @@
            "auto": false,
            "manual": 30000
           }
-         },
-         {
-          "at": 7,
-          "role": "reacted",
-          "torque": {
-           "auto": true,
-           "manual": 0
-          },
-          "speed": {
-           "auto": true,
-           "manual": 0
-          }
          }
         ],
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 7,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -25443,18 +25186,6 @@
         "kind": "ultimate",
         "enabled": true,
         "loads": [
-         {
-          "at": 7,
-          "role": "load",
-          "torque": {
-           "auto": false,
-           "manual": 3
-          },
-          "speed": {
-           "auto": false,
-           "manual": 0
-          }
-         },
          {
           "at": 1,
           "role": "reacted",
@@ -25471,7 +25202,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 7,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -25493,24 +25224,12 @@
            "auto": false,
            "manual": 30000
           }
-         },
-         {
-          "at": 7,
-          "role": "reacted",
-          "torque": {
-           "auto": true,
-           "manual": 0
-          },
-          "speed": {
-           "auto": true,
-           "manual": 0
-          }
          }
         ],
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 7,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -25532,24 +25251,12 @@
            "auto": false,
            "manual": 30000
           }
-         },
-         {
-          "at": 7,
-          "role": "reacted",
-          "torque": {
-           "auto": true,
-           "manual": 0
-          },
-          "speed": {
-           "auto": true,
-           "manual": 0
-          }
          }
         ],
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 7,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -25570,18 +25277,6 @@
           "speed": {
            "auto": false,
            "manual": 30000
-          }
-         },
-         {
-          "at": 7,
-          "role": "reacted",
-          "torque": {
-           "auto": true,
-           "manual": 0
-          },
-          "speed": {
-           "auto": true,
-           "manual": 0
           }
          }
         ],
@@ -25617,7 +25312,7 @@
          "min_planet_clearance": "0.29999999999999999"
         },
         {
-         "carried_by": 1,
+         "carried_by": 7,
          "count": 1,
          "min_planet_clearance": "0.29999999999999999"
         }
@@ -25661,7 +25356,7 @@
         },
         {
          "body": 10,
-         "axis": 0
+         "axis": 1
         },
         {
          "body": 11,
@@ -25669,7 +25364,7 @@
         },
         {
          "body": 12,
-         "axis": 0
+         "axis": 1
         },
         {
          "body": 13,
@@ -27041,7 +26736,7 @@
         },
         {
          "axes": [
-          0,
+          1,
           4
          ],
          "angle": 0,
@@ -27091,24 +26786,12 @@
            "auto": false,
            "manual": 30000
           }
-         },
-         {
-          "at": 7,
-          "role": "reacted",
-          "torque": {
-           "auto": true,
-           "manual": 0
-          },
-          "speed": {
-           "auto": true,
-           "manual": 0
-          }
          }
         ],
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 7,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -27119,18 +26802,6 @@
         "kind": "ultimate",
         "enabled": true,
         "loads": [
-         {
-          "at": 7,
-          "role": "load",
-          "torque": {
-           "auto": false,
-           "manual": 3
-          },
-          "speed": {
-           "auto": false,
-           "manual": 0
-          }
-         },
          {
           "at": 1,
           "role": "reacted",
@@ -27147,7 +26818,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 7,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -27169,24 +26840,12 @@
            "auto": false,
            "manual": 30000
           }
-         },
-         {
-          "at": 7,
-          "role": "reacted",
-          "torque": {
-           "auto": true,
-           "manual": 0
-          },
-          "speed": {
-           "auto": true,
-           "manual": 0
-          }
          }
         ],
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 7,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -27208,24 +26867,12 @@
            "auto": false,
            "manual": 30000
           }
-         },
-         {
-          "at": 7,
-          "role": "reacted",
-          "torque": {
-           "auto": true,
-           "manual": 0
-          },
-          "speed": {
-           "auto": true,
-           "manual": 0
-          }
          }
         ],
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 7,
+          "at": 1,
           "actuations": 1000,
           "reversing": false
          }
@@ -27246,18 +26893,6 @@
           "speed": {
            "auto": false,
            "manual": 30000
-          }
-         },
-         {
-          "at": 7,
-          "role": "reacted",
-          "torque": {
-           "auto": true,
-           "manual": 0
-          },
-          "speed": {
-           "auto": true,
-           "manual": 0
           }
          }
         ],
@@ -27293,7 +26928,7 @@
          "min_planet_clearance": "0.29999999999999999"
         },
         {
-         "carried_by": 1,
+         "carried_by": 7,
          "count": 1,
          "min_planet_clearance": "0.29999999999999999"
         },
@@ -27342,7 +26977,7 @@
         },
         {
          "body": 10,
-         "axis": 0
+         "axis": 1
         },
         {
          "body": 11,
@@ -27350,7 +26985,7 @@
         },
         {
          "body": 12,
-         "axis": 0
+         "axis": 1
         },
         {
          "body": 13,
@@ -28971,7 +28606,7 @@
         },
         {
          "axes": [
-          0,
+          1,
           4
          ],
          "angle": 0,
@@ -29028,9 +28663,7 @@
      [
       "ui.train_edit_refused_geared",
       "ui.train_edit_refused_no_distance",
-      "ui.train_edit_refused_no_such",
-      "ui.train_edit_refused_loaded",
-      "ui.train_edit_refused_locks"
+      "ui.train_edit_refused_no_such"
      ]
     ]
    ]
@@ -29347,7 +28980,7 @@
          "ring": true
         }
        },
-       "refused": "ui.train_edit_refused_locks"
+       "refused": null
       },
       {
        "edit": {
@@ -29419,7 +29052,7 @@
          "ring": true
         }
        },
-       "refused": "ui.train_edit_refused_locks"
+       "refused": null
       },
       {
        "edit": {
@@ -29799,7 +29432,7 @@
            "contact_stress": "904.34765443247124",
            "min_face_width": {
             "bending": "0.024596268257586214",
-            "contact": "0.040370131893468622"
+            "contact": "0.040370131893468587"
            }
           },
           {
@@ -29813,7 +29446,7 @@
            "contact_stress": "3114.4852381402852",
            "min_face_width": {
             "bending": "0.29172318165974342",
-            "contact": "0.47880854106206960"
+            "contact": "0.47880854106206927"
            }
           },
           {
@@ -29892,9 +29525,9 @@
          },
          "ranges": {
           "module": {
-           "min": 0,
-           "max": null,
-           "exclusive_min": true,
+           "min": "0.0010000000000000000",
+           "max": 1.7014118346046923e+38,
+           "exclusive_min": false,
            "exclusive_max": false
           },
           "pressure_angle": {
@@ -29905,7 +29538,7 @@
           },
           "teeth": {
            "min": 1,
-           "max": null,
+           "max": 4294967295,
            "exclusive_min": false,
            "exclusive_max": false
           },
@@ -29993,7 +29626,7 @@
            "contact_stress": "821.68357675559616",
            "min_face_width": {
             "bending": "0.020823420821798000",
-            "contact": "0.033327178581922030"
+            "contact": "0.033327178581921996"
            }
           },
           {
@@ -30007,7 +29640,7 @@
            "contact_stress": "2829.7982061263888",
            "min_face_width": {
             "bending": "0.24697545625853434",
-            "contact": "0.39527583899488911"
+            "contact": "0.39527583899488883"
            }
           },
           {
@@ -30086,9 +29719,9 @@
          },
          "ranges": {
           "module": {
-           "min": 0,
-           "max": null,
-           "exclusive_min": true,
+           "min": "0.0010000000000000000",
+           "max": 1.7014118346046923e+38,
+           "exclusive_min": false,
            "exclusive_max": false
           },
           "pressure_angle": {
@@ -30099,7 +29732,7 @@
           },
           "teeth": {
            "min": 1,
-           "max": null,
+           "max": 4294967295,
            "exclusive_min": false,
            "exclusive_max": false
           },
@@ -30228,7 +29861,7 @@
          "layout": null,
          "count": {
           "min": 1,
-          "max": null,
+          "max": 4294967295,
           "exclusive_min": false,
           "exclusive_max": false
          }
@@ -30237,7 +29870,7 @@
          "layout": null,
          "count": {
           "min": 1,
-          "max": null,
+          "max": 4294967295,
           "exclusive_min": false,
           "exclusive_max": false
          }
@@ -30994,7 +30627,7 @@
            "contact_stress": "2420.5591724396090",
            "min_face_width": {
             "bending": "0.024596268257586217",
-            "contact": "0.040370131893468650"
+            "contact": "0.040370131893468622"
            }
           },
           {
@@ -31008,7 +30641,7 @@
            "contact_stress": "3114.4852381402861",
            "min_face_width": {
             "bending": "0.040720243561907073",
-            "contact": "0.066834594016973878"
+            "contact": "0.066834594016973808"
            }
           },
           {
@@ -31087,9 +30720,9 @@
          },
          "ranges": {
           "module": {
-           "min": 0,
-           "max": null,
-           "exclusive_min": true,
+           "min": "0.0010000000000000000",
+           "max": 1.7014118346046923e+38,
+           "exclusive_min": false,
            "exclusive_max": false
           },
           "pressure_angle": {
@@ -31100,7 +30733,7 @@
           },
           "teeth": {
            "min": 1,
-           "max": null,
+           "max": 4294967295,
            "exclusive_min": false,
            "exclusive_max": false
           },
@@ -31188,7 +30821,7 @@
            "contact_stress": "2199.3021254717696",
            "min_face_width": {
             "bending": "0.020823420821798007",
-            "contact": "0.033327178581922037"
+            "contact": "0.033327178581922010"
            }
           },
           {
@@ -31202,7 +30835,7 @@
            "contact_stress": "2829.7982061263888",
            "min_face_width": {
             "bending": "0.034474122609805806",
-            "contact": "0.055174663687792190"
+            "contact": "0.055174663687792148"
            }
           },
           {
@@ -31281,9 +30914,9 @@
          },
          "ranges": {
           "module": {
-           "min": 0,
-           "max": null,
-           "exclusive_min": true,
+           "min": "0.0010000000000000000",
+           "max": 1.7014118346046923e+38,
+           "exclusive_min": false,
            "exclusive_max": false
           },
           "pressure_angle": {
@@ -31294,7 +30927,7 @@
           },
           "teeth": {
            "min": 1,
-           "max": null,
+           "max": 4294967295,
            "exclusive_min": false,
            "exclusive_max": false
           },
@@ -31382,7 +31015,7 @@
            "contact_stress": "2643.3831320181152",
            "min_face_width": {
             "bending": "0.026535587785001268",
-            "contact": "0.062741856662562337"
+            "contact": "0.062741856662562281"
            }
           },
           {
@@ -31396,7 +31029,7 @@
            "contact_stress": "3467.3666984990218",
            "min_face_width": {
             "bending": "0.045657069299376414",
-            "contact": "0.10795348951091691"
+            "contact": "0.10795348951091681"
            }
           },
           {
@@ -31475,9 +31108,9 @@
          },
          "ranges": {
           "module": {
-           "min": 0,
-           "max": null,
-           "exclusive_min": true,
+           "min": "0.0010000000000000000",
+           "max": 1.7014118346046923e+38,
+           "exclusive_min": false,
            "exclusive_max": false
           },
           "pressure_angle": {
@@ -31488,7 +31121,7 @@
           },
           "teeth": {
            "min": 1,
-           "max": null,
+           "max": 4294967295,
            "exclusive_min": false,
            "exclusive_max": false
           },
@@ -31576,7 +31209,7 @@
            "contact_stress": "2429.3797375787271",
            "min_face_width": {
             "bending": "0.030841779286724293",
-            "contact": "0.052994152033505985"
+            "contact": "0.052994152033505951"
            }
           },
           {
@@ -31590,7 +31223,7 @@
            "contact_stress": "3186.6551231480908",
            "min_face_width": {
             "bending": "0.053066292166551135",
-            "contact": "0.091181612084850094"
+            "contact": "0.091181612084850025"
            }
           },
           {
@@ -31669,9 +31302,9 @@
          },
          "ranges": {
           "module": {
-           "min": 0,
-           "max": null,
-           "exclusive_min": true,
+           "min": "0.0010000000000000000",
+           "max": 1.7014118346046923e+38,
+           "exclusive_min": false,
            "exclusive_max": false
           },
           "pressure_angle": {
@@ -31682,7 +31315,7 @@
           },
           "teeth": {
            "min": 1,
-           "max": null,
+           "max": 4294967295,
            "exclusive_min": false,
            "exclusive_max": false
           },
@@ -31770,7 +31403,7 @@
            "contact_stress": "1090.9403953890285",
            "min_face_width": {
             "bending": "0.017339571947874263",
-            "contact": "0.010686590889632488"
+            "contact": "0.010686590889632482"
            }
           },
           {
@@ -31784,7 +31417,7 @@
            "contact_stress": "1450.4383577738831",
            "min_face_width": {
             "bending": "0.030650310518057541",
-            "contact": "0.018890162348375397"
+            "contact": "0.018890162348375383"
            }
           },
           {
@@ -31861,9 +31494,9 @@
          },
          "ranges": {
           "module": {
-           "min": 0,
-           "max": null,
-           "exclusive_min": true,
+           "min": "0.0010000000000000000",
+           "max": 1.7014118346046923e+38,
+           "exclusive_min": false,
            "exclusive_max": false
           },
           "pressure_angle": {
@@ -31874,7 +31507,7 @@
           },
           "teeth": {
            "min": 1,
-           "max": null,
+           "max": 4294967295,
            "exclusive_min": false,
            "exclusive_max": false
           },
@@ -32128,7 +31761,7 @@
          "layout": null,
          "count": {
           "min": 1,
-          "max": null,
+          "max": 4294967295,
           "exclusive_min": false,
           "exclusive_max": false
          }
@@ -32137,7 +31770,7 @@
          "layout": null,
          "count": {
           "min": 1,
-          "max": null,
+          "max": 4294967295,
           "exclusive_min": false,
           "exclusive_max": false
          }
@@ -32153,7 +31786,7 @@
          },
          "count": {
           "min": 1,
-          "max": null,
+          "max": 4294967295,
           "exclusive_min": false,
           "exclusive_max": false
          }
@@ -33730,6 +33363,89 @@
     "refused": "unknown field `extra` beside a variant, expected value at line 1 column 3522"
    }
   ],
+  "refused_values": {
+   "solve_gear": [
+    {
+     "refused": "{\"key\":\"error.input_out_of_range\",\"values\":{\"bound\":\"[0.001, 1.7014118346046923e38]\",\"field\":\"params.module\",\"value\":\"0\"}}"
+    },
+    {
+     "refused": "{\"key\":\"error.input_out_of_range\",\"values\":{\"bound\":\"[1, 4294967295]\",\"field\":\"params.teeth\",\"value\":\"0\"}}"
+    }
+   ],
+   "drawn": [
+    [
+     {
+      "refused": "{\"key\":\"error.input_out_of_range\",\"values\":{\"bound\":\"[0.001, 1.7014118346046923e38]\",\"field\":\"params.module\",\"value\":\"0\"}}"
+     },
+     {
+      "refused": "{\"key\":\"error.input_out_of_range\",\"values\":{\"bound\":\"[0.001, 1.7014118346046923e38]\",\"field\":\"params.module\",\"value\":\"0\"}}"
+     }
+    ],
+    [
+     {
+      "refused": "{\"key\":\"error.input_out_of_range\",\"values\":{\"bound\":\"[1, 4294967295]\",\"field\":\"params.teeth\",\"value\":\"0\"}}"
+     },
+     {
+      "refused": "{\"key\":\"error.input_out_of_range\",\"values\":{\"bound\":\"[1, 4294967295]\",\"field\":\"params.teeth\",\"value\":\"0\"}}"
+     }
+    ]
+   ],
+   "import_train": [
+    {
+     "refused": "{\"key\":\"error.input_out_of_range\",\"values\":{\"bound\":\"[0, 1]\",\"field\":\"train.shape.meshes.0.b\",\"value\":\"2\"}}"
+    },
+    {
+     "refused": "{\"key\":\"error.train_malformed_carried_by\",\"values\":{\"axis\":\"1\"}}"
+    }
+   ],
+   "gear_profile": [
+    {
+     "refused": "{\"key\":\"error.input_out_of_range\",\"values\":{\"bound\":\"[1, 65536]\",\"field\":\"points_per_tooth\",\"value\":\"4294967295\"}}"
+    },
+    {
+     "refused": "{\"key\":\"error.input_out_of_range\",\"values\":{\"bound\":\"[1, 65536]\",\"field\":\"points_per_tooth\",\"value\":\"2147483648\"}}"
+    },
+    {
+     "refused": "{\"key\":\"error.input_out_of_range\",\"values\":{\"bound\":\"[1, 65536]\",\"field\":\"points_per_tooth\",\"value\":\"65537\"}}"
+    },
+    {
+     "ok": 308
+    }
+   ],
+   "ring_profile": [
+    {
+     "refused": "{\"key\":\"error.input_out_of_range\",\"values\":{\"bound\":\"[1, 65536]\",\"field\":\"points_per_tooth\",\"value\":\"4294967295\"}}"
+    },
+    {
+     "refused": "{\"key\":\"error.input_out_of_range\",\"values\":{\"bound\":\"[1, 65536]\",\"field\":\"points_per_tooth\",\"value\":\"2147483648\"}}"
+    }
+   ],
+   "solve_ring": {
+    "refused": "{\"key\":\"error.input_out_of_range\",\"values\":{\"bound\":\"[1, 4294967295]\",\"field\":\"cutter.teeth\",\"value\":\"0\"}}"
+   },
+   "solve_train": {
+    "ok": {
+     "note": {
+      "key": "error.input_out_of_range",
+      "values": {
+       "bound": "[1, 4294967295]",
+       "field": "train.shape.members.0.gear.teeth",
+       "value": "0"
+      }
+     },
+     "part": null
+    }
+   },
+   "edit_train": {
+    "refused": "{\"key\":\"error.input_out_of_range\",\"values\":{\"bound\":\"[1, 4294967295]\",\"field\":\"train.shape.members.0.gear.teeth\",\"value\":\"0\"}}"
+   },
+   "export_materials": {
+    "refused": "{\"key\":\"error.input_out_of_range\",\"values\":{\"bound\":\"(-1, 0.5]\",\"field\":\"material.0.poissons_ratio.value\",\"value\":\"0.7\"}}"
+   },
+   "import_materials": {
+    "refused": "{\"key\":\"error.input_out_of_range\",\"values\":{\"bound\":\"(-1, 0.5]\",\"field\":\"material.0.poissons_ratio.value\",\"value\":\"0.7\"}}"
+   }
+  },
   "export_materials": {
    "ok": "[[material]]\nname = \"4340 Steel\"\nclass = \"steel\"\ngrade = \"AISI 4340 (UNS G43400)\"\ncondition = \"annealed\"\nsource = \"MakeItFrom, Annealed 4340 Ni-Cr-Mo Steel; density cross-checked against AZoM UNS G43400. Retrieved 2026-08-15.\"\nultimate_measure = \"yield\"\nfatigue_load_ratio = \"reversed\"\nfatigue_specimen = \"coupon\"\n\n[material.density]\nvalue = 7850.0\nbasis = \"datasheet\"\n\n[material.elastic_modulus]\nvalue = 190000.0\nbasis = \"datasheet\"\n\n[material.poissons_ratio]\nvalue = 0.29\nbasis = \"datasheet\"\n\n[material.ultimate_allowable]\nvalue = 470.0\nbasis = \"datasheet\"\nnote = \"Tensile yield strength. UTS is 690 MPa.\"\n\n[material.fatigue_allowable]\nvalue = 330.0\nbasis = \"datasheet\"\nnote = \"Published fatigue strength; the source does not state the cycle count.\"\n\n[material.contact_estimate]\nline = \"through_hardened_alloy_steel\"\ngrade = \"mq\"\n\n[material.contact_estimate.hardness]\nvalue = 230.0\nbasis = \"derived\"\nnote = \"The source's 220 HB, converted by ASTM E140. The flank allowable is ISO 6336-5:2016 Table 1's through-hardened alloy steel line at this hardness and the grade asked: 490 / 675 / 769 MPa at ML / MQ / ME.\"\n\n[[material]]\nname = \"4340 Hardened Steel\"\nclass = \"steel\"\ngrade = \"AISI 4340 (UNS G43400)\"\ncondition = \"oil quenched from 845 °C, tempered at 425 °C — 46 HRC\"\nsource = \"ASM Desk Edition tempering table for oil-quenched 4340, as reproduced by theworldmaterial.com. Retrieved 2026-08-15.\"\nultimate_measure = \"yield\"\nfatigue_load_ratio = \"reversed\"\nfatigue_specimen = \"coupon\"\n\n[material.density]\nvalue = 7850.0\nbasis = \"datasheet\"\n\n[material.elastic_modulus]\nvalue = 190000.0\nbasis = \"datasheet\"\n\n[material.poissons_ratio]\nvalue = 0.29\nbasis = \"datasheet\"\n\n[material.ultimate_allowable]\nvalue = 1365.0\nbasis = \"datasheet\"\nnote = \"Tensile yield strength at this temper. UTS is 1500 MPa.\"\n\n[material.fatigue_allowable]\nvalue = 750.0\nbasis = \"estimated\"\nnote = \"0.5 × UTS, the classical steel endurance ratio, which reproduces the annealed entry's published 330 MPa to within 5 %. No published fatigue figure was found at THIS temper. Treat as optimistic: the endurance ratio is known to fall away above roughly 1400 MPa UTS rather than track 0.5 indefinitely, so the true figure is plausibly nearer 700 MPa. The first number here worth replacing with your own data.\"\n\n[material.contact_estimate]\nline = \"through_hardened_alloy_steel\"\ngrade = \"mq\"\n\n[material.contact_estimate.hardness]\nvalue = 458.0\nbasis = \"derived\"\nnote = \"46 HRC, the condition's, converted by ASTM E140. Past the end of ISO 6336-5:2016 Table 1's through-hardened alloy steel line (360 HV at ML and MQ, 390 at ME), where the table gives nothing, so the flank allowable is held at the line's end: 660.7 / 845.7 / 1123.1 MPa at ML / MQ / ME.\"\n\n[[material]]\nname = \"Brass C360\"\nclass = \"brass\"\ngrade = \"UNS C36000 free-cutting brass\"\ncondition = \"H02 half hard — the temper free-cutting brass is normally supplied in\"\nsource = \"Copper Development Association alloy data for C36000, as published by National Bronze. Retrieved 2026-08-15.\"\nultimate_measure = \"yield\"\nfatigue_load_ratio = \"reversed\"\nfatigue_specimen = \"coupon\"\n\n[material.density]\nvalue = 8500.0\nbasis = \"datasheet\"\nnote = \"0.307 lb/in³. Some secondary sources give 8.2 g/cm³, which is wrong.\"\n\n[material.elastic_modulus]\nvalue = 96500.0\nbasis = \"datasheet\"\nnote = \"14 000 ksi.\"\n\n[material.poissons_ratio]\nvalue = 0.32\nbasis = \"derived\"\nnote = \"ν = E/2G − 1, from the published E = 14 000 ksi and G = 5 300 ksi. Not an estimate: both moduli are measured.\"\n\n[material.ultimate_allowable]\nvalue = 310.0\nbasis = \"datasheet\"\nnote = \"Typical H02 yield, 45 ksi. UTS is 386 MPa. Yield is strongly temper-dependent — the published range across tempers is 124–310 MPa.\"\n\n[material.fatigue_allowable]\nvalue = 115.0\nbasis = \"estimated\"\nnote = \"0.30 × UTS, the usual endurance ratio for wrought copper alloys. No fatigue figure for C36000 was found in the CDA data.\"\n\n[[material]]\nname = \"POM Delrin 100P\"\nclass = \"pom\"\ngrade = \"DuPont Delrin 100P NC010, acetal homopolymer\"\ncondition = \"23 °C, as moulded\"\nsource = \"DuPont Delrin 100P product datasheet (ISO test methods). Fatigue from the DuPont Delrin design guide, figure 6.14. Retrieved 2026-08-15.\"\nultimate_measure = \"yield\"\nfatigue_load_ratio = \"reversed\"\nfatigue_specimen = \"coupon\"\n\n[material.density]\nvalue = 1420.0\nbasis = \"datasheet\"\n\n[material.elastic_modulus]\nvalue = 3000.0\nbasis = \"datasheet\"\nnote = \"ISO 527-1/-2. Flexural modulus is 2800 MPa.\"\n\n[material.poissons_ratio]\nvalue = 0.37\nbasis = \"datasheet\"\nnote = \"ISO 527-1/-2. Published, unusually for a polymer.\"\n\n[material.ultimate_allowable]\nvalue = 71.0\nbasis = \"datasheet\"\nnote = \"Yield stress, ISO 527-1/-2, at 22 % yield strain.\"\n\n[material.fatigue_allowable]\nvalue = 35.0\nbasis = \"chart\"\nnote = \"Read off DuPont figure 6.14, flexural fatigue of Delrin 100 at 10⁷ cycles — ASTM D671, 23 °C, 50 % RH, fully reversed, 30 Hz. The curve is published for Delrin 100, not 100P. Roughly half the yield stress, which is high for a thermoplastic and characteristic of acetal.\"\n\n[[material]]\nname = \"PA6\"\nclass = \"polyamide\"\ngrade = \"EMS-GRIVORY Grilon BS\"\ncondition = \"conditioned, 23 °C / 50 % RH\"\nsource = \"EMS-GRIVORY Grilon BS CAMPUS datasheet, ISO 10350. Retrieved 2026-08-15.\"\nultimate_measure = \"yield\"\n\n[material.density]\nvalue = 1130.0\nbasis = \"datasheet\"\n\n[material.elastic_modulus]\nvalue = 1000.0\nbasis = \"datasheet\"\nnote = \"ISO 527-1/-2. Moisture costs two thirds of the stiffness. Dry as moulded: 3000.0.\"\n\n[material.poissons_ratio]\nvalue = 0.39\nbasis = \"estimated\"\nnote = \"No polyamide datasheet publishes ν. Class value for unfilled PA. The whole plausible range 0.33–0.44 moves Hertzian contact stress by only ±2.5 %, so this is a low-consequence estimate.\"\n\n[material.ultimate_allowable]\nvalue = 40.0\nbasis = \"datasheet\"\nnote = \"Yield stress, ISO 527-1/-2. Dry as moulded: 80.0.\"\n\n[material.fatigue_allowable]\nvalue = 12.0\nbasis = \"estimated\"\nnote = \"0.30 × ultimate. No S-N data exists for this grade in any published form. Dry as moulded: 24.0.\"\n\n[[material]]\nname = \"PA6 GF30\"\nclass = \"polyamide\"\ngrade = \"EMS-GRIVORY Grilon BG-30 S\"\ncondition = \"conditioned, 23 °C / 50 % RH\"\nsource = \"EMS-GRIVORY Grilon BG-30 S CAMPUS datasheet, ISO 10350. Retrieved 2026-08-15.\"\nultimate_measure = \"break\"\n\n[material.density]\nvalue = 1350.0\nbasis = \"datasheet\"\n\n[material.elastic_modulus]\nvalue = 6000.0\nbasis = \"datasheet\"\nnote = \"Dry as moulded: 9500.0.\"\n\n[material.poissons_ratio]\nvalue = 0.36\nbasis = \"estimated\"\nnote = \"0.39 less 0.001 per % glass; see the file header.\"\n\n[material.ultimate_allowable]\nvalue = 125.0\nbasis = \"datasheet\"\nnote = \"Stress at break — glass-filled polyamide has no yield point. Dry as moulded: 185.0.\"\n\n[material.fatigue_allowable]\nvalue = 37.5\nbasis = \"estimated\"\nnote = \"0.30 × ultimate. No S-N data exists for this grade. Dry as moulded: 55.5.\"\n\n[[material]]\nname = \"PA GF50\"\nclass = \"polyamide\"\ngrade = \"EMS-GRIVORY Grilon BG-50 S\"\ncondition = \"conditioned, 23 °C / 50 % RH\"\nsource = \"EMS-GRIVORY Grilon BG-50 S CAMPUS datasheet, ISO 10350. Retrieved 2026-08-15.\"\nultimate_measure = \"break\"\n\n[material.density]\nvalue = 1580.0\nbasis = \"datasheet\"\n\n[material.elastic_modulus]\nvalue = 11500.0\nbasis = \"datasheet\"\nnote = \"Dry as moulded: 17500.0.\"\n\n[material.poissons_ratio]\nvalue = 0.34\nbasis = \"estimated\"\nnote = \"0.39 less 0.001 per % glass; see the file header.\"\n\n[material.ultimate_allowable]\nvalue = 165.0\nbasis = \"datasheet\"\nnote = \"Stress at break. Dry as moulded: 245.0.\"\n\n[material.fatigue_allowable]\nvalue = 49.5\nbasis = \"estimated\"\nnote = \"0.30 × ultimate. No S-N data exists for this grade. Dry as moulded: 73.5.\"\n\n[[material]]\nname = \"PA GF70\"\nclass = \"polyamide\"\ngrade = \"EMS-GRIVORY Grivory GVX-7H\"\ncondition = \"conditioned, 23 °C / 50 % RH\"\nsource = \"EMS-GRIVORY Grivory GVX-7H CAMPUS datasheet, ISO 10350. Retrieved 2026-08-15.\"\nultimate_measure = \"break\"\n\n[material.density]\nvalue = 1850.0\nbasis = \"datasheet\"\n\n[material.elastic_modulus]\nvalue = 27500.0\nbasis = \"datasheet\"\nnote = \"At 70 % glass the moisture effect nearly vanishes. Dry as moulded: 28000.0.\"\n\n[material.poissons_ratio]\nvalue = 0.32\nbasis = \"estimated\"\nnote = \"0.39 less 0.001 per % glass; see the file header.\"\n\n[material.ultimate_allowable]\nvalue = 260.0\nbasis = \"datasheet\"\nnote = \"Stress at break, at 1.5 % strain — this material is stiff and brittle. Dry as moulded: 290.0.\"\n\n[material.fatigue_allowable]\nvalue = 78.0\nbasis = \"estimated\"\nnote = \"0.30 × ultimate. No S-N data exists for this grade. Dry as moulded: 87.0.\"\n"
   },
@@ -34016,6 +33732,26 @@
       }
      }
     ]
+   }
+  },
+  "huge_counts": {
+   "summarised": {
+    "ok": 150000000
+   },
+   "drawn": {
+    "refused": "{\"key\":\"error.input_past_memory\",\"values\":{\"field\":\"params.teeth\",\"value\":\"30000000\"}}"
+   },
+   "exported": {
+    "refused": "{\"key\":\"error.input_past_memory\",\"values\":{\"field\":\"params.teeth\",\"value\":\"30000000\"}}"
+   },
+   "eccentric": {
+    "refused": "{\"key\":\"error.input_past_memory\",\"values\":{\"field\":\"params.teeth\",\"value\":\"30000000\"}}"
+   },
+   "ring": {
+    "refused": "{\"key\":\"error.input_past_memory\",\"values\":{\"field\":\"params.teeth\",\"value\":\"30000000\"}}"
+   },
+   "panicked": {
+    "ok": ""
    }
   }
  }

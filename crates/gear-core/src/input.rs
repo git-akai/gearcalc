@@ -36,31 +36,71 @@ use crate::ring::Cutter;
 use crate::train::shape::{Axis, BodyOn, Distance, Member, MeshInput, Shape};
 use crate::train::{Duty, Load, LoadCase, Train};
 
+// ------------------------------------------------------------ the scale ---
+
+/// **The degree of the widest product the model forms before a root or a
+/// quotient brings it back**: the contact width's `b (σ_H/σ_allow)²`, where
+/// `σ_H² = F·E*/(b·ρ)` and `F = T/r` — a torque, a modulus, three lengths
+/// and an allowable twice, then the width again: eight figures' exponents.
+pub const PRODUCT_DEGREE: u64 = 8;
+
+/// **The binary exponent every figure's magnitude is held within**, ±127:
+/// a product of [`PRODUCT_DEGREE`] figures each within `2^±E` lies within
+/// `2^±8E`, a normal double where `8E ≤ 1022`, the normal doubles' own
+/// exponent range. A figure is a length, a torque, a speed, a duration, a
+/// stress, a friction, a hardness, a coefficient in modules; a count and
+/// an angle have their own bounds.
+pub const SCALE_EXPONENT: u64 = 1022 / PRODUCT_DEGREE;
+
+/// `f64`'s exponent bias: the stored exponent of 1.
+const EXPONENT_BIAS: u64 = 1023;
+
+/// **The largest magnitude a figure may have**, `2^127` ≈ 1.7e38.
+pub const CEILING: f64 = f64::from_bits((EXPONENT_BIAS + SCALE_EXPONENT) << 52);
+
+/// **The smallest non-zero magnitude a figure may have**, `2^−127` ≈ 5.9e−39.
+pub const FLOOR: f64 = f64::from_bits((EXPONENT_BIAS - SCALE_EXPONENT) << 52);
+
+/// **The smallest module the model is built for**, 1 µm: where its
+/// compatibility tolerance ([`crate::params::compat::SAME_RACK`], 1e−9 mm)
+/// stops being what it is written as, a millionth of anything a designer
+/// could mean ([`crate::params::compat::DESIGN_MARGIN`]). Below it the
+/// model's absolute tolerances are no longer small beside the teeth: the
+/// homogeneity law (`train/homogeneity.rs`) holds every preset from it up.
+pub const SMALLEST_MODULE: f64 =
+    crate::params::compat::SAME_RACK * crate::params::compat::DESIGN_MARGIN;
+
 // ------------------------------------------------------------- the bounds ---
 
-/// `m > 0`: at nought every radius collapses.
-pub const MODULE: Bound = Bound::above(0.0);
+/// `m`: at least [`SMALLEST_MODULE`], at most [`CEILING`].
+pub const MODULE: Bound = Bound::between(Some(SMALLEST_MODULE), Some(CEILING));
 /// `0 < α < 90°`: at nought the thickness-equivalent shift diverges, at 90°
 /// the base circle does.
 pub const PRESSURE_ANGLE: Bound = Bound::strictly(0.0, 90.0);
 /// `|β| < 90°`: the transverse module diverges at the limit.
 pub const HELIX_ANGLE: Bound = Bound::strictly(-90.0, 90.0);
+/// **An angle between two axes, one period**, degrees: a turn more is the
+/// same pair of axes.
+pub const SHAFT_ANGLE: Bound = Bound::between(Some(-180.0), Some(180.0));
 /// `0 < k < 2`: a rack whose tooth or space has no width is not a rack.
 pub const THICKNESS_MOD: Bound = Bound::strictly(0.0, 2.0);
 /// **The bound on every count**: a gear's or a cutter's teeth, an axis's
 /// planets, a duty's actuations. At least one, since none is no gear, no
-/// tool, no axis and no duty.
-pub const COUNT: Bound = Bound::between(Some(1.0), None);
-/// A length, a ratio or an allowable that has to be there to mean anything:
-/// a face, a rim, a pin, a distance, a modulus.
-pub const POSITIVE: Bound = Bound::above(0.0);
-/// A length or a figure that may be nought and not less: a clearance a
-/// floor is asked at, a tolerance's size, a friction coefficient.
-pub const NOT_NEGATIVE: Bound = Bound::between(Some(0.0), None);
+/// tool, no axis and no duty; at most what the wire's `u32` carries.
+pub const COUNT: Bound = Bound::between(Some(1.0), Some(u32::MAX as f64));
+/// A figure of either sign: a shift, an addendum, a torque, a speed.
+pub const FIGURE: Bound = Bound::between(Some(-CEILING), Some(CEILING));
+/// A figure that may be nought and not less: a clearance a floor is asked
+/// at, a tolerance's size, a friction coefficient.
+pub const NOT_NEGATIVE: Bound = Bound::between(Some(0.0), Some(CEILING));
+/// A figure that has to be there to mean anything: a face, a rim, a pin, a
+/// distance, a modulus, an allowable.
+pub const POSITIVE: Bound = Bound::between(Some(FLOOR), Some(CEILING));
 /// **Poisson's ratio of an isotropic solid**, `−1 < ν ≤ ½`: its bulk and
 /// shear moduli positive. The incompressible limit is a solid — its bulk
 /// modulus `E / 3(1 − 2ν)` is unbounded, and the contact model multiplies
-/// by `1 − 2ν` and never divides by it (`hertz.rs`).
+/// by `1 − 2ν` and never divides by it (`hertz.rs`). The one bound on ν:
+/// the first-yield factor reads it too.
 pub const POISSONS_RATIO: Bound = Bound {
     min: Some(-1.0),
     max: Some(0.5),
@@ -110,8 +150,9 @@ impl Lists {
 }
 
 /// **One row**: a number of a record of type `T`, where it is on the wire
-/// relative to the record, the bound it is held to (`None`: any finite
-/// number), and what the model holds it to inside that.
+/// relative to the record, the bound it is held to (`None` only where the
+/// row does not read the number: an automatic box's seed, which must still
+/// be finite), and what the model holds it to inside that.
 pub struct Row<T> {
     pub field: &'static str,
     /// What the number is: a figure, or an index — a list's position or a
@@ -136,15 +177,6 @@ pub enum Kind {
 
 /// A row with a fixed bound and nothing held.
 macro_rules! row {
-    ($field:literal, $get:expr) => {
-        Row {
-            field: $field,
-            kind: Kind::Figure,
-            get: $get,
-            bound: |_, _| None,
-            held: None,
-        }
-    };
     ($field:literal, $get:expr, $bound:expr) => {
         Row {
             field: $field,
@@ -216,20 +248,20 @@ pub const GEAR: &[Row<GearParams>] = &[
         }),
     },
     row!("teeth", |p| Some(f64::from(p.teeth)), COUNT),
-    row!("profile_shift", |p| Some(p.profile_shift)),
+    row!("profile_shift", |p| Some(p.profile_shift), FIGURE),
     row!("helix_angle", |p| Some(p.helix_angle), HELIX_ANGLE),
-    row!("addendum", |p| Some(p.addendum)),
-    row!("dedendum", |p| Some(p.dedendum)),
-    row!("root_radius", |p| Some(p.root_radius)),
+    row!("addendum", |p| Some(p.addendum), FIGURE),
+    row!("dedendum", |p| Some(p.dedendum), FIGURE),
+    row!("root_radius", |p| Some(p.root_radius), FIGURE),
     row!("thickness_mod", |p| Some(p.thickness_mod), THICKNESS_MOD),
-    row!("angular_shift", |p| Some(p.angular_shift)),
-    row!("index_offset", |p| Some(p.index_offset)),
+    row!("angular_shift", |p| Some(p.angular_shift), FIGURE),
+    row!("index_offset", |p| Some(p.index_offset), FIGURE),
 ];
 
 /// A pinion cutter ([`Cutter`]): a ring's tool.
 pub const CUTTER: &[Row<Cutter>] = &[
     row!("teeth", |c| Some(f64::from(c.teeth)), COUNT),
-    row!("addendum", |c| Some(c.addendum)),
+    row!("addendum", |c| Some(c.addendum), FIGURE),
     row!("tip_round", |c| Some(c.tip_round), NOT_NEGATIVE),
 ];
 
@@ -293,20 +325,24 @@ pub const MEMBER: &[Row<Member>] = &[
     given!("thickness_mod.manual", thickness_mod, THICKNESS_MOD),
     given!("pitch_diameter.manual", pitch_diameter, POSITIVE),
     row!("gear.teeth", |m| Some(f64::from(m.gear.teeth)), COUNT),
-    row!("gear.profile_shift.manual", |m| Some(
-        m.gear.profile_shift.manual
-    )),
-    row!("gear.working_depth.manual", |m| Some(
-        m.gear.working_depth.manual
-    )),
-    row!("gear.addendum", |m| Some(m.gear.addendum)),
+    row!(
+        "gear.profile_shift.manual",
+        |m| Some(m.gear.profile_shift.manual),
+        FIGURE
+    ),
+    row!(
+        "gear.working_depth.manual",
+        |m| Some(m.gear.working_depth.manual),
+        FIGURE
+    ),
+    row!("gear.addendum", |m| Some(m.gear.addendum), FIGURE),
     row!(
         "gear.min_tip_width",
         |m| Some(m.gear.min_tip_width),
         NOT_NEGATIVE
     ),
-    row!("gear.dedendum", |m| Some(m.gear.dedendum)),
-    row!("gear.root_radius", |m| Some(m.gear.root_radius)),
+    row!("gear.dedendum", |m| Some(m.gear.dedendum), FIGURE),
+    row!("gear.root_radius", |m| Some(m.gear.root_radius), FIGURE),
     given!("gear.helix_angle.manual", gear.helix_angle, HELIX_ANGLE),
     // Read where given, and where no rating sizes it: an automatic width
     // with no source stands at its box (`FaceSources::width_for`).
@@ -362,9 +398,9 @@ pub const DISTANCE: &[Row<Distance>] = &[
         bound: |l, _| Some(index(l.axes)),
         held: None,
     },
-    row!("angle", |d| Some(d.angle)),
+    row!("angle", |d| Some(d.angle), SHAFT_ANGLE),
     given!("distance.manual", distance, POSITIVE),
-    row!("clearance.manual", |d| Some(d.clearance.manual)),
+    row!("clearance.manual", |d| Some(d.clearance.manual), FIGURE),
     row!("tip_clearance", |d| Some(d.tip_clearance), NOT_NEGATIVE),
     row!("tolerance_plus", |d| Some(d.tolerance_plus), NOT_NEGATIVE),
     row!("tolerance_minus", |d| Some(d.tolerance_minus), NOT_NEGATIVE),
@@ -404,7 +440,7 @@ pub const CASE: &[Row<LoadCase>] = &[Row {
     field: "application_factor",
     kind: Kind::Figure,
     get: |c| Some(c.application_factor),
-    bound: |_, _| None,
+    bound: |_, _| Some(FIGURE),
     held: Some(Held {
         to: APPLICATION_FACTOR_HELD,
         note: key::TRAIN_APPLICATION_FACTOR_HELD,
@@ -420,8 +456,8 @@ pub const LOAD: &[Row<Load>] = &[
         bound: |l, _| Some(case_body(l)),
         held: None,
     },
-    row!("torque.manual", |l| Some(l.torque.manual)),
-    row!("speed.manual", |l| Some(l.speed.manual)),
+    row!("torque.manual", |l| Some(l.torque.manual), FIGURE),
+    row!("speed.manual", |l| Some(l.speed.manual), FIGURE),
 ];
 
 /// A fatigue case's duty ([`Duty`]), each variant's under its own name.
@@ -499,16 +535,11 @@ pub const MATERIAL: &[Row<Material>] = &[
     ),
 ];
 
-/// **A cyclic allowable**: positive, and no more than the static one it is
+/// **A cyclic allowable**: [`POSITIVE`]'s floor, and no more than the static one it is
 /// a fraction of — a root that survives more cycles than one at a higher
 /// stress than it survives once describes no material.
 fn cyclic(ultimate: f64) -> Bound {
-    Bound {
-        min: Some(0.0),
-        max: Some(ultimate),
-        exclusive_min: true,
-        exclusive_max: false,
-    }
+    Bound::between(Some(FLOOR), Some(ultimate))
 }
 
 /// A member's replaced material figures ([`Overrides`]), each held to its
@@ -536,13 +567,13 @@ pub const PIN_DIAMETER: Asked = row!("pin_diameter", |v| *v, POSITIVE);
 /// How far a drawn outline may stand off its curve, mm.
 pub const CHORD_TOLERANCE: Asked = row!("chord_tolerance", |v| *v, POSITIVE);
 /// The depth, in modules, an undercut is asked at.
-pub const WORKING_DEPTH: Asked = row!("working_depth", |v| *v);
+pub const WORKING_DEPTH: Asked = row!("working_depth", |v| *v, FIGURE);
 /// An eccentric gear's commanded centre-distance throw, mm, signed.
-pub const ECCENTRIC_THROW: Asked = row!("eccentric_throw", |v| *v);
+pub const ECCENTRIC_THROW: Asked = row!("eccentric_throw", |v| *v, FIGURE);
 /// The mate's teeth.
 pub const MATE_TEETH: Asked = row!("mate.teeth", |v| *v, COUNT);
 /// The mate's shift.
-pub const MATE_SHIFT: Asked = row!("mate.profile_shift", |v| *v);
+pub const MATE_SHIFT: Asked = row!("mate.profile_shift", |v| *v, FIGURE);
 /// **Points a tooth a screen profile is drawn with**: at least one, and at
 /// most [`POINTS_PER_TOOTH_MAX`].
 pub const POINTS_PER_TOOTH: Asked = row!(
@@ -578,28 +609,42 @@ pub fn asked(row: &Asked, value: Option<f64>, at: &str) -> Result<(), Refused> {
 pub struct Refused {
     pub field: String,
     pub value: f64,
-    /// The bound it is outside; `None` where it is not a finite number,
-    /// which no field holds.
-    pub bound: Option<Bound>,
+    pub reason: Reason,
+}
+
+/// **Why a value was refused.**
+#[derive(Clone, Copy, Debug)]
+pub enum Reason {
+    /// Not a finite number, which no field holds.
+    NotFinite,
+    /// Outside its row's bound.
+    Outside(Bound),
+    /// **More than the machine's memory holds** where the model lists
+    /// something per unit of it — a gear's teeth drawn, a ring's outline.
+    /// The bound is what the allocator gives, and no chosen cap.
+    PastMemory,
 }
 
 /// Equal where every figure is the same double, a not-a-number included:
 /// two refusals of one value at one field are one refusal.
 impl PartialEq for Refused {
     fn eq(&self, other: &Self) -> bool {
-        let bits = |b: &Option<Bound>| {
-            b.map(|b| {
-                (
+        let reason = |r: &Reason| match r {
+            Reason::NotFinite => (0, None),
+            Reason::Outside(b) => (
+                1,
+                Some((
                     b.min.map(f64::to_bits),
                     b.max.map(f64::to_bits),
                     b.exclusive_min,
                     b.exclusive_max,
-                )
-            })
+                )),
+            ),
+            Reason::PastMemory => (2, None),
         };
         self.field == other.field
             && self.value.to_bits() == other.value.to_bits()
-            && bits(&self.bound) == bits(&other.bound)
+            && reason(&self.reason) == reason(&other.reason)
     }
 }
 
@@ -615,18 +660,44 @@ impl Refused {
             ..self
         }
     }
+
+    /// **A list `n` long that the machine's memory could not hold**,
+    /// refused naming `field` (a gear's `teeth`), its value `n`.
+    #[must_use]
+    pub fn past_memory(field: &str, n: f64) -> Self {
+        Self {
+            field: field.to_owned(),
+            value: n,
+            reason: Reason::PastMemory,
+        }
+    }
+
+    /// The bound it is outside, where that is why.
+    #[must_use]
+    pub fn bound(&self) -> Option<Bound> {
+        match self.reason {
+            Reason::Outside(b) => Some(b),
+            Reason::NotFinite | Reason::PastMemory => None,
+        }
+    }
 }
 
 impl std::fmt::Display for Refused {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.bound {
-            None => write!(f, "{} is not a finite number", self.field),
-            Some(b) => write!(
+        match self.reason {
+            Reason::NotFinite => write!(f, "{} is not a finite number", self.field),
+            Reason::Outside(b) => write!(
                 f,
                 "{} is {}, outside {}",
                 self.field,
                 figure(self.value),
                 interval(&b)
+            ),
+            Reason::PastMemory => write!(
+                f,
+                "{} is {}: more than this machine's memory holds",
+                self.field,
+                figure(self.value)
             ),
         }
     }
@@ -636,14 +707,31 @@ impl std::error::Error for Refused {}
 
 impl Explain for Refused {
     fn note(&self) -> Note {
-        match self.bound {
-            None => Note::new(key::ERROR_INPUT_NOT_FINITE).text("field", self.field.clone()),
-            Some(b) => Note::new(key::ERROR_INPUT_OUT_OF_RANGE)
-                .text("field", self.field.clone())
+        let field = self.field.clone();
+        match self.reason {
+            Reason::NotFinite => Note::new(key::ERROR_INPUT_NOT_FINITE).text("field", field),
+            Reason::Outside(b) => Note::new(key::ERROR_INPUT_OUT_OF_RANGE)
+                .text("field", field)
                 .text("value", figure(self.value))
                 .text("bound", interval(&b)),
+            Reason::PastMemory => Note::new(key::ERROR_INPUT_PAST_MEMORY)
+                .text("field", field)
+                .text("value", figure(self.value)),
         }
     }
+}
+
+/// **Room for `n` more in `v`, or the refusal naming `field`** — every
+/// list the model makes per tooth or per vertex asks through this, so a
+/// count past memory is refused by name where it would otherwise stop the
+/// process. `count` is the field's own value, for the refusal to quote.
+///
+/// # Errors
+///
+/// [`Refused::past_memory`], naming `field`.
+pub fn room<T>(v: &mut Vec<T>, n: usize, field: &str, count: f64) -> Result<(), Refused> {
+    v.try_reserve_exact(n)
+        .map_err(|_| Refused::past_memory(field, count))
 }
 
 /// A figure as it was given, exactly: its shortest decimal that reads back
@@ -690,6 +778,25 @@ fn join(prefix: &str, field: &str) -> String {
 
 // ----------------------------------------------------------- the check ---
 
+/// **What a walk does at each row it meets**: the row's path (made only
+/// where asked), its value and its bound — go on, or refuse.
+type Visit<'a> = &'a mut dyn FnMut(&dyn Fn() -> String, f64, Option<Bound>) -> Result<(), Refused>;
+
+/// The check every entry makes: [`verdict`] at each row.
+fn checking() -> impl FnMut(&dyn Fn() -> String, f64, Option<Bound>) -> Result<(), Refused> {
+    |field: &dyn Fn() -> String, value, bound| verdict(field, value, bound)
+}
+
+/// **One field the table reads**, as a walk meets it: its path, its value
+/// and its bound — `None` where the row does not bound it (an automatic
+/// box's seed).
+#[derive(Clone, Debug)]
+pub struct Field {
+    pub path: String,
+    pub value: f64,
+    pub bound: Option<Bound>,
+}
+
 /// **`record` read against `rows`**, at `at`: the first value that is not a
 /// finite number or is outside its row's bound, refused.
 ///
@@ -697,37 +804,24 @@ fn join(prefix: &str, field: &str) -> String {
 ///
 /// [`Refused`], naming the field.
 pub fn check<T>(rows: &[Row<T>], lists: &Lists, record: &T, at: &str) -> Result<(), Refused> {
-    check_of(None, rows, lists, record, at)
+    check_of(None, rows, lists, record, at, &mut checking())
 }
 
-/// [`check`], of the rows of one kind only where `kind` names one.
+/// [`check`], of the rows of one kind only where `kind` names one, each
+/// handed to `visit`.
 fn check_of<T>(
     kind: Option<Kind>,
     rows: &[Row<T>],
     lists: &Lists,
     record: &T,
     at: &str,
+    visit: Visit<'_>,
 ) -> Result<(), Refused> {
     for row in rows.iter().filter(|r| kind.is_none_or(|k| r.kind == k)) {
         let Some(value) = (row.get)(record) else {
             continue;
         };
-        if !value.is_finite() {
-            return Err(Refused {
-                field: join(at, row.field),
-                value,
-                bound: None,
-            });
-        }
-        if let Some(bound) = (row.bound)(lists, record) {
-            if !bound.admits(value) {
-                return Err(Refused {
-                    field: join(at, row.field),
-                    value,
-                    bound: Some(bound),
-                });
-            }
-        }
+        visit(&|| join(at, row.field), value, (row.bound)(lists, record))?;
     }
     Ok(())
 }
@@ -740,10 +834,58 @@ fn each<T>(
     lists: &Lists,
     list: &[T],
     at: &str,
+    visit: Visit<'_>,
 ) -> Result<(), Refused> {
-    list.iter()
-        .enumerate()
-        .try_for_each(|(i, x)| check_of(kind, rows, lists, x, &join(at, &i.to_string())))
+    for (i, x) in list.iter().enumerate() {
+        check_of(kind, rows, lists, x, &join(at, &i.to_string()), &mut *visit)?;
+    }
+    Ok(())
+}
+
+/// **One number read against a bound**: refused where it is not finite, or
+/// outside the bound where there is one — the verdict every row gives.
+fn verdict(field: &dyn Fn() -> String, value: f64, bound: Option<Bound>) -> Result<(), Refused> {
+    let reason = if !value.is_finite() {
+        Reason::NotFinite
+    } else {
+        match bound {
+            Some(b) if !b.admits(value) => Reason::Outside(b),
+            _ => return Ok(()),
+        }
+    };
+    Err(Refused {
+        field: field(),
+        value,
+        reason,
+    })
+}
+
+/// **One figure outside any record, read against the bound the table holds
+/// for what it is** — a harness's positional argument: a torque against
+/// [`FIGURE`], a face against [`POSITIVE`], a shaft angle against
+/// [`SHAFT_ANGLE`].
+///
+/// # Errors
+///
+/// [`Refused`], naming `field`.
+pub fn scalar(field: &str, value: f64, bound: Bound) -> Result<(), Refused> {
+    verdict(&|| field.to_owned(), value, Some(bound))
+}
+
+/// Every field a walk meets, collected rather than checked.
+fn collected(walk: impl FnOnce(Visit<'_>) -> Result<(), Refused>) -> Vec<Field> {
+    let mut out = Vec::new();
+    let mut visit = |path: &dyn Fn() -> String, value: f64, bound: Option<Bound>| {
+        out.push(Field {
+            path: path(),
+            value,
+            bound,
+        });
+        Ok(())
+    };
+    // The collecting visit refuses nothing.
+    let _ = walk(&mut visit);
+    out
 }
 
 impl GearParams {
@@ -755,6 +897,12 @@ impl GearParams {
     pub fn check(&self) -> Result<(), Refused> {
         check(GEAR, &Lists::default(), self, "")
     }
+
+    /// Every field [`Self::check`] reads, with its bound.
+    #[must_use]
+    pub fn fields(&self) -> Vec<Field> {
+        collected(|v| check_of(None, GEAR, &Lists::default(), self, "", v))
+    }
 }
 
 impl Cutter {
@@ -765,6 +913,12 @@ impl Cutter {
     /// [`Refused`], naming the field.
     pub fn check(&self) -> Result<(), Refused> {
         check(CUTTER, &Lists::default(), self, "")
+    }
+
+    /// Every field [`Self::check`] reads, with its bound.
+    #[must_use]
+    pub fn fields(&self) -> Vec<Field> {
+        collected(|v| check_of(None, CUTTER, &Lists::default(), self, "", v))
     }
 }
 
@@ -787,14 +941,26 @@ impl MaterialLibrary {
     ///
     /// [`Refused`], naming the field.
     pub fn check(&self) -> Result<(), Refused> {
-        each(
-            None,
-            MATERIAL,
-            &Lists::default(),
-            &self.materials,
-            "material",
-        )
+        library_of(self, &mut checking())
     }
+
+    /// Every field [`Self::check`] reads, with its bound.
+    #[must_use]
+    pub fn fields(&self) -> Vec<Field> {
+        collected(|v| library_of(self, v))
+    }
+}
+
+/// [`MaterialLibrary::check`]'s walk.
+fn library_of(lib: &MaterialLibrary, visit: Visit<'_>) -> Result<(), Refused> {
+    each(
+        None,
+        MATERIAL,
+        &Lists::default(),
+        &lib.materials,
+        "material",
+        visit,
+    )
 }
 
 /// **A graph's every number**, each at its path from the shape: its axes,
@@ -806,20 +972,20 @@ impl MaterialLibrary {
 ///
 /// [`Refused`], naming the field.
 pub fn shape(s: &Shape) -> Result<(), Refused> {
-    shape_of(Some(Kind::Index), s)?;
-    shape_of(Some(Kind::Figure), s)
+    shape_of(Some(Kind::Index), s, &mut checking())?;
+    shape_of(Some(Kind::Figure), s, &mut checking())
 }
 
 /// [`shape`], of the rows of one kind.
-fn shape_of(kind: Option<Kind>, s: &Shape) -> Result<(), Refused> {
+fn shape_of(kind: Option<Kind>, s: &Shape, visit: Visit<'_>) -> Result<(), Refused> {
     let l = Lists::of(s);
-    each(kind, AXIS, &l, &s.axes, "axes")?;
-    each(kind, BODY, &l, &s.bodies, "bodies")?;
+    each(kind, AXIS, &l, &s.axes, "axes", &mut *visit)?;
+    each(kind, BODY, &l, &s.bodies, "bodies", &mut *visit)?;
     for (i, m) in s.members.iter().enumerate() {
         let at = format!("members.{i}");
-        check_of(kind, MEMBER, &l, m, &at)?;
+        check_of(kind, MEMBER, &l, m, &at, &mut *visit)?;
         if let Some(c) = &m.ring {
-            check_of(kind, CUTTER, &l, c, &join(&at, "ring"))?;
+            check_of(kind, CUTTER, &l, c, &join(&at, "ring"), &mut *visit)?;
         }
         check_of(
             kind,
@@ -827,11 +993,12 @@ fn shape_of(kind: Option<Kind>, s: &Shape) -> Result<(), Refused> {
             &l,
             &m.gear.material_overrides,
             &join(&at, "gear.material_overrides"),
+            &mut *visit,
         )?;
     }
-    each(kind, MESH, &l, &s.meshes, "meshes")?;
-    each(kind, DISTANCE, &l, &s.distances, "distances")?;
-    each(kind, COUPLING, &l, &s.couplings, "couplings")
+    each(kind, MESH, &l, &s.meshes, "meshes", &mut *visit)?;
+    each(kind, DISTANCE, &l, &s.distances, "distances", &mut *visit)?;
+    each(kind, COUPLING, &l, &s.couplings, "couplings", visit)
 }
 
 /// **A train's every number**, each at its path from the train: its
@@ -854,7 +1021,7 @@ pub fn train(t: &Train) -> Result<(), Refused> {
 ///
 /// [`Refused`], naming the field.
 pub fn graph(t: &Train) -> Result<(), Refused> {
-    train_of(Some(Kind::Index), t)
+    train_of(Some(Kind::Index), t, &mut checking())
 }
 
 /// **A train's every figure**: what its solve reads once its graph can be.
@@ -863,19 +1030,36 @@ pub fn graph(t: &Train) -> Result<(), Refused> {
 ///
 /// [`Refused`], naming the field.
 pub fn figures(t: &Train) -> Result<(), Refused> {
-    train_of(Some(Kind::Figure), t)
+    train_of(Some(Kind::Figure), t, &mut checking())
+}
+
+/// **Every field [`train`] reads**, with its path from the train and its
+/// bound — what a law sets to each bound's ends.
+#[must_use]
+pub fn fields(t: &Train) -> Vec<Field> {
+    collected(|v| train_of(None, t, v))
 }
 
 /// [`train`], of the rows of one kind.
-fn train_of(kind: Option<Kind>, t: &Train) -> Result<(), Refused> {
-    shape_of(kind, &t.shape).map_err(|e| e.within("shape"))?;
+fn train_of(kind: Option<Kind>, t: &Train, visit: Visit<'_>) -> Result<(), Refused> {
+    let mut within = |path: &dyn Fn() -> String, value: f64, bound: Option<Bound>| {
+        visit(&|| join("shape", &path()), value, bound)
+    };
+    shape_of(kind, &t.shape, &mut within)?;
     let l = Lists::of(&t.shape);
-    each(kind, HOLD, &l, &t.held, "held")?;
+    each(kind, HOLD, &l, &t.held, "held", &mut *visit)?;
     for (c, case) in t.load_cases.iter().enumerate() {
         let at = format!("load_cases.{c}");
-        check_of(kind, CASE, &l, case, &at)?;
-        each(kind, LOAD, &l, &case.loads, &join(&at, "loads"))?;
-        check_of(kind, DUTY, &l, &case.duty, &join(&at, "duty"))?;
+        check_of(kind, CASE, &l, case, &at, &mut *visit)?;
+        each(
+            kind,
+            LOAD,
+            &l,
+            &case.loads,
+            &join(&at, "loads"),
+            &mut *visit,
+        )?;
+        check_of(kind, DUTY, &l, &case.duty, &join(&at, "duty"), &mut *visit)?;
     }
     Ok(())
 }
@@ -905,13 +1089,13 @@ pub fn resolved(m: &Material, o: &Overrides, at: &str) -> Result<(), Refused> {
             Refused {
                 field: join(at, "fatigue_allowable"),
                 value: fatigue,
-                bound: Some(within),
+                reason: Reason::Outside(within),
             }
         } else {
             Refused {
                 field: join(at, "ultimate_allowable"),
                 value: ultimate,
-                bound: Some(Bound::between(Some(fatigue), None)),
+                reason: Reason::Outside(Bound::between(Some(fatigue), Some(CEILING))),
             }
         },
     )
@@ -929,7 +1113,9 @@ mod tests {
             ("pressure angle", PRESSURE_ANGLE),
             ("helix angle", HELIX_ANGLE),
             ("thickness mod", THICKNESS_MOD),
+            ("shaft angle", SHAFT_ANGLE),
             ("count", COUNT),
+            ("figure", FIGURE),
             ("positive", POSITIVE),
             ("not negative", NOT_NEGATIVE),
             ("poisson", POISSONS_RATIO),
@@ -976,7 +1162,9 @@ mod tests {
                 assert!(!b.admits(x), "{name}: {x}");
             }
         }
-        assert_eq!(ends, 22);
+        // Every bound two-sided but the two a model holds a value to from
+        // one side.
+        assert_eq!(ends, 2 * bounds().len() - 2);
         // An index into an empty list names nothing, and says so.
         assert!(!index(0).admits(0.0));
         assert_eq!(interval(&index(0)), "∅");
@@ -1072,14 +1260,14 @@ mod tests {
         assert_eq!(n.key, key::ERROR_INPUT_OUT_OF_RANGE);
         assert_eq!(n.values["field"], "params.module");
         assert_eq!(n.values["value"], "-1e300");
-        assert_eq!(n.values["bound"], "(0, ∞)");
+        assert_eq!(n.values["bound"], "[0.001, 1.7014118346046923e38]");
         let e = GearParams {
             teeth: 0,
             ..GearParams::default()
         }
         .check()
         .unwrap_err();
-        assert_eq!(e.note().values["bound"], "[1, ∞)");
+        assert_eq!(e.note().values["bound"], "[1, 4294967295]");
         let e = GearParams {
             dedendum: f64::NAN,
             ..GearParams::default()
@@ -1127,7 +1315,7 @@ mod tests {
             ..Overrides::default()
         });
         assert_eq!(r.field, format!("{at}.fatigue_allowable"));
-        assert_eq!(r.bound, Some(cyclic(ultimate)));
+        assert_eq!(r.bound(), Some(cyclic(ultimate)));
         let r = refused(Overrides {
             ultimate_allowable: Some(fatigue * 0.99),
             ..Overrides::default()
@@ -1175,7 +1363,7 @@ mod tests {
         );
         assert_ne!(at(zero), at(zero).within("params"));
         let other_bound = Refused {
-            bound: Some(POSITIVE),
+            reason: Reason::Outside(POSITIVE),
             ..at(GearParams {
                 teeth: 0,
                 ..GearParams::default()
@@ -1188,5 +1376,248 @@ mod tests {
                 ..GearParams::default()
             })
         );
+    }
+    /// The values a bound's ends admit: each end itself where inclusive,
+    /// the next double inside where exclusive.
+    fn ends(b: Bound) -> Vec<f64> {
+        let mut out = Vec::new();
+        if let Some(lo) = b.min {
+            out.push(if b.exclusive_min { lo.next_up() } else { lo });
+        }
+        if let Some(hi) = b.max {
+            out.push(if b.exclusive_max { hi.next_down() } else { hi });
+        }
+        out
+    }
+
+    /// `v` with the leaf at the `.`-joined `path` set to `x`.
+    fn set(v: &mut serde_json::Value, path: &str, x: serde_json::Value) {
+        let mut at = v;
+        for step in path.split('.') {
+            at = match step.parse::<usize>() {
+                Ok(i) if at.is_array() => &mut at[i],
+                _ => &mut at[step],
+            };
+        }
+        *at = x;
+    }
+
+    /// The leaf of `v` at the `.`-joined `path`.
+    fn leaf<'a>(v: &'a serde_json::Value, path: &str) -> Option<&'a serde_json::Value> {
+        path.split('.')
+            .try_fold(v, |at, step| match step.parse::<usize>() {
+                Ok(i) if at.is_array() => at.get(i),
+                _ => at.get(step),
+            })
+    }
+
+    /// A row's name, its list indices dropped: `shape.members.#.module.manual`.
+    fn row_name(path: &str) -> String {
+        path.split('.')
+            .map(|s| if s.parse::<usize>().is_ok() { "#" } else { s })
+            .collect::<Vec<_>>()
+            .join(".")
+    }
+
+    /// **Every number in a train's report is finite at each end of every
+    /// row's bound** — each row set to each of its ends in turn, the rest
+    /// as the arrangement lays them, over arrangements that between them
+    /// hold every row the train's tables have (a ring's cutter, a worm's
+    /// distance, a coupling, a hold, both duties, every replaced material
+    /// figure, a rim): the train solves with every number finite, or is
+    /// refused. A row whose box is automatic is asked given too — the
+    /// helix, the thickness, the pitch diameter, the distance, the face
+    /// with no rating to size it. A refusal at an end is the model's
+    /// answer to a design no one can make — a 0.1 mm tip width on a 1 µm
+    /// module, a 7 mm worm of a 1e38 mm module — and whether the model is
+    /// right at the module's floor is the homogeneity law's to hold, every
+    /// millimetre scaled with it (`train/homogeneity.rs`, from
+    /// [`SMALLEST_MODULE`] up).
+    #[test]
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "a bound's end set as the integer the wire carries"
+    )]
+    fn every_report_is_finite_at_every_rows_ends() {
+        use crate::train::arrangements::Preset;
+        use crate::train::{solve_train, test_library, Duty, LoadCase, Train};
+        let lib = test_library();
+        let mut rows: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+        let (mut solved, mut refused) = (0, 0);
+        let mut faults = Vec::new();
+        let prepared = |shape: crate::train::Shape| {
+            let mut t = crate::train::sweep::cased(vec![shape]);
+            let continuous = LoadCase {
+                duty: Duty::Continuous {
+                    runtime_hours: 100.0,
+                },
+                ..t.load_cases[1].clone()
+            };
+            t.load_cases.push(continuous);
+            let material = lib.get(&t.shape.members[0].gear.material).unwrap().clone();
+            let g = &mut t.shape.members[0].gear;
+            g.rim_thickness = Some(5.0);
+            g.material_overrides = Overrides {
+                density: Some(material.density.value),
+                elastic_modulus: Some(material.elastic_modulus.value),
+                poissons_ratio: Some(material.poissons_ratio.value),
+                ultimate_allowable: Some(material.ultimate_allowable.value),
+                fatigue_allowable: Some(material.fatigue_allowable.value),
+                contact_fatigue_allowable: Some(500.0),
+                ..Overrides::default()
+            };
+            t
+        };
+        let judge = |name: &str, t: &Train, path: &str, x: f64, faults: &mut Vec<String>| -> bool {
+            match solve_train(t, &lib) {
+                Ok(r) => {
+                    let bad = crate::finite::non_finite(&r);
+                    if !bad.is_empty() {
+                        faults.push(format!(
+                            "{name}: {path} = {x:e}: {} not finite, first {}",
+                            bad.len(),
+                            bad[0]
+                        ));
+                    }
+                    true
+                }
+                Err(_) => false,
+            }
+        };
+        for preset in [
+            Preset::Spur,
+            Preset::Worm,
+            Preset::Planetary,
+            Preset::Planocentric,
+        ] {
+            let name = format!("{preset:?}");
+            let base = prepared(preset.build());
+            base.validate().unwrap_or_else(|e| panic!("{name}: {e:?}"));
+            let json = serde_json::to_value(&base).unwrap();
+            for f in fields(&base) {
+                // A box the solve fills is asked given too.
+                let (json, bound) = match (f.bound, f.path.strip_suffix(".manual")) {
+                    (Some(b), _) => (json.clone(), b),
+                    (None, Some(auto)) => {
+                        let mut given = json.clone();
+                        set(
+                            &mut given,
+                            &format!("{auto}.auto"),
+                            serde_json::Value::Bool(false),
+                        );
+                        let t: Train = serde_json::from_value(given.clone()).unwrap();
+                        let Some(b) = fields(&t)
+                            .into_iter()
+                            .find(|g| g.path == f.path)
+                            .and_then(|g| g.bound)
+                        else {
+                            continue;
+                        };
+                        (given, b)
+                    }
+                    (None, None) => continue,
+                };
+                rows.insert(row_name(&f.path));
+                for x in ends(bound) {
+                    let mut v = json.clone();
+                    // A count or an index crosses as an integer, a figure as
+                    // a number: the leaf as the train wrote it says which.
+                    let integer = leaf(&json, &f.path).is_some_and(serde_json::Value::is_u64);
+                    let x_leaf = if integer {
+                        serde_json::json!(x as u64)
+                    } else {
+                        serde_json::json!(x)
+                    };
+                    set(&mut v, &f.path, x_leaf);
+                    let Ok(t) = serde_json::from_value::<Train>(v) else {
+                        continue;
+                    };
+                    if judge(&name, &t, &f.path, x, &mut faults) {
+                        solved += 1;
+                    } else {
+                        refused += 1;
+                    }
+                }
+            }
+        }
+        assert!(
+            faults.is_empty(),
+            "{} faults:\n{}",
+            faults.len(),
+            faults.join("\n")
+        );
+        // Every row the train's tables have was set to its ends somewhere.
+        fn names<T>(prefix: &str, rows: &[Row<T>]) -> Vec<String> {
+            rows.iter()
+                .map(|r| row_name(&join(prefix, r.field)))
+                .collect()
+        }
+        let every: Vec<String> = [
+            names("shape.axes.#", AXIS),
+            names("shape.bodies.#", BODY),
+            names("shape.members.#", MEMBER),
+            names("shape.members.#.ring", CUTTER),
+            names("shape.members.#.gear.material_overrides", OVERRIDES),
+            names("shape.meshes.#", MESH),
+            names("shape.distances.#", DISTANCE),
+            names("shape.couplings.#", COUPLING),
+            names("held.#", HOLD),
+            names("load_cases.#", CASE),
+            names("load_cases.#.loads.#", LOAD),
+            names("load_cases.#.duty", DUTY),
+        ]
+        .concat();
+        let missed: Vec<&String> = every.iter().filter(|r| !rows.contains(*r)).collect();
+        assert!(missed.is_empty(), "rows never asked: {missed:?}");
+        eprintln!("{} rows, {solved} solved, {refused} refused", rows.len());
+        assert!(solved > 0 && refused > 0);
+    }
+
+    /// **Every number a train's report holds is finite at each end of every
+    /// material figure's bound** — each figure of the library's every
+    /// material (its modulus, ν, allowables, the cyclic one up to its static
+    /// one, a flank figure and a hardness where it has them) set to each end
+    /// in turn and a pair and a worm, whose gears are of two of them, solved.
+    #[test]
+    fn every_report_is_finite_at_every_material_figures_ends() {
+        use crate::train::{arrangements::Preset, solve_train, test_library, Train};
+        // Every figure present: the steel given a published flank figure.
+        let mut base = test_library();
+        base.materials[0].contact_fatigue_allowable =
+            Some(crate::material::Value::datasheet(1000.0));
+        let json = serde_json::to_value(&base).unwrap();
+        let trains = [Preset::Spur, Preset::Worm].map(|p| Train::alone(&p.build(), 2.0, 100.0));
+        let (mut asked, mut faults) = (0, Vec::new());
+        let mut named = std::collections::BTreeSet::new();
+        for f in base.fields() {
+            let Some(b) = f.bound else { continue };
+            named.insert(row_name(&f.path));
+            for x in ends(b) {
+                let mut v = json.clone();
+                set(&mut v, &f.path, serde_json::json!(x));
+                let lib: MaterialLibrary = serde_json::from_value(v).unwrap();
+                if lib.check().is_err() {
+                    continue;
+                }
+                for t in &trains {
+                    if let Ok(r) = solve_train(t, &lib) {
+                        let bad = crate::finite::non_finite(&r);
+                        if !bad.is_empty() {
+                            faults.push(format!("{} = {x:e}: {bad:?}", f.path));
+                        }
+                    }
+                    asked += 1;
+                }
+            }
+        }
+        assert!(faults.is_empty(), "{}", faults.join("\n"));
+        let every: Vec<String> = MATERIAL
+            .iter()
+            .map(|r| row_name(&join("material.#", r.field)))
+            .collect();
+        let missed: Vec<&String> = every.iter().filter(|r| !named.contains(*r)).collect();
+        assert!(missed.is_empty(), "figures never asked: {missed:?}");
+        assert!(asked > 0);
     }
 }

@@ -326,4 +326,9 @@ pub mod compat {
     /// handful of ulps by six orders, and a millionth of anything a designer
     /// could mean.
     pub const SAME_SHIFT: f64 = SAME_RACK;
+
+    /// **How far below anything a designer could mean these tolerances
+    /// sit**: six orders, [`SAME_RACK`]'s own statement. What makes the
+    /// smallest module the model is built for ([`crate::input::SMALLEST_MODULE`]).
+    pub const DESIGN_MARGIN: f64 = 1e6;
 }

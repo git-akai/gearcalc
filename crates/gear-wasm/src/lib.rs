@@ -14,6 +14,7 @@
 //! does not cover — each comes back as an explanation the UI can show, because
 //! a plausible-looking number for an impossible measurement is worse than none.
 
+use gear_core::input::Refused;
 use gear_core::jgma;
 use gear_core::metrology::{self, PinCount};
 use gear_core::note::{Explain, Note};
@@ -636,8 +637,13 @@ fn parse_ring(input: &str) -> Result<RingRequest, String> {
 
 fn solve_ring_impl(input: &str) -> Result<String, String> {
     let req = parse_ring(input)?;
-    let g = ring_of(&req);
-    let summary = RingSummary {
+    serde_json::to_string(&ring_summary(&req)).map_err(|e| format!("could not encode result: {e}"))
+}
+
+/// What the ring a request holds comes to.
+fn ring_summary(req: &RingRequest) -> RingSummary {
+    let g = ring_of(req);
+    RingSummary {
         teeth: g.teeth,
         transverse_module: g.mt,
         transverse_pressure_angle: g.alpha_t.to_degrees(),
@@ -669,19 +675,35 @@ fn solve_ring_impl(input: &str) -> Result<String, String> {
         pin_diameter_range: metrology::pin_diameter_range(&metrology::Space::of_ring(&g))
             .map(metrology::pin_bound),
         clamps: g.clamps.clone(),
-    };
-    serde_json::to_string(&summary).map_err(|e| format!("could not encode result: {e}"))
+    }
 }
 
 fn ring_profile_impl(input: &str, points_per_tooth: u32) -> Result<Vec<f64>, String> {
     let req = parse_ring(input)?;
     let n = points(points_per_tooth)?;
-    Ok(ring_of(&req).profile(n).into_iter().flatten().collect())
+    let drawn = ring_of(&req).profile(n).map_err(params_refusal)?;
+    flat(&drawn, req.params.teeth)
+}
+
+/// **A refusal of the gear a request holds**, its field under `params`.
+fn params_refusal(e: gear_core::input::Refused) -> String {
+    refusal(&e.within("params").note())
+}
+
+/// **A drawing's points as the canvas takes them**, `[x, y, x, y, …]`, the
+/// list given room first ([`gear_core::input::room`]): twice the points,
+/// past memory where they are, refused naming the gear's `teeth`.
+fn flat(points: &[[f64; 2]], teeth: u32) -> Result<Vec<f64>, String> {
+    let mut out = Vec::new();
+    let n = points.len().saturating_mul(2);
+    gear_core::input::room(&mut out, n, "teeth", f64::from(teeth)).map_err(params_refusal)?;
+    out.extend(points.iter().flatten());
+    Ok(out)
 }
 
 fn export_ring_dxf_impl(input: &str) -> Result<String, String> {
     let req = parse_ring(input)?;
-    Ok(gear_io::ring_to_dxf(
+    gear_io::ring_to_dxf(
         &ring_of(&req),
         &gear_io::DxfOptions {
             chord_tolerance: req
@@ -691,7 +713,8 @@ fn export_ring_dxf_impl(input: &str) -> Result<String, String> {
                 .reference_circles
                 .unwrap_or(REFERENCE_CIRCLES_BY_DEFAULT),
         },
-    ))
+    )
+    .map_err(params_refusal)
 }
 
 /// **A gear request as it enters**: its gear read against the table
@@ -763,10 +786,9 @@ fn resolved_params(req: &GearRequest) -> Result<GearParams, String> {
     let Some(target) = req.eccentric_throw else {
         return Ok(req.params);
     };
-    let (mate, kind) = eccentric_mate(req).ok_or_else(|| {
-        "a centre-distance throw is commanded against a mate — set the mate's tooth count"
-            .to_string()
-    })?;
+    // Each refusal crosses as its catalogue key, the words the panel's.
+    let (mate, kind) =
+        eccentric_mate(req).ok_or_else(|| refusal(&Note::new("ui.gear_throw_needs_mate")))?;
     let magnitude = gear_core::gear::amplitude_for_throw(
         req.params,
         &mate,
@@ -775,12 +797,7 @@ fn resolved_params(req: &GearRequest) -> Result<GearParams, String> {
         target.abs(),
     )
     .map_err(|_| {
-        format!(
-            "a centre-distance throw of {:.4} mm is not reachable with this mate — a larger \
-             tooth-count difference or a mean shift nearer zero each raise the throw a pair \
-             can deliver",
-            target.abs()
-        )
+        refusal(&Note::new("ui.gear_throw_unreachable").number("throw", target.abs(), 4))
     })?;
     Ok(GearParams {
         angular_shift: magnitude.copysign(target),
@@ -795,7 +812,7 @@ fn solve_gear_impl(input: &str) -> Result<String, String> {
     // degenerate of the eccentric assembly, and its `mean` is `Tooth::new`
     // verbatim. Building it here means every scalar the summary quotes is a
     // tooth the gear actually has.
-    let ecc = gear_core::gear::Gear::new(params);
+    let ecc = gear_core::gear::Gear::try_new(params).map_err(params_refusal)?;
     serde_json::to_string(&summarise(&ecc, &req, params))
         .map_err(|e| format!("could not encode result: {e}"))
 }
@@ -803,17 +820,21 @@ fn solve_gear_impl(input: &str) -> Result<String, String> {
 fn gear_profile_impl(input: &str, points_per_tooth: u32) -> Result<Vec<f64>, String> {
     let req = parse(input)?;
     let n = points(points_per_tooth)?;
-    Ok(gear_core::gear::Gear::new(resolved_params(&req)?)
-        .profile(n)
-        .into_iter()
-        .flat_map(|p| [p[0], p[1]])
-        .collect())
+    let drawn = built(&req)?.profile(n).map_err(params_refusal)?;
+    flat(&drawn, req.params.teeth)
+}
+
+/// **The gear a request holds, built** — its per-tooth lists given room
+/// ([`gear_core::gear::Gear::try_new`]), past memory refused naming
+/// `params.teeth`.
+fn built(req: &GearRequest) -> Result<gear_core::gear::Gear, String> {
+    gear_core::gear::Gear::try_new(resolved_params(req)?).map_err(params_refusal)
 }
 
 fn export_dxf_impl(input: &str) -> Result<String, String> {
     let req = parse(input)?;
-    let g = gear_core::gear::Gear::new(resolved_params(&req)?);
-    Ok(gear_io::gear_to_dxf(
+    let g = built(&req)?;
+    gear_io::gear_to_dxf(
         &g,
         &gear_io::DxfOptions {
             chord_tolerance: req
@@ -823,7 +844,8 @@ fn export_dxf_impl(input: &str) -> Result<String, String> {
                 .reference_circles
                 .unwrap_or(REFERENCE_CIRCLES_BY_DEFAULT),
         },
-    ))
+    )
+    .map_err(params_refusal)
 }
 
 /// Derived geometry and metrology for one gear.
@@ -1134,7 +1156,16 @@ fn centre_profile(params: GearParams, req: &GearRequest) -> Maybe<gear_core::gea
             unavailable: Note::new("ui.gear_concentric_has_no_profile"),
         };
     }
-    match gear_core::gear::Gear::new(params).centre_profile(&other, kind, MeshSide::First) {
+    // The gear the summary reads is built already (`solve_gear_impl`), so
+    // its lists have room; it is built again here as the mate's partner.
+    let Ok(gear) = gear_core::gear::Gear::try_new(params) else {
+        return Maybe::Unavailable {
+            unavailable: Refused::past_memory("teeth", f64::from(params.teeth))
+                .within("params")
+                .note(),
+        };
+    };
+    match gear.centre_profile(&other, kind, MeshSide::First) {
         Ok(p) => Maybe::Value(p),
         // `inv α_w < 0` at some tooth: no centre distance puts that tooth in the
         // mate's space at zero backlash. The shift term carries `1/Σz`, and for
@@ -2787,6 +2818,244 @@ mod tests {
         let _ = std::panic::take_hook();
     }
 
+    /// **A huge count is answered or refused naming it, never trapped** —
+    /// here, on the host, at the sizes whose lists are past any address
+    /// space (the drawings of every tooth a wire's count carries, 4.3e9, at a
+    /// screen's most points a tooth or an export's finest chord), so the
+    /// allocator's answer is the same on every machine; the payload's
+    /// probe asks the browser's 4 GB at the counts that trapped it (3e7 and
+    /// 3e8 teeth). The summary of a concentric gear of 3e8 and 4.3e9 teeth
+    /// is answered — its teeth one tooth, every reading one reading — and
+    /// every number in it finite.
+    #[test]
+    fn a_huge_count_is_answered_or_refused_by_name() {
+        let gear: serde_json::Value = serde_json::from_str(REQ).unwrap();
+        let with = |teeth: u32, extra: serde_json::Value| {
+            let mut g = gear.clone();
+            g["params"]["teeth"] = serde_json::json!(teeth);
+            if let serde_json::Value::Object(m) = extra {
+                for (k, v) in m {
+                    g[k] = v;
+                }
+            }
+            g.to_string()
+        };
+        let past = |r: Result<String, String>, at: &str| {
+            let n: Note = serde_json::from_str(&r.expect_err(at)).unwrap();
+            assert_eq!(n.key, "error.input_past_memory", "{at}: {n:?}");
+            assert_eq!(n.values["field"], "params.teeth", "{at}");
+        };
+        for teeth in [300_000_000, u32::MAX] {
+            let req = with(teeth, serde_json::json!({}));
+            let params: GearParams = serde_json::from_value(
+                serde_json::from_str::<serde_json::Value>(&req).unwrap()["params"].clone(),
+            )
+            .unwrap();
+            let g = gear_core::gear::Gear::try_new(params).unwrap();
+            let summary = summarise(&g, &parse(&req).unwrap(), params);
+            assert!(
+                gear_core::finite::non_finite(&summary).is_empty(),
+                "z {teeth}"
+            );
+        }
+        let huge = with(u32::MAX, serde_json::json!({}));
+        past(
+            gear_profile_impl(&huge, 65_536).map(|_| String::new()),
+            "gear_profile",
+        );
+        past(
+            export_dxf_impl(&with(
+                u32::MAX,
+                serde_json::json!({"chord_tolerance": 1e-30}),
+            )),
+            "export_dxf",
+        );
+        let ring = |teeth: u32| {
+            let mut g = gear.clone();
+            g["params"]["teeth"] = serde_json::json!(teeth);
+            g.as_object_mut().unwrap().remove("pin_diameter");
+            g.to_string()
+        };
+        past(
+            ring_profile_impl(&ring(u32::MAX), 65_536).map(|_| String::new()),
+            "ring_profile",
+        );
+    }
+
+    /// **Every number the gear tab and the ring report is finite at each end
+    /// of every row's bound** — each of a gear's parameters, a ring's
+    /// cutter and every figure a request asks beside them (the pin, the
+    /// chord, the working depth, the throw and its mate) set to each end in
+    /// turn, the rest the tab's default: the summary, the screen's drawing
+    /// and the export's outline each have every number finite, or the
+    /// request is refused — by a bound the gear's other figures set, a pin
+    /// that does not seat, a throw the mate cannot deliver, a drawing past
+    /// memory. The drawings are asked where their lists are small, and are
+    /// the huge-count law's past that.
+    #[test]
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        clippy::type_complexity,
+        reason = "a bound's end set as the integer the wire carries"
+    )]
+    fn every_gear_report_is_finite_at_every_rows_ends() {
+        use gear_core::finite::non_finite;
+        use gear_core::input::{self, Field};
+        let ends = |f: &Field| -> Vec<f64> {
+            let Some(b) = f.bound else { return Vec::new() };
+            [
+                b.min
+                    .map(|lo| if b.exclusive_min { lo.next_up() } else { lo }),
+                b.max
+                    .map(|hi| if b.exclusive_max { hi.next_down() } else { hi }),
+            ]
+            .into_iter()
+            .flatten()
+            .collect()
+        };
+        let base: GearRequest = parse(REQ).unwrap();
+        let mut faults = Vec::new();
+        let (mut answered, mut refused) = (0, 0);
+        let mut ask = |what: String, req: GearRequest| {
+            let Ok(params) = resolved_params(&req) else {
+                refused += 1;
+                return;
+            };
+            if params.check().is_err() {
+                refused += 1;
+                return;
+            }
+            let Ok(g) = gear_core::gear::Gear::try_new(params) else {
+                refused += 1;
+                return;
+            };
+            let bad = non_finite(&summarise(&g, &req, params));
+            if !bad.is_empty() {
+                faults.push(format!("{what}: summary {bad:?}"));
+            }
+            // Drawn only where one tooth's list is small beside memory.
+            if params.teeth <= 1_000 {
+                if let Ok(p) = g.profile(64) {
+                    if !non_finite(&p).is_empty() {
+                        faults.push(format!("{what}: profile"));
+                    }
+                }
+                if let Ok(o) = g.outline(req.chord_tolerance.unwrap_or(1e-3)) {
+                    if o.iter()
+                        .any(|v| !(v.x.is_finite() && v.y.is_finite() && v.bulge.is_finite()))
+                    {
+                        faults.push(format!("{what}: outline"));
+                    }
+                }
+            }
+            answered += 1;
+        };
+        for f in base.params.fields() {
+            for x in ends(&f) {
+                let mut req = parse(REQ).unwrap();
+                let mut v = serde_json::to_value(req.params).unwrap();
+                v[f.path.as_str()] = if f.path == "teeth" {
+                    serde_json::json!(x as u64)
+                } else {
+                    serde_json::json!(x)
+                };
+                req.params = serde_json::from_value(v).unwrap();
+                ask(format!("params.{} = {x:e}", f.path), req);
+            }
+        }
+        let asked: [(&input::Asked, fn(&mut GearRequest, f64)); 6] = [
+            (&input::PIN_DIAMETER, |r, x| r.pin_diameter = Some(x)),
+            (&input::CHORD_TOLERANCE, |r, x| r.chord_tolerance = Some(x)),
+            (&input::WORKING_DEPTH, |r, x| r.working_depth = Some(x)),
+            (&input::ECCENTRIC_THROW, |r, x| {
+                r.eccentric_throw = Some(x);
+                r.mate = Some(MateRef {
+                    teeth: 40,
+                    profile_shift: 0.0,
+                    internal: false,
+                });
+            }),
+            (&input::MATE_TEETH, |r, x| {
+                r.params.angular_shift = 0.2;
+                r.mate = Some(MateRef {
+                    teeth: x as u32,
+                    profile_shift: 0.0,
+                    internal: false,
+                });
+            }),
+            (&input::MATE_SHIFT, |r, x| {
+                r.params.angular_shift = 0.2;
+                r.mate = Some(MateRef {
+                    teeth: 40,
+                    profile_shift: x,
+                    internal: false,
+                });
+            }),
+        ];
+        for (row, set) in asked {
+            let f = Field {
+                path: row.field.to_owned(),
+                value: 0.0,
+                bound: (row.bound)(&input::Lists::default(), &None),
+            };
+            for x in ends(&f) {
+                let mut req = parse(REQ).unwrap();
+                set(&mut req, x);
+                ask(format!("{} = {x:e}", f.path), req);
+            }
+        }
+        // A ring's parameters and its cutter's.
+        let ring: RingRequest =
+            parse_ring(r#"{"params":{"module":1.0,"pressure_angle":20.0,"teeth":60,"profile_shift":0.0,"helix_angle":0.0,"addendum":1.0,"dedendum":1.25,"root_radius":0.38,"thickness_mod":1.0},"pin_diameter":1.5}"#)
+                .unwrap();
+        let mut rings = 0;
+        let fields = ring.params.fields().into_iter().map(|f| ("params", f));
+        let cutter = ring
+            .cutter
+            .to_cutter()
+            .fields()
+            .into_iter()
+            .map(|f| ("cutter", f));
+        for (under, f) in fields.chain(cutter) {
+            for x in ends(&f) {
+                let mut v = serde_json::from_str::<serde_json::Value>(
+                    r#"{"params":{"module":1.0,"pressure_angle":20.0,"teeth":60,"profile_shift":0.0,"helix_angle":0.0,"addendum":1.0,"dedendum":1.25,"root_radius":0.38,"thickness_mod":1.0},"pin_diameter":1.5,"cutter":{"teeth":20,"addendum":1.25,"tip_round":0.2}}"#,
+                )
+                .unwrap();
+                v[under][f.path.as_str()] = if f.path == "teeth" {
+                    serde_json::json!(x as u64)
+                } else {
+                    serde_json::json!(x)
+                };
+                let Ok(req) = parse_ring(&v.to_string()) else {
+                    refused += 1;
+                    continue;
+                };
+                let bad = non_finite(&ring_summary(&req));
+                if !bad.is_empty() {
+                    faults.push(format!("ring {under}.{} = {x:e}: {bad:?}", f.path));
+                }
+                if req.params.teeth <= 1_000 {
+                    if let Ok(o) = ring_of(&req).outline(1e-3) {
+                        if o.iter().any(|v| !(v.x.is_finite() && v.y.is_finite())) {
+                            faults.push(format!("ring {under}.{} = {x:e}: outline", f.path));
+                        }
+                    }
+                }
+                rings += 1;
+            }
+        }
+        assert!(
+            faults.is_empty(),
+            "{} faults:\n{}",
+            faults.len(),
+            faults.join("\n")
+        );
+        eprintln!("gear: {answered} answered, {refused} refused; rings {rings}");
+        assert!(answered > 20 && rings > 10);
+    }
+
     /// Every path of `v` at which an object stands, as a JSON pointer.
     fn object_paths(v: &serde_json::Value, at: &str, out: &mut Vec<String>) {
         match v {
@@ -3212,13 +3481,19 @@ mod tests {
         let v: serde_json::Value = serde_json::from_str(&solve_gear_impl(&neg).unwrap()).unwrap();
         assert!(v["angular_shift"].as_f64().unwrap() < 0.0);
 
-        // No mate, and an out-of-reach throw, are request errors.
+        // No mate, and an out-of-reach throw, are request errors, each
+        // crossing as its catalogue key, the throw formatted in it.
+        let key =
+            |r: Result<String, String>| -> Note { serde_json::from_str(&r.unwrap_err()).unwrap() };
         let no_mate = format!(r#"{{"params":{{{base}}},"eccentric_throw":0.2}}"#);
-        assert!(solve_gear_impl(&no_mate).unwrap_err().contains("mate"));
+        assert_eq!(
+            key(solve_gear_impl(&no_mate)).key,
+            "ui.gear_throw_needs_mate"
+        );
         let too_big = req.replace("\"eccentric_throw\":0.2", "\"eccentric_throw\":50.0");
-        assert!(solve_gear_impl(&too_big)
-            .unwrap_err()
-            .contains("not reachable"));
+        let n = key(solve_gear_impl(&too_big));
+        assert_eq!(n.key, "ui.gear_throw_unreachable");
+        assert_eq!(n.values["throw"], "50.0000");
     }
 
     /// **An eccentric gear's scalars describe a tooth it actually has, and the

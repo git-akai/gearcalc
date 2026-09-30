@@ -51,6 +51,7 @@
 //! z-fold replication it replaces — gated, not hoped for. `λ` has no effect
 //! there either, since there is nothing for it to correct towards.
 
+use crate::input::Refused;
 use crate::involute::inv;
 use crate::mesh::{operating_geometry, MeshError, MeshKind, MeshSide};
 use crate::note::{key, Note};
@@ -92,13 +93,25 @@ pub struct Gear {
     /// eccentric one — teeth `k` and `z − k` take the same shift, since `cos` is
     /// even about the axis of the variation.
     teeth: Vec<Tooth>,
+    /// Which distinct tooth each position uses and where it is seated — for
+    /// an eccentric gear alone. A concentric gear's positions are its one
+    /// tooth at `2πk/z`, read off `k` ([`Self::tooth`]), so a count of
+    /// billions costs what one tooth does.
+    positions: Option<Positions>,
+    /// How many teeth, `z`.
+    count: usize,
+    /// The gear at the mean shift — what every scalar output is quoted from, and
+    /// what the whole gear is when the variation is zero.
+    mean: Tooth,
+}
+
+/// An eccentric gear's teeth, position by position.
+#[derive(Clone, Debug)]
+struct Positions {
     /// Which distinct tooth each of the `z` positions uses.
     which: Vec<usize>,
     /// Where each tooth's centreline sits, radians.
     seat: Vec<f64>,
-    /// The gear at the mean shift — what every scalar output is quoted from, and
-    /// what the whole gear is when the variation is zero.
-    mean: Tooth,
 }
 
 /// **The shift the `k`th tooth is cut at**, `x + Δx cos θ_k`.
@@ -130,25 +143,67 @@ impl Gear {
     ///
     /// # Panics
     ///
-    /// Never: a zero tooth count is guarded to one, as elsewhere.
+    /// Where an eccentric gear's per-tooth lists are more than the machine's
+    /// memory holds — a count no boundary admits unasked: each reads a gear
+    /// through [`Self::try_new`]. A concentric gear lists nothing per tooth.
     #[must_use]
+    #[expect(
+        clippy::expect_used,
+        reason = "a gear built in the crate's own code has a count its memory holds; input reads `try_new`"
+    )]
     pub fn new(params: GearParams) -> Self {
+        Self::try_new(params).expect("a gear's per-tooth lists past memory")
+    }
+
+    /// [`Self::new`], refusing a count whose per-tooth lists the machine's
+    /// memory does not hold.
+    ///
+    /// # Errors
+    ///
+    /// [`Refused::past_memory`], naming `teeth`.
+    pub fn try_new(params: GearParams) -> Result<Self, Refused> {
         let z = params.teeth.max(1);
+        let count = usize::try_from(z).map_err(|_| Refused::past_memory("teeth", f64::from(z)))?;
         let shift_at = |k: u32| shift_at(&params, k);
 
         // Distinct shifts, by exact equality. Nothing is quantised: two teeth
         // share a gear only if their shift is the *same number*, which for a
         // concentric gear is all of them and for an eccentric one is the mirror
-        // pairs about the variation's axis.
+        // pairs about the variation's axis. `shift_at` folds position `k` to
+        // `min(k, z − k)` and is monotone in that, so equal shifts are
+        // neighbours in it and the distinct ones are read in one pass — and a
+        // gear whose ends of the half-turn agree is concentric, its one shift
+        // read at a single position.
+        let half = z / 2;
+        let concentric = shift_at(0) == shift_at(half);
+        // **Every list an eccentric gear keeps per tooth, given room before
+        // any is written**, the largest first: a count past memory is
+        // refused having touched nothing. A concentric gear keeps one tooth.
+        let distinct = if concentric { 1 } else { count / 2 + 1 };
+        let per_position = if concentric { 0 } else { count };
+        let mut teeth: Vec<Tooth> = Vec::new();
+        let mut wanted: Vec<(Rack, Vec<Note>)> = Vec::new();
         let mut shifts: Vec<f64> = Vec::new();
-        let mut which = Vec::with_capacity(z as usize);
-        for k in 0..z {
-            let x = shift_at(k);
-            let at = shifts.iter().position(|&s| s == x).unwrap_or_else(|| {
-                shifts.push(x);
-                shifts.len() - 1
-            });
-            which.push(at);
+        let mut group: Vec<usize> = Vec::new();
+        let mut which: Vec<usize> = Vec::new();
+        let mut seat: Vec<f64> = Vec::new();
+        let asked = f64::from(z);
+        crate::input::room(&mut teeth, distinct, "teeth", asked)?;
+        crate::input::room(&mut wanted, distinct, "teeth", asked)?;
+        crate::input::room(&mut shifts, distinct, "teeth", asked)?;
+        crate::input::room(&mut group, distinct, "teeth", asked)?;
+        crate::input::room(&mut which, per_position, "teeth", asked)?;
+        crate::input::room(&mut seat, per_position, "teeth", asked)?;
+        if concentric {
+            shifts.push(shift_at(0));
+        } else {
+            for j in 0..=half {
+                let x = shift_at(j);
+                if shifts.last() != Some(&x) {
+                    shifts.push(x);
+                }
+                group.push(shifts.len() - 1);
+            }
         }
         // **One hob, one setting.** This is the whole of what makes an eccentric
         // gear an eccentric gear rather than a ring of unrelated ones.
@@ -169,10 +224,7 @@ impl Gear {
             profile_shift: x,
             ..params
         };
-        let wanted: Vec<(Rack, Vec<Note>)> = shifts
-            .iter()
-            .map(|&x| Tooth::tool_wanted_by(&at(x)))
-            .collect();
+        wanted.extend(shifts.iter().map(|&x| Tooth::tool_wanted_by(&at(x))));
 
         let depth = wanted.iter().fold(f64::MIN, |d, (r, _)| d.max(r.depth));
         let mut tool = Rack {
@@ -202,7 +254,7 @@ impl Gear {
             };
         }
 
-        let teeth: Vec<Tooth> = shifts.iter().map(|&x| Tooth::cut_by(at(x), tool)).collect();
+        teeth.extend(shifts.iter().map(|&x| Tooth::cut_by(at(x), tool)));
 
         // **The mean gear is cut by the same tool.** It is where every scalar
         // output is quoted from, and `root_at` builds the root envelope on its
@@ -224,19 +276,34 @@ impl Gear {
 
         // Seats. `ψ_b` is the angular half-thickness at the base circle — the
         // seat of the flank — and the correction is towards the mean tooth's.
-        let seat = (0..z)
-            .map(|k| {
+        // A concentric gear's teeth are its mean's, so its correction is
+        // nought and its seats are `2πk/z`, read where they are asked.
+        let positions = if concentric {
+            None
+        } else {
+            for k in 0..z {
+                let i = group[usize::try_from(k.min(z - k)).unwrap_or(0)];
                 let base = std::f64::consts::TAU * f64::from(k) / f64::from(z);
-                base + params.index_offset * (mean.psi_b - teeth[which[k as usize]].psi_b)
-            })
-            .collect();
+                which.push(i);
+                seat.push(base + params.index_offset * (mean.psi_b - teeth[i].psi_b));
+            }
+            Some(Positions { which, seat })
+        };
 
-        Self {
+        Ok(Self {
             teeth,
-            which,
-            seat,
+            positions,
+            count,
             mean,
-        }
+        })
+    }
+
+    /// **Whether every tooth is the one tooth** — a concentric gear, whose
+    /// positions differ only in where they are seated, `2πk/z`. Every
+    /// reading taken round the revolution is then one reading.
+    #[must_use]
+    pub fn is_concentric(&self) -> bool {
+        self.positions.is_none()
     }
 
     /// The gear at the mean shift.
@@ -426,7 +493,7 @@ impl Gear {
     /// concentric gear — where every `ψ_k` is the same — gets exactly `0.0` and
     /// the root is left where it was, to the bit.
     pub fn root_reach(&self, k: usize, side: f64) -> f64 {
-        let n = self.which.len();
+        let n = self.count;
         let psi = |j: usize| self.tooth(j % n).0.psi_b;
         let (a, b) = if side < 0.0 {
             ((k + n - 1) % n, k)
@@ -485,14 +552,21 @@ impl Gear {
     /// The tooth at position `k`, and where it is seated.
     #[must_use]
     pub fn tooth(&self, k: usize) -> (&Tooth, f64) {
-        let i = k % self.which.len();
-        (&self.teeth[self.which[i]], self.seat[i])
+        let i = k % self.count;
+        match &self.positions {
+            Some(p) => (&self.teeth[p.which[i]], p.seat[i]),
+            // The expression every seat is built on, at the one tooth.
+            None => (
+                &self.teeth[0],
+                std::f64::consts::TAU * i as f64 / self.count as f64,
+            ),
+        }
     }
 
     /// How many teeth the gear has.
     #[must_use]
     pub fn teeth(&self) -> usize {
-        self.seat.len()
+        self.count
     }
 
     /// Where one flank sits, as an angle on the base circle.
@@ -537,7 +611,7 @@ impl Gear {
     /// revolution it is constant on (`docs/corrections.md`).
     #[must_use]
     pub fn space_half_angle(&self, k: usize) -> f64 {
-        let z = self.seat.len();
+        let z = self.count;
         let (a, b) = (self.tooth(k).0.psi_b, self.tooth(k + 1).0.psi_b);
         let lam = self.mean.params.index_offset;
         let pitch = std::f64::consts::TAU / z as f64;
@@ -554,7 +628,7 @@ impl Gear {
     /// exactly when the teeth agree.
     #[must_use]
     pub fn space_centre_delta(&self, a: usize, b: usize) -> f64 {
-        let z = self.seat.len();
+        let z = self.count;
         let psi = |k: usize| self.tooth(k).0.psi_b;
         let lam = self.mean.params.index_offset;
         let pitch = std::f64::consts::TAU * (b as f64 - a as f64) / z as f64;
@@ -565,15 +639,18 @@ impl Gear {
 
     /// Which teeth came out other than as drawn, and why.
     ///
-    /// Empty for an ordinary gear whose inputs are buildable, and empty for an
-    /// eccentric one too — the tool settings are shared, so a guard that trips
-    /// on a *setting* trips for the whole gear or not at all. What lands here is
-    /// only what is true of one tooth and not its neighbour.
+    /// Empty for an ordinary gear — its teeth are one tooth, whose clamps are
+    /// the gear's own ([`Tooth::clamps`], `undercut`, `severed`) — and empty
+    /// for an eccentric one whose inputs are buildable: the tool settings are
+    /// shared, so a guard that trips on a *setting* trips for the whole gear
+    /// or not at all. What lands here is only what is true of one tooth and
+    /// not its neighbour.
     #[must_use]
     pub fn per_tooth_clamps(&self) -> PerToothClamps {
         let mut teeth = Vec::new();
         let mut notes: Vec<Note> = Vec::new();
-        for k in 0..self.which.len() {
+        let positions = if self.is_concentric() { 0 } else { self.count };
+        for k in 0..positions {
             let (g, _) = self.tooth(k);
             let mut its: Vec<Note> = g.clamps.notes.clone();
             if g.severed {
@@ -599,8 +676,12 @@ impl Gear {
     ///
     /// `per_tooth` is the point budget for one tooth, as for the single-gear
     /// generator it replaces.
-    #[must_use]
-    pub fn profile(&self, per_tooth: usize) -> Vec<[f64; 2]> {
+    ///
+    /// # Errors
+    ///
+    /// [`Refused::past_memory`], naming `teeth`, where the outline is more
+    /// points than the machine's memory holds.
+    pub fn profile(&self, per_tooth: usize) -> Result<Vec<[f64; 2]>, Refused> {
         // A virtual spur gear has a fractional tooth count and exists only to be
         // measured; replicating it would draw a shape whose teeth do not close.
         // Caught in development rather than emitted as a plausible wrong outline.
@@ -629,10 +710,25 @@ impl Gear {
             })
             .collect();
 
+        // Every position's points, and the closing one, reserved at once.
+        let teeth = self.mean.params.teeth;
+        let past = || Refused::past_memory("teeth", f64::from(teeth));
+        let points = if self.is_concentric() {
+            halves[0].0.len().checked_mul(self.count)
+        } else {
+            (0..self.count).try_fold(0_usize, |n, k| n.checked_add(halves[self.which(k)].0.len()))
+        }
+        .and_then(|n| n.checked_add(1));
         let mut out = Vec::new();
-        for (k, &i) in self.which.iter().enumerate() {
-            let (r_full, th_full) = &halves[i];
-            let base = self.seat[k];
+        crate::input::room(
+            &mut out,
+            points.ok_or_else(past)?,
+            "teeth",
+            f64::from(teeth),
+        )?;
+        for k in 0..self.count {
+            let (r_full, th_full) = &halves[self.which(k)];
+            let base = self.tooth(k).1;
             for (rr, tt) in r_full.iter().zip(th_full) {
                 // Corrected for the tool's motion and for where the neighbours
                 // actually sit. No section needs identifying: the rules are
@@ -645,7 +741,14 @@ impl Gear {
         if let Some(&first) = out.first() {
             out.push(first);
         }
-        out
+        Ok(out)
+    }
+
+    /// Which distinct tooth position `k` uses.
+    fn which(&self, k: usize) -> usize {
+        self.positions
+            .as_ref()
+            .map_or(0, |p| p.which[k % self.count])
     }
 }
 
@@ -669,22 +772,42 @@ impl Gear {
     /// **concentric** gear with no complaint. Routed here for the same reason
     /// [`Self::profile`] is: one assembly, and the ordinary gear is its
     /// `Δx = 0`.
-    #[must_use]
-    pub fn outline(&self, chord_tolerance: f64) -> Vec<crate::outline::Vertex> {
+    ///
+    /// # Errors
+    ///
+    /// [`Refused::past_memory`], naming `teeth`, where the outline is more
+    /// vertices than the machine's memory holds.
+    pub fn outline(&self, chord_tolerance: f64) -> Result<Vec<crate::outline::Vertex>, Refused> {
         let chord_tolerance = self.chord_tolerance(chord_tolerance);
+        let teeth = f64::from(self.mean.params.teeth);
         // A constant root is a circle and stays an exact arc in the export; a
         // varying one is not a circle, so it is subdivided like a flank. The
         // rule for *where* it runs is `root_radius`, shared with the screen
         // outline — one root, two consumers.
         let varying = self.mean.params.angular_shift != 0.0;
         let mut out = Vec::new();
-        for (k, &i) in self.which.iter().enumerate() {
+        // Each position's vertices are made apart and then given room: the
+        // first sizes the rest, which a concentric gear's all match.
+        let mut one = Vec::new();
+        for k in 0..self.count {
             let displace = |r: f64, tt: f64| self.corrected(k, r, tt);
             let displace: Option<&dyn Fn(f64, f64) -> (f64, f64)> =
                 if varying { Some(&displace) } else { None };
-            self.teeth[i].tooth_outline(chord_tolerance, self.seat[k], displace, &mut out);
+            one.clear();
+            let (_, seat) = self.tooth(k);
+            self.teeth[self.which(k)].tooth_outline(chord_tolerance, seat, displace, &mut one);
+            let wanted = if k == 0 {
+                one.len().saturating_mul(self.count)
+            } else {
+                one.len()
+            };
+            if out.capacity() - out.len() < one.len() {
+                out.try_reserve(wanted)
+                    .map_err(|_| Refused::past_memory("teeth", teeth))?;
+            }
+            out.extend_from_slice(&one);
         }
-        out
+        Ok(out)
     }
 }
 
@@ -775,24 +898,27 @@ impl Gear {
         };
         // Departure from uniform spacing: the flank's seat less the ideal
         // `2πk/z`. **Not** centred on its own mean — both outputs below are
-        // ranges, and a range does not care about a constant offset. Subtracting
-        // one anyway left a concentric gear reporting 8e-15 mm of pitch error,
-        // which is a rounding residual wearing the clothes of a measurement.
-        let departures = |side: f64| (0..z).map(|k| departure(k, side)).collect::<Vec<f64>>();
-        // Adjacent-flank spacing error, and the accumulated swing.
+        // ranges, and a range does not care about a constant offset.
+        // Subtracting one anyway left a concentric gear reporting 8e-15 mm of
+        // pitch error, which is a rounding residual wearing the clothes of a
+        // measurement. Both as **ranges** — the full swing from the tightest
+        // pitch to the widest — rather than as amplitudes about the mean. That
+        // is what a gear chart shows and what
+        // docs/reference.md#angularly-varying-profile-shift's tabulated
+        // figures are. Read in one pass, with nothing listed per tooth; a
+        // concentric gear's every departure is its one `ψ_b`, so both ranges
+        // are nought and it reads one tooth.
         let errors = |side: f64| {
-            let d = departures(side);
-            // Both as **ranges** — the full swing from the tightest pitch to
-            // the widest — rather than as amplitudes about the mean. That is
-            // what a gear chart shows and what docs/reference.md#angularly-varying-profile-shift's tabulated figures are.
-            let range = |v: &[f64]| {
-                let (lo, hi) = v
-                    .iter()
-                    .fold((f64::MAX, f64::MIN), |(l, h), &x| (l.min(x), h.max(x)));
-                hi - lo
-            };
-            let steps: Vec<f64> = (0..z).map(|k| d[(k + 1) % z] - d[k]).collect();
-            (range(&steps) * self.mean.rb, range(&d) * self.mean.rb)
+            let positions = if self.is_concentric() { 1 } else { z };
+            let (mut d_lo, mut d_hi) = (f64::MAX, f64::MIN);
+            let (mut s_lo, mut s_hi) = (f64::MAX, f64::MIN);
+            for k in 0..positions {
+                let d = departure(k, side);
+                let step = departure((k + 1) % z, side) - d;
+                (d_lo, d_hi) = (d_lo.min(d), d_hi.max(d));
+                (s_lo, s_hi) = (s_lo.min(step), s_hi.max(step));
+            }
+            ((s_hi - s_lo) * self.mean.rb, (d_hi - d_lo) * self.mean.rb)
         };
         let (drive_pitch, drive_index) = errors(1.0);
         let (coast_pitch, coast_index) = errors(-1.0);
@@ -1000,15 +1126,20 @@ fn centre_profile_of(
         // report zero throw for every amplitude, and λ is not a property of the
         // *pair* at all. It is gated now
         // (`the_commanded_centre_distance_does_not_depend_on_the_indexing`).
-        let commanded = (0..teeth)
-            .map(|k| {
-                let x_e = shift(k) + g.params.thickness_shift();
-                let x_sum = sign_e * x_e + sign_m * x_mate;
+        // One figure per tooth, given room first.
+        let mut commanded = Vec::new();
+        let n = usize::try_from(teeth).map_err(|_| MeshError::PastMemory { teeth })?;
+        crate::input::room(&mut commanded, n, "teeth", f64::from(teeth))
+            .map_err(|_| MeshError::PastMemory { teeth })?;
+        for k in 0..teeth {
+            let x_e = shift(k) + g.params.thickness_shift();
+            let x_sum = sign_e * x_e + sign_m * x_mate;
+            commanded.push(
                 operating_geometry(g.mt, g.alpha_t, g.alpha_n, z_sum, x_sum)
                     .map(|(_, _, a_w)| a_w)
-                    .ok_or(MeshError::OutsideInvoluteDomain)
-            })
-            .collect::<Result<Vec<f64>, MeshError>>()?;
+                    .ok_or(MeshError::OutsideInvoluteDomain)?,
+            );
+        }
 
         let n = commanded.len();
         let count = n as f64;
@@ -1491,7 +1622,7 @@ mod tests {
                             was.push(first);
                         }
 
-                        let now = Gear::new(params).profile(per_tooth);
+                        let now = Gear::new(params).profile(per_tooth).unwrap();
                         assert_eq!(now.len(), was.len(), "z={teeth} x={shift}");
                         for (i, (a, b)) in now.iter().zip(&was).enumerate() {
                             assert_eq!(
@@ -2323,9 +2454,10 @@ mod tests {
             .per_tooth_clamps()
         };
 
-        // A buildable gear has nothing to report, eccentric or not. Not the
-        // default one: z = 17 at zero shift is the textbook marginal-undercut
-        // case, and reporting it is the feature working.
+        // A buildable gear has nothing to report, eccentric or not; and a
+        // concentric one never does — its teeth are one tooth, and z = 17 at
+        // zero shift, the textbook marginal-undercut case, says so on the
+        // tooth (`undercut`), not tooth by tooth.
         assert!(at(0.2).teeth.is_empty());
         assert!(Gear::new(GearParams {
             teeth: 30,
@@ -2334,10 +2466,9 @@ mod tests {
         .per_tooth_clamps()
         .teeth
         .is_empty());
-        assert!(!Gear::new(GearParams::default())
-            .per_tooth_clamps()
-            .teeth
-            .is_empty());
+        let marginal = Gear::new(GearParams::default());
+        assert!(marginal.per_tooth_clamps().teeth.is_empty());
+        assert!(marginal.mean().undercut);
 
         // Too much shift: the high teeth come to a point, and they are the ones
         // named — positions near θ = 0, not a bare count.
@@ -2458,7 +2589,7 @@ mod tests {
             // Screen: doubling the points must nearly halve the largest jump.
             let mut previous = f64::MAX;
             for n in [600_usize, 1200, 2400, 4800] {
-                let jump = radial_jump(&e.profile(n));
+                let jump = radial_jump(&e.profile(n).unwrap());
                 assert!(
                     jump < 0.6 * previous,
                     "z={teeth} Δx={amplitude} λ={lambda}: {n} points a tooth jump {jump} mm \
@@ -2480,6 +2611,7 @@ mod tests {
             for tol in [1e-2_f64, 1e-3, 1e-4] {
                 let jump = radial_jump(
                     &e.outline(tol)
+                        .unwrap()
                         .iter()
                         .map(|v| [v.x, v.y])
                         .collect::<Vec<_>>(),
@@ -2606,7 +2738,7 @@ mod tests {
             let below = junction * 1.02;
             let mut previous = f64::MAX;
             for n in [600_usize, 1200, 2400, 4800] {
-                let turn = turning(&e.profile(n), below);
+                let turn = turning(&e.profile(n).unwrap(), below);
                 assert!(
                     turn < 0.6 * previous,
                     "z={teeth} x={shift} Δx={amplitude}: at {n} points a tooth the root \
@@ -2627,7 +2759,8 @@ mod tests {
             teeth: 24,
             ..Default::default()
         })
-        .outline(1e-3);
+        .outline(1e-3)
+        .unwrap();
         let arcs = flat.iter().filter(|v| v.bulge != 0.0).count();
         // Three arcs a tooth: the tip, and the root either side of it — the
         // root is emitted as two halves, one leading into the tooth and one
@@ -2641,7 +2774,8 @@ mod tests {
             angular_shift: 0.25,
             ..Default::default()
         })
-        .outline(1e-3);
+        .outline(1e-3)
+        .unwrap();
         // One left: the tip. Both root halves gave up their arcs, since a
         // varying root is not a circle at all.
         assert_eq!(ecc.iter().filter(|v| v.bulge != 0.0).count(), 24);
@@ -2682,8 +2816,24 @@ mod tests {
         // *plus* the eccentricity. Taking the concentric gear's spread away
         // leaves the eccentricity alone — which is what has to appear in both,
         // and what a check on the raw spread would have confused with a tooth.
-        let screen = |g: &Gear| spread(g.profile(600).iter().map(|p| p[0].hypot(p[1])).collect());
-        let export = |g: &Gear| spread(g.outline(1e-3).iter().map(|v| v.x.hypot(v.y)).collect());
+        let screen = |g: &Gear| {
+            spread(
+                g.profile(600)
+                    .unwrap()
+                    .iter()
+                    .map(|p| p[0].hypot(p[1]))
+                    .collect(),
+            )
+        };
+        let export = |g: &Gear| {
+            spread(
+                g.outline(1e-3)
+                    .unwrap()
+                    .iter()
+                    .map(|v| v.x.hypot(v.y))
+                    .collect(),
+            )
+        };
         for (name, got) in [
             ("screen", screen(&ecc) - screen(&flat)),
             ("export", export(&ecc) - export(&flat)),

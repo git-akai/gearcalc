@@ -321,6 +321,10 @@ pub mod key {
     /// an index naming nothing in its list, where a value enters
     /// ([`crate::input`]).
     pub const ERROR_INPUT_OUT_OF_RANGE: &str = "error.input_out_of_range";
+    /// `error.input_past_memory`: a count whose per-unit lists — a gear's
+    /// teeth drawn — are more than the machine's memory holds
+    /// ([`crate::input::Refused::past_memory`]).
+    pub const ERROR_INPUT_PAST_MEMORY: &str = "error.input_past_memory";
     /// `error.train_file_unversioned`: a geartrain file that states no
     /// format (read by `gear_io::train`).
     pub const ERROR_TRAIN_FILE_UNVERSIONED: &str = "error.train_file_unversioned";
@@ -436,6 +440,7 @@ pub mod key {
         ERROR_TRAIN_FILE_FORMAT,
         ERROR_INPUT_NOT_FINITE,
         ERROR_INPUT_OUT_OF_RANGE,
+        ERROR_INPUT_PAST_MEMORY,
         ERROR_TRAIN_SIZE_OVER_CONSTRAINED,
         ERROR_TRAIN_AXES_TOO_CLOSE,
         ERROR_TRAIN_AXES_TOO_FAR,

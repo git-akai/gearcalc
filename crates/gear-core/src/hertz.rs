@@ -57,7 +57,7 @@
 //! mesh the tool supports today, without a branch and without moving a digit.
 
 use crate::elliptic::{r_d, r_f};
-use crate::solve::{brent, maximise, Tol};
+use crate::solve::{brent, greatest, Tol};
 use std::f64::consts::PI;
 
 /// The contact patch and the pressure in it.
@@ -465,7 +465,7 @@ fn curvature_ratio(kappa: f64) -> Option<f64> {
 ///
 /// The largest von Mises stress under a Hertz patch lies below the centre,
 /// on the axis, and its depth has no closed form: this is a bracketed 1-D
-/// maximisation over depth ([`maximise`]) of the stress field on that axis.
+/// maximisation over depth ([`greatest`], ends compared) of the stress field on that axis.
 /// Only the field is closed form, and only at the two ends:
 ///
 /// - `κ = 0`, line contact in plane strain (McEwen): on the axis, with
@@ -477,11 +477,18 @@ fn curvature_ratio(kappa: f64) -> Option<f64> {
 ///   sweep stopped. `C = 1.60` at `κ = 1` and `ν = 0.3` (Johnson, *Contact
 ///   Mechanics*, 4.2, to three figures; 1.6128 here), and it tends to the line's as `κ → 0`.
 ///
-/// `None` outside `0 ≤ κ ≤ 1` or `0 ≤ ν < 0.5`, or if the maximum is not
-/// found inside the depths searched.
+/// **Where the peak is.** Below the surface for the common solids; **at**
+/// the surface for a line contact on a material whose ν is below about
+/// 0.195 (at ν = 0 the surface's is `p₀` against 0.55 `p₀` below it), and
+/// for a patch on an auxetic one. So the depth searched runs from the
+/// surface, both ends compared, down to where the field can no longer reach
+/// what it reached already ([`deepest_peak`]).
+///
+/// `None` outside `0 ≤ κ ≤ 1`, or for a ν no isotropic solid has
+/// ([`crate::input::POISSONS_RATIO`], the one bound on it).
 #[must_use]
 pub fn first_yield_factor(kappa: f64, nu: f64) -> Option<f64> {
-    if !(0.0..=1.0).contains(&kappa) || !(0.0..0.5).contains(&nu) {
+    if !(0.0..=1.0).contains(&kappa) || !crate::input::POISSONS_RATIO.admits(nu) {
         return None;
     }
     // A pure function of two numbers, asked for the same patch in every case
@@ -510,18 +517,28 @@ pub fn first_yield_factor(kappa: f64, nu: f64) -> Option<f64> {
 type Remembered = ((u64, u64), Option<f64>);
 
 fn first_yield_uncached(kappa: f64, nu: f64) -> Option<f64> {
-    // Depths in the minor semi-axis: the peak sits at 0.48 (circle) to 0.79
-    // (line) of it for any ν in range, well inside [0.1, 2].
-    let (_, peak) = maximise(
-        |z| von_mises(axis_stress(kappa, nu, z)),
-        0.1,
-        2.0,
-        Tol {
-            x_tol: 1e-7,
-            max_iter: 200,
-        },
-    )?;
+    let at = |z: f64| Some(von_mises(axis_stress(kappa, nu, z))).filter(|v| v.is_finite());
+    let (_, peak) = greatest(at, 0.0, deepest_peak(&at)?)?;
     Some(1.0 / peak)
+}
+
+/// **Below this depth, in minor semi-axes, the field cannot reach what it
+/// reached already**, so the peak is above it.
+///
+/// On the axis the three stresses are principal, and none exceeds twice the
+/// normal one, `|σ_z|`, in magnitude — the in-plane pair are each at most
+/// `|σ_z|` and the third is ν times their sum, `|ν| < 1` — while `|σ_z|`
+/// is at most the line's `p₀/√(1+ζ²)`, a patch of finite length spreading
+/// the same peak pressure over less. Three principal stresses within `±M`
+/// give a von Mises stress of at most `√3·M`, so at depth `ζ` it is at most
+/// `2√3/√(1+ζ²)` of `p₀`. Any value the field has — the larger of the
+/// surface's and one semi-axis down's — is then only reached above
+/// `ζ = √((2√3/v)² − 1)`. `first_yields_peak_lies_above_the_derived_depth`
+/// holds the envelope over the patches and ratios admitted.
+fn deepest_peak(at: &dyn Fn(f64) -> Option<f64>) -> Option<f64> {
+    let reached = at(0.0)?.max(at(1.0)?);
+    let envelope = 2.0 * 3.0_f64.sqrt();
+    Some(((envelope / reached).powi(2) - 1.0).sqrt())
 }
 
 /// Von Mises equivalent of three principal stresses.
@@ -539,7 +556,27 @@ fn axis_stress(kappa: f64, nu: f64, z: f64) -> [f64; 3] {
         let sz = -1.0 / q;
         return [sx, nu * (sx + sz), sz];
     }
+    if z == 0.0 {
+        return surface_centre_stress(kappa, nu);
+    }
     ellipse_axis_stress(kappa, nu, z)
+}
+
+/// **The stresses at the centre of an elliptical patch, on its surface**,
+/// over `p₀` — semi-axes `1/κ` along `x` and 1 along `y`, as
+/// [`ellipse_axis_stress`] has them — in closed form (Johnson, *Contact
+/// Mechanics*, 7.5): `σ_x = −(2ν + (1−2ν) κ/(1+κ))`,
+/// `σ_y = −(2ν + (1−2ν)/(1+κ))`, `σ_z = −1`. The quadrature's point-load
+/// kernel is singular there, its panels graded about a depth of nought,
+/// so the surface is read here; `the_surface_is_the_quadratures_limit` holds
+/// the two together as the depth closes.
+fn surface_centre_stress(kappa: f64, nu: f64) -> [f64; 3] {
+    let shear_free = 1.0 - 2.0 * nu;
+    [
+        -(2.0 * nu + shear_free * kappa / (1.0 + kappa)),
+        -(2.0 * nu + shear_free / (1.0 + kappa)),
+        -1.0,
+    ]
 }
 
 /// Gauss–Legendre nodes and weights on `[-1, 1]`, by Newton on `P_n`.
@@ -1091,6 +1128,84 @@ mod tests {
             }
         }
         assert_eq!(checked, 3 * 7);
+    }
+
+    /// **The surface's closed form is the quadrature's limit** — the switch
+    /// at the patch's centre continuous: at a depth of 1e-6 semi-axes the
+    /// summed field is the surface's to 1e-5, over the long ellipse, a middling
+    /// one and the circle, and ν across its range; the circle's to its own
+    /// closed form at the surface, `−(1+2ν)/2`.
+    #[test]
+    fn the_surface_is_the_quadratures_limit() {
+        let mut asked = 0;
+        for kappa in [0.05, 0.5, 1.0] {
+            for nu in [-0.9, 0.0, 0.3, 0.5] {
+                let at = ellipse_axis_stress(kappa, nu, 1e-6);
+                let surface = surface_centre_stress(kappa, nu);
+                for (q, c) in at.iter().zip(surface) {
+                    assert!(
+                        (q - c).abs() < 1e-5,
+                        "κ {kappa} ν {nu}: {at:?} vs {surface:?}"
+                    );
+                }
+                asked += 1;
+            }
+        }
+        assert_eq!(asked, 12);
+        let circle = surface_centre_stress(1.0, 0.3);
+        assert!((circle[0] + 0.8).abs() < 1e-15 && (circle[1] + 0.8).abs() < 1e-15);
+    }
+
+    /// **The first-yield depth search holds the peak for every patch and
+    /// every ν a solid can have**, the surface included. Against an oracle
+    /// that shares nothing with the search but the field: the greatest von
+    /// Mises stress over 4,001 depths from the surface to eight semi-axes,
+    /// refined by golden section about the best sample. Over κ from the line
+    /// to the circle and ν from −0.99 to ½ — the surface governs a line below
+    /// ν ≈ 0.195 and an auxetic patch; ½ is the incompressible end — `C` is
+    /// the oracle's to 1e-9. The envelope the search's depth is derived from,
+    /// `2√3/√(1+ζ²)`, is held at every sampled depth. Near miss: the search
+    /// as it was, between 0.1 and 2 semi-axes, finds no peak on a line at
+    /// ν = 0.1 (the flank went unjudged) and at ν = 0.17 the interior one,
+    /// short of the surface's — `C` 1.59 for 1.52, the allowable 5 % high.
+    #[test]
+    fn first_yields_peak_lies_above_the_derived_depth() {
+        let mut asked = 0;
+        for kappa in [0.0, 1e-3, 0.01, 0.1, 0.3, 0.5, 0.8, 1.0] {
+            for nu in [
+                -0.99, -0.5, 0.0, 0.1, 0.13, 0.17, 0.195, 0.2, 0.3, 0.45, 0.5,
+            ] {
+                let at = |z: f64| von_mises(axis_stress(kappa, nu, z));
+                let (mut best, mut arg) = (f64::MIN, 0.0);
+                for i in 0..=4000 {
+                    let z = 8.0 * f64::from(i) / 4000.0;
+                    let v = at(z);
+                    assert!(
+                        v <= 2.0 * 3.0_f64.sqrt() / (1.0 + z * z).sqrt() + 1e-12,
+                        "κ {kappa} ν {nu} ζ {z}: {v} above the envelope"
+                    );
+                    if v > best {
+                        (best, arg) = (v, z);
+                    }
+                }
+                let step = 8.0 / 4000.0;
+                let (lo, hi) = ((arg - step).max(0.0), arg + step);
+                let oracle = crate::solve::greatest(|z| Some(at(z)), lo, hi).unwrap().1;
+                let c = first_yield_factor(kappa, nu)
+                    .unwrap_or_else(|| panic!("κ {kappa} ν {nu}: no factor"));
+                assert!(
+                    (c - 1.0 / oracle).abs() <= 1e-9 * c,
+                    "κ {kappa} ν {nu}: C {c} against the oracle's {}",
+                    1.0 / oracle
+                );
+                asked += 1;
+            }
+        }
+        assert_eq!(asked, 8 * 11);
+        // The one bound on ν is the table's: its ends and past them.
+        assert!(first_yield_factor(0.0, 0.5).is_some());
+        assert!(first_yield_factor(0.0, -1.0).is_none());
+        assert!(first_yield_factor(0.0, 0.5_f64.next_up()).is_none());
     }
 
     /// **`C` at its two published values, and continuous between them.**

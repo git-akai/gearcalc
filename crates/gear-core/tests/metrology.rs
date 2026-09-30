@@ -1059,7 +1059,7 @@ fn the_span_is_what_a_caliper_reads_off_the_drawn_teeth() {
 
             let mut previous = f64::MAX;
             for per_tooth in [900_usize, 3600] {
-                let pts = gear.profile(per_tooth);
+                let pts = gear.profile(per_tooth).unwrap();
                 let (mut lo, mut hi) = (f64::MAX, f64::MIN);
                 for q in &pts {
                     // Only the teeth the caliper is over. The bounds are the two
@@ -1316,4 +1316,91 @@ fn over_pins_around_reads_exactly_where_its_bound_admits() {
         }
     }
     assert_eq!(asked, 5 * 25 * 2);
+}
+
+/// **A concentric gear's readings round the revolution are one reading, and
+/// its spans are found without asking every count** — the same answers, to
+/// the bit, as asking every position and every count: over tooth counts
+/// from 5 to 400, shifts either side of nought, both helices and two
+/// pressure angles, the best span and its range is the one a scan of
+/// every count at every position finds (the scan as it was: first
+/// smallest offset from the pitch circle wins). And a gear of every tooth
+/// a wire's count carries answers at once, its teeth built once.
+#[test]
+fn a_concentric_gears_readings_are_one_reading_found_without_a_scan() {
+    use gear_core::gear::Gear;
+    use gear_core::metrology::{best_span_around, span_over_teeth_at};
+    let scan = |gear: &Gear| {
+        let z = gear.teeth();
+        let r = gear.mean().r;
+        let mut best: Option<(u32, f64, [f64; 2], f64)> = None;
+        for k in 1..=gear.mean().params.teeth {
+            let mut spans = Vec::new();
+            for j in 0..z {
+                match span_over_teeth_at(gear, j, k) {
+                    Some(s) => spans.push(s),
+                    None => {
+                        spans.clear();
+                        break;
+                    }
+                }
+            }
+            if spans.is_empty() {
+                continue;
+            }
+            let lo = spans.iter().map(|s| s.nominal).fold(f64::MAX, f64::min);
+            let hi = spans.iter().map(|s| s.nominal).fold(f64::MIN, f64::max);
+            let worst = spans
+                .iter()
+                .map(|s| (s.contact_radius - r).abs())
+                .fold(0.0_f64, f64::max);
+            if best.is_none_or(|(_, _, _, w)| worst < w) {
+                best = Some((k, spans[0].nominal, [lo, hi], worst));
+            }
+        }
+        best.map(|(k, n, range, _)| (k, n, range))
+    };
+    let mut asked = 0;
+    for teeth in [5_u32, 9, 17, 43, 100, 257, 400] {
+        for shift in [-0.4, 0.0, 0.6] {
+            for helix in [0.0, 25.0] {
+                for alpha in [14.5, 25.0] {
+                    let g = Gear::new(GearParams {
+                        teeth,
+                        profile_shift: shift,
+                        helix_angle: helix,
+                        pressure_angle: alpha,
+                        ..GearParams::default()
+                    });
+                    assert!(g.is_concentric());
+                    let fast = best_span_around(&g)
+                        .ok()
+                        .map(|(s, range)| (s.teeth_spanned, s.nominal, range));
+                    let bits = |x: Option<(u32, f64, [f64; 2])>| {
+                        x.map(|(k, n, [a, b])| (k, n.to_bits(), a.to_bits(), b.to_bits()))
+                    };
+                    assert_eq!(
+                        bits(fast),
+                        bits(scan(&g)),
+                        "z {teeth} x {shift} β {helix} α {alpha}"
+                    );
+                    asked += 1;
+                }
+            }
+        }
+    }
+    assert_eq!(asked, 7 * 3 * 2 * 2);
+    // Every tooth a wire's count carries: one tooth built, and every reading
+    // taken at once.
+    let huge = Gear::new(GearParams {
+        teeth: u32::MAX,
+        ..GearParams::default()
+    });
+    assert_eq!(huge.distinct_teeth(), 1);
+    let span = best_span_around(&huge).expect("a span on the largest gear");
+    assert!(span.0.nominal.is_finite() && span.1[0] == span.1[1]);
+    assert!(gear_core::metrology::pin_diameter_range_around(&huge).is_some());
+    assert!(huge.per_tooth_clamps().teeth.is_empty());
+    let v = huge.variation();
+    assert_eq!((v.drive_pitch_error, v.drive_index_error), (0.0, 0.0));
 }

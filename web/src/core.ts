@@ -204,20 +204,36 @@ import init, {
   edit_train,
   adopt_member,
   last_panic,
+  type InitOutput,
 } from "./wasm/gear_wasm.js";
 import { failureDetail, said, wire } from "./boundary";
 
-/** **A call into the core, its trap said.** A panic in Rust is a trap here —
- *  a `WebAssembly.RuntimeError` saying only "unreachable" — so the words the
- *  panic had are read back (`last_panic`, which the hook the module installs
- *  at start keeps) and thrown on in its place, for the caller's
- *  `boundaryFailure` to say. Every entry goes through this one wrapper, so
- *  none says less. */
-function core<T>(call: () => T): T {
+/** The instance's own exports, kept at load: what a trap's aftermath is
+ *  repaired through. */
+let raw: InitOutput | null = null;
+
+/** **A call into the core, its trap said and its stack put back.** A panic in
+ *  Rust is a trap here — a `WebAssembly.RuntimeError` saying only
+ *  "unreachable" — so the words the panic had are read back (`last_panic`,
+ *  which the hook the module installs at start keeps) and thrown on in its
+ *  place, for the caller's `boundaryFailure` to say.
+ *
+ *  **A trap unwinds nothing**: the frames the call pushed onto the module's
+ *  own stack stay pushed, and after a few hundred traps every call — and
+ *  `last_panic` itself — finds no stack left and reads out of bounds. So the
+ *  stack pointer is read before each call and put back after a trap, which
+ *  is everything a returning call would have done. Every entry goes through
+ *  this one wrapper, so none says less; exported so a test can hand it a
+ *  trap. */
+export function guarded<T>(call: () => T): T {
+  const stack = raw?.__wbindgen_add_to_stack_pointer(0);
   try {
     return call();
   } catch (e) {
     if (!(e instanceof WebAssembly.RuntimeError)) throw e;
+    if (raw && stack !== undefined) {
+      raw.__wbindgen_add_to_stack_pointer(stack - raw.__wbindgen_add_to_stack_pointer(0));
+    }
     let words = "";
     try {
       words = last_panic();
@@ -227,6 +243,7 @@ function core<T>(call: () => T): T {
     throw new Error(words || e.message);
   }
 }
+const core = guarded;
 
 /** **A call into the core that failed**, as the catalogue words it: the
  *  front end's own key, since nothing in Rust can emit it — it means the call
@@ -517,7 +534,8 @@ export function setLanguage(tag: string): void {
 /** Load the core once. Safe to await repeatedly. */
 export function loadCore(): Promise<void> {
   if (!ready) {
-    ready = init().then(() => {
+    ready = init().then((exports) => {
+      raw = exports;
       cachedDefaults = JSON.parse(wasm_defaults()) as Defaults;
       setLanguages(JSON.parse(wasm_languages()) as LanguageOption[]);
       // A stored preference, else what the browser asks for. Neither needs

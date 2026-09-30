@@ -286,7 +286,7 @@ And elsewhere:
   assumed. It is where a law belongs that decides it: a profile law wants the
   whole grid `tests/common` builds, a guard's value wants a recorded output,
   and a law about a shape wants every preset.
-- **Two notes nothing can fire** are named in `strings.rs`'s `UNFIRED` with
+- **The notes nothing can fire** are named in `strings.rs`'s `UNFIRED` with
   their evidence. Live code, a live message, deliberately not deleted on
   suspicion — and the evidence carries the breadth of the search that found
   nothing, because an absence has a date. A note whose *site* goes, goes with

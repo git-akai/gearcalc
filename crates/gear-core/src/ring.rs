@@ -830,8 +830,12 @@ impl Ring {
     /// The outline of the *material's inner boundary*: a ring's teeth point
     /// inward, so this traces the bore, and whatever rim sits outside it is the
     /// designer's business rather than the tooth geometry's.
-    #[must_use]
-    pub fn profile(&self, per_tooth: usize) -> Vec<[f64; 2]> {
+    ///
+    /// # Errors
+    ///
+    /// [`crate::input::Refused::past_memory`], naming `teeth`, where the
+    /// outline is more points than the machine's memory holds.
+    pub fn profile(&self, per_tooth: usize) -> Result<Vec<[f64; 2]>, crate::input::Refused> {
         let half = self.half_profile((per_tooth / 2).max(8));
 
         let mut full: Vec<(f64, f64)> = half.iter().rev().map(|&(r, t)| (r, -t)).collect();
@@ -840,7 +844,14 @@ impl Ring {
         full.extend(half.iter().skip(1));
 
         let z = self.teeth;
-        let mut out = Vec::with_capacity(full.len() * z as usize + 1);
+        let past = || crate::input::Refused::past_memory("teeth", f64::from(z));
+        let points = full
+            .len()
+            .checked_mul(usize::try_from(z).map_err(|_| past())?)
+            .and_then(|n| n.checked_add(1))
+            .ok_or_else(past)?;
+        let mut out = Vec::new();
+        crate::input::room(&mut out, points, "teeth", f64::from(z))?;
         for k in 0..z {
             let base = 2.0 * std::f64::consts::PI * f64::from(k) / f64::from(z);
             for &(r, t) in &full {
@@ -851,7 +862,7 @@ impl Ring {
         if let Some(&first) = out.first() {
             out.push(first);
         }
-        out
+        Ok(out)
     }
 }
 
@@ -1649,7 +1660,7 @@ mod tests {
     fn the_profile_closes_and_stays_between_the_tip_and_the_root() {
         for teeth in [43u32, 60, 90] {
             let g = ring(teeth);
-            let outline = g.profile(120);
+            let outline = g.profile(120).unwrap();
             assert!(
                 outline.len() > 100,
                 "z={teeth}: only {} points",
@@ -1693,11 +1704,13 @@ mod tests {
         });
         let ring_max = g
             .profile(120)
+            .unwrap()
             .iter()
             .map(|[x, y]| f64::hypot(*x, *y))
             .fold(0.0_f64, f64::max);
         let ext_max = crate::gear::Gear::new(external.params)
             .profile(120)
+            .unwrap()
             .iter()
             .map(|[x, y]| f64::hypot(*x, *y))
             .fold(0.0_f64, f64::max);

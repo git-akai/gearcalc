@@ -35,6 +35,7 @@
 //! chord tolerance passed to [`gear_core::gear::Gear::outline`].
 
 use gear_core::gear::Gear;
+use gear_core::input::Refused;
 use gear_core::outline::Envelope;
 use gear_core::ring::Ring;
 use gear_core::Vertex;
@@ -71,6 +72,9 @@ impl Default for DxfOptions {
 struct Writer {
     out: String,
     next: u32,
+    /// Whether a tag found no room: the drawing is more than the machine's
+    /// memory holds, and is refused rather than written in part.
+    full: bool,
 }
 
 impl Writer {
@@ -81,11 +85,16 @@ impl Writer {
             // *point at* are named in `handle` below and take the low numbers;
             // everything else counts up from here, so the two cannot collide.
             next: handle::FIRST_COUNTED,
+            full: false,
         }
     }
 
     fn tag(&mut self, code: i32, value: &str) {
-        self.out.push_str(&format!("{code}\n{value}\n"));
+        let tag = format!("{code}\n{value}\n");
+        self.full = self.full || self.out.try_reserve(tag.len()).is_err();
+        if !self.full {
+            self.out.push_str(&tag);
+        }
     }
 
     fn int(&mut self, code: i32, value: i32) {
@@ -120,11 +129,16 @@ impl Writer {
 /// and the tip and root envelopes all come from the one [`Gear`] handed in —
 /// the tooth the panel quotes is its mean — so nothing drawn is a second gear
 /// the writer built for itself.
-#[must_use]
-pub fn gear_to_dxf(gear: &Gear, opts: &DxfOptions) -> String {
+///
+/// # Errors
+///
+/// [`Refused::past_memory`], naming `teeth`, where the drawing is more than
+/// the machine's memory holds.
+pub fn gear_to_dxf(gear: &Gear, opts: &DxfOptions) -> Result<String, Refused> {
     let mean = gear.mean();
+    let teeth = f64::from(mean.params.teeth);
     outline_to_dxf(
-        &gear.outline(opts.chord_tolerance),
+        &gear.outline(opts.chord_tolerance)?,
         &[
             Envelope::circle(mean.r),
             Envelope::circle(mean.rb),
@@ -132,6 +146,7 @@ pub fn gear_to_dxf(gear: &Gear, opts: &DxfOptions) -> String {
             gear.root_envelope(opts.chord_tolerance),
         ],
         opts,
+        teeth,
     )
 }
 
@@ -140,17 +155,22 @@ pub fn gear_to_dxf(gear: &Gear, opts: &DxfOptions) -> String {
 /// A ring exports the outline of its **bore**: its teeth point inward, so what
 /// this traces is the hole, and whatever rim sits outside it is the designer's
 /// business rather than the tooth geometry's.
-#[must_use]
-pub fn ring_to_dxf(ring: &Ring, opts: &DxfOptions) -> String {
+///
+/// # Errors
+///
+/// [`Refused::past_memory`], naming `teeth`, where the drawing is more than
+/// the machine's memory holds.
+pub fn ring_to_dxf(ring: &Ring, opts: &DxfOptions) -> Result<String, Refused> {
     // The rim circle joins the reference circles on the construction layer
     // rather than the profile layer: it is where the *drawing* shades the
     // material to, and a real ring's outside diameter is the designer's
     // (`Ring::rim_radius`). Putting it on the profile layer would hand CAD a
     // boundary nobody chose.
     outline_to_dxf(
-        &ring.outline(opts.chord_tolerance),
+        &ring.outline(opts.chord_tolerance)?,
         &[ring.r, ring.rb, ring.ra, ring.rf, ring.rim_radius()].map(Envelope::circle),
         opts,
+        f64::from(ring.teeth),
     )
 }
 
@@ -159,7 +179,12 @@ pub fn ring_to_dxf(ring: &Ring, opts: &DxfOptions) -> String {
 /// Both gear kinds come through here. The writer has no reason to know which it
 /// is holding — a polyline is a polyline and a circle a circle — and keeping it
 /// that way is what stops a second export path growing its own quirks.
-fn outline_to_dxf(outline: &[Vertex], references: &[Envelope], opts: &DxfOptions) -> String {
+fn outline_to_dxf(
+    outline: &[Vertex],
+    references: &[Envelope],
+    opts: &DxfOptions,
+    teeth: f64,
+) -> Result<String, Refused> {
     let mut w = Writer::new();
     header(&mut w);
     classes(&mut w);
@@ -182,7 +207,10 @@ fn outline_to_dxf(outline: &[Vertex], references: &[Envelope], opts: &DxfOptions
     objects(&mut w);
 
     w.tag(0, "EOF");
-    w.out
+    if w.full {
+        return Err(Refused::past_memory("teeth", teeth));
+    }
+    Ok(w.out)
 }
 
 /// The handles of the records that other records point at.
@@ -516,6 +544,7 @@ mod tests {
                 reference_circles: true,
             },
         )
+        .unwrap()
     }
 
     fn tags(dxf: &str) -> Vec<(i32, String)> {
@@ -538,7 +567,7 @@ mod tests {
     #[test]
     fn structure_is_well_formed() {
         let g = Gear::new(GearParams::default());
-        let dxf = gear_to_dxf(&g, &DxfOptions::default());
+        let dxf = gear_to_dxf(&g, &DxfOptions::default()).unwrap();
         let t = tags(&dxf);
 
         // sections open and close in pairs, and the file ends with EOF
@@ -649,14 +678,15 @@ mod tests {
     #[test]
     fn the_file_meets_the_r2000_minimum() {
         for dxf in [
-            gear_to_dxf(&Gear::new(GearParams::default()), &DxfOptions::default()),
+            gear_to_dxf(&Gear::new(GearParams::default()), &DxfOptions::default()).unwrap(),
             gear_to_dxf(
                 &Gear::new(GearParams::default()),
                 &DxfOptions {
                     reference_circles: false,
                     ..DxfOptions::default()
                 },
-            ),
+            )
+            .unwrap(),
             ring_to_dxf(
                 &gear_core::ring::Ring::cut_by(
                     &GearParams {
@@ -666,7 +696,8 @@ mod tests {
                     &gear_core::ring::Cutter::default(),
                 ),
                 &DxfOptions::default(),
-            ),
+            )
+            .unwrap(),
         ] {
             let t = tags(&dxf);
 
@@ -766,7 +797,7 @@ mod tests {
     /// may hand out, so it has to be above every handle written here.
     #[test]
     fn the_handle_graph_closes() {
-        let dxf = gear_to_dxf(&Gear::new(GearParams::default()), &DxfOptions::default());
+        let dxf = gear_to_dxf(&Gear::new(GearParams::default()), &DxfOptions::default()).unwrap();
         let t = tags(&dxf);
 
         let seed_at = t
@@ -832,14 +863,15 @@ mod tests {
             teeth: 9,
             ..Default::default()
         });
-        let want = g.outline(1e-3);
+        let want = g.outline(1e-3).unwrap();
         let dxf = gear_to_dxf(
             &g,
             &DxfOptions {
                 chord_tolerance: 1e-3,
                 reference_circles: false,
             },
-        );
+        )
+        .unwrap();
         let t = entities(&tags(&dxf));
 
         let count = t
@@ -881,14 +913,16 @@ mod tests {
                 reference_circles: true,
                 ..Default::default()
             },
-        );
+        )
+        .unwrap();
         let without = gear_to_dxf(
             &g,
             &DxfOptions {
                 reference_circles: false,
                 ..Default::default()
             },
-        );
+        )
+        .unwrap();
         assert_eq!(
             tags(&with)
                 .iter()
@@ -927,7 +961,7 @@ mod tests {
             },
             &Cutter::default(),
         );
-        let with = ring_to_dxf(&ring, &DxfOptions::default());
+        let with = ring_to_dxf(&ring, &DxfOptions::default()).unwrap();
         let radii: Vec<f64> = entities(&tags(&with))
             .iter()
             .filter(|(c, _)| *c == 40)
@@ -951,7 +985,8 @@ mod tests {
                 reference_circles: false,
                 ..DxfOptions::default()
             },
-        );
+        )
+        .unwrap();
         assert_eq!(
             tags(&without)
                 .iter()
@@ -967,14 +1002,15 @@ mod tests {
             teeth: 12,
             ..Default::default()
         });
-        let outline = g.outline(1e-3);
+        let outline = g.outline(1e-3).unwrap();
         let dxf = gear_to_dxf(
             &g,
             &DxfOptions {
                 chord_tolerance: 1e-3,
                 reference_circles: false,
             },
-        );
+        )
+        .unwrap();
         let n_bulge_written = entities(&tags(&dxf))
             .iter()
             .filter(|(c, _)| *c == 42)

@@ -1819,8 +1819,12 @@ impl Indexed<'_> {
             // close in. Inward, the involute domain may end before the room
             // does; the shifts' own distance then stands, the tips asking
             // nothing of it.
+            // Steps a hundredth of the distance itself, so a watch's mesh
+            // is walked as a gearbox's is: a floor of a millimetre here
+            // walked a 0.01-module planocentric's past the involute domain
+            // at the first step, and refused it as no distance clearing.
             let (mut lo, mut hi) = (from, from);
-            let mut step = from.abs().max(1.0) * 0.01;
+            let mut step = from.abs() * 0.01;
             let mut found = false;
             if room < 0.0 {
                 // No internal mesh runs more than a couple of reference
@@ -1859,7 +1863,7 @@ impl Indexed<'_> {
                         // Below the involute domain on some mesh: come back
                         // out, by halves, until the step is nothing.
                         step *= 0.5;
-                        if step < 1e-12 * from.abs().max(1.0) {
+                        if step < 1e-12 * from.abs() {
                             break;
                         }
                         continue;

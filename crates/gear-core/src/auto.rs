@@ -679,7 +679,10 @@ pub fn admissible_angular_shift(p: &GearParams) -> Bound {
     };
 
     let amplitude = by_spread.min(by_sink).max(0.0);
-    Bound::between(Some(-amplitude), Some(amplitude))
+    // A one-toothed gear with nothing to bind it has no bound either side:
+    // absent, and no infinity standing for it.
+    let side = |a: f64| a.is_finite().then_some(a);
+    Bound::between(side(-amplitude), side(amplitude))
 }
 
 /// The ranges for a gear cut at one shift — every tooth of a concentric gear,

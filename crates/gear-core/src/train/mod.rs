@@ -3043,7 +3043,13 @@ pub fn allowable(material: &Material, rating: Rating, kind: CaseKind) -> Option<
         (Rating::Contact { .. }, CaseKind::Fatigue) => material.flank_endurance().map(|v| v.value),
         (Rating::Contact { aspect }, CaseKind::Ultimate) => (material.ultimate_measure
             == crate::material::Measure::Yield)
-            .then(|| crate::hertz::first_yield_factor(aspect, material.poissons_ratio.value))
+            .then(|| {
+                // Every patch and every ν the table admits has a first yield:
+                // a figure at break is the one reason there is none.
+                let c = crate::hertz::first_yield_factor(aspect, material.poissons_ratio.value);
+                debug_assert!(c.is_some(), "no first yield at κ {aspect}: {material:?}");
+                c
+            })
             .flatten()
             .map(|c| c * material.ultimate_allowable.value),
     }
@@ -3827,7 +3833,18 @@ fn paths_of(
         let mut out = vec![None; train.shape.members.len()];
         for (k, part) in parts.iter().enumerate() {
             for i in 0..part.shape.members.len() {
-                let raising = |j: usize, m: usize, z: u32| if (j, m) == (k, i) { z + 1 } else { z };
+                // No count past the wire's `u32` to ask: that gear has no
+                // tooth more.
+                if part.shape.members[i].gear.teeth == u32::MAX {
+                    continue;
+                }
+                let raising = |j: usize, m: usize, z: u32| {
+                    if (j, m) == (k, i) {
+                        z.saturating_add(1)
+                    } else {
+                        z
+                    }
+                };
                 let raised = train.system_counting(parts, raising).ok().and_then(|sys| {
                     let mut c: Vec<Condition> = base.to_vec();
                     c[from] = Condition::Drive(crate::ratio::Ratio::ONE);

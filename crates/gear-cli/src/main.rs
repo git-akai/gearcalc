@@ -27,6 +27,7 @@ mod identity;
 mod kinematics;
 mod matrix;
 
+use gear_core::input::{FIGURE, HELIX_ANGLE, MODULE, POSITIVE, PRESSURE_ANGLE, SHAFT_ANGLE};
 use gear_core::train::arrangements as arr;
 use gear_core::{GearParams, Tooth};
 
@@ -382,6 +383,26 @@ fn refuse(why: &dyn std::fmt::Display) -> ! {
     std::process::exit(2)
 }
 
+/// **A positional figure, or its default where absent, held to the bound the
+/// input table holds for what it is** (`gear_core::input`): refused naming
+/// `field` where it is past it.
+fn num(args: &[String], n: usize, default: f64, field: &str, bound: gear_core::auto::Bound) -> f64 {
+    let v = arg(args, n, default);
+    if let Err(e) = gear_core::input::scalar(field, v, bound) {
+        refuse(&e);
+    }
+    v
+}
+
+/// ...and a count, held to the table's bound on every count.
+fn count(args: &[String], n: usize, default: u32, field: &str) -> u32 {
+    let v: u32 = arg(args, n, default);
+    if let Err(e) = gear_core::input::scalar(field, f64::from(v), gear_core::input::COUNT) {
+        refuse(&e);
+    }
+    v
+}
+
 /// **A gear as the harness is asked it**, read against the table every entry
 /// reads it through (`gear_core::input::GEAR`): refused naming the field.
 fn asked(p: GearParams) -> GearParams {
@@ -436,12 +457,12 @@ const COMMANDS: &[Command] = &[
         summary: "a worked mesh: bending, contact, efficiency (17, 43, 2 N·m)",
         run: |a| {
             strength_report(
-                arg(a, 1, 17),
-                arg(a, 2, 43),
-                arg(a, 3, 2.0),
+                count(a, 1, 17, "z1"),
+                count(a, 2, 43, "z2"),
+                num(a, 3, 2.0, "torque", FIGURE),
                 a.get(4).map_or("4340 Hardened Steel", String::as_str),
-                arg(a, 5, 0.0),
-                opt(a, 6),
+                num(a, 5, 0.0, "helix", HELIX_ANGLE),
+                opt::<f64>(a, 6).map(|_| num(a, 6, 0.0, "rim", POSITIVE)),
             );
         },
         record: Record::Cases(&["strength 17 43 2.0"]),
@@ -453,12 +474,12 @@ const COMMANDS: &[Command] = &[
         summary: "one pair's figures at full precision, for `tools/iso_6336_3_stack.py` (17, 43, 20°, 0°, 0, 0, 10 mm, 2 N·m)",
         run: |a| {
             iso_report(
-                [arg(a, 1, 17), arg(a, 2, 43)],
-                arg(a, 3, 20.0),
-                arg(a, 4, 0.0),
-                [arg(a, 5, 0.0), arg(a, 6, 0.0)],
-                arg(a, 7, 10.0),
-                arg(a, 8, 2.0),
+                [count(a, 1, 17, "z1"), count(a, 2, 43, "z2")],
+                num(a, 3, 20.0, "alpha", PRESSURE_ANGLE),
+                num(a, 4, 0.0, "helix", HELIX_ANGLE),
+                [num(a, 5, 0.0, "x1", FIGURE), num(a, 6, 0.0, "x2", FIGURE)],
+                num(a, 7, 10.0, "face", POSITIVE),
+                num(a, 8, 2.0, "torque", FIGURE),
             );
         },
         record: Record::Cases(&["iso 17 43", "iso 17 43 20 20"]),
@@ -520,7 +541,7 @@ const COMMANDS: &[Command] = &[
             if a.get(1).map(String::as_str) == Some("epicyclic") {
                 epicyclic_shifts_report();
             } else {
-                shifts_report(arg(a, 1, 9), arg(a, 2, 37));
+                shifts_report(count(a, 1, 9, "z1"), count(a, 2, 37, "z2"));
             }
         },
         // **Two pairs, because the documented table has two rows** — and an
@@ -591,7 +612,14 @@ const COMMANDS: &[Command] = &[
         name: "worm",
         args: "[starts] [z_wheel] [d_worm] [shaft angle]",
         summary: "a worm pair, both directions (1, 40, 7 mm, 90°)",
-        run: |a| worm_report(arg(a, 1, 1), arg(a, 2, 40), arg(a, 3, 7.0), arg(a, 4, 90.0)),
+        run: |a| {
+            worm_report(
+                count(a, 1, 1, "starts"),
+                count(a, 2, 40, "z_wheel"),
+                num(a, 3, 7.0, "d_worm", POSITIVE),
+                num(a, 4, 90.0, "shaft angle", SHAFT_ANGLE),
+            );
+        },
         record: Record::Cases(&["worm 1 40 7 90"]),
         slow: false
     },
@@ -600,7 +628,12 @@ const COMMANDS: &[Command] = &[
         args: "[starts] [z_wheel] [d_worm] [torque]",
         summary: "a worm stage, end to end (1, 40, 7 mm, 2 N·m)",
         run: |a| {
-            worm_stage_report(arg(a, 1, 1), arg(a, 2, 40), arg(a, 3, 7.0), arg(a, 4, 2.0));
+            worm_stage_report(
+                count(a, 1, 1, "starts"),
+                count(a, 2, 40, "z_wheel"),
+                num(a, 3, 7.0, "d_worm", POSITIVE),
+                num(a, 4, 2.0, "torque", FIGURE),
+            );
         },
         record: Record::Cases(&["wormstage 1 40 7 2"]),
         slow: false
@@ -609,7 +642,13 @@ const COMMANDS: &[Command] = &[
         name: "crossed",
         args: "[z1] [z2] [shaft angle]",
         summary: "a crossed pair, swept over the helix split (17, 23, 90°)",
-        run: |a| crossed_report(arg(a, 1, 17), arg(a, 2, 23), arg(a, 3, 90.0)),
+        run: |a| {
+            crossed_report(
+                count(a, 1, 17, "z1"),
+                count(a, 2, 23, "z2"),
+                num(a, 3, 90.0, "shaft angle", SHAFT_ANGLE),
+            );
+        },
         record: Record::Cases(&["crossed 17 23 90", "crossed 17 43 5"]),
         slow: false
     },
@@ -619,11 +658,11 @@ const COMMANDS: &[Command] = &[
         summary: "every ring count that can work, and the planet shift each needs (17, 17, 3)",
         run: |a| {
             planetary_report(
-                arg(a, 1, 17),
-                arg(a, 2, 17),
-                arg(a, 3, 3),
-                arg(a, 4, 0.0),
-                arg(a, 5, 0.0),
+                count(a, 1, 17, "z_sun"),
+                count(a, 2, 17, "z_planet"),
+                count(a, 3, 3, "N"),
+                num(a, 4, 0.0, "x_sun", FIGURE),
+                num(a, 5, 0.0, "x_ring", FIGURE),
             );
         },
         record: Record::Cases(&["planetary 17 17 3"]),
@@ -635,11 +674,11 @@ const COMMANDS: &[Command] = &[
         summary: "a planetary stage in all six arrangements (12, 30, 72, 3)",
         run: |a| {
             planetary_stage_report(
-                arg(a, 1, 12),
-                arg(a, 2, 30),
-                arg(a, 3, 72),
-                arg(a, 4, 3),
-                arg(a, 5, 0.0),
+                count(a, 1, 12, "z_sun"),
+                count(a, 2, 30, "z_planet"),
+                count(a, 3, 72, "z_ring"),
+                count(a, 4, 3, "N"),
+                num(a, 5, 0.0, "helix", HELIX_ANGLE),
             );
         },
         record: Record::Cases(&["planetstage 12 30 72 3", "planetstage 24 18 60 3"]),
@@ -651,11 +690,11 @@ const COMMANDS: &[Command] = &[
         summary: "a hula stage: the offset, the shifts it takes, and what the teeth then do (18, 0.5)",
         run: |a| {
             hula_report(
-                arg(a, 1, 18),
-                arg(a, 2, 0.5),
-                arg(a, 3, 1.0),
-                arg(a, 4, 1.0),
-                opt(a, 5),
+                count(a, 1, 18, "N"),
+                num(a, 2, 0.5, "clearance", FIGURE),
+                num(a, 3, 1.0, "m_outer", MODULE),
+                num(a, 4, 1.0, "m_inner", MODULE),
+                opt::<u32>(a, 5).map(|_| count(a, 5, 1, "cutter teeth")),
             );
         },
         record: Record::Cases(&["hula 18 0.2"]),
@@ -665,7 +704,12 @@ const COMMANDS: &[Command] = &[
         name: "hulaband",
         args: "[N] [clearance in modules]",
         summary: "one reduction at every tooth difference, to see what the difference of one costs (18, 0.30)",
-        run: |a| hula_band(arg(a, 1, 18), arg(a, 2, 0.30)),
+        run: |a| {
+            hula_band(
+                count(a, 1, 18, "N"),
+                num(a, 2, 0.30, "clearance in modules", FIGURE),
+            );
+        },
         record: Record::Cases(&["hulaband 18"]),
         slow: true
     },
@@ -674,7 +718,12 @@ const COMMANDS: &[Command] = &[
         args: "[z_ring] [z_pinion] [ring addendum] [pinion addendum]",
         summary: "roll an ordinary internal pair through a tooth — the control (40, 20)",
         run: |a| {
-            mesh_sweep(arg(a, 1, 40), arg(a, 2, 20), arg(a, 3, 1.0), arg(a, 4, 1.0));
+            mesh_sweep(
+                count(a, 1, 40, "z_ring"),
+                count(a, 2, 20, "z_pinion"),
+                num(a, 3, 1.0, "ring addendum", FIGURE),
+                num(a, 4, 1.0, "pinion addendum", FIGURE),
+            );
         },
         record: Record::Cases(&["meshsweep 60 20 0.8"]),
         slow: true
@@ -683,7 +732,13 @@ const COMMANDS: &[Command] = &[
         name: "hulasweep",
         args: "[N] [clearance] [mesh]",
         summary: "the same roll on a hula pair, where the tip circles cross (18, 0.2)",
-        run: |a| hula_sweep(arg(a, 1, 18), arg(a, 2, 0.2), arg(a, 3, 0)),
+        run: |a| {
+            hula_sweep(
+                count(a, 1, 18, "N"),
+                num(a, 2, 0.2, "clearance", FIGURE),
+                arg(a, 3, 0),
+            );
+        },
         record: Record::Cases(&["hulasweep 18 0.25"]),
         slow: true
     },
@@ -1098,8 +1153,14 @@ fn tips_text(tips: Option<gear_core::train::TipRoom>) -> String {
 /// this harness's business.
 fn roll_pair(ring: &gear_core::ring::Ring, pinion: &gear_core::Gear, a: f64, title: &str) {
     const TOLERANCE: f64 = 1e-5;
-    let pin_pts = flatten(&pinion.outline(TOLERANCE));
-    let bore = Boundary::new(&flatten(&ring.outline(TOLERANCE)));
+    let pin_pts = flatten(
+        &pinion
+            .outline(TOLERANCE)
+            .expect("a sweep's pinion is drawn"),
+    );
+    let bore = Boundary::new(&flatten(
+        &ring.outline(TOLERANCE).expect("a sweep's ring is drawn"),
+    ));
 
     let (z1, z2) = (f64::from(pinion.mean().params.teeth), f64::from(ring.teeth));
     // Only the points that could reach the bore are worth testing: everything
@@ -2815,8 +2876,11 @@ fn show(p: GearParams) {
             println!("    - {}", words().render(n));
         }
     }
-    let pts = gear_core::gear::Gear::new(g.params).profile(400);
-    println!("  profile points {:12}", pts.len());
+    let drawn = gear_core::gear::Gear::try_new(g.params).and_then(|g| g.profile(400));
+    match drawn {
+        Ok(pts) => println!("  profile points {:12}", pts.len()),
+        Err(e) => refuse(&e),
+    }
 }
 
 fn sweep() {
@@ -2971,23 +3035,22 @@ fn verify(limit: usize) {
 
 /// Write a DXF to stdout, for inspecting or importing into CAD.
 fn dxf(teeth: u32, x: f64, tol: f64, angular_shift: f64) {
-    let g = gear_core::gear::Gear::new(asked(GearParams {
+    let g = gear_core::gear::Gear::try_new(asked(GearParams {
         teeth,
         profile_shift: x,
         angular_shift,
         ..Default::default()
-    }));
+    }))
+    .unwrap_or_else(|e| refuse(&e));
     chord(tol);
-    print!(
-        "{}",
-        gear_io::gear_to_dxf(
-            &g,
-            &gear_io::DxfOptions {
-                chord_tolerance: tol,
-                reference_circles: true,
-            }
-        )
+    let text = gear_io::gear_to_dxf(
+        &g,
+        &gear_io::DxfOptions {
+            chord_tolerance: tol,
+            reference_circles: true,
+        },
     );
+    print!("{}", text.unwrap_or_else(|e| refuse(&e)));
 }
 
 /// A ring's bore, cut by the default shaper, as a DXF on stdout.
@@ -3001,16 +3064,14 @@ fn dxf_ring(teeth: u32, x: f64, tol: f64) {
         &gear_core::ring::Cutter::default(),
     );
     chord(tol);
-    print!(
-        "{}",
-        gear_io::ring_to_dxf(
-            &ring,
-            &gear_io::DxfOptions {
-                chord_tolerance: tol,
-                reference_circles: true,
-            }
-        )
+    let text = gear_io::ring_to_dxf(
+        &ring,
+        &gear_io::DxfOptions {
+            chord_tolerance: tol,
+            reference_circles: true,
+        },
     );
+    print!("{}", text.unwrap_or_else(|e| refuse(&e)));
 }
 
 /// A drawing's chord tolerance, read against its row.

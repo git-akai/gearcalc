@@ -316,8 +316,12 @@ impl crate::ring::Ring {
     ///
     /// A fully filleted root has no root arc to emit; the fillets meet at
     /// mid-space and the closing bulge is simply zero.
-    #[must_use]
-    pub fn outline(&self, chord_tolerance: f64) -> Vec<Vertex> {
+    ///
+    /// # Errors
+    ///
+    /// [`crate::input::Refused::past_memory`], naming `teeth`, where the
+    /// outline is more vertices than the machine's memory holds.
+    pub fn outline(&self, chord_tolerance: f64) -> Result<Vec<Vertex>, crate::input::Refused> {
         let tol = if chord_tolerance.is_finite() && chord_tolerance > 0.0 {
             chord_tolerance.max(MIN_RELATIVE_TOLERANCE * self.rf)
         } else {
@@ -335,8 +339,12 @@ impl crate::ring::Ring {
         let z = self.teeth;
         let pitch = 2.0 * std::f64::consts::PI / f64::from(z);
         let mut out: Vec<Vertex> = Vec::new();
+        // Each tooth's vertices are made apart and then given room: the
+        // first sizes the rest, which a ring's all match.
+        let mut one: Vec<Vertex> = Vec::new();
 
         for k in 0..z {
+            one.clear();
             let base = pitch * f64::from(k);
             let pt = |r: f64, th: f64| {
                 let a = base + th;
@@ -347,14 +355,14 @@ impl crate::ring::Ring {
             //    starts: one bulged vertex and the arc's own end. A fully
             //    filleted root has no arc, and an empty section adds no vertex.
             let start = pt(self.rf, -self.half_pitch);
-            out.push(Vertex {
+            one.push(Vertex {
                 x: start.0,
                 y: start.1,
                 bulge: bulge_for(root_arc),
             });
             if root_arc > 0.0 {
                 let end = pt(self.rf, -theta_root);
-                out.push(Vertex::line(end.0, end.1));
+                one.push(Vertex::line(end.0, end.1));
             }
 
             // 2. fillet, minus side, climbing inward from the root. Absent when
@@ -371,7 +379,7 @@ impl crate::ring::Ring {
                     let (r, th) = fillet(t);
                     pt(r, -th)
                 };
-                subdivide(&f_minus, 0.0, 1.0, tol, 0, &mut out);
+                subdivide(&f_minus, 0.0, 1.0, tol, 0, &mut one);
             }
 
             // 3. flank, minus side, on inward to the tip
@@ -380,21 +388,21 @@ impl crate::ring::Ring {
                 let (r, th) = flank(t);
                 pt(r, -th)
             };
-            subdivide(&l_minus, 0.0, 1.0, tol, 0, &mut out);
+            subdivide(&l_minus, 0.0, 1.0, tol, 0, &mut one);
 
             // 4. tip arc, across the tooth. Exact.
-            if let Some(last) = out.last_mut() {
+            if let Some(last) = one.last_mut() {
                 last.bulge = bulge_for(2.0 * theta_tip);
             }
             let tip = pt(self.ra, theta_tip);
-            out.push(Vertex::line(tip.0, tip.1));
+            one.push(Vertex::line(tip.0, tip.1));
 
             // 5. flank, plus side, back out toward the root
             let l_plus = |t: f64| {
                 let (r, th) = flank(t);
                 pt(r, th)
             };
-            subdivide(&l_plus, 1.0, 0.0, tol, 0, &mut out);
+            subdivide(&l_plus, 1.0, 0.0, tol, 0, &mut one);
 
             // 6. fillet, plus side, out to where the root arc resumes
             if self.fillet.is_some() {
@@ -402,17 +410,27 @@ impl crate::ring::Ring {
                     let (r, th) = fillet(t);
                     pt(r, th)
                 };
-                subdivide(&f_plus, 1.0, 0.0, tol, 0, &mut out);
+                subdivide(&f_plus, 1.0, 0.0, tol, 0, &mut one);
             }
 
             // 7. the run out to mid tooth-space opens the next tooth, so only
             //    its bulge is recorded here.
-            if let Some(last) = out.last_mut() {
+            if let Some(last) = one.last_mut() {
                 last.bulge = bulge_for(root_arc);
             }
+            let wanted = if k == 0 {
+                one.len().saturating_mul(z as usize)
+            } else {
+                one.len()
+            };
+            if out.capacity() - out.len() < one.len() {
+                out.try_reserve(wanted)
+                    .map_err(|_| crate::input::Refused::past_memory("teeth", f64::from(z)))?;
+            }
+            out.extend_from_slice(&one);
         }
 
-        out
+        Ok(out)
     }
 }
 
@@ -440,7 +458,7 @@ mod tests {
                 &Cutter::default(),
             );
             let tol = 1e-3;
-            let v = g.outline(tol);
+            let v = g.outline(tol).unwrap();
             assert!(
                 v.len() > 20 * teeth as usize / 4,
                 "z={teeth}: {} vertices",
@@ -499,8 +517,14 @@ mod tests {
             },
             &Cutter::default(),
         );
-        let coarse = crate::gear::Gear::new(g.params).outline(1e-2).len();
-        let fine = crate::gear::Gear::new(g.params).outline(1e-5).len();
+        let coarse = crate::gear::Gear::new(g.params)
+            .outline(1e-2)
+            .unwrap()
+            .len();
+        let fine = crate::gear::Gear::new(g.params)
+            .outline(1e-5)
+            .unwrap()
+            .len();
         assert!(
             fine > coarse,
             "a tighter tolerance should add vertices: {fine} against {coarse}"
@@ -537,9 +561,9 @@ mod tests {
         // and then what is measured is the reference's own coarseness. It read
         // as the deviation *rising* at 1e-4.
         let gear = crate::gear::Gear::new(g.params);
-        let v = gear.outline(tol);
+        let v = gear.outline(tol).unwrap();
         let per_tooth = 10 * (v.len() / (g.params.teeth as usize).max(1)).max(20);
-        let all = gear.profile(per_tooth);
+        let all = gear.profile(per_tooth).unwrap();
         let truth = &all[..per_tooth.min(all.len())];
 
         deviation(&v, truth)
@@ -674,9 +698,18 @@ mod tests {
         let g = Tooth::new(GearParams::default());
         let (coarse, fine) = (worst_deviation(&g, 1e-2), worst_deviation(&g, 1e-4));
         assert!(fine < coarse, "{fine} !< {coarse}");
-        let a = crate::gear::Gear::new(g.params).outline(1e-2).len();
-        let b = crate::gear::Gear::new(g.params).outline(1e-4).len();
-        let c = crate::gear::Gear::new(g.params).outline(1e-6).len();
+        let a = crate::gear::Gear::new(g.params)
+            .outline(1e-2)
+            .unwrap()
+            .len();
+        let b = crate::gear::Gear::new(g.params)
+            .outline(1e-4)
+            .unwrap()
+            .len();
+        let c = crate::gear::Gear::new(g.params)
+            .outline(1e-6)
+            .unwrap()
+            .len();
         assert!(a < b && b < c, "{a} {b} {c}");
     }
 
@@ -700,7 +733,7 @@ mod tests {
             },
         ] {
             let g = Tooth::new(p);
-            for v in crate::gear::Gear::new(g.params).outline(1e-3) {
+            for v in crate::gear::Gear::new(g.params).outline(1e-3).unwrap() {
                 let r = f64::hypot(v.x, v.y);
                 assert!(
                     r >= g.rf - 1e-9 && r <= g.ra + 1e-9,
@@ -720,7 +753,7 @@ mod tests {
                 teeth,
                 ..Default::default()
             });
-            let v = crate::gear::Gear::new(g.params).outline(1e-3);
+            let v = crate::gear::Gear::new(g.params).outline(1e-3).unwrap();
             assert!(
                 v.len().is_multiple_of(teeth as usize),
                 "z={teeth}: {} vertices is not a whole number of teeth",
@@ -737,7 +770,7 @@ mod tests {
         let external = |p: GearParams| {
             let gear = crate::gear::Gear::new(p);
             let radii = gear.distinct().flat_map(|t| [t.ra, t.rf]).collect();
-            (format!("{p:?}"), gear.outline(1e-3), radii)
+            (format!("{p:?}"), gear.outline(1e-3).unwrap(), radii)
         };
         let with = |f: fn(&mut GearParams)| {
             let mut p = GearParams::default();
@@ -787,7 +820,7 @@ mod tests {
             );
             cases.push((
                 format!("ring z{teeth}"),
-                ring.outline(1e-3),
+                ring.outline(1e-3).unwrap(),
                 vec![ring.ra, ring.rf],
             ));
         }
@@ -827,7 +860,7 @@ mod tests {
         ] {
             let gear = crate::Gear::new(p);
             assert!(gear.mean().tool.closes, "{p:?}: the space did not close");
-            let v = gear.outline(1e-3);
+            let v = gear.outline(1e-3).unwrap();
             let root = gear.distinct().map(|t| t.rf).fold(f64::MAX, f64::min);
             for (i, a) in v.iter().enumerate() {
                 assert!(
@@ -924,9 +957,10 @@ mod tests {
         let g = Tooth::new(GearParams::default());
         let want = crate::gear::Gear::new(g.params)
             .outline(DEFAULT_CHORD_TOLERANCE)
+            .unwrap()
             .len();
         for t in [0.0, -1.0, f64::NAN, f64::INFINITY] {
-            let v = crate::gear::Gear::new(g.params).outline(t);
+            let v = crate::gear::Gear::new(g.params).outline(t).unwrap();
             assert_eq!(
                 v.len(),
                 want,
@@ -952,7 +986,10 @@ mod tests {
         const SPANS: f64 = 68.0;
         const DEPTH: u32 = 14;
         let g = Tooth::new(GearParams::default());
-        let n = crate::gear::Gear::new(g.params).outline(1e-18).len();
+        let n = crate::gear::Gear::new(g.params)
+            .outline(1e-18)
+            .unwrap()
+            .len();
         let expected = SPANS * f64::from(1u32 << DEPTH);
         let ratio = n as f64 / expected;
         assert!(
