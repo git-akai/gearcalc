@@ -130,17 +130,17 @@ pub struct TipForm {
     /// `σ_t = r_e tan(θ_a/2)`, where the round meets the flank.
     tangency: f64,
     /// `w_e = r_e sin θ_a`, the round's extent in `w = σ_t − σ`.
-    span: f64,
+    extent: f64,
     /// `σ_t − w_e`, where the round meets the tip land.
     land: f64,
     /// `r_e (1 − cos θ_a)`, the offset where the land begins.
     rise: f64,
 }
 
-/// The piece of the edge a `σ` lies on.
+/// Which piece of the form a `σ` lies on: the flank below the round, the round, or the tip land.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Edge {
-    Flank,
+enum Region {
+    OnFlank,
     Round,
     Land,
 }
@@ -214,16 +214,16 @@ impl TipForm {
             Some(r) => Some((r, relief_end(r, corner)?)),
             None => None,
         };
-        let span = radius * corner.sin;
+        let extent = radius * corner.sin;
         // r_e tan(θ_a/2), as r_e sin θ_a / (1 + cos θ_a).
-        let tangency = span / (1.0 + corner.cos);
+        let tangency = extent / (1.0 + corner.cos);
         Ok(Self {
             corner,
             relief,
             radius,
             tangency,
-            span,
-            land: tangency - span,
+            extent,
+            land: tangency - extent,
             rise: radius * (1.0 - corner.cos),
         })
     }
@@ -259,31 +259,31 @@ impl TipForm {
 
     fn jet(&self, across: f64) -> Jet {
         let relieved = self.relief.is_some_and(|(_, end)| across < end);
-        self.piece(across, self.edge_at(across), relieved)
+        self.piece(across, self.region_at(across), relieved)
     }
 
-    /// The piece of the edge `σ` is on: the flank's side at the round's tangency, the land's at
-    /// its end.
-    fn edge_at(&self, across: f64) -> Edge {
+    /// The piece `σ` is on: the flank's side at the round's tangency, the land's at the round's
+    /// end.
+    fn region_at(&self, across: f64) -> Region {
         if across >= self.tangency {
-            Edge::Flank
+            Region::OnFlank
         } else if across <= self.land {
-            Edge::Land
+            Region::Land
         } else {
-            Edge::Round
+            Region::Round
         }
     }
 
     /// The jet of the given pieces at `σ`, wherever `σ` is: a joint's two sides are two calls.
-    fn piece(&self, across: f64, edge: Edge, relieved: bool) -> Jet {
+    fn piece(&self, across: f64, region: Region, relieved: bool) -> Jet {
         let relief = match self.relief {
             Some((r, _)) if relieved => relief_jet(r, self.corner, across),
             _ => Jet::ZERO,
         };
         let w = self.tangency - across;
-        let edge = match edge {
-            Edge::Flank => Jet::ZERO,
-            Edge::Round => {
+        let edge = match region {
+            Region::OnFlank => Jet::ZERO,
+            Region::Round => {
                 let r = (self.radius * self.radius - w * w).sqrt();
                 // r_e²/r³, as (r_e/r)²/r: r³ underflows long before r² does.
                 let k = self.radius / r;
@@ -293,10 +293,10 @@ impl TipForm {
                     d2: k * k / r,
                 }
             }
-            Edge::Land => {
+            Region::Land => {
                 let tan = self.corner.tan();
                 Jet {
-                    f: self.rise + tan * (w - self.span),
+                    f: self.rise + tan * (w - self.extent),
                     d1: -tan,
                     d2: 0.0,
                 }
@@ -389,13 +389,17 @@ mod tests {
         // Where the reliefs end: on the flank and on the round, so the relief's joint is read on
         // both; never on the land, which lies beyond the edge (σ < 0) where no relief ends.
         const ENDS: (usize, usize, usize) = (15, 25, 0);
-        let ends = |e: Edge| {
+        let ends = |e: Region| {
             out.iter()
-                .filter(|f| f.relief.is_some_and(|(_, end)| f.edge_at(end) == e))
+                .filter(|f| f.relief.is_some_and(|(_, end)| f.region_at(end) == e))
                 .count()
         };
         assert_eq!(
-            (ends(Edge::Flank), ends(Edge::Round), ends(Edge::Land)),
+            (
+                ends(Region::OnFlank),
+                ends(Region::Round),
+                ends(Region::Land)
+            ),
             ENDS,
             "where the reliefs end"
         );
@@ -407,11 +411,14 @@ mod tests {
     /// Every record of `form.json`: the gear's circles, the corner, the round's constants, and
     /// `(F, F', κ)` and `on_edge` at each σ, within the record's own tolerance. A sharp edge is
     /// refused, so of its records the corner and the flank side (σ ≥ 0, the relief alone) are
-    /// compared and the points beyond the edge counted as refused.
-    fn reproduce(perturb: impl Fn(f64) -> f64) -> (Worst, usize, usize, usize) {
+    /// compared and the points beyond the edge counted as refused. Returns the worst miss, the
+    /// whole records, the refused points, the `on_edge` flags the port is compared on, and the
+    /// sharp records' flags, which are the oracle checked against its own rule (`σ < 0`), not
+    /// the port.
+    fn reproduce(perturb: impl Fn(f64) -> f64) -> (Worst, usize, usize, usize, usize) {
         let file = oracle_file();
         let mut worst = Worst::default();
-        let (mut whole, mut refused_points, mut flags) = (0, 0, 0);
+        let (mut whole, mut refused_points, mut flags, mut own_rule) = (0, 0, 0, 0);
         let records = oracle::records(&file);
         assert_eq!(records.len(), 20);
         for rec in records {
@@ -447,7 +454,7 @@ mod tests {
                 Ok(f) => {
                     whole += 1;
                     check("sig_t", f.tangency, num(&o["sig_t"]), false);
-                    check("w_end", f.span, num(&o["w_end"]), false);
+                    check("w_end", f.extent, num(&o["w_end"]), false);
                     check("F_end", f.rise, num(&o["F_end"]), false);
                     for ((&s, v), e) in sigma.iter().zip(values).zip(on_edge) {
                         for (name, port, oracle) in point(s, f.at(s), v) {
@@ -464,7 +471,7 @@ mod tests {
                     let end = relief_end(relief, corner).expect("a relief");
                     for ((&s, v), e) in sigma.iter().zip(values).zip(on_edge) {
                         assert_eq!(e.as_bool(), Some(s < 0.0), "{}", rec.id);
-                        flags += 1;
+                        own_rule += 1;
                         if s >= 0.0 {
                             let jet = if s < end {
                                 relief_jet(relief, corner, s)
@@ -481,20 +488,22 @@ mod tests {
                 }
             }
         }
-        (worst, whole, refused_points, flags)
+        (worst, whole, refused_points, flags, own_rule)
     }
 
     #[test]
     fn the_oracle_records_reproduce() {
-        let (worst, whole, refused, flags) = reproduce(|x| x);
+        let (worst, whole, refused, flags, own_rule) = reproduce(|x| x);
         eprintln!(
             "form.json: {whole}/20 records whole, {} values within tolerance, worst {:.3} of it \
-             ({}); {refused} points beyond a sharp edge refused",
+             ({}); {flags} on_edge flags equal; {refused} points beyond a sharp edge refused, \
+             and its {own_rule} flags checked against the oracle's own rule",
             worst.count, worst.ratio, worst.at
         );
+        // Flags: the port's on the 15 laid forms, the oracle's own rule on the 5 sharp ones.
+        assert_eq!((whole, refused, flags, own_rule), (15, 46, 15 * 25, 5 * 25));
         // 15 laid forms × (5 circles and corner + 3 round constants + 25 × 3) + 5 sharp-edge
         // records × 5 + 79 flank-side points × 3.
-        assert_eq!((whole, refused, flags), (15, 46, 20 * 25));
         assert_eq!(worst.count, 15 * (5 + 3 + 75) + 5 * 5 + 79 * 3);
         assert!(worst.ratio <= 1.0, "worst {} at {}", worst.ratio, worst.at);
     }
@@ -550,17 +559,17 @@ mod tests {
         };
         let s = f.tangency;
         meet(
-            f.piece(s, Edge::Flank, relieved(s)),
-            f.piece(s, Edge::Round, relieved(s)),
+            f.piece(s, Region::OnFlank, relieved(s)),
+            f.piece(s, Region::Round, relieved(s)),
         );
         let s = f.land;
         meet(
-            f.piece(s, Edge::Round, relieved(s)),
-            f.piece(s, Edge::Land, relieved(s)),
+            f.piece(s, Region::Round, relieved(s)),
+            f.piece(s, Region::Land, relieved(s)),
         );
         if let Some((_, end)) = f.relief {
-            let edge = f.edge_at(end);
-            meet(f.piece(end, edge, false), f.piece(end, edge, true));
+            let region = f.region_at(end);
+            meet(f.piece(end, region, false), f.piece(end, region, true));
         }
         assert_eq!(out.len(), f.joints().count(), "every joint is met");
         out
@@ -655,35 +664,35 @@ mod tests {
             let mut sides = vec![
                 (
                     t,
-                    Edge::Flank,
+                    Region::OnFlank,
                     relieved(t),
                     t.next_down(),
-                    Edge::Round,
+                    Region::Round,
                     relieved(t),
                 ),
                 (
                     l,
-                    Edge::Land,
+                    Region::Land,
                     relieved(l),
                     l.next_up(),
-                    Edge::Round,
+                    Region::Round,
                     relieved(l),
                 ),
             ];
             if let Some((_, end)) = f.relief {
-                let e = f.edge_at(end);
+                let e = f.region_at(end);
                 sides.push((end, e, false, end.next_down(), e, true));
             }
-            for (joint, edge, relief, other, other_edge, other_relief) in sides {
-                assert_eq!(f.edge_at(joint), edge);
-                assert_eq!(f.at(joint), f.piece(joint, edge, relief).point());
-                assert_eq!(f.edge_at(other), other_edge);
+            for (joint, region, relief, other, other_region, other_relief) in sides {
+                assert_eq!(f.region_at(joint), region);
+                assert_eq!(f.at(joint), f.piece(joint, region, relief).point());
+                assert_eq!(f.region_at(other), other_region);
                 assert_eq!(
                     f.at(other),
-                    f.piece(other, other_edge, other_relief).point()
+                    f.piece(other, other_region, other_relief).point()
                 );
                 for s in [joint.next_down(), joint, joint.next_up()] {
-                    assert_eq!(f.on_edge(s), f.edge_at(s) != Edge::Flank, "{s}");
+                    assert_eq!(f.on_edge(s), f.region_at(s) != Region::OnFlank, "{s}");
                 }
                 read += 1;
             }
@@ -737,7 +746,7 @@ mod tests {
         let f = plain();
         // The prototype's probe: the round's midpoint, printed to four decimals.
         let naive = |kappa: &dyn Fn(Jet) -> f64| {
-            let mid = f.tangency - 0.5 * f.span;
+            let mid = f.tangency - 0.5 * f.extent;
             ((kappa(f.jet(mid)) * f.radius - 1.0).abs()) < 5e-5
         };
         assert!(round_misses(&f, 1001, production).1 <= 1.0 && naive(&production));
@@ -788,7 +797,7 @@ mod tests {
                 .map(num)
                 .zip(values)
             {
-                if f.edge_at(s) != Edge::Round {
+                if f.region_at(s) != Region::Round {
                     continue;
                 }
                 let (port, oracle) = (kappa(&f, s), num(&v[2]));
@@ -826,7 +835,7 @@ mod tests {
 
     #[test]
     fn the_relieved_round_gate_fails_its_plants() {
-        // The naive gate: κ r_e near 1 (the records span 0.968 … 1.003), which every plant passes.
+        // The naive gate: κ r_e near 1 (the records run 0.968 … 1.003), which every plant passes.
         let naive = |kappa: Reading| {
             let (seen, _, _, _) = relieved_round(kappa);
             let file = oracle_file();
@@ -839,7 +848,7 @@ mod tests {
                 let gear = FieldGear::from_spec(&spec_of(&rec.inputs["member"])).expect("a gear");
                 let f = TipForm::new(&form, gear.tip_corner().expect("a corner")).expect("a round");
                 for s in rec.inputs["sigma"].as_array().expect("σ").iter().map(num) {
-                    if f.edge_at(s) == Edge::Round && (kappa(&f, s) * r_e - 1.0).abs() < 0.04 {
+                    if f.region_at(s) == Region::Round && (kappa(&f, s) * r_e - 1.0).abs() < 0.04 {
                         near += 1;
                     }
                 }
@@ -853,12 +862,12 @@ mod tests {
         assert!(gate(read_production) && naive(read_production));
 
         // The round's own curvature, 1/r_e, as though the relief were not there.
-        let own: Reading = |f, s| f.piece(s, Edge::Round, false).point().curvature;
+        let own: Reading = |f, s| f.piece(s, Region::Round, false).point().curvature;
         // Near miss: the pieces' curvatures summed, each of its own graph: 0.4 … 0.5 % above
         // 1/r_e, so a check against 1/r_e alone passes it, and up to 4 % off the summed form's.
         let summed: Reading = |f, s| {
             let (r, _) = f.relief.expect("relieved");
-            f.piece(s, Edge::Round, false).point().curvature
+            f.piece(s, Region::Round, false).point().curvature
                 + relief_jet(r, f.corner, s).point().curvature
         };
         let (_, _, least, _) = relieved_round(summed);
@@ -950,7 +959,7 @@ mod tests {
         let tiny = 1e-160;
         let laid = TipForm {
             radius: tiny,
-            span: tiny * c.sin,
+            extent: tiny * c.sin,
             tangency: tiny * c.sin / (1.0 + c.cos),
             land: tiny * c.sin / (1.0 + c.cos) - tiny * c.sin,
             rise: tiny * (1.0 - c.cos),
