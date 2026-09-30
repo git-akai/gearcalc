@@ -41,9 +41,10 @@ a covariant influence function of the load point. E drops out exactly [X]; ν en
 (Michell [C]), ≤ 0.28 % per 0.05 on the truncated body [X].
 
 **The reductions a fast model makes, and their cost on the record [X]:**
-1. **Patch to point force** ≤ 0.04 %. **Point force to wrench** (Saint-Venant) 2.3 % median, 4.0 % worst at HPSTC,
-   growing as the load nears the fillet (along 17/43's path the peak falls to 2.729 at r 8.17, then rises to 2.914 at
-   r 8.00); unmeasured at the lowest point on z 1000 or ring 60 (§7).
+1. **Patch to point force** ≤ 0.04 %. **Point force to wrench** (Saint-Venant) 2.3 % median, 4.0 % worst at HPSTC
+   (*superseded*, §9.1: −1.0 % median, −3.6 … +0.3, with the moment at the tip centre), growing as the load nears the
+   fillet (along 17/43's path the peak falls to 2.729 at r 8.17, then rises to 2.914 at r 8.00); unmeasured at the
+   lowest point on z 1000 or ring 60 (§7).
 2. **Wrench to one moment with one K.** The across force adds ≈ 35–37 % of the bending nominal on ordinary fillets; the
    along force is concentrated 29 % less than the across (ordinary), 32–34 % (middle, tight), 44 % (rings). One K on
    (Y_F − axial) underrates by 11.5 % median on ordinary external fillets, 18.3 % on rings: the frame round's split of
@@ -347,3 +348,334 @@ record, with structured errors off it. **Cost:** µs per section at one load, �
 4. **P2's class.** Live needs rule 3 amended, the solve on a worker with a loading state, and cache memory bounded;
    otherwise it is option D made cheaper (≈ 32 ms per sector member), still needing the corner, body and scale fixes.
 5. **Whether bending will ever enter the shift search.** Today it does not, and that sets every cost budget above.
+
+## 9. Component model (components round, 2026-09-30; three reviews applied)
+
+For the owner's direction of 2026-10-03, item 3 (`plan.md` §5): split the stress into its load components, give each
+its own mechanics, and see whether a fast model built that way escapes item 2's structured errors.
+- **Baseline:** the exact elastic fillet peak over root land and fillet, as `work/bending-options.md` names it. On the
+  record that is `tools/fillet_bem.txt`. Off the record it is P2 at level F, or the record's own solver, as the options
+  file says for each column.
+- **Figures:** model / baseline − 1 in %, negative unconservative. A structure is a range in points.
+- **The rule:** the options file's, one rule for every row. Substantial means ≥ 5 anywhere measured; *at the threshold*
+  means 4–6, inside the reference's ±1 point.
+- **Marks:** [X] this round's; [X, rev] a reviewer's run; [X, ed] the final editor's. No source was read, so the
+  literature here is [C], except one piece of metadata [M].
+- **Scripts:** `~/.cache/gearcalc-work/bending-comp/` (README there). The reviewers' and the editor's checks are in
+  `bending-options/final/`. Nothing in the crate changed.
+
+**Short answer.**
+- **The split is exact in the exact field, and the components do need their own mechanics.** Superposition holds at
+  the load point to 5e-8. At the exact peak no one-factor form gets the along force, the across force and the moment
+  right together.
+- **Neuber's deep hyperbolic notch works as a closed form, but not alone.** Solved here in closed form for all three
+  components and fitted to each fillet point, it places the along force's action within 0.01–0.02 h of exact (§9.3).
+  It cannot rate a tooth alone.
+- **The model built on it is a hybrid, not a superposition.** "Neck components" (§9.4) takes N and M from the neck at
+  a corner-mapped sharpness, and V from LWW's term about a chosen reference point. Its answer depends on that point
+  and on a named pivot q0.
+- **It misstates comparisons less than LWW,** with a p90 of 6.8 points against 8.4, and 30 reversals of 22,346 pairs
+  against 66.
+- **But by the one rule it still carries substantial structure on seven of nine variables,** two of them at the
+  threshold.
+  - It removes the ring structure and most of the structure at ordinary fillets.
+  - It keeps or adds structure at tight tools and 14.5°: shift 8.1, notch 10.8, record groups x 10.6 and z 9.9.
+  - Direction is worse than LWW at every span, reaching 11.7 at ±14°.
+- **Its accuracy at the design load is partly cancellation.** V reads 5–18 % high and M 2–9 % low on externals.
+- **The residual is in V, LWW's own term reused,** not in the neck (§9.4).
+- **Cost:** ≈ 100 µs per section in wasm, 10.7× LWW, measured.
+- No closed form here reaches "no substantial structure".
+
+### 9.1 The exact reference, per component [X]
+
+17 record teeth (12 external z 12–1000, 5 rings) were rerun on the record's BEM class and body (`refsubset.py`: one LU,
+seven loads). The loads were unit N and V at the reference point (the tip centre), a unit couple M (an along pair on the
+tip land), and unit along and across forces at the load point.
+- L0's sampled peak against the record: −0.012 … +0.031 %. The rerun equals comp-fast's earlier run bit for bit.
+- **Superposition at the load point is exact:** L0 = F_across·L1 + F_along·L2 at every station, to 1.4e-8 … 4.9e-8 of
+  the peak. On all 228 it holds to ≤ 4.9e-8 [X, rev]. This is a property of the BEM (linear elasticity), not of any
+  model below.
+- **The wrench at the reference point is not exact.** V g_V + N g_N + M g_M reads −3.1 … +0.1 % of L0's peak (median
+  −1.0): the load's own near field at HPSTC. On all 228 it reads −1.0 % (−3.6 … +0.3) [R, comp-fast; X, rev]. This
+  supersedes §1's "2.3 % median, 4.0 % worst", which took its moment from a lower-flank load and carried that load's
+  near field (now marked there).
+- Every model below is therefore a model of the remote wrench, and it carries that floor low on the path: −0.4 … −6.7
+  at LPSTC, down to −48 at the lowest point, relative to HPSTC [R, components round].
+
+### 9.2 A closed form for each component: Neuber's neck, all three [X]
+
+On z = i c sinh ζ, the strip |Im ζ| < θ maps onto the region between the branches x = ±c cosh ξ sin θ,
+y = c sinh ξ cos θ. The waist half-width is c sin θ, the root radius c cos²θ / sin θ, and the asymptotes lie at ±θ
+from the axis. Traction-free branches reduce Muskhelishvili's boundary condition to one equation with constant
+coefficients, Ḡ(w + 2iθ) − Ḡ(w − 2iθ) − 2i sin 2θ G′(w) = const (φ = G(ζ)). Its solutions that carry a resultant are
+φ = iαζ (tension), φ = Aζ (shear, zero moment at the waist) and φ = B cosh ζ (a pure couple).
+
+On the branch, take D = sinh²ξ + cos²θ, N in tension, V the force the upper part puts on the lower, and M about the
+waist centre with the +x side in tension:
+
+    σ_N = N · 4 cosh ξ cos θ / [2 (2θ + sin 2θ) · c D]
+    σ_V = V · 4 sinh ξ sin θ / [2 (2θ − sin 2θ) · c D]
+    σ_M = M · 4 sin 2θ / [(sin 2θ − 2θ cos 2θ) · c² (cosh 2ξ + cos 2θ)]
+
+- **Checks** (`neck.py` → `neck.txt`; rerun to the same output [X, rev]):
+  - The traction residual is ≤ 1e-15 of the largest stress on both branches.
+  - The three resultants, integrated across the waist, equal the closed forms to 1e-6.
+  - At the waist, the tension and bending factors equal Neuber's deep-notch formulas to 7 digits (a/ρ 0.25 … 100). A
+    reviewer confirmed this algebraically against the formulas as recalled [C].
+  - The shear case is derived here; Neuber treated it too [C].
+  - E and ν drop out, as for any traction problem on a simply connected body.
+- **Fitting it to a fillet point.** Take a point at distance x from the axis, with tangent angle a and radius ρ. The
+  neck with tan a = tanh(−ξ) tan θ, x = c cosh ξ sin θ and the same curvature is unique for every a in [0, 90°) and
+  every x/ρ > 0, because x/ρ is monotone in θ over (a, 90°) (`match_check.txt`).
+- **Its flat limit is LWW's wedge, exactly.** As ρ → ∞, θ → a, and the three responses become the Flamant and
+  Carothers edge stresses LWW uses: k_N, k_V and k_M to 1e-6 (`flat_check.txt`).
+
+### 9.3 What the fitted neck gets right, and why it cannot rate alone [X]
+
+**The mix.** Each quantity is read at the exact peak station, against the exact per-station components (`extra.txt`).
+x* is the along force's pole, η* the across force's, and h the chord. "Neck" is the fitted neck alone. "Built" is the
+neck components model of §9.4. Its V is LWW's, so its η* is not the neck's.
+
+| Class | x*/h: exact · neck · built · LWW | η*/h: exact · neck · built · LWW | Bending level (exact = 1): neck · built · LWW |
+|---|---|---|---|
+| ordinary | −0.248 · −0.231 · −0.228 · −0.189 | −0.318 · −0.283 · −0.359 · −0.326 | 1.046 · 0.978 · 1.062 |
+| middle | −0.263 · −0.244 · −0.242 · −0.201 | −0.400 · −0.356 · −0.485 · −0.442 | 1.122 · 0.952 · 1.030 |
+| tight | −0.268 · −0.249 · −0.248 · −0.211 | −0.436 · −0.423 · −0.566 · −0.555 | 1.238 · 0.912 · 0.948 |
+| rings | −0.258 · −0.247 · −0.246 · −0.217 | −0.555 · −0.508 · −0.585 · −0.628 | 1.185 · 1.008 · 0.932 |
+
+- **The along force.** The neck, and the model built from it, place its pole within 0.01–0.02 h of exact on every
+  class. LWW's wedge is 0.04–0.06 h off.
+- **The across force.** The neck is nearer than LWW on tight fillets and rings, about level on middle ones, and further
+  on ordinary ones. The built model's pole comes from LWW's V over the neck's M. It is further from exact than LWW's on
+  every external class, though nearer on rings [X, rev]. "Gets the mix right" is therefore true of the neck, not of the
+  model built from it.
+- **At those stations the fitted neck alone** reads L0 at ordinary −1.1, middle +6.1, tight +20.7 and rings +12.3.
+  Its direction structure is 0.9 / 5.3 and its load-height structure 1.2 / 6.4. At the same stations LWW reads 1.4 /
+  4.4 and 1.5 / 7.7 (`atpeak.txt`).
+
+**The level and the location fail**, for two reasons of body:
+- **The neck is a deep notch on both sides.** Its sharp limit is a double-edge crack (exponent ½); the tooth's is the
+  rack corner (1 − λ = 0.40–0.43). Its bending level therefore climbs with sharpness (the table's last column). At the
+  peak station its notch structure is 15 / 34.
+- **Its curvature peaks in the wrong place.** The hyperbola's curvature is largest at its waist; the fillet's is largest
+  near its root end.
+  - A point low on the fillet (a → 90°) is fitted by a neck with θ → 90° and its waist just above: a crack tip.
+  - There the neck's shear term becomes a mode-II crack field, with neck/wedge for V at 26–95 at a 89–90° (rack,
+    ring 60).
+  - The exact V is 2.8–3.1 and flat along the whole fillet, while M and N rise toward the root end in both.
+
+Its own maximum therefore runs to the root end, and it reads +163 % at the median on the record
+(`record_summary.txt`). **It is not a rating.**
+
+### 9.4 The model built: neck components, a hybrid [X]
+
+**The model.** At each fillet station, σ = N·s_N + V·s_V + M_Q·s_M. The load's wrench is taken about **Q, the
+station's foot on the axis** (a chosen reference point), and the rating is the maximum over the root and fillet (the
+stations LWW scans). The three terms:
+- **Along force N and moment M.** The fitted neck's σ_N and σ_M (§9.2), evaluated at the corner-mapped sharpness
+  q_eff = q0 (q/q0)^(2(1−λ)), with q = x/ρ and q0 = 1. The map turns the neck's sharp-limit exponent ½ into the rack
+  corner's 1 − λ(α_n) and leaves the flat limit unchanged.
+- **Across force V.** The tangent wedge's V response about Q, × W = (2x/ρ)^(1−λ). This is LWW's V term, unchanged.
+  - About Q it is not a pure shear. It is Carothers' shear plus the moment V·x·cot a, since the wedge's apex lies
+    x·cot a above Q [X, rev]. Part of the bending therefore travels through LWW's power law, not through the neck.
+  - The earlier claim that "LWW's term tracks" the exact V (exact / W 0.77–1.09 across tangent angles, `collapse.py`)
+    does not hold at the peak. There it reads 1.10 of exact at the median, with a 35-point spread (below).
+
+**It is not superposition: the reference point matters** [X, rev].
+- **Why.** In the exact field the response does not depend on where the wrench is taken, since s_V(Q′) = s_V(Q) +
+  h s_M. The model's does, because its V and M factors come from different bodies. Moving the reference h up the axis
+  changes σ by V·h·(s_M,neck − W·w_M).
+- **How much.** At the exact peak station:
+
+  | Reference | Median | Ring-minus-ordinary step |
+  |---|---|---|
+  | Q (as built) | +2.9 | +1.6 |
+  | the neck's centre | +3.4 | +0.8 |
+  | the wedge's apex | +7.3 | −6.3 |
+
+  As a maximum over the fillet, the apex version diverges, since a → 0 at the fillet's top.
+- **So** Q is a chosen constant of the model, like κ.
+
+**Constants.** None is fitted. The model was nonetheless chosen from 13 structural variants scored on the record (§9.5).
+- **Derived:** the three neck solutions and the fit to each point.
+- **Chosen and named:**
+  - the reference point Q;
+  - the corner map, both its exponent 2(1 − λ) and its pivot q0 = 1;
+  - the notch length: x for N and M, c = 2x for V;
+  - κ = 1 for V.
+- **The exponent is chosen, not derived:** it interpolates between the neck's flat limit and the sharp corner's
+  exponent, and the record's teeth never reach that sharp regime [X, rev].
+  - The exact log-slope −d ln σ/d ln ρ_fP from ρ_fP 0.01 to 0.03 is 0.08–0.09, against 1 − λ = 0.40–0.43.
+  - The reason is that a sharp tool corner cuts a trochoid of finite curvature at finite z. The radius at the peak
+    stops falling: z 12 reads 0.389 / 0.402 at ρ_fP 0.01 / 0.03, z 30 reads 0.148, and only z 1000 gets small
+    (0.015).
+  - The model's slope overshoots the exact one by +0.016 … +0.039 at 14.5°, +0.011 … +0.023 at 20° and +0.004 …
+    +0.009 at 25°. Summed over the tool-radius steps, that is ≈ 9, 6 and 3 points. It is the notch structure reported
+    in §9.5, and the reason its worst cases fall at 14.5°.
+- **Sensitivity** [X, rev; two reviewers agree]:
+  - **q0 moves the median, not the structure.** q0 = 0.25 / 0.5 / 1 / 2 / 4 reads −0.9 / +1.1 / +3.1 / +5.4 / +8.1,
+    while the c/ρ bins stay at 5.5–6.1 and the notch sweep at 6.8–8.5. The +3.1 median is a choice as arbitrary as
+    LWW's κ, not a gain of mechanics.
+  - **V's c moves the structure.** c = x reads −10.4 with notch sweep 3.9, record ρ groups 7.9 and x groups 5.6.
+    c = 4x reads +22.9 with notch 12.2.
+
+**Per component, at the exact peak station** [X, rev; checked, X, ed]: model / exact, median (range).
+
+| Component | All 228 | Ordinary | Middle | Tight | Rings |
+|---|---|---|---|---|---|
+| V (LWW's term, about Q) | 1.103 (0.953 … 1.307) | 1.08 | 1.17 | 1.18 | 1.05 |
+| M (neck) | 0.973 (0.875 … 1.041) | 0.98 | 0.95 | 0.91 | 1.01 |
+| N (neck) | 0.908 (0.814 … 1.016) | 0.91 | 0.88 | 0.84 | 0.95 |
+| M, for comparison: LWW | 1.029 | 1.06 | 1.03 | 0.95 | 0.93 |
+
+- **V varies with the design.** It rises with sharpness: 1.078 at ρ_fP 0.38, 1.134 at 0.1 and 1.200 at 0.01. It falls
+  with α: 1.157 at 14.5°, 1.099 at 25°.
+- **The errors, in points of the peak** (ordinary / middle / tight / rings):
+
+  | | Ordinary | Middle | Tight | Rings |
+  |---|---|---|---|---|
+  | V's error | +4.0 | +8.4 | +9.9 | +3.1 |
+  | M's error | −1.5 | −2.9 | −5.0 | +0.4 |
+  | Sum of the absolute term errors | 6.5 | 12.7 | 17.8 | 5.0 |
+  | Net error | 3.4 | 6.0 | 7.0 | 4.1 |
+
+  The model's accuracy at the design load is V high cancelling M low.
+- **The mix, as the along-minus-across error at the load point:** +0.4 on ordinary fillets, −7.6 on middle, −8.3 on
+  tight. Over the record it spans −15.6 … +13.1, no narrower than LWW's −11.8 … +14.8.
+
+**Which component carries the structure that remains** [X, rev]. Each component in turn is replaced by the exact
+per-station response:
+
+| Variant | ρ groups, max | x groups, max | c/ρ bins, low → high | Direction ±6°, max |
+|---|---|---|---|---|
+| As built | 12.1 | 10.6 | +0.1 … +6.2 | 4.5 |
+| Exact V | **3.4** | 6.6 | +0.0 … −3.9 | **1.6** |
+| Exact M | 13.8 | — | +0.8 … +11 | — |
+| Exact N and M | 13.5 | — | — | — |
+
+The residual is V's, and V is LWW's term. Correcting M or N alone makes the structure worse, because M's low error
+partly cancels V's high one.
+
+**Guard.** Points whose tangent turns past the axis normal (a ≥ 90°, on ring root lands only) have no symmetric neck
+and are not rated. No maximum lies near one. The model searches the lower flank as well for turned and unit loads; that
+changes none of the 228 [X, rev].
+
+**Continuity.**
+- The fit is smooth in every input, and flat or convex points take the flat limit continuously.
+- The largest step between sweep neighbours is 0.14–0.44 points. The exception is 1.26, at the sharp end of the notch
+  sweep, where the curve is smooth. The step across the rack is 0.0.
+- The maximum is taken finely enough [X, rev]: 2001 stations per piece, at most 0.002 ρ apart. Refining it with a
+  parabola moves it by ≤ 1e-4 %. No maximum sits at the end of a piece.
+- The flat limits differ. As ρ → ∞, N and M tend to the wedge, but V tends to 0, since W → 0 (LWW shares this). That
+  matters for c/ρ < 2, which is untested.
+
+**Location.** The model's maximum lies 0.05 ρ from the exact peak at the median and 0.15 ρ at the worst (LWW: 0.08,
+0.28).
+
+**Cost** [X, ed; `bending-options/final/neckwasm`].
+- **What was built.** The model in Rust, on the P1 crate's scan (16 samples, then a golden refine, per section). The θ
+  solve uses gear-core's Brent on ln Q − ln q, to 1e-12 rad, at ≈ 11 evaluations per station.
+- **Checked.** It reproduces the Python prototype to 1e-6 on all 228.
+- **Measured, at one load:**
+
+  | Build | Neck components, per section | LWW, same build | Ratio |
+  |---|---|---|---|
+  | wasm32 under node | 98–101 µs | 9.1–9.5 µs | 10.7× |
+  | native | 65 µs | 6.1 µs | 10.7× |
+
+  The prototype's 80 halvings cost 50×. The earlier estimate of 2–4× is withdrawn.
+- **Not tried or built.** A better-started θ solve could cut the cost; it was not tried. The model is linear in the
+  load, so a ramp could reuse each station's three responses; that is not built.
+
+### 9.5 Against the baseline [X]
+
+Sources: `record_summary.txt`, `sweeps.txt`, `path.txt`, `where.txt`, `bending-options/final/`.
+- LWW, rerun through the same pipeline, reproduces its options-table row to 0.01 points.
+- **In-sample.** The record figures are in-sample: 13 structural variants were scored on the full record (neck, C, D,
+  Va, Vc, Ve, Vn, E1, E2, G, DW, DW088, QW) [X, ed; rev].
+- **Out of sample.** The sweeps and the path (run after `models.py` was fixed) and the reviewers' new sweeps are out of
+  sample. The worst figure in sample is 12.1 (record ρ groups); out of sample it is 10.8 (notch at 14.5°) and 8.1
+  (shift at a tight tool, 14.5°).
+
+| | Neck components | LWW, κ = 1 |
+|---|---|---|
+| All 228: median (min … max) · IQR width | +3.1 (−0.7 … +14.4) · 3.5 | +10.1 (+0.3 … +19.1) · 5.3 |
+| Ordinary · middle · tight · rings · undercut | +2.0 · +5.4 · +5.5 · +3.5 · +1.5 | +9.6 · +13.0 · +12.3 · +5.8 · +8.7 |
+| Load position LPSTC → HPSTC, 11 teeth | 1.5 / 5.0 (5.01, at the threshold) | 3.8 / 9.6 |
+| Direction ±6° · ±10° · ±14° | 1.8 / 4.5 · 3.0 / 7.7 · 4.4 / 11.7 | 1.3 / 4.0 · 2.3 / 7.0 · 3.4 / 10.7 |
+| Load height: across at L, near the tip, at the tip centre | 1.1 / 5.0 (5.05, at the threshold) | 2.2 / 10.9 |
+| Shift sweeps: ρ_fP 0.25, 20° · 0.03, 20° · 0.03, 14.5° | 3.5 · 3.7 · **8.1** | 13.0 · 9.9 · 10.0 |
+| Shift: record groups [≥ 5 at ρ_fP ≥ 0.1 · ≤ 0.03] | 0.7 / 10.6 [1/51 · 4/34] | 2.6 / 7.2 [10/51 · 4/34] |
+| Teeth z 12–220 · record groups [≥ 5 at ρ_fP ≥ 0.1 · ≤ 0.03] | 3.4 · 3.2 / 9.9 [2/18 · 7/12] | 7.0 · 3.9 / 7.5 [8/18 · 3/12] |
+| Mate z: ρ_fP 0.25 · 0.03 · ring | 0.9 · 2.7 · 0.8 | 3.5 · 2.1 · 1.5 |
+| Pressure angle 14.5–25° · 25–31° · record groups | 1.2 · 3.3 · 2.8 / 8.1 | 0.6 · 4.9 · 3.0 / 8.1 |
+| Notch sweeps at 14.5° · 20° · 25° · record groups | **10.8** · 7.6 · 3.8 · 5.1 / 12.1 | 7.0 · 3.7 · 1.8 · 4.9 / 8.7 |
+| Median by c/ρ bin, < 4 … > 32 | +0.1 … +6.2 (range 6.1) | +5.6 … +13.8 (range 8.2) |
+| Ring vs external: the step across the rack at ρ_fP 0.2 · 0.1 · 0.03 · class medians | 0.0 · +0.7 · +0.7 · +1.5 | −7.1 · −7.2 · −5.1 · −3.7 |
+| All record pairs: misstatement median · p90 · max · reversed of 22,346 | 2.4 · 6.8 · 13.2 · 30 | 3.5 · 8.4 · 18.8 · 66 |
+| Share of benefit credited: shift (ρ_fP 0.25) · notch (20°) | 87 % · 108 % | 54 % · 104 % |
+| Outside the span: tip side − HPSTC · the lowest point | −3.4 … +2.4 · −34.1 … −1.4 | −0.3 … +9.9 · −31.1 … +0.5 |
+
+An earlier row, "along the tooth", compared the most compressive stress under the along load, not the baseline's σ_tt
+maximum. That extreme changes with the domain on 217 of 228 teeth, by up to 275 % [X, rev], so the row is withdrawn,
+along with the claim built on it (−13.0 → −5.8).
+
+**What the split does, by the one rule:**
+- **Removes:**
+  - ring against external: the step across the rack is 0.0 · 0.7 · 0.7, against LWW's 7.1 · 7.2 · 5.1;
+  - most of the ordinary-fillet structure: record groups ≥ 5 at ρ_fP ≥ 0.1 are z 2/18 and x 1/51, against LWW's 8/18
+    and 10/51;
+  - the shift structure at ordinary fillets, 13.0 → 3.5.
+- **Reduces, but leaves at the threshold:** load position 9.6 → 5.0 (5.01, at z 30, 25°, ρ_fP 0.25: an ordinary
+  fillet, not a notch effect), and load height 10.9 → 5.0 (5.05).
+- **Keeps or adds (substantial):**
+  - **At tight tools:**
+    - shift at ρ_fP 0.03 and 14.5°: 8.1, with 7.8 of it through undercut onset;
+    - the notch sweeps: 10.8 · 7.6 · 3.8, which is 1.5–2.2× LWW at every angle;
+    - the record's tight-fillet groups: z ≥ 5 in 7 of 12 against 3 of 12, worst z 9.9 against 5.3, worst x 10.6
+      against 7.2.
+  - **Direction,** worse than LWW at every span and on 160 of 228 teeth at ±6°.
+  - **The worst groups.** In z, x and α they sit at ρ_fP 0.01, but not all at 14.5°. At 20° the z group (x 0,
+    ρ_fP 0.01) reads 9.2 (+0.2 → +9.4 → +5.7 across z 12 → 60 → 1000; LWW 2.7). The x group (z 12, 20°,
+    ρ_fP 0.01) reads 8.2 (LWW 7.2). LWW's worst α group is also at a tight tool (z 150, x 0, ρ_fP 0.01), so the
+    tight-tool attribution applies to both models.
+- **Not addressed:** the load's own near field. The lowest point reads −34 %, as it does for every wrench model.
+
+The earlier conclusion, "removes shift, ring, load position and load height; leaves only the notch", overstated the
+split. The correct statement: it is reduced at ordinary fillets and at 20–25°, and it stays substantial at 14.5° with a
+tight tool, in the tight-fillet record groups and in direction.
+
+**Variants measured and set aside** (their own maxima on the record; three of the thirteen):
+- The neck for the mix, at LWW's level: load height 4.6 / 13.6.
+- LWW with the neck's along-to-bending ratio (G): +7.2, with worst groups z 6.1, α 9.1, x 5.9 and ρ 8.9, and load height
+  10.9. At ±6° its direction is 0.7 / 3.4 [X, rev].
+- The neck's factors raised to 2(1 − λ): +1.0, with worst groups 10.8–12.1.
+
+### 9.6 Open issues, for this model
+
+1. **V's notch factor, first.** The remaining structure is V's (§9.4): it is 5–18 % high, rising with sharpness and
+   falling with α. The next test is V's own notch factor against the exact per-station V. Its power law with the
+   sharp-corner exponent over-steepens on teeth that never reach the sharp regime. **Do not fix M or N alone:** that
+   makes the structure worse (the ablation). The earlier plan to compute per-α sharp-limit coefficients for N and M is
+   dropped, because the record's teeth are not in that regime.
+2. **The reference point.** A reference-free form is untested. It would carry V's lever moment through the neck's M
+   factor and apply W to the pure shear only, about the neck's centre. Until then, Q is a named choice, and the spread
+   over references (+2.9 … +7.3 at the median; the ring step +1.6 … −6.3) belongs beside every figure.
+3. **The corner map.** Either replace it with a derived blunt-V-notch field, or keep it as a named interpolation with
+   its q0.
+   - Filippi, Lazzarin and Tovo 2002 (https://doi.org/10.1016/s0020-7683(02)00342-6) [M] give such fields. That their
+     opening angle and root radius enter independently is recalled [C].
+4. **c.** V's notch length governs the structure (c = x halves the notch structure and reads −10 %). Whether a derived
+   c exists is open.
+5. **Selection.** Choose among variants on half the record and score on the other half. Until then, the record figures
+   are in-sample.
+6. **The baseline's domain off L0.** The path column was read on P2's domain rule. Its agreement with root+fillet away
+   from HPSTC is unchecked, as is every tooth whose flank maximum exceeds its fillet's there.
+7. **Cost.** A better-started θ solve, and a ramp that reuses each station's three responses, are both untried.
+8. **The near field** (the components round's D4), which every wrench model shares.
+9. **Not tested:**
+   - c/ρ < 2, where V's flat limit (0) and N's and M's (the wedge) part;
+   - α above 31°, where the reference BEM failed at 32.5°;
+   - pointed teeth loaded at the apex;
+   - shaper-cut, asymmetric and thin-rim teeth;
+   - the ring tip-side reference (F was verified near the corner on externals only).
