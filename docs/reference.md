@@ -2442,7 +2442,9 @@ a refused edit changes nothing.
 train has, a new body of an axis it has or a new axis fixed in ground
 (`AddGear`) — sized to the distance between the two axes where they have
 one, a sun or a ring on a planet gear to the radius the planet runs at, and
-on a new axis a copy of its mate or a ring twice its count — and refused
+on a new axis its mate's count or a ring twice it; the crate's default gear
+at that count, its module, pressure angle and helix following its mesh and
+nothing of its mate's given helix, form or material copied — and refused
 where no distance joins the two axes, or where the body is the carrier of
 the planet it would mesh; **another ratio** across a distance on the body
 asked (`AddRatio`); a **step**; a **coupling**; a gear **moved**; a **join**,

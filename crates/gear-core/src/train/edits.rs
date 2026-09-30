@@ -21,9 +21,7 @@
 
 use super::shape::{Member, Shape};
 use super::structure::{CarrierTree, Hang};
-use super::MemberGear;
 use crate::kinematics::GROUND;
-use crate::params::Auto;
 
 /// **What a designer does to a train's graph** — the one set of edits,
 /// every index the graph's own: a member, a mesh, a distance, an axis or a
@@ -43,8 +41,10 @@ pub enum Edit {
     /// **A gear meshing `mate`**, on `on` — a ring where `ring` — sized to
     /// what it meets: to the distance between the two axes where they have
     /// one (a sun or a ring on a planet gear to the radius its axis runs
-    /// at), and on a new axis the mate's count, a ring twice it. It follows
-    /// the mate's module and pressure angle, its shift and thickness
+    /// at), and on a new axis the mate's count, a ring twice it. It is the
+    /// crate's default gear at that count — a ring cut by the default
+    /// cutter — its module, pressure angle and helix automatic, so its mesh
+    /// gives it the group's and the hand it needs, its shift and thickness
     /// automatic.
     AddGear { mate: usize, on: Place, ring: bool },
     /// **Another ratio across a distance**: a gear on `shared` — a body on
@@ -397,7 +397,7 @@ impl Shape {
     }
 
     /// **A gear on a new axis fixed in ground**, at an automatic distance
-    /// from its mate's: a copy of the mate — which at a chain's end is an
+    /// from its mate's: the mate's count — which at a chain's end is an
     /// idler behind the last — or a ring twice its count round it. Refused
     /// for a mate that does not mesh in ground — a planet, or a sun or a
     /// ring meshing planets — whose frame the new axis cannot share.
@@ -413,18 +413,8 @@ impl Shape {
         }
         let axis = self.push_axis(GROUND, 1);
         let body = self.push_body(axis, next);
-        if ring {
-            let teeth = 2 * self.members[mate].gear.teeth;
-            self.push_follower(mate, body, teeth, true);
-        } else {
-            self.members.push(Member {
-                body,
-                ring: None,
-                ..self.members[mate].clone()
-            });
-            let new = self.members.len() - 1;
-            self.push_mesh(mate, new);
-        }
+        let z = self.members[mate].gear.teeth;
+        self.push_follower(mate, body, if ring { 2 * z } else { z }, ring);
         self.push_distance([from, axis], 0.0);
         Ok(())
     }
@@ -529,28 +519,17 @@ impl Shape {
         Ok(z as u32)
     }
 
-    /// A gear of `teeth` on `body` meshing `mate` and following it: its
-    /// module, pressure angle and form the mate's, its shift and thickness
-    /// automatic — a second central at one carrier radius is closed by its
-    /// shift, which one given at zero could not do — a ring cut by the
-    /// shape's first cutter.
+    /// **A gear of `teeth` on `body` meshing `mate`**: a gear of the
+    /// crate's defaults — a ring cut by the default pinion cutter — its
+    /// count the one thing the edit decides; its module, pressure angle and
+    /// helix automatic, so the mesh it joins gives it the group's and the
+    /// hand its mesh needs, and its shift and thickness automatic, so a
+    /// second central at one carrier radius is closed by its shift. It reads
+    /// nothing of its mate but the module its automatic box is seeded at:
+    /// a gear never copies another's given helix, form or material.
     fn push_follower(&mut self, mate: usize, body: usize, teeth: u32, ring: bool) {
-        let cutter = ring.then(|| self.members.iter().find_map(|m| m.ring).unwrap_or_default());
         let module = self.members[mate].normal_module();
-        self.members.push(Member {
-            body,
-            gear: MemberGear {
-                teeth,
-                profile_shift: Auto::automatic(0.0),
-                ..self.members[mate].gear.clone()
-            },
-            module: Auto::automatic(module),
-            pressure_angle: Auto::automatic(self.members[mate].normal_pressure_angle()),
-            thickness_mod: Auto::automatic(1.0),
-            ring: cutter,
-            pitch_diameter: Auto::automatic(0.0),
-        });
-        let new = self.members.len() - 1;
+        let new = self.push_member(body, teeth, module, ring.then(Default::default));
         self.push_mesh(new, mate);
     }
 
@@ -1594,6 +1573,102 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// **Every gear a preset offers is a gear of its own** (audit T13.7):
+    /// on every preset, cased, and on each with its first gear's helix
+    /// given (20°), every `AddGear` offered unrefused adds the crate's
+    /// default gear at the count the edit sizes — its helix, module and
+    /// pressure angle automatic, so the mesh gives it the group's and the
+    /// hand it needs, and nothing of its mate's given helix, pitch diameter,
+    /// form or material copied. The train it leaves solves, or its cases
+    /// say the load divides by stiffness, or a part says by name why its
+    /// geometry does not close; never a gear that cannot mesh its mate
+    /// (`Mesh(Incompatible)`, which a copied given helix gave), nor a
+    /// wiring that is no mechanism. A preset that does not solve before the
+    /// edit is skipped: its failure is not the gear's.
+    #[test]
+    fn every_gear_a_preset_offers_is_its_own() {
+        use super::super::testing::cased;
+        use super::super::{MemberGear, TrainError};
+        let lib = library();
+        let (mut solved, mut said, mut skipped) = (0, 0, 0);
+        let mut failures: Vec<String> = Vec::new();
+        for p in Preset::ALL {
+            for helix in [None, Some(20.0)] {
+                let shape = helix.map_or_else(|| p.build(), |b| p.build().with_first_helix(b));
+                let t = cased(vec![shape]);
+                if solve_train(&t, &lib).is_err() {
+                    skipped += 1;
+                    continue;
+                }
+                let mut seen: Vec<String> = Vec::new();
+                for at in super::super::sweep::targets(&t) {
+                    for o in t.offers(at) {
+                        let Edit::AddGear { .. } = o.edit else {
+                            continue;
+                        };
+                        let named = format!("{:?}", o.edit);
+                        if o.refused.is_some() || seen.contains(&named) {
+                            continue;
+                        }
+                        seen.push(named.clone());
+                        let context = format!("{p:?} helix {helix:?}, {named}");
+                        let mut u = t.clone();
+                        u.edit(o.edit.clone()).unwrap();
+                        let new = u.shape.members.last().unwrap();
+                        let own = MemberGear {
+                            teeth: new.gear.teeth,
+                            ..MemberGear::default()
+                        };
+                        if format!("{:?}", new.gear) != format!("{own:?}")
+                            || !(new.module.auto
+                                && new.pressure_angle.auto
+                                && new.pitch_diameter.auto)
+                        {
+                            failures.push(format!("{context}: not its own: {new:?}"));
+                        }
+                        match solve_train(&u, &lib) {
+                            Ok(r) if r.cases.iter().all(|c| c.solved) => solved += 1,
+                            Ok(r)
+                                if r.cases.iter().any(|c| {
+                                    c.notes
+                                        .iter()
+                                        .any(|n| n.is(crate::note::key::TRAIN_LOAD_SHARED))
+                                }) =>
+                            {
+                                said += 1;
+                            }
+                            Err(TrainError::InPart { cause, .. })
+                                if matches!(
+                                    *cause,
+                                    TrainError::NoCommonDistance
+                                        | TrainError::TipsUnclearable { .. }
+                                        | TrainError::FlankInterference
+                                        | TrainError::Mesh(
+                                            crate::mesh::MeshError::OutsideInvoluteDomain
+                                        )
+                                ) =>
+                            {
+                                said += 1;
+                            }
+                            Err(TrainError::Overdetermined { .. }) => said += 1,
+                            other => failures.push(format!("{context}: {other:?}")),
+                        }
+                    }
+                }
+            }
+        }
+        assert!(
+            failures.is_empty(),
+            "{} failures:\n{}",
+            failures.len(),
+            failures.join("\n")
+        );
+        assert!(
+            solved > 50 && said > 0 && skipped < Preset::ALL.len(),
+            "solved {solved}, said {said}, skipped {skipped}"
+        );
     }
 
     /// **Every add undoes**: the gear it added taken off again — a step's
