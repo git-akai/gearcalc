@@ -1,0 +1,32 @@
+# Float literals below 1e-3 in gear-core's production code that are not yet a
+# named `const` (tools/check_literals.py). Each is a tolerance, floor or nudge
+# whose basis is not stated; each goes when it is named in the train's
+# tolerance module with its derivation (plan redesign N) or derived where it
+# stands. The list must match what the check finds exactly.
+#
+# file	function	literal	count	stage that empties it
+crates/gear-core/src/auto.rs	member_is_buildable	1e-12	1	Stage 3 (N)
+crates/gear-core/src/auto.rs	shifts_for_efficiency	1e-12	1	Stage 3 (N)
+crates/gear-core/src/contact.rs	load_fraction	1e-9	1	Stage 3 (N)
+crates/gear-core/src/gear.rs	profile	1e-12	1	Stage 3 (N)
+crates/gear-core/src/hertz.rs	aspect_ratio	1e-14	1	Stage 3 (N)
+crates/gear-core/src/hertz.rs	first_yield_uncached	1e-7	1	Stage 3 (N)
+crates/gear-core/src/hertz.rs	gauss_legendre	1e-16	1	Stage 3 (N)
+crates/gear-core/src/screw.rs	least_distance_lead_angle	1e-12	3	Stage 3 (N)
+crates/gear-core/src/screw.rs	least_distance_lead_angle	1e-9	2	Stage 3 (N)
+crates/gear-core/src/screw.rs	mesh_branch	1e-6	1	Stage 3 (N)
+crates/gear-core/src/screw.rs	solve3	1e-12	1	Stage 3 (N)
+crates/gear-core/src/solve.rs	default	1e-15	1	Stage 3 (N)
+crates/gear-core/src/strength.rs	loaded_at	1e-12	1	Stage 3 (N)
+crates/gear-core/src/strength.rs	root_section_with	1e-12	1	Stage 3 (N)
+crates/gear-core/src/train/flow.rs	least_squares_exact	1e-12	1	Stage 3 (N)
+crates/gear-core/src/train/flow.rs	least_squares_exact	1e-9	1	Stage 3 (N)
+crates/gear-core/src/train/groupings.rs	flow	1e-9	1	Stage 3 (N)
+crates/gear-core/src/train/mod.rs	addendum_asked	1e-12	1	Stage 3 (N)
+crates/gear-core/src/train/shape.rs	closed	1e-9	1	Stage 3 (N)
+crates/gear-core/src/train/shape.rs	place_meshes	1e-9	1	Stage 3 (N)
+crates/gear-core/src/train/shape.rs	pull_in	1e-9	1	Stage 3 (N)
+crates/gear-core/src/train/shape.rs	size_reaching	1e-9	2	Stage 3 (N)
+crates/gear-core/src/train/shape.rs	sized	1e-12	1	Stage 3 (N)
+crates/gear-core/src/train/shape.rs	sized	1e-6	1	Stage 3 (N)
+crates/gear-core/src/verify.rs	check_cut	1e-12	1	Stage 3 (N)

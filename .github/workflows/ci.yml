@@ -72,6 +72,32 @@ jobs:
       - name: Angular units are unambiguous
         run: nix develop --command tools/check_units.py
 
+      # A float literal below 1e-3 in gear-core's production code is a
+      # tolerance, and a tolerance is a named constant whose basis is stated
+      # once. The ones not yet named are listed with the stage that names
+      # them, exactly, so a new one fails and a named one leaves the list. Its
+      # planted faults include code after a test module and a `let` with a
+      # constant's name.
+      - name: Small literals are named
+        run: |
+          nix develop --command bash -c '
+            set -euo pipefail
+            tools/check_literals.py
+            tools/check_literals.py --self-test
+          '
+
+      # A number standing for "none" -- `unwrap_or(<literal>)`,
+      # `map_or(<literal>, ...)`, the same through a closure, INFINITY or NAN
+      # as a value -- fails unless its line says `// absence: <why>`. The
+      # sites there before are listed with the stage that empties them.
+      - name: Absence is typed
+        run: |
+          nix develop --command bash -c '
+            set -euo pipefail
+            tools/check_absence.py
+            tools/check_absence.py --self-test
+          '
+
       # The figure checker's own rules, on a fixture: the fixture passes and
       # every planted fault (a drifted figure, rows swapped, a figure a test
       # does not hold, ...) fails. A gate is seen failing before it is trusted.

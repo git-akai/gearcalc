@@ -31,6 +31,8 @@ CHEAP=(
   "Documentation pointers resolve"
   "The string catalogue is complete"
   "Angular units are unambiguous"
+  "Small literals are named"
+  "Absence is typed"
   "The figure checker fails on planted faults"
   "Independent derivations agree with the recorded crate"
 )
