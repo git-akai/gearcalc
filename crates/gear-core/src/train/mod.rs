@@ -10716,9 +10716,10 @@ mod tests {
     /// not reaching them.**
     ///
     /// The ramp's worst point is the largest `Y_F · Y_S · share`, and below
-    /// `ε_n = 2` the single-pair boundary is in the sweep with a share of
-    /// exactly 1 — so the maximum is the point the unshared rating already
-    /// took, and the answer is the one already reported. A hula stage is the
+    /// `ε_n = 2` the single-pair boundary is a candidate with a share of
+    /// exactly 1 — so the maximum is almost always the point the unshared
+    /// rating already took (`strength::bending_section_shared` says where it is
+    /// not), and on a hula's meshes it is. A hula stage is the
     /// case worth pinning: **its meshes cannot reach the band at any proportion
     /// it can be built at**, running just above continuous contact by
     /// construction, so the control is offered and provably cannot bite there.

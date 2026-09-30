@@ -701,9 +701,11 @@ whose size is unmeasured is a debt still owed, and is marked as one.
 
 <!-- figures: gear-cli matrix -->
 - **The ISO set against the default, at the tip**: `gear-cli matrix` study 5's
-  `Y_F·K_f / Y_F·Y_S` reads 0.510 – 1.128, mean 0.827, over the external
+  `Y_F·K_f / Y_F·Y_S` reads 0.510 – 3.150, mean 0.852, over the external
   population. The default is **lower** than the ISO construction on most
-  teeth, by up to half; the spur band above is the same comparison at the
+  teeth, by up to half, and **higher** by up to 3.15× where a narrow tip is
+  loaded steeply at its tip and the largest parabola that fits touches the
+  flank under its vertex; the spur band above is the same comparison at the
   single-pair point, against ISO's own closed form.
 
 - **Hardened 4340's flank estimate is held at the end of ISO's line.** Its
@@ -990,10 +992,10 @@ higher number, and a ratio a little under 1 is that difference showing up where
 it should.
 
 <!-- figures: gear-cli matrix -->
-The external population reads 0.510 – 1.128, mean 0.827, and the wider spread
-there is the same thing seen on a population that includes small and undercut
-teeth, where the two constructions genuinely disagree about where the section
-is.
+The external population reads 0.510 – 3.150, mean 0.852, and the wider spread
+there is the same thing seen on a population that includes small, undercut and
+narrow-tipped teeth, where the two constructions genuinely disagree about where
+the section is.
 
 ### And one thing the sweep found on the way
 

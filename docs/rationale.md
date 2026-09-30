@@ -560,8 +560,11 @@ touches where the real tooth is weakest.
   property the cantilever model is meant to have. Its tangents cross the
   centreline 11.8 % below the load point at z = 9 and 0.04 % above it at z = 60.
 - It is the more conservative construction everywhere: +2.9 % to +13.7 % on `Y_F`.
-- It changes rankings very little — Spearman ρ = 0.993 over 1521 designs — so the
-  choice is principled rather than consequential.
+- It ranks designs close to the tangent's order — Spearman ρ = 0.898 over 1508
+  designs loaded at the tip — parting from it where a narrow tip is loaded
+  steeply and the largest parabola that fits touches the flank under its
+  vertex. (A flank search that took the first crossing it bracketed missed
+  those tangencies and read 0.993.)
 - NASA TM-107012 makes the same choice for internal teeth, independently.
 - Experimental single-tooth-bending work reports measured critical locations
   *above* the 30° prediction, which is the direction the parabola moves it. The
@@ -791,12 +794,13 @@ away there, so allowing sharing means sweeping the cycle for the maximum of the
 two together instead of evaluating one point.
 
 **Measured: 0.0–0.2 %** across every ordinary mesh tried. Once sharing is
-allowed the governing point *becomes* the highest point of single-pair contact —
-where the share is exactly 1 — so the answer is the one already reported, and the
-expensive model buys almost nothing for a worst-case number. That is not an
-approximate agreement below the band but an exact one: the single-pair boundary
-is itself a candidate in the sweep, so where the maximum sits there the answer is
-the unshared one to the bit. **A hula stage never leaves that regime** — its
+allowed the governing point usually *becomes* the highest point of single-pair
+contact — where the share is exactly 1 — so the answer is the one already
+reported, to the bit, since the single-pair boundary is itself a candidate. Not
+always: low on the flank the held section's `K_f` grows as its arm shortens, and
+the maximum, taken over the whole cycle rather than over samples of it, can sit
+there, above the unshared figure — on 11 of `gear-cli bendgrid`'s 564 ramp rows
+below `ε_n = 2`, by up to 3.2 % (z 9, 25°, `ε_n` 1.7). **A hula stage never leaves that regime** — its
 meshes run just above continuous contact by construction — so the control is
 offered there and provably cannot bite.
 

@@ -188,15 +188,24 @@ fn a_mate_loaded_low_on_its_flank_is_not_rated_negative() {
     );
 }
 
-/// **A pair whose tips stay on usable flank rates every member.** Since the
-/// path of contact ends at the usable flanks, a load point off every section
-/// is reached only through flank interference: over the grid below, every
-/// pair that solves with no flagged mesh has both members rated, and the
-/// grid does reach unrated members with one.
+/// **A pair whose tips stay on usable flank rates every member, unless its
+/// section is one the model cannot read.** Since the path of contact ends at
+/// the usable flanks, a load point off every section is reached only through
+/// flank interference: over the grid below, every pair that solves with no
+/// flagged mesh has both members rated or, where not, a Lewis section at the
+/// member's load point on which Dolan–Broghamer's factor is not a positive
+/// number (T08.2's domain) — rebuilt here from the member's own proportions
+/// at its transverse contact ratio. That is where a narrow tip is loaded
+/// steeply at its tip: the largest parabola that fits touches the flank just
+/// under its vertex, with an arm too short for the bending term to outweigh
+/// the axial one (5/40, β 20°, x 1, the tip held to its width). A search that
+/// took the flank's first crossing rated such a tooth at a parabola that
+/// crossed it. The grid reaches unrated members with a flagged mesh too.
 #[test]
 fn only_flank_interference_leaves_a_member_unrated() {
+    use crate::strength::{bending_section_by, CriticalSection, RootStressModel};
     let lib = test_library();
-    let (mut clean, mut unrated_with) = (0, 0);
+    let (mut clean, mut unrated_with, mut unreadable) = (0, 0, 0);
     for (z0, z1) in [
         (5_u32, 40_u32),
         (7, 300),
@@ -229,12 +238,26 @@ fn only_flank_interference_leaves_a_member_unrated() {
                         });
                         if r.meshes[0].flank_interference.contains(&true) {
                             unrated_with += usize::from(unrated);
-                        } else {
-                            clean += 1;
+                            continue;
+                        }
+                        clean += 1;
+                        for (i, g) in r.members.iter().enumerate() {
+                            if g.cases.iter().any(|c| c.bending_stress.is_some()) {
+                                continue;
+                            }
+                            let tooth = crate::Tooth::new(g.params);
+                            let eps = r.meshes[0].line.map(|l| l.contact_ratios.transverse);
+                            let section = eps.and_then(|e| {
+                                bending_section_by(&tooth, e, CriticalSection::LewisParabola)
+                            });
                             assert!(
-                                !unrated,
-                                "{z0}/{z1} β {beta} h_a {addendum} x {x}: unrated on usable flank"
+                                section.is_some_and(|s| s
+                                    .bending_factor(RootStressModel::DolanBroghamer)
+                                    .is_none()),
+                                "{z0}/{z1} β {beta} h_a {addendum} x {x}: member {i} unrated \
+                                 on usable flank with a section the model reads"
                             );
+                            unreadable += 1;
                         }
                     }
                 }
@@ -242,8 +265,8 @@ fn only_flank_interference_leaves_a_member_unrated() {
         }
     }
     assert!(
-        clean > 100 && unrated_with > 0,
-        "{clean} clean, {unrated_with} unrated"
+        clean > 100 && unrated_with > 0 && unreadable > 0,
+        "{clean} clean, {unrated_with} unrated with interference, {unreadable} unreadable"
     );
 }
 

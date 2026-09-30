@@ -1,4 +1,4 @@
-//! Scalar root finding, and one bracketed maximiser.
+//! Scalar root finding, and two bracketed maximisers.
 //!
 //! Two solvers cover every transcendental step in this crate (docs/rationale.md#where-closed-form-is-impossible).
 //! Both are **bracketed**, so neither can diverge: a Newton step that leaves the
@@ -265,10 +265,92 @@ where
     None
 }
 
+/// **The greatest value of `f` on `[lo, hi]`, ends included**: `(x, f(x))`,
+/// or `None` where `f` has no value anywhere it was asked.
+///
+/// Golden section, as [`maximise`], for an `f` that rises to one peak and
+/// falls on the bracket, or does only one of the two — the ends are compared
+/// with what the search settles on, so a greatest value at an end is found as
+/// one inside is. A point where `f` has no value ranks below every value: it is
+/// never the answer, and a search is never steered toward it.
+///
+/// **The trip count is derived, not a stopping test.** Near a smooth peak `f`
+/// is flat to its own rounding, `ε`, within `√ε` of the peak's argument, so
+/// narrowing the bracket past `√ε` of its magnitude cannot change the value
+/// found. Each step keeps `1/φ` of the bracket, so it takes
+/// `⌈ln((hi − lo)/(√ε·max(|lo|, |hi|))) / ln φ⌉` steps, 38 at most on a
+/// bracket that starts at zero.
+pub fn greatest<F>(f: F, lo: f64, hi: f64) -> Option<(f64, f64)>
+where
+    F: Fn(f64) -> Option<f64>,
+{
+    let at = |x: f64| f(x).map(|v| (x, v));
+    let better = |a: Option<(f64, f64)>, b: Option<(f64, f64)>| match (a, b) {
+        (Some(p), Some(q)) => Some(if q.1 > p.1 { q } else { p }),
+        (p, q) => p.or(q),
+    };
+    let ends = better(at(lo), at(hi));
+    let width = hi - lo;
+    let scale = f64::EPSILON.sqrt() * lo.abs().max(hi.abs());
+    if width <= scale {
+        return ends;
+    }
+    // 1/φ, the share of the bracket each step keeps.
+    let r = (5.0_f64.sqrt() - 1.0) / 2.0;
+    let steps = ((width / scale).ln() / (1.0 / r).ln()).ceil();
+    let (mut a, mut b) = (lo, hi);
+    let (mut c, mut d) = (b - r * (b - a), a + r * (b - a));
+    let (mut fc, mut fd) = (at(c), at(d));
+    let mut step = 0.0;
+    while step < steps {
+        // `None` ranks below every value: the side holding a value is kept.
+        if fc.map(|p| p.1) > fd.map(|q| q.1) {
+            b = d;
+            d = c;
+            fd = fc;
+            c = b - r * (b - a);
+            fc = at(c);
+        } else {
+            a = c;
+            c = d;
+            fc = fd;
+            d = a + r * (b - a);
+            fd = at(d);
+        }
+        step += 1.0;
+    }
+    better(ends, better(fc, fd))
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    /// **The greatest value is found inside and at either end**, to the
+    /// value's rounding, in the derived number of steps: a peak inside, a
+    /// function rising to its right end, one falling from its left, and one
+    /// with no value on part of the bracket.
+    #[test]
+    fn the_greatest_value_is_found_inside_and_at_either_end() {
+        let peak = |x: f64| Some(-(x - 0.3) * (x - 0.3) + 2.0);
+        let (x, v) = greatest(peak, 0.0, 1.0).unwrap();
+        assert!((v - 2.0).abs() <= 4.0 * f64::EPSILON * 2.0, "{v}");
+        assert!((x - 0.3).abs() <= 4.0 * f64::EPSILON.sqrt(), "{x}");
+        assert_eq!(
+            greatest(|x: f64| Some(x.exp()), 0.0, 2.0).unwrap(),
+            (2.0, 2.0_f64.exp())
+        );
+        assert_eq!(greatest(|x: f64| Some(-x), 1.0, 3.0).unwrap(), (1.0, -1.0));
+        // No value past 0.6: the peak at 0.5 is still found.
+        let partial = |x: f64| (x < 0.6).then(|| 1.0 - (x - 0.5).abs());
+        let (x, v) = greatest(partial, 0.0, 1.0).unwrap();
+        assert!(
+            (x - 0.5).abs() <= 4.0 * f64::EPSILON.sqrt() && (v - 1.0).abs() < 1e-7,
+            "{x} {v}"
+        );
+        assert_eq!(greatest(|_: f64| None::<f64>, 0.0, 1.0), None);
+    }
 
     #[test]
     fn brent_finds_a_polynomial_root() {

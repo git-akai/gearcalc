@@ -10,29 +10,29 @@ parabola · Y_F·K_f                  5.6172%         10               0.00424%
 
 == 2. rank agreement (Spearman) ==
   30° · Y_F only         vs 30° · Y_F·Y_S          rho = 0.794170  (n=1508)
-  30° · Y_F only         vs parabola · Y_F only    rho = 0.993410  (n=1508)
-  30° · Y_F only         vs parabola · Y_F·K_f     rho = 0.894366  (n=1508)
-  30° · Y_F·Y_S          vs parabola · Y_F only    rho = 0.782620  (n=1508)
-  30° · Y_F·Y_S          vs parabola · Y_F·K_f     rho = 0.897656  (n=1508)
-  parabola · Y_F only    vs parabola · Y_F·K_f     rho = 0.900661  (n=1521)
+  30° · Y_F only         vs parabola · Y_F only    rho = 0.897927  (n=1508)
+  30° · Y_F only         vs parabola · Y_F·K_f     rho = 0.834571  (n=1508)
+  30° · Y_F·Y_S          vs parabola · Y_F only    rho = 0.705646  (n=1508)
+  30° · Y_F·Y_S          vs parabola · Y_F·K_f     rho = 0.860309  (n=1508)
+  parabola · Y_F only    vs parabola · Y_F·K_f     rho = 0.869854  (n=1521)
 
 == 3. gradient sign agreement, ignoring effects below 0.0% ==
                                                      shift  fillet  dedend
   30° · Y_F only         vs 30° · Y_F·Y_S            68.6%   94.6%   63.4%
-  30° · Y_F only         vs parabola · Y_F only      95.0%   95.0%   93.4%
-  30° · Y_F only         vs parabola · Y_F·K_f       92.6%   94.6%   89.4%
-  30° · Y_F·Y_S          vs parabola · Y_F only      70.3%   95.6%   58.9%
-  30° · Y_F·Y_S          vs parabola · Y_F·K_f       70.9%   98.1%   74.0%
-  parabola · Y_F only    vs parabola · Y_F·K_f       97.6%   96.3%   85.1%
+  30° · Y_F only         vs parabola · Y_F only      87.3%   93.9%   87.6%
+  30° · Y_F only         vs parabola · Y_F·K_f       85.1%   94.6%   84.6%
+  30° · Y_F·Y_S          vs parabola · Y_F only      66.0%   94.9%   59.6%
+  30° · Y_F·Y_S          vs parabola · Y_F·K_f       67.8%   98.1%   75.1%
+  parabola · Y_F only    vs parabola · Y_F·K_f       96.1%   95.4%   83.7%
 
 == 3. gradient sign agreement, ignoring effects below 1.0% ==
                                                      shift  fillet  dedend
   30° · Y_F only         vs 30° · Y_F·Y_S            99.8%  100.0%   96.4%
-  30° · Y_F only         vs parabola · Y_F only     100.0%  100.0%  100.0%
-  30° · Y_F only         vs parabola · Y_F·K_f      100.0%  100.0%  100.0%
-  30° · Y_F·Y_S          vs parabola · Y_F only      99.8%  100.0%   95.1%
-  30° · Y_F·Y_S          vs parabola · Y_F·K_f      100.0%  100.0%  100.0%
-  parabola · Y_F only    vs parabola · Y_F·K_f      100.0%  100.0%  100.0%
+  30° · Y_F only         vs parabola · Y_F only      90.0%  100.0%  100.0%
+  30° · Y_F only         vs parabola · Y_F·K_f       90.2%  100.0%  100.0%
+  30° · Y_F·Y_S          vs parabola · Y_F only      95.6%  100.0%   96.5%
+  30° · Y_F·Y_S          vs parabola · Y_F·K_f       97.0%   99.9%   99.7%
+  parabola · Y_F only    vs parabola · Y_F·K_f       98.7%  100.0%  100.0%
 
 == 4. divergence across the matrix, by tooth count (x=0) ==
      z       spread
@@ -44,15 +44,15 @@ parabola · Y_F·K_f                  5.6172%         10               0.00424%
     70       74.96%
    120       81.51%
    250       88.08%
-   worst over the population: 174.37% at z=140 x=+0.8 alpha=25
+   worst over the population: 1273.41% at z=9 x=+0.5 alpha=25
 
 == 5. parabola against the 30° tangent ==
   designs rated by both        1508
-  parabola tangency on flank   194 (12.9%)
-  Y_F   parabola/tangent       1.006 .. 1.312   mean 1.055   spread 0.306
-  Y_F·K_f / Y_F·Y_S            0.510 .. 1.128   mean 0.827   spread 0.617
-  mean q_s                     1.945 parabola, 3.169 tangent
-  q_s outside Y_S's band       290 parabola (19.2%), 88 tangent (5.8%)
+  parabola tangency on flank   319 (21.2%)
+  Y_F   parabola/tangent       1.007 .. 13.734   mean 1.145   spread 12.727
+  Y_F·K_f / Y_F·Y_S            0.510 .. 3.150   mean 0.852   spread 2.640
+  mean q_s                     1.732 parabola, 3.169 tangent
+  q_s outside Y_S's band       366 parabola (24.3%), 88 tangent (5.8%)
 
 ################ RING (160 designs, tangent at 60°) ################
 

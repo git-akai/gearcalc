@@ -73,7 +73,11 @@ pub enum CriticalSection {
     /// Unlike the tangent construction this **follows the load point**, which is
     /// the property the cantilever model is supposed to have. On an external
     /// tooth the tangency sits higher up the fillet, the section is narrower,
-    /// and `Y_F` comes out 0.6–31 % larger, most on undercut teeth.
+    /// and `Y_F` comes out larger: loaded at the tip over `gear-cli matrix`'s
+    /// population, 0.7 % to 13.7× the tangent's, mean 14.5 %. The large end is
+    /// a narrow tip loaded steeply, where the largest parabola that fits
+    /// touches the flank just under its vertex: 21 % of the population
+    /// touches the flank.
     ///
     /// **That is `Y_F` alone, and it is not what a designer feels.** The number
     /// a stress is proportional to is the whole bending factor, and a narrower
@@ -95,12 +99,15 @@ pub enum CriticalSection {
     ///   support rather than proof.)
     /// - It gives the larger `Y_F` of the two, everywhere.
     ///
-    /// Against that: on an **external** tooth it changes ranking very little —
-    /// Spearman ρ = 0.993 against the 30° tangent over 1521 designs, with
-    /// identical gradient direction wherever a parameter moves the answer by 1 %
-    /// or more — so the choice is principled rather than consequential. And
-    /// **`Y_S` is calibrated against the tangent construction**, so pairing the
-    /// two mixes conventions.
+    /// Against that: on an **external** tooth loaded at its tip it ranks
+    /// designs as the 30° tangent does to Spearman ρ = 0.898 over 1508
+    /// designs, and agrees with it on the direction of a change in shift 90 %
+    /// of the time where the change moves the answer by 1 % or more — close,
+    /// and not the same: the two part where a narrow tip is loaded steeply. (A
+    /// flank search that took the first crossing it bracketed never found
+    /// those tangencies, and read ρ = 0.993.) And **`Y_S` is calibrated
+    /// against the tangent construction**, so pairing the two mixes
+    /// conventions.
     ///
     /// # On a ring, none of that paragraph holds
     ///
@@ -110,12 +117,12 @@ pub enum CriticalSection {
     ///
     /// | | external | ring |
     /// |---|---|---|
-    /// | tangency on the **flank** | 12.9 % | **100 %** |
-    /// | `Y_F` parabola/tangent | mean 1.055 | mean 1.425 |
-    /// | whole factor, each set's own | mean 0.827 | mean 0.970 |
-    /// | mean `q_s` | 1.95 vs 3.17 | **1.00** vs 4.94 |
-    /// | outside the `Y_S` band | 19.2 % | **66.9 %** |
-    /// | Spearman ρ on `Y_F` | **0.993** | **0.537** |
+    /// | tangency on the **flank** | 21.2 % | **100 %** |
+    /// | `Y_F` parabola/tangent | mean 1.145 | mean 1.425 |
+    /// | whole factor, each set's own | mean 0.852 | mean 0.970 |
+    /// | mean `q_s` | 1.73 vs 3.17 | **1.00** vs 4.94 |
+    /// | outside the `Y_S` band | 24.3 % | **66.9 %** |
+    /// | Spearman ρ on `Y_F` | **0.898** | **0.537** |
     ///
     /// The parabola's tangency lands on the involute flank for **every** ring in
     /// the population, so `s_Fn` is read across the flank while `ρ_F` falls back
@@ -469,6 +476,13 @@ pub trait ToothOutline {
     fn fillet_curvature(&self, s: f64) -> f64;
     /// Radius of curvature of the involute flank at roll `u`, mm — `r_b u`.
     fn flank_curvature(&self, u: f64) -> f64;
+    /// **How far the flank's tangent at roll `u` leans in toward the
+    /// centreline**, radians, going toward the tip: `u − ψ_b` on a tooth,
+    /// `u + ψ_b` on a ring, whose `ψ_b` is the involute's angle at the base
+    /// circle in its own sense. Linear in `u` on both. It is also the load's
+    /// angle off the across-tooth direction there, in magnitude, since the
+    /// load is along the flank's normal.
+    fn flank_tilt(&self, u: f64) -> f64;
 
     // ---- what a *rating* needs beyond the outline -------------------- //
     //
@@ -547,6 +561,11 @@ impl ToothOutline for Tooth {
     fn flank_curvature(&self, u: f64) -> f64 {
         self.rb * u
     }
+    fn flank_tilt(&self, u: f64) -> f64 {
+        // The tangent of `(r sin θ, r cos θ)`, `θ = ψ_b − inv(u)`, points at
+        // `θ + atan u = ψ_b − u` from the centreline, outward.
+        u - self.psi_b
+    }
     fn base_radius(&self) -> f64 {
         self.rb
     }
@@ -618,6 +637,11 @@ impl ToothOutline for crate::ring::Ring {
     }
     fn flank_curvature(&self, u: f64) -> f64 {
         self.rb * u
+    }
+    fn flank_tilt(&self, u: f64) -> f64 {
+        // `θ = ψ_b + inv(u)`, and in the flipped frame the tangent toward the
+        // tip points at `θ + atan u = ψ_b + u` inward.
+        u + self.psi_b
     }
     fn base_radius(&self) -> f64 {
         self.rb
@@ -723,6 +747,35 @@ pub fn root_section_with<T: ToothOutline + ?Sized>(
             // tangency, which is every ring; they can differ on an external
             // tooth, where the fillet usually has one and the flank was never
             // consulted.
+            //
+            // **Each curve is searched only where its tangency is a least of
+            // `x²/(y_v − y)`**, which is what a parabola that fits is:
+            //
+            // - On the fillet the outline, read as a half-width `w(y)`, falls
+            //   and is convex (the fillet is concave toward the space), so
+            //   `w + 2w′(y_v − y)` rises: one crossing at most, from falling to
+            //   rising `x²/(y_v − y)`. The fillet's bracket holds every
+            //   tangency it has.
+            // - On an involute, with `δ` the tangent's lean ([`ToothOutline::
+            //   flank_tilt`]) and `u` the roll, the condition is
+            //   `r_b (cos δ + u sin δ + u / sin δ) = 2|y_v|`, whose left side
+            //   falls and then rises: its slope has the sign of
+            //   `sin δ − u cos³δ`, which rises with `u`. A crossing on the
+            //   falling part is a *greatest* `x²/(y_v − y)`, one on the rising
+            //   part the least. So the flank is searched from where that sign
+            //   turns: a search of the whole flank finds no sign change when
+            //   both are there, and the fillet's tangency was then taken
+            //   where the flank's governs (z 30, x 0.8, 25°, h_a 1.25, ρ 0.2
+            //   at ε 1.2 read 5.9 % low).
+            let turn = |u: f64| {
+                let lean = g.flank_tilt(u);
+                lean.sin() - u * lean.cos().powi(3)
+            };
+            let rising = if turn(flank_lo) >= 0.0 {
+                Some(flank_lo)
+            } else {
+                brent(turn, flank_lo, flank_hi, Tol::default())
+            };
             let candidates = [
                 brent(
                     |s| {
@@ -734,16 +787,19 @@ pub fn root_section_with<T: ToothOutline + ?Sized>(
                     Tol::default(),
                 )
                 .and_then(|s| finish(g, method, s, false, load_point, dir, crossing, vertex)),
-                brent(
-                    |u| {
-                        let (q, t) = g.flank_at(u);
-                        condition(q, t)
-                    },
-                    flank_lo,
-                    flank_hi,
-                    Tol::default(),
-                )
-                .and_then(|u| finish(g, method, u, true, load_point, dir, crossing, vertex)),
+                rising
+                    .and_then(|from| {
+                        brent(
+                            |u| {
+                                let (q, t) = g.flank_at(u);
+                                condition(q, t)
+                            },
+                            from,
+                            flank_hi,
+                            Tol::default(),
+                        )
+                    })
+                    .and_then(|u| finish(g, method, u, true, load_point, dir, crossing, vertex)),
             ];
             // A candidate with no finite form factor is no section; of the
             // rest the higher wins, the fillet's on a tie.
@@ -798,8 +854,10 @@ fn finish<T: ToothOutline + ?Sized>(
     };
     let _ = vertex;
     // cos α_Fen is the share of the load acting across the tooth; the load
-    // direction's x-component is exactly that.
-    let load_angle = load_dir[0].abs().clamp(-1.0, 1.0).acos();
+    // direction's x-component is exactly that. Read as an arctangent of the
+    // two components, since an arccosine is flat to rounding within `√ε` of a
+    // square load, where the rating has a corner.
+    let load_angle = load_dir[1].abs().atan2(load_dir[0].abs());
 
     // **The notch is the fillet, wherever the critical section ended up.**
     //
@@ -875,7 +933,7 @@ impl RootSection {
         }
         let crossing = [0.0, load_point[1] + (-load_point[0] / dir[0]) * dir[1]];
         let moment_arm = crossing[1] - self.tangency[1];
-        let load_angle = dir[0].abs().clamp(-1.0, 1.0).acos();
+        let load_angle = dir[1].abs().atan2(dir[0].abs());
         let (form_factor, axial_compression) = beam(
             moment_arm,
             load_angle,
@@ -1531,6 +1589,23 @@ impl<T: ToothOutline + ?Sized> LoadPoint<'_, T> {
         root_section_with(self.v, self.roll(d)?, self.method)
     }
 
+    /// Base pitches back from the tip to roll `u`: [`Self::roll`] inverted.
+    fn back_to(&self, u: f64) -> f64 {
+        (u - self.u_tip) * self.rb / (self.sense * self.base_pitch)
+    }
+
+    /// **Where the load runs off the flank and where it lies level**: the
+    /// flank's far end as a roll and in base pitches back from the tip, and
+    /// where the load is square across the tooth, `flank_tilt = 0`, at which
+    /// the load angle's magnitude turns — a corner in the rated factor.
+    /// Either may be off the cycle; the caller clips.
+    fn corners(&self) -> (f64, f64, Option<f64>) {
+        let (lo, hi) = self.v.flank_bracket();
+        let far = if self.sense < 0.0 { lo } else { hi };
+        let level = brent(|u| self.v.flank_tilt(u), lo, hi, Tol::default());
+        (far, self.back_to(far), level.map(|u| self.back_to(u)))
+    }
+
     /// The roll `d` base pitches back from the tip, where it is on the flank.
     fn roll(&self, d: f64) -> Option<f64> {
         let roll = self.u_tip + self.sense * d * self.base_pitch / self.rb;
@@ -1553,11 +1628,29 @@ impl<T: ToothOutline + ?Sized> LoadPoint<'_, T> {
 /// With sharing off there is nothing to sweep — the tooth carries everything at
 /// the highest point of single-pair contact, `d = ε_n − 1`, which is the
 /// standard conservative reading and the one expression this used to be.
+///
+/// # The greatest over the cycle, not over samples
+///
+/// With sharing on, the rating is the greatest `(Y_F − axial)·K_f · share`
+/// anywhere on the cycle the flank carries. It is smooth except where the
+/// share steps or turns (at `ε_n − 1` and `1` below `ε_n = 2`, at `ε_n / 2`
+/// above), where the load lies square across the tooth (its angle's magnitude
+/// turns there), and where the flank ends. So the cycle is cut at each of
+/// those and each piece's greatest found by [`crate::solve::greatest`], ends
+/// included. It used to be the best of 204 samples, which fell short of the
+/// maximum by up to 1.4e-3 and missed it outright where the flank's end
+/// governs, since that end was not among them.
+///
+/// Measured over 532 random teeth, each piece's product rises to one peak and
+/// falls, or rises to an end, and the pieces' greatest equals a 4,000-sample
+/// maximum of the whole cycle to 1e-9; a second interior extremum on a piece
+/// (the product falling, then rising again toward a corner) is what would
+/// defeat the golden section, and `the_swept_maximum_is_the_greatest_over_the_cycle`
+/// holds the answer against a fine sweep.
 fn worst_over_cycle<T: ToothOutline + ?Sized>(
     at: &LoadPoint<T>,
     eps_n: f64,
     model: LoadSharing,
-    samples_wanted: usize,
     afresh: bool,
 ) -> Option<(RootSection, f64)> {
     // **The section is found once**, at the highest point of single-pair
@@ -1573,8 +1666,12 @@ fn worst_over_cycle<T: ToothOutline + ?Sized>(
     if matches!(model, LoadSharing::None) {
         return Some((section, 1.0));
     }
+    let (far_roll, far, level) = at.corners();
+    // The flank's far end is loaded at its own roll, which `d → roll` would
+    // round off the flank.
+    let roll = |d: f64| if d == far { Some(far_roll) } else { at.roll(d) };
     let rated = |d: f64| {
-        at.roll(d)
+        roll(d)
             .and_then(|roll| {
                 if afresh {
                     root_section_with(at.v, roll, at.method)
@@ -1587,36 +1684,49 @@ fn worst_over_cycle<T: ToothOutline + ?Sized>(
                     .map(|f| (s, f))
             })
     };
-    // The candidates the sweep must not miss, then the sweep itself.
-    let mut samples = vec![0.0, eps_n, highest_single_pair(eps_n), eps_n.min(1.0)];
-    for i in 0..=samples_wanted {
-        let t = i as f64 / samples_wanted as f64;
-        samples.push(t * eps_n);
-    }
+    // The form factor is what the stress is proportional to at a fixed
+    // torque, so the worst point is the largest `(Y_F − axial)·K_f · share`.
+    // Taking the factor rather than a stress keeps this independent of the
+    // load case, which is why it is evaluated once per member and not once per
+    // case.
+    //
+    // **`Y_β` and `Y_B` are deliberately absent from this product**, and
+    // their absence changes nothing: both are constant over a mesh cycle, so
+    // they scale every candidate alike and cannot move which one wins.
+    let weighted = |d: f64| rated(d).map(|(_, f)| f * crate::contact::load_share(d, eps_n, model));
 
-    let mut best: Option<(RootSection, f64, f64)> = None;
-    for d in samples {
-        let share = crate::contact::load_share(d, eps_n, model);
-        let Some((section, factor)) = rated(d) else {
-            continue;
-        };
-        // The form factor is what the stress is proportional to at a fixed
-        // torque, so the worst point is the largest `Y_F · Y_S · share`. Taking
-        // the factor rather than a stress keeps this independent of the load
-        // case, which is why it is evaluated once per member and not once per
-        // case.
-        //
-        // **`Y_β` and `Y_B` are deliberately absent from this product**, and
-        // their absence changes nothing: both are constant over a mesh cycle,
-        // so they scale every candidate alike and cannot move which one wins.
-        // Multiplying them in here would cost a sweep's worth of arithmetic to
-        // reach the same `d`.
-        let weighted = factor * share;
-        if best.is_none_or(|(_, _, w)| weighted.total_cmp(&w).is_gt()) {
-            best = Some((section, share, weighted));
+    // The part of the cycle the flank carries, and every corner inside it.
+    let end = far.min(eps_n);
+    let mut cuts: Vec<f64> = [
+        Some(0.0),
+        Some(end),
+        Some(highest_single_pair(eps_n)),
+        Some(eps_n - 1.0),
+        Some(1.0),
+        Some(eps_n / 2.0),
+        level,
+    ]
+    .into_iter()
+    .flatten()
+    .filter(|d| (0.0..=end).contains(d))
+    .collect();
+    cuts.sort_by(f64::total_cmp);
+    cuts.dedup();
+
+    let mut best: Option<(f64, f64)> = None;
+    for piece in cuts.windows(2) {
+        if let Some((d, w)) = crate::solve::greatest(weighted, piece[0], piece[1]) {
+            if best.is_none_or(|(_, b)| w > b) {
+                best = Some((d, w));
+            }
         }
     }
-    best.map(|(section, share, _)| (section, share))
+    // A cycle of one point: the flank holds only the tip.
+    if cuts.len() == 1 {
+        best = weighted(cuts[0]).map(|w| (cuts[0], w));
+    }
+    let (d, _) = best?;
+    rated(d).map(|(s, _)| (s, crate::contact::load_share(d, eps_n, model)))
 }
 
 /// **The highest point of single-pair contact**, in base pitches back from the
@@ -1642,32 +1752,6 @@ fn worst_over_cycle<T: ToothOutline + ?Sized>(
 fn highest_single_pair(eps_n: f64) -> f64 {
     (eps_n - 1.0).max(0.0)
 }
-
-/// How finely the mesh cycle is sampled when load sharing is enabled.
-///
-/// A count rather than a tolerance because what is wanted is the **maximum** of
-/// a smooth product over an interval, not an integral of it — and a sampled
-/// maximum near a smooth interior peak converges as `h²`. The two places the
-/// peak can sit are added to the sweep explicitly rather than hoped for: the
-/// single-pair boundary, which is where it provably is once sharing is allowed
-/// ([rationale](../../../docs/rationale.md)), and the tip. So the sampling
-/// refines an answer it is already guaranteed not to miss, which is why no
-/// tolerance is attached to it.
-/// Points swept along the mesh cycle when load sharing is allowed to move the
-/// governing point.
-///
-/// **The four candidates that must not be missed are seeded explicitly**, not
-/// hoped for — the two ends of the path, the highest point of single-pair
-/// contact, and the end of the single-pair zone — which is why the unshared
-/// answer is reproduced *exactly* below a virtual contact ratio of 2 rather than
-/// to a tolerance. What this count is for is the interior maximum inside the
-/// band, where the product of a rising form factor and a falling share turns
-/// over somewhere with no closed form.
-///
-/// A bound records where a sweep stopped, so this one is measured:
-/// `the_sharing_sweep_has_converged` quadruples it and asserts the answer moves
-/// by less than a part in ten thousand.
-const SHARING_SAMPLES: usize = 200;
 
 /// The critical section to rate bending on, and the share of the load acting
 /// there, once load sharing is allowed to move the governing point.
@@ -1696,12 +1780,13 @@ const SHARING_SAMPLES: usize = 200;
 /// single-pair contact, which is the standard conservative reading; with it, the
 /// whole cycle is swept.
 ///
-/// **Measured at 0.0–0.2 %** on ordinary meshes, because the governing point
-/// *becomes* the single-pair boundary — where the share is exactly 1, so the
-/// answer is the one already reported. It is worth having anyway for the case
-/// the measurement does not cover: at a high contact ratio (`ε ≥ 2`) two pairs
-/// are always engaged and the single-pair zone this argument rests on does not
-/// exist.
+/// **Below `ε_n = 2` it usually changes nothing**: the governing point is the
+/// single-pair boundary, where the share is exactly 1, and the answer is the
+/// unshared one. Not always: low on the flank the held section's `K_f` grows
+/// as its arm shortens, and on 11 of `gear-cli bendgrid`'s 564 ramp rows below
+/// 2 the lower flank governs, up to 3.2 % above the unshared figure (z 9, 25°,
+/// ε_n 1.7). At a high contact ratio (`ε ≥ 2`) two pairs are always engaged and
+/// the single-pair zone does not exist.
 ///
 /// The model itself is an **uncalibrated placeholder** — see [`LoadSharing`] —
 /// which is why it is an option a designer switches on rather than something
@@ -1717,42 +1802,18 @@ pub fn bending_section_shared<T: ToothOutline>(
     transverse_contact_ratio: f64,
     model: LoadSharing,
 ) -> Option<(RootSection, f64)> {
-    bending_section_shared_with(g, transverse_contact_ratio, model, SHARING_SAMPLES)
-}
-
-/// ...at a stated sweep resolution.
-///
-/// Exists so [`SHARING_SAMPLES`] can be *measured* rather than asserted. A
-/// resolution is a bound on where a sweep stopped, and this project has been
-/// caught taking one of those for a statement about the thing.
-#[must_use]
-pub fn bending_section_shared_with<T: ToothOutline>(
-    g: &T,
-    transverse_contact_ratio: f64,
-    model: LoadSharing,
-    samples: usize,
-) -> Option<(RootSection, f64)> {
-    let v = g.virtual_spur();
-    let (at, eps_n) = load_point(
-        g,
-        &v,
-        transverse_contact_ratio,
-        0.0,
-        CriticalSection::default(),
-    )?;
-    worst_over_cycle(&at, eps_n, model, samples, false)
+    bending_section_on_path(g, transverse_contact_ratio, 0.0, model)
 }
 
 /// **The sweep as it was: a section searched afresh at every load point.**
 /// The instrument that measures what holding the section costs
-/// (`gear-cli sharingbias`); unbounded near a pointed apex, so not the
-/// rating.
+/// (`gear-cli sharingbias`); unbounded near a pointed apex, and not smooth
+/// where the section moves from one curve to the other, so not the rating.
 #[must_use]
 pub fn bending_section_searched_afresh<T: ToothOutline>(
     g: &T,
     transverse_contact_ratio: f64,
     model: LoadSharing,
-    samples: usize,
 ) -> Option<(RootSection, f64)> {
     let v = g.virtual_spur();
     let (at, eps_n) = load_point(
@@ -1762,7 +1823,7 @@ pub fn bending_section_searched_afresh<T: ToothOutline>(
         0.0,
         CriticalSection::default(),
     )?;
-    worst_over_cycle(&at, eps_n, model, samples, true)
+    worst_over_cycle(&at, eps_n, model, true)
 }
 
 /// [`bending_section_shared`] on a path whose far end falls `short_of_tip`
@@ -1789,7 +1850,7 @@ pub fn bending_section_on_path<T: ToothOutline>(
         short_of_tip,
         CriticalSection::default(),
     )?;
-    worst_over_cycle(&at, eps_n, model, SHARING_SAMPLES, false)
+    worst_over_cycle(&at, eps_n, model, false)
 }
 
 /// Where the load sits on `v`, the virtual spur member of `g`, and the
@@ -2101,60 +2162,96 @@ mod tests {
     use crate::mesh::MeshKind;
     use crate::GearParams;
 
-    /// **The sharing sweep's resolution has converged.**
-    ///
-    /// `SHARING_SAMPLES` is 200, and a bound taken from a measurement is a
-    /// record of the parameters that were swept rather than a statement about
-    /// the thing — `docs/corrections.md`, "A bound records where the sweep
-    /// stopped". So the count is quadrupled and the answer must not move.
-    ///
-    /// The band this is about is `ε_n ≥ 2`, where there is no single-pair zone
-    /// and the maximum is at an interior point of a smooth product with no
-    /// closed form. **Below the band it cannot move at any resolution**, because
-    /// the four points that can win are seeded into the sweep explicitly rather
-    /// than hoped for — which is asserted here as an exact equality, since that
-    /// is what "the unshared answer is the same answer" means.
+    /// **The swept maximum is the greatest over the cycle.** Under the ramp
+    /// a rating is the greatest `(Y_F − axial)·K_f · share` on the cycle the
+    /// flank carries, so no load point on it may rate higher: checked against
+    /// 20,000 even points and the flank's own end. The best of the 204 samples
+    /// the sweep used to take fell short of this by up to 1.4e-3, and missed
+    /// the flank's end where it governs (ε 1.7 among them), so the law also
+    /// asserts that some answers lie beyond what those samples reach, and some
+    /// off the single-pair point. The tolerance is the rounding of one
+    /// evaluation, `2⁸ε` of it: both sides are the same function at two
+    /// arguments.
     #[test]
-    fn the_sharing_sweep_has_converged() {
-        for teeth in [12_u32, 17, 43, 97] {
-            for beta in [0.0_f64, 20.0] {
-                let g = Tooth::new(GearParams {
-                    teeth,
-                    helix_angle: beta,
-                    // A high-contact-ratio tooth, so the band is reachable.
-                    addendum: 1.35,
-                    ..Default::default()
-                });
-                for eps in [1.2_f64, 1.9, 2.1, 2.6] {
-                    let at = |n: usize| {
-                        bending_section_shared_with(&g, eps, LoadSharing::LinearRamp, n).map(
-                            |(s, f)| s.bending_factor(RootStressModel::DolanBroghamer).unwrap() * f,
-                        )
-                    };
-                    let (Some(coarse), Some(fine)) = (at(SHARING_SAMPLES), at(4 * SHARING_SAMPLES))
-                    else {
-                        continue;
-                    };
-                    assert!(
-                        (fine - coarse).abs() / coarse < 1e-4,
-                        "z={teeth} β={beta} ε={eps}: quadrupling the sweep moved the \
-                         governing factor {coarse} -> {fine}, so 200 is not converged"
-                    );
-                    // Refining can only *find* a larger maximum, never a
-                    // smaller one, so a fine sweep below a coarse one would mean
-                    // the two are not sampling the same function.
-                    assert!(
-                        fine >= coarse * (1.0 - 1e-12),
-                        "z={teeth} ε={eps}: a finer sweep found a smaller maximum"
-                    );
+    fn the_swept_maximum_is_the_greatest_over_the_cycle() {
+        let model = LoadSharing::LinearRamp;
+        let (mut checked, mut off_single_pair, mut beyond_samples) = (0, 0, 0);
+        for teeth in [9_u32, 12, 17, 25, 40, 70, 150] {
+            for (profile_shift, pressure_angle, addendum) in [
+                (0.0_f64, 20.0_f64, 1.0_f64),
+                (0.5, 25.0, 1.0),
+                (-0.3, 14.5, 1.0),
+                (0.3, 20.0, 1.35),
+                (0.8, 25.0, 1.25),
+            ] {
+                for helix_angle in [0.0_f64, 15.0, 30.0] {
+                    let g = Tooth::new(GearParams {
+                        teeth,
+                        profile_shift,
+                        pressure_angle,
+                        addendum,
+                        helix_angle,
+                        ..Default::default()
+                    });
+                    let v = g.virtual_spur();
+                    let cos_bb = g.base_helix_angle().cos();
+                    for eps_n in [1.3_f64, 1.7, 2.3, 2.6] {
+                        let eps = eps_n * cos_bb * cos_bb;
+                        for short in [0.0_f64, 0.2] {
+                            let Some((s, share)) = bending_section_on_path(&g, eps, short, model)
+                            else {
+                                continue;
+                            };
+                            let got =
+                                s.bending_factor(RootStressModel::DolanBroghamer).unwrap() * share;
+                            let (at, en) =
+                                load_point(&g, &v, eps, short, CriticalSection::default()).unwrap();
+                            let held = at.at(highest_single_pair(en)).unwrap();
+                            let w = |d: f64| {
+                                at.roll(d)
+                                    .and_then(|r| held.loaded_at(&v, r))
+                                    .and_then(|x| x.bending_factor(RootStressModel::DolanBroghamer))
+                                    .map(|f| f * crate::contact::load_share(d, en, model))
+                            };
+                            let (lo, hi) = v.flank_bracket();
+                            let far = (hi - lo) * v.rb
+                                / crate::plane::base_pitch(v.transverse_module(), v.alpha_t)
+                                - short / (cos_bb * cos_bb);
+                            let n = 20_000;
+                            let fine = (0..=n)
+                                .map(|i| en * f64::from(i) / f64::from(n))
+                                .chain([far])
+                                .filter_map(w)
+                                .fold(got, f64::max);
+                            assert!(
+                                fine <= got * (1.0 + 256.0 * f64::EPSILON),
+                                "z{teeth} x{profile_shift} {pressure_angle}° h_a{addendum} \
+                                 β{helix_angle} ε_n{eps_n} short {short}: rated {got}, \
+                                 but a load point rates {fine}"
+                            );
+                            checked += 1;
+                            off_single_pair += usize::from(share != 1.0);
+                            let samples = [0.0, en, highest_single_pair(en), en.min(1.0)]
+                                .into_iter()
+                                .chain((0..=200).map(|i| f64::from(i) / 200.0 * en))
+                                .filter_map(w)
+                                .fold(0.0, f64::max);
+                            beyond_samples +=
+                                usize::from(got > samples * (1.0 + 256.0 * f64::EPSILON));
+                        }
+                    }
                 }
             }
         }
+        assert!(checked > 300, "checked {checked}");
+        assert!(
+            off_single_pair > 0 && beyond_samples > 0,
+            "off the single-pair point {off_single_pair}, beyond 204 samples {beyond_samples}: \
+             the law does not reach where the sweep differs"
+        );
     }
 
-    /// **Continuous across the pointed limit, and independent of the sweep.**
-    /// A rating is a maximum over the mesh cycle, not over where a sweep
-    /// happened to sample: 200 and 3200 samples agree to 1e-4. And as the
+    /// **Continuous across the pointed limit.** As the
     /// addendum approaches the pointed limit the figure has a one-sided
     /// derivative there: the difference quotients against the limit at 1e-3
     /// and 1e-6 of the addendum short agree. A step at the limit makes the
@@ -2199,22 +2296,12 @@ mod tests {
                         } else {
                             build(limit * (1.0 - short))
                         };
-                        let at = |n: usize| {
-                            bending_section_shared_with(&g, eps, model, n).and_then(|(s, f)| {
+                        bending_section_shared(&g, eps, model)
+                            .and_then(|(s, f)| {
                                 s.bending_factor(RootStressModel::DolanBroghamer)
                                     .map(|b| b * f)
                             })
-                        };
-                        let (Some(coarse), Some(fine)) =
-                            (at(SHARING_SAMPLES), at(16 * SHARING_SAMPLES))
-                        else {
-                            panic!("{label}, {short} short: unrated");
-                        };
-                        assert!(
-                            (fine - coarse).abs() / coarse < 1e-4,
-                            "{label}, {short} short: {coarse} at {SHARING_SAMPLES} samples, {fine} at 16x"
-                        );
-                        coarse
+                            .unwrap_or_else(|| panic!("{label}, {short} short: unrated"))
                     };
                     let at_limit = rate(0.0);
                     let quotient = |short: f64| (at_limit - rate(short)) / (limit * short);
@@ -2228,17 +2315,16 @@ mod tests {
         }
     }
 
-    /// **A pointed tooth is rated at its root, and the sweep converges on
-    /// it.** Near a pointed apex the Lewis parabola tangent to the flank
-    /// shrinks onto the point, and its form factor grows like `1/d` — the
-    /// stress in the point, not at the root. At `d = 0` it is `0/0`. So a
-    /// sweep that samples there answers `NaN`, and one that skips only the
-    /// apex answers whatever its finest sample reaches (17.4 at 200 samples,
-    /// 208.6 at 3200). Below `ε_n = 2`, where a single-pair zone exists,
-    /// sharing may only relieve the unshared figure, and refining the sweep
-    /// may not move it.
+    /// **A pointed tooth is rated at its root.** Near a pointed apex the
+    /// Lewis parabola tangent to the flank shrinks onto the point, and its
+    /// form factor grows like `1/d` — the stress in the point, not at the
+    /// root. At `d = 0` it is `0/0`. So a sweep that searched a section afresh
+    /// there answered `NaN`, or whatever its finest sample reached (17.4 at
+    /// 200 samples, 208.6 at 3200). Held, the figure is finite and positive,
+    /// and below `ε_n = 2`, where a single-pair zone exists, sharing relieves
+    /// the unshared figure.
     #[test]
-    fn a_pointed_tooth_is_rated_at_its_root_and_the_sweep_converges() {
+    fn a_pointed_tooth_is_rated_at_its_root() {
         let mut pointed = 0;
         for teeth in [10_u32, 12, 17, 25, 40] {
             for profile_shift in [0.3_f64, 0.5, 0.8] {
@@ -2278,14 +2364,9 @@ mod tests {
                             .filter(|e| *e <= flank)
                         {
                             let alone = bending_section(&g, eps).and_then(|s| factor(&s, 1.0));
-                            let at = |n: usize| {
-                                bending_section_shared_with(&g, eps, LoadSharing::LinearRamp, n)
-                                    .and_then(|(s, f)| factor(&s, f))
-                            };
-                            let (coarse, fine) = (at(SHARING_SAMPLES), at(16 * SHARING_SAMPLES));
-                            for (what, v) in
-                                [("unshared", alone), ("coarse", coarse), ("fine", fine)]
-                            {
+                            let shared = bending_section_shared(&g, eps, LoadSharing::LinearRamp)
+                                .and_then(|(s, f)| factor(&s, f));
+                            for (what, v) in [("unshared", alone), ("shared", shared)] {
                                 if let Some(v) = v {
                                     assert!(
                                         v.is_finite() && v > 0.0,
@@ -2293,17 +2374,12 @@ mod tests {
                                     );
                                 }
                             }
-                            let (Some(alone), Some(coarse), Some(fine)) = (alone, coarse, fine)
-                            else {
+                            let (Some(alone), Some(shared)) = (alone, shared) else {
                                 continue;
                             };
                             assert!(
-                                (fine - coarse).abs() / coarse < 1e-4,
-                                "{label} ε={eps}: the sweep moved {coarse} -> {fine}"
-                            );
-                            assert!(
-                                coarse / alone <= 1.002,
-                                "{label} ε={eps}: sharing raised {alone} to {coarse}"
+                                shared / alone <= 1.002,
+                                "{label} ε={eps}: sharing raised {alone} to {shared}"
                             );
                         }
                     }
@@ -2321,10 +2397,12 @@ mod tests {
     /// Not "agrees to a tolerance": with [`LoadSharing::None`] the sweep is not
     /// entered at all and the answer is [`bending_section`]'s own, which is
     /// what lets an uncalibrated model be offered without it reaching anyone
-    /// who did not ask for it. Switched on, it may only ever *reduce* what a
-    /// tooth carries — sharing cannot invent load — and the reduction is the
-    /// small one the rationale measured, because the governing point moves to
-    /// the single-pair boundary where the share is exactly 1.
+    /// who did not ask for it. Switched on, on these ordinary teeth it only
+    /// relieves one, the governing point staying at the single-pair boundary
+    /// where the share is exactly 1. That is these teeth, not the model: low
+    /// on a small tooth's flank the held section's `K_f` grows as its arm
+    /// shortens, and the ramp's maximum can sit there, above the unshared
+    /// figure ([`bending_section_shared`]).
     #[test]
     fn sharing_is_off_by_default_and_can_only_ever_relieve_the_tooth() {
         for teeth in [12_u32, 17, 43, 97] {

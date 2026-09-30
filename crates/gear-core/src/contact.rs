@@ -1049,12 +1049,12 @@ mod tests {
     /// Everything above is written *in terms of* `RAMP_MIN` and `RAMP_MAX`, so
     /// moving either moves both sides of every comparison and the test does not
     /// notice — `docs/corrections.md`'s "a gate on a ratio cannot see a scale
-    /// error", met again. Nothing else could see them either: below `ε = 2` the
-    /// governing point *is* the single-pair boundary, where the share is exactly
-    /// one, so the ramp reaches no answer the tool reports and no recorded
-    /// output moves with it. Measured: perturbing `RAMP_MIN` by two hundredths
-    /// left all 558 tests, all 26 golden files and every documented figure
-    /// unchanged.
+    /// error", met again. Little else could see them: below `ε = 2` the
+    /// governing point is almost always the single-pair boundary, where the
+    /// share is exactly one. When this was written, perturbing `RAMP_MIN` by two
+    /// hundredths left all 558 tests, all 26 golden files and every documented
+    /// figure unchanged; `gear-cli bendgrid`'s ramp rows, held to an outside
+    /// rebuild by `tools/bending_gate.py`, see them now.
     ///
     /// So the two ends are pinned here as the figures they are. A canary on an
     /// **uncalibrated** number is the right shape for one — it is not a law and

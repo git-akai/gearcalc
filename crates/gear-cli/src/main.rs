@@ -2646,7 +2646,7 @@ fn sharing_bias_report() {
                 };
                 let held = bending_section_shared(&g, eps, LoadSharing::LinearRamp)
                     .and_then(|(s, f)| factor(&s, f));
-                let fresh = bending_section_searched_afresh(&g, eps, LoadSharing::LinearRamp, 200)
+                let fresh = bending_section_searched_afresh(&g, eps, LoadSharing::LinearRamp)
                     .and_then(|(s, f)| factor(&s, f));
                 let alone = bending_section(&g, eps).and_then(|s| factor(&s, 1.0));
                 let (Some(held), Some(fresh), Some(alone)) = (held, fresh, alone) else {

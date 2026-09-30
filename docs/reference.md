@@ -2988,9 +2988,11 @@ The share is `RAMP_MIN + (RAMP_MAX − RAMP_MIN)·t` with
 expression, continuous everywhere, and identical to the two-branch form below
 `ε_αn = 2` — where the single-pair plateau covers the whole region they could
 differ in.
-**Below it the model changes nothing**, and that is the model rather than a
-plumbing fault: the single-pair boundary is in the sweep with a share of exactly
-1, so the maximum is the point the unshared rating already took. A hula stage
+**Below it the model usually changes nothing**: the single-pair boundary is a
+candidate with a share of exactly 1, and the maximum is almost always the point
+the unshared rating already took. Low on a small tooth's flank the held
+section's `K_f` grows as its arm shortens and can govern instead, by up to 3.2 %
+over the unshared figure on `gear-cli bendgrid`'s grid. A hula stage
 cannot reach the band at any proportion it can be built at — its meshes run just
 above continuous contact by construction — so the control is offered there and
 provably cannot bite.

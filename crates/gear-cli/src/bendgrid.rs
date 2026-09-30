@@ -32,7 +32,7 @@ const BLOCKS: &[Block] = &[
     // Finite tooth counts, the three offered pressure angles, shifts either
     // side of zero, spur and helical, at the default proportions.
     Block {
-        teeth: &[9, 12, 17, 25, 40, 70, 150, 400],
+        teeth: &[9, 12, 17, 25, 40, 70, 150, 400, 3000],
         alpha_deg: &[14.5, 20.0, 25.0],
         shift: &[-0.3, 0.0, 0.5],
         helix_deg: &[0.0, 15.0, 30.0],
@@ -49,6 +49,17 @@ const BLOCKS: &[Block] = &[
         proportions: &[(1.25, 1.5, 0.25, 1.0), (1.0, 1.25, 0.2, 0.96)],
         eps_n: &[1.5, 2.2],
         short_of_tip: &[0.0, 0.2],
+    },
+    // Teeth with a tangency on both curves, where the flank's governs: a
+    // long, shifted tooth with a small round, loaded near its tip.
+    Block {
+        teeth: &[20, 30, 40],
+        alpha_deg: &[25.0],
+        shift: &[0.6, 0.8],
+        helix_deg: &[0.0, 15.0],
+        proportions: &[(1.25, 1.25, 0.2, 1.0), (1.1, 1.35, 0.25, 1.0)],
+        eps_n: &[1.2, 1.5],
+        short_of_tip: &[0.0],
     },
 ];
 

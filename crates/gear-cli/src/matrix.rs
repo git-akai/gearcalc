@@ -516,6 +516,12 @@ mod tests {
     /// lands on a ring's flank every time, that the two sets agree on a ring to
     /// within a few percent, that `q_s` collapses under the parabola — not the
     /// last digit of a population mean.
+    ///
+    /// Every design here is loaded at its tip. On a narrow tip loaded steeply
+    /// the largest parabola that fits touches the flank just under its vertex,
+    /// which a flank search that took the first crossing it bracketed never
+    /// found: that moved the external flank share from 12.9 % to 21.2 % and
+    /// the mean `Y_F` ratio from 1.055 to 1.145, and left the ring unmoved.
     #[test]
     fn the_studies_report_the_figures_the_documents_quote() {
         let ext = parting(Member::External, &population_for(Member::External));
@@ -528,15 +534,15 @@ mod tests {
         );
         let ext_flank = ext.on_flank as f64 / ext.n as f64;
         assert!(
-            (0.10..0.16).contains(&ext_flank),
-            "external flank tangencies ~12.9%, got {:.1}%",
+            (0.18..0.25).contains(&ext_flank),
+            "external flank tangencies ~21.2%, got {:.1}%",
             100.0 * ext_flank
         );
 
         // `Y_F` alone: the parabola's section is the narrower one, much more so
         // on a ring.
         assert!(
-            (ext.form[2] - 1.055).abs() < 0.02,
+            (ext.form[2] - 1.145).abs() < 0.02,
             "external Y_F {:?}",
             ext.form
         );

@@ -978,3 +978,154 @@ fn a_rating_is_taken_at_a_point_on_the_tooth() {
     let (lo, hi) = ToothOutline::flank_bracket(&v);
     assert!(root_section(&v, hi).is_some() && root_section(&v, lo).is_some());
 }
+
+/// **The section is the least tangency on either curve.** The Lewis parabola
+/// is the largest that fits, `x²/(y_v − y)` least over the outline, so the
+/// section must be the least of that ratio's interior minima on the fillet and
+/// the flank, found here by brute force from the curves alone: sampled, then
+/// each dip closed by golden section. A search that takes the first tangency it
+/// brackets fails where the flank dips below the fillet's tangency after
+/// rising past it — z 30, x 0.8, 25°, h_a 1.25, ρ 0.2, loaded 0.2 base pitches
+/// below the tip, read the fillet's section 5.9 % low.
+///
+/// The tolerance is rounding: the ratio is read off coordinates as large as the
+/// outline's largest, `c`, so each carries `2⁸ε·c` of the operations behind it,
+/// and the ratio `2/x + 1/(y_v − y)` of that relatively; its dip is closed to
+/// the argument's rounding, where the ratio is flat to `ε`.
+#[test]
+fn the_section_is_the_least_tangency_on_either_curve() {
+    use gear_core::ring::{Cutter, Ring};
+    use gear_core::strength::{root_section_with, CriticalSection, ToothOutline};
+
+    /// The least interior minimum of `x²/(y_v − y)` on one curve, and the
+    /// largest coordinate the sweep saw.
+    fn dips(curve: &dyn Fn(f64) -> [f64; 2], lo: f64, hi: f64, vertex: f64) -> (Vec<f64>, f64) {
+        let ratio = |p: f64| {
+            let q = curve(p);
+            (q[1] < vertex && q[0] > 0.0).then(|| q[0] * q[0] / (vertex - q[1]))
+        };
+        let n = 800;
+        let at = |i: usize| lo + (hi - lo) * i as f64 / n as f64;
+        let mut scale = 0.0_f64;
+        let vals: Vec<Option<f64>> = (0..=n)
+            .map(|i| {
+                let q = curve(at(i));
+                scale = scale.max(q[0].abs()).max(q[1].abs());
+                ratio(at(i))
+            })
+            .collect();
+        let mut out = Vec::new();
+        for i in 1..n {
+            let (Some(a), Some(b), Some(c)) = (vals[i - 1], vals[i], vals[i + 1]) else {
+                continue;
+            };
+            if !(b <= a && b <= c) || (b == a && b == c) {
+                continue;
+            }
+            // Golden section on [at(i-1), at(i+1)], to the argument's rounding.
+            let g = (5.0_f64.sqrt() - 1.0) / 2.0;
+            let (mut l, mut h) = (at(i - 1), at(i + 1));
+            while h - l > f64::EPSILON.sqrt() * l.abs().max(h.abs()).max(1e-3) {
+                let (x1, x2) = (h - g * (h - l), l + g * (h - l));
+                if ratio(x1) <= ratio(x2) {
+                    h = x2;
+                } else {
+                    l = x1;
+                }
+            }
+            if let Some(v) = ratio(0.5 * (l + h)) {
+                out.push(v);
+            }
+        }
+        (out, scale)
+    }
+
+    let mut checked = 0;
+    let mut flank_under_fillet = 0;
+    let mut rings = 0;
+    let mut members: Vec<(String, Box<dyn ToothOutline>)> = Vec::new();
+    for teeth in [12_u32, 20, 30, 40] {
+        for (x, alpha, h_a, rho) in [
+            (0.8_f64, 25.0_f64, 1.25_f64, 0.2_f64),
+            (0.6, 25.0, 1.25, 0.2),
+            (0.8, 20.0, 1.1, 0.25),
+            (0.0, 20.0, 1.0, 0.38),
+            (-0.3, 14.5, 1.0, 0.3),
+        ] {
+            members.push((
+                format!("z{teeth} x{x} {alpha}° h_a{h_a} ρ{rho}"),
+                Box::new(Tooth::new(GearParams {
+                    teeth,
+                    profile_shift: x,
+                    pressure_angle: alpha,
+                    addendum: h_a,
+                    root_radius: rho,
+                    ..Default::default()
+                })),
+            ));
+        }
+    }
+    for teeth in [40_u32, 60, 90] {
+        for x in [0.0_f64, 0.4] {
+            let params = GearParams {
+                teeth,
+                profile_shift: x,
+                root_radius: 0.3,
+                ..Default::default()
+            };
+            let ring = Ring::cut_by(
+                &params,
+                &Cutter {
+                    teeth: 20,
+                    addendum: 1.25,
+                    tip_round: 0.3,
+                },
+            );
+            members.push((format!("ring z{teeth} x{x}"), Box::new(ring)));
+        }
+    }
+    for (label, g) in &members {
+        if !g.is_usable() {
+            continue;
+        }
+        let (ulo, uhi) = g.flank_bracket();
+        let tip = if g.tip_at_high_roll() { uhi } else { ulo };
+        for frac in [0.0_f64, 0.15, 0.3, 0.5] {
+            let roll = tip + (if g.tip_at_high_roll() { -1.0 } else { 1.0 }) * frac * (uhi - ulo);
+            let (load_point, dir) = g.load_at(roll);
+            let vertex = load_point[1] + (-load_point[0] / dir[0]) * dir[1];
+            let (flo, fhi) = g.fillet_bracket();
+            let (fillet, s1) = dips(&|p| g.fillet_at(p).0, flo, fhi, vertex);
+            let (flank, s2) = dips(&|p| g.flank_at(p).0, ulo, uhi, vertex);
+            let Some(least) = fillet.iter().chain(&flank).copied().reduce(f64::min) else {
+                continue;
+            };
+            let got = root_section_with(g.as_ref(), roll, CriticalSection::LewisParabola)
+                .unwrap_or_else(|| panic!("{label} at {frac}: a tangency {least} and no section"));
+            let x_got = got.root_chord * got.root_chord / (4.0 * got.moment_arm);
+            let c = s1.max(s2);
+            let tol = 256.0 * f64::EPSILON * c * (4.0 / got.root_chord + 1.0 / got.moment_arm);
+            assert!(
+                (x_got - least).abs() <= tol * least,
+                "{label} at {frac} of the flank: the section's x²/(y_v − y) is {x_got}, \
+                 the least tangency {least} (fillet {fillet:?}, flank {flank:?})"
+            );
+            checked += 1;
+            rings += usize::from(!g.tip_at_high_roll());
+            if let (Some(f), Some(k)) = (
+                fillet.iter().copied().reduce(f64::min),
+                flank.iter().copied().reduce(f64::min),
+            ) {
+                flank_under_fillet += usize::from(k < f);
+            }
+        }
+    }
+    assert!(
+        checked > 60 && rings > 0,
+        "checked {checked}, rings {rings}"
+    );
+    assert!(
+        flank_under_fillet > 0,
+        "no case has a flank tangency below a fillet one: the law is vacuous where it matters"
+    );
+}
