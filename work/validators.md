@@ -22,8 +22,8 @@ tooth from the ring's and reported 2.7 µm on a cutter 0.44 mm out of place
 | `crossed_path.py` (CI) | the crossed line of action and zone; every row of `golden/crossed_17_23_90.txt` | flanks as parametric surfaces, normals by numerical differentiation, one-sidedness from the helicoid's own parameter; crate: a construction in lines — **different** | the two-sided band (3.161 vs 1.829 on 9/37); "one line" in the docs (eight, two the path) | none per model change | **keep** |
 | `validate_dxf.py` (CI) | an exported DXF's structure and every arc | ezdxf and raw tags; crate: its own writer — **different parser** | every arc bulged off its chord, 5.2 mm off the axis (9dd0945, T04.1). It missed the missing BLOCKS/OBJECTS that ezdxf invents on load, which SOLIDWORKS found; the structure is read raw now | none | **keep** |
 | `worm_flank_curvature.py` (hand) | a worm flank's principal curvatures; what ZI/ZN/ZA costs | first and second fundamental forms of the surface, numerically; crate: developable-helicoid closed form — **different** | the ZN/ZI contact-stress figures in `reference.md#crossed-axes` | none | **keep** |
-| `iso_6336_3_stack.py` (hand; its block gated by `check_figures`) | the ratings against ISO 6336-2/-3, after reproducing the tool's ISO set to 1e-8 | ISO Method B and 6336-2 in closed form, published; crate: DB on the generated tooth — **different (published method)** | the bias record against ISO (state.md) | its grid | **keep** (an analysis) |
-| `fillet_bem.py` · `shoulder_trefftz.py` (hand; bias tables gated) | the default and ISO ratings against the exact elastic peak | plane-strain BEM (Kelvin kernel); Kolosov–Muskhelishvili Trefftz with lightning poles for the canary; crate: DB fit — **different** | DB unconservative: −15 % median on external fillets, every ring under (Q10) | re-solve when teeth move (`--run`) | **keep** |
+| `iso_6336_3_stack.py` (CI through `check_figures`) | the ratings against ISO 6336-2/-3, after reproducing the tool's ISO set to 1e-8 | ISO Method B and 6336-2 in closed form, published; crate: DB on the generated tooth — **different (published method)** | the bias record against ISO (state.md); `Y_S` +0.15 % and a 30.1° tangent (the Q11 checker) | its grid | **keep** (an analysis); its reproduction of the ISO set is now also Rust law 9 |
+| `fillet_bem.py` · `shoulder_trefftz.py` (default mode in CI through `check_figures`) | the default and ISO ratings against the exact elastic peak | plane-strain BEM (Kelvin kernel); Kolosov–Muskhelishvili Trefftz with lightning poles for the canary; crate: DB fit — **different** | DB unconservative: −15 % median on external fillets, every ring under (Q10) | re-solve when teeth move (`--run`) | **keep** |
 | `hula_kinematics.py` (CI) | `golden/hula_18_0.2.txt`'s ratio and speeds; Willis over 32 arrangements | no slip at the pitch points (different) on one record; the other half `closed()` = the crate's `z₂z₄/D` held to it, never the crate — **half mirror** | a frame swap on its one record (e1dc809), also caught by `train_kinematics.py`'s `hula` section | a record and a formula | **retired** → Rust law 1 |
 | `helical_measurement.py` (hand) | a helical ball's and span's contact | Newton on the flank surface — different, **and already ported**: `tests/common`'s `Helicoid` with two laws over the helical grid (3788a97, which failed at its base) | T09.2's contact in the base tangent plane (via the port) | a second copy of the port | **retired**: the prototype of a port |
 | `first_yield.py` (hand) | `C` at the line and circle ends against `gear-cli iso` | the line field is McEwen's closed form as `hertz.rs` writes it — **mirror**; the circle's closed form and Johnson's 1.79 / 1.60 are already Rust laws (`the_summed_field_is_the_circles_closed_form`, `…_johnsons_at_both_ends`) | nothing recorded | a second copy of the line field | **retired** → Rust law 2 |
@@ -62,16 +62,22 @@ the corpus's record of the rating across its domain and the source of the ramp f
 state.md quotes), `dump`, `meshsweep`, `hulasweep`, `hulaband` (recorded analyses).
 
 ## New laws, and the faults they fail on
+Each plant run at head against the laws named; laws 8–12, and the last plant of 3 and 7,
+answer the checker (see Corrections).
 | Law | Replaces | Planted fault | Fails | Passes at head |
 |---|---|---|---|---|
 | 1 `a_hulas_speeds_are_its_pitch_points_rolling_without_slip` (arrangements.rs): 32 arrangements, exact, through `hula` and `Train::motion` | `hula_kinematics.py` | the wobble ring's negative count dropped in `arrangements::hula` | yes | yes |
 | 2 `the_line_field_is_flamants_load_summed_over_the_strip` (hertz.rs): McEwen against Flamant by Gauss–Chebyshev, to `10·400·ε` | `first_yield.py`'s line half | McEwen's `2ζ` → `(2 + 1e-11)ζ` (Johnson's law passes it) | yes | yes |
-| 3 `a_helical_members_virtual_spur_is_its_normal_section` (bending.rs): the virtual pitch radius is the normal section's osculating radius, from three points, to 1e-10; external and ring | the gate's virtual count, which held externals only | ISO 2019's count on a ring (the suite: silent); `z_n` 1e-9 off (10× the tolerance) | yes; yes | yes |
+| 3 `a_helical_members_virtual_spur_is_its_normal_section` (bending.rs): the virtual pitch radius is the normal section's osculating radius, from three points, to 1e-10; external and helical rings, the ring's cutter sectioned with it | the gate's virtual count, which held externals only | ISO 2019's count on a ring (the suite: silent); `z_n` 1e-9 off (10× the tolerance); the ring's cutter left unsectioned | yes; yes; yes | yes |
 | 4 `the_load_angle_is_the_roll_off_the_half_base_angle` (bending.rs): the load angle is `abs(u − ψ_b)` to `2⁸ε·r/(r_b u)`, found and moved sections, near a square load | the gate's square-load rows | the angle read by an arccosine (the suite: silent) | yes (1.9e-11 off at 3e-6) | yes |
 | 5 `the_swept_maximum_is_the_greatest_over_the_cycle` (strength.rs), strengthened: the flank's end loaded at its own roll, and asserted reached | the gate's far-end rows | the far end rounded off the flank (the suite: silent — the law read the end through the same rounding) | yes | yes |
 | 6 `a_path_short_of_the_tip_loads_where_more_contact_would` (bending.rs): unshared, `(ε, s)` rates as `(ε + s, 0)` to `2⁸ε`, spur and helical | the gate's `short` rows | `short` not scaled to the normal plane (the suite: one incidental failure) | yes | yes |
-| 7 `each_curve_offers_its_least_and_the_highest_rated_governs`, strengthened: every section's `ρ_f` is the fillet's brute-force least radius | the gate's notch radius | `ρ_f` read at the section (the suite: two figure canaries only) | yes | yes |
-| 8 `form_factor_converges_to_the_rack_limit`, strengthened: the axial term against the rack's closed form, `sin α / ((s_Fn/m) cos α)` | the gate's axial figure | the axial term without `cos α_n` (the suite: one figure canary) | yes (0.1459 against 0.1546 at 20°) | yes |
+| 7 `each_curve_offers_its_least_and_the_highest_rated_governs`, strengthened: every section's `ρ_f` is the fillet's brute-force least radius; each curve's least bracketed up to the vertex (an unbounded measure there, not none); tip-land rows z 9/12 x 0.505/0.508; a pointed apex loaded at its point stated as the rule reads it | the gate's notch radius and its tip-land rows | `ρ_f` read at the section (the suite: two figure canaries only); the flank's last 1/600, and 1/2000, under the vertex dropped | yes; yes | yes |
+| 8 `the_beams_terms_are_the_loads_own_statics` (bending.rs): `Y_F` and the axial term from the load vector, `F_n = F_t r/d` by the moment about the axis, finite teeth, to `2⁸ε r_a/d` (replaces a rack-limit check at a bare 5e-3, where `γ = α` hides a term read with the wrong angle) | the gate's axial figure | the axial term over `cos γ`, the load's angle | yes | yes |
+| 9 `the_iso_set_is_method_b_in_closed_form` (bending.rs): ISO 6336-3 Method B's `s_Fn, h_Fe, ρ_F, α_Fen, Y_F, Y_S` against the instrument's 30° section, 48 spur rows, to `10·2⁸ε·r_a/m` | `iso_6336_3_stack.py`'s reproduction, now in the suite | `Y_S` +0.15 %; the tangent 30.1° | yes | yes |
+| 10 `the_fillets_least_radius_is_the_rollings_closed_form` (bending.rs): `ρ_f` from Euler–Savary at the root — AGMA 908's `ρ + b²/(r + b)` for a rack, the hypotrochoid's apex for a shaper in a ring — to `2⁸ε·R/b` | the gate's `ρ_f` closed form, externals only | the ring's fillet curvature 1e-9 high | yes | yes |
+| 11 `the_first_yield_factor_is_the_peak_of_the_closed_fields` (hertz.rs): `C` is `1/peak` of Johnson's circle field (Tresca = von Mises there) and of `√(3J₂)` of the line's, to `C²(10⁻⁹ + ½f″x_tol² + 2⁸ε)` | `first_yield.py`'s end-to-end `C` at 1e-6 | von Mises over 1.99 (Johnson's 3-figure law passes it) | yes | yes |
+| 12 `the_reversed_bending_fraction_is_isos_idler_factor` (hertz.rs): a canary on 0.7, ISO 6336-3 Annex B's `Y_M` | the corpus | 0.701 | yes | yes |
 
 The trimmed scripts alone, on the crate planted and its corpus file re-recorded: flow.rs
 keeping the least consistent assignment → `breakaway.py` exits 1 (the Wolfrom's forward
@@ -79,6 +85,15 @@ keeping the least consistent assignment → `breakaway.py` exits 1 (the Wolfrom'
 `train_kinematics.py` exits 1 (16 sections). The removed halves added nothing: `crate_rows`
 never read the crate, and the flow half was held to the same recorded figures at the same
 tolerance as the closed form, which reaches them without the crate's search.
+
+## Corrections (after the Q11 checker)
+- The tools commit (58a6d5f after the rebase) says each retired script is "replaced by a law in
+  320ce8b": that hash is gone; the laws commit is 09ce77b.
+- It also says `Y_S` +0.15 %, a 30.1° tangent and a 0.701 reversed fraction pass the whole suite,
+  "held by the corpus alone". The suite was silent, but `iso_6336_3_stack.py`, a different method
+  CI runs through `check_figures.py`, fails the first two. Laws 9 and 12 now hold all three.
+- The first version of law 7 inherited the gate's blind spot above, and law 8 checked the axial
+  term only at the rack, where the load's angle is the pressure angle.
 
 ## bending_gate.py: retired
 **Method.** A rebuild by the crate's own method: the same AGMA fit, fillet envelope,
@@ -106,10 +121,11 @@ was fixed by adopting the crate's bracket, a closer mirror.
 | tangencies alone | eight, `each_curve_offers_…` among them | those laws |
 | `ε_α` for `ε_αn` at the load point | `the_bending_load_point_uses_the_virtual_contact_ratio` and one more | those laws |
 | the ramp's maximum from samples | `the_swept_maximum_…` | that law |
+| the flank's last 1/600 under the vertex dropped (64dddcd) | **none**: the section-rule law's 800-sample least had the gate's old blind spot (the sample past the vertex read as none, so a least in the last interval was never a dip) | law 7 |
 | the arccosine load angle | **none** | law 4 |
 | the flank's far end rounded off | **none** | law 5 |
 | `short` not scaled | one, incidentally | law 6 |
-| the axial term without `cos α_n` | one figure canary | law 8 |
+| the axial term without `cos α_n`, or over `cos γ` | one figure canary; none | law 8 |
 
 **Upkeep.** 1,058 lines, rewritten in each of the three rating commits since it landed (655,
 237 and 93 lines changed), and every rule change written twice.

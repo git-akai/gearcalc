@@ -189,8 +189,8 @@ The checks, by what each catches. `nix flake check` is **not** all of them.
 | `python3 tools/validate_dxf.py` | an export read back by a parser that shares no code with the writer. *Kept: a different parser, and the raw tags read before it repairs anything* | yes |
 | `python3 tools/train_kinematics.py` · `python3 tools/train_kinematics.py --self-test` · `python3 tools/breakaway.py` · `python3 tools/crossed_path.py` | **the crate's recorded output against a different method** — each reads `tools/golden/` and exits non-zero on a disagreement, so a defect in the crate that reaches the corpus fails here. *Kept because none restates the crate*: every body's speed from rigid-body velocities along the base circles' common tangent, not signed-count rows; each preset's efficiency, breakaway and sign from the carrier-frame power flow with no search in it, not the `2^M` assignments; the crossed line and zone off the flanks as surfaces differentiated numerically, not the construction in lines | yes |
 | `tools/worm_flank_curvature.py` | the worm flank's curvature from its fundamental forms, the surface differentiated numerically, against the crate's closed form, compared by eye; and what the ZI/ZN/ZA choice costs. *Kept: a different method* | no — by hand |
-| `tools/iso_6336_3_stack.py` | an **analysis**, not a check: where the ratings stand against ISO 6336-2/-3, after reproducing the tool's own ISO set. *Kept: published methods in closed form, which the rating does not use* | no — by hand |
-| `tools/fillet_bem.py` · `tools/fillet_bem.py --self-test` · `tools/shoulder_trefftz.py` | **the bending ratings against the exact elastic peak**: a boundary-element solve of each tooth `gear-cli fillet grid` lists, sharing no code with the crate, kept in `tools/fillet_bem.txt` with a fingerprint of the geometry it was solved on. The default mode joins the record with today's ratings and prints the bias tables `docs/state.md` quotes, so `check_figures.py` (which runs it) sees a moved rating as a moved bias, and it refuses a record whose teeth have moved: re-solve with `--run` (two to ten minutes on twelve cores). The self-test holds the solver to Kirsch, Inglis, Golovin, a second solver on four stepped bars (`shoulder_trefftz.py`, no boundary integral, which re-solves them) and the body it stands the teeth on, with planted faults, and moves every figure the document quotes to see each fail. *Kept: two solvers of the elasticity itself, where the rating is a fit* | no — by hand |
+| `tools/iso_6336_3_stack.py` | an **analysis**, not a check: where the ratings stand against ISO 6336-2/-3, after reproducing the tool's own ISO set, which a planted `Y_S` or tangent angle fails. *Kept: published methods in closed form, which the rating does not use* | no step of its own: CI runs it through `check_figures.py`, for the block `docs/state.md` quotes |
+| `tools/fillet_bem.py` · `tools/fillet_bem.py --self-test` · `tools/shoulder_trefftz.py` | **the bending ratings against the exact elastic peak**: a boundary-element solve of each tooth `gear-cli fillet grid` lists, sharing no code with the crate, kept in `tools/fillet_bem.txt` with a fingerprint of the geometry it was solved on. The default mode joins the record with today's ratings and prints the bias tables `docs/state.md` quotes, so `check_figures.py` (which runs it) sees a moved rating as a moved bias, and it refuses a record whose teeth have moved: re-solve with `--run` (two to ten minutes on twelve cores). The self-test holds the solver to Kirsch, Inglis, Golovin, a second solver on four stepped bars (`shoulder_trefftz.py`, no boundary integral, which re-solves them) and the body it stands the teeth on, with planted faults, and moves every figure the document quotes to see each fail. *Kept: two solvers of the elasticity itself, where the rating is a fit* | no step of its own: CI runs the default mode through `check_figures.py`; `--run` and `--self-test` by hand |
 | `tools/mutants.sh [--sample N] <file>… \| --in-diff <rev>` | **code no test pins**: cargo-mutants (in the dev shell) changes one operator, constant or return value at a time and runs the package's tests, one mutant at a time at three test threads, every Nth mutant for a sample. `--in-diff` is a package's own lines; `mutants.out/` lists what was missed | no — by hand |
 | `tools/check_identity.sh <base-rev>` | **any float that moved by a bit** since `<base-rev>`, across every preset, arrangement and a gear grid (`gear-cli identity`) — for a refactor meant to move nothing | no — by hand |
 
@@ -209,11 +209,14 @@ script goes. `work/validators.md` classifies every check by its method.
 The corpus is on that list because of a measurement, not for symmetry.
 Perturbing five of the rating model's cited constants — `K_f`'s `H` and `L`,
 ISO's `Y_S`, the tangent angle, the reversed-bending fraction — once left the
-**entire test suite silent**, and the corpus caught every one. `H` and `L` are
-held now by the section rule's law, which writes AGMA's fit from the standard
-(`H` off by 1e-9 fails it); the other three by the corpus alone. A `nextest`
-run is not evidence that the strength model is the one that was there
-yesterday. What the rating is worth is `tools/fillet_bem.py`'s question.
+**entire test suite silent**, and the corpus caught every one. The suite holds
+each now: `H` and `L` the section rule's law, which writes AGMA's fit from the
+standard (`H` off by 1e-9 fails it); `Y_S` and the 30° tangent
+`the_iso_set_is_method_b_in_closed_form`, ISO 6336-3 Method B solved in closed
+form; the reversed-bending fraction a canary citing ISO 6336-3 Annex B. A
+`nextest` run is still not evidence that the strength model is the one that
+was there yesterday: the corpus is. What the rating is worth is
+`tools/fillet_bem.py`'s question.
 
 ---
 
