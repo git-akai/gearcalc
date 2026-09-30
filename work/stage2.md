@@ -83,3 +83,10 @@ Carried from the exact-geometry research (`notch-research.md` §9):
   - apply the standard fix (one constraint on the held boundary).
   The expensive mode's computed fillet peak (bending-mechanics P2's BEM) must carry both before it
   lands.
+
+Carried from the bending-mechanics research (`bending-mechanics.md`), for Q6 (domain edges) or Q3
+(absence):
+- For every pointed tooth with ε < 1 that `gear-cli fillet` reaches, the crate prints the load
+  direction as (±1, 0) or NaN depending on rounding. Absence is written as a value, and the result is
+  discontinuous. Decide the load direction at a pointed tip by construction, or refuse by name.
+- Apex-loaded pointed teeth get no rating (fixable).
