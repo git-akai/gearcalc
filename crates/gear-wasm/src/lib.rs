@@ -620,7 +620,8 @@ pub struct RingSummary {
 /// export or measure.
 fn ring_of(req: &RingRequest) -> Result<gear_core::ring::Ring, String> {
     let g = gear_core::ring::Ring::cut_by(&req.params, &req.cutter.to_cutter());
-    g.has_a_tooth().map_err(|e| refusal(&gear_core::note::Explain::note(&e)))?;
+    g.has_a_tooth()
+        .map_err(|e| refusal(&gear_core::note::Explain::note(&e)))?;
     Ok(g)
 }
 
@@ -629,7 +630,8 @@ fn ring_of(req: &RingRequest) -> Result<gear_core::ring::Ring, String> {
 fn gear_of(params: GearParams) -> Result<gear_core::gear::Gear, String> {
     let g = gear_core::gear::Gear::try_new(params, Budget::DEFAULT).map_err(params_refusal)?;
     for t in g.distinct() {
-        t.has_a_tooth().map_err(|e| refusal(&gear_core::note::Explain::note(&e)))?;
+        t.has_a_tooth()
+            .map_err(|e| refusal(&gear_core::note::Explain::note(&e)))?;
     }
     Ok(g)
 }
@@ -652,8 +654,7 @@ fn parse_ring(input: &str) -> Result<RingRequest, String> {
 
 fn solve_ring_impl(input: &str) -> Result<String, String> {
     let req = parse_ring(input)?;
-    serde_json::to_string(&ring_summary(&req)?)
-        .map_err(|e| format!("could not encode result: {e}"))
+    serde_json::to_string(&ring_summary(&req)?).map_err(|e| format!("could not encode result: {e}"))
 }
 
 /// What the ring a request holds comes to, or its refusal ([`ring_of`]).
@@ -3063,12 +3064,20 @@ mod tests {
                     refused += 1;
                     continue;
                 };
-                let bad = non_finite(&ring_summary(&req).unwrap());
+                // A ring with no tooth left is refused, by its note.
+                let Ok(summary) = ring_summary(&req) else {
+                    refused += 1;
+                    continue;
+                };
+                let bad = non_finite(&summary);
                 if !bad.is_empty() {
                     faults.push(format!("ring {under}.{} = {x:e}: {bad:?}", f.path));
                 }
                 if req.params.teeth <= 1_000 {
-                    if let Ok(o) = ring_of(&req).outline(1e-3, Budget::DEFAULT) {
+                    if let Some(o) = ring_of(&req)
+                        .ok()
+                        .and_then(|g| g.outline(1e-3, Budget::DEFAULT).ok())
+                    {
                         if o.iter().any(|v| !(v.x.is_finite() && v.y.is_finite())) {
                             faults.push(format!("ring {under}.{} = {x:e}: outline", f.path));
                         }

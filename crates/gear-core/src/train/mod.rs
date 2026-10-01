@@ -1913,6 +1913,12 @@ impl crate::note::Explain for TrainError {
             Self::Malformed(Invariant::RingFirst(k)) => {
                 Note::new(key::ERROR_TRAIN_MALFORMED_RING_FIRST).count("mesh", numbered(*k))
             }
+            Self::Malformed(Invariant::TwoRings(k)) => {
+                Note::new(key::ERROR_TRAIN_MALFORMED_TWO_RINGS).count("mesh", numbered(*k))
+            }
+            Self::Malformed(Invariant::RingCrossed(k)) => {
+                Note::new(key::ERROR_TRAIN_MALFORMED_RING_CROSSED).count("mesh", numbered(*k))
+            }
             Self::Malformed(Invariant::DistanceOffFrame(d)) => {
                 Note::new(key::ERROR_TRAIN_MALFORMED_DISTANCE_OFF_FRAME)
                     .count("distance", numbered(*d))
@@ -2005,6 +2011,9 @@ impl std::fmt::Display for TrainError {
                 }
                 WiringError::NotACoupling(k) => {
                     write!(f, "coupling {} joins no two bodies this shape has", k + 1)
+                }
+                WiringError::NoKind(k) => {
+                    write!(f, "mesh {}'s two members make no mesh", k + 1)
                 }
             },
             Self::UnknownMaterial(n) => write!(f, "no material named {n:?} in the library"),
@@ -4752,6 +4761,9 @@ fn solve_parts(
     for (k, w) in wirings.iter().enumerate() {
         let mut mine = Vec::new();
         for (j, m) in w.meshes.iter().enumerate() {
+            // The system above was built from these wirings, which refuses
+            // a mesh with no kind; asked again rather than defaulted.
+            let kind = m.kind.ok_or(TrainError::Wiring(WiringError::NoKind(j)))?;
             mine.push(meshes.len());
             let [efficiency, at_rest] = cuts[k].efficiency(j);
             let mesh = flow::MeshFlow {
@@ -4759,7 +4771,7 @@ fn solve_parts(
                 b: port(k, w.mounts[m.b].spins_with),
                 frame: w.frame(j).map_or(GROUND, |f| port(k, f)),
                 za: f64::from(cuts[k].teeth(m.a)),
-                zb: m.kind.sign() * f64::from(cuts[k].teeth(m.b)),
+                zb: kind.sign() * f64::from(cuts[k].teeth(m.b)),
                 efficiency,
                 paths: f64::from(m.paths),
             };
@@ -9018,6 +9030,31 @@ mod tests {
         assert!(
             new.is_empty() && cleared.is_empty(),
             "of {checked} given inputs ({freed} freed), not honoured and not listed: {new:?}; listed and now honoured: {cleared:?}"
+        );
+    }
+
+    /// **A mesh with no kind is refused by the wiring, never read as
+    /// external** (T05.8). Two rings in a set's planet–ring mesh, built in
+    /// code where no entry validated it: the wiring carries no kind for
+    /// that mesh and its system is refused `NoKind`, where it was laid in as
+    /// an external mesh; validated, it is refused `TwoRings`. The set as
+    /// shipped wires every mesh with its kind — the control.
+    #[test]
+    fn a_mesh_with_no_kind_is_refused_by_the_wiring() {
+        let set = arr::planetary(12, 30, 72, 3);
+        let teeth: Vec<u32> = set.members.iter().map(|m| m.gear.teeth).collect();
+        let w = set.wiring();
+        assert!(w.meshes.iter().all(|m| m.kind.is_some()));
+        assert!(w.alone(&teeth).is_ok());
+        let mut two = set.clone();
+        let (planet, ring) = (two.meshes[1].a, two.meshes[1].b);
+        two.members[planet].ring = two.members[ring].ring;
+        let w = two.wiring();
+        assert_eq!(w.meshes[1].kind, None);
+        assert_eq!(w.alone(&teeth).err(), Some(WiringError::NoKind(1)));
+        assert_eq!(
+            two.validate().err(),
+            Some(TrainError::Malformed(Invariant::TwoRings(1)))
         );
     }
 

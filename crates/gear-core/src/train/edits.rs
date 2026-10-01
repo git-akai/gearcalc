@@ -931,6 +931,11 @@ pub enum Invariant {
     DistanceTwice(usize),
     /// A mesh whose first member is a ring: a ring is a mesh's second.
     RingFirst(usize),
+    /// A mesh between two rings, which is no mesh.
+    TwoRings(usize),
+    /// A ring meshing across crossed axes: the screw model has no internal
+    /// kind.
+    RingCrossed(usize),
     /// An axis distance between two axes that stand still in no one
     /// frame — neither carried by one body nor one turning about the other.
     DistanceOffFrame(usize),
@@ -1022,17 +1027,58 @@ impl Shape {
         Ok(())
     }
 
-    /// **A ring is its mesh's second member** — the side a mesh's kind is
-    /// read on ([`kind_of`](super::incidence::Indexed::kind_of)).
-    fn rings_second(&self) -> Result<(), Invariant> {
-        match self
-            .meshes
-            .iter()
-            .position(|m| self.members.get(m.a).is_some_and(|x| x.ring.is_some()))
-        {
-            Some(k) => Err(Invariant::RingFirst(k)),
-            None => Ok(()),
+    /// **Every mesh has a kind**, read off its members
+    /// ([`kind_of`](super::incidence::Indexed::kind_of)): two rings make no
+    /// mesh, a ring is its mesh's second member — the side a mesh's kind is
+    /// read on, which [`Self::order_meshes`] puts it on where a file comes
+    /// in — and a ring does not mesh across crossed axes.
+    fn meshes_have_a_kind(&self) -> Result<(), Invariant> {
+        let ring = |i: usize| self.members.get(i).is_some_and(|x| x.ring.is_some());
+        let axis = |i: usize| {
+            let body = self.members.get(i)?.body;
+            self.bodies.iter().find(|b| b.body == body).map(|b| b.axis)
+        };
+        let crossed = |a: usize, b: usize| match (axis(a), axis(b)) {
+            (Some(p), Some(q)) => self
+                .distances
+                .iter()
+                // A shaft angle that is no number is the figure's to refuse,
+                // by its field, once the graph is read.
+                .any(|d| {
+                    (d.axes == [p, q] || d.axes == [q, p]) && d.angle.is_finite() && d.angle != 0.0
+                }),
+            _ => false,
+        };
+        for (k, m) in self.meshes.iter().enumerate() {
+            match (ring(m.a), ring(m.b)) {
+                (true, true) => return Err(Invariant::TwoRings(k)),
+                (true, false) => return Err(Invariant::RingFirst(k)),
+                (false, true) if crossed(m.a, m.b) => return Err(Invariant::RingCrossed(k)),
+                _ => {}
+            }
         }
+        Ok(())
+    }
+
+    /// **Every internal mesh written (gear, ring)**, the order its kind is
+    /// read in: a mesh listing its ring first is turned round, which changes
+    /// nothing a mesh owns (its inputs are the pair's, in either order).
+    /// Whether any was turned. Asked where a file comes in; two rings stay as
+    /// they are, for [`Self::validate`] to refuse.
+    pub fn order_meshes(&mut self) -> bool {
+        let ring = |members: &[super::shape::Member], i: usize| {
+            members.get(i).is_some_and(|x| x.ring.is_some())
+        };
+        let mut turned = false;
+        for k in 0..self.meshes.len() {
+            let m = self.meshes[k];
+            if ring(&self.members, m.a) && !ring(&self.members, m.b) {
+                self.meshes[k].a = m.b;
+                self.meshes[k].b = m.a;
+                turned = true;
+            }
+        }
+        turned
     }
 
     /// **Every axis distance holds in one frame** — one axis per line in a
@@ -1061,8 +1107,9 @@ impl Shape {
     /// set of the graph's invariants input can break, read where input
     /// enters ([`Self::validate`]) and by every edit's check
     /// ([`super::Train::check`]): the carriers a tree rooted at ground
-    /// ([`Self::carriers`]), one distance per pair of axes, a ring its
-    /// mesh's second member, and every distance held in one frame. Whether
+    /// ([`Self::carriers`]), one distance per pair of axes, every mesh of a
+    /// kind (no two rings, a ring its mesh's second member and on parallel
+    /// axes), and every distance held in one frame. Whether
     /// a loop of distances on a carrier closes is a question of their
     /// values, asked once they are known (`Indexed::frames_close`).
     ///
@@ -1072,7 +1119,7 @@ impl Shape {
     pub fn invariants(&self) -> Result<(), Invariant> {
         self.carriers()?;
         self.distances_once()?;
-        self.rings_second()?;
+        self.meshes_have_a_kind()?;
         self.distances_in_a_frame()
     }
 

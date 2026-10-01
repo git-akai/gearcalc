@@ -150,7 +150,10 @@ pub struct MeshSpec {
     /// spins with — is caught.
     pub a: usize,
     pub b: usize,
-    pub kind: MeshKind,
+    /// The mesh's kind, `None` where its two members make no mesh — two
+    /// rings, or a ring across crossed axes — which [`Wiring::add_to`]
+    /// refuses ([`WiringError::NoKind`]) rather than reading as external.
+    pub kind: Option<MeshKind>,
     /// How many parallel instances of this mesh the shape has — the planet
     /// count. It changes no speed and no ratio, every instance being identical;
     /// it is what a member's engagements are counted over
@@ -192,6 +195,9 @@ pub enum WiringError {
     NotAMesh(usize),
     /// A coupling naming a body the shape does not have, or one body twice.
     NotACoupling(usize),
+    /// A mesh whose two members make no mesh: two rings, or a ring across
+    /// crossed axes (the screw model has no internal kind).
+    NoKind(usize),
 }
 
 impl Wiring {
@@ -272,6 +278,7 @@ impl Wiring {
                     Some(z) => Ok(i64::from(*z)),
                 }
             };
+            let kind = m.kind.ok_or(WiringError::NoKind(k))?;
             let (za, zb) = (count(m.a)?, count(m.b)?);
             system
                 .mesh(MeshRow {
@@ -279,7 +286,7 @@ impl Wiring {
                     b: at(self.mounts[m.b].spins_with),
                     za,
                     // **The sign is the mesh kind's**, never the wiring's.
-                    zb: m.kind.signed(zb),
+                    zb: kind.signed(zb),
                     frame: at(frame),
                 })
                 .ok_or(WiringError::NotAMesh(k))?;

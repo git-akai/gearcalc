@@ -5100,9 +5100,9 @@ impl Indexed<'_> {
                     MeshSpec {
                         a: m.a,
                         b: m.b,
-                        // Two rings in mesh is no mesh; the wiring's own check
-                        // refuses it as it refuses a member meshing itself.
-                        kind: self.kind_of(k).unwrap_or(MeshKind::External),
+                        // Two rings in mesh, or a ring across crossed axes,
+                        // is no mesh; the wiring's own check refuses it.
+                        kind: self.kind_of(k),
                         paths: self
                             .count_of(self.slot_of_member(m.a))
                             .max(self.count_of(self.slot_of_member(m.b))),

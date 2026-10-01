@@ -231,9 +231,12 @@ pub fn from_toml(src: &str) -> Result<Imported, DocumentError> {
         Some(found) if found == i64::from(FORMAT) => {}
         found => return Err(DocumentError::Format(found)),
     }
-    let Read { name, train, .. } = toml::from_str(src).map_err(DocumentError::Parse)?;
+    let Read {
+        name, mut train, ..
+    } = toml::from_str(src).map_err(DocumentError::Parse)?;
+    let turned = train.shape.order_meshes();
     validated(&train)?;
-    Ok(relieved(TrainDocument { name, train }))
+    Ok(relieved(TrainDocument { name, train }, turned))
 }
 
 /// **A train as a file holds it, validated** ([`Train::validate`]): a
@@ -251,9 +254,11 @@ fn validated(train: &Train) -> Result<(), DocumentError> {
 /// A document read, relieved of anything it asks for that nothing can
 /// honour: the graph as the panel relieves it — every group of inputs that
 /// argue is a part's, so relieving the one graph relieves each part — and
-/// every load case the same.
-fn relieved(mut document: TrainDocument) -> Imported {
-    let mut adjusted = false;
+/// every load case the same. `turned` says a mesh was written (gear, ring)
+/// on the way in ([`gear_core::train::shape::Shape::order_meshes`]), which is
+/// an adjustment too.
+fn relieved(mut document: TrainDocument, turned: bool) -> Imported {
+    let mut adjusted = turned;
     let shape = &mut document.train.shape;
     let relieved = shape.relieved(None);
     if relieved.toggles() != shape.toggles() {
@@ -323,17 +328,21 @@ pub fn convert(src: &str) -> Result<Imported, DocumentError> {
             )))
         }
     };
-    let train = Train {
+    let mut train = Train {
         load_cases,
         reversed_bending: train.reversed_bending,
         shape,
         held: train.held,
     };
+    let turned = train.shape.order_meshes();
     validated(&train)?;
-    Ok(relieved(TrainDocument {
-        name: old.name,
-        train,
-    }))
+    Ok(relieved(
+        TrainDocument {
+            name: old.name,
+            train,
+        },
+        turned,
+    ))
 }
 
 /// Write a geartrain as TOML, at the current format, in the shape the
@@ -417,6 +426,80 @@ mod tests {
             name: "Test train".into(),
             train,
         }
+    }
+
+    /// **A file that lists a ring first reads as the one that lists it
+    /// second** (T05.8): on every preset with an internal mesh, each such
+    /// mesh written (ring, gear) reads back to the shape written (gear,
+    /// ring), said as adjusted, and the two solve to the same motion and the
+    /// same paths. At the base a turned mesh was refused (`RingFirst`), and
+    /// solved as written it gave a set −5 where it is 7 (audit T05.8). Two
+    /// rings in mesh, and a ring across crossed axes, are refused by their
+    /// own keys.
+    #[test]
+    fn a_ring_listed_first_reads_as_listed_second() {
+        use gear_core::note::Explain;
+        use gear_core::train::{solve_train, Preset};
+        let lib = crate::default_library();
+        let read = |train: &Train| {
+            from_toml(
+                &to_toml(&TrainDocument {
+                    name: "turned".into(),
+                    train: train.clone(),
+                })
+                .unwrap(),
+            )
+        };
+        let mut checked = 0;
+        for preset in Preset::ALL {
+            let train = Train::alone(&preset.build(), 2.0, 3000.0);
+            let rings: Vec<usize> = (0..train.shape.meshes.len())
+                .filter(|&k| train.shape.members[train.shape.meshes[k].b].ring.is_some())
+                .collect();
+            if rings.is_empty() {
+                continue;
+            }
+            checked += 1;
+            let mut turned = train.clone();
+            for &k in &rings {
+                let m = &mut turned.shape.meshes[k];
+                std::mem::swap(&mut m.a, &mut m.b);
+            }
+            let straight = read(&train).unwrap();
+            let back = read(&turned).unwrap_or_else(|e| panic!("{preset:?}: {e:?}"));
+            assert!(back.adjusted, "{preset:?}: a turned mesh is an adjustment");
+            assert_eq!(
+                format!("{:?}", back.document.train.shape),
+                format!("{:?}", straight.document.train.shape)
+            );
+            let [a, b] = [&straight, &back].map(|d| solve_train(&d.document.train, &lib));
+            assert_eq!(
+                format!("{:?}", a.map(|r| (r.cases, r.paths))),
+                format!("{:?}", b.map(|r| (r.cases, r.paths))),
+                "{preset:?}"
+            );
+        }
+        assert_eq!(checked, 5, "every epicyclic preset has a ring");
+
+        let mut two = Train::alone(&arr::planetary(12, 30, 72, 3), 2.0, 3000.0);
+        let ring = two.shape.meshes[1].b;
+        let planet = two.shape.meshes[1].a;
+        two.shape.members[planet].ring = two.shape.members[ring].ring;
+        let refused = |r: Result<Imported, DocumentError>| match r {
+            Err(DocumentError::Malformed(e)) => e.note().key,
+            other => panic!("{other:?}"),
+        };
+        assert_eq!(
+            refused(read(&two)),
+            gear_core::note::key::ERROR_TRAIN_MALFORMED_TWO_RINGS
+        );
+        let mut crossed = Train::alone(&arr::pair([17, 43]), 2.0, 3000.0);
+        crossed.shape.members[1].ring = Some(gear_core::ring::Cutter::default());
+        crossed.shape.distances[0].angle = 90.0;
+        assert_eq!(
+            refused(read(&crossed)),
+            gear_core::note::key::ERROR_TRAIN_MALFORMED_RING_CROSSED
+        );
     }
 
     /// **What we write, we read back — every field of it.**

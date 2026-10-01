@@ -312,6 +312,10 @@ pub mod key {
     pub const ERROR_TRAIN_MALFORMED_DISTANCE_TWICE: &str = "error.train_malformed_distance_twice";
     /// `error.train_malformed_ring_first`
     pub const ERROR_TRAIN_MALFORMED_RING_FIRST: &str = "error.train_malformed_ring_first";
+    /// `error.train_malformed_two_rings`
+    pub const ERROR_TRAIN_MALFORMED_TWO_RINGS: &str = "error.train_malformed_two_rings";
+    /// `error.train_malformed_ring_crossed`
+    pub const ERROR_TRAIN_MALFORMED_RING_CROSSED: &str = "error.train_malformed_ring_crossed";
     /// `error.train_malformed_distance_off_frame`
     pub const ERROR_TRAIN_MALFORMED_DISTANCE_OFF_FRAME: &str =
         "error.train_malformed_distance_off_frame";
@@ -464,6 +468,8 @@ pub mod key {
         ERROR_TRAIN_MALFORMED_CARRIED_BY_CYCLE,
         ERROR_TRAIN_MALFORMED_DISTANCE_TWICE,
         ERROR_TRAIN_MALFORMED_RING_FIRST,
+        ERROR_TRAIN_MALFORMED_TWO_RINGS,
+        ERROR_TRAIN_MALFORMED_RING_CROSSED,
         ERROR_TRAIN_MALFORMED_DISTANCE_OFF_FRAME,
         ERROR_TRAIN_AXES_LOOP_OPEN,
         ERROR_TRAIN_MALFORMED_NUMBER_GAP,

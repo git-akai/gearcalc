@@ -1579,6 +1579,8 @@ mod tests {
                 for invariant in [
                     Invariant::DistanceTwice(0),
                     Invariant::RingFirst(1),
+                    Invariant::TwoRings(1),
+                    Invariant::RingCrossed(0),
                     Invariant::DistanceOffFrame(2),
                     Invariant::NumberGap(2),
                     Invariant::BodyOnNoAxis(1),
