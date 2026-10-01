@@ -350,15 +350,16 @@ pub const MEMBER: &[Row<Member>] = &[
         NOT_NEGATIVE
     ),
     given!("gear.helix_angle.manual", gear.helix_angle, HELIX_ANGLE),
-    // Read where given, and where no rating sizes it: an automatic width
-    // with no source stands at its box (`FaceSources::width_for`).
-    Row {
-        field: "gear.face_width.manual",
-        kind: Kind::Figure,
-        get: |m| Some(m.gear.face_width.manual),
-        bound: |_, m| (!m.gear.face_width.auto || !m.gear.face_sources.any()).then_some(POSITIVE),
-        held: None,
-    },
+    // A width wherever it is read: given, or the box an automatic width
+    // stands at where nothing sizes it — no source, no case, or a mesh no
+    // case loads (`FaceSources::width_for`), the last of which no field of
+    // the gear's tells apart. A box of nought there was a face of nothing,
+    // refused `NoContact` as if the teeth missed (stage1-exit item 3).
+    row!(
+        "gear.face_width.manual",
+        |m| Some(m.gear.face_width.manual),
+        POSITIVE
+    ),
     row!("gear.rim_thickness", |m| m.gear.rim_thickness, POSITIVE),
 ];
 

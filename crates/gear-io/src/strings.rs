@@ -972,11 +972,15 @@ mod tests {
                     let mut s = stage.clone();
                     s.distances[0].angle = sigma;
                     s.members[0].gear = gear_core::train::MemberGear {
-                        face_width: gear_core::params::Auto::automatic(0.0),
+                        face_width: gear_core::params::Auto::automatic(
+                            gear_core::train::DEFAULT_FACE_WIDTH,
+                        ),
                         ..stage.members[0].gear.clone()
                     };
                     s.members[1].gear = gear_core::train::MemberGear {
-                        face_width: gear_core::params::Auto::automatic(0.0),
+                        face_width: gear_core::params::Auto::automatic(
+                            gear_core::train::DEFAULT_FACE_WIDTH,
+                        ),
                         ..stage.members[1].gear.clone()
                     };
                     s

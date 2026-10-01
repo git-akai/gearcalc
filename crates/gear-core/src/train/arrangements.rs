@@ -726,10 +726,10 @@ pub fn worm(starts: u32, wheel_teeth: u32) -> Shape {
     // the coefficient is nought.
     thread.root_radius = 0.0;
     thread.helix_angle = Auto::automatic(helix);
-    thread.face_width = Auto::automatic(10.0);
+    thread.face_width = Auto::automatic(super::DEFAULT_FACE_WIDTH);
     let wheel = &mut shape.members[1].gear;
     wheel.helix_angle = Auto::automatic(90.0 - helix);
-    wheel.face_width = Auto::automatic(10.0);
+    wheel.face_width = Auto::automatic(super::DEFAULT_FACE_WIDTH);
     wheel.material = "Brass C360".to_string();
     shape
 }

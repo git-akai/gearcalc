@@ -1391,11 +1391,12 @@ fn defaults_impl() -> Result<String, String> {
     use gear_core::train::{CaseKind, LoadCase, Train};
 
     // The tab starts with an automatic face width, where the core's own
-    // default is a plain 10 mm. Both are right for their caller: the CLI and
-    // the tests want a fixed number they can reason about, and a designer
+    // default is given. Both are right for their caller: the CLI and the
+    // tests want a fixed number they can reason about, and a designer
     // opening the panel wants to see the width the rating asks for. Seeded at
-    // 5 mm so the field has something to fall back to when the toggle is
-    // turned off.
+    // the width every gear is born with (`DEFAULT_FACE_WIDTH`), so what the
+    // box falls back to — the toggle turned off, or a mesh no case loads — is
+    // the core's width, not the panel's own.
     //
     // **Every preset the panel offers**, which it was not: the rule reached the
     // parallel pair and the epicyclic set, and a hula stage opened at a *fixed*
@@ -1405,10 +1406,10 @@ fn defaults_impl() -> Result<String, String> {
     // own, and no golden case reaches it. See the test below. Now one walk
     // over every member of every preset's shape, so a preset added to the
     // core's list is seeded by being on it.
-    const UI_SEED: f64 = 5.0;
     let ui = |mut shape: gear_core::train::shape::Shape| {
         for m in &mut shape.members {
-            m.gear.face_width = gear_core::params::Auto::automatic(UI_SEED);
+            m.gear.face_width =
+                gear_core::params::Auto::automatic(gear_core::train::DEFAULT_FACE_WIDTH);
         }
         shape
     };
@@ -4328,7 +4329,11 @@ mod tests {
             for m in stage["members"].as_array().unwrap() {
                 let w = &m["gear"]["face_width"];
                 assert_eq!(w["auto"], true, "a seeded width is not automatic");
-                assert_eq!(w["manual"], 5.0, "a seeded width is not 5 mm");
+                assert_eq!(
+                    w["manual"],
+                    gear_core::train::DEFAULT_FACE_WIDTH,
+                    "a seeded width is not the width every gear is born with"
+                );
                 seeded += 1;
             }
         }

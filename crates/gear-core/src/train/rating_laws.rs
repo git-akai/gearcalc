@@ -460,6 +460,45 @@ fn with_contact_sizing_on_every_flank_holds_its_allowable() {
     assert!(judged > 0, "no flank was judged: the law is vacuous");
 }
 
+/// **An automatic width's box is a width wherever it is read** (stage1-exit
+/// item 3). A mesh no case loads asks no width, so its gears stand at their
+/// boxes — a layshaft's idle pairs — and a box of nought there was a face of
+/// nothing, which the solve refused as if the teeth missed (`NoContact`, or
+/// at the base this ran on `FlankInterference`). It is refused where it
+/// enters, by its field, as a given width or an unsized one is — on a
+/// loaded pair too, where it is never read: the box has one bound, not one
+/// per context. Boxes of the width every gear is born with solve (the
+/// control).
+#[test]
+fn an_automatic_widths_box_is_a_width() {
+    use super::{ByKind, FaceSources, DEFAULT_FACE_WIDTH};
+    let lib = test_library();
+    let with_box = |preset: Preset, width: f64| {
+        let mut s = preset.build();
+        for m in &mut s.members {
+            m.gear.face_width = Auto::automatic(width);
+            m.gear.face_sources = FaceSources {
+                bending: ByKind::of(|_| true),
+                contact: ByKind::of(|_| true),
+            };
+        }
+        solve_train(&Train::alone(&s, 2.0, 100.0), &lib)
+    };
+    for preset in [Preset::Layshaft, Preset::Spur] {
+        let refused = with_box(preset, 0.0)
+            .err()
+            .map(|e| crate::note::Explain::note(&e));
+        assert!(
+            refused.as_ref().is_some_and(|n| n
+                .values
+                .get("field")
+                .is_some_and(|f| f.ends_with("gear.face_width.manual"))),
+            "{preset:?}: {refused:?}"
+        );
+        assert!(with_box(preset, DEFAULT_FACE_WIDTH).is_ok(), "{preset:?}");
+    }
+}
+
 /// **The canary runs past its flank's endurance, and says so.** At the
 /// bending-sized default width its pinion's contact stress is well above any
 /// published contact endurance for 46 HRC 4340; contact sizing is off by
@@ -469,7 +508,7 @@ fn the_canary_says_its_flank_is_past_its_allowable() {
     let mut s = pair([17, 43]);
     for m in &mut s.members {
         m.gear.profile_shift = Auto::fixed(0.0);
-        m.gear.face_width = Auto::automatic(0.0);
+        m.gear.face_width = Auto::automatic(super::DEFAULT_FACE_WIDTH);
     }
     let r = solve_train(&Train::alone(&s, 2.0, 100.0), &test_library()).unwrap();
     assert!(

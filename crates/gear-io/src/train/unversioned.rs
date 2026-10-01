@@ -277,7 +277,14 @@ impl From<Member> for shape::Member {
                 dedendum: g.dedendum,
                 root_radius: g.root_radius,
                 helix_angle: g.helix_angle,
-                face_width: g.face_width,
+                // An automatic width's box was nought until the panel
+                // seeded it, and nothing read it while a load sized the
+                // gear: read as the width every gear is born with now.
+                face_width: if g.face_width.auto && g.face_width.manual == 0.0 {
+                    Auto::automatic(gear_core::train::DEFAULT_FACE_WIDTH)
+                } else {
+                    g.face_width
+                },
                 face_sources: g.face_sources,
                 rim_thickness: g.rim_thickness,
                 material: g.material,

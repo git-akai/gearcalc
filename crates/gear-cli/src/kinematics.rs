@@ -67,7 +67,7 @@ fn loads(input: usize, output: usize) -> Vec<LoadCase> {
 fn gear(teeth: u32) -> MemberGear {
     MemberGear {
         teeth,
-        face_width: gear_core::params::Auto::automatic(0.0),
+        face_width: gear_core::params::Auto::automatic(gear_core::train::DEFAULT_FACE_WIDTH),
         ..MemberGear::default()
     }
 }

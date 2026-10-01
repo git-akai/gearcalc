@@ -1426,6 +1426,15 @@ impl MemberGear {
     }
 }
 
+/// **The width every gear is born with, mm**, wherever it is born — the
+/// core's default, a preset the panel lays in, a gear an edit adds: the box
+/// an automatic width stands at where nothing sizes it, and the given width
+/// of a gear laid in fixed. Ten millimetres is the width the crate has laid
+/// gears in at from the start, and the corpus is recorded at it; the panel
+/// seeded its presets at 5 and an added gear at its mate's box, so one gear
+/// was three widths by where it came from (`work/stage2.md`, Q5 to Q6).
+pub const DEFAULT_FACE_WIDTH: f64 = 10.0;
+
 impl Default for MemberGear {
     fn default() -> Self {
         Self {
@@ -1440,7 +1449,7 @@ impl Default for MemberGear {
             dedendum: 1.25,
             root_radius: 0.38,
             helix_angle: Auto::automatic(0.0),
-            face_width: Auto::fixed(10.0),
+            face_width: Auto::fixed(DEFAULT_FACE_WIDTH),
             face_sources: FaceSources::default(),
             // A rim nobody described: `Y_B` is 1, and the gear cannot be told
             // its rim is thin because it has not said what its rim is.
@@ -10438,7 +10447,7 @@ mod tests {
         let width = |sources: FaceSources| {
             let mut s = arr::pair([17, 43]);
             for g in s.members.iter_mut().map(|m| &mut m.gear) {
-                g.face_width = Auto::automatic(0.0);
+                g.face_width = Auto::automatic(DEFAULT_FACE_WIDTH);
                 g.face_sources = sources;
             }
             try_alone(&s).unwrap().members[0].face_width
@@ -11619,7 +11628,7 @@ mod tests {
         let auto_width = |sources: FaceSources, o: Overrides| {
             let mut s = arr::pair([17, 43]);
             for g in s.members.iter_mut().map(|m| &mut m.gear) {
-                g.face_width = Auto::automatic(0.0);
+                g.face_width = Auto::automatic(DEFAULT_FACE_WIDTH);
                 g.face_sources = sources;
                 g.material_overrides = o;
             }
@@ -11895,7 +11904,7 @@ mod tests {
         ] {
             let mut stage = arr::pair([17, 43]);
             for (g, o) in stage.members.iter_mut().map(|m| &mut m.gear).zip(over) {
-                g.face_width = Auto::automatic(0.0);
+                g.face_width = Auto::automatic(DEFAULT_FACE_WIDTH);
                 g.material_overrides = o;
                 // Every rating sizes the width, so every one is asked below:
                 // contact sizes none by default.

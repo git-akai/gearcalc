@@ -1488,7 +1488,7 @@ fn elevation_drive() -> gear_io::TrainDocument {
                     let mut s = arr::pair([17, 43]);
                     s.members[0].gear = MemberGear {
                         teeth: 17,
-                        face_width: Auto::automatic(0.0),
+                        face_width: Auto::automatic(gear_core::train::DEFAULT_FACE_WIDTH),
                         ..MemberGear::default()
                     };
                     s.members[1].gear = MemberGear {
@@ -1985,7 +1985,7 @@ fn train_report(mode: Option<&str>) {
     let lib = gear_io::default_library();
     let auto_width = |teeth: u32| MemberGear {
         teeth,
-        face_width: Auto::automatic(0.0),
+        face_width: Auto::automatic(gear_core::train::DEFAULT_FACE_WIDTH),
         ..MemberGear::default()
     };
     let mut train = Train::chained(
@@ -1999,7 +1999,7 @@ fn train_report(mode: Option<&str>) {
                     fatigue_allowable: Some(420.0),
                     ..gear_core::material::Overrides::default()
                 },
-                face_width: Auto::automatic(0.0),
+                face_width: Auto::automatic(gear_core::train::DEFAULT_FACE_WIDTH),
                 ..MemberGear::default()
             };
             vec![

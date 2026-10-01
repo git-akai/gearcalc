@@ -584,14 +584,14 @@ impl Shape {
     /// helix automatic, so the mesh it joins gives it the group's and the
     /// hand its mesh needs; its shift and thickness automatic, so a second
     /// central at one carrier radius is closed by its shift; and its face
-    /// width automatic, as every gear the panel lays in is. It reads nothing
-    /// of its mate but the seeds of its automatic module and width boxes: a
-    /// gear never copies another's given helix, form or material.
+    /// width automatic, as every gear the panel lays in is, seeded at the
+    /// width every gear is born with ([`super::DEFAULT_FACE_WIDTH`]). It
+    /// reads nothing of its mate but the seed of its automatic module box: a
+    /// gear never copies another's width, given helix, form or material.
     fn push_follower(&mut self, mate: usize, body: usize, teeth: u32, ring: bool) {
         let module = self.members[mate].normal_module();
-        let width = self.members[mate].gear.face_width.manual;
         let new = self.push_member(body, teeth, module, ring.then(Default::default));
-        self.members[new].gear.face_width = Auto::automatic(width);
+        self.members[new].gear.face_width = Auto::automatic(super::DEFAULT_FACE_WIDTH);
         self.push_mesh(new, mate);
     }
 
@@ -1321,6 +1321,36 @@ mod tests {
     /// skipped. A loop of distances on a carrier is no fault of the graph's
     /// shape: whether it closes is its values' (`frame_closure` in
     /// `shape.rs`).
+    /// **A gear is born at one width, wherever it is born** (Q5 to Q6): a gear
+    /// an edit adds is seeded at [`super::super::DEFAULT_FACE_WIDTH`], as the
+    /// core's default and the panel's presets are — not at its mate's box,
+    /// which it once copied (a gear never reads its mate). A mate at 7 mm
+    /// given, and one at 7 mm automatic: the new gear is automatic at the
+    /// default either way.
+    #[test]
+    fn an_added_gear_is_born_at_the_default_width() {
+        for mate_width in [Auto::fixed(7.0), Auto::automatic(7.0)] {
+            let mut t = Train::alone(&arr::pair([17, 43]), 2.0, 3000.0);
+            t.shape.members[1].gear.face_width = mate_width;
+            t.edit(Edit::AddGear {
+                mate: 1,
+                on: Place::NewAxis,
+                ring: false,
+            })
+            .unwrap();
+            let new = &t.shape.members.last().unwrap().gear;
+            assert_eq!(
+                new.face_width,
+                Auto::automatic(super::super::DEFAULT_FACE_WIDTH),
+                "against a mate at {mate_width:?}"
+            );
+            assert_eq!(
+                super::super::MemberGear::default().face_width.manual,
+                new.face_width.manual
+            );
+        }
+    }
+
     #[test]
     fn malformed_graphs_are_refused_where_they_enter_by_name() {
         use crate::note::Explain;
@@ -1768,10 +1798,11 @@ mod tests {
                         let mut u = t.clone();
                         u.edit(o.edit.clone()).unwrap();
                         let new = u.shape.members.last().unwrap();
-                        let seed = t.shape.members[mate].gear.face_width.manual;
                         let own = MemberGear {
                             teeth: new.gear.teeth,
-                            face_width: crate::params::Auto::automatic(seed),
+                            face_width: crate::params::Auto::automatic(
+                                super::super::DEFAULT_FACE_WIDTH,
+                            ),
                             ..MemberGear::default()
                         };
                         if format!("{:?}", new.gear) != format!("{own:?}")
