@@ -127,6 +127,25 @@ impl Ratio {
         }
     }
 
+    /// **The least whole number not below this**, exactly: a count of
+    /// whole things that this many, or a part more, takes.
+    #[must_use]
+    pub fn ceil(self) -> i128 {
+        // The denominator is positive in lowest terms.
+        -((-self.num).div_euclid(self.den))
+    }
+
+    /// The magnitude. `None` for the one value with none in `i128`, which
+    /// [`Self::new`] never makes.
+    #[must_use]
+    pub fn checked_abs(self) -> Option<Self> {
+        if self.num < 0 {
+            self.checked_neg()
+        } else {
+            Some(self)
+        }
+    }
+
     /// A whole number.
     #[must_use]
     pub const fn whole(n: i64) -> Self {

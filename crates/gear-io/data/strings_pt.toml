@@ -86,6 +86,7 @@ near_self_locking = "próximo do autobloqueio: μ estático {friction} perto do 
 forward_locking = "não pode ser acionado no sentido direto: μ estático {friction} contra um limiar de {threshold}, portanto o primeiro membro não consegue acionar o segundo"
 near_forward_locking = "próximo de não acionar no sentido direto: μ estático {friction} perto do limiar {threshold}, portanto acionar ou não depende de um coeficiente estimado"
 low_efficiency = "rendimento do engrenamento {percent} %: a maior parte da entrada torna-se calor, o que normalmente limita um engrenamento de eixos cruzados antes da tensão"
+tolerance_below_base = "a tolerância da distância chega a {end} mm, dentro do limite dos círculos de base de {limit} mm, onde os dentes não têm ângulo de operação: a faixa não tem extremos a ler — reduza a tolerância"
 
 [train]
 load_not_reacted = "nada suporta esta carga: o trem gira sob ela e não suporta nada dela — reaja um eixo, ou um engrenamento que trava suporta-a"
@@ -137,7 +138,6 @@ train_wiring_no_common_frame = "o engrenamento {mesh} une duas engrenagens cujos
 train_wiring_not_a_mesh = "o engrenamento {mesh} nomeia um membro ou corpo que o trem não tem, ou uma engrenagem engrenando consigo mesma"
 train_wiring_not_a_coupling = "o acoplamento {coupling} nomeia um corpo que o trem não tem, ou um corpo duas vezes"
 train_empty = "o trem não tem engrenagens: não há nada a resolver"
-train_tolerance_below_base = "a tolerância da distância {distance} chega a {end} mm, dentro do limite dos círculos de base de {limit} mm, onde os dentes não têm ângulo de operação: reduza a tolerância"
 train_unknown_material = "não há material chamado {name} na biblioteca"
 train_flank_interference = "uma cabeça ultrapassa tanto o flanco útil do par que não resta contacto evolvente para avaliar; encurte a cabeça ou desloque o par"
 train_load_port = "o caso de carga {case} entra por um corpo que não pode receber carga: a terra, um corpo fixo, ou um que não é uma porta"

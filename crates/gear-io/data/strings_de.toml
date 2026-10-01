@@ -85,6 +85,7 @@ near_self_locking = "nahe der Selbsthemmung: Haftreibung μ {friction} nahe der 
 forward_locking = "nicht vorwärts antreibbar: Haftreibung μ {friction} gegenüber einer Grenze von {threshold}, das erste Glied kann das zweite also nicht antreiben"
 near_forward_locking = "nahe daran, nicht mehr vorwärts anzutreiben: Haftreibung μ {friction} nahe der Grenze {threshold}, ob angetrieben wird, hängt damit an einem geschätzten Beiwert"
 low_efficiency = "Verzahnungswirkungsgrad {percent} %: der größte Teil der Eingangsleistung wird Wärme, was einen Eingriff mit gekreuzten Achsen meist vor der Spannung begrenzt"
+tolerance_below_base = "die Achsabstandstoleranz reicht bis {end} mm, innerhalb der Grundkreisgrenze von {limit} mm, wo die Zähne keinen Betriebseingriffswinkel haben: das Band hat keine ablesbaren Grenzen — die Toleranz verkleinern"
 
 [train]
 load_not_reacted = "nichts stützt diese Last ab: der Strang dreht unter ihr und trägt nichts davon — eine Welle abstützen, oder eine sperrende Verzahnung hält sie"
@@ -136,7 +137,6 @@ train_wiring_no_common_frame = "Eingriff {mesh} verbindet zwei Räder, deren Ach
 train_wiring_not_a_mesh = "Eingriff {mesh} nennt ein Glied oder einen Körper, den der Strang nicht hat, oder ein Rad, das mit sich selbst kämmt"
 train_wiring_not_a_coupling = "Kupplung {coupling} nennt einen Körper, den der Strang nicht hat, oder einen Körper zweimal"
 train_empty = "der Strang hat keine Zahnräder: es gibt nichts zu berechnen"
-train_tolerance_below_base = "die Toleranz von Achsabstand {distance} reicht bis {end} mm, innerhalb der Grundkreisgrenze von {limit} mm, wo die Zähne keinen Betriebseingriffswinkel haben: die Toleranz verkleinern"
 train_unknown_material = "kein Werkstoff namens {name} in der Bibliothek"
 train_flank_interference = "ein Kopf reicht so weit über die nutzbare Gegenflanke hinaus, dass kein Evolventeneingriff zum Bewerten bleibt; den Kopf kürzen oder das Paar verschieben"
 train_load_port = "Lastfall {case} greift an einem Körper an, auf den keine Last gesetzt werden kann: Masse, ein festgehaltener Körper oder einer, der kein Anschluss ist"

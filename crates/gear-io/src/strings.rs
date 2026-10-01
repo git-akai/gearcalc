@@ -2000,8 +2000,8 @@ mod tests {
                 |_| vec![gear_core::train::LoadCase::ultimate(1, 2, 1.0, 1000.0)],
             );
             wide.shape.distances[0].tolerance_minus = 5.0;
-            if let Err(e) = gear_core::train::solve_train(&wide, &lib) {
-                record(&[e.note()]);
+            if let Ok(r) = gear_core::train::solve_train(&wide, &lib) {
+                record(&r.every_note());
             }
         }
 
@@ -2019,7 +2019,7 @@ mod tests {
         use gear_core::metrology::MeasurementError;
         use gear_core::note::Explain;
         use gear_core::screw::ScrewError;
-        use gear_core::train::{EditRefused, Invariant, Quoted, TrainError, WiringError};
+        use gear_core::train::{EditRefused, Invariant, TrainError, WiringError};
         let en = Catalogue::english();
         // Each with the number it must say, where it carries one.
         let mut errors: Vec<(Box<dyn Explain>, Option<&str>)> = vec![
@@ -2050,14 +2050,6 @@ mod tests {
                 Box::new(TrainError::AxesCannotBePlaced {
                     distance: 6,
                     too_close: true,
-                }),
-                Some("7"),
-            ),
-            (
-                Box::new(TrainError::ToleranceBelowBase {
-                    distance: 6,
-                    end: Quoted(25.5),
-                    limit: Quoted(28.25),
                 }),
                 Some("7"),
             ),

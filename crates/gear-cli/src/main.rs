@@ -60,8 +60,8 @@ fn play_or_nan(
 ) -> gear_core::contact::Directional<gear_core::train::Backlash> {
     let nan = gear_core::train::Backlash {
         nominal: f64::NAN,
-        minimum: f64::NAN,
-        maximum: f64::NAN,
+        minimum: Some(f64::NAN),
+        maximum: Some(f64::NAN),
     };
     x.unwrap_or(gear_core::contact::Directional {
         forward: nan,
@@ -951,10 +951,10 @@ fn hula_report(n: u32, clearance: f64, m_outer: f64, m_inner: f64, cutter_teeth:
         result.fixed_carrier_efficiency
     );
     println!(
-        "  backlash at the output {:.6} deg (min {:.6}, max {:.6})   at the crank {:.4} deg",
+        "  backlash at the output {:.6} deg (min {}, max {})   at the crank {:.4} deg",
         result.backlash.forward.nominal,
-        result.backlash.forward.minimum,
-        result.backlash.forward.maximum,
+        figure(result.backlash.forward.minimum, 6),
+        figure(result.backlash.forward.maximum, 6),
         result.backlash.backward.nominal
     );
 
@@ -2201,8 +2201,10 @@ fn train_report(mode: Option<&str>) {
                 || "— deg  (min —, max —)".to_owned(),
                 |b| {
                     format!(
-                        "{:.5} deg  (min {:.5}, max {:.5})",
-                        b.nominal, b.minimum, b.maximum
+                        "{:.5} deg  (min {}, max {})",
+                        b.nominal,
+                        figure(b.minimum, 5),
+                        figure(b.maximum, 5)
                     )
                 },
             )
@@ -3747,8 +3749,11 @@ fn worm_stage_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, torque: 
         m.cases[0].contact.patch_width
     );
     println!(
-        "  backlash     at the wheel {:.5} deg (min {:.5}, max {:.5})   at the worm {:.5} deg",
-        m.backlash[1].nominal, m.backlash[1].minimum, m.backlash[1].maximum, m.backlash[0].nominal
+        "  backlash     at the wheel {:.5} deg (min {}, max {})   at the worm {:.5} deg",
+        m.backlash[1].nominal,
+        figure(m.backlash[1].minimum, 5),
+        figure(m.backlash[1].maximum, 5),
+        m.backlash[0].nominal
     );
     println!("  bending      not reported - see docs/reference.md#crossed-axes");
     println!(

@@ -480,13 +480,13 @@ mod tests {
             "nominal, with no slack at all"
         );
         assert!(
-            r.meshes[0].backlash_by_drive().forward.maximum > 0.0,
+            r.meshes[0].backlash_by_drive().forward.maximum.unwrap() > 0.0,
             "opening the centres opens the mesh"
         );
         // Tighter than nominal the teeth would overlap: the play goes
         // negative, as a line contact's does, continuous through nought.
         assert!(
-            r.meshes[0].backlash_by_drive().forward.minimum < 0.0,
+            r.meshes[0].backlash_by_drive().forward.minimum.unwrap() < 0.0,
             "tighter than nominal is interference"
         );
     }

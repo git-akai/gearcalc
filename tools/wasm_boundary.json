@@ -31393,8 +31393,8 @@
            "speed": "-11860.465116279071",
            "speed_against_carrier": "-10166.112956810632",
            "cycles": {
-            "bending": 1251,
-            "contact": 1251
+            "bending": 1250,
+            "contact": 1250
            },
            "bending_stress": "136.51256135569119",
            "contact_stress": "1182.1568747537613",

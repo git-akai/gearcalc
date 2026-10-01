@@ -2296,6 +2296,19 @@ impl Indexed<'_> {
                 }
             }
         };
+        // **A candidate's tolerance band stays outside the base circles'
+        // limit**: a shift that puts a band end where the teeth have no
+        // operating angle is no candidate, so the search lands where every
+        // band reads whole.
+        let band_reads = built.meshes.iter().all(|bm| match &bm.contact {
+            BuiltContact::Line(l) => {
+                bm.running - self.distances[bm.distance].tolerance_minus > l.base_limit()
+            }
+            BuiltContact::Point(_) => true,
+        });
+        if !band_reads {
+            return None;
+        }
         let mut product = 1.0;
         for (k, bm) in built.meshes.iter().enumerate() {
             // A component's search scores its own meshes; the rest are a
@@ -2905,7 +2918,7 @@ struct PointMesh {
     /// The power through the mesh per load case, in the loads' order.
     case_power: Vec<f64>,
     backlash: [super::Backlash; 2],
-    row_play: [f64; 3],
+    row_play: super::Ends,
     flank_interference: [bool; 2],
     /// The first member's reference radius, mm — what its pitch line speed
     /// is read at.
@@ -4394,15 +4407,18 @@ pub fn rate(
     // it shows on a body is a path's to say ([`super::PathReport`]).
     // **Every mesh's play, one law**: at its distance's minus end, running
     // point and plus end, the row's play — a member's angular play at its
-    // own count, times the count. A band end inside the base-circle limit
-    // describes no assembly, and the tolerance is refused for it.
-    let row_plays: Vec<[f64; 3]> = (0..shape.meshes.len())
+    // own count, times the count. A band end inside the base circles' limit
+    // has no operating angle and no play: that end is absent, the mesh says
+    // where it is and where the limit stands, and the rest of the solve
+    // stands (rule 5).
+    let mut below_base: Vec<Option<Note>> = vec![None; shape.meshes.len()];
+    let row_plays: Vec<super::Ends> = (0..shape.meshes.len())
         .map(|k| {
             let bm = &built.meshes[k];
             let m = shape.meshes[k];
             let d = &shape.distances[bm.distance];
             let z = shape.members[m.a].gear.teeth;
-            let at = |a: f64| -> Result<f64, TrainError> {
+            let at = |a: f64| -> Result<Option<f64>, TrainError> {
                 let play = match &bm.contact {
                     BuiltContact::Line(l) => {
                         let rack = shape.rack_of(k, helix);
@@ -4410,26 +4426,37 @@ pub fn rate(
                             shape.base_params(m.a, helix).normal_pressure_angle_rad();
                         let bb = crate::plane::base_helix_angle(helix[m.a].to_radians(), alpha_n);
                         let p_bn = crate::plane::base_pitch(rack.mn, alpha_n);
-                        l.angular_play(a, d.axial_clearance, bb, p_bn, z).ok_or(
-                            TrainError::ToleranceBelowBase {
-                                distance: bm.distance,
-                                end: super::Quoted(a),
-                                limit: super::Quoted(l.base_limit()),
-                            },
-                        )?
+                        l.angular_play(a, d.axial_clearance, bb, p_bn, z)
                     }
-                    BuiltContact::Point(p) => p
-                        .angular_play(a, d.axial_clearance, z)
-                        .ok_or(TrainError::NoContact)?,
+                    BuiltContact::Point(p) => Some(
+                        p.angular_play(a, d.axial_clearance, z)
+                            .ok_or(TrainError::NoContact)?,
+                    ),
                 };
-                Ok(play * f64::from(z))
+                Ok(play.map(|p| p * f64::from(z)))
             };
             let running = bm.running;
-            Ok([
-                at(running - d.tolerance_minus)?,
-                at(running)?,
-                at(running + d.tolerance_plus)?,
-            ])
+            // The running point is where the mesh was built: it has play.
+            let mid = at(running)?.ok_or(TrainError::NoContact)?;
+            let (lo, hi) = (running - d.tolerance_minus, running + d.tolerance_plus);
+            let (minus, plus) = (at(lo)?, at(hi)?);
+            if let (BuiltContact::Line(l), Some(end)) = (
+                &bm.contact,
+                [(minus, lo), (plus, hi)]
+                    .into_iter()
+                    .find_map(|(p, a)| p.is_none().then_some(a)),
+            ) {
+                below_base[k] = Some(
+                    Note::new(key::MESH_TOLERANCE_BELOW_BASE)
+                        .number("end", end, 4)
+                        .number("limit", l.base_limit(), 4),
+                );
+            }
+            Ok(super::Ends {
+                minus,
+                running: mid,
+                plus,
+            })
         })
         .collect::<Result<_, TrainError>>()?;
     let member_backlash = |k: usize, side: MeshSide| -> super::Backlash {
@@ -4708,8 +4735,7 @@ pub fn rate(
                     // those are the same body.
                     let cycles = c.turns.as_ref().map(|t| {
                         super::loaded_cycles(super::Turns {
-                            revolutions: (t[shaft] - t[frame]).abs()
-                                * f64::from(wiring.paths_seen(i)),
+                            revolutions: t[shaft].against(t[frame]).times(wiring.paths_seen(i)),
                             reversing_actuations: c.reversing_actuations,
                         })
                     });
@@ -4798,6 +4824,7 @@ pub fn rate(
                         )
                         .into_iter()
                         .chain(flank_interference_notes(&l.path))
+                        .chain(below_base[k].clone())
                         .collect(),
                     },
                 ),
@@ -5254,45 +5281,43 @@ mod tests {
     }
 
     /// **The band's least play falls as its minus tolerance widens, and a
-    /// tolerance past the base circles' limit is refused** (T02.8): on the
+    /// band end past the base circles' limit has none** (T02.8): on the
     /// 17/43 pair from ±0.25 mm to ±5 mm, each band no tighter than the one
-    /// before, never a jump to nought, and once a band end reaches inside
-    /// `a_ref cos α_t` the train refused by name, its end and its limit.
+    /// before, never a jump to nought; once the minus end reaches inside
+    /// `a_ref cos α_t` the band's extremes are absent and the mesh says so,
+    /// its end and its limit, and the train still solves (rule 5).
     #[test]
     fn a_wider_tolerance_never_reads_less_interference() {
         let lib = test_library();
         let mut last: Option<f64> = None;
-        let (mut banded, mut refused) = (0, 0);
+        let (mut banded, mut beyond) = (0, 0);
         for step in 1..=20 {
             let tol = 0.25 * f64::from(step);
             let mut t = crate::train::sweep::cased(vec![arr::pair([17, 43])]);
             t.shape.distances[0].tolerance_minus = tol;
-            match crate::train::solve_train(&t, &lib) {
-                Ok(r) => {
-                    assert_eq!(refused, 0, "±{tol}: solved after a refusal");
-                    let least = r.paths[0].backlash.forward.unwrap().minimum;
+            let r = crate::train::solve_train(&t, &lib).unwrap();
+            let said = r.meshes[0]
+                .notes
+                .iter()
+                .any(|n| n.is(key::MESH_TOLERANCE_BELOW_BASE));
+            match r.paths[0].backlash.forward.unwrap().minimum {
+                Some(least) => {
+                    assert!(beyond == 0 && !said, "±{tol}: a band read past the limit");
                     if let Some(before) = last {
                         assert!(least <= before, "±{tol}: {least} above {before}");
                     }
                     last = Some(least);
                     banded += 1;
                 }
-                Err(e) => {
-                    let cause = match &e {
-                        TrainError::InPart { cause, .. } => &**cause,
-                        other => other,
-                    };
-                    assert!(
-                        matches!(cause, TrainError::ToleranceBelowBase { .. }),
-                        "±{tol}: {e:?}"
-                    );
-                    refused += 1;
+                None => {
+                    assert!(said, "±{tol}: absent with no note");
+                    beyond += 1;
                 }
             }
         }
         assert!(
-            banded >= 3 && refused >= 3,
-            "banded {banded}, refused {refused}"
+            banded >= 3 && beyond >= 3,
+            "banded {banded}, beyond {beyond}"
         );
         assert!(last.unwrap() < 0.0, "the widest band reads interference");
     }
@@ -6498,16 +6523,16 @@ mod tests {
         // it opens on both sides of the nominal since the two meshes' operating
         // angles no longer move together.
         let b = &tight.backlash.unwrap().forward;
-        assert!(b.minimum <= b.nominal && b.nominal <= b.maximum);
+        assert!(b.minimum.unwrap() <= b.nominal && b.nominal <= b.maximum.unwrap());
         let off = set_of(24, 18, 61, 0.0);
         let off = try_alone(&off).unwrap();
         let b = &off.backlash.unwrap().forward;
         assert!(
-            b.minimum < b.nominal && b.nominal < b.maximum,
+            b.minimum.unwrap() < b.nominal && b.nominal < b.maximum.unwrap(),
             "off the ideal ring the band opens: {} … {} … {}",
-            b.minimum,
+            b.minimum.unwrap(),
             b.nominal,
-            b.maximum
+            b.maximum.unwrap()
         );
 
         // At the zero-backlash centre distance there is no play at all.

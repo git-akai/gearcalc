@@ -81,6 +81,7 @@ near_self_locking = "接近自锁：静摩擦系数 μ {friction} 接近阈值 {
 forward_locking = "无法正向驱动：静摩擦系数 μ {friction}，阈值为 {threshold}，因此第一构件无法驱动第二构件"
 near_forward_locking = "接近无法正向驱动：静摩擦系数 μ {friction} 接近阈值 {threshold}，能否驱动取决于一个估算的系数"
 low_efficiency = "啮合效率 {percent} %：大部分输入功率变为热量，通常在应力之前就限制了交错轴啮合"
+tolerance_below_base = "中心距公差达到 {end} mm，位于基圆极限 {limit} mm 之内，此处齿没有工作压力角：侧隙带的极值无从读取——请缩小公差"
 
 [train]
 load_not_reacted = "没有构件承受此载荷：轮系在其作用下空转，不承担任何该载荷——请让某个轴口承受，或由自锁啮合承受"
@@ -132,7 +133,6 @@ train_wiring_no_common_frame = "啮合 {mesh} 连接的两个齿轮，其轴线�
 train_wiring_not_a_mesh = "啮合 {mesh} 指向齿轮系中不存在的构件或体，或齿轮与自身啮合"
 train_wiring_not_a_coupling = "联轴器 {coupling} 指向齿轮系中不存在的体，或同一个体两次"
 train_empty = "齿轮系中没有齿轮：无可求解"
-train_tolerance_below_base = "中心距 {distance} 的公差达到 {end} mm，位于基圆极限 {limit} mm 之内，此处齿没有工作压力角：请缩小公差"
 train_unknown_material = "材料库中没有名为 {name} 的材料"
 train_flank_interference = "齿顶越过配对齿面可用范围过多，已无可评估的渐开线接触；请缩短齿顶或对齿对变位"
 train_load_port = "载荷工况 {case} 从一个不能施加载荷的体进入：地、被固定的体，或不是端口的体"

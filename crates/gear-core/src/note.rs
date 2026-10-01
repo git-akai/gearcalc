@@ -153,6 +153,8 @@ pub mod key {
     pub const MESH_LOAD_SHARING_OUT_OF_BAND: &str = "mesh.load_sharing_out_of_band";
     /// `mesh.flank_interference`
     pub const MESH_FLANK_INTERFERENCE: &str = "mesh.flank_interference";
+    /// `mesh.tolerance_below_base`
+    pub const MESH_TOLERANCE_BELOW_BASE: &str = "mesh.tolerance_below_base";
     /// `mesh.contact_off_face`
     pub const MESH_CONTACT_OFF_FACE: &str = "mesh.contact_off_face";
 
@@ -324,8 +326,6 @@ pub mod key {
         "error.train_malformed_distance_off_frame";
     /// `error.train_axes_loop_open`
     pub const ERROR_TRAIN_AXES_LOOP_OPEN: &str = "error.train_axes_loop_open";
-    /// `error.train_tolerance_below_base`
-    pub const ERROR_TRAIN_TOLERANCE_BELOW_BASE: &str = "error.train_tolerance_below_base";
     /// `error.gear_throw_unreachable`
     pub const ERROR_GEAR_THROW_UNREACHABLE: &str = "error.gear_throw_unreachable";
     /// `error.library_empty`
@@ -456,6 +456,7 @@ pub mod key {
         MESH_SELF_LOCKING,
         MESH_LOAD_SHARING_OUT_OF_BAND,
         MESH_FLANK_INTERFERENCE,
+        MESH_TOLERANCE_BELOW_BASE,
         MESH_CONTACT_OFF_FACE,
         PART_DISTANCE_NOT_REACHED,
         PART_CLEARANCE_NEGATIVE,
@@ -523,7 +524,6 @@ pub mod key {
         ERROR_TRAIN_MALFORMED_RING_FIRST,
         ERROR_TRAIN_MALFORMED_DISTANCE_OFF_FRAME,
         ERROR_TRAIN_AXES_LOOP_OPEN,
-        ERROR_TRAIN_TOLERANCE_BELOW_BASE,
         ERROR_GEAR_THROW_UNREACHABLE,
         ERROR_LIBRARY_EMPTY,
         ERROR_LIBRARY_DUPLICATE_NAME,

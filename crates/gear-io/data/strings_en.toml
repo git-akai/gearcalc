@@ -159,6 +159,7 @@ low_efficiency = "mesh efficiency {percent} %: most of the input becomes heat, w
 # Facts about the whole shaft line, which no single part is in a position to
 # say: an input clamped against the peak it is measured from, and where a
 # back-driving load is reacted.
+tolerance_below_base = "the distance's tolerance reaches {end} mm, inside the base circles' limit of {limit} mm, where the teeth have no operating angle: the band has no extremes to read — narrow the tolerance"
 
 [train]
 load_not_reacted = "nothing holds this load: the train turns under it and carries none of it — react a port, or a mesh that locks holds it"
@@ -223,7 +224,6 @@ train_wiring_no_common_frame = "mesh {mesh} joins two gears whose axes stand sti
 train_wiring_not_a_mesh = "mesh {mesh} names a member or body the train does not have, or a gear meshing itself"
 train_wiring_not_a_coupling = "coupling {coupling} names a body the train does not have, or one body twice"
 train_empty = "the train has no gears: there is nothing to solve"
-train_tolerance_below_base = "distance {distance}'s tolerance reaches {end} mm, inside the base circles' limit of {limit} mm, where the teeth have no operating angle: narrow the tolerance"
 train_unknown_material = "no material named {name} in the library"
 train_flank_interference = "a tip reaches so far past its mate's usable flank that no involute contact is left to rate; shorten the tip or shift the pair"
 train_load_port = "load case {case} enters by a body no load can be put on: ground, a held body, or one that is not a port"

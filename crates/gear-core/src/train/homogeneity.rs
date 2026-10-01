@@ -105,7 +105,9 @@ const CLASSES: &[(&str, Class)] = &[
     ("operating_pressure_angle", Class::Power(0)),
     ("backlash/*", Class::Power(0)),
     ("backlash/*/*", Class::Power(0)),
-    ("meshes/row_play", Class::Power(0)),
+    ("row_play/minus", Class::Power(0)),
+    ("row_play/running", Class::Power(0)),
+    ("row_play/plus", Class::Power(0)),
     ("tips/tip_margin", Class::Power(0)),
     // Ratios, efficiencies and fractions of the power in.
     ("paths/ratio", Class::Power(0)),

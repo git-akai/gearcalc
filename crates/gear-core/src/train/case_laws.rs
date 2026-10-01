@@ -352,12 +352,12 @@ fn a_paths_figures_are_the_case_through_it() {
                     q.backlash.forward.unwrap().nominal,
                 ),
                 (
-                    p.backlash.backward.unwrap().minimum,
-                    q.backlash.forward.unwrap().minimum,
+                    p.backlash.backward.unwrap().minimum.unwrap(),
+                    q.backlash.forward.unwrap().minimum.unwrap(),
                 ),
                 (
-                    p.backlash.backward.unwrap().maximum,
-                    q.backlash.forward.unwrap().maximum,
+                    p.backlash.backward.unwrap().maximum.unwrap(),
+                    q.backlash.forward.unwrap().maximum.unwrap(),
                 ),
             ] {
                 differ("backward backlash", x, y);

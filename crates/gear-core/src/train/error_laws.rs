@@ -176,7 +176,8 @@ fn doubling_any_mesh_never_lowers_the_play() {
                         continue;
                     };
                     assert!(
-                        now.minimum >= was.minimum - 1e-9 * was.minimum.abs().max(1.0),
+                        now.minimum.unwrap()
+                            >= was.minimum.unwrap() - 1e-9 * was.minimum.unwrap().abs().max(1.0),
                         "{preset:?} mesh {k}: {now:?} below {was:?}"
                     );
                 }
@@ -355,4 +356,73 @@ fn no_count_short_is_nought_or_a_sentinel() {
         }
     }
     assert!(read >= 1, "no count short was read");
+}
+
+/// One unit in the last place of a double.
+fn ulp(x: f64) -> f64 {
+    let a = x.abs();
+    a.next_up() - a
+}
+
+/// **A given speed agrees to the precision it was given in, and no
+/// further** (T02.3, rule 2): 1000 rpm in with its output given as the
+/// double `1000 · (−17/43)` makes, and that ±1 ulp, solve; a disagreement
+/// ten times what the two speeds carry — `ulp(out) + 17/43 · ulp(in)` — is
+/// refused at the output; and the near miss a reader at single precision
+/// would pass, the output read through an `f32`, is refused.
+#[test]
+fn a_given_speed_agrees_to_its_own_precision() {
+    let lib = test_library();
+    let solves = |out: f64| {
+        let r = solve_train(&pair_given([1000.0, out]), &lib).unwrap();
+        r.cases[0].solved
+    };
+    let out = 1000.0 * (-17.0 / 43.0);
+    assert!(solves(out), "its own double");
+    assert!(
+        solves(out.next_up()) && solves(out.next_down()),
+        "a ulp either way"
+    );
+    let carried = ulp(out) + 17.0 / 43.0 * ulp(1000.0);
+    assert!(!solves(out + 10.0 * carried), "ten times what they carry");
+    assert!(!solves(out - 10.0 * carried), "ten times what they carry");
+    #[allow(clippy::cast_possible_truncation)]
+    let single = f64::from(out as f32);
+    assert!(single != out, "the plant moves the figure");
+    assert!(!solves(single), "a figure read at single precision");
+}
+
+/// **A count that is whole reads whole** (T02.3 with the cycles): two
+/// meshed-planet sets in a chain, driven at 2400 rpm for 1000 hours, whose
+/// planets turn at −800/3 rpm against their carrier, count 48,000,000
+/// cycles — never one
+/// more for a speed rounded above its true size — and every count is a
+/// whole number.
+#[test]
+fn a_whole_count_of_cycles_reads_whole() {
+    let lib = test_library();
+    let mut t = Train::chained(
+        vec![Preset::MeshedPlanets.build(), Preset::MeshedPlanets.build()],
+        |_| Vec::new(),
+    );
+    let mut case = LoadCase {
+        duty: super::Duty::Continuous {
+            runtime_hours: 1000.0,
+        },
+        ..t.fresh_case(super::CaseKind::Fatigue, 2.0, 2400.0)
+    };
+    case.enabled = true;
+    t.load_cases = vec![case];
+    let r = solve_train(&t, &lib).unwrap();
+    let mut counts = Vec::new();
+    for g in &r.members {
+        for c in &g.cases {
+            if let Some(n) = c.cycles {
+                assert_eq!(n.bending, n.bending.round(), "{n:?}");
+                counts.push(n.bending);
+            }
+        }
+    }
+    assert!(counts.contains(&48_000_000.0), "{counts:?}");
+    assert!(!counts.contains(&48_000_001.0), "{counts:?}");
 }
