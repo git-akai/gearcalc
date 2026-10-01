@@ -8912,15 +8912,6 @@ mod tests {
         // refusal should say that (T10.9, with T02's naming).
         ("Worm", "Distance(0)", "T10.9"),
         ("WormAndPair", "Distance(0)", "T10.9"),
-        // Not relief's: the shipped set sits 0.06 mm from where its planets
-        // can be placed (21.02 + 18.02 against 38.98), so its planet
-        // distance moved 0.1 mm is refused `AxesCannotBePlaced` with every
-        // other input free as well. A preset with margin (T10.2's note).
-        ("MeshedPlanets", "Distance(1)", "preset margin, T10.2"),
-        // Refused `AxesCannotBePlaced` only with the rest pinned; with them
-        // free, the sun at k = 1.1 solves (T10.4, one thickness freedom per
-        // mesh group).
-        ("MeshedPlanets", "Member(0, ThicknessMod)", "T10.4"),
         // A clearance the tips hold open, said by `sized_by` and no note.
         ("Planocentric", "Clearance(0)", "T10.10"),
         ("Hula", "Clearance(0)", "T10.10"),
@@ -12468,16 +12459,17 @@ mod tests {
         }
     }
 
-    /// **The bands the audit measured**, at the shipped proportions: the
-    /// meshed-planet set alone, whose three distances stack to a band from
-    /// nought, a pair ahead of a planocentric at ±0.02 mm, and a planetary
+    /// **The bands the audit measured**, at the proportions it measured
+    /// them at: the meshed-planet set alone (24, 18 + 18, 96 — the preset
+    /// before it was given room to place its planets), whose three
+    /// distances stack to a band from nought, a pair ahead of a planocentric at ±0.02 mm, and a planetary
     /// set, whose one distance holds its path's play stationary at every
     /// tolerance.
     #[test]
     fn the_stacked_bands_the_audit_measured() {
         let deg = |b: &Backlash| [b.minimum, b.maximum];
         let meshed = solve_train(
-            &Train::alone(&Preset::MeshedPlanets.build(), 2.0, 3000.0),
+            &Train::alone(&arr::meshed_planets(24, [18, 18], 96, 3), 2.0, 3000.0),
             &test_library(),
         )
         .unwrap();

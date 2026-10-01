@@ -950,7 +950,12 @@ impl Preset {
             Self::Wolfrom => wolfrom(18, [60, 61], 3),
             Self::Compound => stepped(24, [18, 17], [60, 59], 3),
             Self::Planocentric => planocentric(30, 33),
-            Self::MeshedPlanets => meshed_planets(24, [18, 18], 96, 3),
+            // 20-tooth planets, where 18 + 18 put the three axes 0.06 mm
+            // from in line (24 + 36 + 36 = 96) and a nudged distance could
+            // not be placed: here the planet distance clears the difference
+            // of the two carrier radii by 4 mm, and the ratio is the same
+            // (it is the sun's and the ring's alone).
+            Self::MeshedPlanets => meshed_planets(24, [20, 20], 96, 3),
         }
     }
 }
