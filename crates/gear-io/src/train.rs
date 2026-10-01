@@ -639,6 +639,47 @@ mod tests {
     /// loading a different gearbox. Converted, it is three parts, holds and
     /// loads what it did, reads back unchanged, and turns at the ratio the
     /// tool recorded of it then (`tools/golden/trainfile.txt` at the time).
+    /// **An automatic width's box of nought, in a file of stages, reads as
+    /// the width every gear is born with**: the panel of the time left an
+    /// automatic box at nought, and nothing read it while a load sized the
+    /// gear. Only an automatic box is read so: a *given* width of nought is
+    /// a gear with no face, refused by its field as in any file.
+    #[test]
+    fn a_staged_files_automatic_box_of_nought_reads_as_the_default() {
+        let old = include_str!("../tests/data/elevation_drive_staged.toml");
+        let given = "auto = false\nmanual = 10.0";
+        assert!(old.contains("auto = true\nmanual = 0.0") && old.contains(given));
+        let converted = convert(old).unwrap();
+        let widths: Vec<_> = converted
+            .document
+            .train
+            .shape
+            .members
+            .iter()
+            .map(|m| m.gear.face_width)
+            .collect();
+        assert!(widths.iter().all(|w| w.manual > 0.0), "{widths:?}");
+        assert!(widths.contains(&Auto::automatic(gear_core::train::DEFAULT_FACE_WIDTH)));
+        assert!(
+            widths.contains(&Auto::fixed(10.0)),
+            "a given width is as written"
+        );
+        let nought = old.replacen(given, "auto = false\nmanual = 0.0", 1);
+        match convert(&nought) {
+            Err(DocumentError::Malformed(e)) => {
+                use gear_core::note::Explain;
+                let n = e.note();
+                assert!(
+                    n.values
+                        .get("field")
+                        .is_some_and(|f| f.ends_with("gear.face_width.manual")),
+                    "{n:?}"
+                );
+            }
+            other => panic!("a given width of nought: {:?}", other.map(|_| ())),
+        }
+    }
+
     #[test]
     fn a_file_written_as_stages_is_refused_by_name_and_converts() {
         let old = include_str!("../tests/data/elevation_drive_staged.toml");

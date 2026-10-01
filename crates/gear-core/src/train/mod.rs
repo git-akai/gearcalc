@@ -1869,8 +1869,9 @@ impl crate::note::Explain for TrainError {
             // than restating it.
             Self::TipsUnclearable { mesh } => Note::new(key::ERROR_TRAIN_TIPS_UNCLEARABLE)
                 .count("mesh", u32::try_from(*mesh + 1).unwrap_or(1)),
-            Self::NoTooth { member } => Note::new(key::ERROR_TRAIN_NO_TOOTH)
-                .count("member", u32::try_from(*member + 1).unwrap_or(u32::MAX)),
+            Self::NoTooth { member } => {
+                Note::new(key::ERROR_TRAIN_NO_TOOTH).count("member", numbered(*member))
+            }
             Self::Screw(e) => e.note(),
             Self::NoContact => Note::new(key::ERROR_TRAIN_NO_CONTACT),
             Self::NoCommonDistance => Note::new(key::ERROR_TRAIN_NO_COMMON_DISTANCE),
@@ -9058,6 +9059,9 @@ mod tests {
         let mut two = set.clone();
         let (planet, ring) = (two.meshes[1].a, two.meshes[1].b);
         two.members[planet].ring = two.members[ring].ring;
+        // Two rings are not turned round where a file comes in: there is no
+        // order that gives them a kind.
+        assert!(!two.clone().order_meshes());
         let w = two.wiring();
         assert_eq!(w.meshes[1].kind, None);
         assert_eq!(w.alone(&teeth).err(), Some(WiringError::NoKind(1)));
@@ -9080,9 +9084,12 @@ mod tests {
             s.members[2].gear.profile_shift = Auto::fixed(x);
             try_alone(&s)
         };
+        let refused = with_ring_at(5.0).err();
+        assert_eq!(refused, Some(TrainError::NoTooth { member: 2 }));
+        // Numbered from 1, as the front end numbers gears.
         assert_eq!(
-            with_ring_at(5.0).err(),
-            Some(TrainError::NoTooth { member: 2 })
+            refused.map(|e| crate::note::Explain::note(&e).values["member"].clone()),
+            Some("3".to_string())
         );
         assert!(!matches!(
             with_ring_at(3.0),
