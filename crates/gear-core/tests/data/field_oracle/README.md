@@ -115,6 +115,41 @@ the prototype, never widened to a flaw. What each step found:
     identities `panel_sep` uses) and the surface as `∫ G′` by Gauss–Legendre where the panel is short beside
     its distance from the point; the panel law holds 58 such panels, to `3e-5 b`, to `1e-13` of scale.
   - This README's "34 cases" for `kernel/panel`: the file holds 35.
+- **P3 (`trace.py`'s strip, `t6_creep.py`).**
+  - `_segments` maps the contact's own ends through `acos((t − m)/c)`, which is `±1` only to
+    rounding where `m ≠ 0`: the end piece stops `√ε` short of `0` or `π` (`π − 1.5e-8` on
+    `across/strip42`), and the sliver goes unintegrated. Eleven of the 43 strips' `(c, m)` do
+    not solve their own equations: `I₀ = 0` and `(E*/2) c I₁ = q`, read by Gauss–Legendre over
+    `φ` of `h′` summed from the steps, miss by up to `6e-9` of their scale (the port's by
+    `9e-15`); `c` is off by up to `7.1e-11` mm (710 times its `1e-13`), `m` by `6.7e-11` (67
+    times its `1e-12`), and the pressures follow. The port takes the ends as `0` and `π`.
+  - `strip_report`'s edge share integrates the pressure by Gauss–Legendre 12 on pieces whose
+    ends are knots, where the pressure has `x ln x` kinks: off by up to `1.7e-5` (`strip15`,
+    whose strip is all edge, reads `0.999983`, not 1), on 23 of the 43 strips, against
+    `1e-10`. The port's share is a closed form (`Strip::load_to`), equal to the pressure's
+    tanh-sinh integral to `1.2e-14` of the load; the boundary-element reference
+    (`../field_bem/`) agrees with it within its own uncertainty (`strip11`: `0.30027648` ±
+    `8e-8`, the record `0.30027991`). `edge_on_panel` reads this share, so the state records'
+    `F_edge` (P7) carry the same error, against `5e-8`.
+  - The two above refute 65 values in 23 records; every other value reproduces within its rule
+    (worst `0.96` of it, `strip39`'s peak, on a record whose `(c, m)` the ends moved; on the
+    records neither flaw reaches, below `1e-3`).
+  - `_strip` grows the width's bracket by doubling, up to 40 times, from a guess (half and twice
+    Hertz's width at the extreme curvatures, the least taken over positive pieces anywhere, which
+    bounds nothing where the section is concave beyond the contact: `gap.json`'s ring has
+    `k₀ < 0` there). The port brackets by construction: where `h″ ≥ κ > 0` across the contact
+    its load is at least Hertz's at `κ`, so Hertz's width at the least curvature within twice
+    it is an upper bound, sought band by band between the knots; no such band is a refusal.
+  - The pressure is evaluated `1e-12` off a knot (`_conj`'s logarithms are singular there, and
+    their sum is not) and set to 0 within `1e-12` of the ends. Integrated by parts at each knot
+    the pressure has neither (`(cos θ − cos φ_j) ln|…| → 0`), so the port has no nudge.
+  - Absence carried as numbers: `pflank`/`pedge` `0.0` for a region the strip does not have,
+    a flank's ends `±inf` and an empty flank as `lo = inf, hi = −inf`. The port types each
+    (`Option`s; `FlankPart` with `Option` ends, empty where `lo > hi`; `None` for no flank).
+  - The location's tolerance, `t_pmax` `rel 1e-4`, is relative to a value that passes zero
+    (Hertz's peak is at `t = 0`); the port reads it as `1e-4` of the strip's half-width.
+  - `gap.json`'s ring (pair 0, valley points 0–2) records `k₀ = kz ≈ −9.4e149`, no curvature
+    of a gear: for P5 to answer.
 
 ## Provenance of this copy
 
