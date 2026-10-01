@@ -2,8 +2,9 @@
 """**Absence is typed.** A number standing for "there is none" is refused in
 production code: `unwrap_or(<literal>)`, `map_or(<literal>, …)`, the same
 through a closure (`unwrap_or_else(|| <literal>)`, `map_or_else(|| <literal>,
-…)`), and `f64::INFINITY`, `NEG_INFINITY` or `NAN` used at all — unless the
-line says why, with a comment `// absence: <why>`.
+…)`), `f64::INFINITY`, `NEG_INFINITY` or `NAN` used at all, and an array of
+literals returned (`return (p, [1.0, 0.0])`, a direction standing for none)
+— unless the line says why, with a comment `// absence: <why>`.
 
 Each of these has put a wrong number in a report (pattern C of the Stage 1
 exit review, work/stage1-exit.md): an `unwrap_or(0.0)` read as a length,
@@ -57,6 +58,12 @@ CLOSURE = re.compile(
     re.S,
 )
 CALL = re.compile(r"\.\s*(unwrap_or|map_or|unwrap_or_else|map_or_else)\s*\(")
+# A `return` whose value holds an array of literals — `return (p, [1.0, 0.0])`
+# — is a fallback standing for a direction, a point or a vector that is not
+# there: an early exit with made-up coordinates (strength.rs's line of action
+# at the base circle returned `[1, 0]`).
+RETURN = re.compile(r"(?<![\w.])return\b")
+LITERAL_ARRAY = re.compile(r"\[([^\[\]]*,[^\[\]]*)\]")
 # Any use of the three, however it is reached: `f64::NAN`, `std::f64::NAN`,
 # `<f64>::NAN`, or a bare `NAN` brought in by a `use`.
 SENTINEL = re.compile(r"(?<![\w.])(INFINITY|NEG_INFINITY|NAN)\b")
@@ -104,6 +111,13 @@ def sites(sources):
                 body = arg
             found.append((m.start(), f"{m.group(1)}({' '.join(body.split())})"))
             spans.append((m.end(), m.end() + len(arg)))
+        for m in RETURN.finditer(s.code):
+            end = s.code.find(";", m.end())
+            value = s.code[m.end():end if end >= 0 else len(s.code)]
+            for a in LITERAL_ARRAY.finditer(value):
+                if is_literal(a.group(1)):
+                    found.append((m.start(), f"return[{' '.join(a.group(1).split())}]"))
+                    spans.append((m.end(), m.end() + len(value)))
         # A constant is one site with the call it is the default of.
         for m in SENTINEL.finditer(s.code):
             if not any(a <= m.start() < b for a, b in spans):
@@ -227,6 +241,18 @@ mod tests {
     fn inside(a: Option<f64>) -> f64 { a.unwrap_or(0.0) + f64::NAN }
 }
 fn after_the_tests(a: Option<f64>) -> f64 { a.unwrap_or(0.0) }
+fn fallback(len: f64, p: [f64; 2], d: [f64; 2]) -> ([f64; 2], [f64; 2]) {
+    if len < f64::MIN_POSITIVE {
+        return (p, [1.0, 0.0]);
+    }
+    if len > 1.0 {
+        return (p, [d[0], -d[1]]);
+    }
+    if len > 2.0 {
+        return (p, [1.0, 0.0]); // absence: the fixture says why
+    }
+    (p, [1.0, 0.0])
+}
 fn near_misses(a: Option<usize>, b: Option<f64>, c: Result<f64, ()>) -> f64 {
     let i = a.unwrap_or(usize::MAX);
     let j = a.map_or(i32::MIN, |v| v as i32);
@@ -258,6 +284,7 @@ WANT = sorted([
     ("near_misses", "unwrap_or(f64::NAN)"), ("near_misses", "unwrap_or(0)"),
     ("near_misses", "unwrap_or_else(0.0)"), ("near_misses", "INFINITY"),
     ("near_misses", "unwrap_or(<f64>::NAN)"),
+    ("fallback", "return[1.0,0.0]"),
 ])
 
 
@@ -298,6 +325,7 @@ def self_test():
         ("near_misses", "unwrap_or(0)", "a site inside another's argument"),
         ("near_misses", "INFINITY", "a constant reached as `<f64>::`"),
         ("near_misses", "unwrap_or(<f64>::NAN)", "a default reached as `<f64>::`"),
+        ("fallback", "return[1.0,0.0]", "an array of literals returned early"),
     ):
         expect(f"found: {why}", (fn, site) in got)
     expect("not found: a variable, a boolean, a computed closure, a reason, the default, a predicate",
@@ -305,6 +333,8 @@ def self_test():
     expect("found: `|| { 0.0 }`, `|_| 0.0` and `|| -> f64 { 0.0 }`",
            sum(1 for fn, site in got if (fn, site) == ("near_misses", "unwrap_or_else(0.0)")) == 3)
     expect("not found: test code or prose", all(fn not in ("inside",) for fn, _ in got))
+    expect("found once: a returned array of literals; not: a computed one, a reason, a tail value",
+           sum(1 for fn, _ in got if fn == "fallback") == 1)
     listed = {k: (n, "Stage 2 (Q3)") for k, n in counted(found).items()}
     expect("every site listed passes", compare(found, listed) == [])
     fewer = dict(listed)

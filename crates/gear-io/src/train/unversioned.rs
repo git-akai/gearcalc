@@ -18,6 +18,39 @@ use gear_core::train::shape::{self, BodyOn};
 use gear_core::train::{CaseKind, Duty, FaceSources, LoadRole};
 use serde::Deserialize;
 
+/// **An automatic width's box of nought, read as this width, mm.** Such a
+/// file left the box at nought, and nothing read it while a load sized the
+/// gear; the box is a width wherever it is read now, so it reads as the
+/// width the format's gears were born with when it was numbered. Frozen, as
+/// every value this reading supplies: a literal, so moving the core's default
+/// changes nothing an old file means (`docs/reference.md#geartrain-file-formats`).
+const BOX_OF_NOUGHT_READ_AS: f64 = 10.0;
+
+trait Boxed {
+    /// An automatic figure whose box is nought.
+    fn boxed_nought(&self) -> bool;
+}
+
+impl Boxed for Auto<f64> {
+    fn boxed_nought(&self) -> bool {
+        self.auto && self.manual == 0.0
+    }
+}
+
+impl Document {
+    /// Whether reading it reads an automatic width's box of nought as
+    /// [`BOX_OF_NOUGHT_READ_AS`] — an adjustment, said as one.
+    pub(super) fn reads_a_box_of_nought(&self) -> bool {
+        self.train
+            .stages
+            .iter()
+            .flatten()
+            .chain(&self.train.shape)
+            .flat_map(|s| &s.members)
+            .any(|m| m.gear.face_width.boxed_nought())
+    }
+}
+
 /// The document: its name and its train.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -277,11 +310,8 @@ impl From<Member> for shape::Member {
                 dedendum: g.dedendum,
                 root_radius: g.root_radius,
                 helix_angle: g.helix_angle,
-                // An automatic width's box was nought until the panel
-                // seeded it, and nothing read it while a load sized the
-                // gear: read as the width every gear is born with now.
-                face_width: if g.face_width.auto && g.face_width.manual == 0.0 {
-                    Auto::automatic(gear_core::train::DEFAULT_FACE_WIDTH)
+                face_width: if g.face_width.boxed_nought() {
+                    Auto::automatic(BOX_OF_NOUGHT_READ_AS)
                 } else {
                     g.face_width
                 },

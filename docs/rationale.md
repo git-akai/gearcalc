@@ -1139,6 +1139,16 @@ would inflate any notch factor by that factor. **Which point on the fillet is
 read matters as much**, and for the same reason: junction against minimum is
 another 1.4–6.3× (see [`state.md`](state.md)).
 
+**A mesh's kind is read off its members, and never defaulted.** A ring is
+its mesh's second member, the side the kind is read on. A file that lists a
+mesh (ring, gear) describes the same mesh, so it is turned round as it is read
+(`Shape::order_meshes`) and said as an adjustment: refusing it would refuse a
+shape the reader can name exactly, and teaching every reader of a mesh both
+orders would be fifteen places to keep in step. Two rings, or a ring across
+crossed axes, describe no mesh at all and are refused by their own keys; the
+wiring refuses a mesh with no kind rather than reading it as external, which
+it once did (`docs/reference.md#geartrain-file-formats`).
+
 ### An eccentric gear is an ordinary gear with `Δx = 0`
 
 `eccentric.rs` assembles a gear tooth by tooth, and **every** gear in the crate

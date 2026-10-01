@@ -3342,6 +3342,8 @@ converter reads the last of them, from *every hold is stated* on.
 | 0 | A member's gear gained `no_tip_past_mate_flank` | on, which shortens a tip that reached past a mate's flank |
 | 1 | The format is stated at the root, and every field is required: nothing read is filled in. An addendum is a number | what format 0 meant, row by row above, which `gear-cli convert` writes |
 | 1 | A duty's `at` may be left out: the sweep is unset | nothing changed meaning: every file of format 1 states it |
+| 1 | An automatic face width's box is a width wherever it is read (positive), as a given one is | an automatic box of nought is 10 mm, said as an adjustment; a given nought is refused |
+| 1 | A mesh lists a ring second; one written (ring, gear) is turned round as it is read, said as an adjustment, and two rings, or a ring across crossed axes, are refused by their own keys | nothing changed meaning: a mesh's inputs are the pair's, in either order |
 
 ---
 

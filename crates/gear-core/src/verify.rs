@@ -276,6 +276,54 @@ pub fn check_cut(g: &Tooth, profile_points: usize) -> CutReport {
     }
 }
 
+/// **The half-angle the rack's sweep leaves at a radius**: from the tooth's
+/// centreline to where a point at `radius` first lies inside the generating
+/// rack at some phase, found by `iterations` bisections on that question
+/// alone. It reads nothing of the tooth's flank, fillet or tip land — only the
+/// rack its inputs describe ([`BasicRack::of`]) and where it travels — so a
+/// tip on the fillet, a pointed tip and a severed one come out the width the
+/// cut leaves them. Nought where the rack takes everything at that radius.
+#[must_use]
+pub fn swept_half_angle(g: &Tooth, radius: f64, iterations: u32) -> f64 {
+    let pitch = std::f64::consts::PI * g.mt;
+    let (lo, hi) = rack_travel_range(g);
+    let rotation = (hi - lo) / g.r;
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    let nphase = ((rotation / MAX_ROTATION_STEP).ceil() as usize).clamp(2, MAX_PHASES);
+    #[allow(clippy::cast_possible_truncation)]
+    let (copy_lo, copy_hi) = (
+        (lo / pitch).floor() as i32 - COPY_MARGIN,
+        (hi / pitch).ceil() as i32 + COPY_MARGIN,
+    );
+    let rack = BasicRack::of(g);
+    let kept = |h: f64| {
+        let (px, py) = (radius * h.sin(), radius * h.cos());
+        (0..=nphase).all(|k| {
+            #[allow(clippy::cast_precision_loss)]
+            let xi = lo + (hi - lo) * (k as f64) / (nphase as f64);
+            let (s, c) = (-xi / g.r).sin_cos();
+            let (fx, fy) = (px * c - py * s, px * s + py * c);
+            (copy_lo..=copy_hi).all(|j| {
+                let sh = xi + f64::from(j) * pitch;
+                fx < sh - pitch || fx > sh + 2.0 * pitch || rack.distance(fx, fy, sh) >= 0.0
+            })
+        })
+    };
+    if !kept(0.0) {
+        return 0.0;
+    }
+    let (mut inside, mut outside) = (0.0, g.half_pitch);
+    for _ in 0..iterations {
+        let mid = 0.5 * (inside + outside);
+        if kept(mid) {
+            inside = mid;
+        } else {
+            outside = mid;
+        }
+    }
+    inside
+}
+
 /// Extra rack copies considered on each side of the travel range.
 ///
 /// A copy further than this cannot be the nearest feature for any point, since

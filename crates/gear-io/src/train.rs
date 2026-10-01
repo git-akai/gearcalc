@@ -60,6 +60,13 @@
 //! way in, and the reader is told in one sentence rather than left to find
 //! a box that does nothing.
 //!
+//! Two more adjustments are made on the way in, each said the same way: a
+//! mesh written (ring, gear) is turned round to (gear, ring), the order its
+//! kind is read in, which changes nothing a mesh owns
+//! ([`gear_core::train::Shape::order_meshes`]); and in a file before the
+//! format was numbered, an automatic width's box of nought reads as 10 mm
+//! ([`convert`]).
+//!
 //! # What is *not* checked on import
 //!
 //! A member names its material by name, and the library that has them is the
@@ -300,6 +307,7 @@ pub fn convert(src: &str) -> Result<Imported, DocumentError> {
         found => return Err(DocumentError::Format(found)),
     }
     let old: unversioned::Document = toml::from_str(src).map_err(DocumentError::Parse)?;
+    let widened = old.reads_a_box_of_nought();
     let train = old.train;
     let load_cases: Vec<gear_core::train::LoadCase> =
         train.load_cases.into_iter().map(Into::into).collect();
@@ -341,7 +349,7 @@ pub fn convert(src: &str) -> Result<Imported, DocumentError> {
             name: old.name,
             train,
         },
-        turned,
+        turned || widened,
     ))
 }
 
@@ -632,24 +640,19 @@ mod tests {
         assert_eq!(back.train.load_cases.len(), doc.train.load_cases.len());
     }
 
-    /// **A file written as stages is refused as unnumbered, and converts to
-    /// the train a chain builds now.** The file is one the tool wrote before
-    /// the train was one graph — the harness's elevation drive, a pair, a
-    /// worm and a set — and the reader points at the converter rather than
-    /// loading a different gearbox. Converted, it is three parts, holds and
-    /// loads what it did, reads back unchanged, and turns at the ratio the
-    /// tool recorded of it then (`tools/golden/trainfile.txt` at the time).
     /// **An automatic width's box of nought, in a file of stages, reads as
-    /// the width every gear is born with**: the panel of the time left an
-    /// automatic box at nought, and nothing read it while a load sized the
-    /// gear. Only an automatic box is read so: a *given* width of nought is
-    /// a gear with no face, refused by its field as in any file.
+    /// the width the format's gears were born with (10 mm)**, said as an
+    /// adjustment: the panel of the time left an automatic box at nought,
+    /// and nothing read it while a load sized the gear. Only an automatic
+    /// box is read so: a *given* width of nought is a gear with no face,
+    /// refused by its field as in any file.
     #[test]
     fn a_staged_files_automatic_box_of_nought_reads_as_the_default() {
         let old = include_str!("../tests/data/elevation_drive_staged.toml");
         let given = "auto = false\nmanual = 10.0";
         assert!(old.contains("auto = true\nmanual = 0.0") && old.contains(given));
         let converted = convert(old).unwrap();
+        assert!(converted.adjusted, "a box read as a width is an adjustment");
         let widths: Vec<_> = converted
             .document
             .train
@@ -659,7 +662,7 @@ mod tests {
             .map(|m| m.gear.face_width)
             .collect();
         assert!(widths.iter().all(|w| w.manual > 0.0), "{widths:?}");
-        assert!(widths.contains(&Auto::automatic(gear_core::train::DEFAULT_FACE_WIDTH)));
+        assert!(widths.contains(&Auto::automatic(10.0)));
         assert!(
             widths.contains(&Auto::fixed(10.0)),
             "a given width is as written"
@@ -680,6 +683,15 @@ mod tests {
         }
     }
 
+    /// **A file written as stages is refused as unnumbered, and converts to
+    /// the train a chain builds now.** The file is one the tool wrote before
+    /// the train was one graph — the harness's elevation drive, a pair, a
+    /// worm and a set — and the reader points at the converter rather than
+    /// loading a different gearbox. Converted, it is three parts, holds and
+    /// loads what it did, reads back unchanged, and turns at the ratio the
+    /// tool recorded of it then (`tools/golden/trainfile.txt` at the time).
+    /// Adjusted only where it left an automatic width's box at nought
+    /// (`a_staged_files_automatic_box_of_nought_reads_as_the_default`).
     #[test]
     fn a_file_written_as_stages_is_refused_by_name_and_converts() {
         let old = include_str!("../tests/data/elevation_drive_staged.toml");
@@ -690,7 +702,8 @@ mod tests {
             other => panic!("a file of stages must be refused, not {other:?}"),
         }
         let converted = convert(old).unwrap();
-        assert!(!converted.adjusted, "a file the tool wrote needs no relief");
+        // Relieved of nothing: its one adjustment is the boxes of nought.
+        assert!(converted.adjusted, "its automatic boxes of nought are read");
         let train = &converted.document.train;
         assert_eq!(
             train

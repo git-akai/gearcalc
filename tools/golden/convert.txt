@@ -1,4 +1,4 @@
-"Elevation drive": 3 stages as written, 3 parts as read
+"Elevation drive": 3 stages as written, 3 parts as read, relieved
 
   quantity                converted          built now   same
   total ratio               708.235294118    708.235294118   yes

@@ -1310,17 +1310,6 @@ mod tests {
         format!("{a:?}") == format!("{b:?}")
     }
 
-    /// **A graph that describes no train is refused where it enters, by
-    /// the key that names why** — each fixture refused by
-    /// [`solve_train`]'s [`Train::validate`] with its own catalogue key, and
-    /// beside each the near miss that stands: a carrier cycle of three
-    /// axes; an axis distance stated twice, the same way round and the
-    /// other; a mesh listing its ring first; a sun on an axis entry of its
-    /// own that the carrier does not turn about — two entries for one line
-    /// — beside the set as built and meshed planets; and a body number
-    /// skipped. A loop of distances on a carrier is no fault of the graph's
-    /// shape: whether it closes is its values' (`frame_closure` in
-    /// `shape.rs`).
     /// **A gear is born at one width, wherever it is born** (Q5 to Q6): a gear
     /// an edit adds is seeded at [`super::super::DEFAULT_FACE_WIDTH`], as the
     /// core's default and the panel's presets are — not at its mate's box,
@@ -1351,6 +1340,17 @@ mod tests {
         }
     }
 
+    /// **A graph that describes no train is refused where it enters, by
+    /// the key that names why** — each fixture refused by
+    /// [`solve_train`]'s [`Train::validate`] with its own catalogue key, and
+    /// beside each the near miss that stands: a carrier cycle of three
+    /// axes; an axis distance stated twice, the same way round and the
+    /// other; a mesh listing its ring first; a sun on an axis entry of its
+    /// own that the carrier does not turn about — two entries for one line
+    /// — beside the set as built and meshed planets; and a body number
+    /// skipped. A loop of distances on a carrier is no fault of the graph's
+    /// shape: whether it closes is its values' (`frame_closure` in
+    /// `shape.rs`).
     #[test]
     fn malformed_graphs_are_refused_where_they_enter_by_name() {
         use crate::note::Explain;

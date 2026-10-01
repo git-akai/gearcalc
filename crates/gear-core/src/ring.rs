@@ -1260,19 +1260,21 @@ pub(crate) mod roll {
     use crate::tooth::Tooth;
     use std::f64::consts::{PI, TAU};
 
-    /// Points along the pinion's half outline, tip centre to mid-space: the
-    /// tip land and flank, which are what can reach ring material, take
-    /// about half of them by arc length.
-    const OUTLINE_POINTS: usize = 160;
+    /// Radii along the pinion's flank, and points across its land.
+    const OUTLINE_POINTS: usize = 24;
+    /// Bisections of each half-angle: π/z halved 30 times is below 1e-9 rad.
+    const BISECTIONS: u32 = 30;
 
     /// The deepest a pinion point sits inside ring material over one pinion
     /// pitch, negated, mm: zero where the teeth only touch, negative where
     /// they foul. The pinion sits in the middle of its play at the mesh.
     ///
-    /// The pinion is its own outline, every tooth — [`Tooth::half_profile`]
-    /// sampled densely, so a tip on the fillet, a pointed tip and a severed
-    /// one are the shape they are; the ring is involute teeth and a tip
-    /// circle. A point is in ring material outside the ring's tip circle and
+    /// The pinion is the outline its rack's sweep leaves, every tooth —
+    /// [`crate::verify::swept_half_angle`] at each radius, which reads nothing
+    /// of the tooth's own flank, fillet or tip land (the tip window reads
+    /// that land, so an outline drawn from it would be the window checking
+    /// itself) — so a tip on the fillet and a pointed tip are the shape the
+    /// cut leaves; the ring is involute teeth and a tip circle. A point is in ring material outside the ring's tip circle and
     /// within its tooth's half-angle there, and how deep is the lesser of its
     /// height above the tip circle and its distance from the flank — `r_b`
     /// times the angle between the two involutes, since involutes of one base
@@ -1284,12 +1286,23 @@ pub(crate) mod roll {
             let al = (rb / rho).min(1.0).acos();
             al.tan() - al
         };
-        let (radii, angles) = pinion.half_profile(OUTLINE_POINTS);
-        let outline: Vec<(f64, f64)> = radii
-            .iter()
-            .zip(&angles)
-            .flat_map(|(&r, &h)| [(r, h), (r, -h)])
-            .collect();
+        // The pinion as its rack's sweep leaves it (`verify::swept_half_angle`):
+        // its flanks from two modules under its tip, and its tip land, none of
+        // it read off the tooth's own flank, fillet or land.
+        let from = pinion.ra - 2.0 * pinion.params.module;
+        let mut outline = Vec::new();
+        for i in 0..=OUTLINE_POINTS {
+            #[allow(clippy::cast_precision_loss)]
+            let rho = from + (pinion.ra - from) * i as f64 / OUTLINE_POINTS as f64;
+            let h = crate::verify::swept_half_angle(pinion, rho, BISECTIONS);
+            outline.extend([(rho, h), (rho, -h)]);
+        }
+        let land = crate::verify::swept_half_angle(pinion, pinion.ra, BISECTIONS);
+        for i in 0..=OUTLINE_POINTS {
+            #[allow(clippy::cast_precision_loss)]
+            let f = i as f64 / OUTLINE_POINTS as f64;
+            outline.push((pinion.ra, land * (2.0 * f - 1.0)));
+        }
         // Ring teeth centred half a ring pitch off `+y`, where its space is.
         let depth = |x: f64, y: f64| -> f64 {
             let rho = x.hypot(y);

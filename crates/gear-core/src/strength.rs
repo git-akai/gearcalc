@@ -396,15 +396,13 @@ fn flank_point_and_load_direction(g: &Tooth, roll: f64) -> ([f64; 2], [f64; 2]) 
     let (r, th) = g.involute_at(roll);
     let p = [r * th.sin(), r * th.cos()];
     // The generating tangent point sits `roll` radians back around the base
-    // circle from the involute's own angular position.
-    let tangent_angle = g.psi_b - roll;
-    let t = [g.rb * tangent_angle.sin(), g.rb * tangent_angle.cos()];
-    let (dx, dy) = (p[0] - t[0], p[1] - t[1]);
-    let len = f64::hypot(dx, dy);
-    if len < f64::MIN_POSITIVE {
-        return (p, [1.0, 0.0]);
-    }
-    (p, [dx / len, dy / len])
+    // circle from the involute's own angular position, and the point is
+    // `r_b · roll` from it along the base circle's tangent there, toward
+    // increasing angle: the direction is that tangent, in closed form, and
+    // so is defined at the base circle itself (roll nought), where the
+    // difference of the two points vanishes.
+    let (s, c) = (g.psi_b - roll).sin_cos();
+    (p, [c, -s])
 }
 
 // ------------------------------------------------------- tooth outlines ---
@@ -2774,6 +2772,42 @@ mod tests {
             across <= 2.0 * beside,
             "{across} across the point, {beside} beside it"
         );
+    }
+
+    /// **The line of action has a direction at the base circle too**: written
+    /// as the base circle's tangent, it agrees with the unit difference of
+    /// the flank point and its tangency point wherever they are apart (to
+    /// 1e-9 over rolls from 1e-6 to the tip, the difference losing
+    /// `ε r / (r_b roll)` to cancellation), and at roll nought — where
+    /// that difference vanishes and a fallback `[1, 0]` stood in — it is the
+    /// same tangent, a unit vector continuous with the rest.
+    #[test]
+    fn the_line_of_action_has_a_direction_at_the_base_circle() {
+        let g = Tooth::new(GearParams {
+            teeth: 23,
+            ..Default::default()
+        });
+        let mut checked = 0;
+        for i in 0..=100 {
+            let roll = 1e-6 + (g.u_tip - 1e-6) * f64::from(i) / 100.0;
+            let (p, d) = flank_point_and_load_direction(&g, roll);
+            let a = g.psi_b - roll;
+            let t = [g.rb * a.sin(), g.rb * a.cos()];
+            let (dx, dy) = (p[0] - t[0], p[1] - t[1]);
+            let len = dx.hypot(dy);
+            assert!(
+                (d[0] - dx / len).abs() < 1e-9 && (d[1] - dy / len).abs() < 1e-9,
+                "roll {roll}: {d:?} against {:?}",
+                [dx / len, dy / len]
+            );
+            checked += 1;
+        }
+        assert_eq!(checked, 101);
+        let (_, at_base) = flank_point_and_load_direction(&g, 0.0);
+        let (_, near) = flank_point_and_load_direction(&g, 1e-9);
+        assert!((at_base[0].hypot(at_base[1]) - 1.0).abs() < 1e-15);
+        assert!((at_base[0] - near[0]).abs() < 1e-8 && (at_base[1] - near[1]).abs() < 1e-8);
+        assert!(at_base != [1.0, 0.0], "{at_base:?}");
     }
 
     /// The load line must actually pass through the contact point and the
