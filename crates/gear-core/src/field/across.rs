@@ -9,7 +9,7 @@
 //!
 //! **The strip** ([`Strip`]). The plane-strain contact of the two half-planes with that gap,
 //! modulus `E*`, bounded at both ends, has half-width `c` and centre `m` from two equations in
-//! `t = m + c cos φ` (Muskhelishvili; Johnson, *Contact Mechanics*, §5.7):
+//! `t = m + c cos φ` (Muskhelishvili; Johnson, *Contact Mechanics*, section 5.7):
 //!
 //! ```text
 //! I₀ = ∫₀^π h′(m + c cos φ) dφ = 0,      q = (E*/2) c I₁,   I₁ = ∫₀^π h′(m + c cos φ) cos φ dφ,
@@ -38,7 +38,7 @@
 //! **Creep** ([`Strip::creep`]). In steady rolling of like materials the stick zone `[d, x_l]` at
 //! the leading edge carries a corrective traction that solves the normal problem's equation on
 //! that zone, so the creepage is `ξ = μ I₀′/π` and the traction `Q = μP − μ(E*/2) c′ I₁′`, the
-//! zone's own `I₀′` and `I₁′` (Johnson §8.2, generalised): the exact curve for any piecewise
+//! zone's own `I₀′` and `I₁′` (Johnson, section 8.2, generalised): the exact curve for any piecewise
 //! quadratic strip, which is Carter's `Q/μP = 1 − (1 − ξ/ξ*)²` on Hertz.
 //!
 //! **A panel's friction** ([`panel_slide`], [`carter_slide`]): the means over a panel of the
@@ -961,7 +961,7 @@ fn slide_moments(v: Vec3, b: Vec3) -> (Vec3, f64) {
 }
 
 /// **Carter's creep over a panel**: the means over `u ∈ [−½, ½]` of `f(|v|/s*) v/|v|` and
-/// `f(|v|/s*) |v|`, `f(x) = 2x − x²` below 1 and 1 beyond (Johnson §8.2: `Q/μP = 1 − (1 −
+/// `f(|v|/s*) |v|`, `f(x) = 2x − x²` below 1 and 1 beyond (Johnson, section 8.2: `Q/μP = 1 − (1 −
 /// ξ/ξ*)²`), `s* = v_r μ a k`, the sliding speed at full slip. The window `|v| < s*` is the
 /// interval between the roots of `|B|² u² + 2(A·B) u + |A|² − s*²` (the stable form: the larger
 /// root from the discriminant `|B|² s*² − |A × B|²`, the smaller from their product); each piece
@@ -1880,7 +1880,7 @@ mod tests {
         (worst, regions)
     }
 
-    /// The verifier's two-round strip (contact-verify6 §2: both members' rounds in one strip),
+    /// The verifier's two-round strip (contact-verify6, its maxima section: both members' rounds in one strip),
     /// its round's start swept over `[−0.1033, −0.1032]` in 200 steps, with the two points
     /// `8e-17` apart that round five read 2.35 % apart.
     fn two_round_sweep() -> Vec<(Case, Strip)> {
