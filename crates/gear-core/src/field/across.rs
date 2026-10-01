@@ -1802,29 +1802,133 @@ mod tests {
         assert!(twelve > 10.0 * SHARE_ABS);
     }
 
-    /// The regions' maxima by a dense scan: 4000 samples a region, the best refined by golden
-    /// section within its neighbours.
+    /// The regions' maxima by a dense scan, sharing no search with the port: 4000 samples a
+    /// region, then the same scan again within the best sample's two neighbours, four times
+    /// (each narrowing `2000×`, so the last spacing is `π/(4000·2000⁴) ≈ 5e-17`, below the
+    /// angle's `ε`).
     fn dense(strip: &Strip, a: f64, b: f64) -> (f64, f64) {
         let n = 4000;
         let mut best = (strip.pressure(a), a);
-        for k in 0..=n {
-            let th = a + (b - a) * f64::from(k) / f64::from(n);
-            let v = strip.pressure(th);
-            if v > best.0 {
-                best = (v, th);
+        let (mut lo, mut hi) = (a, b);
+        for _ in 0..5 {
+            for k in 0..=n {
+                let th = lo + (hi - lo) * f64::from(k) / f64::from(n);
+                let v = strip.pressure(th);
+                if v > best.0 {
+                    best = (v, th);
+                }
+            }
+            let h = (hi - lo) / f64::from(n);
+            (lo, hi) = ((best.1 - h).max(a), (best.1 + h).min(b));
+        }
+        best
+    }
+
+    /// **Golden section finds a maximum to its argument's resolution**, and its round count is
+    /// the fewest that reach it: on `−|θ − θ₀|` (a kink, so the value is no flatter than the
+    /// argument) at `θ₀` spread over `[0, π]`, the argument within `4ε·π`, the value the best it
+    /// evaluated, and the bracket after
+    /// [`golden_rounds`] at most `ε·scale` where one round fewer is not. Plant: a search stopped
+    /// at `√ε` (the textbook stop) misses by `1e-8`; one asked for the minimum lands on an end.
+    #[test]
+    fn golden_section_finds_the_peak_to_resolution() {
+        let r = golden();
+        let mut ran = 0;
+        for k in 1..64 {
+            let x0 = PI * f64::from(k) / 64.0 + 1e-3 * f64::from(k % 7);
+            let seen = std::cell::Cell::new(f64::NEG_INFINITY);
+            let f = |x: f64| {
+                let v = -(x - x0).abs();
+                seen.set(seen.get().max(v));
+                v
+            };
+            let (x, fx) = golden_section(&f, 0.0, PI);
+            assert!((x - x0).abs() <= 4.0 * EPS * PI, "{x} {x0}");
+            // The best point it evaluated is the one it returns.
+            assert_eq!(fx, seen.get());
+            assert_eq!(fx, -(x - x0).abs());
+            ran += 1;
+        }
+        assert_eq!(ran, 63);
+        for (w, scale) in [(PI, PI), (1e-3, 2.0), (1e-9, 1.0), (3.0, 1e3)] {
+            let n = golden_rounds(w, scale);
+            let after = |n: u32| w * r.powi(i32::try_from(n).expect("a small count"));
+            assert!(
+                after(n) <= EPS * scale && after(n - 1) > EPS * scale,
+                "{w} {scale} {n}"
+            );
+        }
+        assert_eq!(golden_rounds(EPS, 1.0), 0);
+        // Off the origin, its work is those rounds and no more: one evaluation a round, two to
+        // start.
+        let calls = std::cell::Cell::new(0_u32);
+        let (lo, hi) = (2.0, 2.0 + 1e-3);
+        let (x, _) = golden_section(
+            &|x: f64| {
+                calls.set(calls.get() + 1);
+                -(x - 2.000_3).abs()
+            },
+            lo,
+            hi,
+        );
+        assert!((x - 2.000_3).abs() <= 4.0 * EPS * hi);
+        assert_eq!(calls.get(), golden_rounds(hi - lo, hi) + 2);
+        // Plants: a search stopped at √ε, and one that keeps the lesser point.
+        let stopped = |f: &dyn Fn(f64) -> f64, lo: f64, hi: f64, keep_greater: bool| {
+            let (mut a, mut b) = (lo, hi);
+            while b - a > EPS.sqrt() * hi {
+                let (x1, x2) = (b - r * (b - a), a + r * (b - a));
+                if (f(x1) >= f(x2)) == keep_greater {
+                    b = x2;
+                } else {
+                    a = x1;
+                }
+            }
+            0.5 * (a + b)
+        };
+        let x0 = 1.234_567;
+        let f = |x: f64| -(x - x0).abs();
+        assert!((stopped(&f, 0.0, PI, true) - x0).abs() > 1e3 * EPS * PI);
+        assert!((stopped(&f, 0.0, PI, false) - x0).abs() > 1.0);
+    }
+
+    /// **Where Hertz holds, the strip is Hertz's to the bit**: on a section with no knot in its
+    /// width, `Strip::new` returns the closed form `c = √(4q/(πE*k))`, `m = 0` exactly, and the
+    /// general solve (the same strip without the closed form) agrees to `1e-13`. Plant: the
+    /// general solve returned in its place, which the `1e-13` alone passes and the identity does
+    /// not.
+    #[test]
+    fn where_hertz_holds_the_strip_is_hertzs() {
+        let mut identical_general = 0;
+        let mut ran = 0;
+        for (q, k0) in [
+            (300.0, 0.4),
+            (60.0, 0.8),
+            (20.0, 1.5),
+            (1.0, 7.0),
+            (900.0, 0.05),
+        ] {
+            let c = (4.0 * q / (PI * STEEL * k0)).sqrt();
+            for steps in [
+                vec![],
+                vec![CurvatureStep {
+                    from: Some(2.0 * c),
+                    to: None,
+                    dk: 3.0,
+                }],
+            ] {
+                let profile = Profile::new(k0, &steps).expect("a profile");
+                let s = Strip::new(&profile, q, STEEL).expect("a strip");
+                assert_eq!((s.half_width(), s.centre()), (c, 0.0), "{q} {k0}");
+                let g = Strip::general(&profile, q, STEEL).expect("a strip");
+                assert!((g.half_width() / c - 1.0).abs() <= 1e-13 && g.centre().abs() <= 1e-13 * c);
+                identical_general += usize::from(g.half_width() == c && g.centre() == 0.0);
+                ran += 1;
             }
         }
-        let h = (b - a) / f64::from(n);
-        let (x, v) = golden_section(
-            &|th| strip.pressure(th),
-            (best.1 - h).max(a),
-            (best.1 + h).min(b),
-        );
-        if v > best.0 {
-            (v, x)
-        } else {
-            best
-        }
+        assert_eq!(ran, 10);
+        // The plant: the general solve is not the closed form to the bit on every one.
+        assert!(identical_general < ran, "{identical_general}");
     }
 
     /// Round five's search (`trace_round5.py`'s `contact2d`): 48 samples at the midpoints of
@@ -2288,6 +2392,50 @@ mod tests {
         eprintln!("homogeneity: worst {worst:.2e}; an absolute floor {absolute:.2e}");
         assert!(worst <= 1e-13, "{worst:e}");
         assert!(absolute > 1e-13);
+    }
+
+    /// **A panel that slides uniformly is its one point**, and the panels about it close on it:
+    /// with `B = 0`, Coulomb's direction is `A/|A|` at speed `|A|`, Carter's is `f(|A|/s*)` of
+    /// that, `f(x) = 2x − x²` below `1` (a creepage read against `s*`, never against `1`); and a
+    /// panel with `B = δ` differs by `O(δ²)` (the mean over `u ∈ [−½, ½]` cancels the odd term),
+    /// within `|B|²/|A|²` relative at `δ = 1e-5 |A|`. Where nothing slides the direction is zero.
+    /// Plant: Carter's factor read at `|A|` rather than `|A|/s*` fails the point on seven of
+    /// the nine (the other two are at full slip both ways).
+    #[test]
+    fn a_uniform_panel_is_its_point() {
+        let carter = |x: f64| if x < 1.0 { 2.0 * x - x * x } else { 1.0 };
+        let (mut ran, mut plant_misses) = (0, 0);
+        for a in [[0.3, -0.1, 0.0], [2.0, 0.5, -1.0], [1e-7, 0.0, 3e-8]] {
+            let na = norm(a);
+            let unit = scale(a, 1.0 / na);
+            let p = panel_slide(a, [0.0; 3]);
+            assert_eq!((p.direction, p.speed), (unit, na));
+            for sstar in [0.25 * na, 0.9 * na, 3.0 * na] {
+                let c = carter_slide(a, [0.0; 3], sstar);
+                let f = carter(na / sstar);
+                for (d, u) in c.direction.iter().zip(unit) {
+                    assert!((d - f * u).abs() <= 4.0 * EPS);
+                }
+                assert!((c.speed / (f * na) - 1.0).abs() <= 4.0 * EPS);
+                // The plant: the factor read at |A|.
+                plant_misses += usize::from((carter(na) - f).abs() > 1e-2);
+                let b = scale([0.2, 0.7, -0.4], 1e-5 * na / norm([0.2, 0.7, -0.4]));
+                let near = carter_slide(a, b, sstar);
+                let bound = 4.0 * (norm(b) / na).powi(2) + 16.0 * EPS;
+                assert!((near.speed / c.speed - 1.0).abs() <= bound);
+                for (n, d) in near.direction.iter().zip(c.direction) {
+                    assert!((n - d).abs() <= bound);
+                }
+                let near_p = panel_slide(a, b);
+                assert!((near_p.speed / na - 1.0).abs() <= bound);
+                ran += 1;
+            }
+        }
+        assert_eq!((ran, plant_misses), (9, 7));
+        let still = panel_slide([0.0; 3], [0.0; 3]);
+        assert_eq!((still.direction, still.speed), ([0.0; 3], 0.0));
+        let still = carter_slide([0.0; 3], [0.0; 3], 1.0);
+        assert_eq!((still.direction, still.speed), ([0.0; 3], 0.0));
     }
 
     /// What is no strip is refused: a load or modulus that is not a finite number `> 0`, a
