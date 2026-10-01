@@ -1045,9 +1045,9 @@ pub struct RingMesh {
 /// ```
 ///
 /// both measured from the line of centres on the **mesh** side. A tooth is
-/// present at its own tip circle over its angular half-thickness there, which
-/// the involute gives from the half-thickness at the base circle each member
-/// already carries.
+/// present at its own tip circle over its angular half-thickness there: the
+/// pinion's tip land as its tooth was cut, and the ring's from the
+/// half-thickness at its base circle along its involute.
 ///
 /// # Why the two windows can be compared at all
 ///
@@ -1089,12 +1089,15 @@ fn tip_clearance(ring: &Ring, pinion: &Tooth, a: f64) -> Option<f64> {
         .clamp(-1.0, 1.0)
         .acos();
 
-    // Half the angular thickness of each tooth at its own tip, from the
-    // half-thickness at the base circle: an external tooth loses angle outward
-    // and a ring's gains it, which is `psi_b`'s sign convention and not a case.
-    let at_tip = |rb: f64, ra: f64| inv((rb / ra).clamp(-1.0, 1.0).acos());
-    let half_p = pinion.psi_b - at_tip(pinion.rb, r_a);
-    let half_r = ring.psi_b + at_tip(ring.rb, big_r_a);
+    // Half the angular thickness of each tooth at its own tip, never below
+    // nought: a pointed tip is a point. The pinion's is its own tip land,
+    // which is nought by construction where the flanks meet and the
+    // fillet's where its tip is on the fillet; the involute continued to the
+    // tip radius read that last one wide. A ring's tip is on its involute,
+    // whose angle it gains outward from its half-thickness at the base
+    // circle.
+    let half_p = pinion.theta_a.max(0.0);
+    let half_r = (ring.psi_b + inv((ring.rb / big_r_a).clamp(-1.0, 1.0).acos())).max(0.0);
 
     let (z_p, z_r) = (f64::from(pinion.params.teeth), f64::from(ring.teeth));
     let ratio = z_r / z_p;
@@ -1238,36 +1241,36 @@ pub(crate) mod roll {
     use crate::tooth::Tooth;
     use std::f64::consts::{PI, TAU};
 
+    /// Points along the pinion's half outline, tip centre to mid-space: the
+    /// tip land and flank, which are what can reach ring material, take
+    /// about half of them by arc length.
+    const OUTLINE_POINTS: usize = 160;
+
     /// The deepest a pinion point sits inside ring material over one pinion
     /// pitch, negated, mm: zero where the teeth only touch, negative where
     /// they foul. The pinion sits in the middle of its play at the mesh.
     ///
-    /// Both members are involute teeth and tip circles, zero backlash where
-    /// the distance is the pair's own. The pinion is its two flanks from
-    /// where they start to its tip and its tip land, every tooth; a point is
-    /// in ring material outside the ring's tip circle and within its tooth's
-    /// half-angle there, and how deep is the lesser of its height above the
-    /// tip circle and its distance from the flank — `r_b` times the angle
-    /// between the two involutes, since involutes of one base circle are
-    /// parallel. Past the ring's junction its fillet only adds material, so
-    /// this reads a foul there as no deeper than it is.
+    /// The pinion is its own outline, every tooth — [`Tooth::half_profile`]
+    /// sampled densely, so a tip on the fillet, a pointed tip and a severed
+    /// one are the shape they are; the ring is involute teeth and a tip
+    /// circle. A point is in ring material outside the ring's tip circle and
+    /// within its tooth's half-angle there, and how deep is the lesser of its
+    /// height above the tip circle and its distance from the flank — `r_b`
+    /// times the angle between the two involutes, since involutes of one base
+    /// circle are parallel. Past the ring's junction its fillet only adds
+    /// material, so this reads a foul there as no deeper than it is.
     pub(crate) fn rolled(ring: &Ring, pinion: &Tooth, a: f64) -> f64 {
         let (zp, zr) = (f64::from(pinion.params.teeth), f64::from(ring.teeth));
         let inv_at = |rb: f64, rho: f64| {
             let al = (rb / rho).min(1.0).acos();
             al.tan() - al
         };
-        let lo = pinion.rb.max(pinion.r_j);
-        let mut outline = Vec::new();
-        for i in 0..=40 {
-            let rho = lo + (pinion.ra - lo) * f64::from(i) / 40.0;
-            let h = pinion.psi_b - inv_at(pinion.rb, rho);
-            outline.extend([(rho, h), (rho, -h)]);
-        }
-        let h_tip = pinion.psi_b - inv_at(pinion.rb, pinion.ra);
-        for i in 0..=10 {
-            outline.push((pinion.ra, h_tip * (f64::from(i) / 5.0 - 1.0)));
-        }
+        let (radii, angles) = pinion.half_profile(OUTLINE_POINTS);
+        let outline: Vec<(f64, f64)> = radii
+            .iter()
+            .zip(&angles)
+            .flat_map(|(&r, &h)| [(r, h), (r, -h)])
+            .collect();
         // Ring teeth centred half a ring pitch off `+y`, where its space is.
         let depth = |x: f64, y: f64| -> f64 {
             let rho = x.hypot(y);
@@ -3352,6 +3355,90 @@ mod tests {
                 "{teeth:?} at {a}: rolled {rolled}, called clear"
             );
         }
+    }
+
+    /// **The tip window reads each tooth's own tip land** (T03.5): a pointed
+    /// tip is a point, and a tip on its fillet is as wide as the fillet is
+    /// there. A 5-tooth pinion at x −0.4 has its tip below the form circle,
+    /// on the fillet: at a 0.2-module addendum its land is 0.189 rad where
+    /// the involute continued to that radius would be 0.271. Read at the
+    /// involute's width it was called tip-fouled against rings of 6 to 14
+    /// teeth that its own outline rolls clear of; at 0.4 modules (0.238
+    /// against 0.256) the two readings agree that it is clear, the control.
+    #[test]
+    fn a_tip_on_its_fillet_is_read_at_its_own_land() {
+        let mut checked = 0;
+        for addendum in [0.2, 0.4] {
+            for ring_teeth in 6..=14_u32 {
+                for ring_shift in [0.0, 0.5, 1.0] {
+                    let (ring, pinion) = internal_pair(
+                        [ring_teeth, 5],
+                        [ring_shift, -0.4],
+                        [1.0, addendum],
+                        (ring_teeth / 2).max(3),
+                    );
+                    assert!(pinion
+                        .clamps
+                        .notes
+                        .iter()
+                        .any(|n| n.is(key::CLAMP_TIP_BELOW_FORM)));
+                    let m = mesh_with(&ring, &pinion).unwrap();
+                    let Some(margin) = m.tip_margin else {
+                        continue;
+                    };
+                    checked += 1;
+                    let rolled = roll::rolled(&ring, &pinion, m.centre_distance);
+                    assert!(
+                        rolled > -1e-9 && margin >= 0.0,
+                        "{ring_teeth} x {ring_shift} / 5 h_a {addendum}: rolled {rolled}, \
+                         margin {margin}"
+                    );
+                }
+            }
+        }
+        assert_eq!(checked, 54, "every pair's tip circles cross");
+    }
+
+    /// **A pointed tip is a point, and the margin passes through it
+    /// continuously** (T03.5). The audit's pair — a 24-tooth ring at x 1.1
+    /// cut by a 12-tooth shaper, a 19-tooth pinion at x 1.2 at 2.3613 mm —
+    /// has a pointed pinion whose tip half-width came out −1.1e-16, which an
+    /// early return once read as +∞ room; it fouls by 0.0251 rad. Swept
+    /// through the shift at which the pinion's tip comes to a point, no step
+    /// of the margin is more than twice the larger of its neighbours.
+    #[test]
+    fn a_pointed_tip_is_a_point_in_the_tip_window() {
+        let at = |x: f64| {
+            let (ring, pinion) = internal_pair([24, 19], [1.1, x], [1.0, 1.0], 12);
+            let pointed = pinion
+                .clamps
+                .notes
+                .iter()
+                .any(|n| n.is(key::CLAMP_TIP_CAPPED_POINTED));
+            let m = mesh_at(&ring, &pinion, 2.3613).unwrap();
+            (m.tip_margin.unwrap(), m.tip_interference, pointed)
+        };
+        let (margin, fouled, pointed) = at(1.2);
+        assert!(pointed && fouled, "{margin}");
+        assert!((margin + 0.0251).abs() < 5e-5, "{margin}");
+
+        let shifts: Vec<f64> = (0..=60).map(|i| 0.9 + 0.005 * f64::from(i)).collect();
+        let read: Vec<_> = shifts.iter().map(|&x| at(x)).collect();
+        let first = read
+            .iter()
+            .position(|r| r.2)
+            .expect("the sweep reaches a point");
+        assert!(
+            first > 1 && first + 1 < read.len(),
+            "the point is inside the sweep"
+        );
+        let step = |i: usize| (read[i].0 - read[i - 1].0).abs();
+        let across = step(first);
+        let beside = step(first - 1).max(step(first + 1));
+        assert!(
+            across <= 2.0 * beside,
+            "{across} across the point, {beside} beside it"
+        );
     }
 
     /// **Clear means clear**: over tooth differences 1–10, shifts and addenda,
