@@ -98,10 +98,11 @@ pub struct ContactRatios {
     /// Transverse, `ε_α` — profile overlap.
     pub transverse: f64,
     /// Overlap, `ε_β = b sin β / (π m_n)` — axial overlap. Exactly zero for a
-    /// spur stage.
-    pub overlap: f64,
-    /// Total, `ε_γ = ε_α + ε_β`.
-    pub total: f64,
+    /// spur stage, which reads no width; `None` on a helical one whose face
+    /// is not sized.
+    pub overlap: Option<f64>,
+    /// Total, `ε_γ = ε_α + ε_β`; `None` where the overlap is.
+    pub total: Option<f64>,
 }
 
 impl ContactRatios {
@@ -111,15 +112,21 @@ impl ContactRatios {
     /// written out once per stage type they were three copies of the same two
     /// lines, and a fourth type away from being four. The width is the mesh's
     /// **effective** one, the narrower of the two members, because that is the
-    /// width that carries the pair.
+    /// width that carries the pair — `None` where no case sized it, which a
+    /// spur mesh does not read: straight teeth overlap by nothing at any
+    /// width.
     #[must_use]
-    pub fn of(transverse: f64, width: f64, helix_angle: f64, normal_module: f64) -> Self {
-        let overlap =
-            width * helix_angle.to_radians().sin().abs() / (std::f64::consts::PI * normal_module);
+    pub fn of(transverse: f64, width: Option<f64>, helix_angle: f64, normal_module: f64) -> Self {
+        let sin = helix_angle.to_radians().sin().abs();
+        let overlap = if sin == 0.0 {
+            Some(0.0)
+        } else {
+            width.map(|b| b * sin / (std::f64::consts::PI * normal_module))
+        };
         Self {
             transverse,
             overlap,
-            total: transverse + overlap,
+            total: overlap.map(|o| transverse + o),
         }
     }
 
@@ -128,9 +135,10 @@ impl ContactRatios {
     /// Below this a gear is helical in form but still transfers load like a spur
     /// gear — abrupt engagement, no smoothing — which is usually not what the
     /// helix angle was chosen for, and is invisible without the check.
+    /// `None` where the overlap is not known.
     #[must_use]
-    pub fn has_full_axial_overlap(&self) -> bool {
-        self.overlap >= 1.0
+    pub fn has_full_axial_overlap(&self) -> Option<bool> {
+        self.overlap.map(|o| o >= 1.0)
     }
 }
 
@@ -256,8 +264,9 @@ pub struct MeshReport {
     /// lines across the face, a point counts points along one line, and the
     /// point's limit as the bodies straighten is the normal-plane `ε_α / cos²β_b`
     /// rather than the total. The decomposition each has is in [`Self::line`]
-    /// and [`Self::point`].
-    pub contact_ratio: f64,
+    /// and [`Self::point`]. `None` on a helical line contact whose face no
+    /// case sized: its overlap needs a width.
+    pub contact_ratio: Option<f64>,
     /// Mesh efficiency, both drive senses. Equal for a parallel-axis mesh — the
     /// mirror flank is the same integral — and genuinely different on crossed
     /// bodies, where **either** can be zero or negative: backward is what
@@ -346,9 +355,11 @@ pub struct MeshCase {
     /// The one patch the two members share in this case. **Not sent**: each
     /// member's own contact stress is on its card, which is this or worse,
     /// and the patch is the harness's and the core's to read.
+    /// `None` on a line contact whose face no case sized: a pressure
+    /// spread over no width has no value.
     #[cfg_attr(feature = "serde", serde(skip))]
     #[cfg_attr(feature = "typescript", ts(skip))]
-    pub contact: ContactPatch,
+    pub contact: Option<ContactPatch>,
     /// **The power crossing this mesh, over the power the case puts in** —
     /// the train's flow's own figure ([`flow::Flow::mesh_powers`]): one on a
     /// pair's mesh, under one where a carrier carries part of it bodily,
@@ -481,8 +492,9 @@ pub(crate) struct LineMesh {
     /// Transverse operating pressure angle, degrees — the report's unit.
     pub operating_pressure_angle: f64,
     pub efficiency: Directional<f64>,
-    /// One contact per load case, in the loads' order.
-    pub contact: Vec<ContactPatch>,
+    /// One contact per load case, in the loads' order; `None` where the
+    /// face is not sized.
+    pub contact: Vec<Option<ContactPatch>>,
     /// The power through the mesh per load case, in the loads' order.
     pub case_power: Vec<f64>,
     pub backlash: [Backlash; 2],
@@ -507,19 +519,25 @@ pub(crate) fn line_mesh_report(cases: &[CaseLoad], m: LineMesh) -> MeshReport {
     // transverse gap, and only `ε_γ < 1` loses it. A transverse ratio below
     // one under a total that keeps contact is said as what it is — outside
     // the range ISO 6336 rates.
-    if r.total < 1.0 {
-        notes.push(Note::new(key::MESH_CONTACT_RATIO_BELOW_ONE).number("ratio", r.total, 3));
-    } else if r.transverse < 1.0 {
-        notes.push(
+    // Decided on what is known: a helical mesh whose face is not sized has
+    // no overlap and no total, and says so rather than comparing a number
+    // that is not there.
+    match r.total {
+        Some(total) if total < 1.0 => {
+            notes.push(Note::new(key::MESH_CONTACT_RATIO_BELOW_ONE).number("ratio", total, 3));
+        }
+        Some(_) if r.transverse < 1.0 => notes.push(
             Note::new(key::MESH_TRANSVERSE_CONTACT_RATIO_BELOW_ONE).number(
                 "ratio",
                 r.transverse,
                 3,
             ),
-        );
+        ),
+        Some(_) => {}
+        None => notes.push(Note::new(key::MESH_FACE_NOT_SIZED)),
     }
     // Without the figure: it is drawn beside the ratio's own box.
-    if r.overlap > 0.0 && !r.has_full_axial_overlap() {
+    if r.overlap.is_some_and(|o| o > 0.0) && r.has_full_axial_overlap() == Some(false) {
         notes.push(Note::new(key::MESH_OVERLAP_BELOW_ONE));
     }
     MeshReport {
@@ -886,8 +904,9 @@ pub(crate) struct Loading {
     /// settled and none is needed ([`MemberRating::asks`]); and for a rating
     /// that evaluated its stresses at the width it ended with, where there is
     /// nothing to scale and the figures are the ones its own arithmetic
-    /// produced, bit for bit.
-    pub carried_at: f64,
+    /// produced, bit for bit. `None` where the mesh's face is not sized: the
+    /// figures there have no value, and the widths asked for still do.
+    pub carried_at: Option<f64>,
     /// **Whether the contact figure can be inverted for a width.** A line
     /// contact's pressure falls with the face it is spread over, so a stress
     /// says what width would bring it to the allowable; a point contact's
@@ -904,18 +923,6 @@ pub(crate) struct Loading {
 }
 
 impl Loading {
-    /// The two stresses as they stand at [`Self::carried_at`].
-    ///
-    /// Bending is inversely linear in width and contact goes as the inverse
-    /// square root of it, so a change of width is a scale rather than a second
-    /// solve — and where the two widths are equal this is the identity, which
-    /// is what lets a rating that evaluated at its final width keep its own
-    /// digits to the bit.
-    fn at_width(self) -> (Option<f64>, f64) {
-        let by = self.measured_at / self.carried_at;
-        (self.bending.map(|s| s * by), self.contact * by.sqrt())
-    }
-
     /// **The same loading under `k` times the torque.**
     ///
     /// Bending is linear in torque and contact goes as its square root
@@ -984,7 +991,7 @@ pub(crate) struct Rated {
     pub case: usize,
     pub kind: CaseKind,
     pub bending_stress: Option<f64>,
-    pub contact_stress: f64,
+    pub contact_stress: Option<f64>,
     pub min_face_width: Widths,
     /// The mesh whose contact stress stands highest over its allowable at
     /// the width it is carried at: `(stress, allowable)`, MPa. `None` where
@@ -1024,46 +1031,75 @@ impl Rated {
 impl MemberRating<'_> {
     /// The rating: each mesh at the width it carries the member at, and the
     /// worst of them, in every case.
+    ///
+    /// **The width each figure asks is read where the figure was measured**,
+    /// so it is the same number whatever width the member ends up carried at
+    /// — the probe pass and this one ask it in the same arithmetic — and
+    /// **the stress reported at the carried width is the allowable scaled by
+    /// that ask**, `σ_a (b_ask / b)^p` with `p` 1 for bending and ½ for
+    /// contact, each an exact power of the width. In reals that is the
+    /// measured stress scaled, `σ (b_m / b)^p`; written from the ask, a width
+    /// sized by a figure carries that figure at its allowable exactly, where
+    /// the scaled stress came out an ulp either side of it.
     pub(crate) fn rated(&self) -> Vec<Rated> {
         self.cases
             .iter()
             .map(|c| {
-                // A bending stress that no mesh could rate stays absent; one
-                // that any mesh could rate is that mesh's worst, and a mesh
-                // with no rating does not make an absence out of a figure
-                // another mesh has.
+                let reverses = self.reversal.reverses(self.always_reverses, c.reverses);
+                let bending_allowable =
+                    self.reversal
+                        .bending_allowable(self.material, c.kind, reverses);
+                // A line contact is what a width is inverted from.
+                let flank = allowable(self.material, Rating::Contact { aspect: 0.0 }, c.kind);
+                // What each mesh asks, and what it carries at its width. A
+                // bending stress no mesh could rate stays absent; one any mesh
+                // could is the worst, and a mesh with no rating does not make
+                // an absence out of a figure another mesh has.
+                let mut ask_bending: Option<f64> = None;
+                let mut ask_contact: Option<f64> = None;
                 let mut bending: Option<f64> = None;
-                let mut contact = 0.0_f64;
-                // The worst contact among the meshes whose figure a width
-                // can be read off, which is what the width is inverted from.
-                let mut sizable: Option<f64> = None;
-                let mut width = 0.0_f64;
+                let mut contact: Option<f64> = None;
                 // The contact figure standing highest over its own
                 // allowable: first yield depends on each patch's shape.
                 let mut worst: Option<(f64, f64)> = None;
+                let most = |had: Option<f64>, x: f64| Some(had.map_or(x, |h: f64| h.max(x)));
                 for l in &c.meshes {
-                    let (b, s) = l.at_width();
+                    let asked_bending = l.bending.map(|s| {
+                        crate::strength::min_face_width_bending(
+                            s,
+                            l.measured_at,
+                            bending_allowable,
+                        )
+                    });
+                    let asked_contact = flank.filter(|_| l.sizes_face).map(|a| {
+                        crate::strength::min_face_width_contact(l.contact, l.measured_at, a)
+                    });
+                    if let Some(w) = asked_bending {
+                        ask_bending = most(ask_bending, w);
+                    }
+                    if let Some(w) = asked_contact {
+                        ask_contact = most(ask_contact, w);
+                    }
+                    let Some(b) = l.carried_at else {
+                        continue;
+                    };
+                    let b_stress = asked_bending.map(|ask| bending_allowable * (ask / b));
+                    let c_stress = match (asked_contact, flank) {
+                        (Some(ask), Some(a)) => a * (ask / b).sqrt(),
+                        _ => l.contact * (l.measured_at / b).sqrt(),
+                    };
                     let judged =
                         allowable(self.material, Rating::Contact { aspect: l.aspect }, c.kind);
                     if let Some(a) = judged {
-                        if worst.is_none_or(|(ws, wa)| s / a > ws / wa) {
-                            worst = Some((s, a));
+                        if worst.is_none_or(|(ws, wa)| c_stress / a > ws / wa) {
+                            worst = Some((c_stress, a));
                         }
                     }
-                    if let Some(b) = b {
-                        bending = Some(bending.map_or(b, |had: f64| had.max(b)));
+                    if let Some(s) = b_stress {
+                        bending = most(bending, s);
                     }
-                    if s >= contact {
-                        contact = s;
-                    }
-                    if l.sizes_face {
-                        sizable = Some(sizable.map_or(s, |had: f64| had.max(s)));
-                        width = width.max(l.carried_at);
-                    }
+                    contact = most(contact, c_stress);
                 }
-                let reverses = self.reversal.reverses(self.always_reverses, c.reverses);
-                // A line contact is what a width is inverted from.
-                let flank = allowable(self.material, Rating::Contact { aspect: 0.0 }, c.kind);
                 Rated {
                     case: c.case,
                     kind: c.kind,
@@ -1071,24 +1107,14 @@ impl MemberRating<'_> {
                     contact_stress: contact,
                     contact_worst: worst,
                     contact_unjudged: flank.is_none() && !c.meshes.is_empty(),
-                    // **Each figure is inverted at the width it was taken at**,
-                    // and the widest mesh is the one that answers: a minimum
-                    // is what this member would need, and it needs enough for
-                    // every mesh it is in.
+                    // **The widest ask answers**: a minimum is what this
+                    // member would need, and it needs enough for every mesh
+                    // it is in. Two allowables, because a reversed root
+                    // endures less bending while its flank pits exactly as
+                    // it did.
                     min_face_width: Widths {
-                        // Two allowables, because a reversed root endures less
-                        // bending while its flank pits exactly as it did.
-                        bending: bending.map(|s| {
-                            crate::strength::min_face_width_bending(
-                                s,
-                                width,
-                                self.reversal
-                                    .bending_allowable(self.material, c.kind, reverses),
-                            )
-                        }),
-                        contact: sizable.zip(flank).map(|(contact, flank)| {
-                            crate::strength::min_face_width_contact(contact, width, flank)
-                        }),
+                        bending: ask_bending,
+                        contact: ask_contact,
                     },
                 }
             })
@@ -1506,8 +1532,9 @@ pub struct GearCase {
     /// so this is not a per-tooth curvature effect. They differ because they are
     /// rated at different *moments*: each gear's dedendum is loaded alone at one
     /// end of the path, and that is where its own pitting is assessed. See
-    /// [`crate::strength::ContactStress::governing`].
-    pub contact_stress: f64,
+    /// [`crate::strength::ContactStress::governing`]. `None` where the
+    /// member's face is not sized ([`GearResult::face_width`]).
+    pub contact_stress: Option<f64>,
     /// The face width each rating would need.
     pub min_face_width: Widths,
 }
@@ -1533,8 +1560,11 @@ pub struct GearResult {
     pub profile_shift: f64,
     /// Likewise the addendum.
     pub addendum: f64,
-    /// Likewise the face width.
-    pub face_width: f64,
+    /// Likewise the face width. **`None` where nothing sizes it**: an
+    /// automatic width on a line contact that no case loads and no given
+    /// axial contact ratio floors — not sized, rather than the number in its
+    /// box (`docs/corrections.md`).
+    pub face_width: Option<f64>,
     /// What a convention recommends for the face width, mm, where one applies
     /// and whether or not it is in use — a worm's length and its wheel's width
     /// ([`crossed::proportions`]). `None` where a rating sizes the face
@@ -1627,8 +1657,8 @@ pub(crate) struct MemberFacts<'a> {
     /// disagree with.
     pub cases: Vec<GearCase>,
     /// The width this member is *rated at*, which is its mesh's rather than its
-    /// own ([`Widths`]).
-    pub face_width: f64,
+    /// own ([`Widths`]); `None` where nothing sizes it.
+    pub face_width: Option<f64>,
     /// A convention's recommendation for the width, where one applies.
     pub recommended_face_width: Option<f64>,
     pub material: Material,
@@ -2338,17 +2368,18 @@ pub enum MemberFreedom {
 }
 
 impl MemberFreedom {
-    /// What this input of a gear came to, off its result.
+    /// What this input of a gear came to, off its result — `None` for a
+    /// face width nothing sized.
     #[must_use]
-    pub fn of(self, g: &GearResult) -> f64 {
+    pub fn of(self, g: &GearResult) -> Option<f64> {
         match self {
-            Self::Shift => g.profile_shift,
-            Self::Helix => g.helix_angle,
-            Self::PitchDiameter => g.pitch_diameter,
+            Self::Shift => Some(g.profile_shift),
+            Self::Helix => Some(g.helix_angle),
+            Self::PitchDiameter => Some(g.pitch_diameter),
             Self::FaceWidth => g.face_width,
-            Self::ThicknessMod => g.params.thickness_mod,
-            Self::Module => g.params.module,
-            Self::PressureAngle => g.params.pressure_angle,
+            Self::ThicknessMod => Some(g.params.thickness_mod),
+            Self::Module => Some(g.params.module),
+            Self::PressureAngle => Some(g.params.pressure_angle),
         }
     }
 }
@@ -2815,51 +2846,35 @@ impl Default for FaceSources {
 }
 
 impl FaceSources {
-    /// **The width to size a member to**: the largest an *enabled* rating asks
-    /// for, or the width the member was given where none is enabled.
+    /// **The width the enabled ratings ask a member for**: the largest any
+    /// asks over every case of a kind that is switched on — the highest case
+    /// is the one that sizes the part, however many overlap — or `None`
+    /// where nothing asks: no source switched on, no case, or every case
+    /// carrying nothing (a case the train could not solve is a load of
+    /// nought on every mesh). A width of nought is no width, so a case that
+    /// asks nought asks nothing.
     ///
-    /// Nothing enabled used to come out **zero**, and the rating then divided by
-    /// it — every stress infinite, every minimum width a NaN. Those cross the
-    /// boundary as `null` and draw as blanks, so a reader saw the note and no
-    /// figures, which is the right outcome reached by accident. The note's
-    /// promise is that the input is *said* rather than divided by, and this is
-    /// what keeps it: an automatic width with nothing to choose between has
-    /// nothing to choose, so it stands at the number already in its box, which
-    /// is on screen beside the toggle that stopped deciding it.
-    ///
-    /// A width a designer **types** as zero is a different thing — it describes
-    /// a gear with no face, and this cannot rescue it. See `docs/state.md`.
-    ///
-    /// `asks` is every load case's ask with the kind that made it: the largest
-    /// over every case of a kind that is switched on — the highest case is the
-    /// one that sizes the part, however many overlap. A train with no case
-    /// asks nothing, and that is the same answer as no source: the width
-    /// stands at its box — and so does one whose every case carries nothing,
-    /// a case the train could not solve being a load of nought on every
-    /// mesh, which asks a width of nought and means no width was asked.
+    /// Nothing asked used to stand at the number in the member's box, so as
+    /// a load fell to nought the width fell with it and then jumped to the
+    /// box at nought exactly (`docs/corrections.md`). It is not sized now,
+    /// and says so ([`crate::note::key::GEAR_FACE_WIDTH_NOT_SIZED`]); a
+    /// width a designer **types** as nought is a gear with no face, refused
+    /// where it enters.
     #[must_use]
-    pub fn width_for(&self, asks: &[(CaseKind, Widths)], given: f64) -> f64 {
-        if !self.any() || asks.is_empty() {
-            return given;
-        }
-        let mut want = 0.0_f64;
+    pub fn width_for(&self, asks: &[(CaseKind, Widths)]) -> Option<f64> {
+        let mut want: Option<f64> = None;
         for (kind, w) in asks {
-            if *self.bending.get(*kind) {
-                if let Some(b) = w.bending {
-                    want = want.max(b);
-                }
-            }
-            if *self.contact.get(*kind) {
-                if let Some(c) = w.contact {
-                    want = want.max(c);
+            let on = [
+                (*self.bending.get(*kind), w.bending),
+                (*self.contact.get(*kind), w.contact),
+            ];
+            for (enabled, asked) in on {
+                if let Some(x) = asked.filter(|&x| enabled && x > 0.0) {
+                    want = Some(want.map_or(x, |had: f64| had.max(x)));
                 }
             }
         }
-        if want == 0.0 {
-            given
-        } else {
-            want
-        }
+        want
     }
 
     /// Whether anything at all is selected.
@@ -4580,8 +4595,8 @@ impl TrainResult {
             Freedom::Overlap(k) => self
                 .meshes
                 .get(k)
-                .and_then(|m| m.line.as_ref().map(|l| l.contact_ratios.overlap)),
-            Freedom::Member(i, m) => self.members.get(i).map(|g| m.of(g)),
+                .and_then(|m| m.line.as_ref().and_then(|l| l.contact_ratios.overlap)),
+            Freedom::Member(i, m) => self.members.get(i).and_then(|g| m.of(g)),
         }
     }
 

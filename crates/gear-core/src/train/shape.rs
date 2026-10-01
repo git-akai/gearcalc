@@ -2925,7 +2925,7 @@ fn point_mesh_report(
     MeshReport {
         notes,
         coprime: m.coprime,
-        contact_ratio,
+        contact_ratio: Some(contact_ratio),
         locking_friction: m.locking_friction,
         efficiency: m.efficiency,
         sliding_ratio: s.sliding_ratio,
@@ -2936,7 +2936,7 @@ fn point_mesh_report(
             .zip(m.case_power)
             .map(|(((c, contact), speed), power_through)| super::MeshCase {
                 case: c.case,
-                contact,
+                contact: Some(contact),
                 power_through,
                 // **How fast the surfaces slide past each other**, which is a
                 // speed with no sign to it: a pair rubbing at 3 m/s rubs at
@@ -4176,8 +4176,13 @@ pub fn rate(
                 .collect::<Result<Vec<_>, _>>()
                 .map(Some)
         };
-    let point_probes: Vec<Option<Vec<super::ContactPatch>>> = (0..shape.meshes.len())
-        .map(|k| point_contact(k, face_of(k, &early_width)))
+    let point_probes: Vec<Option<([f64; 2], Vec<super::ContactPatch>)>> = (0..shape
+        .meshes
+        .len())
+        .map(|k| {
+            let faces = face_of(k, &early_width);
+            point_contact(k, faces).map(|p| p.map(|p| (faces, p)))
+        })
         .collect::<Result<_, _>>()?;
 
     // ---- what each member's ratings come to, from the probe pass.
@@ -4192,7 +4197,7 @@ pub fn rate(
         .map(|s| s * b.share)
     };
     let always_reverses = |i: usize| meshes_of(i).len() > 1;
-    let rating = |i: usize, widths: &[f64]| -> MemberRating<'_> {
+    let rating = |i: usize, widths: &[Option<f64>]| -> MemberRating<'_> {
         // A line mesh's loading at the probe width, every case a scale of
         // it; a point mesh's at its own width, case by case.
         let cases = cases
@@ -4225,15 +4230,15 @@ pub fn rate(
                                 }
                                 .under(scaled[k].1[c])
                             }
-                            (None, Some(patches)) => Loading {
+                            (None, Some((faces, patches))) => Loading {
                                 bending: None,
                                 // The mesh's figure, which is the members'
                                 // figure: two flanks share one patch, one
                                 // normal force and one `E*`, and a point
                                 // contact has only the one place.
                                 contact: patches[c].max_pressure,
-                                measured_at: widths[k],
-                                carried_at: widths[k],
+                                measured_at: faces[0].min(faces[1]),
+                                carried_at: Some(faces[0].min(faces[1])),
                                 sizes_face: false,
                                 aspect: crate::hertz::patch_aspect(
                                     patches[c].curvature_along,
@@ -4244,8 +4249,8 @@ pub fn rate(
                             (None, None) => Loading {
                                 bending: None,
                                 contact: 0.0,
-                                measured_at: widths[k],
-                                carried_at: widths[k],
+                                measured_at: PROBE,
+                                carried_at: None,
                                 sizes_face: false,
                                 aspect: 0.0,
                             },
@@ -4261,84 +4266,100 @@ pub fn rate(
             cases,
         }
     };
-    let probe_widths = vec![PROBE; shape.meshes.len()];
+    let probe_widths = vec![Some(PROBE); shape.meshes.len()];
     // ...and the width a given axial contact ratio needs, a floor under an
     // automatic width: each mesh's own, at its own helix, and a member's is
     // the largest of its meshes'.
-    let mesh_floor: Vec<f64> = shape
+    let mesh_floor: Vec<Option<f64>> = shape
         .meshes
         .iter()
         .enumerate()
         .map(|(k, m)| {
-            if built.meshes[k].line().is_none() {
-                return 0.0;
-            }
+            built.meshes[k].line()?;
             super::width_for_overlap(&m.overlap, helix[m.a], shape.members[m.a].normal_module())
-                .unwrap_or(0.0)
         })
         .collect();
-    let for_overlap = |i: usize| -> f64 {
-        meshes_of(i)
-            .iter()
-            .map(|&k| mesh_floor[k])
-            .fold(0.0_f64, f64::max)
+    // The larger of two asks, either of which may be nothing.
+    let larger = |x: Option<f64>, y: Option<f64>| match (x, y) {
+        (Some(x), Some(y)) => Some(x.max(y)),
+        (x, y) => x.or(y),
     };
-    // A member on no line mesh has nothing to ask of a rating, and asks
-    // nothing of its mate: its width is its own — a worm distance's
-    // proportions, or the box's, and the gear says which.
-    let asks: Vec<f64> = (0..n)
+    // **What each member's line meshes ask of it**: its enabled ratings'
+    // widths, and a given axial contact ratio's floor. A member on no line
+    // mesh asks nothing of a rating, and nothing of its mate.
+    let asks: Vec<Option<f64>> = (0..n)
         .map(|i| {
-            if on_a_line(i) {
-                shape.members[i]
-                    .gear
-                    .face_sources
-                    .width_for(
-                        &rating(i, &probe_widths).asks(),
-                        shape.members[i].gear.face_width.manual,
-                    )
-                    .max(for_overlap(i))
-            } else {
-                0.0
+            if !on_a_line(i) {
+                return None;
             }
+            let rated = shape.members[i]
+                .gear
+                .face_sources
+                .width_for(&rating(i, &probe_widths).asks());
+            meshes_of(i)
+                .iter()
+                .map(|&k| mesh_floor[k])
+                .fold(rated, larger)
         })
         .collect();
+    let on_a_point = |i: usize| meshes_of(i).iter().any(|&k| built.meshes[k].line().is_none());
     let as_entered = |i: usize| {
         shape.members[i].gear.face_width.auto && !on_a_line(i) && recommended[i].is_none()
     };
     // **A member's automatic width is the largest requirement of any mesh it
-    // is in**, because the narrower face carries the pair.
-    let mesh_ask: Vec<f64> = shape
+    // is in**, because the narrower face carries the pair. Where nothing asks
+    // it is not sized — unless it is on a point contact, whose width is its
+    // proportions or its box, cases or not: its pressure does not invert for
+    // one.
+    let mesh_ask: Vec<Option<f64>> = shape
         .meshes
         .iter()
-        .map(|m| asks[m.a].max(asks[m.b]))
+        .map(|m| larger(asks[m.a], asks[m.b]))
         .collect();
-    let widths: Vec<f64> = (0..n)
+    let widths: Vec<Option<f64>> = (0..n)
         .map(|i| {
+            let own = shape.members[i].gear.face_width;
+            if !own.auto {
+                return Some(own.manual);
+            }
             let wanted = meshes_of(i)
                 .iter()
                 .map(|&k| mesh_ask[k])
-                .fold(0.0_f64, f64::max);
-            let own = shape.members[i].gear.face_width;
-            // Nothing rated it: its own proportions, or the box as entered.
-            let wanted = if on_a_line(i) {
-                wanted.max(recommended[i].unwrap_or(0.0))
+                .fold(recommended[i], larger);
+            if wanted.is_none() && on_a_point(i) {
+                Some(own.manual)
             } else {
-                recommended[i].unwrap_or(own.manual)
-            };
-            own.resolve(wanted)
+                wanted
+            }
         })
         .collect();
-    let mesh_widths: Vec<f64> = shape
+    // The narrower face carries the pair; a mesh with a face not sized is
+    // not sized.
+    let mesh_widths: Vec<Option<f64>> = shape
         .meshes
         .iter()
-        .map(|m| widths[m.a].min(widths[m.b]))
+        .map(|m| widths[m.a].zip(widths[m.b]).map(|(a, b)| a.min(b)))
         .collect();
     let rated_contact: Vec<Option<crate::strength::ContactStress>> = (0..shape.meshes.len())
-        .map(|k| contact_at(k, mesh_widths[k]))
+        .map(|k| mesh_widths[k].map_or(Ok(None), |w| contact_at(k, w)))
         .collect::<Result<_, _>>()?;
-    let final_width = |i: usize| widths[i];
-    let rated_point: Vec<Option<Vec<super::ContactPatch>>> = (0..shape.meshes.len())
-        .map(|k| point_contact(k, face_of(k, &final_width)))
+    // A point contact's two faces: every member on one has a width.
+    let point_faces = |k: usize| -> Option<[f64; 2]> {
+        let m = shape.meshes[k];
+        let faces = widths[m.a].zip(widths[m.b]).map(|(a, b)| [a, b]);
+        debug_assert!(
+            built.meshes[k].line().is_some() || faces.is_some(),
+            "a member on a point contact always has a width"
+        );
+        faces
+    };
+    let rated_point: Vec<Option<([f64; 2], Vec<super::ContactPatch>)>> = (0..shape
+        .meshes
+        .len())
+        .map(|k| match point_faces(k) {
+            Some(f) => point_contact(k, f).map(|p| p.map(|p| (f, p))),
+            None => Ok(None),
+        })
         .collect::<Result<_, _>>()?;
 
     // ---- backlash: each mesh's play, as its row and at each member. Where
@@ -4562,6 +4583,7 @@ pub fn rate(
             out.push(Note::new(key::GEAR_TIP_CANNOT_CLEAR_MATE_FLANK));
         }
         out.extend(g.face_width_note());
+        out.extend(widths[i].is_none().then(|| Note::new(key::GEAR_FACE_WIDTH_NOT_SIZED)));
         out.extend(as_entered(i).then(|| Note::new(key::GEAR_FACE_WIDTH_AS_ENTERED)));
         // ...and each mesh whose load point leaves this member no section
         // to rate, where another mesh's did — or, where none did, that the
@@ -4711,17 +4733,19 @@ pub fn rate(
                         ),
                         operating_pressure_angle: l.operating.alpha_w.to_degrees(),
                         efficiency,
-                        // Every line contact was rated above; the map is
-                        // over the option so nothing here can panic.
-                        contact: rated_contact[k].as_ref().map_or_else(Vec::new, |stress| {
-                            scaled[k]
-                                .1
-                                .iter()
-                                .map(|&s| {
-                                    super::ContactPatch::line(stress, s, mesh_widths[k], e_star[k])
-                                })
-                                .collect()
-                        }),
+                        // A patch per case where the face is sized and a
+                        // case loads it; none where it is not.
+                        contact: scaled[k]
+                            .1
+                            .iter()
+                            .map(|&s| {
+                                rated_contact[k].as_ref().zip(mesh_widths[k]).map(
+                                    |(stress, width)| {
+                                        super::ContactPatch::line(stress, s, width, e_star[k])
+                                    },
+                                )
+                            })
+                            .collect(),
                         case_power,
                         backlash,
                         row_play,
@@ -4746,13 +4770,18 @@ pub fn rate(
                 BuiltContact::Point(p) => point_mesh_report(
                     cases,
                     p,
-                    face_of(k, &final_width),
+                    point_faces(k).unwrap_or_else(|| face_of(k, &early_width)),
                     m.static_friction,
                     PointMesh {
                         coprime,
                         efficiency,
-                        locking_friction: p.locking_friction(face_of(k, &final_width)),
-                        contact: rated_point[k].clone().unwrap_or_default(),
+                        locking_friction: p.locking_friction(
+                            point_faces(k).unwrap_or_else(|| face_of(k, &early_width)),
+                        ),
+                        contact: rated_point[k]
+                            .as_ref()
+                            .map(|(_, patches)| patches.clone())
+                            .unwrap_or_default(),
                         case_power,
                         backlash,
                         row_play,

@@ -121,6 +121,8 @@ pub mod key {
     pub const GEAR_BENDING_UNRATED_COMPRESSED: &str = "gear.bending_unrated_compressed";
     /// `gear.ring_addendum_clamped`
     pub const GEAR_RING_ADDENDUM_CLAMPED: &str = "gear.ring_addendum_clamped";
+    /// `gear.face_width_not_sized`
+    pub const GEAR_FACE_WIDTH_NOT_SIZED: &str = "gear.face_width_not_sized";
     /// `gear.face_width_no_source`
     pub const GEAR_FACE_WIDTH_NO_SOURCE: &str = "gear.face_width_no_source";
     /// `gear.reversed_bending_uncorrected`
@@ -137,6 +139,8 @@ pub mod key {
     // two meshes and says which.
     /// `mesh.contact_ratio_below_one`
     pub const MESH_CONTACT_RATIO_BELOW_ONE: &str = "mesh.contact_ratio_below_one";
+    /// `mesh.face_not_sized`
+    pub const MESH_FACE_NOT_SIZED: &str = "mesh.face_not_sized";
     /// `mesh.transverse_contact_ratio_below_one`
     pub const MESH_TRANSVERSE_CONTACT_RATIO_BELOW_ONE: &str =
         "mesh.transverse_contact_ratio_below_one";
@@ -395,11 +399,13 @@ pub mod key {
         GEAR_CONTACT_ULTIMATE_UNJUDGED,
         GEAR_RING_ADDENDUM_CLAMPED,
         GEAR_FACE_WIDTH_NO_SOURCE,
+        GEAR_FACE_WIDTH_NOT_SIZED,
         GEAR_REVERSED_BENDING_UNCORRECTED,
         GEAR_REVERSED_BENDING_APPLIED,
         GEAR_RIM_BELOW_MINIMUM,
         MESH_CONTACT_RATIO_BELOW_ONE,
         MESH_TRANSVERSE_CONTACT_RATIO_BELOW_ONE,
+        MESH_FACE_NOT_SIZED,
         MESH_LOW_EFFICIENCY,
         MESH_NEAR_SELF_LOCKING,
         MESH_FORWARD_LOCKING,
