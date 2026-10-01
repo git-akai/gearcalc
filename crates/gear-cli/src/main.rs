@@ -3205,7 +3205,7 @@ fn matrix_report() {
                 100.0 * thresh
             );
             println!(
-                "  {:<48} {:>7} {:>7} {:>7}",
+                "  {:<48} {:>7} {:>7} {:>7}   ties (within a rating's resolution)",
                 "", "shift", "fillet", "dedend"
             );
             for i in 0..matrix::MATRIX.len() {
@@ -3218,12 +3218,15 @@ fn matrix_report() {
                         thresh,
                     );
                     println!(
-                        "  {:<22} vs {:<22} {:6.1}% {:6.1}% {:6.1}%",
+                        "  {:<22} vs {:<22} {:6.1}% {:6.1}% {:6.1}%   {} {} {}",
                         matrix::MATRIX[i].name(member),
                         matrix::MATRIX[j].name(member),
-                        100.0 * g[0],
-                        100.0 * g[1],
-                        100.0 * g[2]
+                        100.0 * g[0].0,
+                        100.0 * g[1].0,
+                        100.0 * g[2].0,
+                        g[0].1,
+                        g[1].1,
+                        g[2].1
                     );
                 }
             }

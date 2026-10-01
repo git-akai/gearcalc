@@ -265,6 +265,15 @@ where
     None
 }
 
+/// **`√ε`, the resolution of a flat extremum or a tangency.** Near a smooth
+/// peak a value is flat to its own rounding `ε` within `√ε` of the peak's
+/// argument, and a tangency — a double root of the gap between two curves —
+/// is placed by a gap rounded to `ε` only to within `√ε`. So `√ε` of an
+/// argument's scale is as finely as either can be located, and the bound
+/// [`greatest`] narrows its bracket to. Written out because `sqrt` is not a
+/// `const fn`; a law holds it to `f64::EPSILON.sqrt()`.
+pub const SQRT_EPSILON: f64 = 1.490_116_119_384_765_6e-8;
+
 /// **The greatest value of `f` on `[lo, hi]`, ends included**: `(x, f(x))`,
 /// or `None` where `f` has no value anywhere it was asked.
 ///
@@ -291,7 +300,7 @@ where
     };
     let ends = better(at(lo), at(hi));
     let width = hi - lo;
-    let scale = f64::EPSILON.sqrt() * lo.abs().max(hi.abs());
+    let scale = SQRT_EPSILON * lo.abs().max(hi.abs());
     if width <= scale {
         return ends;
     }
@@ -326,6 +335,12 @@ where
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    /// The constant is the square root it names, to the bit.
+    #[test]
+    fn sqrt_epsilon_is_the_square_root_of_epsilon() {
+        assert_eq!(SQRT_EPSILON.to_bits(), f64::EPSILON.sqrt().to_bits());
+    }
 
     /// **The greatest value is found inside and at either end**, to the
     /// value's rounding, in the derived number of steps: a peak inside, a

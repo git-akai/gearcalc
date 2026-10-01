@@ -250,6 +250,52 @@ pub fn continuity_in_profile_shift(model: Model, on: Member, teeth: u32) -> f64 
 /// Spearman rank correlation between two models over the population.
 ///
 /// This is the question "would these two ever pick a different design?".
+/// **A rating's resolution, relative**: `√ε`
+/// ([`gear_core::solve::SQRT_EPSILON`]). Every rating here is read at a
+/// tangency — where a parabola or the 30° line touches the fillet — and a
+/// tangency is a double root of the gap between the two curves: a gap rounded
+/// to `ε` places the touch point, and the rating read there, only to `√ε`.
+/// Two ratings closer than that, or a change smaller than it, cannot be told
+/// from rounding: a **tie**. The rounding the population shows is 3.5e-14 at
+/// most, and the smallest effect a lever has is 4e-6, so the line falls
+/// between them by two orders or more either way.
+pub(crate) const RESOLUTION: f64 = gear_core::solve::SQRT_EPSILON;
+
+/// Whether two ratings are one value to [`RESOLUTION`].
+fn tied(x: f64, y: f64) -> bool {
+    (x - y).abs() <= RESOLUTION * x.abs().max(y.abs())
+}
+
+/// **Ranks with ties averaged**: values [`tied`] to the first of their run
+/// share the mean of the places they span, as Spearman's rank correlation
+/// takes ties — so rounding never orders two equal ratings.
+fn ranks(values: &[f64]) -> Vec<f64> {
+    let n = values.len();
+    let mut idx: Vec<usize> = (0..n).collect();
+    idx.sort_by(|&i, &j| values[i].total_cmp(&values[j]));
+    let mut r = vec![0.0; n];
+    let mut start = 0;
+    while start < n {
+        let mut end = start + 1;
+        while end < n && tied(values[idx[start]], values[idx[end]]) {
+            end += 1;
+        }
+        #[allow(clippy::cast_precision_loss)]
+        let mean = (start + end - 1) as f64 / 2.0;
+        for &i in &idx[start..end] {
+            r[i] = mean;
+        }
+        start = end;
+    }
+    r
+}
+
+/// **The sign of a lever's effect**, from a rating `before` and `after`:
+/// `None` where the change is a [`tied`] one.
+fn effect(before: f64, after: f64) -> Option<bool> {
+    (!tied(before, after)).then_some(after > before)
+}
+
 pub fn rank_correlation(a: Model, b: Model, on: Member, pop: &[GearParams]) -> (f64, usize) {
     let pairs: Vec<(f64, f64)> = pop
         .iter()
@@ -259,23 +305,8 @@ pub fn rank_correlation(a: Model, b: Model, on: Member, pop: &[GearParams]) -> (
     if n < 3 {
         return (f64::NAN, n);
     }
-    let rank = |get: &dyn Fn(&(f64, f64)) -> f64| {
-        let mut idx: Vec<usize> = (0..n).collect();
-        idx.sort_by(|&i, &j| {
-            get(&pairs[i])
-                .partial_cmp(&get(&pairs[j]))
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
-        let mut r = vec![0.0; n];
-        for (place, &i) in idx.iter().enumerate() {
-            {
-                r[i] = place as f64;
-            }
-        }
-        r
-    };
-    let ra = rank(&|p| p.0);
-    let rb = rank(&|p| p.1);
+    let ra = ranks(&pairs.iter().map(|p| p.0).collect::<Vec<_>>());
+    let rb = ranks(&pairs.iter().map(|p| p.1).collect::<Vec<_>>());
     let nf = n as f64;
     let mean = (nf - 1.0) / 2.0;
     let (mut num, mut da, mut db) = (0.0, 0.0, 0.0);
@@ -297,13 +328,20 @@ pub fn rank_correlation(a: Model, b: Model, on: Member, pop: &[GearParams]) -> (
 /// all: near a turning point the sign is noise, and counting it as disagreement
 /// overstates the problem. Expressed as a relative change in the bending factor
 /// across the step, so it means "the lever visibly did something".
+///
+/// **A change within a rating's resolution has no sign** ([`effect`]): it is a
+/// tie, counted as one and left out of the fraction, whatever `min_effect` is.
+/// At a threshold of nought a sign was read off a difference of rounding —
+/// a lever that does nothing to either model came out `±1e-14` — and which way
+/// it rounded moved a rate by a tenth of a point. Returns each lever's fraction
+/// and its ties.
 pub fn gradient_agreement(
     a: Model,
     b: Model,
     on: Member,
     pop: &[GearParams],
     min_effect: f64,
-) -> [f64; 3] {
+) -> [(f64, usize); 3] {
     let levers: [fn(GearParams, f64) -> GearParams; 3] = [
         |mut p, d| {
             p.profile_shift += d;
@@ -318,9 +356,9 @@ pub fn gradient_agreement(
             p
         },
     ];
-    let mut out = [0.0; 3];
+    let mut out = [(0.0, 0); 3];
     for (k, lever) in levers.iter().enumerate() {
-        let (mut agree, mut total) = (0usize, 0usize);
+        let (mut agree, mut total, mut ties) = (0usize, 0usize, 0usize);
         for p in pop {
             let h = 0.02;
             let up = lever(*p, h);
@@ -331,22 +369,29 @@ pub fn gradient_agreement(
             let (Some(b1), Some(b0)) = (b.evaluate(on, up), b.evaluate(on, dn)) else {
                 continue;
             };
+            let (Some(sa), Some(sb)) = (effect(a0, a1), effect(b0, b1)) else {
+                ties += 1;
+                continue;
+            };
             let (ga, gb) = (a1 - a0, b1 - b0);
             // both models must agree the lever does something material
             if (ga / a0).abs() < min_effect || (gb / b0).abs() < min_effect {
                 continue;
             }
             total += 1;
-            if (ga > 0.0) == (gb > 0.0) {
+            if sa == sb {
                 agree += 1;
             }
         }
         {
-            out[k] = if total == 0 {
-                f64::NAN
-            } else {
-                agree as f64 / total as f64
-            };
+            out[k] = (
+                if total == 0 {
+                    f64::NAN
+                } else {
+                    agree as f64 / total as f64
+                },
+                ties,
+            );
         }
     }
     out
@@ -512,6 +557,29 @@ pub fn fillet_radius_readings(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// **A tie is decided by the resolution, both sides of it**: a change of
+    /// rounding's size (1e-14, the population's largest is 3.5e-14) has no
+    /// sign, and one ten times the resolution has its own; values a
+    /// thousandth of the resolution apart share a rank, and values ten
+    /// resolutions apart do not. Near miss: a change at the resolution itself
+    /// is still a tie, one at twice it is not.
+    #[test]
+    fn a_tie_is_a_change_within_the_resolution() {
+        let x = 3.7;
+        assert_eq!(effect(x, x * (1.0 + 1e-14)), None);
+        assert_eq!(effect(x, x * (1.0 - 1e-14)), None);
+        assert_eq!(effect(x, x * (1.0 + 10.0 * RESOLUTION)), Some(true));
+        assert_eq!(effect(x, x * (1.0 - 10.0 * RESOLUTION)), Some(false));
+        assert_eq!(effect(x, x * (1.0 + 0.5 * RESOLUTION)), None);
+        assert_eq!(effect(x, x * (1.0 + 2.0 * RESOLUTION)), Some(true));
+        let r = ranks(&[1.0, 1.0 + 1e-3 * RESOLUTION, 1.0 + 10.0 * RESOLUTION, 0.5]);
+        assert_eq!(r, vec![1.5, 1.5, 3.0, 0.0]);
+        // The order rounding would have put two equal values in does not
+        // matter: swapped, they rank the same.
+        let s = ranks(&[1.0 + 1e-3 * RESOLUTION, 1.0, 1.0 + 10.0 * RESOLUTION, 0.5]);
+        assert_eq!(s, vec![1.5, 1.5, 3.0, 0.0]);
+    }
 
     /// **The documents quote these figures, so the code has to keep printing
     /// them.**
