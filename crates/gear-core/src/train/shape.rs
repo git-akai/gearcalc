@@ -4176,9 +4176,7 @@ pub fn rate(
                 .collect::<Result<Vec<_>, _>>()
                 .map(Some)
         };
-    let point_probes: Vec<Option<([f64; 2], Vec<super::ContactPatch>)>> = (0..shape
-        .meshes
-        .len())
+    let point_probes: Vec<Option<([f64; 2], Vec<super::ContactPatch>)>> = (0..shape.meshes.len())
         .map(|k| {
             let faces = face_of(k, &early_width);
             point_contact(k, faces).map(|p| p.map(|p| (faces, p)))
@@ -4302,7 +4300,11 @@ pub fn rate(
                 .fold(rated, larger)
         })
         .collect();
-    let on_a_point = |i: usize| meshes_of(i).iter().any(|&k| built.meshes[k].line().is_none());
+    let on_a_point = |i: usize| {
+        meshes_of(i)
+            .iter()
+            .any(|&k| built.meshes[k].line().is_none())
+    };
     let as_entered = |i: usize| {
         shape.members[i].gear.face_width.auto && !on_a_line(i) && recommended[i].is_none()
     };
@@ -4353,9 +4355,7 @@ pub fn rate(
         );
         faces
     };
-    let rated_point: Vec<Option<([f64; 2], Vec<super::ContactPatch>)>> = (0..shape
-        .meshes
-        .len())
+    let rated_point: Vec<Option<([f64; 2], Vec<super::ContactPatch>)>> = (0..shape.meshes.len())
         .map(|k| match point_faces(k) {
             Some(f) => point_contact(k, f).map(|p| p.map(|p| (f, p))),
             None => Ok(None),
@@ -4583,7 +4583,11 @@ pub fn rate(
             out.push(Note::new(key::GEAR_TIP_CANNOT_CLEAR_MATE_FLANK));
         }
         out.extend(g.face_width_note());
-        out.extend(widths[i].is_none().then(|| Note::new(key::GEAR_FACE_WIDTH_NOT_SIZED)));
+        out.extend(
+            widths[i]
+                .is_none()
+                .then(|| Note::new(key::GEAR_FACE_WIDTH_NOT_SIZED)),
+        );
         out.extend(as_entered(i).then(|| Note::new(key::GEAR_FACE_WIDTH_AS_ENTERED)));
         // ...and each mesh whose load point leaves this member no section
         // to rate, where another mesh's did — or, where none did, that the
@@ -5769,8 +5773,14 @@ mod tests {
                 )
                 .unwrap();
             let planets = f64::from(stage.axes[1].count);
-            let sp_width = r.members[1].face_width.unwrap().min(r.members[0].face_width.unwrap());
-            let pr_width = r.members[1].face_width.unwrap().min(r.members[2].face_width.unwrap());
+            let sp_width = r.members[1]
+                .face_width
+                .unwrap()
+                .min(r.members[0].face_width.unwrap());
+            let pr_width = r.members[1]
+                .face_width
+                .unwrap()
+                .min(r.members[2].face_width.unwrap());
             let planet = built.members[1].as_gear();
             let each = |contact_ratio: f64, torque: f64, b: f64| {
                 let section = crate::strength::bending_section(planet, contact_ratio).unwrap();
@@ -6789,7 +6799,10 @@ mod overlap_per_group {
         shape.meshes[1].overlap = Auto::fixed(2.0);
         let r = solve(&shape);
         let floor = super::super::width_for_overlap(&Auto::fixed(2.0), 15.0, 1.0).unwrap();
-        assert!(r.members[2].face_width.unwrap() >= floor - 1e-9 && r.members[3].face_width.unwrap() >= floor - 1e-9);
+        assert!(
+            r.members[2].face_width.unwrap() >= floor - 1e-9
+                && r.members[3].face_width.unwrap() >= floor - 1e-9
+        );
         assert!(
             r.members[0].face_width.unwrap() < floor,
             "the first pair asked no floor"

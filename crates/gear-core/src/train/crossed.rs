@@ -511,7 +511,8 @@ mod tests {
             "crossed shafts make a point contact, not a line"
         );
         assert!(
-            point(&r).cases[0].contact.unwrap().patch_length > point(&r).cases[0].contact.unwrap().patch_width,
+            point(&r).cases[0].contact.unwrap().patch_length
+                > point(&r).cases[0].contact.unwrap().patch_width,
             "an ellipse: {} by {}",
             point(&r).cases[0].contact.unwrap().patch_length,
             point(&r).cases[0].contact.unwrap().patch_width
@@ -622,13 +623,11 @@ mod tests {
     fn automatic_takes_the_recommendation_and_manual_is_left_alone() {
         let auto = alone(&arr::worm(1, 40));
         assert_eq!(
-            auto.members[0].face_width,
-            auto.members[0].recommended_face_width,
+            auto.members[0].face_width, auto.members[0].recommended_face_width,
             "an automatic worm length is the recommendation"
         );
         assert_eq!(
-            auto.members[1].face_width,
-            auto.members[1].recommended_face_width,
+            auto.members[1].face_width, auto.members[1].recommended_face_width,
             "an automatic wheel face width is the recommendation"
         );
 
@@ -668,7 +667,8 @@ mod tests {
         // beside it as a figure.
         for (i, gear) in as_gears.members.iter().enumerate() {
             assert_eq!(
-                gear.face_width.unwrap(), stage.members[i].gear.face_width.manual,
+                gear.face_width.unwrap(),
+                stage.members[i].gear.face_width.manual,
                 "member {i}"
             );
             assert!(gear
@@ -876,7 +876,8 @@ mod tests {
         // are compared as a ratio, which divides the load out: the same mesh
         // rated at its worst against rated at its pitch point.
         let severity = |r: &ShapeResult| {
-            point(r).cases[0].contact.unwrap().max_pressure / point(r).cases[0].contact.unwrap().at_pitch_point
+            point(r).cases[0].contact.unwrap().max_pressure
+                / point(r).cases[0].contact.unwrap().at_pitch_point
         };
         // The margin is small, and the reason is worth knowing: a narrow face
         // cuts the zone's *ends* off, and those ends are what made the path

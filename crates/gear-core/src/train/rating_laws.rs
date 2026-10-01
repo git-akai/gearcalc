@@ -424,18 +424,22 @@ fn each_allowable_moves_its_own_width_and_nothing_else() {
 }
 
 /// **With contact sizing on, every flank holds its allowable at the width it
-/// is given**, on every preset, in every case: the automatic width is the
-/// largest any rating asks, so no line contact is left above its own figure.
+/// is given, and the flank that sized the width holds it exactly**, on every
+/// preset, in every case: the automatic width is the largest any rating
+/// asks, and the stress reported at a width is the allowable scaled by the
+/// ask (`σ_a √(b_ask / b)`), so where a member's width is its own contact
+/// ask the stress is the allowable to the bit and `gear.contact_above_allowable`
+/// is silent — where the scaled stress had come out an ulp either side of it.
+/// The bending default the same way: a width its own bending ask set carries
+/// the bending allowable to the bit.
 #[test]
 fn with_contact_sizing_on_every_flank_holds_its_allowable() {
     use super::{allowable, ByKind, FaceSources, Rating};
     let lib = test_library();
-    let mut judged = 0;
+    let (mut judged, mut exact) = (0, 0);
     for p in Preset::ALL {
         let mut s = p.build();
         for m in &mut s.members {
-            // The box a member no rating sizes keeps: a layshaft's idle pair.
-            m.gear.face_width = Auto::automatic(10.0);
             m.gear.face_sources = FaceSources {
                 bending: ByKind::of(|_| true),
                 contact: ByKind::of(|_| true),
@@ -444,37 +448,74 @@ fn with_contact_sizing_on_every_flank_holds_its_allowable() {
         let t = Train::alone(&s, 2.0, 100.0);
         let r = solve_train(&t, &lib).unwrap_or_else(|e| panic!("{p:?}: {e:?}"));
         for g in &r.members {
+            assert!(
+                !g.notes.iter().any(|n| n.is("gear.contact_above_allowable")),
+                "{p:?}: {:?}",
+                g.notes
+            );
             for (c, case) in g.cases.iter().zip(&t.load_cases) {
                 // A member sized by a line contact: the one kind of contact
                 // a width answers to.
-                if c.min_face_width.contact.is_none() {
+                let (Some(ask), Some(stress), Some(width)) =
+                    (c.min_face_width.contact, c.contact_stress, g.face_width)
+                else {
                     continue;
-                }
+                };
                 let a = allowable(&g.material, Rating::Contact { aspect: 0.0 }, case.kind).unwrap();
-                assert!(
-                    c.contact_stress.unwrap() <= a * (1.0 + 1e-9),
-                    "{p:?}: {} MPa against {a} at {} mm",
-                    c.contact_stress.unwrap(),
-                    g.face_width.unwrap()
-                );
+                assert!(stress <= a, "{p:?}: {stress} MPa against {a} at {width} mm");
                 judged += 1;
+                if ask == width {
+                    assert_eq!(stress.to_bits(), a.to_bits(), "{p:?}: sized, so at {a}");
+                    exact += 1;
+                }
             }
         }
     }
-    assert!(judged > 0, "no flank was judged: the law is vacuous");
+    assert!(
+        judged > 0 && exact > 0,
+        "{judged} judged, {exact} sized exactly"
+    );
 }
 
-/// **An automatic width's box is a width wherever it is read** (stage1-exit
-/// item 3). A mesh no case loads asks no width, so its gears stand at their
-/// boxes — a layshaft's idle pairs — and a box of nought there was a face of
-/// nothing, which the solve refused as if the teeth missed (`NoContact`, or
-/// at the base this ran on `FlankInterference`). It is refused where it
-/// enters, by its field, as a given width or an unsized one is — on a
-/// loaded pair too, where it is never read: the box has one bound, not one
-/// per context. Boxes of the width every gear is born with solve (the
-/// control).
+/// **A stress one ulp over its allowable fires the note; the allowable
+/// itself does not** — the comparison is strict, and needs no tolerance
+/// because a sized width carries its allowable exactly.
 #[test]
-fn an_automatic_widths_box_is_a_width() {
+fn the_contact_note_fires_one_ulp_over_and_not_at_the_allowable() {
+    use super::{contact_notes, CaseKind, Rated, Widths};
+    let a = 845.68;
+    let rated = |s: f64| Rated {
+        case: 0,
+        kind: CaseKind::Fatigue,
+        bending_stress: None,
+        contact_stress: Some(s),
+        min_face_width: Widths {
+            bending: None,
+            contact: None,
+        },
+        contact_worst: Some((s, a)),
+        contact_unjudged: false,
+    };
+    let fires = |s: f64| {
+        contact_notes(&[rated(s)])
+            .iter()
+            .any(|n| n.is("gear.contact_above_allowable"))
+    };
+    assert!(!fires(a), "at the allowable");
+    assert!(fires(f64::from_bits(a.to_bits() + 1)), "one ulp over");
+    assert!(!fires(f64::from_bits(a.to_bits() - 1)), "one ulp under");
+}
+
+/// **An automatic width's box is bounded where it is read** (stage1-exit
+/// item 3). On a line contact it is not read: a layshaft at boxes of nought
+/// solves, its engaged ratio sized by its ratings and its idle ratios — which
+/// no case loads — not sized, where a box of nought there was a face of
+/// nothing the solve refused as if the teeth missed (`NoContact`, at the
+/// base this ran on `FlankInterference`). On a point contact the box is the
+/// width, so a crossed pair's box of nought is refused by its field. Boxes of
+/// the default solve both (the control).
+#[test]
+fn an_automatic_widths_box_is_bounded_where_it_is_read() {
     use super::{ByKind, FaceSources, DEFAULT_FACE_WIDTH};
     let lib = test_library();
     let with_box = |preset: Preset, width: f64| {
@@ -488,17 +529,26 @@ fn an_automatic_widths_box_is_a_width() {
         }
         solve_train(&Train::alone(&s, 2.0, 100.0), &lib)
     };
-    for preset in [Preset::Layshaft, Preset::Spur] {
-        let refused = with_box(preset, 0.0)
-            .err()
-            .map(|e| crate::note::Explain::note(&e));
-        assert!(
-            refused.as_ref().is_some_and(|n| n
-                .values
-                .get("field")
-                .is_some_and(|f| f.ends_with("gear.face_width.manual"))),
-            "{preset:?}: {refused:?}"
-        );
+    let r = with_box(Preset::Layshaft, 0.0).unwrap_or_else(|e| panic!("{e:?}"));
+    let (sized, not): (Vec<_>, Vec<_>) = r.members.iter().partition(|g| g.face_width.is_some());
+    assert!(
+        sized.len() >= 4 && !not.is_empty(),
+        "{} / {}",
+        sized.len(),
+        not.len()
+    );
+    assert!(sized.iter().all(|g| g.face_width.is_some_and(|w| w > 0.0)));
+    let refused = with_box(Preset::Crossed, 0.0)
+        .err()
+        .map(|e| crate::note::Explain::note(&e));
+    assert!(
+        refused.as_ref().is_some_and(|n| n
+            .values
+            .get("field")
+            .is_some_and(|f| f.ends_with("gear.face_width.manual"))),
+        "{refused:?}"
+    );
+    for preset in [Preset::Layshaft, Preset::Crossed] {
         assert!(with_box(preset, DEFAULT_FACE_WIDTH).is_ok(), "{preset:?}");
     }
 }

@@ -640,6 +640,45 @@ mod tests {
         assert_eq!(back.train.load_cases.len(), doc.train.load_cases.len());
     }
 
+    /// **A file of format 1 with an automatic box of nought still reads, as
+    /// written** — the file `gear-cli trainfile` wrote at e95edd7, whose
+    /// first gear is automatic at a box of nought. On a line contact that box
+    /// is not read (the width is what the ratings ask), so it is admitted
+    /// without the format moving, and the gear is sized by its cases. A
+    /// *given* width of nought in it is refused by its field, as in any file.
+    #[test]
+    fn a_format_one_file_with_an_automatic_box_of_nought_reads_as_written() {
+        let file = include_str!("../tests/data/elevation_drive_format1.toml");
+        let zero = "face_width]\nauto = true\nmanual = 0.0";
+        assert!(file.contains("format = 1\n") && file.matches(zero).count() == 1);
+        let read = from_toml(file).unwrap_or_else(|e| panic!("{e:?}"));
+        let shape = &read.document.train.shape;
+        let i = shape
+            .members
+            .iter()
+            .position(|m| m.gear.face_width == Auto::automatic(0.0))
+            .expect("the box is kept as written");
+        let r =
+            gear_core::train::solve_train(&read.document.train, &crate::default_library()).unwrap();
+        assert!(
+            r.members[i].face_width.is_some_and(|w| w > 0.0),
+            "{:?}",
+            r.members[i].face_width
+        );
+        let given = file.replacen(zero, "face_width]\nauto = false\nmanual = 0.0", 1);
+        match from_toml(&given) {
+            Err(DocumentError::Malformed(e)) => {
+                use gear_core::note::Explain;
+                assert!(e
+                    .note()
+                    .values
+                    .get("field")
+                    .is_some_and(|f| f.ends_with("gear.face_width.manual")));
+            }
+            other => panic!("a given width of nought: {:?}", other.map(|_| ())),
+        }
+    }
+
     /// **An automatic width's box of nought, in a file of stages, reads as
     /// the width the format's gears were born with (10 mm)**, said as an
     /// adjustment: the panel of the time left an automatic box at nought,

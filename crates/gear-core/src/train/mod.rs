@@ -1065,11 +1065,7 @@ impl MemberRating<'_> {
                 let most = |had: Option<f64>, x: f64| Some(had.map_or(x, |h: f64| h.max(x)));
                 for l in &c.meshes {
                     let asked_bending = l.bending.map(|s| {
-                        crate::strength::min_face_width_bending(
-                            s,
-                            l.measured_at,
-                            bending_allowable,
-                        )
+                        crate::strength::min_face_width_bending(s, l.measured_at, bending_allowable)
                     });
                     let asked_contact = flank.filter(|_| l.sizes_face).map(|a| {
                         crate::strength::min_face_width_contact(l.contact, l.measured_at, a)
@@ -6529,10 +6525,7 @@ mod tests {
                             b / a
                         );
                     }
-                    let (a, b) = (
-                        start.contact_stress.unwrap(),
-                        end.contact_stress.unwrap(),
-                    );
+                    let (a, b) = (start.contact_stress.unwrap(), end.contact_stress.unwrap());
                     assert!(
                         (b / a - want.sqrt()).abs() < tol * want.sqrt(),
                         "stage {k} member {i}: contact {b} against {a} is {}, \
@@ -6659,7 +6652,8 @@ mod tests {
         let driving = locked.clone().with_first_helix(18.0);
         let d = try_alone(&driving).expect("and this one");
         let d_point = &d.meshes[0];
-        let ratio = r_point.cases[0].contact.unwrap().max_pressure / d_point.cases[0].contact.unwrap().max_pressure;
+        let ratio = r_point.cases[0].contact.unwrap().max_pressure
+            / d_point.cases[0].contact.unwrap().max_pressure;
         assert!(
             (0.5..2.0).contains(&ratio),
             "the locked split rates at {} MPa against the driving split's {}",
@@ -6701,7 +6695,8 @@ mod tests {
             }
             for (i, g) in r.by_part[0].members.iter().enumerate() {
                 assert_eq!(
-                    g.cases[1].contact_stress.unwrap(), 0.0,
+                    g.cases[1].contact_stress.unwrap(),
+                    0.0,
                     "member {i} carries nothing and reports a stress"
                 );
                 assert!(
@@ -6840,7 +6835,8 @@ mod tests {
 
         // With friction, the flank load is the seam: 1.5 % at the pitch point.
         let (line, point) = (mesh(0.0, mu), mesh(0.01, mu));
-        let gap = (line.cases[0].contact.unwrap().at_pitch_point - point.cases[0].contact.unwrap().at_pitch_point)
+        let gap = (line.cases[0].contact.unwrap().at_pitch_point
+            - point.cases[0].contact.unwrap().at_pitch_point)
             / line.cases[0].contact.unwrap().at_pitch_point;
         assert!(
             (100.0 * gap - pitch_friction_percent).abs() <= 0.05,
@@ -9135,6 +9131,101 @@ mod tests {
         ));
     }
 
+    /// **A spur train with no case is not sized, and nothing else moves.**
+    /// Its line members' automatic widths are `None` — not the box — and
+    /// every figure a width does not enter is what the same train reports
+    /// with a case: shifts, addenda, diameters, distances, each mesh's
+    /// efficiency, transverse ratio and play. Adding a case sizes each
+    /// width. Near miss: a member given a width keeps it with no case.
+    #[test]
+    fn a_train_with_no_case_is_not_sized_and_a_case_sizes_it() {
+        let lib = test_library();
+        let cased = Train::alone(&arr::pair([17, 43]), 2.0, 3000.0);
+        let mut bare = cased.clone();
+        bare.load_cases.clear();
+        let (with, without) = (
+            solve_train(&cased, &lib).unwrap(),
+            solve_train(&bare, &lib).unwrap(),
+        );
+        for (a, b) in with.members.iter().zip(&without.members) {
+            assert!(a.face_width.is_some_and(|w| w > 0.0), "a case sizes it");
+            assert_eq!(b.face_width, None, "no case, not sized: not the box");
+            assert!(b.notes.iter().any(|n| n.is(key::GEAR_FACE_WIDTH_NOT_SIZED)));
+            assert_eq!(
+                (a.profile_shift, a.addendum, a.pitch_diameter, a.params),
+                (b.profile_shift, b.addendum, b.pitch_diameter, b.params)
+            );
+        }
+        for (a, b) in with.meshes.iter().zip(&without.meshes) {
+            assert_eq!(a.efficiency, b.efficiency);
+            assert_eq!(format!("{:?}", a.backlash), format!("{:?}", b.backlash));
+            let (la, lb) = (a.line.unwrap(), b.line.unwrap());
+            assert_eq!(la.contact_ratios.transverse, lb.contact_ratios.transverse);
+            // A spur mesh's overlap reads no width: nought, sized or not.
+            assert_eq!(lb.contact_ratios.overlap, Some(0.0));
+            assert_eq!(lb.contact_ratios.total, Some(lb.contact_ratios.transverse));
+        }
+        assert_eq!(
+            format!("{:?}", with.distances),
+            format!("{:?}", without.distances)
+        );
+        // Near miss: a given width is a width with no case as with one.
+        let mut given = bare.clone();
+        given.shape.members[0].gear.face_width = Auto::fixed(7.0);
+        let r = solve_train(&given, &lib).unwrap();
+        assert_eq!(r.members[0].face_width, Some(7.0));
+        // ...and a helical mesh with no width has no overlap to give.
+        let mut helical = Train::alone(&arr::pair([17, 43]).with_first_helix(20.0), 2.0, 3000.0);
+        helical.load_cases.clear();
+        let h = solve_train(&helical, &lib).unwrap();
+        let ratios = h.meshes[0].line.unwrap().contact_ratios;
+        assert_eq!((ratios.overlap, ratios.total), (None, None));
+        assert_eq!(h.meshes[0].contact_ratio, None);
+        assert!(h.meshes[0]
+            .notes
+            .iter()
+            .any(|n| n.is(key::MESH_FACE_NOT_SIZED)));
+    }
+
+    /// **As the load falls to nought the width falls to nought with it, and
+    /// is never the box**: bending sizes a width in proportion to the torque
+    /// (`σ_F ∝ T/b`), so a thousandth of the load asks a thousandth of the
+    /// width to rounding, and at nought exactly nothing is asked — not
+    /// sized — where the width used to jump up to the box. Swept over a
+    /// pair, a set and a layshaft (whose idle ratios carry nothing at any
+    /// load: not sized at every load).
+    #[test]
+    fn load_to_nought_takes_the_width_to_nought_never_the_box() {
+        let lib = test_library();
+        for preset in [Preset::Spur, Preset::Planetary, Preset::Layshaft] {
+            let at = |torque: f64| {
+                solve_train(&Train::alone(&preset.build(), torque, 3000.0), &lib)
+                    .unwrap_or_else(|e| panic!("{preset:?} at {torque}: {e:?}"))
+                    .members
+                    .iter()
+                    .map(|g| g.face_width)
+                    .collect::<Vec<_>>()
+            };
+            let (one, small, nought) = (at(1.0), at(1e-3), at(0.0));
+            let mut sized = 0;
+            for i in 0..one.len() {
+                match (one[i], small[i]) {
+                    (Some(w), Some(v)) => {
+                        sized += 1;
+                        assert!(
+                            (v / w - 1e-3).abs() < 1e-9,
+                            "{preset:?} member {i}: {v} at a thousandth of {w}"
+                        );
+                    }
+                    (None, None) => {}
+                    other => panic!("{preset:?} member {i}: {other:?}"),
+                }
+                assert_eq!(nought[i], None, "{preset:?} member {i}: not the box");
+            }
+            assert!(sized >= 2, "{preset:?}: {sized} widths sized");
+        }
+    }
+
     /// **"Loses contact" is said on the ratio that governs continuity, `ε_γ`**,
     /// and a transverse ratio below one under a total at or above it is said
     /// as what it is: outside the range ISO 6336 rates, with contact kept by
@@ -10415,9 +10506,22 @@ mod tests {
         );
 
         let helical = try_alone(&arr::pair([17, 43]).with_additional_helix(20.0)).unwrap();
-        assert!(helical.meshes[0].line.unwrap().contact_ratios.overlap.unwrap() > 0.0);
         assert!(
-            helical.meshes[0].line.unwrap().contact_ratios.total.unwrap()
+            helical.meshes[0]
+                .line
+                .unwrap()
+                .contact_ratios
+                .overlap
+                .unwrap()
+                > 0.0
+        );
+        assert!(
+            helical.meshes[0]
+                .line
+                .unwrap()
+                .contact_ratios
+                .total
+                .unwrap()
                 > helical.meshes[0].line.unwrap().contact_ratios.transverse
         );
     }
@@ -11950,7 +12054,10 @@ mod tests {
                 };
             }
             let r = try_alone(&stage).unwrap();
-            let effective = r.members[0].face_width.unwrap().min(r.members[1].face_width.unwrap());
+            let effective = r.members[0]
+                .face_width
+                .unwrap()
+                .min(r.members[1].face_width.unwrap());
             assert!(effective > 0.0);
 
             for (i, g) in r.members.iter().enumerate() {

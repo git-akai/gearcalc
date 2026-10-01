@@ -2381,7 +2381,11 @@ fn print_point_pair(k: usize, kind: &str, s: &Pair, m: &gear_core::train::MeshRe
         _ => ["1", "2"],
     };
     for (name, g) in names.iter().zip(&s.gears) {
-        println!("  {name:<6} {:>8}   {}", shown(g.face_width, 3), g.material.name);
+        println!(
+            "  {name:<6} {:>8}   {}",
+            shown(g.face_width, 3),
+            g.material.name
+        );
         print_gear_cases(&g.cases);
     }
     println!("  bending not reported, flank type ZI - see docs/reference.md#crossed-axes");
@@ -3919,8 +3923,14 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
                         }
                         println!(
                             "sigma_H at pitch  sun-planet {} MPa   planet-ring {} MPa",
-                            crate::shown(r.sun_planet.cases[0].contact.map(|p| p.at_pitch_point), 1),
-                            crate::shown(r.planet_ring.cases[0].contact.map(|p| p.at_pitch_point), 1)
+                            crate::shown(
+                                r.sun_planet.cases[0].contact.map(|p| p.at_pitch_point),
+                                1
+                            ),
+                            crate::shown(
+                                r.planet_ring.cases[0].contact.map(|p| p.at_pitch_point),
+                                1
+                            )
                         );
                         println!(
                             "sigma_F  sun {}   planet {}   ring {}",

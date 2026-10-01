@@ -22,7 +22,6 @@
 use super::shape::{Member, Shape};
 use super::structure::{CarrierTree, Hang};
 use crate::kinematics::GROUND;
-use crate::params::Auto;
 
 /// **What a designer does to a train's graph** — the one set of edits,
 /// every index the graph's own: a member, a mesh, a distance, an axis or a
@@ -1294,6 +1293,7 @@ mod tests {
     use super::super::testing::{alone, grid};
     use super::super::{solve_train, test_library as library, LoadCase, LoadRole, Shape, Train};
     use super::*;
+    use crate::params::Auto;
 
     /// The shape asked with `held` held, loaded at `input` and reacted at
     /// `output` — its slots, as a train of one numbers them.

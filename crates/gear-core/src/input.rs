@@ -362,7 +362,6 @@ pub const MEMBER: &[Row<Member>] = &[
         bound: |_, m| (!m.gear.face_width.auto).then_some(POSITIVE),
         held: None,
     },
-
     row!("gear.rim_thickness", |m| m.gear.rim_thickness, POSITIVE),
 ];
 
