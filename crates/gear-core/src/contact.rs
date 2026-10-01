@@ -315,6 +315,47 @@ impl<T> Directional<T> {
     }
 }
 
+impl<T> Directional<Option<T>> {
+    /// Both directions' figures, where both were computed.
+    #[must_use]
+    pub fn both(self) -> Option<Directional<T>> {
+        Some(Directional {
+            forward: self.forward?,
+            backward: self.backward?,
+        })
+    }
+}
+
+impl Directional<Option<f64>> {
+    /// [`Directional::<f64>::once_moving`] for a pair either of whose figures
+    /// may not have been computed: what was not computed on either side is
+    /// not computed here.
+    #[must_use]
+    pub fn once_moving(self, at_rest: &Self) -> Self {
+        Directional::of(|d| match (*self.get(d), *at_rest.get(d)) {
+            (Some(moving), Some(rest)) => Some(
+                Directional {
+                    forward: moving,
+                    backward: moving,
+                }
+                .once_moving(&Directional {
+                    forward: rest,
+                    backward: rest,
+                })
+                .forward,
+            ),
+            _ => None,
+        })
+    }
+
+    /// [`Directional::<f64>::locked`] where the figure was computed: a
+    /// direction with no figure is not called locked.
+    #[must_use]
+    pub fn locked(&self) -> Directional<bool> {
+        Directional::of(|d| self.get(d).is_some_and(|e| e <= 0.0))
+    }
+}
+
 impl Directional<f64> {
     /// Reading this pair as an efficiency: **which directions it refuses to be
     /// driven in at all.**
@@ -568,17 +609,18 @@ pub fn efficiency(path: &ContactPath, mesh: &Mesh, g1: &Tooth, friction: f64, dr
 /// sum. The audit's record says what wiring it in would take and why that was weighed
 /// and not taken.
 #[must_use]
-pub fn split_residual(path: &ContactPath) -> f64 {
+pub fn split_residual(path: &ContactPath) -> Option<f64> {
     let p_b = path.base_pitch;
     let (e1, e2) = (path.approach / p_b, path.recess / p_b);
     let total = e1 + e2;
     let n = e1 * e1.abs() + e2 * e2.abs();
     let [a1, a2] = path.tip_pressure_angle;
     let (s1, s2) = (a1.sin(), a2.sin());
+    // A tip at its base circle has no rate to weigh by: no residual there.
     if s1.abs() < f64::EPSILON || s2.abs() < f64::EPSILON {
-        return f64::NAN;
+        return None;
     }
-    (2.0 * e2.abs() * total - n) / s1 - (2.0 * e1.abs() * total - n) / s2
+    Some((2.0 * e2.abs() * total - n) / s1 - (2.0 * e1.abs() * total - n) / s2)
 }
 
 /// The division of a pair's profile shift that makes it lose least.
@@ -602,8 +644,8 @@ pub fn efficient_split(
     path_at: &dyn Fn(f64) -> Option<ContactPath>,
     bracket: (f64, f64),
 ) -> Option<f64> {
-    let residual = |d: f64| path_at(d).map_or(f64::NAN, |p| split_residual(&p));
-    crate::solve::brent(residual, bracket.0, bracket.1, crate::solve::Tol::default())
+    let residual = |d: f64| path_at(d).and_then(|p| split_residual(&p));
+    crate::solve::brent_partial(residual, bracket.0, bracket.1, crate::solve::Tol::default())
 }
 
 /// A relative sliding velocity, resolved in the plane where the flanks touch.
@@ -1224,7 +1266,7 @@ mod tests {
                 if eta > best.0 {
                     best = (eta, d);
                 }
-                samples.push((d, split_residual(&path)));
+                samples.push((d, split_residual(&path).expect("a tip above its base")));
             }
             assert!(best.0 > 0.0, "z{z1}/z{z2}: nothing solved");
 
@@ -1355,7 +1397,7 @@ mod tests {
                 let path = ContactPath::new(&a, b.flank_ends(), &mesh).unwrap();
                 (
                     efficiency(&path, &mesh, &a, 0.08, Drive::Forward),
-                    split_residual(&path),
+                    split_residual(&path).expect("a tip above its base"),
                 )
             };
             let (one, one_r) = of(1.0);

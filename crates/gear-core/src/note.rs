@@ -153,6 +153,8 @@ pub mod key {
     pub const MESH_LOAD_SHARING_OUT_OF_BAND: &str = "mesh.load_sharing_out_of_band";
     /// `mesh.flank_interference`
     pub const MESH_FLANK_INTERFERENCE: &str = "mesh.flank_interference";
+    /// `mesh.tolerance_below_base`
+    pub const MESH_TOLERANCE_BELOW_BASE: &str = "mesh.tolerance_below_base";
     /// `mesh.contact_off_face`
     pub const MESH_CONTACT_OFF_FACE: &str = "mesh.contact_off_face";
 
@@ -187,6 +189,10 @@ pub mod key {
     pub const TRAIN_CASE_NO_LOAD: &str = "train.case_no_load";
     /// `train.case_underdetermined`
     pub const TRAIN_CASE_UNDERDETERMINED: &str = "train.case_underdetermined";
+    /// `train.case_overdetermined`
+    pub const TRAIN_CASE_OVERDETERMINED: &str = "train.case_overdetermined";
+    /// `train.mesh_loop`
+    pub const TRAIN_MESH_LOOP: &str = "train.mesh_loop";
     /// `train.case_nothing_drives`
     pub const TRAIN_CASE_NOTHING_DRIVES: &str = "train.case_nothing_drives";
     /// `train.load_shared`
@@ -253,6 +259,8 @@ pub mod key {
     pub const ERROR_MEASURE_PIN_TOO_SMALL: &str = "error.measure_pin_too_small";
     /// `error.measure_pin_too_large`
     pub const ERROR_MEASURE_PIN_TOO_LARGE: &str = "error.measure_pin_too_large";
+    /// `error.screw_not_finite`
+    pub const ERROR_SCREW_NOT_FINITE: &str = "error.screw_not_finite";
     /// `error.screw_not_positive`
     pub const ERROR_SCREW_NOT_POSITIVE: &str = "error.screw_not_positive";
     /// `error.screw_worm_too_thin`
@@ -270,8 +278,16 @@ pub mod key {
     pub const ERROR_TRAIN_NO_CONTACT: &str = "error.train_no_contact";
     /// `error.train_no_common_distance`
     pub const ERROR_TRAIN_NO_COMMON_DISTANCE: &str = "error.train_no_common_distance";
-    /// `error.train_wiring`
-    pub const ERROR_TRAIN_WIRING: &str = "error.train_wiring";
+    /// `error.train_wiring_no_teeth`
+    pub const ERROR_TRAIN_WIRING_NO_TEETH: &str = "error.train_wiring_no_teeth";
+    /// `error.train_wiring_no_common_frame`
+    pub const ERROR_TRAIN_WIRING_NO_COMMON_FRAME: &str = "error.train_wiring_no_common_frame";
+    /// `error.train_wiring_not_a_mesh`
+    pub const ERROR_TRAIN_WIRING_NOT_A_MESH: &str = "error.train_wiring_not_a_mesh";
+    /// `error.train_wiring_not_a_coupling`
+    pub const ERROR_TRAIN_WIRING_NOT_A_COUPLING: &str = "error.train_wiring_not_a_coupling";
+    /// `error.train_empty`
+    pub const ERROR_TRAIN_EMPTY: &str = "error.train_empty";
     /// `error.train_unknown_material`
     pub const ERROR_TRAIN_UNKNOWN_MATERIAL: &str = "error.train_unknown_material";
     /// `error.train_flank_interference`
@@ -310,6 +326,50 @@ pub mod key {
         "error.train_malformed_distance_off_frame";
     /// `error.train_axes_loop_open`
     pub const ERROR_TRAIN_AXES_LOOP_OPEN: &str = "error.train_axes_loop_open";
+    /// `error.gear_throw_unreachable`
+    pub const ERROR_GEAR_THROW_UNREACHABLE: &str = "error.gear_throw_unreachable";
+    /// `error.library_empty`
+    pub const ERROR_LIBRARY_EMPTY: &str = "error.library_empty";
+    /// `error.library_duplicate_name`
+    pub const ERROR_LIBRARY_DUPLICATE_NAME: &str = "error.library_duplicate_name";
+    /// `error.document_unreadable`
+    pub const ERROR_DOCUMENT_UNREADABLE: &str = "error.document_unreadable";
+    /// `error.edit_no_such`
+    pub const ERROR_EDIT_NO_SUCH: &str = "error.edit_no_such";
+    /// `error.edit_last_on_step`
+    pub const ERROR_EDIT_LAST_ON_STEP: &str = "error.edit_last_on_step";
+    /// `error.edit_family`
+    pub const ERROR_EDIT_FAMILY: &str = "error.edit_family";
+    /// `error.edit_not_carried`
+    pub const ERROR_EDIT_NOT_CARRIED: &str = "error.edit_not_carried";
+    /// `error.edit_central_axis`
+    pub const ERROR_EDIT_CENTRAL_AXIS: &str = "error.edit_central_axis";
+    /// `error.edit_ring_to_ring`
+    pub const ERROR_EDIT_RING_TO_RING: &str = "error.edit_ring_to_ring";
+    /// `error.edit_orbiting_mate`
+    pub const ERROR_EDIT_ORBITING_MATE: &str = "error.edit_orbiting_mate";
+    /// `error.edit_ring_crossed`
+    pub const ERROR_EDIT_RING_CROSSED: &str = "error.edit_ring_crossed";
+    /// `error.edit_locks`
+    pub const ERROR_EDIT_LOCKS: &str = "error.edit_locks";
+    /// `error.edit_axis`
+    pub const ERROR_EDIT_AXIS: &str = "error.edit_axis";
+    /// `error.edit_no_room`
+    pub const ERROR_EDIT_NO_ROOM: &str = "error.edit_no_room";
+    /// `error.edit_carrier`
+    pub const ERROR_EDIT_CARRIER: &str = "error.edit_carrier";
+    /// `error.edit_coupled`
+    pub const ERROR_EDIT_COUPLED: &str = "error.edit_coupled";
+    /// `error.edit_no_distance`
+    pub const ERROR_EDIT_NO_DISTANCE: &str = "error.edit_no_distance";
+    /// `error.edit_geared`
+    pub const ERROR_EDIT_GEARED: &str = "error.edit_geared";
+    /// `error.edit_apart`
+    pub const ERROR_EDIT_APART: &str = "error.edit_apart";
+    /// `error.edit_loaded`
+    pub const ERROR_EDIT_LOADED: &str = "error.edit_loaded";
+    /// `error.edit_two_frames`
+    pub const ERROR_EDIT_TWO_FRAMES: &str = "error.edit_two_frames";
     /// `error.train_malformed_number_gap`
     pub const ERROR_TRAIN_MALFORMED_NUMBER_GAP: &str = "error.train_malformed_number_gap";
     /// `error.train_tips_unclearable`
@@ -396,6 +456,7 @@ pub mod key {
         MESH_SELF_LOCKING,
         MESH_LOAD_SHARING_OUT_OF_BAND,
         MESH_FLANK_INTERFERENCE,
+        MESH_TOLERANCE_BELOW_BASE,
         MESH_CONTACT_OFF_FACE,
         PART_DISTANCE_NOT_REACHED,
         PART_CLEARANCE_NEGATIVE,
@@ -407,6 +468,8 @@ pub mod key {
         PART_PLANETS_SHARE_LOAD_EQUALLY,
         TRAIN_CASE_NO_LOAD,
         TRAIN_CASE_UNDERDETERMINED,
+        TRAIN_CASE_OVERDETERMINED,
+        TRAIN_MESH_LOOP,
         TRAIN_CASE_NOTHING_DRIVES,
         TRAIN_LOAD_SHARED,
         TRAIN_LOAD_NOT_REACTED,
@@ -423,6 +486,7 @@ pub mod key {
         ERROR_MEASURE_PIN_TOO_SMALL,
         ERROR_MEASURE_PIN_TOO_LARGE,
         ERROR_SCREW_NOT_POSITIVE,
+        ERROR_SCREW_NOT_FINITE,
         ERROR_SCREW_WORM_TOO_THIN,
         ERROR_SCREW_SHAFT_ANGLE_IMPOSSIBLE,
         ERROR_SCREW_FIRST_MEMBER_IS_A_DISC,
@@ -430,7 +494,11 @@ pub mod key {
         ERROR_SCREW_AXES_ARE_PARALLEL,
         ERROR_TRAIN_NO_CONTACT,
         ERROR_TRAIN_NO_COMMON_DISTANCE,
-        ERROR_TRAIN_WIRING,
+        ERROR_TRAIN_WIRING_NO_TEETH,
+        ERROR_TRAIN_WIRING_NO_COMMON_FRAME,
+        ERROR_TRAIN_WIRING_NOT_A_MESH,
+        ERROR_TRAIN_WIRING_NOT_A_COUPLING,
+        ERROR_TRAIN_EMPTY,
         ERROR_TRAIN_UNKNOWN_MATERIAL,
         ERROR_TRAIN_FLANK_INTERFERENCE,
         ERROR_TRAIN_OVERDETERMINED,
@@ -456,6 +524,28 @@ pub mod key {
         ERROR_TRAIN_MALFORMED_RING_FIRST,
         ERROR_TRAIN_MALFORMED_DISTANCE_OFF_FRAME,
         ERROR_TRAIN_AXES_LOOP_OPEN,
+        ERROR_GEAR_THROW_UNREACHABLE,
+        ERROR_LIBRARY_EMPTY,
+        ERROR_LIBRARY_DUPLICATE_NAME,
+        ERROR_DOCUMENT_UNREADABLE,
+        ERROR_EDIT_NO_SUCH,
+        ERROR_EDIT_LAST_ON_STEP,
+        ERROR_EDIT_FAMILY,
+        ERROR_EDIT_NOT_CARRIED,
+        ERROR_EDIT_CENTRAL_AXIS,
+        ERROR_EDIT_RING_TO_RING,
+        ERROR_EDIT_ORBITING_MATE,
+        ERROR_EDIT_RING_CROSSED,
+        ERROR_EDIT_LOCKS,
+        ERROR_EDIT_AXIS,
+        ERROR_EDIT_NO_ROOM,
+        ERROR_EDIT_CARRIER,
+        ERROR_EDIT_COUPLED,
+        ERROR_EDIT_NO_DISTANCE,
+        ERROR_EDIT_GEARED,
+        ERROR_EDIT_APART,
+        ERROR_EDIT_LOADED,
+        ERROR_EDIT_TWO_FRAMES,
         ERROR_TRAIN_MALFORMED_NUMBER_GAP,
     ];
 }
@@ -495,6 +585,7 @@ impl Note {
     /// quantity deserves to be quoted is part of what the quantity means.
     #[must_use]
     pub fn number(mut self, name: &str, value: f64, decimals: usize) -> Self {
+        debug_assert!(value.is_finite(), "a note quotes {name} as {value}");
         self.values
             .insert(name.to_string(), format!("{value:.decimals$}"));
         self
@@ -504,6 +595,24 @@ impl Note {
     #[must_use]
     pub fn count(mut self, name: &str, value: u32) -> Self {
         self.values.insert(name.to_string(), value.to_string());
+        self
+    }
+
+    /// Add a count of pieces at the width they are counted in, never held to
+    /// a narrower type's largest value.
+    #[must_use]
+    pub fn tally(mut self, name: &str, value: usize) -> Self {
+        self.values.insert(name.to_string(), value.to_string());
+        self
+    }
+
+    /// Add a piece's number as a person reads it: an index counted from one,
+    /// as the panel numbers members, meshes, distances and axes.
+    #[must_use]
+    pub fn ordinal(mut self, name: &str, index: usize) -> Self {
+        // Widened first, so the largest index still reads one more.
+        self.values
+            .insert(name.to_string(), (index as u128 + 1).to_string());
         self
     }
 
@@ -524,6 +633,19 @@ impl Note {
     }
 }
 
+/// **A note as its key and values**, for a log or a harness that has no
+/// catalogue to hand: `key name=value …`, never a sentence. The words are
+/// the catalogue's ([`Explain`]).
+impl std::fmt::Display for Note {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.key)?;
+        for (name, value) in &self.values {
+            write!(f, " {name}={value}")?;
+        }
+        Ok(())
+    }
+}
+
 /// Something that can say why it happened, in the catalogue's currency.
 ///
 /// Errors used to answer that question in English, through `Display`, from
@@ -532,8 +654,8 @@ impl Note {
 /// and part notes: one channel for every reason a person reads, so the
 /// catalogue check covers all of them and a translator has one file.
 ///
-/// `Display` stays on each of these, for the CLI and for `Debug`. What changed
-/// is which of the two the browser sees.
+/// `Display` stays on each of these because `std::error::Error` asks for
+/// it, and it prints the note — key and values, no words.
 pub trait Explain {
     /// Why, as a key and the values its sentence needs.
     fn note(&self) -> Note;

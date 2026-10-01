@@ -438,12 +438,15 @@ fn gear(p: &GearParams, opened_by: f64, dxf: Option<&gear_io::DxfOptions>) {
 /// A drawing as the record prints it: its points, or the refusal that
 /// stands in for them.
 fn drawn<T: std::fmt::Debug>(r: Result<T, gear_core::input::Refused>) -> String {
-    r.map_or_else(|e| format!("refused: {e}"), |v| format!("{v:?}"))
+    r.map_or_else(
+        |e| format!("refused: {}", crate::in_words(&e)),
+        |v| format!("{v:?}"),
+    )
 }
 
 /// A drawing's text, or the refusal that stands in for it.
 fn drawn_text(r: Result<String, gear_core::input::Refused>) -> String {
-    r.unwrap_or_else(|e| format!("refused: {e}"))
+    r.unwrap_or_else(|e| format!("refused: {}", crate::in_words(&e)))
 }
 
 fn ring(p: &GearParams, dxf: Option<&gear_io::DxfOptions>) {

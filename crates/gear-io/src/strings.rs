@@ -1703,11 +1703,40 @@ mod tests {
                     duty: Duty::intermittent(at),
                     ..fatigue.clone()
                 };
-                for case in [twice, at(Some(gear_core::kinematics::GROUND)), at(None)] {
+                // Two speeds the ratio cannot both turn at: the second named.
+                let disagree = LoadCase {
+                    loads: vec![
+                        Load::given(1, 2.0, 3000.0),
+                        Load {
+                            speed: Auto::fixed(1000.0),
+                            ..Load::derived(2)
+                        },
+                    ],
+                    ..fatigue.clone()
+                };
+                for case in [
+                    twice,
+                    at(Some(gear_core::kinematics::GROUND)),
+                    at(None),
+                    disagree,
+                ] {
                     match gear_core::train::solve_train(&pair(case), &lib) {
                         Err(e) => err(e.note()),
                         Ok(r) => r.every_note().into_iter().for_each(&mut err),
                     }
+                }
+                // A pair doubled: a loop of meshes no body's torque closes.
+                let mut doubled = pair(LoadCase::ultimate(1, 2, 2.0, 3000.0));
+                doubled
+                    .edit(Edit::AddGear {
+                        mate: 0,
+                        on: gear_core::train::Place::Body(2),
+                        ring: false,
+                    })
+                    .expect("a second gear on the driven body");
+                match gear_core::train::solve_train(&doubled, &lib) {
+                    Err(e) => err(e.note()),
+                    Ok(r) => r.every_note().into_iter().for_each(&mut err),
                 }
                 // Ground is no body a case names, and the input table
                 // refuses it first: the sweep at no open port is the set's
@@ -1786,10 +1815,7 @@ mod tests {
                 let nothing = gear_core::train::solve_alone(&empty, &lib)
                     .map(|_| ())
                     .expect_err("nothing to drive");
-                assert!(
-                    matches!(nothing, TrainError::NoSuchBody { .. }),
-                    "{nothing:?}"
-                );
+                assert!(matches!(nothing, TrainError::Empty), "{nothing:?}");
                 err(nothing.note());
                 let trains = [(set(vec![2, 3]), "overdetermined"), (wide, "overflow")];
                 for (train, what) in trains {
@@ -1896,7 +1922,192 @@ mod tests {
             fire(&set, Edit::Hold(3));
         }
 
+        // **Every refusal of an edit, every way a wiring is no mechanism, and
+        // a crossed pair of figures that are not numbers.** An edit's
+        // refusal carries no values, so its note is its key; each is
+        // reached from the model by `train::edits`'s `a_refusal_says_why`.
+        // A wiring's four are a preset's defects, which no input reaches.
+        {
+            use gear_core::note::Explain;
+            use gear_core::train::{EditRefused, TrainError, WiringError};
+            for e in EditRefused::ALL {
+                record(&[e.note()]);
+            }
+            for w in [
+                WiringError::NoCommonFrame(0),
+                WiringError::MemberWithoutTeeth(0),
+                WiringError::NotAMesh(0),
+                WiringError::NotACoupling(0),
+            ] {
+                record(&[TrainError::Wiring(w).note()]);
+            }
+            record(&[TrainError::NoSuchBody { at: 9 }.note()]);
+            let nan = gear_core::screw::Screw::new(&gear_core::screw::ScrewParams {
+                normal_module: f64::NAN,
+                normal_pressure_angle_rad: 0.35,
+                shaft_angle_rad: std::f64::consts::FRAC_PI_2,
+                starts: 1,
+                wheel_teeth: 40,
+                worm_pitch_diameter: 20.0,
+                profile_shifts: [0.0; 2],
+            });
+            if let Err(e) = nan {
+                record(&[e.note()]);
+            }
+            // A library and a train file that do not read, a library with
+            // nothing in it and one naming a material twice.
+            for text in ["material = [", "", "[[material]]\nname = 1"] {
+                if let Err(e) = crate::from_toml(text) {
+                    record(&e.note().into_iter().collect::<Vec<_>>());
+                }
+            }
+            let mut twice = crate::default_library();
+            twice.materials.push(twice.materials[0].clone());
+            if let Ok(text) = crate::to_toml(&twice) {
+                if let Err(e) = crate::from_toml(&text) {
+                    record(&e.note().into_iter().collect::<Vec<_>>());
+                }
+            }
+            if let Err(e) = crate::train::from_toml("train = [") {
+                record(&e.note().into_iter().collect::<Vec<_>>());
+            }
+            // A throw past what the mesh reaches, said as the boundary says it.
+            let g = |z: u32| {
+                gear_core::tooth::Tooth::new(gear_core::params::GearParams {
+                    teeth: z,
+                    ..Default::default()
+                })
+            };
+            let target = 50.0;
+            if gear_core::gear::amplitude_for_throw(
+                g(17).params,
+                &g(43),
+                gear_core::mesh::MeshKind::External,
+                gear_core::mesh::MeshSide::First,
+                target,
+                gear_core::input::Budget::DEFAULT,
+            )
+            .is_err()
+            {
+                record(&[gear_core::note::Note::new(
+                    gear_core::note::key::ERROR_GEAR_THROW_UNREACHABLE,
+                )
+                .number("throw", target, 4)]);
+            }
+            // A tolerance reaching inside the base circles' limit.
+            let mut wide = gear_core::train::Train::chained(
+                vec![gear_core::train::arrangements::pair([17, 43])],
+                |_| vec![gear_core::train::LoadCase::ultimate(1, 2, 1.0, 1000.0)],
+            );
+            wide.shape.distances[0].tolerance_minus = 5.0;
+            if let Ok(r) = gear_core::train::solve_train(&wide, &lib) {
+                record(&r.every_note());
+            }
+        }
+
         seen
+    }
+
+    /// **Every refusal reads whole in English** (T02.1): each variant of
+    /// each of the core's error enums rendered through the catalogue
+    /// leaves no `{placeholder}` standing, renders no key back, and says
+    /// the index it carries — a wiring's member, mesh or coupling; a
+    /// distance; a body — numbered from one as the panel numbers it.
+    #[test]
+    fn every_refusal_reads_whole_in_english() {
+        use gear_core::mesh::MeshError;
+        use gear_core::metrology::MeasurementError;
+        use gear_core::note::Explain;
+        use gear_core::screw::ScrewError;
+        use gear_core::train::{EditRefused, Invariant, TrainError, WiringError};
+        let en = Catalogue::english();
+        // Each with the number it must say, where it carries one.
+        let mut errors: Vec<(Box<dyn Explain>, Option<&str>)> = vec![
+            (
+                Box::new(TrainError::Wiring(WiringError::MemberWithoutTeeth(6))),
+                Some("7"),
+            ),
+            (
+                Box::new(TrainError::Wiring(WiringError::NoCommonFrame(6))),
+                Some("7"),
+            ),
+            (
+                Box::new(TrainError::Wiring(WiringError::NotAMesh(6))),
+                Some("7"),
+            ),
+            (
+                Box::new(TrainError::Wiring(WiringError::NotACoupling(6))),
+                Some("7"),
+            ),
+            (Box::new(TrainError::Empty), None),
+            (Box::new(TrainError::NoSuchBody { at: 7 }), Some("7")),
+            (Box::new(TrainError::Overdetermined { at: 7 }), Some("7")),
+            (
+                Box::new(TrainError::AxesLoopOpen { distance: 6 }),
+                Some("7"),
+            ),
+            (
+                Box::new(TrainError::AxesCannotBePlaced {
+                    distance: 6,
+                    too_close: true,
+                }),
+                Some("7"),
+            ),
+            (Box::new(TrainError::TipsUnclearable { mesh: 6 }), Some("7")),
+            (
+                Box::new(TrainError::Malformed(Invariant::RingFirst(6))),
+                Some("7"),
+            ),
+            (Box::new(TrainError::NoContact), None),
+            (Box::new(TrainError::FlankInterference), None),
+            (Box::new(TrainError::Overflow), None),
+        ];
+        for e in [
+            MeshError::Incompatible,
+            MeshError::RingTooSmall,
+            MeshError::OutsideInvoluteDomain,
+            MeshError::CentreDistanceTooSmall,
+        ] {
+            errors.push((Box::new(e), None));
+        }
+        for e in [
+            MeasurementError::NoValidSpan,
+            MeasurementError::PinTooSmall,
+            MeasurementError::PinTooLarge,
+        ] {
+            errors.push((Box::new(e), None));
+        }
+        for e in [
+            ScrewError::NotPositive,
+            ScrewError::NonFinite,
+            ScrewError::WormTooThin,
+            ScrewError::ShaftAngleImpossible,
+            ScrewError::AxesAreParallel,
+            ScrewError::FirstMemberIsADisc,
+            ScrewError::FirstMemberOppositeHand,
+        ] {
+            errors.push((Box::new(e), None));
+        }
+        for e in EditRefused::ALL {
+            errors.push((Box::new(e), None));
+        }
+        let mut read = 0;
+        for (e, number) in &errors {
+            let n = e.note();
+            let text = en.render(&n);
+            assert!(text != n.key, "{} has no English", n.key);
+            assert!(!text.contains('{'), "{}: {text}", n.key);
+            if let Some(number) = number {
+                assert!(
+                    text.contains(number),
+                    "{}: {text} does not say {number}",
+                    n.key
+                );
+            }
+            read += 1;
+        }
+        assert_eq!(read, errors.len());
+        assert!(read >= 40, "only {read} read");
     }
 
     /// **The sweep fires every key there is.**

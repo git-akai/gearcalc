@@ -133,9 +133,10 @@ pub enum DocumentError {
 }
 
 impl DocumentError {
-    /// The catalogue's note, where the refusal has one: a file of another
-    /// format, or a graph that describes no train. A parse error is the
-    /// parser's own words, which name the line.
+    /// The catalogue's note for every refusal a reader's file can reach: a
+    /// file that does not read (the parser's own words, naming the line and
+    /// column, as its `detail`), a file of another format, or a graph that
+    /// describes no train. `None` only where writing failed.
     #[must_use]
     pub fn note(&self) -> Option<Note> {
         use gear_core::note::Explain;
@@ -150,7 +151,8 @@ impl DocumentError {
                     .text("current", current),
             ),
             Self::Malformed(e) => Some(e.note()),
-            Self::Parse(_) | Self::Serialise(_) => None,
+            Self::Parse(e) => Some(crate::materials::unreadable(e)),
+            Self::Serialise(_) => None,
         }
     }
 }
@@ -158,7 +160,7 @@ impl DocumentError {
 impl std::fmt::Display for DocumentError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match (self, self.note()) {
-            (Self::Parse(e), _) => write!(f, "geartrain file is not valid: {e}"),
+            (Self::Parse(e), _) => write!(f, "{e}"),
             (Self::Serialise(e), _) => write!(f, "geartrain could not be written: {e}"),
             (_, Some(note)) => {
                 let words = crate::strings::Catalogue::english().render(&note);
@@ -483,7 +485,7 @@ mod tests {
             .unwrap()
             .replace("manual = 12000.0", "manual = 3000.0 # slowed down by hand");
         let back = from_toml(&text).unwrap().document;
-        assert!((back.train.load_cases[0].speed() - 3000.0).abs() < 1e-12);
+        assert!((back.train.load_cases[0].speed().unwrap() - 3000.0).abs() < 1e-12);
     }
 
     /// A train with no load cases is a shaft line and round-trips as one: the

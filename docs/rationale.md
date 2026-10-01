@@ -54,11 +54,13 @@ nothing to match on but its text otherwise. Four places once branched on a
 message's wording, every one of which would have gone quietly false on a
 rewording and all of them on a translation.
 
-This covers **errors** too. `MeshError`, `MeasurementError`, `TrainError` and
-`ScrewError` each carry `Explain::note`, and `Maybe::Unavailable` carries a
-`Note` rather than a string, so one typed channel holds every reason a user
-reads. Their `Display` impls remain, for the CLI and for `Debug`; what changed is
-which of the two the browser sees.
+This covers **errors** too. `MeshError`, `MeasurementError`, `TrainError`,
+`ScrewError`, `EditRefused` and the input table's `Refused` each carry
+`Explain::note`, and `Maybe::Unavailable` carries a `Note` rather than a
+string, so one typed channel holds every reason a user reads. Their `Display`
+prints that note — its key and values, no words — because
+`std::error::Error` asks for one; the harness renders the note through the
+English catalogue, as the browser does through the reader's.
 
 ### Inputs are the only state
 

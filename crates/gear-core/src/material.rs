@@ -300,8 +300,10 @@ pub const REVERSED_BENDING_FRACTION: f64 = 0.7;
 pub struct Value {
     pub value: f64,
     pub basis: Basis,
-    /// Why this number is what it is, where that is not obvious. Always present
-    /// on anything that is not a plain datasheet reading.
+    /// Why this number is what it is, where that is not obvious. On a
+    /// library's entry, present on anything that is not a plain datasheet
+    /// reading; a designer's own replacement ([`Basis::Overridden`]) needs
+    /// none, its basis being the designer.
     #[cfg_attr(
         feature = "serde",
         serde(default, skip_serializing_if = "Option::is_none")

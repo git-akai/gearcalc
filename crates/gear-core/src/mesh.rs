@@ -169,7 +169,7 @@ pub fn operating_geometry(
 pub fn shift_sum_for(mt: f64, alpha_t: f64, alpha_n: f64, sum_z: f64, a_w: f64) -> Option<f64> {
     let a_ref = mt * sum_z.abs() / 2.0;
     let cos_w = a_ref * alpha_t.cos() / a_w;
-    if !(a_w > 0.0 && cos_w <= 1.0 && cos_w > -1.0) {
+    if !(a_w > 0.0 && cos_w <= 1.0) {
         return None;
     }
     let alpha_w = cos_w.acos();
@@ -317,7 +317,9 @@ impl Mesh {
     /// [`MeshError::CentreDistanceTooSmall`] if the base circles cannot reach.
     pub fn pressure_angle_at(&self, a_actual: f64) -> Result<f64, MeshError> {
         let c = self.a_ref * self.alpha_t.cos() / a_actual;
-        if !(-1.0..=1.0).contains(&c) {
+        // A distance of nought or less has no operating angle either: the
+        // cosine there is negative or not a number, never a pair.
+        if !(a_actual > 0.0 && (0.0..=1.0).contains(&c)) {
             return Err(MeshError::CentreDistanceTooSmall);
         }
         Ok(c.acos())
@@ -799,32 +801,10 @@ impl crate::note::Explain for MeshError {
     }
 }
 
-/// English, for the CLI and for `Debug`. **Not** what the browser renders — see
-/// [`crate::note::Explain::note`], which is where the words come from there.
 impl std::fmt::Display for MeshError {
+    /// The note — its key and values, no words ([`crate::note::Explain`]).
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = match self {
-            Self::Incompatible => "the gears cannot mesh: module, pressure angle or helix differ",
-            Self::RingTooSmall => "an internal mesh needs more teeth on the ring than the pinion",
-            Self::OutsideInvoluteDomain => {
-                "no such gear pair: the profile shifts require the base circles to overlap"
-            }
-            Self::CentreDistanceTooSmall => "the axis distance is below the base-circle limit",
-            Self::PastBudget {
-                teeth,
-                size,
-                budget,
-            } => {
-                return write!(
-                    f,
-                    "{teeth} teeth: the output would be {size} bytes, past its budget of {budget}"
-                );
-            }
-            Self::PastMemory { teeth } => {
-                return write!(f, "{teeth} teeth: more than this machine's memory holds");
-            }
-        };
-        f.write_str(s)
+        write!(f, "{}", crate::note::Explain::note(self))
     }
 }
 
@@ -834,6 +814,45 @@ impl std::error::Error for MeshError {}
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    /// **A distance inside the base circles' limit, or of nought or less,
+    /// has no shift sum**: `shift_sum_for` is `None` there, at the limit's
+    /// own edge a sum, and just inside it none — never a NaN.
+    #[test]
+    fn a_distance_with_no_operating_angle_has_no_shift_sum() {
+        let (mt, alpha) = (1.0, 20f64.to_radians());
+        let sum_z = 60.0;
+        let limit = mt * sum_z / 2.0 * alpha.cos();
+        assert!(shift_sum_for(mt, alpha, alpha, sum_z, limit).is_some_and(f64::is_finite));
+        let mut read = 0;
+        for a in [limit * (1.0 - 1e-9), limit / 2.0, 0.0, -limit] {
+            assert_eq!(shift_sum_for(mt, alpha, alpha, sum_z, a), None, "at {a}");
+            read += 1;
+        }
+        assert_eq!(read, 4);
+    }
+
+    /// **No distance of nought or less has an operating angle** (T02.8):
+    /// every negative distance, and nought, is refused, where a negative
+    /// distance once read as an angle of 1.86 rad and a backlash of a metre.
+    #[test]
+    fn a_distance_of_nought_or_less_has_no_operating_angle() {
+        let g = |z: u32| {
+            Tooth::new(crate::params::GearParams {
+                teeth: z,
+                ..Default::default()
+            })
+        };
+        let m = Mesh::new(&g(17), &g(43), MeshKind::External).unwrap();
+        let mut read = 0;
+        for x in [0.0, 1e-9, 1.0, 30.0, 100.0, 1e9] {
+            assert!(m.pressure_angle_at(-x).is_err(), "at {}", -x);
+            assert!(m.backlash(-x).is_err(), "at {}", -x);
+            read += 1;
+        }
+        assert_eq!(read, 6);
+        assert!(m.pressure_angle_at(m.a_w).is_ok());
+    }
     use crate::GearParams;
 
     /// **The bottom clearance a standard tooth leaves is the standard figure**,

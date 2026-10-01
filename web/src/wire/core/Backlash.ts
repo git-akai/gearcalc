@@ -3,4 +3,10 @@
 /**
  * Angular backlash at one gear, in degrees.
  */
-export type Backlash = { nominal: number, minimum: number, maximum: number, };
+export type Backlash = { nominal: number, 
+/**
+ * The band's least and greatest play; `None` where an end of the
+ * tolerance has no play to read — inside the base circles' limit, where
+ * the teeth have no operating angle — and that end might have set it.
+ */
+minimum: number | null, maximum: number | null, };

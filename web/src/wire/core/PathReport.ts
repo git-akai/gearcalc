@@ -22,21 +22,26 @@ reads: RatioReading,
  * away** is the same flow against every mesh's static friction — each
  * mesh's efficiency at rest, off its cut ([`Directional::once_moving`]):
  * a path that cannot start delivers nothing, and one that can runs on
- * sliding friction.
+ * sliding friction. **`None` where the flow was not solved** — a load
+ * held at both ends, or a loop of meshes, which the case's note names —
+ * so nought keeps its one meaning: the path locks.
  */
-efficiency: Directional<number>, 
+efficiency: Directional<number | null>, 
 /**
  * Angular play at `to` driving from `from`, degrees, and at `from`
  * driving from `to`: every mesh's play through the kinematics' own
- * coefficients, so a mesh the path does not cross adds nothing.
+ * coefficients, so a mesh the path does not cross adds nothing. `None`
+ * where a mesh's play has no single reading at the path's end — a mesh
+ * in a loop, whose play the loop's other branch takes up.
  */
-backlash: Directional<Backlash>, 
+backlash: Directional<Backlash | null>, 
 /**
  * **The power crossing the teeth, over the power in**, each way — the
  * sum over the meshes the path loads of what each passes: one across a
  * pair, under one where a carrier takes part of it bodily, many times
  * one where power circulates, which is where such a path's efficiency
  * goes ([`flow::Flow::mesh_powers`]). An offset coupling passes power
- * and has no teeth, so it counts for nothing here.
+ * and has no teeth, so it counts for nothing here. `None` where the flow
+ * was not solved, as for [`Self::efficiency`].
  */
-circulation: Directional<number>, };
+circulation: Directional<number | null>, };

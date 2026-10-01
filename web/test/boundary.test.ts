@@ -136,3 +136,20 @@ test("a drawing past its budget is refused by name", () => {
   );
   expect("ok" in solve(huge)).toBe(true);
 });
+
+// **A refused edit is an answer, and a malformed one is not a success**
+// (T02.5): joining the default pair's two bodies comes back as the note of
+// why — an `error.` key — with the train as it was; an edit the core cannot
+// read comes back as the boundary's failure, never as `null`, which the
+// panel reads as an edit made.
+test("a refused edit says why, and a malformed one is never a success", () => {
+  const train = defaultTrain();
+  const before = JSON.stringify(train);
+  const refused = editTrain(train, { graph: { join: { a: 1, b: 2 } } });
+  expect(refused?.key.startsWith("error.edit_")).toBe(true);
+  expect(JSON.stringify(train)).toBe(before);
+  const malformed = editTrain(train, { graph: { no_such_edit: {} } } as never);
+  expect(malformed).not.toBeNull();
+  expect(malformed?.key).toBe(KEY);
+  expect(JSON.stringify(train)).toBe(before);
+});

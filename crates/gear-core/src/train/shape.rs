@@ -39,8 +39,8 @@ use super::incidence::{Incidence, Indexed};
 use super::structure::{breadth_first_forest, series_parallel, DisjointSets};
 use super::wiring::{BodyLabel, MeshSpec, Mount, Wiring};
 use super::{
-    ContactRatios, Freedom, FreedomGroup, GearResult, Loading, MemberFacts, MemberFreedom,
-    MemberGear, MemberRating, MeshReport, Ports, Reading, TrainError, PROBE,
+    ContactRatios, Freedom, FreedomGroup, GearResult, Invariant, Loading, MemberFacts,
+    MemberFreedom, MemberGear, MemberRating, MeshReport, Ports, Reading, TrainError, PROBE,
 };
 use crate::contact::{efficiency, ContactPath, Directional, Drive, LoadSharing};
 use crate::kinematics::{Body, GROUND};
@@ -385,9 +385,12 @@ impl Shape {
             .is_some_and(|a| self.axes[a].count > 1)
     }
 
-    /// How many instances of a body's axis there are.
+    /// How many instances of a body's axis there are: ground is one.
     fn count_of(&self, shaft: Body) -> u32 {
-        self.axis_of_slot(shaft).map_or(1, |a| self.axes[a].count)
+        match self.axis_of_slot(shaft) {
+            Some(a) => self.axes[a].count,
+            None => 1,
+        }
     }
 
     /// **The mesh groups**: the connected components of the mesh graph, in
@@ -399,11 +402,16 @@ impl Shape {
     /// for and writes to every member of.
     #[must_use]
     pub fn mesh_groups(&self) -> Vec<Vec<usize>> {
+        self.member_sets().components()
+    }
+
+    /// The members joined by the meshes, as sets.
+    fn member_sets(&self) -> DisjointSets {
         let mut groups = DisjointSets::new(self.members.len());
         for m in &self.meshes {
             groups.union(m.a, m.b);
         }
-        groups.components()
+        groups
     }
 
     /// **Every member cut at its mesh group's module and pressure angle** —
@@ -675,7 +683,7 @@ impl Indexed<'_> {
             self.members[m.b].ring.is_some(),
         ) {
             (false, false) => Some(MeshKind::External),
-            (false, true) if self.shaft_angle_of(mesh) == 0.0 => Some(MeshKind::Internal),
+            (false, true) if self.shaft_angle_of(mesh) == Some(0.0) => Some(MeshKind::Internal),
             _ => None,
         }
     }
@@ -683,14 +691,23 @@ impl Indexed<'_> {
     /// The angle between a mesh's two axes, degrees — nought on a
     /// parallel-axis mesh, which is the line contact; anything else is the
     /// point contact of crossed-axis screw gearing.
-    fn shaft_angle_of(&self, mesh: usize) -> f64 {
-        self.distance_of(mesh)
-            .map_or(0.0, |d| self.distances[d].angle)
+    /// `None` on a mesh across no distance, which a valid shape has not
+    /// ([`Invariant::MeshAcrossNoDistance`]).
+    fn shaft_angle_of(&self, mesh: usize) -> Option<f64> {
+        self.distance_of(mesh).map(|d| self.distances[d].angle)
+    }
+
+    /// **The sign a mesh's second count enters its sums with**: an
+    /// internal mesh's ring negative; an external mesh, and the point
+    /// contact of crossed shafts, whose members' sizes add as an external
+    /// pair's do, positive.
+    fn sign_of(&self, mesh: usize) -> f64 {
+        self.kind_of(mesh).unwrap_or(MeshKind::External).sign()
     }
 
     /// Whether a mesh is the point contact of crossed shafts.
     pub(crate) fn is_crossed(&self, mesh: usize) -> bool {
-        self.shaft_angle_of(mesh) != 0.0
+        self.shaft_angle_of(mesh).is_some_and(|a| a != 0.0)
     }
 
     /// **The helices a crossed mesh's screw can represent**, asked before
@@ -747,7 +764,10 @@ impl Indexed<'_> {
         Screw::new(&ScrewParams {
             normal_module: module,
             normal_pressure_angle_rad: self.base_params(m.a, helix).normal_pressure_angle_rad().0,
-            shaft_angle_rad: self.shaft_angle_of(mesh).to_radians(),
+            shaft_angle_rad: self
+                .shaft_angle_of(mesh)
+                .ok_or(TrainError::Malformed(Invariant::MeshAcrossNoDistance(mesh)))?
+                .to_radians(),
             starts: self.members[m.a].gear.teeth,
             wheel_teeth: self.members[m.b].gear.teeth,
             worm_pitch_diameter: f64::from(self.members[m.a].gear.teeth) * module
@@ -797,7 +817,7 @@ impl Indexed<'_> {
         let MeshInput { a: fa, b: fb, .. } = self.meshes[first];
         let lever = |i: usize, mesh: usize| -> f64 {
             let mm = self.meshes[mesh];
-            let sign = self.kind_of(mesh).map_or(1.0, MeshKind::sign);
+            let sign = self.sign_of(mesh);
             let c = f64::from(u8::from(mm.a == i)) + if mm.b == i { sign } else { 0.0 };
             c * self.tooth_sum(mesh).signum()
         };
@@ -930,8 +950,9 @@ impl Indexed<'_> {
                 let alike: Vec<usize> = (0..roles.len()).filter(|&j| roles[j] == r).collect();
                 MemberName {
                     role: r,
+                    // Counted from one among the members alike before it.
                     ordinal: (alike.len() > 1 && r != MemberRole::Gear)
-                        .then(|| alike.iter().position(|&j| j == i).map_or(1, |p| p + 1)),
+                        .then(|| alike.iter().take_while(|&&j| j != i).count() + 1),
                 }
             })
             .collect()
@@ -1001,8 +1022,10 @@ impl Indexed<'_> {
         let propagate = |out: &mut Vec<Option<f64>>| loop {
             let mut moved = false;
             for (k, m) in self.meshes.iter().enumerate() {
-                let sign = self.kind_of(k).map_or(1.0, MeshKind::sign);
-                let angle = self.shaft_angle_of(k);
+                let sign = self.sign_of(k);
+                let Some(angle) = self.shaft_angle_of(k) else {
+                    continue;
+                };
                 match (out[m.a], out[m.b]) {
                     (Some(a), None) => {
                         out[m.b] = Some(angle - sign * a);
@@ -1050,21 +1073,22 @@ impl Indexed<'_> {
             // the shifts as the members will actually be cut at it — a typed
             // shift held to the undercut bound moves with the helix, and the
             // size must reach the distance with the shift it gets.
-            let at = |beta: f64| -> f64 {
+            let at = |beta: f64| -> Option<f64> {
                 let mut helix = vec![0.0; self.members.len()];
                 helix[m.a] = beta;
                 helix[m.b] = angle - sign * beta;
                 let shifts: Vec<f64> = self.asked(&helix).iter().map(|a| a.settled).collect();
-                self.nominal_of(k, &shifts, &helix).unwrap_or(f64::NAN)
+                self.nominal_of(k, &shifts, &helix)
             };
             let size = |target: f64| -> Option<f64> {
                 if angle == 0.0 {
                     // Straight teeth are the floor; the distance grows with
                     // the helix without bound below ninety degrees.
-                    (at(0.0) <= target)
+                    at(0.0)
+                        .is_some_and(|d| d <= target)
                         .then(|| {
-                            crate::solve::brent(
-                                |b| at(b) - target,
+                            crate::solve::brent_partial(
+                                |b| at(b).map(|d| d - target),
                                 0.0,
                                 89.0,
                                 crate::solve::Tol::default(),
@@ -1113,7 +1137,7 @@ impl Indexed<'_> {
             }
         }
         (
-            out.into_iter().map(|h| h.unwrap_or(0.0)).collect(),
+            out.into_iter().map(|h| h.unwrap_or(0.0)).collect(), // absence: a helix nothing states or carries is β = 0, straight teeth
             conflict,
         )
     }
@@ -1134,7 +1158,12 @@ impl Indexed<'_> {
     /// the target moves the answer smoothly instead of jumping between a
     /// thin fast worm and a fat slow one. A target *below* the minimum is
     /// reached by neither and there is no answer to give.
-    fn size_reaching(&self, mesh: usize, target: f64, at: &dyn Fn(f64) -> f64) -> Option<f64> {
+    fn size_reaching(
+        &self,
+        mesh: usize,
+        target: f64,
+        at: &dyn Fn(f64) -> Option<f64>,
+    ) -> Option<f64> {
         let m = self.meshes[mesh];
         let a = &self.members[m.a];
         let z1 = f64::from(a.gear.teeth);
@@ -1142,7 +1171,7 @@ impl Indexed<'_> {
         // The designer's own number, held to the tooth's own diameter below
         // which no pair exists.
         let from = a.pitch_diameter.manual.max(floor * 1.000_001);
-        let sigma = self.shaft_angle_of(mesh).to_radians();
+        let sigma = self.shaft_angle_of(mesh)?.to_radians();
         let turning =
             Screw::least_distance_lead_angle(a.gear.teeth, self.members[m.b].gear.teeth, sigma)
                 .map(|least| floor / least.sin());
@@ -1155,7 +1184,7 @@ impl Indexed<'_> {
         let grown = |from: f64| {
             let mut top = from * 2.0;
             for _ in 0..60 {
-                if distance(top) >= target || !distance(top).is_finite() {
+                if distance(top).is_none_or(|d| !d.is_finite() || d >= target) {
                     break;
                 }
                 top *= 2.0;
@@ -1167,8 +1196,8 @@ impl Indexed<'_> {
             Some(turning) => (turning, grown(turning.max(from))),
             None => (floor * (1.0 + 1e-9), grown(from.max(floor * 2.0))),
         };
-        crate::solve::brent(
-            |d1| distance(d1) - target,
+        crate::solve::brent_partial(
+            |d1| distance(d1).map(|d| d - target),
             lo,
             hi,
             crate::solve::Tol::default(),
@@ -1182,7 +1211,7 @@ impl Indexed<'_> {
         group
             .iter()
             .map(|&i| self.members[i].gear.face_width.manual)
-            .fold(f64::INFINITY, f64::min)
+            .fold(f64::INFINITY, f64::min) // absence: a fold to the least starts at its identity; a group has two members at least
     }
 
     /// Whether a mesh group's overlap decides its helix: every width of
@@ -1220,13 +1249,11 @@ impl Indexed<'_> {
 
     /// The mesh group a mesh belongs to, and that group's meshes.
     fn group_of_mesh(&self, k: usize) -> (Vec<usize>, Vec<usize>) {
-        let groups = self.mesh_groups();
-        let meshes = self.group_meshes();
-        let g = groups
-            .iter()
-            .position(|g| g.contains(&self.meshes[k].a))
-            .unwrap_or(0);
-        (groups[g].clone(), meshes[g].clone())
+        // Numbered as `mesh_groups` lists them, by each set's first member.
+        let mut sets = self.member_sets();
+        let g = sets.labels()[self.meshes[k].a];
+        let groups = sets.components();
+        (groups[g].clone(), self.group_meshes().swap_remove(g))
     }
 
     // ----------------------------------------------------------- params ---
@@ -1345,7 +1372,7 @@ impl Indexed<'_> {
     /// The signed tooth sum of a mesh, a ring's negative.
     fn tooth_sum(&self, mesh: usize) -> f64 {
         let m = self.meshes[mesh];
-        let sign = self.kind_of(mesh).map_or(1.0, MeshKind::sign);
+        let sign = self.sign_of(mesh);
         f64::from(self.members[m.a].gear.teeth) + sign * f64::from(self.members[m.b].gear.teeth)
     }
 
@@ -1354,7 +1381,7 @@ impl Indexed<'_> {
     /// thickness modification as an equivalent shift.
     fn shift_sum(&self, mesh: usize, shifts: &[f64], helix: &[f64]) -> f64 {
         let m = self.meshes[mesh];
-        let sign = self.kind_of(mesh).map_or(1.0, MeshKind::sign);
+        let sign = self.sign_of(mesh);
         let eff = |i: usize| shifts[i] + self.base_params(i, helix).thickness_shift();
         eff(m.a) + sign * eff(m.b)
     }
@@ -1606,7 +1633,7 @@ impl Indexed<'_> {
         // The coefficient of `x_i` in each mesh's shift sum.
         let coefficient = |mesh: usize| -> f64 {
             let mm = self.meshes[mesh];
-            let sign = self.kind_of(mesh).map_or(1.0, MeshKind::sign);
+            let sign = self.sign_of(mesh);
             f64::from(u8::from(mm.a == i)) + if mm.b == i { sign } else { 0.0 }
         };
         let slope = |mesh: usize, v: f64| -> Option<f64> {
@@ -1625,20 +1652,14 @@ impl Indexed<'_> {
             )?;
             Some(coefficient(mesh) * 2.0 * a * rack.alpha_n.tan() / (sum_z * aw.tan()))
         };
-        let g = |v: f64| match (
-            self.running_of(first, &with(v), helix),
-            self.running_of(m, &with(v), helix),
-        ) {
-            (Some(p), Some(q)) => p - q,
-            _ => f64::NAN,
+        let g = |v: f64| {
+            Some(self.running_of(first, &with(v), helix)? - self.running_of(m, &with(v), helix)?)
         };
-        let dg = |v: f64| match (slope(first, v), slope(m, v)) {
-            (Some(p), Some(q)) => p - q,
-            _ => f64::NAN,
-        };
+        let dg = |v: f64| Some(slope(first, v)? - slope(m, v)?);
         // The bracket: where both meshes' operating geometry exists —
-        // `Σx · sgn(Σz) ≥ −reach · |Σz|` for each, read in `x_i`.
-        let (mut lo, mut hi) = (f64::NEG_INFINITY, f64::INFINITY);
+        // `Σx · sgn(Σz) ≥ −reach · |Σz|` for each, read in `x_i`. An end no
+        // mesh bounds is absent.
+        let (mut lo, mut hi): (Option<f64>, Option<f64>) = (None, None);
         for mesh in [first, m] {
             let c = coefficient(mesh);
             if c == 0.0 || self.is_crossed(mesh) {
@@ -1650,28 +1671,35 @@ impl Indexed<'_> {
             let rest = self.shift_sum(mesh, &with(0.0), helix);
             let bound = (-reach * sum_z.abs() * sum_z.signum() - rest) / c;
             if c * sum_z.signum() > 0.0 {
-                lo = lo.max(bound);
+                lo = Some(lo.map_or(bound, |l| l.max(bound)));
             } else {
-                hi = hi.min(bound);
+                hi = Some(hi.map_or(bound, |h| h.min(bound)));
             }
         }
-        if !lo.is_finite() || !hi.is_finite() {
-            let p = self.params_at(i, 0.0, helix);
-            let range = crate::auto::admissible_ranges(&p, p.dedendum)
-                .profile_shift
-                .bound;
-            lo = lo.max(range.min.unwrap_or(-5.0));
-            hi = hi.min(range.max.unwrap_or(5.0));
-        }
+        let (lo, hi) = match (lo, hi) {
+            (Some(lo), Some(hi)) => (lo, hi),
+            (lo, hi) => {
+                let p = self.params_at(i, 0.0, helix);
+                let range = crate::auto::admissible_ranges(&p, p.dedendum)
+                    .profile_shift
+                    .bound;
+                let floor = range.min.unwrap_or(-5.0);
+                let ceiling = range.max.unwrap_or(5.0);
+                (
+                    lo.map_or(floor, |l| l.max(floor)),
+                    hi.map_or(ceiling, |h| h.min(ceiling)),
+                )
+            }
+        };
         if hi <= lo {
             return None;
         }
         let mid = 0.5 * (lo + hi);
-        if !g(mid).is_finite() {
+        if !g(mid).is_some_and(f64::is_finite) {
             return None;
         }
         let (lo, hi) = (pull_in(&g, lo, mid)?, pull_in(&g, hi, mid)?);
-        crate::solve::newton_bracketed(
+        crate::solve::newton_bracketed_partial(
             g,
             dg,
             lo,
@@ -1710,12 +1738,12 @@ impl Indexed<'_> {
             .iter()
             .copied()
             .filter(|&k| self.kind_of(k) == Some(MeshKind::Internal))
-            .map(|k| {
+            .filter_map(|k| {
                 let m = self.meshes[k];
                 let pinion = Tooth::new(self.params_at(m.a, x[m.a], helix));
-                let ring = self.members[m.b]
-                    .ring
-                    .map(|cutter| Ring::cut_by(&self.params_at(m.b, x[m.b], helix), &cutter));
+                // An internal mesh's second member is a ring, so it has a cutter.
+                let cutter = self.members[m.b].ring?;
+                let ring = Ring::cut_by(&self.params_at(m.b, x[m.b], helix), &cutter);
                 // Both rooms rise with the distance: the pinion's tip on the
                 // side away from contact stands `r_tip − e` from the ring's
                 // centre, and the tips' room where their circles cross opens
@@ -1723,14 +1751,13 @@ impl Indexed<'_> {
                 // The crossing's room is an angle of pinion turn; as the arc
                 // it sweeps at the pinion's tip it is a length like the far
                 // gap, so the two compare at any module.
-                let room = ring.map_or(f64::INFINITY, |ring| {
-                    super::TipRoom::at(&ring, &pinion, running).map_or(f64::NAN, |t| {
-                        let far = t.far_gap - asked;
-                        t.tip_margin
-                            .map_or(far, |deg| far.min(deg.to_radians() * pinion.ra))
-                    })
-                });
-                (room, k)
+                // A mesh whose tips cannot be read here has no room to give.
+                let room = super::TipRoom::at(&ring, &pinion, running).map(|t| {
+                    let far = t.far_gap - asked;
+                    t.tip_margin
+                        .map_or(far, |deg| far.min(deg.to_radians() * pinion.ra))
+                })?;
+                Some((room, k))
             })
             .min_by(|p, q| p.0.total_cmp(&q.0))
     }
@@ -1771,13 +1798,13 @@ impl Indexed<'_> {
             held[d] = None;
             // Held at `e`, the plan reaches it; the room at that plan's
             // closure is what is driven to zero.
-            let room_at = |e: f64| -> f64 {
+            let room_at = |e: f64| -> Option<f64> {
                 let mut h = held.clone();
                 h[d] = Some(e);
                 let plan = self.plan_held(helix, h.clone());
                 self.closed(&plan, free, helix)
                     .and_then(|x| self.tip_room(d, &x, helix, &h))
-                    .map_or(f64::NAN, |(room, _)| room)
+                    .map(|(room, _)| room)
             };
             // At what the shifts leave, with nothing holding this distance
             // — or, where that is no mesh at all (a ring pinned low enough
@@ -1785,7 +1812,10 @@ impl Indexed<'_> {
             // domain) and a gap was asked, from the domain's own floor.
             let loose = self.plan_held(helix, held.clone());
             let meshes = self.meshes_on(d);
-            let mesh_0 = *meshes.first().unwrap_or(&0);
+            // The distance has an internal mesh, so it has a first mesh.
+            let Some(&mesh_0) = meshes.first() else {
+                continue;
+            };
             let (from, room, mesh) = match self.closed(&loose, free, helix).and_then(|x| {
                 let (room, mesh) = self.tip_room(d, &x, helix, &held)?;
                 let from = self
@@ -1803,10 +1833,8 @@ impl Indexed<'_> {
                         })
                         .fold(0.0_f64, f64::max)
                         * (1.0 + 1e-6);
-                    let room = room_at(floor);
-                    if room.is_nan() {
-                        return Err(TrainError::TipsUnclearable { mesh: mesh_0 });
-                    }
+                    let room =
+                        room_at(floor).ok_or(TrainError::TipsUnclearable { mesh: mesh_0 })?;
                     (floor, room, mesh_0)
                 }
                 None => continue,
@@ -1836,12 +1864,11 @@ impl Indexed<'_> {
                     if hi > from + reach {
                         break;
                     }
-                    let r = room_at(hi);
-                    if r.is_nan() {
+                    let Some(r) = room_at(hi) else {
                         // Past the involute domain on some mesh: come back in.
                         step *= 0.5;
                         continue;
-                    }
+                    };
                     if r >= 0.0 {
                         found = true;
                         break;
@@ -1858,8 +1885,7 @@ impl Indexed<'_> {
                     if lo <= 0.0 {
                         break;
                     }
-                    let r = room_at(lo);
-                    if r.is_nan() {
+                    let Some(r) = room_at(lo) else {
                         // Below the involute domain on some mesh: come back
                         // out, by halves, until the step is nothing.
                         step *= 0.5;
@@ -1867,7 +1893,7 @@ impl Indexed<'_> {
                             break;
                         }
                         continue;
-                    }
+                    };
                     if r < 0.0 {
                         found = true;
                         break;
@@ -1883,9 +1909,14 @@ impl Indexed<'_> {
             }
             // The end of the solver's last bracket with room: the tips may
             // touch (room 0), and the verdict is on room below it.
-            let [b, c] = crate::solve::brent_bracket(room_at, lo, hi, crate::solve::Tol::default())
-                .ok_or(TrainError::TipsUnclearable { mesh })?;
-            let e = if room_at(b) >= 0.0 { b } else { c };
+            let [b, c] =
+                crate::solve::brent_bracket_partial(room_at, lo, hi, crate::solve::Tol::default())
+                    .ok_or(TrainError::TipsUnclearable { mesh })?;
+            let e = if room_at(b).is_some_and(|r| r >= 0.0) {
+                b
+            } else {
+                c
+            };
             held[d] = Some(e);
             bound_by[d] = self
                 .closed(&self.plan_held(helix, held.clone()), free, helix)
@@ -2110,7 +2141,7 @@ impl Indexed<'_> {
                     free.iter().position(|&i| i == m.a)?,
                     free.iter().position(|&i| i == m.b)?,
                 );
-                Some((pa, pb, self.kind_of(k).map_or(1.0, MeshKind::sign)))
+                Some((pa, pb, self.sign_of(k)))
             })
             .collect();
         let mut used = vec![false; free.len()];
@@ -2265,6 +2296,19 @@ impl Indexed<'_> {
                 }
             }
         };
+        // **Candidates are ranked by whether their bands read whole, then
+        // by efficiency**: a shift that puts a band end where the teeth have
+        // no operating angle ranks below every one that does not — the
+        // solve would say that band has no extremes — and where none does,
+        // the most efficient is taken and the mesh says so
+        // (`mesh.tolerance_below_base`). One condition, read one way by the
+        // search and the solve.
+        let band_reads = built.meshes.iter().all(|bm| match &bm.contact {
+            BuiltContact::Line(l) => {
+                bm.running - self.distances[bm.distance].tolerance_minus >= l.base_limit()
+            }
+            BuiltContact::Point(_) => true,
+        });
         let mut product = 1.0;
         for (k, bm) in built.meshes.iter().enumerate() {
             // A component's search scores its own meshes; the rest are a
@@ -2297,7 +2341,11 @@ impl Indexed<'_> {
                 .efficiency()?,
             };
         }
-        Some(product)
+        Some(if band_reads {
+            product
+        } else {
+            product - BAND_PAST_LIMIT
+        })
     }
 }
 
@@ -2473,15 +2521,15 @@ pub struct Chosen {
 /// exactly and exists a hair inside; halving toward the middle instead
 /// stepped a third of the way in at once and, on a hula's mesh, past the
 /// root — which read as *no common distance* on a stage that had one.
-fn pull_in(g: &impl Fn(f64) -> f64, from: f64, toward: f64) -> Option<f64> {
-    if g(from).is_finite() {
+fn pull_in(g: &impl Fn(f64) -> Option<f64>, from: f64, toward: f64) -> Option<f64> {
+    if g(from).is_some_and(f64::is_finite) {
         return Some(from);
     }
     let span = toward - from;
     let mut step = span * 1e-9;
     while step.abs() <= span.abs() {
         let x = from + step;
-        if g(x).is_finite() {
+        if g(x).is_some_and(f64::is_finite) {
             return Some(x);
         }
         step *= 2.0;
@@ -2576,6 +2624,8 @@ impl BuiltMember {
 /// One mesh as it runs.
 pub(crate) struct BuiltMesh {
     pub(crate) kind: MeshKind,
+    /// The distance it runs across, which a valid shape gives every mesh.
+    pub(crate) distance: usize,
     pub(crate) running: f64,
     pub(crate) contact: BuiltContact,
     /// Per side: the tip held to its mate's junction on this mesh
@@ -2604,6 +2654,34 @@ pub(crate) struct LineBuilt {
     /// At the running distance, where the teeth touch.
     pub(crate) operating: Mesh,
     pub(crate) path: ContactPath,
+}
+
+impl LineBuilt {
+    /// **Angular play at one member**, radians, at a centre distance `a`:
+    /// the transverse backlash there, `j(a)`, taken to the normal plane —
+    /// `j cos α_t(a) cos β_b` — with the axial float's `sin β_b` beside it,
+    /// through the law every mesh shares ([`crate::mesh::angular_play`]).
+    /// Negative inside the zero-backlash distance. `None` inside the
+    /// base-circle limit, where no operating angle exists.
+    fn angular_play(
+        &self,
+        a: f64,
+        axial_clearance: f64,
+        base_helix: f64,
+        normal_base_pitch: f64,
+        teeth: u32,
+    ) -> Option<f64> {
+        let alpha = self.design.pressure_angle_at(a).ok()?;
+        let gap = self.design.backlash(a).ok()? * alpha.cos() * base_helix.cos()
+            + axial_clearance * base_helix.sin().abs();
+        Some(crate::mesh::angular_play(gap, teeth, normal_base_pitch))
+    }
+
+    /// The base-circle limit, `a_ref cos α_t`: the least distance the pair
+    /// has an operating angle at.
+    fn base_limit(&self) -> f64 {
+        self.design.a_ref * self.design.alpha_t.cos()
+    }
 }
 
 /// Crossed-axis screw gearing between two involute helicoids.
@@ -2769,7 +2847,11 @@ impl PointBuilt {
                 }
             }
         }
+        // `patch_at` read these curvatures, so they make a patch.
+        let aspect =
+            crate::hertz::patch_aspect(curvatures.0, curvatures.1).ok_or(TrainError::NoContact)?;
         Ok(super::ContactPatch {
+            aspect,
             max_pressure,
             at_pitch_point: pitch_pressure,
             worst_position,
@@ -2784,16 +2866,22 @@ impl PointBuilt {
     /// separation above nominal and the axial slack projected onto the one
     /// contact normal — the module documentation of [`super::crossed`]
     /// derives it — through the law every mesh shares.
-    fn angular_play(&self, a: f64, axial_clearance: f64, teeth: u32) -> f64 {
+    ///
+    /// Negative inside the zero-backlash distance, where the teeth would
+    /// overlap, as a line contact's is: one law, continuous through zero.
+    /// `None` where the pair has no contact normal.
+    fn angular_play(&self, a: f64, axial_clearance: f64, teeth: u32) -> Option<f64> {
         let s = &self.screw;
-        let Some(n) = s.contact_normal() else {
-            return 0.0;
-        };
+        let n = s.contact_normal()?;
         // A separation opens **both** flanks; a rigid-body slide along the
         // worm's axis opens one exactly as far as it closes the other.
-        let separation = 2.0 * (a - s.centre_distance).max(0.0) * n[0].abs();
+        let separation = 2.0 * (a - s.centre_distance) * n[0].abs();
         let slide = axial_clearance * n[2].abs();
-        crate::mesh::angular_play(separation + slide, teeth, s.normal_base_pitch())
+        Some(crate::mesh::angular_play(
+            separation + slide,
+            teeth,
+            s.normal_base_pitch(),
+        ))
     }
 }
 
@@ -2834,7 +2922,7 @@ struct PointMesh {
     /// The power through the mesh per load case, in the loads' order.
     case_power: Vec<f64>,
     backlash: [super::Backlash; 2],
-    row_play: [f64; 3],
+    row_play: super::Ends,
     flank_interference: [bool; 2],
     /// The first member's reference radius, mm — what its pitch line speed
     /// is read at.
@@ -3079,6 +3167,9 @@ impl Indexed<'_> {
             };
             meshes.push(BuiltMesh {
                 kind,
+                distance: self
+                    .distance_of(k)
+                    .ok_or(TrainError::Malformed(Invariant::MeshAcrossNoDistance(k)))?,
                 running: at,
                 contact,
                 held: tagged,
@@ -3234,14 +3325,14 @@ impl Indexed<'_> {
                     // No zone at all: the build refuses the mesh.
                     Placed::Point(_, None) => continue,
                 };
-                let Some(c) = radius
-                    .map(|r| members[i].addendum_at_tip(r))
-                    .filter(|&c| c > 0.0)
+                let Some((c, r)) = radius
+                    .map(|r| (members[i].addendum_at_tip(r), r))
+                    .filter(|&(c, _)| c > 0.0)
                 else {
                     unholdable[i] = true;
                     continue;
                 };
-                per_side[k][s] = Some((c, radius.unwrap_or(f64::NAN)));
+                per_side[k][s] = Some((c, r));
                 lowest[i] = Some(lowest[i].map_or(c, |o: f64| o.min(c)));
             }
         }
@@ -4216,11 +4307,7 @@ pub fn rate(
                                 measured_at: widths[k],
                                 carried_at: widths[k],
                                 sizes_face: false,
-                                aspect: crate::hertz::patch_aspect(
-                                    patches[c].curvature_along,
-                                    patches[c].curvature_across,
-                                )
-                                .unwrap_or(0.0),
+                                aspect: patches[c].aspect,
                             },
                             (None, None) => Loading {
                                 bending: None,
@@ -4246,22 +4333,20 @@ pub fn rate(
     // ...and the width a given axial contact ratio needs, a floor under an
     // automatic width: each mesh's own, at its own helix, and a member's is
     // the largest of its meshes'.
-    let mesh_floor: Vec<f64> = shape
+    // A point contact, or an overlap no width reads, asks no floor.
+    let mesh_floor: Vec<Option<f64>> = shape
         .meshes
         .iter()
         .enumerate()
         .map(|(k, m)| {
-            if built.meshes[k].line().is_none() {
-                return 0.0;
-            }
+            built.meshes[k].line()?;
             super::width_for_overlap(&m.overlap, helix[m.a], shape.members[m.a].normal_module())
-                .unwrap_or(0.0)
         })
         .collect();
     let for_overlap = |i: usize| -> f64 {
         meshes_of(i)
             .iter()
-            .map(|&k| mesh_floor[k])
+            .filter_map(|&k| mesh_floor[k])
             .fold(0.0_f64, f64::max)
     };
     // A member on no line mesh has nothing to ask of a rating, and asks
@@ -4302,7 +4387,7 @@ pub fn rate(
             let own = shape.members[i].gear.face_width;
             // Nothing rated it: its own proportions, or the box as entered.
             let wanted = if on_a_line(i) {
-                wanted.max(recommended[i].unwrap_or(0.0))
+                recommended[i].map_or(wanted, |r| wanted.max(r))
             } else {
                 recommended[i].unwrap_or(own.manual)
             };
@@ -4324,44 +4409,69 @@ pub fn rate(
 
     // ---- backlash: each mesh's play, as its row and at each member. Where
     // it shows on a body is a path's to say ([`super::PathReport`]).
-    let play_of = |k: usize, a: f64| -> f64 {
-        let bm = &built.meshes[k];
-        let m = shape.meshes[k];
-        let d = shape.distance_of(k).unwrap_or(0);
-        let axial = shape.distances[d].axial_clearance;
-        match &bm.contact {
-            BuiltContact::Line(l) => {
-                let rack = shape.rack_of(k, helix);
-                let (alpha_n, _) = shape.base_params(m.a, helix).normal_pressure_angle_rad();
-                let bb = crate::plane::base_helix_angle(helix[m.a].to_radians(), alpha_n);
-                let slide = axial * bb.sin().abs();
-                let p_bn = std::f64::consts::PI * rack.mn * alpha_n.cos();
-                // The row's play: `Δ = j |Σz| / a`, plus the axial float's.
-                l.design.backlash(a).unwrap_or(0.0) * shape.tooth_sum(k).abs() / a
-                    + 2.0 * std::f64::consts::PI * slide / p_bn
+    // **Every mesh's play, one law**: at its distance's minus end, running
+    // point and plus end, the row's play — a member's angular play at its
+    // own count, times the count. A band end inside the base circles' limit
+    // has no operating angle and no play: that end is absent, the mesh says
+    // where it is and where the limit stands, and the rest of the solve
+    // stands (rule 5).
+    let mut below_base: Vec<Option<Note>> = vec![None; shape.meshes.len()];
+    let row_plays: Vec<super::Ends> = (0..shape.meshes.len())
+        .map(|k| {
+            let bm = &built.meshes[k];
+            let m = shape.meshes[k];
+            let d = &shape.distances[bm.distance];
+            let z = shape.members[m.a].gear.teeth;
+            let at = |a: f64| -> Result<Option<f64>, TrainError> {
+                let play = match &bm.contact {
+                    BuiltContact::Line(l) => {
+                        let rack = shape.rack_of(k, helix);
+                        let (alpha_n, _) =
+                            shape.base_params(m.a, helix).normal_pressure_angle_rad();
+                        let bb = crate::plane::base_helix_angle(helix[m.a].to_radians(), alpha_n);
+                        let p_bn = crate::plane::base_pitch(rack.mn, alpha_n);
+                        l.angular_play(a, d.axial_clearance, bb, p_bn, z)
+                    }
+                    BuiltContact::Point(p) => Some(
+                        p.angular_play(a, d.axial_clearance, z)
+                            .ok_or(TrainError::NoContact)?,
+                    ),
+                };
+                Ok(play.map(|p| p * f64::from(z)))
+            };
+            let running = bm.running;
+            // The running point is where the mesh was built: it has play.
+            let mid = at(running)?.ok_or(TrainError::NoContact)?;
+            let (lo, hi) = (running - d.tolerance_minus, running + d.tolerance_plus);
+            let (minus, plus) = (at(lo)?, at(hi)?);
+            if let (BuiltContact::Line(l), Some(end)) = (
+                &bm.contact,
+                [(minus, lo), (plus, hi)]
+                    .into_iter()
+                    .find_map(|(p, a)| p.is_none().then_some(a)),
+            ) {
+                below_base[k] = Some(
+                    Note::new(key::MESH_TOLERANCE_BELOW_BASE)
+                        .number("end", end, 4)
+                        .number("limit", l.base_limit(), 4),
+                );
             }
-            // The screw law takes the *separation* from the geometric
-            // distance rather than the distance itself, and the row's play
-            // is a member's angular play at its own count.
-            BuiltContact::Point(p) => {
-                let z = shape.members[m.a].gear.teeth;
-                p.angular_play(a, axial, z) * f64::from(z)
-            }
-        }
-    };
+            // One mesh's play moves one way with its distance.
+            Ok(super::Ends {
+                minus,
+                running: mid,
+                plus,
+                monotone: true,
+            })
+        })
+        .collect::<Result<_, TrainError>>()?;
     let member_backlash = |k: usize, side: MeshSide| -> super::Backlash {
         let m = shape.meshes[k];
         let z = f64::from(match side {
             MeshSide::First => shape.members[m.a].gear.teeth,
             MeshSide::Second => shape.members[m.b].gear.teeth,
         });
-        let d = shape.distance_of(k).unwrap_or(0);
-        super::Backlash::banded(
-            built.meshes[k].running,
-            shape.distances[d].tolerance_minus,
-            shape.distances[d].tolerance_plus,
-            |a| (play_of(k, a) / z).to_degrees(),
-        )
+        super::Backlash::of_ends(row_plays[k].map(|play| (play / z).to_degrees()))
     };
 
     // ---- notes.
@@ -4373,7 +4483,10 @@ pub fn rate(
         let Some(&first) = meshes.first() else {
             continue;
         };
-        let running = built.running[d].unwrap_or(0.0);
+        // A distance with a mesh on it runs somewhere.
+        let Some(running) = built.running[d] else {
+            continue;
+        };
         let clearance = built.meshes[first].kind.sign() * (running - built.meshes[first].nominal());
         // What the distance has to say, **asked of every mesh on it**: a
         // given distance one mesh's shifts could not reach — a set with two
@@ -4628,8 +4741,7 @@ pub fn rate(
                     // those are the same body.
                     let cycles = c.turns.as_ref().map(|t| {
                         super::loaded_cycles(super::Turns {
-                            revolutions: (t[shaft] - t[frame]).abs()
-                                * f64::from(wiring.paths_seen(i)),
+                            revolutions: t[shaft].against(&t[frame]).times(wiring.paths_seen(i)),
                             reversing_actuations: c.reversing_actuations,
                         })
                     });
@@ -4662,7 +4774,8 @@ pub fn rate(
             let bm = &built.meshes[k];
             let case_power: Vec<f64> = cases
                 .iter()
-                .map(|c| c.mesh_powers.get(k).copied().unwrap_or(0.0))
+                // One per mesh, in every case, solved or not.
+                .map(|c| c.mesh_powers[k])
                 .collect();
             let (a, b) = (&built.members[m.a], &built.members[m.b]);
             let coprime =
@@ -4674,11 +4787,7 @@ pub fn rate(
             ];
             // Each mesh's play at its own distance's minus end, running
             // point and plus end: the three a path's band folds per distance.
-            let row_play = {
-                let d = &shape.distances[shape.distance_of(k).unwrap_or(0)];
-                let running = built.meshes[k].running;
-                [-d.tolerance_minus, 0.0, d.tolerance_plus].map(|dx| play_of(k, running + dx))
-            };
+            let row_play = row_plays[k];
             match &bm.contact {
                 BuiltContact::Line(l) => super::line_mesh_report(
                     cases,
@@ -4721,6 +4830,7 @@ pub fn rate(
                         )
                         .into_iter()
                         .chain(flank_interference_notes(&l.path))
+                        .chain(below_base[k].clone())
                         .collect(),
                     },
                 ),
@@ -5099,6 +5209,12 @@ impl Indexed<'_> {
     }
 }
 
+/// **What a candidate whose band reaches past the base circles' limit is
+/// ranked down by**: an efficiency is a fraction in `[0, 1]`, so lowered by
+/// two it ranks below every candidate whose band reads whole, and among
+/// its own kind by efficiency still.
+const BAND_PAST_LIMIT: f64 = 2.0;
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
@@ -5118,6 +5234,141 @@ mod tests {
     use crate::train::arrangements as arr;
     use crate::train::test_library;
     use crate::train::testing::{try_alone, try_alone_at};
+
+    /// **One play law** (T02.8): a line contact's play through the law
+    /// every mesh shares — the transverse backlash taken to the normal
+    /// plane, `j cos α_t(a) cos β_b`, with the float's `sin β_b` — is the row
+    /// play it replaced, `j |Σz| / a + 2π f sin β_b / p_bn`, to rounding, at
+    /// the three band points of every line mesh of every preset, straight
+    /// and helical, with and without axial float.
+    #[test]
+    fn a_line_contacts_play_is_the_one_law() {
+        let lib = test_library();
+        let mut read = 0;
+        for preset in crate::train::arrangements::Preset::ALL {
+            for (float, helix) in [(0.0, None), (0.05, Some(20.0))] {
+                let mut shape = preset.build();
+                for d in &mut shape.distances {
+                    d.axial_clearance = float;
+                }
+                if let Some(h) = helix {
+                    shape = shape.with_first_helix(h);
+                }
+                for part in shape.parts() {
+                    let Ok(c) = cut(&part.shape, &lib) else {
+                        continue;
+                    };
+                    let at = Incidence::of(&c.shape);
+                    let s = Indexed::over(&c.shape, &at);
+                    for (k, bm) in c.built.meshes.iter().enumerate() {
+                        let BuiltContact::Line(l) = &bm.contact else {
+                            continue;
+                        };
+                        let m = s.meshes[k];
+                        let d = &s.distances[bm.distance];
+                        let rack = s.rack_of(k, &c.helix);
+                        let (alpha_n, _) = s.base_params(m.a, &c.helix).normal_pressure_angle_rad();
+                        let bb = crate::plane::base_helix_angle(c.helix[m.a].to_radians(), alpha_n);
+                        let p_bn = std::f64::consts::PI * rack.mn * alpha_n.cos();
+                        let z = s.members[m.a].gear.teeth;
+                        for a in [
+                            bm.running - d.tolerance_minus,
+                            bm.running,
+                            bm.running + d.tolerance_plus,
+                        ] {
+                            let old = l.design.backlash(a).unwrap() * s.tooth_sum(k).abs() / a
+                                + 2.0 * std::f64::consts::PI * float * bb.sin().abs() / p_bn;
+                            let new = l.angular_play(a, float, bb, p_bn, z).unwrap() * f64::from(z);
+                            assert!(
+                                (new - old).abs() <= 1e-12 * old.abs().max(1e-6),
+                                "{preset:?} mesh {k} at {a}: {new} against {old}"
+                            );
+                            read += 1;
+                        }
+                    }
+                }
+            }
+        }
+        assert!(read > 60, "only {read} band points read");
+    }
+
+    /// **The search and the solve read one condition one way** (T02.8): a
+    /// hula at a module of a sixth, whose every candidate's tolerance band
+    /// reaches past the base circles' limit, still has its shifts chosen —
+    /// the most efficient, where none reads whole — and its mesh says
+    /// where the band ends; at a module of a third, where some candidate's
+    /// band reads whole, the one chosen does and nothing is said.
+    #[test]
+    fn a_search_ranks_whole_bands_first_and_chooses_where_none_is() {
+        let hula = |d: u32| {
+            let n = 18 * d;
+            let mut s = arr::hula([n, n + d, n + d, n + 2 * d], [1.0 / f64::from(d); 2]);
+            s.distances[0].tip_clearance = 0.30 / f64::from(d);
+            s.set_search(true);
+            try_alone_at(&s, 2.0, 1000.0).unwrap()
+        };
+        let said = |r: &crate::train::Alone, k: &str| {
+            r.notes.iter().any(|n| n.is(k))
+                || r.meshes.iter().any(|m| m.notes.iter().any(|n| n.is(k)))
+        };
+        let none_whole = hula(6);
+        assert!(
+            !said(&none_whole, key::PART_OPTIMISER_FOUND_NOTHING),
+            "{:?}",
+            none_whole.notes
+        );
+        assert!(said(&none_whole, key::MESH_TOLERANCE_BELOW_BASE));
+        let some_whole = hula(3);
+        assert!(!said(&some_whole, key::PART_OPTIMISER_FOUND_NOTHING));
+        assert!(!said(&some_whole, key::MESH_TOLERANCE_BELOW_BASE));
+    }
+
+    /// **The band's least play falls as its minus tolerance widens, and a
+    /// band end past the base circles' limit has none** (T02.8): on the
+    /// 17/43 pair from ±0.25 mm to ±5 mm, each band no tighter than the one
+    /// before, never a jump to nought; once the minus end reaches inside
+    /// `a_ref cos α_t` the band's extremes are absent and the mesh says so,
+    /// its end and its limit, and the train still solves (rule 5).
+    #[test]
+    fn a_wider_tolerance_never_reads_less_interference() {
+        let lib = test_library();
+        let mut last: Option<f64> = None;
+        let (mut banded, mut beyond) = (0, 0);
+        for step in 1..=20 {
+            let tol = 0.25 * f64::from(step);
+            let mut t = crate::train::sweep::cased(vec![arr::pair([17, 43])]);
+            t.shape.distances[0].tolerance_minus = tol;
+            let r = crate::train::solve_train(&t, &lib).unwrap();
+            let said = r.meshes[0]
+                .notes
+                .iter()
+                .any(|n| n.is(key::MESH_TOLERANCE_BELOW_BASE));
+            let band = r.paths[0].backlash.forward.unwrap();
+            match band.minimum {
+                Some(least) => {
+                    assert!(beyond == 0 && !said, "±{tol}: a band read past the limit");
+                    if let Some(before) = last {
+                        assert!(least <= before, "±{tol}: {least} above {before}");
+                    }
+                    last = Some(least);
+                    banded += 1;
+                }
+                None => {
+                    assert!(said, "±{tol}: absent with no note");
+                    // Play rises with the distance on an external pair, so
+                    // the end inside the limit is the least, and the
+                    // greatest — the plus end's — still reads.
+                    assert!(band.maximum.is_some(), "±{tol}: {band:?}");
+                    beyond += 1;
+                }
+            }
+        }
+        assert!(
+            banded >= 3 && beyond >= 3,
+            "banded {banded}, beyond {beyond}"
+        );
+        assert!(last.unwrap() < 0.0, "the widest band reads interference");
+    }
 
     /// How far a set's two meshes disagree about the one distance, from the
     /// zero-backlash distances it reports, each opened by the clearance its
@@ -6320,16 +6571,16 @@ mod tests {
         // it opens on both sides of the nominal since the two meshes' operating
         // angles no longer move together.
         let b = &tight.backlash.unwrap().forward;
-        assert!(b.minimum <= b.nominal && b.nominal <= b.maximum);
+        assert!(b.minimum.unwrap() <= b.nominal && b.nominal <= b.maximum.unwrap());
         let off = set_of(24, 18, 61, 0.0);
         let off = try_alone(&off).unwrap();
         let b = &off.backlash.unwrap().forward;
         assert!(
-            b.minimum < b.nominal && b.nominal < b.maximum,
+            b.minimum.unwrap() < b.nominal && b.nominal < b.maximum.unwrap(),
             "off the ideal ring the band opens: {} … {} … {}",
-            b.minimum,
+            b.minimum.unwrap(),
             b.nominal,
-            b.maximum
+            b.maximum.unwrap()
         );
 
         // At the zero-backlash centre distance there is no play at all.

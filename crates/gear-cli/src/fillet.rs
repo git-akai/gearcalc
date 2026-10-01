@@ -170,7 +170,7 @@ fn asked(c: Case) -> Case {
         Kind::Ring => ring_cutter(c.round).check().map_err(|e| e.within("cutter")),
     };
     if let Err(e) = member.and(mate).and(cutter) {
-        crate::refuse(&e);
+        crate::refuse_for(&e);
     }
     c
 }
@@ -315,7 +315,13 @@ const SAMPLES: usize = 2001;
 /// The half tooth, tip centre to mid-space: `tip`, `flank`, `fillet`, `root`,
 /// each as `piece <name> <n>` and `n` lines `x y tx ty`.
 fn print_outline<T: ToothOutline>(g: &T, ra: f64, rf: f64, half_pitch: f64, flip: f64) {
-    let (lo, hi) = g.flank_bracket();
+    // A usable outline has a fillet; one without has no outline to print.
+    let Some(ends) = g.fillet() else {
+        return;
+    };
+    let Some((lo, hi)) = g.flank_bracket() else {
+        return;
+    };
     let (u_tip, u_junction) = if g.tip_at_high_roll() {
         (hi, lo)
     } else {
@@ -340,7 +346,7 @@ fn print_outline<T: ToothOutline>(g: &T, ra: f64, rf: f64, half_pitch: f64, flip
             .collect::<Vec<_>>()
     };
     let flank = along(u_tip, u_junction, &|u| g.flank_at(u));
-    let fillet = along(g.fillet_junction(), g.fillet_root(), &|s| g.fillet_at(s));
+    let fillet = along(ends.junction, ends.root, &|s| g.fillet_at(s));
     let tip_corner = angle(flank[0].0);
     let root_start = angle(fillet[SAMPLES - 1].0);
     let mut pieces = Vec::new();

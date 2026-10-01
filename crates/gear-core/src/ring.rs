@@ -489,13 +489,13 @@ impl Ring {
             ring.clamps.push(Note::new(key::CLAMP_CUTTER_NO_TIP_CORNER));
             return ring;
         }
-        match ring.solve_junction() {
-            Some((u_j, phi_j)) => {
+        let junction = ring
+            .solve_junction()
+            .and_then(|(u_j, phi_j)| Some((u_j, phi_j, ring.solve_root_end(phi_j)?)));
+        match junction {
+            Some((u_j, phi_j, phi_root)) => {
                 ring.u_j = u_j;
-                ring.fillet = Some(Fillet {
-                    phi_j,
-                    phi_root: ring.solve_root_end(phi_j),
-                });
+                ring.fillet = Some(Fillet { phi_j, phi_root });
                 if !ring.fully_generated() {
                     let limit = ring.generation_limit();
                     ring.clamps.push(
@@ -571,12 +571,14 @@ impl Ring {
     /// Takes the junction's normal angle rather than reading it back off
     /// `self`, because it is called while the fillet is being built and there
     /// is nothing to read yet.
-    fn solve_root_end(&self, phi_j: f64) -> f64 {
+    /// `None` where the fillet's angle cannot be read across the bracket —
+    /// a ring cut from figures that are not numbers.
+    fn solve_root_end(&self, phi_j: f64) -> Option<f64> {
         if self.trochoid_at(0.0).1 <= self.half_pitch {
-            return 0.0;
+            return Some(0.0);
         }
         let over = |phi: f64| self.trochoid_at(phi).1 - self.half_pitch;
-        brent(over, phi_j, 0.0, Tol::default()).unwrap_or(0.0)
+        brent(over, phi_j, 0.0, Tol::default())
     }
 
     /// A circle to draw the rim at, mm — `r + 2 m_t`, so the annulus is two
@@ -1168,7 +1170,8 @@ fn reference_geometry(ring: &Ring, pinion: &Tooth) -> Option<(f64, f64)> {
 /// the relation [`crate::mesh::Mesh::at`] reads — and every verdict follows.
 fn described_at(ring: &Ring, pinion: &Tooth, a_ref: f64, centre_distance: f64) -> Option<RingMesh> {
     let cos_alpha_w = a_ref * ring.alpha_t.cos() / centre_distance;
-    if !(-1.0..=1.0).contains(&cos_alpha_w) {
+    // No distance of nought or less describes a pair.
+    if !(centre_distance > 0.0 && (0.0..=1.0).contains(&cos_alpha_w)) {
         return None;
     }
     let alpha_w = cos_alpha_w.acos();
@@ -3128,7 +3131,8 @@ mod tests {
                 continue;
             }
             let (r_flank, a_flank) = g.involute_at(g.u_j);
-            let (r_fillet, a_fillet) = g.trochoid_at(ToothOutline::fillet_junction(g));
+            let (r_fillet, a_fillet) =
+                g.trochoid_at(ToothOutline::fillet(g).expect("a cut fillet").junction);
             let off = f64::hypot(r_flank - r_fillet, r_flank * (a_flank - a_fillet));
             assert!(
                 off < 1e-9,

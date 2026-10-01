@@ -447,22 +447,22 @@ fn report(name: &str, train: &Train, r: &TrainResult) {
     // Every path: between every two open bodies, the two ends first.
     for p in &r.paths {
         println!(
-            "  path {:<5} -> {:<5} ratio {:>14.6}   efficiency {:>10.6} / {:<10.6} %   backlash {:>10.6} / {:<10.6} deg",
+            "  path {:<5} -> {:<5} ratio {:>14.6}   efficiency {:>10} / {:<10} %   backlash {:>10} / {:<10} deg",
             port(p.from),
             port(p.to),
             p.ratio,
-            100.0 * p.efficiency.forward,
-            100.0 * p.efficiency.backward,
-            p.backlash.forward.nominal,
-            p.backlash.backward.nominal,
+            crate::figure(p.efficiency.forward.map(|e| 100.0 * e), 6),
+            crate::figure(p.efficiency.backward.map(|e| 100.0 * e), 6),
+            crate::figure(p.backlash.forward.map(|b| b.nominal), 6),
+            crate::figure(p.backlash.backward.map(|b| b.nominal), 6),
         );
         // What the teeth pass over what comes in, both ways, and what one
         // more tooth on each gear would make the ratio, each gear by the
         // graph's index for it.
         println!(
-            "    power through the teeth {:>10.6} / {:<10.6}   one more tooth: {}",
-            p.circulation.forward,
-            p.circulation.backward,
+            "    power through the teeth {:>10} / {:<10}   one more tooth: {}",
+            crate::figure(p.circulation.forward, 6),
+            crate::figure(p.circulation.backward, 6),
             p.per_tooth
                 .iter()
                 .map(|r| r.map_or_else(|| "locked".to_string(), |r| format!("{r:.6}")))
@@ -654,7 +654,7 @@ pub fn run(which: Option<&str>) {
             // train's, and the `graph` block beneath it is what the train
             // already knows and does not report.
             Err(e) => {
-                println!("== {name} ==\n  no answer: {e}");
+                println!("== {name} ==\n  no answer: {}", crate::in_words(&e));
                 graph(train);
                 println!();
             }

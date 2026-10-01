@@ -32,16 +32,51 @@ pub enum MaterialError {
 }
 
 impl MaterialError {
-    /// The catalogue's note, where the refusal has one: a figure no
-    /// material has. The rest are the parser's words or this module's.
+    /// The catalogue's note for every refusal a reader's file can reach: a
+    /// document that does not read (the parser's own words, which name the
+    /// line and column, as its `detail`), an empty library, two materials of
+    /// one name, a figure no material has. `None` only where writing failed,
+    /// which no file reaches.
     #[must_use]
     pub fn note(&self) -> Option<gear_core::note::Note> {
-        use gear_core::note::Explain;
+        use gear_core::note::{key, Explain, Note};
         match self {
+            Self::Parse(e) => Some(unreadable(e)),
+            Self::Empty => Some(Note::new(key::ERROR_LIBRARY_EMPTY)),
+            Self::DuplicateName(n) => {
+                Some(Note::new(key::ERROR_LIBRARY_DUPLICATE_NAME).text("name", n.clone()))
+            }
             Self::Implausible(r) => Some(r.note()),
-            _ => None,
+            Self::Serialise(_) => None,
         }
     }
+}
+
+/// **A document that does not read**, as a note: the parser's message as
+/// its `detail`, and the line and column it names — read off the first line
+/// of its report, `… at line L, column C`, which is where `toml` says them —
+/// or `?` where it names none.
+pub(crate) fn unreadable(e: &toml::de::Error) -> gear_core::note::Note {
+    let report = e.to_string();
+    let first = report.lines().next().unwrap_or_default();
+    let after = |word: &str| -> String {
+        first
+            .split(word)
+            .nth(1)
+            .and_then(|rest| {
+                let digits: String = rest
+                    .trim_start()
+                    .chars()
+                    .take_while(char::is_ascii_digit)
+                    .collect();
+                (!digits.is_empty()).then_some(digits)
+            })
+            .unwrap_or_else(|| "?".to_owned())
+    };
+    gear_core::note::Note::new(gear_core::note::key::ERROR_DOCUMENT_UNREADABLE)
+        .text("detail", e.message().trim())
+        .text("line", after("line"))
+        .text("column", after("column"))
 }
 
 impl std::fmt::Display for MaterialError {

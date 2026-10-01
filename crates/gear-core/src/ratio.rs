@@ -83,6 +83,58 @@ impl Ratio {
         Some(Self { num, den })
     }
 
+    /// **A double's exact value**: every finite double is `m·2^e` with `m` a
+    /// 53-bit integer, so it is a rational, and this is that rational with no
+    /// rounding. `None` where it is not finite, or where its numerator or
+    /// denominator needs more than an `i128` holds: any number from `2¹²⁷`,
+    /// and one below about `2⁻⁷⁴` whose mantissa uses all its bits.
+    ///
+    /// For a figure a designer gave, read where the question is exact — two
+    /// speeds given on one rigid chain agree or they do not.
+    #[must_use]
+    pub fn of_double(x: f64) -> Option<Self> {
+        if !x.is_finite() {
+            return None;
+        }
+        if x == 0.0 {
+            return Some(Self::ZERO);
+        }
+        let (magnitude, exponent) = dyadic(x)?;
+        let mut mantissa = i128::from(magnitude);
+        if x < 0.0 {
+            mantissa = -mantissa;
+        }
+        let power = |e: i32| -> Option<i128> {
+            1_i128
+                .checked_shl(u32::try_from(e).ok()?)
+                .filter(|p| *p > 0)
+        };
+        if exponent >= 0 {
+            Self::new(mantissa.checked_mul(power(exponent)?)?, 1)
+        } else {
+            Self::new(mantissa, power(-exponent)?)
+        }
+    }
+
+    /// **The least whole number not below this**, exactly: a count of
+    /// whole things that this many, or a part more, takes.
+    #[must_use]
+    pub fn ceil(self) -> i128 {
+        // The denominator is positive in lowest terms.
+        -((-self.num).div_euclid(self.den))
+    }
+
+    /// The magnitude. `None` for the one value with none in `i128`, which
+    /// [`Self::new`] never makes.
+    #[must_use]
+    pub fn checked_abs(self) -> Option<Self> {
+        if self.num < 0 {
+            self.checked_neg()
+        } else {
+            Some(self)
+        }
+    }
+
     /// A whole number.
     #[must_use]
     pub const fn whole(n: i64) -> Self {
@@ -163,8 +215,8 @@ impl Ratio {
         self.checked_mul(other.recip()?)
     }
 
-    /// What a reader sees. **Lossy on purpose and one-way**: nothing here reads
-    /// a float back.
+    /// What a reader sees. **Lossy on purpose**: the one way a float comes
+    /// back is [`Self::of_double`], which reads a designer's figure exactly.
     #[must_use]
     pub fn to_f64(self) -> f64 {
         self.num as f64 / self.den as f64
@@ -213,13 +265,258 @@ impl fmt::Display for Ratio {
     }
 }
 
+/// **A double's magnitude as `m · 2^e`**, exactly: every finite double is
+/// a dyadic rational, the mantissa an odd integer once its trailing zeros
+/// are taken into the exponent. `None` for one that is not finite; `(0, 0)`
+/// for nought.
+#[must_use]
+pub fn dyadic(x: f64) -> Option<(u64, i32)> {
+    if !x.is_finite() {
+        return None;
+    }
+    if x == 0.0 {
+        return Some((0, 0));
+    }
+    let bits = x.abs().to_bits();
+    let biased = i32::try_from(bits >> 52).ok()?;
+    let fraction = bits & ((1_u64 << 52) - 1);
+    let (mantissa, exponent) = if biased == 0 {
+        (fraction, -1074)
+    } else {
+        (fraction | (1_u64 << 52), biased - 1075)
+    };
+    let zeros = mantissa.trailing_zeros();
+    Some((mantissa >> zeros, exponent + i32::try_from(zeros).ok()?))
+}
+
+/// **A natural number of any size**, as little-endian 64-bit limbs — what an
+/// exact count needs where its numerator or denominator is past an `i128`:
+/// a duration's `2^e` on a speed's quotient. Products, sums, differences,
+/// shifts and one quotient; nothing else.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Natural(Vec<u64>);
+
+// A limb is the low 64 bits of a wider product, taken on purpose.
+#[allow(clippy::cast_possible_truncation)]
+impl Natural {
+    /// `n`.
+    #[must_use]
+    pub fn of(n: u128) -> Self {
+        Self(vec![n as u64, (n >> 64) as u64]).trimmed()
+    }
+
+    fn trimmed(mut self) -> Self {
+        while self.0.last() == Some(&0) {
+            self.0.pop();
+        }
+        self
+    }
+
+    /// Whether this is nought.
+    #[must_use]
+    pub fn is_zero(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// `self · n`.
+    #[must_use]
+    pub fn times(&self, n: u128) -> Self {
+        let parts = [n as u64, (n >> 64) as u64];
+        let mut out = vec![0_u64; self.0.len() + 2];
+        for (j, &p) in parts.iter().enumerate() {
+            let mut carry = 0_u128;
+            for (i, &a) in self.0.iter().enumerate() {
+                let t = u128::from(a) * u128::from(p) + u128::from(out[i + j]) + carry;
+                out[i + j] = t as u64;
+                carry = t >> 64;
+            }
+            let mut k = self.0.len() + j;
+            while carry > 0 {
+                let t = u128::from(out[k]) + carry;
+                out[k] = t as u64;
+                carry = t >> 64;
+                k += 1;
+            }
+        }
+        Self(out).trimmed()
+    }
+
+    /// `self + other`.
+    #[must_use]
+    pub fn plus(&self, other: &Self) -> Self {
+        let n = self.0.len().max(other.0.len());
+        let mut out = Vec::with_capacity(n + 1);
+        let mut carry = 0_u128;
+        for i in 0..n {
+            let t = u128::from(self.0.get(i).copied().unwrap_or_default())
+                + u128::from(other.0.get(i).copied().unwrap_or_default())
+                + carry;
+            out.push(t as u64);
+            carry = t >> 64;
+        }
+        out.push(carry as u64);
+        Self(out).trimmed()
+    }
+
+    /// `|self − other|`.
+    #[must_use]
+    pub fn distance(&self, other: &Self) -> Self {
+        let (big, small) = if self >= other {
+            (self, other)
+        } else {
+            (other, self)
+        };
+        let mut out = Vec::with_capacity(big.0.len());
+        let mut borrow = false;
+        for i in 0..big.0.len() {
+            let b = small.0.get(i).copied().unwrap_or_default();
+            let (d, o1) = big.0[i].overflowing_sub(b);
+            let (d, o2) = d.overflowing_sub(u64::from(borrow));
+            out.push(d);
+            borrow = o1 || o2;
+        }
+        Self(out).trimmed()
+    }
+
+    /// `self · 2^bits`.
+    #[must_use]
+    pub fn shifted(&self, bits: u32) -> Self {
+        let (limbs, rest) = ((bits / 64) as usize, bits % 64);
+        let mut out = vec![0_u64; limbs];
+        let mut carry = 0_u64;
+        for &a in &self.0 {
+            out.push((a << rest) | carry);
+            carry = if rest == 0 { 0 } else { a >> (64 - rest) };
+        }
+        out.push(carry);
+        Self(out).trimmed()
+    }
+
+    /// **`⌈self / by⌉`, where the quotient is below `2^53`** — every whole
+    /// number a double holds exactly, which is the most a report printed as
+    /// one can say (a quotient just under it rounds up to `2^53` itself,
+    /// which a double still holds). `None` where the quotient is `2^53` or
+    /// more, or `by` is nought.
+    #[must_use]
+    pub fn ceil_over(&self, by: &Self) -> Option<u64> {
+        const EXACT_BITS: u32 = f64::MANTISSA_DIGITS;
+        if by.is_zero() || *self >= by.shifted(EXACT_BITS) {
+            return None;
+        }
+        // Long division, one bit of the quotient at a time from the top.
+        let (mut rest, mut q) = (self.clone(), 0_u64);
+        for bit in (0..EXACT_BITS).rev() {
+            let part = by.shifted(bit);
+            if rest >= part {
+                rest = rest.distance(&part);
+                q |= 1 << bit;
+            }
+        }
+        Some(q + u64::from(!rest.is_zero()))
+    }
+}
+
+impl PartialOrd for Natural {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Natural {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.0
+            .len()
+            .cmp(&other.0.len())
+            .then_with(|| self.0.iter().rev().cmp(other.0.iter().rev()))
+    }
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 
+    /// **A natural's quotient is the integers' own**: over a grid of
+    /// numerators, divisors and shifts that `u128` still holds, `ceil_over`
+    /// is `u128`'s ceiling exactly; a quotient of `2^53` is past it and none;
+    /// and a dyadic reads back as the double it came from.
+    #[test]
+    fn a_naturals_ceiling_is_the_integers() {
+        let mut read = 0;
+        for n in [0_u128, 1, 2, 7, 48_000_000, (1 << 60) + 3, (1 << 100) - 1] {
+            for d in [1_u128, 3, 7, 1 << 40, (1 << 47) + 1] {
+                for shift in [0_u32, 5, 13] {
+                    let (num, den) = (Natural::of(n).shifted(shift), Natural::of(d));
+                    let exact = (n << shift).div_ceil(d);
+                    let got = num.ceil_over(&den);
+                    if exact < 1 << 53 {
+                        assert_eq!(got, u64::try_from(exact).ok(), "{n}·2^{shift} / {d}");
+                    } else {
+                        assert_eq!(got, None, "{n}·2^{shift} / {d}");
+                    }
+                    read += 1;
+                }
+            }
+        }
+        assert_eq!(read, 105);
+        // The edge: a quotient one under 2^53 reads, 2^53 does not.
+        let edge = Natural::of(1 << 53);
+        assert_eq!(edge.ceil_over(&Natural::of(1)), None);
+        assert_eq!(
+            Natural::of((1 << 53) - 1).ceil_over(&Natural::of(1)),
+            Some((1 << 53) - 1)
+        );
+        // Sums, products and differences past 128 bits come back.
+        let big = Natural::of(u128::MAX).times(u128::MAX);
+        assert_eq!(big.distance(&big), Natural::of(0));
+        assert_eq!(big.plus(&Natural::of(1)).distance(&big), Natural::of(1));
+        for x in [
+            1.0,
+            0.1,
+            1000.0_f64.next_up(),
+            2f64.powi(126),
+            1e-30,
+            5e-324,
+        ] {
+            let (m, e) = dyadic(x).unwrap();
+            assert_eq!(m as f64 * 2f64.powi(e), x, "{x}");
+        }
+    }
+
     fn r(n: i128, d: i128) -> Ratio {
         Ratio::new(n, d).unwrap()
+    }
+
+    /// **A double read exactly**: its value as a rational, with no rounding —
+    /// so it reads back to the same double — and `None` where the rational
+    /// does not fit or the double is not a number.
+    #[test]
+    fn a_double_is_read_as_the_rational_it_is() {
+        assert_eq!(Ratio::of_double(4300.0), Some(Ratio::whole(4300)));
+        assert_eq!(Ratio::of_double(-1700.0), Some(Ratio::whole(-1700)));
+        assert_eq!(Ratio::of_double(0.0), Some(Ratio::ZERO));
+        assert_eq!(Ratio::of_double(-0.375), Some(r(-3, 8)));
+        // 0.1 is not a tenth: it is the nearest double, exactly.
+        assert_eq!(
+            Ratio::of_double(0.1),
+            Some(r(3_602_879_701_896_397, 36_028_797_018_963_968))
+        );
+        let mut read = 0;
+        for x in [1.0, 1e-20, 123.456, 2e30, -7.0 / 3.0, f64::EPSILON, 1e37] {
+            let q = Ratio::of_double(x).unwrap();
+            assert_eq!(q.to_f64().to_bits(), x.to_bits(), "{x}");
+            read += 1;
+        }
+        assert_eq!(read, 7);
+        // Past what an i128 holds either way, and not numbers at all.
+        for x in [1e39, 1e-30, 5e-324, f64::MAX, f64::NAN, f64::INFINITY] {
+            assert_eq!(Ratio::of_double(x), None, "{x}");
+        }
+        // The edges: 2¹²⁶ fits, 2¹²⁷ does not; 2⁻¹²⁶ fits, 2⁻¹²⁷ does not.
+        assert!(Ratio::of_double(2f64.powi(126)).is_some());
+        assert_eq!(Ratio::of_double(2f64.powi(127)), None);
+        assert!(Ratio::of_double(2f64.powi(-126)).is_some());
+        assert_eq!(Ratio::of_double(2f64.powi(-127)), None);
     }
 
     /// **Equal numbers are the same value.** Normalising on construction is

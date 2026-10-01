@@ -7,9 +7,12 @@
 //! inside the pressure-angle range this tool allows.
 //!
 //! Neither returns a "best effort" answer on failure. A solve that did not
-//! bracket a root — or that ran out of iterations without converging — returns
-//! `None`, and the caller reports the geometry as impossible rather than
-//! propagating a NaN into a stress figure. Both halves of that were promised
+//! bracket a root, that stepped onto a point where the function has no value
+//! (a residual that is not finite, or `None` from a `_partial` form's), or
+//! that ran out of iterations without converging returns `None`, and the
+//! caller reports the geometry as impossible rather than propagating a NaN
+//! into a stress figure. A residual with no value somewhere says so with
+//! `None` through the `_partial` forms, never with a NaN standing for it. Both halves of that were promised
 //! here long before the second was true: falling out of the loop used to return
 //! the last iterate.
 
@@ -61,11 +64,28 @@ pub fn brent_bracket<F>(f: F, lo: f64, hi: f64, tol: Tol) -> Option<[f64; 2]>
 where
     F: Fn(f64) -> f64,
 {
+    brent_bracket_partial(|x| Some(f(x)), lo, hi, tol)
+}
+
+/// [`brent`] for a residual that has no value somewhere: `f` answers `None`
+/// there, and the solve answers `None` if it steps onto such a point. A
+/// non-finite value is read the same way.
+pub fn brent_partial<F>(f: F, lo: f64, hi: f64, tol: Tol) -> Option<f64>
+where
+    F: Fn(f64) -> Option<f64>,
+{
+    brent_bracket_partial(f, lo, hi, tol).map(|[b, _]| b)
+}
+
+/// [`brent_bracket`] for a residual that has no value somewhere, as
+/// [`brent_partial`] reads it.
+pub fn brent_bracket_partial<F>(f: F, lo: f64, hi: f64, tol: Tol) -> Option<[f64; 2]>
+where
+    F: Fn(f64) -> Option<f64>,
+{
+    let f = |x: f64| f(x).filter(|v| v.is_finite());
     let (mut a, mut b) = (lo, hi);
-    let (mut fa, mut fb) = (f(a), f(b));
-    if !fa.is_finite() || !fb.is_finite() {
-        return None;
-    }
+    let (mut fa, mut fb) = (f(a)?, f(b)?);
     if fa == 0.0 {
         return Some([a, a]);
     }
@@ -139,10 +159,7 @@ where
         a = b;
         fa = fb;
         b += if d.abs() > tol1 { d } else { tol1.copysign(xm) };
-        fb = f(b);
-        if !fb.is_finite() {
-            return None;
-        }
+        fb = f(b)?;
     }
     // The iteration bound is a safety stop, so reaching it is a failure to
     // converge and not an answer. Returning the last iterate here contradicted
@@ -163,10 +180,27 @@ where
     F: Fn(f64) -> f64,
     D: Fn(f64) -> f64,
 {
-    let (flo, fhi) = (f(lo), f(hi));
-    if !flo.is_finite() || !fhi.is_finite() {
-        return None;
-    }
+    newton_bracketed_partial(|x| Some(f(x)), |x| Some(df(x)), lo, hi, guess, tol)
+}
+
+/// [`newton_bracketed`] for a function or slope that has no value somewhere,
+/// as [`brent_partial`] reads one: a step onto a point with no value ends the
+/// solve with `None`, and a point with no slope is bisected.
+pub fn newton_bracketed_partial<F, D>(
+    f: F,
+    df: D,
+    lo: f64,
+    hi: f64,
+    guess: f64,
+    tol: Tol,
+) -> Option<f64>
+where
+    F: Fn(f64) -> Option<f64>,
+    D: Fn(f64) -> Option<f64>,
+{
+    let f = |x: f64| f(x).filter(|v| v.is_finite());
+    let df = |x: f64| df(x).filter(|v| v.is_finite());
+    let (flo, fhi) = (f(lo)?, f(hi)?);
     if flo == 0.0 {
         return Some(lo);
     }
@@ -183,22 +217,25 @@ where
     let mut x = guess.clamp(lo.min(hi), lo.max(hi));
     let mut step_prev = (hi - lo).abs();
     let mut step = step_prev;
-    let mut fx = f(x);
+    let mut fx = f(x)?;
     let mut dfx = df(x);
 
     for _ in 0..tol.max_iter {
         // Bisect when the Newton step would leave the bracket, or is not at
         // least halving the interval.
-        let newton_out_of_range = ((x - high) * dfx - fx) * ((x - low) * dfx - fx) > 0.0;
-        let newton_too_slow = (2.0 * fx).abs() > (step_prev * dfx).abs();
-        if !dfx.is_finite() || dfx == 0.0 || newton_out_of_range || newton_too_slow {
-            step_prev = step;
-            step = 0.5 * (high - low);
-            x = low + step;
-        } else {
+        let newton = dfx.filter(|&d| {
+            let out_of_range = ((x - high) * d - fx) * ((x - low) * d - fx) > 0.0;
+            let too_slow = (2.0 * fx).abs() > (step_prev * d).abs();
+            d != 0.0 && !out_of_range && !too_slow
+        });
+        if let Some(dfx) = newton {
             step_prev = step;
             step = fx / dfx;
             x -= step;
+        } else {
+            step_prev = step;
+            step = 0.5 * (high - low);
+            x = low + step;
         }
 
         // Relative, as Brent's is: an absolute floor alone is a different
@@ -207,10 +244,7 @@ where
             return Some(x);
         }
 
-        fx = f(x);
-        if !fx.is_finite() {
-            return None;
-        }
+        fx = f(x)?;
         dfx = df(x);
         if fx < 0.0 {
             low = x;

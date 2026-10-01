@@ -242,7 +242,7 @@ impl Wiring {
             .filter(|m| m.a == member || m.b == member)
             .map(|m| m.paths)
             .max()
-            .unwrap_or(1)
+            .unwrap_or(1) // absence: a member in no mesh, which a valid shape has not, meets its mates once
     }
 
     /// **The system this wiring and these tooth counts make**, with `teeth` one

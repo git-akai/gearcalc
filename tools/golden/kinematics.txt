@@ -1608,6 +1608,6 @@
     b4     planet    of part 1  speed -2/5 + 7/5 × ω(b2 carrier)
 
 == conflict ==
-  no answer: two conditions cannot both hold at body 3
+  no answer: two conditions cannot both hold at body 3: what it is asked to do contradicts what the meshes and the other conditions already decide
   graph    no motion: Conflicts(3)
 

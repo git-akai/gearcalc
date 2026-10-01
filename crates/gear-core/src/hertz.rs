@@ -57,7 +57,7 @@
 //! mesh the tool supports today, without a branch and without moving a digit.
 
 use crate::elliptic::{r_d, r_f};
-use crate::solve::{brent, greatest, Tol};
+use crate::solve::{brent_partial, greatest, Tol};
 use std::f64::consts::PI;
 
 /// The contact patch and the pressure in it.
@@ -169,9 +169,9 @@ pub fn elliptical_contact(
     if kappa <= 0.0 {
         // Line contact: infinitely long patch, zero peak pressure.
         let (semi_x, semi_y) = if curvature_x <= curvature_y {
-            (f64::INFINITY, 0.0)
+            (f64::INFINITY, 0.0) // absence: a line contact's patch is unbounded along its line
         } else {
-            (0.0, f64::INFINITY)
+            (0.0, f64::INFINITY) // absence: a line contact's patch is unbounded along its line
         };
         return Some(EllipticalContact {
             semi_x,
@@ -293,12 +293,11 @@ pub fn peak_pressure(
         return None;
     }
     let line = line_pressure(curvature_across, load, line_length, e_star);
-    // A patch that cannot exist — no load, say — carries no pressure, which the
-    // line term still can. So a failed ellipse contributes zero rather than
-    // refusing the whole answer.
-    let elliptical = elliptical_contact(curvature_along, curvature_across, load, e_star)
-        .map_or(0.0, |c| c.max_pressure);
-    Some(line.max(elliptical))
+    // A patch that cannot exist — no load, say — has no elliptical term, and
+    // the line term answers alone rather than the whole answer being refused.
+    let elliptical =
+        elliptical_contact(curvature_along, curvature_across, load, e_star).map(|c| c.max_pressure);
+    Some(elliptical.map_or(line, |e| line.max(e)))
 }
 
 /// The line term of [`peak_pressure`] on its own: a load `F` spread along a
@@ -386,6 +385,10 @@ pub fn relative_curvatures(
     Some((flatter, sharper))
 }
 
+/// The aspect ratio of a line contact's patch: an ellipse with no curvature
+/// along it, infinitely long for its width.
+pub const LINE_ASPECT: f64 = 0.0;
+
 /// **The aspect ratio `κ = b/a` of the patch two relative curvatures make**:
 /// 0 for a line (one curvature nought), 1 for a circle. `None` where a
 /// curvature is negative or both are nought.
@@ -417,19 +420,13 @@ fn aspect_ratio(q: f64) -> Option<f64> {
 
     // In ln kappa, so the tolerance is relative. g is monotone, so the residual
     // is too, and Brent cannot leave the bracket.
-    let residual = |w: f64| -> f64 {
-        let kappa = w.exp();
-        match curvature_ratio(kappa) {
-            Some(g) => g.ln() - q.ln(),
-            None => f64::NAN,
-        }
-    };
+    let residual = |w: f64| curvature_ratio(w.exp()).map(|g| g.ln() - q.ln());
 
     // kappa² must stay normal for R_D to be evaluable, which is the only floor
     // there is: it comes from the type, not from a choice.
     let floor = f64::MIN_POSITIVE.ln() / 2.0;
     let mut lo = -1.0_f64;
-    while residual(lo) > 0.0 {
+    while residual(lo).is_some_and(|r| r > 0.0) {
         lo *= 2.0;
         if lo <= floor {
             // Below anything f64 can express as an aspect ratio. The ellipse is
@@ -438,7 +435,7 @@ fn aspect_ratio(q: f64) -> Option<f64> {
         }
     }
 
-    let w = brent(
+    let w = brent_partial(
         residual,
         lo,
         0.0,

@@ -480,13 +480,14 @@ mod tests {
             "nominal, with no slack at all"
         );
         assert!(
-            r.meshes[0].backlash_by_drive().forward.maximum > 0.0,
+            r.meshes[0].backlash_by_drive().forward.maximum.unwrap() > 0.0,
             "opening the centres opens the mesh"
         );
-        assert_eq!(
-            r.meshes[0].backlash_by_drive().forward.minimum,
-            0.0,
-            "tighter than nominal is contact"
+        // Tighter than nominal the teeth would overlap: the play goes
+        // negative, as a line contact's does, continuous through nought.
+        assert!(
+            r.meshes[0].backlash_by_drive().forward.minimum.unwrap() < 0.0,
+            "tighter than nominal is interference"
         );
     }
 
@@ -1066,7 +1067,10 @@ mod tests {
     #[test]
     fn a_pair_that_cannot_exist_says_which_way_it_failed() {
         let err = solve_worm(&({ arr::worm(9, 40) }).with_first_diameter(8.0)).unwrap_err();
-        assert!(format!("{err}").contains("too thin"), "{err}");
+        assert!(
+            crate::note::Explain::note(&err).is(crate::note::key::ERROR_SCREW_WORM_TOO_THIN),
+            "{err:?}"
+        );
 
         let err = solve_worm(&member(arr::worm(1, 40), 1, |g| {
             g.material = "Unobtainium".into()

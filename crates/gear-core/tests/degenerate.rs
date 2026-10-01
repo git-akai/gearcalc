@@ -307,3 +307,84 @@ fn the_pressure_angle_floor_is_read_in_one_place() {
     }
     assert!(files > 40, "{files} sources read");
 }
+
+/// **Every guard that binds says so** (T02.6): an input that drives a
+/// guard — a tip at or below the base circle, a root round past what the
+/// space holds, a dedendum past where the rack's tooth closes, a thickness
+/// past half a pitch — comes back clamped with a note, or is refused by the
+/// boundary naming its field; never altered in silence. The near miss: a
+/// sharp rack, `ρ = 0`, binds no guard and is neither.
+#[test]
+fn every_guard_that_binds_says_so() {
+    let base = GearParams {
+        teeth: 17,
+        ..GearParams::default()
+    };
+    let binding = [
+        (
+            "tip below the base circle",
+            GearParams {
+                addendum: -0.52,
+                ..base
+            },
+        ),
+        (
+            "tip below the root",
+            GearParams {
+                addendum: -1.3,
+                ..base
+            },
+        ),
+        (
+            "root round past the space",
+            GearParams {
+                root_radius: 2.0,
+                ..base
+            },
+        ),
+        (
+            "root round negative",
+            GearParams {
+                root_radius: -1.0,
+                ..base
+            },
+        ),
+        (
+            "dedendum past the closing rack",
+            GearParams {
+                dedendum: 3.5,
+                ..base
+            },
+        ),
+        (
+            "tooth past half a pitch",
+            GearParams {
+                thickness_mod: 1.99,
+                ..base
+            },
+        ),
+        (
+            "a pointed tip",
+            GearParams {
+                addendum: 2.5,
+                ..base
+            },
+        ),
+    ];
+    let mut read = 0;
+    for (what, p) in binding {
+        let said = p.check().is_err() || !Tooth::new(p).clamps.notes.is_empty();
+        assert!(said, "{what}: altered in silence");
+        read += 1;
+    }
+    assert_eq!(read, 7);
+    let sharp = GearParams {
+        root_radius: 0.0,
+        ..base
+    };
+    assert!(sharp.check().is_ok());
+    assert!(
+        Tooth::new(sharp).clamps.notes.is_empty(),
+        "a sharp rack binds no guard"
+    );
+}

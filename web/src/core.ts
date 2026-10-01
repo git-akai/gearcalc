@@ -10,6 +10,7 @@ import type {
   TrainDocument,
   Imported,
   TrainEdit,
+  EditAnswer,
   EditRequest,
   PreviewRequest,
   OffersRequest,
@@ -844,14 +845,15 @@ export function isHeld(train: Train, body: number): boolean {
  *  reason, for the panel to say; a train that would not cross comes back as
  *  `boundaryFailure`'s. */
 export function editTrain(train: Train, edit: TrainEdit): Note | null {
-  let edited: Train;
+  let answer: EditAnswer;
   try {
     const req: EditRequest = { train, edit };
-    edited = JSON.parse(core(() => edit_train(wire(req)))) as Train;
+    answer = JSON.parse(core(() => edit_train(wire(req)))) as EditAnswer;
   } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
-    return message.startsWith("ui.") ? { key: message, values: {} } : boundaryFailure(e);
+    return boundaryFailure(e);
   }
+  if (answer.refused) return answer.refused;
+  const edited = answer.train;
   train.shape = edited.shape;
   train.held = edited.held;
   train.load_cases = edited.load_cases;

@@ -126,6 +126,17 @@ enum Junction {
     AtTip { s: f64 },
 }
 
+/// **A tooth's involute flank**, as roll parameters `u = tan α` at its two
+/// ends: where it meets the fillet, and the tip. The two are equal where the
+/// tooth ends at its tip on the fillet, which leaves no flank to load.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Flank {
+    /// At the flank/fillet junction.
+    pub junction: f64,
+    /// At the tip.
+    pub tip: f64,
+}
+
 /// A generated gear cross-section.
 ///
 /// Every field is in millimetres or radians. Construction never fails: degenerate
@@ -174,8 +185,9 @@ pub struct Tooth {
 
     /// Tip (major) radius, after the pointed-tooth cap.
     pub ra: f64,
-    /// Involute roll parameter at the tip. NaN if severed.
-    pub u_tip: f64,
+    /// The involute flank, as roll parameters; `None` where the tooth has
+    /// none — severed, or cut from figures that are not numbers.
+    pub flank: Option<Flank>,
     /// Half angular width of the tip arc, radians.
     pub theta_a: f64,
 
@@ -195,10 +207,6 @@ pub struct Tooth {
     /// degeneracy kind, not a design one: nothing a designer can type sits a
     /// thousand-millionth of a module from the edge.
     pub undercut: bool,
-    /// Roll parameter at the flank/fillet junction. NaN if severed; equal to
-    /// [`Self::u_tip`] when the tooth ends at its tip on the fillet, which
-    /// leaves no flank.
-    pub u_j: f64,
     /// Rack travel parameter at the flank/fillet junction.
     pub s_j: f64,
     /// Radius at the junction.
@@ -518,6 +526,7 @@ impl Tooth {
         let l = m * (x - x_min) / sa;
         let undercut = x < x_min - compat::SAME_SHIFT;
 
+        // Read from where the junction is found, below.
         let mut g = Self {
             params,
             clamps,
@@ -537,11 +546,10 @@ impl Tooth {
             bc,
             ac,
             ra,
-            u_tip,
+            flank: None,
             theta_a,
             l,
             undercut,
-            u_j: 0.0,
             s_j: 0.0,
             r_j: 0.0,
             theta0: if tool.closes {
@@ -558,21 +566,19 @@ impl Tooth {
         // Unreachable for input the boundary admits (`GearParams::check`,
         // whose scale keeps every radius's square a normal double — a module
         // of 1e154 mm on 17 teeth, whose roll `√(r² − r_b²)` is no number,
-        // is refused there), and every test build asks. Reached, the tooth is
-        // read as having no flank, which no rating uses, and says so rather
-        // than guess a junction.
+        // is refused there), and every test build asks. Reached, the tooth
+        // has no flank, and says so by having none.
         debug_assert!(
             junction.is_some() || params.check().is_err(),
             "unsolved flank junction: {params:?}"
         );
         match junction {
-            None => {
-                g.u_j = g.u_tip;
-                g.r_j = g.ra;
-                g.clamps.push(Note::new(key::CLAMP_FLANK_UNSOLVED));
-            }
+            None => g.r_j = g.ra,
             Some(Junction::Crossing { u, s }) => {
-                g.u_j = u;
+                g.flank = Some(Flank {
+                    junction: u,
+                    tip: u_tip,
+                });
                 g.s_j = s;
                 g.r_j = rb * f64::hypot(1.0, u);
             }
@@ -582,7 +588,10 @@ impl Tooth {
                 // circle, where there is no involute at all). The tooth is its
                 // fillets up to the tip, and its land is the fillet's there.
                 g.s_j = s;
-                g.u_j = g.u_tip;
+                g.flank = Some(Flank {
+                    junction: u_tip,
+                    tip: u_tip,
+                });
                 g.r_j = g.ra;
                 g.theta_a = g.trochoid_at(s).1;
                 g.clamps
@@ -590,9 +599,13 @@ impl Tooth {
             }
         }
         if clamp_flank_at_base {
-            g.u_j = l.max(0.0) / rb;
+            let junction = l.max(0.0) / rb;
+            g.flank = Some(Flank {
+                junction,
+                tip: u_tip,
+            });
             g.s_j = -bc / alpha_t.tan();
-            g.r_j = rb * f64::hypot(1.0, g.u_j);
+            g.r_j = rb * f64::hypot(1.0, junction);
         }
         g.check_severed();
         g
@@ -735,8 +748,8 @@ impl Tooth {
     /// a valid simple closed curve, and the condition is reported rather than
     /// silently producing a self-intersecting outline.
     ///
-    /// Any code touching the flank must check [`Tooth::severed`] first — `u_j`
-    /// and `u_tip` are NaN in this state and there are only two sections.
+    /// A severed tooth has no flank ([`Tooth::flank`] is `None`) and two
+    /// sections.
     fn check_severed(&mut self) {
         // **Severing is undercut taken to its limit**, so a tooth that is not
         // undercut has nothing to look for — the same guard [`Self::solve_junction`]
@@ -805,11 +818,10 @@ impl Tooth {
         };
         self.severed = true;
         self.s_j = s_c;
-        self.u_j = f64::NAN;
+        self.flank = None;
         self.ra = self.trochoid_at(s_c).0;
         self.r_j = self.ra;
         self.theta_a = 0.0;
-        self.u_tip = f64::NAN;
         self.clamps.push(Note::new(key::CLAMP_TOOTH_SEVERED));
     }
 
@@ -820,6 +832,8 @@ impl Tooth {
     pub fn sections(&self) -> Vec<Section> {
         if self.severed {
             vec![Section::Trochoid, Section::RootArc]
+        } else if self.flank.is_none() {
+            vec![Section::TipArc, Section::Trochoid, Section::RootArc]
         } else {
             vec![
                 Section::TipArc,
@@ -836,7 +850,11 @@ impl Tooth {
         (0..n)
             .map(|i| match section {
                 Section::TipArc => (self.ra, lerp(0.0, self.theta_a.max(0.0), i)),
-                Section::Involute => self.involute_at(lerp(self.u_tip, self.u_j, i)),
+                // A tooth with no flank lists no involute section, and would
+                // read its tip corner here.
+                Section::Involute => self.flank.map_or((self.ra, self.theta_a), |f| {
+                    self.involute_at(lerp(f.tip, f.junction, i))
+                }),
                 Section::Trochoid => self.trochoid_at(lerp(self.s_j, 0.0, i)),
                 Section::RootArc => (self.rf, lerp(self.theta0, self.half_pitch, i)),
             })
@@ -916,7 +934,7 @@ pub(crate) fn rolling_curvature_radius_turning(
     let speed = f64::hypot(vel[0], vel[1]);
     let cross = (vel[0] * acc[1] - vel[1] * acc[0]).abs();
     if cross < f64::MIN_POSITIVE {
-        f64::INFINITY
+        f64::INFINITY // absence: a path that does not turn is straight, and its radius is unbounded
     } else {
         speed.powi(3) / cross
     }

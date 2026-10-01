@@ -346,7 +346,7 @@ fn helical_contact_at_the_recorded_cases() {
 /// the profile generator actually produces.
 fn distance_to_flank(g: &Tooth, px: f64, py: f64) -> f64 {
     let n = 400_000;
-    let (lo, hi) = (0.0_f64, g.u_tip.max(0.1));
+    let (lo, hi) = (0.0_f64, g.flank.unwrap().tip.max(0.1));
     let mut best = f64::INFINITY;
     for i in 0..=n {
         let u = lo + (hi - lo) * (i as f64 / n as f64);

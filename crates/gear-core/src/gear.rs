@@ -56,7 +56,7 @@ use crate::involute::inv;
 use crate::mesh::{operating_geometry, MeshError, MeshKind, MeshSide};
 use crate::note::{key, Note};
 use crate::params::GearParams;
-use crate::solve::{brent, Tol};
+use crate::solve::{brent_partial, Tol};
 use crate::tooth::{Rack, Tooth};
 
 /// The mean, amplitude and phase of a pure sinusoid, in the units it is read in.
@@ -1095,13 +1095,8 @@ impl Gear {
             &self.mean,
             self.mean.params.teeth.max(1),
             // `k` indexes the teeth this gear was built with, so it is in range
-            // by construction and the width is never what limits it.
-            &|k| {
-                self.tooth(usize::try_from(k).unwrap_or(0))
-                    .0
-                    .params
-                    .profile_shift
-            },
+            // by construction, and a `u32` always fits a `usize` here.
+            &|k| self.tooth(k as usize).0.params.profile_shift,
             mate,
             kind,
             at,
@@ -1418,10 +1413,7 @@ pub fn amplitude_for_throw(
         .angular_shift
         .max
         .filter(|v| v.is_finite() && *v > 0.0)
-        .unwrap_or(0.0);
-    if ceiling <= 0.0 {
-        return Err(MeshError::OutsideInvoluteDomain);
-    }
+        .ok_or(MeshError::OutsideInvoluteDomain)?;
 
     // The feasible amplitudes are `[0, dx_max]`. If the whole range is
     // feasible, `dx_max` is the range end; otherwise bisect for where the mesh
@@ -1442,15 +1434,15 @@ pub fn amplitude_for_throw(
         lo
     };
 
-    let reach = throw(dx_max).unwrap_or(0.0);
+    let reach = throw(dx_max).map_err(|_| MeshError::OutsideInvoluteDomain)?;
     if target > reach {
         return Err(MeshError::OutsideInvoluteDomain);
     }
 
     // `throw(0) − target = −target < 0` and `throw(dx_max) − target ≥ 0`: a
     // bracket, so Brent cannot miss it.
-    brent(
-        |dx| throw(dx).map_or(f64::NAN, |t| t - target),
+    brent_partial(
+        |dx| throw(dx).ok().map(|t| t - target),
         0.0,
         dx_max,
         Tol::default(),

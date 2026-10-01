@@ -90,6 +90,8 @@ const CLASSES: &[(&str, Class)] = &[
     // Curvatures, 1/mm.
     ("contact/curvature_across", Class::Power(-1)),
     ("contact/curvature_along", Class::Power(-1)),
+    // The patch's shape, b/a.
+    ("contact/aspect", Class::Power(0)),
     // Torques, N·m, scaled as s³ with the loads.
     ("bodies/torque", Class::Power(3)),
     ("cases/torque", Class::Power(3)),
@@ -103,7 +105,9 @@ const CLASSES: &[(&str, Class)] = &[
     ("operating_pressure_angle", Class::Power(0)),
     ("backlash/*", Class::Power(0)),
     ("backlash/*/*", Class::Power(0)),
-    ("meshes/row_play", Class::Power(0)),
+    ("row_play/minus", Class::Power(0)),
+    ("row_play/running", Class::Power(0)),
+    ("row_play/plus", Class::Power(0)),
     ("tips/tip_margin", Class::Power(0)),
     // Ratios, efficiencies and fractions of the power in.
     ("paths/ratio", Class::Power(0)),
@@ -327,7 +331,11 @@ fn cusp(train: &Train, r: &super::TrainResult) -> f64 {
             if !(mesh.flank_interference[side] || held) || train.shape.members[i].ring.is_some() {
                 continue;
             }
-            let u = crate::Tooth::new(r.members[i].params).u_j.abs();
+            let u = crate::Tooth::new(r.members[i].params)
+                .flank
+                .unwrap()
+                .junction
+                .abs();
             worst = worst.max(1.0 / u.max(f64::EPSILON.sqrt()));
         }
     }

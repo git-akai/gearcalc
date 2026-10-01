@@ -49,7 +49,7 @@
 use crate::involute::inv;
 use crate::mesh::MeshKind;
 use crate::params::guard;
-use crate::solve::{brent, Tol};
+use crate::solve::{brent_partial, Tol};
 use crate::tooth::Tooth;
 
 /// A workpiece being cut by a pinion-shaped cutter.
@@ -451,12 +451,10 @@ impl ShaperCut {
         alpha_t: f64,
         rho: f64,
     ) -> Option<f64> {
-        let base = cutter_radius * alpha_t.cos();
-        if corner_radius <= base {
+        if corner_radius <= cutter_radius * alpha_t.cos() {
             return None;
         }
-        let alpha_g = (base / corner_radius).acos();
-        let angle = tooth / (2.0 * cutter_radius) + inv(alpha_t) - inv(alpha_g) - rho / base;
+        let angle = Self::signed_corner_angle(cutter_radius, corner_radius, tooth, alpha_t, rho)?;
         // A negative angle means the round's centre has crossed the cutter's own
         // tooth centreline: the two corner rounds would overlap, so the tip is
         // narrower than the rounds asked for and this is not a tool. Refused
@@ -466,6 +464,24 @@ impl ShaperCut {
             return None;
         }
         Some(angle)
+    }
+
+    /// [`Self::corner_angle`] before its sign is judged: negative where the
+    /// rounds cross, `None` only where the corner is inside the cutter's base
+    /// circle and has no involute angle.
+    fn signed_corner_angle(
+        cutter_radius: f64,
+        corner_radius: f64,
+        tooth: f64,
+        alpha_t: f64,
+        rho: f64,
+    ) -> Option<f64> {
+        let base = cutter_radius * alpha_t.cos();
+        if corner_radius < base {
+            return None;
+        }
+        let alpha_g = (base / corner_radius).acos();
+        Some(tooth / (2.0 * cutter_radius) + inv(alpha_t) - inv(alpha_g) - rho / base)
     }
 
     /// The largest tip round this cutter's own tip will hold, capped the way an
@@ -485,24 +501,38 @@ impl ShaperCut {
     /// awkward.
     fn largest_tip_round(p: &CutParams) -> f64 {
         let angle_at = |rho: f64| {
-            let corner = p.cutter_tip_radius - rho;
-            if corner <= 0.0 {
-                return -1.0;
-            }
-            Self::corner_angle(p.cutter_radius, corner, p.cutter_tooth, p.alpha_t, rho)
-                .unwrap_or(-1.0)
+            Self::signed_corner_angle(
+                p.cutter_radius,
+                p.cutter_tip_radius - rho,
+                p.cutter_tooth,
+                p.alpha_t,
+                rho,
+            )
         };
         // A round this small fits any tool that is a tool at all; where it does
         // not, the tip corner is degenerate and `new` refuses on the corner
         // radius rather than here.
         let floor = guard::MIN_FILLET_MODULES * p.module_t;
-        if angle_at(floor) < 0.0 {
+        if angle_at(floor).is_none_or(|a| a < 0.0) {
             return floor;
         }
-        // The boundary is bracketed rather than searched for: the angle falls as
-        // the round grows, and it is certainly negative by the time the round
-        // reaches the tip radius, where the corner has no radius left at all.
-        let boundary = brent(angle_at, floor, p.cutter_tip_radius, Tol::default()).unwrap_or(floor);
+        // The round grows until the rounds cross or its corner reaches the
+        // cutter's base circle, whichever comes first: the angle falls as the
+        // round grows, so the crossing is bracketed by the floor and the round
+        // that puts the corner on the base circle, where the bracket's own end
+        // is the answer if the angle is still positive there.
+        let at_base = p.cutter_tip_radius - p.cutter_radius * p.alpha_t.cos();
+        let boundary = match angle_at(at_base) {
+            Some(a) if a < 0.0 => {
+                let crossing = brent_partial(angle_at, floor, at_base, Tol::default());
+                debug_assert!(
+                    crossing.is_some() || !angle_at(floor).is_some_and(f64::is_finite),
+                    "a bracketed crossing was not found"
+                );
+                crossing.unwrap_or(at_base)
+            }
+            _ => at_base,
+        };
 
         // `min(asked, 0.95 × boundary)`, which is `Tooth::new`'s rule written the
         // same way — and written the same way *deliberately*. Backing off only

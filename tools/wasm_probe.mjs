@@ -153,7 +153,11 @@ const out = {
   // shaft joined to the set's ring instead, then back; and a case of each
   // kind added between the ends, their duties switched.
   edit_train: call("edit_train", () => {
-    const edit = (train, e) => JSON.parse(w.edit_train(JSON.stringify({ train, edit: e })));
+    const edit = (train, e) => {
+      const answer = JSON.parse(w.edit_train(JSON.stringify({ train, edit: e })));
+      if (answer.refused) throw new Error(`refused: ${JSON.stringify(answer.refused)}`);
+      return answer.train;
+    };
     const parts = () => JSON.parse(w.solve_train(JSON.stringify({ train: t, materials: library }))).parts;
     const body = (k, slot) => parts()[k].shape.bodies[slot - 1].body;
     const member = (k, j) => parts()[k].members[j];
@@ -318,7 +322,7 @@ const out = {
       w.edit_train(
         JSON.stringify({ train: t, edit: { graph: { insert: { shape: preset("planetary"), at: null } } } }),
       ),
-    );
+    ).train;
     return [
       ["default", JSON.parse(w.solve_train(JSON.stringify({ train: t, materials: library })))],
       ["chained", JSON.parse(w.solve_train(JSON.stringify({ train: chained, materials: library })))],
@@ -371,6 +375,12 @@ const out = {
     { duty: { case: 0, intermittent: true }, extra: 1 },
   ].map((edit) =>
     call("edit_train", () => JSON.parse(w.edit_train(JSON.stringify({ train: defaults.train, edit })))),
+  ),
+  // **A refusal a designer can reach is an answer** (T02.5): the default
+  // pair's two bodies joined, which a mesh between them forbids, comes back
+  // as the train unchanged and the note of why — never a throw.
+  edit_refused: call("edit_train", () =>
+    JSON.parse(w.edit_train(JSON.stringify({ train: defaults.train, edit: { graph: { join: { a: 1, b: 2 } } } }))),
   ),
   // **A value that describes nothing, refused where it enters, by the note
   // that names it** (`gear_core::input`): a gear of module nought and one of

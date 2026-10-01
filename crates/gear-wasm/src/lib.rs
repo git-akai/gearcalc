@@ -804,7 +804,13 @@ fn resolved_params(req: &GearRequest) -> Result<GearParams, String> {
         Budget::DEFAULT,
     )
     .map_err(|_| {
-        refusal(&Note::new("ui.gear_throw_unreachable").number("throw", target.abs(), 4))
+        refusal(
+            &Note::new(gear_core::note::key::ERROR_GEAR_THROW_UNREACHABLE).number(
+                "throw",
+                target.abs(),
+                4,
+            ),
+        )
     })?;
     Ok(GearParams {
         angular_shift: magnitude.copysign(target),
@@ -1799,7 +1805,7 @@ fn relieve_case_impl(input: &str) -> Result<String, String> {
         .unwrap_or_else(gear_io::default_library);
     req.train
         .relieve_case(req.case, req.just, &lib)
-        .map_err(|e| format!("{e:?}"))?;
+        .map_err(|e| refusal(&gear_core::train::TrainError::from(e).note()))?;
     let case = req
         .train
         .load_cases
@@ -1871,14 +1877,36 @@ pub struct EditRequest {
     pub edit: TrainEdit,
 }
 
+/// What [`edit_train`] answers: the train edited, or as it was with the
+/// reason the edit was refused.
+#[derive(Serialize)]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "wasm/")
+)]
+pub struct EditAnswer {
+    pub train: gear_core::train::Train,
+    /// **A refusal a designer can reach is an answer, not a throw**: the
+    /// note of why, which the panel says beside the verb. `None` where the
+    /// edit was made.
+    pub refused: Option<Note>,
+}
+
 fn edit_train_impl(input: &str) -> Result<String, String> {
     let EditRequest { mut train, edit } = read(input)?;
     entering(&train, None)?;
     edit_entering(&edit)?;
-    // **A refusal crosses as its catalogue key**, which is what the panel
-    // says beside the verb; its `Display` is English for a log.
-    apply_edit(&mut train, edit).map_err(|e| e.key().to_string())?;
-    serde_json::to_string(&train).map_err(|e| e.to_string())
+    let before = train.clone();
+    let refused = match apply_edit(&mut train, edit) {
+        Ok(()) => None,
+        Err(e) => {
+            // Refused whole: the train as it was.
+            train = before;
+            Some(gear_core::note::Explain::note(&e))
+        }
+    };
+    serde_json::to_string(&EditAnswer { train, refused }).map_err(|e| e.to_string())
 }
 
 /// **An edit as it enters**: a shape an insert lays in is read through the
@@ -2034,7 +2062,7 @@ mod tests {
         let train = &d["train"];
         let shipped = train["load_cases"].as_array().unwrap();
         for kind in ["ultimate", "fatigue"] {
-            let edited: serde_json::Value = serde_json::from_str(
+            let answer: serde_json::Value = serde_json::from_str(
                 &edit_train_impl(
                     &serde_json::json!({ "train": train, "edit": { "add_case": kind } })
                         .to_string(),
@@ -2042,6 +2070,7 @@ mod tests {
                 .unwrap(),
             )
             .unwrap();
+            let edited = &answer["train"];
             let added = edited["load_cases"].as_array().unwrap().last().unwrap();
             let own = shipped
                 .iter()
@@ -2334,7 +2363,9 @@ mod tests {
     #[test]
     fn a_bad_geartrain_file_comes_back_as_a_reason() {
         let e = import_train_impl("format = 1\nname = \"nothing here\"").unwrap_err();
-        assert!(e.contains("not valid"), "{e}");
+        let note: Note = serde_json::from_str(&e).unwrap();
+        assert_eq!(note.key, "error.document_unreadable", "{e}");
+        assert!(note.values["detail"].contains("train"), "{e}");
         // A file of no format crosses as the note that points at the
         // converter, naming the format it would come to.
         let e = import_train_impl("name = \"nothing here\"").unwrap_err();
@@ -3243,7 +3274,7 @@ mod tests {
             // A valid request is answered — an edit the core refuses by its
             // key being an answer too.
             if let Err(e) = entry(&valid.to_string()) {
-                if !e.starts_with("ui.") {
+                if !e.starts_with("ui.") && !e.starts_with("error.") {
                     read_past.push(format!("{name}: a valid request refused: {e}"));
                 }
             }
@@ -3507,7 +3538,7 @@ mod tests {
         );
         let too_big = req.replace("\"eccentric_throw\":0.2", "\"eccentric_throw\":50.0");
         let n = key(solve_gear_impl(&too_big));
-        assert_eq!(n.key, "ui.gear_throw_unreachable");
+        assert_eq!(n.key, "error.gear_throw_unreachable");
         assert_eq!(n.values["throw"], "50.0000");
     }
 
@@ -4468,15 +4499,15 @@ mod tests {
         let offers = offers.as_array().unwrap();
         assert!(offers.iter().any(|o| o["refused"].is_null()), "{offers:?}");
         for o in offers {
-            let made = edit_train_impl(
-                &serde_json::json!({ "train": d["train"], "edit": { "graph": o["edit"] } })
-                    .to_string(),
-            );
-            match (made, o["refused"]["key"].as_str()) {
-                (Ok(_), None) => {}
-                (Err(key), Some(offered)) => assert_eq!(key, offered, "{o}"),
-                (made, _) => panic!("{o}: {made:?}"),
-            }
+            let made: serde_json::Value = serde_json::from_str(
+                &edit_train_impl(
+                    &serde_json::json!({ "train": d["train"], "edit": { "graph": o["edit"] } })
+                        .to_string(),
+                )
+                .unwrap(),
+            )
+            .unwrap();
+            assert_eq!(made["refused"]["key"], o["refused"]["key"], "{o}");
         }
     }
 
@@ -4490,10 +4521,18 @@ mod tests {
             serde_json::json!({ "graph": { "join": { "a": 1, "b": 2 } } }),
             serde_json::json!({ "graph": { "add_step": { "axis": 0 } } }),
         ] {
-            let e = edit_train_impl(
-                &serde_json::json!({ "train": d["train"], "edit": edit }).to_string(),
+            let answer: serde_json::Value = serde_json::from_str(
+                &edit_train_impl(
+                    &serde_json::json!({ "train": d["train"], "edit": edit }).to_string(),
+                )
+                .unwrap(),
             )
-            .unwrap_err();
+            .unwrap();
+            assert_eq!(
+                answer["train"], d["train"],
+                "a refused edit changes nothing"
+            );
+            let e = answer["refused"]["key"].as_str().unwrap().to_string();
             let keys = [
                 gear_core::train::EditRefused::Geared,
                 gear_core::train::EditRefused::NotCarried,
@@ -4566,7 +4605,8 @@ mod tests {
             .to_string(),
         )
         .unwrap();
-        let mut train: serde_json::Value = serde_json::from_str(&pushed).unwrap();
+        let answer: serde_json::Value = serde_json::from_str(&pushed).unwrap();
+        let mut train = answer["train"].clone();
         // The second part's one distance is the graph's second: at nought
         // it is no distance, refused by its field before any part is asked...
         train["shape"]["distances"][1]["distance"] =
@@ -4614,11 +4654,15 @@ mod tests {
         // The message must name what is wrong, not merely report failure: this
         // is what the user sees after hand-editing their own library.
         let err = import_materials_impl("[[material]]\nname = ").unwrap_err();
-        assert!(err.contains("not valid"), "unhelpful message: {err}");
+        let note: Note = serde_json::from_str(&err).unwrap();
+        assert_eq!(note.key, "error.document_unreadable", "{err}");
+        assert_eq!(
+            (note.values["line"].as_str(), note.values["column"].as_str()),
+            ("2", "8")
+        );
 
-        assert!(import_materials_impl("")
-            .unwrap_err()
-            .contains("no materials"));
+        let empty: Note = serde_json::from_str(&import_materials_impl("").unwrap_err()).unwrap();
+        assert_eq!(empty.key, "error.library_empty");
         assert!(export_materials_impl("{ not json").is_err());
     }
 

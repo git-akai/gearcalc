@@ -477,9 +477,11 @@
    *  and `mesh.forward_locking` carry the coefficient and the threshold, and
    *  are drawn beside the mesh's efficiency. This is for the readouts that have
    *  no note behind them. */
-  const lockedWays = (e: { forward: number; backward: number } | undefined) => {
+  const lockedWays = (e: { forward: number | null; backward: number | null } | undefined) => {
     if (e === undefined) return undefined;
-    const [f, b] = [e.forward <= 0, e.backward <= 0];
+    // A figure the core did not compute (`null`) is no lock: the case says why.
+    const locks = (x: number | null) => x !== null && x <= 0;
+    const [f, b] = [locks(e.forward), locks(e.backward)];
     if (f && b) return t("ui.train_turns_neither_way");
     if (f) return t("ui.train_cannot_be_driven_forward");
     if (b) return t("ui.train_cannot_be_back_driven");
@@ -2169,12 +2171,12 @@
         <dt>{t("ui.train_backlash")}</dt>
         <dd>
           <span class="line">
-            {t("ui.train_backlash_at", { angle: num(casePath.backlash.forward.nominal, 5), member: bodyName(casePath.to) })}
-            <small>{range(num(casePath.backlash.forward.minimum, 5), num(casePath.backlash.forward.maximum, 5))}</small>
+            {t("ui.train_backlash_at", { angle: num(casePath.backlash.forward?.nominal, 5), member: bodyName(casePath.to) })}
+            <small>{range(num(casePath.backlash.forward?.minimum, 5), num(casePath.backlash.forward?.maximum, 5))}</small>
           </span>
           <span class="line">
-            {t("ui.train_backlash_at", { angle: num(casePath.backlash.backward.nominal, 5), member: bodyName(casePath.from) })}
-            <small>{range(num(casePath.backlash.backward.minimum, 5), num(casePath.backlash.backward.maximum, 5))}</small>
+            {t("ui.train_backlash_at", { angle: num(casePath.backlash.backward?.nominal, 5), member: bodyName(casePath.from) })}
+            <small>{range(num(casePath.backlash.backward?.minimum, 5), num(casePath.backlash.backward?.maximum, 5))}</small>
           </span>
         </dd>
         <!-- The power the path's meshes carry, as a multiple of the power
