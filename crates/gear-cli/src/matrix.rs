@@ -70,7 +70,7 @@ impl Member {
         match self {
             Self::External => {
                 let g = Tooth::new(p);
-                root_section_rated(&g, g.u_tip, method, model)
+                root_section_rated(&g, g.flank?.tip, method, model)
             }
             Self::Internal => {
                 let r = Ring::cut_by(&p, &Cutter::default());
@@ -460,7 +460,10 @@ pub fn parting(on: Member, pop: &[GearParams]) -> Parting {
 /// the tip outward, mm.
 pub fn ring_flank_thickness(p: GearParams, samples: usize) -> Vec<(f64, f64)> {
     let r = Ring::cut_by(&p, &Cutter::default());
-    let (lo, hi) = ToothOutline::flank_bracket(&r);
+    // A ring always has its flank.
+    let Some((lo, hi)) = ToothOutline::flank_bracket(&r) else {
+        return Vec::new();
+    };
     (0..=samples)
         .map(|i| {
             let u = lo + (hi - lo) * (i as f64) / (samples as f64);
@@ -487,8 +490,9 @@ pub fn fillet_radius_readings(
     samples: usize,
 ) -> Option<(f64, f64, f64)> {
     let read = |g: &dyn ToothOutline| {
-        let (lo, hi) = g.fillet_bracket();
-        let at_junction = g.fillet_curvature(g.fillet_junction());
+        let ends = g.fillet()?;
+        let (lo, hi) = ends.bracket();
+        let at_junction = g.fillet_curvature(ends.junction);
         let mut best = (f64::INFINITY, 0.0);
         for i in 0..=samples {
             let t = i as f64 / samples as f64;
@@ -502,10 +506,7 @@ pub fn fillet_radius_readings(
     };
     match on {
         Member::External => read(&Tooth::new(p)),
-        Member::Internal => {
-            let r = Ring::cut_by(&p, &Cutter::default());
-            r.fillet.is_some().then(|| read(&r)).flatten()
-        }
+        Member::Internal => read(&Ring::cut_by(&p, &Cutter::default())),
     }
 }
 

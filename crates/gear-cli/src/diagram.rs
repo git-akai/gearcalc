@@ -55,7 +55,10 @@ fn path_of(pts: &[[f64; 2]]) -> String {
 pub fn tooth_diagram(p: GearParams, width: f64) -> String {
     let g = Tooth::new(p);
     let outline = tooth_outline(&g, 900);
-    let Some(sec) = root_section_with(&g, g.u_tip, CriticalSection::TangentAngle) else {
+    let Some(sec) = g
+        .flank
+        .and_then(|f| root_section_with(&g, f.tip, CriticalSection::TangentAngle))
+    else {
         return format!(
             r#"<svg viewBox="0 0 100 60" class="diagram"><text x="50" y="30" class="label" \
                text-anchor="middle">z={} x={}: no root section (severed)</text></svg>"#,
@@ -176,7 +179,10 @@ pub fn tooth_diagram(p: GearParams, width: f64) -> String {
     // The Lewis parabola: vertex at the end of the moment arm, tangent to the
     // tooth. Drawn alongside the 30 degree construction so the difference — and
     // where it matters — is visible rather than argued.
-    if let Some(par) = root_section_with(&g, g.u_tip, CriticalSection::LewisParabola) {
+    if let Some(par) = g
+        .flank
+        .and_then(|f| root_section_with(&g, f.tip, CriticalSection::LewisParabola))
+    {
         if let Some(pp) = par.parabola_p {
             let vertex = par.load_line_crossing[1];
             let x_end = par.tangency[0].abs() * 1.45;
@@ -221,8 +227,13 @@ pub fn tooth_diagram(p: GearParams, width: f64) -> String {
 /// A caption of the numbers behind one diagram.
 pub fn tooth_caption(p: GearParams) -> String {
     let g = Tooth::new(p);
-    let parabola = root_section_with(&g, g.u_tip, CriticalSection::LewisParabola);
-    match root_section_with(&g, g.u_tip, CriticalSection::TangentAngle) {
+    let parabola = g
+        .flank
+        .and_then(|f| root_section_with(&g, f.tip, CriticalSection::LewisParabola));
+    match g
+        .flank
+        .and_then(|f| root_section_with(&g, f.tip, CriticalSection::TangentAngle))
+    {
         Some(RootSection {
             root_chord,
             moment_arm,
@@ -269,7 +280,8 @@ pub fn form_factor_chart(width: f64, height: f64) -> String {
                     profile_shift: x,
                     ..Default::default()
                 });
-                root_section_with(&g, g.u_tip, CriticalSection::TangentAngle)
+                g.flank
+                    .and_then(|f| root_section_with(&g, f.tip, CriticalSection::TangentAngle))
                     .map(|s| [f64::from(z), s.form_factor])
             })
             .collect();

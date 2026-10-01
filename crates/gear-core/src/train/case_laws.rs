@@ -157,18 +157,16 @@ fn mirror_differences(r: &TrainResult, m: &TrainResult) -> Vec<String> {
     }
     for (p, q) in r.paths.iter().zip(&m.paths) {
         let at = format!("path {}→{}", p.from, p.to);
-        differ(
-            &mut out,
-            format!("{at} forward"),
-            p.efficiency.forward,
-            q.efficiency.forward,
-        );
-        differ(
-            &mut out,
-            format!("{at} backward"),
-            p.efficiency.backward,
-            q.efficiency.backward,
-        );
+        for (way, x, y) in [
+            ("forward", p.efficiency.forward, q.efficiency.forward),
+            ("backward", p.efficiency.backward, q.efficiency.backward),
+        ] {
+            match (x, y) {
+                (Some(x), Some(y)) => differ(&mut out, format!("{at} {way}"), x, y),
+                (None, None) => {}
+                (x, y) => out.push(format!("{at} {way}: {x:?} vs {y:?}")),
+            }
+        }
     }
     if r.paths.len() != m.paths.len() {
         out.push(format!("{} paths vs {}", r.paths.len(), m.paths.len()));
@@ -321,10 +319,10 @@ fn a_paths_figures_are_the_case_through_it() {
                 let x = c.shaft(at).unwrap();
                 (x.torque * x.speed.unwrap()).abs()
             };
-            if p.efficiency.forward > 0.0 {
+            if p.efficiency.forward.unwrap() > 0.0 {
                 differ(
                     &format!("{from}→{to} efficiency against its case"),
-                    p.efficiency.forward,
+                    p.efficiency.forward.unwrap(),
                     power(to) / power(from),
                 );
                 moving += 1;
@@ -332,7 +330,7 @@ fn a_paths_figures_are_the_case_through_it() {
             let through: f64 = r.meshes.iter().map(|m| m.cases[case].power_through).sum();
             differ(
                 &format!("{from}→{to} circulation against its case"),
-                p.circulation.forward,
+                p.circulation.forward.unwrap(),
                 through,
             );
             read += 1;
@@ -340,18 +338,27 @@ fn a_paths_figures_are_the_case_through_it() {
         if let (Some(p), Some(q)) = (path(a, b), path(b, a)) {
             differ(
                 "backward efficiency",
-                p.efficiency.backward,
-                q.efficiency.forward,
+                p.efficiency.backward.unwrap(),
+                q.efficiency.forward.unwrap(),
             );
             differ(
                 "backward circulation",
-                p.circulation.backward,
-                q.circulation.forward,
+                p.circulation.backward.unwrap(),
+                q.circulation.forward.unwrap(),
             );
             for (x, y) in [
-                (p.backlash.backward.nominal, q.backlash.forward.nominal),
-                (p.backlash.backward.minimum, q.backlash.forward.minimum),
-                (p.backlash.backward.maximum, q.backlash.forward.maximum),
+                (
+                    p.backlash.backward.unwrap().nominal,
+                    q.backlash.forward.unwrap().nominal,
+                ),
+                (
+                    p.backlash.backward.unwrap().minimum,
+                    q.backlash.forward.unwrap().minimum,
+                ),
+                (
+                    p.backlash.backward.unwrap().maximum,
+                    q.backlash.forward.unwrap().maximum,
+                ),
             ] {
                 differ("backward backlash", x, y);
             }

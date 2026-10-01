@@ -421,10 +421,7 @@ mod tests {
             .into_iter()
             .find(|o| format!("{:?}", o.edit) == format!("{edit:?}"))
             .unwrap();
-        assert_eq!(
-            offer.refused,
-            Some(Note::new("ui.train_edit_refused_two_frames"))
-        );
+        assert_eq!(offer.refused, Some(Note::new("error.edit_two_frames")));
     }
 
     /// **A ring on crossed shafts is no mesh**, and is refused: the screw

@@ -285,7 +285,7 @@ fn legacy_clamp_still_shows_the_junction_step_it_was_kept_to_demonstrate() {
         };
 
         let fixed = Tooth::new(p);
-        let (r_fl, th_fl) = fixed.involute_at(fixed.u_j);
+        let (r_fl, th_fl) = fixed.involute_at(fixed.flank.unwrap().junction);
         let (r_tr, th_tr) = fixed.trochoid_at(fixed.s_j);
         let gap_fixed = f64::hypot(
             r_fl * th_fl.sin() - r_tr * th_tr.sin(),
@@ -293,7 +293,7 @@ fn legacy_clamp_still_shows_the_junction_step_it_was_kept_to_demonstrate() {
         );
 
         let legacy = Tooth::with_flank_clamped_at_base(p);
-        let (r_fl, th_fl) = legacy.involute_at(legacy.u_j);
+        let (r_fl, th_fl) = legacy.involute_at(legacy.flank.unwrap().junction);
         let (r_tr, th_tr) = legacy.trochoid_at(legacy.s_j);
         let gap_legacy = f64::hypot(
             r_fl * th_fl.sin() - r_tr * th_tr.sin(),

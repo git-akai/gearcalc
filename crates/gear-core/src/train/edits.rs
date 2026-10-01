@@ -190,56 +190,64 @@ pub enum EditRefused {
 }
 
 impl EditRefused {
-    /// The catalogue key of the sentence the panel shows — a `ui.` key,
-    /// since a refusal is the interface's word and not a note the solve
-    /// emits; the [`std::fmt::Display`] below is the harness's English.
+    /// Every refusal, in declaration order.
+    pub const ALL: [Self; 18] = [
+        Self::NoSuchIndex,
+        Self::LastOnItsStep,
+        Self::WrongFamily,
+        Self::NotCarried,
+        Self::CentralAxis,
+        Self::RingToRing,
+        Self::OrbitingMate,
+        Self::RingCrossed,
+        Self::Locks,
+        Self::NotOnTheAxis,
+        Self::NoRoom,
+        Self::CarriesAnAxis,
+        Self::Coupled,
+        Self::NoDistance,
+        Self::Geared,
+        Self::Apart,
+        Self::Loaded,
+        Self::TwoFrames,
+    ];
+
+    /// The catalogue key of the sentence the panel shows.
     #[must_use]
     pub fn key(self) -> &'static str {
+        use crate::note::key;
         match self {
-            Self::NoSuchIndex => "ui.train_edit_refused_no_such",
-            Self::LastOnItsStep => "ui.train_edit_refused_last_on_step",
-            Self::WrongFamily => "ui.train_edit_refused_family",
-            Self::NotCarried => "ui.train_edit_refused_not_carried",
-            Self::CentralAxis => "ui.train_edit_refused_central_axis",
-            Self::RingToRing => "ui.train_edit_refused_ring_to_ring",
-            Self::OrbitingMate => "ui.train_edit_refused_orbiting_mate",
-            Self::RingCrossed => "ui.train_edit_refused_ring_crossed",
-            Self::Locks => "ui.train_edit_refused_locks",
-            Self::NotOnTheAxis => "ui.train_edit_refused_axis",
-            Self::NoRoom => "ui.train_edit_refused_no_room",
-            Self::CarriesAnAxis => "ui.train_edit_refused_carrier",
-            Self::Coupled => "ui.train_edit_refused_coupled",
-            Self::NoDistance => "ui.train_edit_refused_no_distance",
-            Self::Geared => "ui.train_edit_refused_geared",
-            Self::Apart => "ui.train_edit_refused_apart",
-            Self::Loaded => "ui.train_edit_refused_loaded",
-            Self::TwoFrames => "ui.train_edit_refused_two_frames",
+            Self::NoSuchIndex => key::ERROR_EDIT_NO_SUCH,
+            Self::LastOnItsStep => key::ERROR_EDIT_LAST_ON_STEP,
+            Self::WrongFamily => key::ERROR_EDIT_FAMILY,
+            Self::NotCarried => key::ERROR_EDIT_NOT_CARRIED,
+            Self::CentralAxis => key::ERROR_EDIT_CENTRAL_AXIS,
+            Self::RingToRing => key::ERROR_EDIT_RING_TO_RING,
+            Self::OrbitingMate => key::ERROR_EDIT_ORBITING_MATE,
+            Self::RingCrossed => key::ERROR_EDIT_RING_CROSSED,
+            Self::Locks => key::ERROR_EDIT_LOCKS,
+            Self::NotOnTheAxis => key::ERROR_EDIT_AXIS,
+            Self::NoRoom => key::ERROR_EDIT_NO_ROOM,
+            Self::CarriesAnAxis => key::ERROR_EDIT_CARRIER,
+            Self::Coupled => key::ERROR_EDIT_COUPLED,
+            Self::NoDistance => key::ERROR_EDIT_NO_DISTANCE,
+            Self::Geared => key::ERROR_EDIT_GEARED,
+            Self::Apart => key::ERROR_EDIT_APART,
+            Self::Loaded => key::ERROR_EDIT_LOADED,
+            Self::TwoFrames => key::ERROR_EDIT_TWO_FRAMES,
         }
+    }
+}
+
+impl crate::note::Explain for EditRefused {
+    fn note(&self) -> crate::note::Note {
+        crate::note::Note::new(self.key())
     }
 }
 
 impl std::fmt::Display for EditRefused {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(match self {
-            Self::NoSuchIndex => "no such member, mesh, axis or body",
-            Self::LastOnItsStep => "the last on its step",
-            Self::WrongFamily => "not an edit of this family",
-            Self::NotCarried => "that axis is not carried",
-            Self::CentralAxis => "a carrier turns about that axis",
-            Self::RingToRing => "two rings do not mesh",
-            Self::OrbitingMate => "that gear meshes riding a carrier",
-            Self::RingCrossed => "a ring does not mesh across crossed shafts",
-            Self::Locks => "that would force a body that turns to stand still",
-            Self::NotOnTheAxis => "not a body on the member's axis",
-            Self::NoRoom => "nothing of that kind fits at this radius",
-            Self::CarriesAnAxis => "that body carries an axis",
-            Self::Coupled => "that body is coupled already",
-            Self::NoDistance => "no axis distance joins those axes",
-            Self::Geared => "those bodies are geared to each other",
-            Self::Apart => "those bodies are an axis distance apart",
-            Self::Loaded => "a case loads, reacts or measures its sweep at a body this would hold, cut off or join to another it names",
-            Self::TwoFrames => "that gear would mesh in two frames",
-        })
+        write!(f, "{}", crate::note::Explain::note(self))
     }
 }
 
@@ -1738,9 +1746,10 @@ mod tests {
                             Ok(r) if r.cases.iter().all(|c| c.solved) => solved += 1,
                             Ok(r)
                                 if r.cases.iter().any(|c| {
-                                    c.notes
-                                        .iter()
-                                        .any(|n| n.is(crate::note::key::TRAIN_LOAD_SHARED))
+                                    c.notes.iter().any(|n| {
+                                        n.is(crate::note::key::TRAIN_LOAD_SHARED)
+                                            || n.is(crate::note::key::TRAIN_MESH_LOOP)
+                                    })
                                 }) =>
                             {
                                 said += 1;
@@ -1780,7 +1789,7 @@ mod tests {
     /// every preset, and on planocentrics at one and two teeth of
     /// difference (18/19, 20/21, 30/31, 30/32, 18/20), cased, every
     /// `AddGear` offered unrefused solves, or ends with its load divided by
-    /// stiffness (`load_shared`: an equal-ratio twin the model cannot
+    /// stiffness (`mesh_loop`: an equal-ratio twin closes a loop of meshes the model cannot
     /// share). A gear whose mesh contradicts the motion its bodies already
     /// have — a lock — is refused as `Locks` without a solve, and a ring
     /// round a planet that no count can close at the carrier radius as
@@ -1822,7 +1831,7 @@ mod tests {
                     seen.push(named.clone());
                     if o.refused
                         .as_ref()
-                        .is_some_and(|n| n.key == "ui.train_edit_refused_locks")
+                        .is_some_and(|n| n.key == crate::note::key::ERROR_EDIT_LOCKS)
                     {
                         locks += 1;
                     }
@@ -1850,7 +1859,7 @@ mod tests {
                         Ok(r)
                             if r.cases
                                 .iter()
-                                .all(|c| c.notes.iter().any(|n| n.is(key::TRAIN_LOAD_SHARED))) =>
+                                .all(|c| c.notes.iter().any(|n| n.is(key::TRAIN_MESH_LOOP))) =>
                         {
                             twins += 1;
                         }
@@ -2051,17 +2060,17 @@ mod tests {
             (
                 Preset::Spur,
                 Edit::Couple { body: 1 },
-                "ui.train_edit_refused_not_carried",
+                "error.edit_not_carried",
             ),
             (
                 Preset::Spur,
                 Edit::AddStep { axis: 0 },
-                "ui.train_edit_refused_not_carried",
+                "error.edit_not_carried",
             ),
             (
                 Preset::Planetary,
                 Edit::Remove(Piece::Axis(0)),
-                "ui.train_edit_refused_central_axis",
+                "error.edit_central_axis",
             ),
             (
                 Preset::Planetary,
@@ -2070,7 +2079,7 @@ mod tests {
                     on: Place::NewAxis,
                     ring: true,
                 },
-                "ui.train_edit_refused_ring_to_ring",
+                "error.edit_ring_to_ring",
             ),
             (
                 Preset::Planetary,
@@ -2079,7 +2088,7 @@ mod tests {
                     on: Place::NewAxis,
                     ring: false,
                 },
-                "ui.train_edit_refused_orbiting_mate",
+                "error.edit_orbiting_mate",
             ),
             (
                 Preset::Planetary,
@@ -2088,7 +2097,7 @@ mod tests {
                     on: Place::NewAxis,
                     ring: false,
                 },
-                "ui.train_edit_refused_orbiting_mate",
+                "error.edit_orbiting_mate",
             ),
             (
                 Preset::Worm,
@@ -2097,7 +2106,7 @@ mod tests {
                     on: Place::Body(2),
                     ring: true,
                 },
-                "ui.train_edit_refused_ring_crossed",
+                "error.edit_ring_crossed",
             ),
         ];
         for (p, what, key) in cases {
@@ -2698,7 +2707,7 @@ mod tests {
         t.load_cases = vec![LoadCase::ultimate(1, t.port(1, 2), 1.0, 1000.0)];
         let r = solve_train(&t, &library()).unwrap();
         assert!(r.cases[0].solved, "{:?}", r.cases[0].notes);
-        let e = r.paths[0].efficiency.forward;
+        let e = r.paths[0].efficiency.forward.unwrap();
         assert!(e > 0.5 && e < 1.0, "through the coupling: {e}");
 
         // Three pairs in a chain, each shared shaft split: the first pair's
@@ -2977,7 +2986,7 @@ mod tests {
         let (was, is) = (&alone.paths[0], &r.paths[0]);
         assert_eq!((is.from, is.to), (input, output));
         assert!((is.ratio - was.ratio).abs() < 1e-12);
-        assert!((is.efficiency.forward - was.efficiency.forward).abs() < 1e-12);
+        assert!((is.efficiency.forward.unwrap() - was.efficiency.forward.unwrap()).abs() < 1e-12);
         let far = t
             .open_ports()
             .iter()

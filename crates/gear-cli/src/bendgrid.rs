@@ -138,12 +138,13 @@ fn rated(g: &Tooth, eps: f64, short: f64, sharing: LoadSharing) {
     let v = g.virtual_spur();
     let clamps: Vec<&str> = v.clamps.notes.iter().map(|n| n.key.as_str()).collect();
     print!(
-        " | z_n {:e} rho_mm {:e} b_d {:e} u_j {:.12e} u_tip {:.12e} clamps {}",
+        " | z_n {:e} rho_mm {:e} b_d {:e} u_j {} u_tip {} clamps {}",
         v.z,
         v.rho,
         v.bd,
-        v.u_j,
-        v.u_tip,
+        // A tooth with no flank prints `NaN` here, as this record always has.
+        roll(v.flank.map(|f| f.junction)),
+        roll(v.flank.map(|f| f.tip)),
         if clamps.is_empty() {
             "-".to_string()
         } else {
@@ -188,4 +189,9 @@ fn rated(g: &Tooth, eps: f64, short: f64, sharing: LoadSharing) {
 /// none.
 fn said(x: Option<f64>) -> String {
     x.map_or_else(|| "none".to_string(), |v| format!("{v:.12e}"))
+}
+
+/// A roll parameter as this record prints it: `NaN` where there is none.
+fn roll(u: Option<f64>) -> String {
+    u.map_or_else(|| "NaN".to_owned(), |u| format!("{u:.12e}"))
 }

@@ -211,13 +211,13 @@ pub fn pin_bound((smallest, largest): (f64, f64)) -> Bound {
 /// 3 s natively at the output budget's edge, 670 000 teeth.
 #[must_use]
 pub fn pin_diameter_range_around(gear: &crate::gear::Gear) -> Option<(f64, f64)> {
-    (0..positions(gear))
-        .map(|i| pin_diameter_range(&Space::after(gear, i)))
-        .try_fold((0.0_f64, f64::INFINITY), |(lo, hi), r| {
-            let (a, b) = r?;
-            let (lo, hi) = (lo.max(a), hi.min(b));
-            (lo < hi).then_some((lo, hi))
-        })
+    let mut ranges = (0..positions(gear)).map(|i| pin_diameter_range(&Space::after(gear, i)));
+    let first = ranges.next()??;
+    ranges.try_fold(first, |(lo, hi), r| {
+        let (a, b) = r?;
+        let (lo, hi) = (lo.max(a), hi.min(b));
+        (lo < hi).then_some((lo, hi))
+    })
 }
 
 /// **The pin diameters that measure this space**, `(smallest, largest)`, or
@@ -1003,16 +1003,10 @@ impl crate::note::Explain for MeasurementError {
     }
 }
 
-/// English, for the CLI and for `Debug`. **Not** what the browser renders — see
-/// [`crate::note::Explain::note`].
 impl std::fmt::Display for MeasurementError {
+    /// The note — its key and values, no words ([`crate::note::Explain`]).
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = match self {
-            Self::NoValidSpan => "no span contacts the usable flank on this gear",
-            Self::PinTooSmall => "the pin or ball is too small to seat on the flanks",
-            Self::PinTooLarge => "the pin or ball is too large to seat on the flanks",
-        };
-        f.write_str(s)
+        write!(f, "{}", crate::note::Explain::note(self))
     }
 }
 

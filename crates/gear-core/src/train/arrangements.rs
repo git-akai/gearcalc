@@ -338,8 +338,12 @@ impl Shape {
     /// Additional Helix Angle" — stated on the first member.
     #[must_use]
     pub fn with_additional_helix(self, add_deg: f64) -> Self {
-        let half = self.distances.first().map_or(0.0, |d| d.angle) / 2.0;
-        self.with_first_helix(half + add_deg)
+        // A shape with no distance has no shaft angle to halve.
+        let helix = self
+            .distances
+            .first()
+            .map_or(add_deg, |d| d.angle / 2.0 + add_deg);
+        self.with_first_helix(helix)
     }
 
     /// **This shape with its first member's pitch diameter stated**, mm — a
@@ -463,7 +467,7 @@ impl Shape {
             worm: false,
             distance: Auto::automatic(0.0),
             clearance: like.map_or(Auto::fixed(0.02), |d| d.clearance),
-            tip_clearance: like.map_or(0.0, |d| d.tip_clearance),
+            tip_clearance: like.map_or(UNASKED_TIP_GAP, |d| d.tip_clearance),
             tolerance_plus: like.map_or(0.02, |d| d.tolerance_plus),
             tolerance_minus: like.map_or(0.02, |d| d.tolerance_minus),
             axial_clearance: 0.0,
@@ -471,9 +475,22 @@ impl Shape {
     }
 }
 
+/// The far-side tip gap a distance asks when nothing else states one, mm:
+/// none asked, so an automatic distance is what the shifts leave.
+const UNASKED_TIP_GAP: f64 = 0.0;
+
 /// A planet gear's count as [`epicyclic`] takes it: external, so positive.
+///
+/// # Panics
+///
+/// On a count past `i32::MAX`, which no list here writes: a defect in the
+/// list, not an input a designer can give.
 pub(crate) fn external(teeth: u32) -> i32 {
-    i32::try_from(teeth).unwrap_or(i32::MAX)
+    #[expect(
+        clippy::expect_used,
+        reason = "the lists here write counts of a few dozen; one past i32::MAX is a defect in the list"
+    )]
+    i32::try_from(teeth).expect("a planet's count fits the list's signed count")
 }
 
 /// **A hula**: a stepped Wolfrom at one planet, on a crank — the
@@ -745,7 +762,7 @@ pub fn worm(starts: u32, wheel_teeth: u32) -> Shape {
 pub fn planetary(sun: u32, planet: u32, ring: u32, count: u32) -> Shape {
     let mut shape = epicyclic(
         count,
-        &[&[i32::try_from(planet).unwrap_or(i32::MAX)]],
+        &[&[external(planet)]],
         &[
             Central::Sun { on: 0, teeth: sun },
             Central::Carrier,
@@ -1094,12 +1111,12 @@ mod tests {
         assert!(r.meshes[0].point.is_some() && r.meshes[1].line.is_some());
         let product = r.meshes[0].efficiency.forward * r.meshes[1].efficiency.forward;
         assert!(
-            (path.efficiency.forward - product).abs() < 1e-9,
+            (path.efficiency.forward.unwrap() - product).abs() < 1e-9,
             "{} vs {product}",
-            path.efficiency.forward
+            path.efficiency.forward.unwrap()
         );
         assert_eq!(
-            path.efficiency.backward <= 0.0,
+            path.efficiency.backward.unwrap() <= 0.0,
             r.meshes[0].efficiency.backward <= 0.0,
             "the train locks where its worm does"
         );

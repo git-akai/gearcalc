@@ -170,6 +170,8 @@ pub struct Screw {
 pub enum ScrewError {
     /// A module, diameter or tooth count was not positive.
     NotPositive,
+    /// A module, diameter, angle or shift was not a finite number.
+    NonFinite,
     /// `z₁ m_n ≥ d₁`: the thread would have to wrap at 90° or more. The worm is
     /// too thin for that many starts at that module.
     WormTooThin,
@@ -203,6 +205,7 @@ impl crate::note::Explain for ScrewError {
         use crate::note::key;
         crate::note::Note::new(match self {
             Self::NotPositive => key::ERROR_SCREW_NOT_POSITIVE,
+            Self::NonFinite => key::ERROR_SCREW_NOT_FINITE,
             Self::WormTooThin => key::ERROR_SCREW_WORM_TOO_THIN,
             Self::ShaftAngleImpossible => key::ERROR_SCREW_SHAFT_ANGLE_IMPOSSIBLE,
             Self::AxesAreParallel => key::ERROR_SCREW_AXES_ARE_PARALLEL,
@@ -221,13 +224,21 @@ impl Screw {
     pub fn new(p: &ScrewParams) -> Result<Self, ScrewError> {
         // Predicates rather than negated comparisons, so a NaN is refused here
         // instead of propagating into a lead angle.
-        let positive = |v: f64| v.is_finite() && v > 0.0;
-        if !positive(p.normal_module)
-            || !positive(p.worm_pitch_diameter)
+        let figures = [
+            p.normal_module,
+            p.worm_pitch_diameter,
+            p.normal_pressure_angle_rad,
+            p.shaft_angle_rad,
+            p.profile_shifts[0],
+            p.profile_shifts[1],
+        ];
+        if figures.iter().any(|v| !v.is_finite()) {
+            return Err(ScrewError::NonFinite);
+        }
+        if p.normal_module <= 0.0
+            || p.worm_pitch_diameter <= 0.0
             || p.starts == 0
             || p.wheel_teeth == 0
-            || !p.normal_pressure_angle_rad.is_finite()
-            || !p.shaft_angle_rad.is_finite()
         {
             return Err(ScrewError::NotPositive);
         }
@@ -259,9 +270,6 @@ impl Screw {
             return Err(ScrewError::AxesAreParallel);
         }
 
-        if p.profile_shifts.iter().any(|x| !x.is_finite()) {
-            return Err(ScrewError::NotPositive);
-        }
         let axial_module = p.normal_module / lead_angle_rad.cos();
         let reference_distance = 0.5 * (p.worm_pitch_diameter + wheel_pitch_diameter);
         let shift_sum = p.profile_shifts[0] + p.profile_shifts[1];
@@ -452,14 +460,15 @@ impl Screw {
             let (s, c) = (gamma.sin(), gamma.cos());
             let (sb, cb) = (beta2.sin(), beta2.cos());
             if s.abs() < 1e-12 || cb.abs() < 1e-12 {
-                return f64::NAN;
+                return None;
             }
-            z2 * sb / (cb * cb) - z1 * c / (s * s)
+            Some(z2 * sb / (cb * cb) - z1 * c / (s * s))
         };
         // γ ∈ (0, 90°) and |β₂| < 90°, so γ < 180° − Σ.
         let hi = right_angle.min(std::f64::consts::PI - shaft_angle_rad) - 1e-9;
         let lo = 1e-9;
-        (lo < hi).then(|| crate::solve::brent(slope, lo, hi, crate::solve::Tol::default()))?
+        (lo < hi)
+            .then(|| crate::solve::brent_partial(slope, lo, hi, crate::solve::Tol::default()))?
     }
 
     /// The sliding direction resolved on member `which`'s velocity direction.
@@ -939,18 +948,20 @@ impl CrossedPath {
         let mut hi = self.zone[1];
         let mut limit = ZoneLimit::Tips;
         for (i, b) in face.iter().enumerate() {
-            let Some(half) = Self::half_span(screw, i, *b) else {
+            // The face is centred on its own gear, which is `axial_centre` and
+            // not the origin of this parameter. They coincide only at the
+            // reference centre distance; anywhere else — a shifted pair at its
+            // own zero-backlash distance included — the contact has slid along
+            // the shafts and the face may no longer be under it. A contact
+            // that does not travel along this member has neither.
+            let (Some(half), Some(centre)) =
+                (Self::half_span(screw, i, *b), self.axial_centre(screw, i))
+            else {
                 if self.axial_offset(screw, i).abs() > 0.5 * b {
                     return None;
                 }
                 continue;
             };
-            // The face is centred on its own gear, which is `axial_centre` and
-            // not the origin of this parameter. They coincide only at the
-            // reference centre distance; anywhere else — a shifted pair at its
-            // own zero-backlash distance included — the contact has slid along
-            // the shafts and the face may no longer be under it.
-            let centre = self.axial_centre(screw, i).unwrap_or(0.0);
             if centre + half < hi {
                 hi = centre + half;
                 limit = ZoneLimit::Face;
@@ -1020,7 +1031,11 @@ impl CrossedPath {
             // centre distance this is `2 · half · rate` as it always was; once
             // the contact has slid along the shafts the face has to be wider to
             // still be under it, and by different amounts on the two members.
-            let centre = self.axial_centre(screw, i).unwrap_or(0.0);
+            // A contact that does not travel along this member needs no width
+            // of it.
+            let Some(centre) = self.axial_centre(screw, i) else {
+                continue;
+            };
             let reach = (interval[1] - centre)
                 .abs()
                 .max((interval[0] - centre).abs());
@@ -1272,11 +1287,8 @@ impl CrossedPath {
             if !(ceiling.is_finite() && ceiling > 0.0) {
                 return None;
             }
-            let eta = |mu: f64| {
-                self.efficiency(screw, mu, drive, samples)
-                    .unwrap_or(f64::NAN)
-            };
-            crate::solve::brent(eta, 0.0, ceiling, crate::solve::Tol::default())
+            let eta = |mu: f64| self.efficiency(screw, mu, drive, samples);
+            crate::solve::brent_partial(eta, 0.0, ceiling, crate::solve::Tol::default())
         })
     }
 

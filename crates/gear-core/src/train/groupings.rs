@@ -282,9 +282,10 @@ impl Train {
                         Step::Coupling(c) => !said_couplings.contains(&c),
                     })
                     .collect();
-                steps.sort_by(|x, y| {
-                    let p = |v: Option<f64>| v.unwrap_or(f64::INFINITY);
-                    p(y.2).total_cmp(&p(x.2))
+                // The most power first, and a step with no share of it before any.
+                steps.sort_by(|x, y| match (x.2, y.2) {
+                    (Some(a), Some(b)) => b.total_cmp(&a),
+                    (a, b) => a.is_some().cmp(&b.is_some()),
                 });
                 let (mut onward, mut branches) = (Vec::new(), Vec::new());
                 for (step, to, power) in &steps {

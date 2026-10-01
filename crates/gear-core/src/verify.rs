@@ -142,13 +142,13 @@ pub fn rack_travel_range(g: &Tooth) -> (f64, f64) {
     let at = g.alpha_t;
     let tau = |u: f64| u * g.rb - g.r * at.sin();
     let mut bounds = vec![g.s_j - g.ac, -g.ac, 0.0, g.r * g.half_pitch];
-    if !g.severed {
-        for u in [g.u_j, g.u_tip] {
+    if let Some(f) = g.flank {
+        for u in [f.junction, f.tip] {
             bounds.push(tau(u) / at.cos() - g.st / 2.0);
         }
     }
-    let lo = bounds.iter().copied().fold(f64::INFINITY, f64::min);
-    let hi = bounds.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    let lo = bounds.iter().copied().fold(f64::INFINITY, f64::min); // absence: a fold to the least starts at its identity
+    let hi = bounds.iter().copied().fold(f64::NEG_INFINITY, f64::max); // absence: a fold to the greatest starts at its identity
     let pad = TRAVEL_PAD_PITCHES * std::f64::consts::PI * g.mt;
     (lo - pad, hi + pad)
 }
@@ -204,7 +204,7 @@ pub fn check_cut(g: &Tooth, profile_points: usize) -> CutReport {
 
     let rack = BasicRack::of(g);
     let n = px.len();
-    let mut dist = vec![f64::INFINITY; (nphase + 1) * n];
+    let mut dist = vec![f64::INFINITY; (nphase + 1) * n]; // absence: every entry is written below before it is read
     let mut penetration: f64 = 0.0;
 
     for k in 0..=nphase {
@@ -214,7 +214,7 @@ pub fn check_cut(g: &Tooth, profile_points: usize) -> CutReport {
         for i in 0..n {
             let fx = px[i] * c - py[i] * s;
             let fy = px[i] * s + py[i] * c;
-            let mut best = f64::INFINITY;
+            let mut best = f64::INFINITY; // absence: a fold to the least starts at its identity
             for j in copy_lo..=copy_hi {
                 let sh = xi + f64::from(j) * pitch;
                 // Prune copies that cannot be nearest: the tooth spans one
@@ -244,7 +244,7 @@ pub fn check_cut(g: &Tooth, profile_points: usize) -> CutReport {
             continue;
         }
         let mut kmin = 0usize;
-        let mut dmin = f64::INFINITY;
+        let mut dmin = f64::INFINITY; // absence: a fold to the least starts at its identity
         for k in 0..=nphase {
             if dist[k * n + i] < dmin {
                 dmin = dist[k * n + i];
@@ -317,7 +317,7 @@ pub fn fillet_envelope_error(g: &Tooth, fillet_points: usize, path_points: usize
 
     let mut worst: f64 = 0.0;
     for &(qx, qy) in &pts {
-        let mut best = f64::INFINITY;
+        let mut best = f64::INFINITY; // absence: a fold to the least starts at its identity
         for w in path.windows(2) {
             let (ax, ay) = w[0];
             let (bx, by) = w[1];
@@ -374,8 +374,8 @@ pub fn sdf_matches_polyline(g: &Tooth, arc_points: usize, samples: usize) -> f64
     // reproducible without carrying a PRNG.
     let pad = 0.4 * g.params.module;
     let (x_lo, x_hi) = (
-        v.iter().map(|p| p.0).fold(f64::INFINITY, f64::min) - pad,
-        v.iter().map(|p| p.0).fold(f64::NEG_INFINITY, f64::max) + pad,
+        v.iter().map(|p| p.0).fold(f64::INFINITY, f64::min) - pad, // absence: a fold to the least starts at its identity
+        v.iter().map(|p| p.0).fold(f64::NEG_INFINITY, f64::max) + pad, // absence: a fold to the greatest starts at its identity
     );
     let (y_lo, y_hi) = (g.rf - pad, g.ra);
 
@@ -389,7 +389,7 @@ pub fn sdf_matches_polyline(g: &Tooth, arc_points: usize, samples: usize) -> f64
             if a >= 0.5 * g.params.module {
                 continue; // near field only, where the comparison is meaningful
             }
-            let mut b = f64::INFINITY;
+            let mut b = f64::INFINITY; // absence: a fold to the least starts at its identity
             for w in v.windows(2) {
                 let (ax, ay) = w[0];
                 let (bx, by) = w[1];
@@ -520,7 +520,8 @@ pub fn ring_cut_envelope_spans(
 
     // Sweep the cutter and keep the smallest angle reached at each radius.
     let span = spans * PI * ring.mt;
-    let mut envelope = vec![f64::INFINITY; radii];
+    // A radius no cutter point reaches has no angle.
+    let mut envelope: Vec<Option<f64>> = vec![None; radii];
     for j in 0..=phases {
         let s = -span + 2.0 * span * (j as f64 / phases as f64);
         // Rolling is on the operating circles, which are the reference ones only
@@ -555,8 +556,8 @@ pub fn ring_cut_envelope_spans(
             #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
             let bin = (((radius - ring.ra) / (ring.rf - ring.ra)) * radii as f64) as usize;
             let bin = bin.min(radii - 1);
-            if angle < envelope[bin] {
-                envelope[bin] = angle;
+            if envelope[bin].is_none_or(|least| angle < least) {
+                envelope[bin] = Some(angle);
             }
         }
     }
@@ -564,8 +565,8 @@ pub fn ring_cut_envelope_spans(
     envelope
         .iter()
         .enumerate()
-        .filter(|(_, a)| a.is_finite())
-        .map(|(bin, &a)| {
+        .filter_map(|(bin, a)| a.map(|a| (bin, a)))
+        .map(|(bin, a)| {
             let radius = ring.ra + (ring.rf - ring.ra) * (bin as f64 + 0.5) / radii as f64;
             (radius, a)
         })
@@ -623,7 +624,7 @@ pub fn check_ring_cut(ring: &crate::ring::Ring, radii: usize, phases: usize) -> 
         let near = reference
             .iter()
             .map(|&(rx, ry)| f64::hypot(x - rx, y - ry))
-            .fold(f64::INFINITY, f64::min);
+            .fold(f64::INFINITY, f64::min); // absence: a fold to the least starts at its identity
         worst_distance = worst_distance.max(near);
     }
 

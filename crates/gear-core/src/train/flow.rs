@@ -110,7 +110,7 @@ impl Asked {
         if self.unknown.contains(&s) {
             None
         } else {
-            Some(self.known.get(s).copied().flatten().unwrap_or(0.0))
+            Some(self.known.get(s).copied().flatten().unwrap_or(0.0)) // absence: a body asked nothing of carries no external torque: zero, by its balance
         }
     }
 }

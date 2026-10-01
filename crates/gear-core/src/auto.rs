@@ -10,7 +10,7 @@
 
 use crate::involute::{inv, inv_from_roll};
 use crate::params::{guard, GearParams};
-use crate::solve::{brent, Tol};
+use crate::solve::{brent, brent_partial, Tol};
 use crate::tooth::{Rack, Tooth, POINTED_TOOTH_MAX_ROLL};
 
 /// The smallest profile shift that avoids undercut at a stated depth.
@@ -165,17 +165,26 @@ fn edge_of_undercut(x_min: impl Fn(f64) -> f64, start: f64) -> Option<f64> {
         step *= 2.0;
         (residual(far) < 0.0) != (f0 < 0.0)
     });
-    if bracketed {
-        brent(residual, x0.min(far), x0.max(far), Tol::default())
-    } else {
-        None
+    if !bracketed {
+        // The residual keeps its sign over every shift a tooth can take: no edge.
+        return None;
     }
+    // A continuous residual that changes sign in the bracket has a root there,
+    // so Brent finds it; a failure here is a fault, never "no edge".
+    let edge = brent(residual, x0.min(far), x0.max(far), Tol::default());
+    debug_assert!(
+        edge.is_some() || !(f0.is_finite() && residual(far).is_finite()),
+        "a bracketed edge of undercut was not found"
+    );
+    edge
 }
 
 /// Doubling steps of a module the undercut fixed point is walked out for a
-/// bracket before it is declared to have none. A search heuristic, not
-/// geometry: the whole admissible shift range is a few modules wide, and any
-/// bracket gives the same root.
+/// bracket before it is declared to have none. The last step reaches `2¹⁶`
+/// modules from the start, past any shift a tooth can be cut at: the admissible
+/// range ([`admissible_profile_shift`]) holds the tooth's thickness inside one
+/// pitch, which is a few modules of shift either way. Any bracket gives the
+/// same root.
 const MINIMUM_SHIFT_BRACKET_STEPS: u32 = 16;
 
 /// The shift the automatic toggle should apply: enough to avoid undercut, and no
@@ -202,7 +211,7 @@ const MINIMUM_SHIFT_BRACKET_STEPS: u32 = 16;
 pub fn automatic_profile_shift(p: &GearParams, working_depth: f64) -> f64 {
     minimum_profile_shift(p, working_depth)
         .with_cutter_radius
-        .map_or(0.0, |x| x.max(0.0))
+        .map_or(0.0, |x| x.max(0.0)) // absence: with no edge of undercut no shift changes the flank, and the gear is cut unshifted
 }
 
 /// What profile shifts a gear can be built at, and the design thresholds inside
@@ -665,24 +674,18 @@ pub fn admissible_angular_shift(p: &GearParams) -> Bound {
 
     // The tool must reach the high tooth without driving the low tooth's root
     // into the axis...
-    let by_spread = if spread > 0.0 {
-        (headroom - guard::MIN_CUTTER_DEPTH_MODULES) / spread
-    } else {
-        f64::INFINITY
-    };
+    let by_spread = (spread > 0.0).then(|| (headroom - guard::MIN_CUTTER_DEPTH_MODULES) / spread);
     // ...and where the dedendum alone already sets the depth, the low tooth
     // still has to survive it.
-    let by_sink = if sink > 0.0 {
-        (headroom - p.dedendum + p.profile_shift) / sink
-    } else {
-        f64::INFINITY
-    };
+    let by_sink = (sink > 0.0).then(|| (headroom - p.dedendum + p.profile_shift) / sink);
 
-    let amplitude = by_spread.min(by_sink).max(0.0);
-    // A one-toothed gear with nothing to bind it has no bound either side:
-    // absent, and no infinity standing for it.
-    let side = |a: f64| a.is_finite().then_some(a);
-    Bound::between(side(-amplitude), side(amplitude))
+    // A one-toothed gear with nothing to bind it has no bound either side.
+    let amplitude = match (by_spread, by_sink) {
+        (Some(a), Some(b)) => Some(a.min(b)),
+        (a, b) => a.or(b),
+    }
+    .map(|a| a.max(0.0));
+    Bound::between(amplitude.map(|a| -a), amplitude)
 }
 
 /// The ranges for a gear cut at one shift — every tooth of a concentric gear,
@@ -861,7 +864,8 @@ pub fn searchable_shift_where(
 ) -> Option<(f64, f64)> {
     let base = at(0.0);
     let bound = admissible_ranges(&base, base.dedendum).profile_shift.bound;
-    let lo = bound.min?.max(floor.unwrap_or(f64::NEG_INFINITY));
+    let least = bound.min?;
+    let lo = floor.map_or(least, |f| least.max(f));
     let hi = bound.max?;
     if lo >= hi {
         return None;
@@ -874,14 +878,9 @@ pub fn searchable_shift_where(
         // which is an answer about the round rather than about the shift.
         return None;
     }
-    // `NaN` where the bound is unanswerable, so the bracket fails rather than
-    // reading an absence as a sign change.
-    let ceiling = brent(
-        |x| round_fits(x).unwrap_or(f64::NAN),
-        lo,
-        hi,
-        Tol::default(),
-    )?;
+    // Where the bound is unanswerable the bracket fails, rather than reading
+    // an absence as a sign change.
+    let ceiling = brent_partial(round_fits, lo, hi, Tol::default())?;
     (lo < ceiling).then_some((lo, ceiling))
 }
 
@@ -1769,13 +1768,14 @@ impl Search {
     /// One knob, because the claim being checked is about the whole of the
     /// effort and raising one number at a time would let another bind instead.
     #[must_use]
-    pub fn refined(k: u32) -> Self {
-        let k = k.max(1) as usize;
+    pub fn refined(k: u8) -> Self {
+        let k = k.max(1);
+        let n = usize::from(k);
         Self {
-            scan: Self::SHIPPED.scan * i32::try_from(k).unwrap_or(i32::MAX),
-            budget: Self::SHIPPED.budget * k * k,
-            starts: Self::SHIPPED.starts * k,
-            resolution: Self::SHIPPED.resolution / k as f64,
+            scan: Self::SHIPPED.scan * i32::from(k),
+            budget: Self::SHIPPED.budget * n * n,
+            starts: Self::SHIPPED.starts * n,
+            resolution: Self::SHIPPED.resolution / f64::from(k),
             ..Self::SHIPPED
         }
     }
@@ -1848,7 +1848,7 @@ impl Search {
         // smallest interval decides the walk's own scale, since a step that
         // crosses a narrow axis in one stride is not a refinement of anything.
         let step_on = |axis: usize| (box_[axis].1 - box_[axis].0) / f64::from(scan);
-        let spacing = (0..dof).map(step_on).fold(f64::INFINITY, f64::min);
+        let spacing = (0..dof).map(step_on).fold(f64::INFINITY, f64::min); // absence: a fold to the least starts at its identity
         let mut scanned: Vec<(Vec<f64>, f64)> = Vec::new();
         let mut corner = vec![0i32; dof];
         loop {
@@ -1993,6 +1993,43 @@ impl Search {
 mod tests {
     use super::*;
     use crate::note::key;
+
+    /// **A bound a gear's ranges give is a number** (T02.9): absent where
+    /// nothing bounds that side, never an infinity or a NaN standing for it —
+    /// over every count from one to 3000, straight and helical, shifted
+    /// both ways and eccentric. A one-toothed gear has no angular-shift bound
+    /// either side, which is where an infinity once stood.
+    #[test]
+    fn every_bound_a_range_gives_is_a_number() {
+        let mut read = 0;
+        for teeth in 1..=3000_u32 {
+            for (helix_angle, profile_shift, angular_shift) in
+                [(0.0, 0.0, 0.0), (25.0, 0.4, 0.0), (0.0, -0.3, 0.2)]
+            {
+                let p = GearParams {
+                    teeth,
+                    helix_angle,
+                    profile_shift,
+                    angular_shift,
+                    ..GearParams::default()
+                };
+                let r = admissible_ranges(&p, p.dedendum);
+                let bad = crate::finite::non_finite(&r);
+                assert!(
+                    bad.is_empty(),
+                    "z {teeth} β {helix_angle} x {profile_shift}: {bad:?}"
+                );
+                read += 1;
+            }
+        }
+        assert_eq!(read, 9000);
+        // The one-toothed gear's angular shift is unbounded, and says so by absence.
+        let one = admissible_angular_shift(&GearParams {
+            teeth: 1,
+            ..GearParams::default()
+        });
+        assert_eq!((one.min, one.max), (None, None));
+    }
 
     /// **The division is the evenest one the members allow** — checked against
     /// a scan that shares none of its arithmetic.

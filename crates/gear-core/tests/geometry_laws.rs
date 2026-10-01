@@ -44,7 +44,7 @@ fn flank_and_fillet_meet_exactly() {
         if g.severed {
             continue; // no flank exists
         }
-        let (r1, t1) = g.involute_at(g.u_j);
+        let (r1, t1) = g.involute_at(g.flank.unwrap().junction);
         let (r2, t2) = g.trochoid_at(g.s_j);
         let gap = f64::hypot(r1 * t1.sin() - r2 * t2.sin(), r1 * t1.cos() - r2 * t2.cos());
         assert!(
@@ -1300,10 +1300,10 @@ fn the_tooth_ends_at_its_tip() {
             continue;
         }
         assert!(
-            g.u_j <= g.u_tip,
+            g.flank.unwrap().junction <= g.flank.unwrap().tip,
             "junction {} above the tip {} at {tag}",
-            g.u_j,
-            g.u_tip
+            g.flank.unwrap().junction,
+            g.flank.unwrap().tip
         );
         if g.clamps.fired(key::CLAMP_TIP_BELOW_FORM) {
             ended += 1;

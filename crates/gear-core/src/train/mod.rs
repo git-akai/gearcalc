@@ -52,6 +52,8 @@ mod case_laws;
 mod conditions;
 pub mod crossed;
 mod edits;
+#[cfg(test)]
+mod error_laws;
 pub mod flow;
 pub mod graph;
 mod groupings;
@@ -439,6 +441,8 @@ pub struct ContactPatch {
     /// ...and across it, `1/ρ` — the reciprocal of the relative radius of
     /// curvature at the worst point, in the normal plane.
     pub curvature_across: f64,
+    /// The patch's aspect ratio `κ = b/a` there: 0 for a line.
+    pub aspect: f64,
 }
 
 impl ContactPatch {
@@ -467,6 +471,8 @@ impl ContactPatch {
                 * crate::hertz::line_half_width(curvature_across, max_pressure, e_star),
             curvature_along: crate::strength::PARALLEL_AXES,
             curvature_across,
+            // A line contact is the ellipse at no curvature along.
+            aspect: crate::hertz::LINE_ASPECT,
         }
     }
 }
@@ -1372,7 +1378,7 @@ impl MemberGear {
             return ShiftAsked {
                 search_floor: None,
                 given,
-                settled: given.unwrap_or(0.0),
+                settled: given.unwrap_or(0.0), // absence: a shift nothing asks for leaves the tooth unshifted, at zero
                 raised: false,
             };
         }
@@ -1383,11 +1389,11 @@ impl MemberGear {
         if self.profile_shift.auto {
             // `automatic_profile_shift`'s rule, for either tool: at the edge,
             // and not moved where the edge asks nothing.
-            let settled = x_min.map_or(0.0, |x| x.max(0.0));
-            // A search is held at the edge — and, on an external tooth, no
-            // lower than zero, since a negative shift thins it. A negative
-            // shift thickens a ring's tooth, so a ring's search is held at
-            // its edge alone.
+            let settled = x_min.map_or(0.0, |x| x.max(0.0)); // absence: with no edge of undercut no shift changes the flank, and the tooth is cut unshifted
+                                                             // A search is held at the edge — and, on an external tooth, no
+                                                             // lower than zero, since a negative shift thins it. A negative
+                                                             // shift thickens a ring's tooth, so a ring's search is held at
+                                                             // its edge alone.
             let search_floor = if cutter.is_some() {
                 x_min
             } else {
@@ -1676,6 +1682,19 @@ impl GearResult {
     }
 }
 
+/// **A figure an error quotes**, equal to another bit for bit — so an error
+/// that carries one still compares whole.
+#[derive(Clone, Copy, Debug)]
+pub struct Quoted(pub f64);
+
+impl PartialEq for Quoted {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.to_bits() == other.0.to_bits()
+    }
+}
+
+impl Eq for Quoted {}
+
 /// Why a train, or a part of it, could not be solved.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TrainError {
@@ -1725,6 +1744,8 @@ pub enum TrainError {
     Overdetermined { at: usize },
     /// A constraint or a load case names a body the train does not have.
     NoSuchBody { at: usize },
+    /// A train with nothing in it, asked for what it does.
+    Empty,
     /// The tooth counts along the shaft line multiply past what an exact
     /// ratio can hold, and a ratio is refused rather than wrapped.
     Overflow,
@@ -1760,6 +1781,15 @@ pub enum TrainError {
     /// (`Indexed::frames_close`). The loop's last-stated distance,
     /// zero-based; the front end numbers from 1.
     AxesLoopOpen { distance: usize },
+    /// **A band end inside the base-circle limit**: the distance's tolerance
+    /// reaches `end`, below `a_ref cos α_t`, where the involutes have no
+    /// operating angle and no pair runs. Zero-based, as the distances are
+    /// indexed.
+    ToleranceBelowBase {
+        distance: usize,
+        end: Quoted,
+        limit: Quoted,
+    },
     /// **Two given distances ask one mesh group two sizes**: each with both
     /// its mesh's shifts pinned decides the group's helix, and they decide
     /// it differently ([`resolved_helices`](incidence::Indexed::resolved_helices)). The mesh that
@@ -1797,9 +1827,8 @@ pub enum TrainError {
 impl From<MotionError> for TrainError {
     fn from(e: MotionError) -> Self {
         match e {
-            // A train with nothing in it is solved before its motion is
-            // asked; a motion asked of one anyway names the one body it has.
-            MotionError::Empty => Self::NoSuchBody { at: GROUND },
+            // A train with nothing in it says so, under its own key.
+            MotionError::Empty => Self::Empty,
             MotionError::Wiring(part, cause) => Self::InPart {
                 part,
                 cause: Box::new(Self::Wiring(cause)),
@@ -1820,10 +1849,6 @@ impl From<WiringError> for TrainError {
 
 /// **A zero-based index as the front end numbers it**, from 1 — an axis,
 /// a mesh or a distance a malformed graph names.
-fn numbered(index: usize) -> u32 {
-    u32::try_from(index + 1).unwrap_or(u32::MAX) // absence: past 2^32 pieces, the largest count
-}
-
 /// A note about one body, carrying its number as the train counts it —
 /// ground being 0.
 fn located(key: &'static str, at: usize) -> Note {
@@ -1841,12 +1866,25 @@ impl crate::note::Explain for TrainError {
             Self::Mesh(e) => e.note(),
             // The drive diagnoses itself; the train carries the note rather
             // than restating it.
-            Self::TipsUnclearable { mesh } => Note::new(key::ERROR_TRAIN_TIPS_UNCLEARABLE)
-                .count("mesh", u32::try_from(*mesh + 1).unwrap_or(1)),
+            Self::TipsUnclearable { mesh } => {
+                Note::new(key::ERROR_TRAIN_TIPS_UNCLEARABLE).ordinal("mesh", *mesh)
+            }
             Self::Screw(e) => e.note(),
             Self::NoContact => Note::new(key::ERROR_TRAIN_NO_CONTACT),
             Self::NoCommonDistance => Note::new(key::ERROR_TRAIN_NO_COMMON_DISTANCE),
-            Self::Wiring(_) => Note::new(key::ERROR_TRAIN_WIRING),
+            Self::Wiring(WiringError::MemberWithoutTeeth(i)) => {
+                Note::new(key::ERROR_TRAIN_WIRING_NO_TEETH).ordinal("member", *i)
+            }
+            Self::Wiring(WiringError::NoCommonFrame(k)) => {
+                Note::new(key::ERROR_TRAIN_WIRING_NO_COMMON_FRAME).ordinal("mesh", *k)
+            }
+            Self::Wiring(WiringError::NotAMesh(k)) => {
+                Note::new(key::ERROR_TRAIN_WIRING_NOT_A_MESH).ordinal("mesh", *k)
+            }
+            Self::Wiring(WiringError::NotACoupling(c)) => {
+                Note::new(key::ERROR_TRAIN_WIRING_NOT_A_COUPLING).ordinal("coupling", *c)
+            }
+            Self::Empty => Note::new(key::ERROR_TRAIN_EMPTY),
             Self::UnknownMaterial(n) => {
                 Note::new(key::ERROR_TRAIN_UNKNOWN_MATERIAL).text("name", n.clone())
             }
@@ -1864,8 +1902,8 @@ impl crate::note::Explain for TrainError {
                 .text("case", (case + 1).to_string()),
             Self::SizeOverConstrained { meshes: [a, b] } => {
                 Note::new(key::ERROR_TRAIN_SIZE_OVER_CONSTRAINED)
-                    .count("first", u32::try_from(*a + 1).unwrap_or(u32::MAX))
-                    .count("second", u32::try_from(*b + 1).unwrap_or(u32::MAX))
+                    .ordinal("first", *a)
+                    .ordinal("second", *b)
             }
             Self::AxesCannotBePlaced {
                 distance,
@@ -1875,28 +1913,34 @@ impl crate::note::Explain for TrainError {
             } else {
                 key::ERROR_TRAIN_AXES_TOO_FAR
             })
-            .count("distance", u32::try_from(*distance + 1).unwrap_or(u32::MAX)),
+            .ordinal("distance", *distance),
+            Self::ToleranceBelowBase {
+                distance,
+                end,
+                limit,
+            } => Note::new(key::ERROR_TRAIN_TOLERANCE_BELOW_BASE)
+                .ordinal("distance", *distance)
+                .number("end", end.0, 4)
+                .number("limit", limit.0, 4),
             Self::AxesLoopOpen { distance } => {
-                Note::new(key::ERROR_TRAIN_AXES_LOOP_OPEN).count("distance", numbered(*distance))
+                Note::new(key::ERROR_TRAIN_AXES_LOOP_OPEN).ordinal("distance", *distance)
             }
             // Each field a refusal can name has its own key; the axis is
             // numbered from one, as the panel numbers axes.
             Self::Malformed(Invariant::CarriedByNothing(axis)) => {
-                Note::new(key::ERROR_TRAIN_MALFORMED_CARRIED_BY).count("axis", numbered(*axis))
+                Note::new(key::ERROR_TRAIN_MALFORMED_CARRIED_BY).ordinal("axis", *axis)
             }
             Self::Malformed(Invariant::CarriedInACycle(axis)) => {
-                Note::new(key::ERROR_TRAIN_MALFORMED_CARRIED_BY_CYCLE)
-                    .count("axis", numbered(*axis))
+                Note::new(key::ERROR_TRAIN_MALFORMED_CARRIED_BY_CYCLE).ordinal("axis", *axis)
             }
             Self::Malformed(Invariant::DistanceTwice(d)) => {
-                Note::new(key::ERROR_TRAIN_MALFORMED_DISTANCE_TWICE).count("distance", numbered(*d))
+                Note::new(key::ERROR_TRAIN_MALFORMED_DISTANCE_TWICE).ordinal("distance", *d)
             }
             Self::Malformed(Invariant::RingFirst(k)) => {
-                Note::new(key::ERROR_TRAIN_MALFORMED_RING_FIRST).count("mesh", numbered(*k))
+                Note::new(key::ERROR_TRAIN_MALFORMED_RING_FIRST).ordinal("mesh", *k)
             }
             Self::Malformed(Invariant::DistanceOffFrame(d)) => {
-                Note::new(key::ERROR_TRAIN_MALFORMED_DISTANCE_OFF_FRAME)
-                    .count("distance", numbered(*d))
+                Note::new(key::ERROR_TRAIN_MALFORMED_DISTANCE_OFF_FRAME).ordinal("distance", *d)
             }
             // A body is numbered as the train numbers it, ground 0.
             Self::Malformed(Invariant::NumberGap(body)) => {
@@ -1907,151 +1951,15 @@ impl crate::note::Explain for TrainError {
             // Which part it is belongs to the reader rather than to the
             // reason, so the note is the cause's and the part reaches the
             // front end through the error's own shape.
-            Self::InPart { cause, .. } => cause.note(),
+            Self::InPart { part, cause } => cause.note().ordinal("part", *part),
         }
     }
 }
 
-/// A body as the harness writes it.
-fn place(at: usize) -> String {
-    if at == GROUND {
-        "ground".to_string()
-    } else {
-        format!("body {at}")
-    }
-}
-
-/// English, for the CLI and for `Debug`. **Not** what the browser renders — see
-/// [`crate::note::Explain::note`].
 impl std::fmt::Display for TrainError {
+    /// The note — its key and values, no words ([`crate::note::Explain`]).
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Mesh(e) => write!(f, "{e}"),
-            Self::TipsUnclearable { mesh } => {
-                write!(f, "mesh {}: no distance clears the teeth", mesh + 1)
-            }
-            Self::Screw(e) => match e {
-                crate::screw::ScrewError::NotPositive => {
-                    write!(f, "a module, diameter or tooth count is not positive")
-                }
-                crate::screw::ScrewError::WormTooThin => write!(
-                    f,
-                    "the first member has no lead angle: given a diameter, the worm \
-                     is too thin for that many starts at that module and its thread \
-                     would have to wrap at ninety degrees or more; given a helix \
-                     angle, a zero helix makes it a spur gear, which has no lead at \
-                     all — put the helical member first and the spur one second"
-                ),
-                crate::screw::ScrewError::ShaftAngleImpossible => {
-                    write!(f, "that shaft angle leaves the wheel with no lead angle")
-                }
-                crate::screw::ScrewError::FirstMemberIsADisc => write!(
-                    f,
-                    "the first member's helix angle reaches ninety degrees: its teeth \
-                     would run circumferentially and its pitch diameter is unbounded, \
-                     which is a disc rather than a gear"
-                ),
-                crate::screw::ScrewError::AxesAreParallel => write!(
-                    f,
-                    "parallel axes: a worm stage needs crossed shafts, and a \
-                     parallel pair is a spur stage"
-                ),
-                crate::screw::ScrewError::FirstMemberOppositeHand => write!(
-                    f,
-                    "the first member's helix is negative, an opposite hand the \
-                     crossed-axis model cannot yet represent"
-                ),
-            },
-            Self::NoContact => write!(f, "the teeth never come into contact"),
-            Self::NoCommonDistance => write!(
-                f,
-                "no profile shift brings the meshes to one axis distance; \
-                 these tooth counts cannot be assembled"
-            ),
-            Self::Wiring(e) => match e {
-                WiringError::MemberWithoutTeeth(i) => {
-                    write!(f, "member {} has no teeth", i + 1)
-                }
-                WiringError::NoCommonFrame(k) => write!(
-                    f,
-                    "mesh {}'s two members' axes are not fixed in one frame, so \
-                     they cannot stay a fixed distance apart",
-                    k + 1
-                ),
-                WiringError::NotAMesh(k) => {
-                    write!(f, "mesh {} is not a mesh this shape has", k + 1)
-                }
-                WiringError::NotACoupling(k) => {
-                    write!(f, "coupling {} joins no two bodies this shape has", k + 1)
-                }
-            },
-            Self::UnknownMaterial(n) => write!(f, "no material named {n:?} in the library"),
-            Self::FlankInterference => write!(
-                f,
-                "a tip reaches so far past its mate's usable flank that no involute contact is \
-                 left to rate"
-            ),
-            Self::Overdetermined { at } => {
-                write!(f, "two conditions cannot both hold at {}", place(*at))
-            }
-            Self::NoSuchBody { at } => write!(f, "no such body: {}", place(*at)),
-            Self::Input(e) => write!(f, "{e}"),
-            Self::Overflow => write!(
-                f,
-                "the tooth counts along the shaft line multiply past what an exact ratio holds"
-            ),
-            Self::SizeOverConstrained { meshes: [a, b] } => write!(
-                f,
-                "meshes {} and {}: their given distances, with every shift pinned, ask \
-                 their gears two different sizes",
-                a + 1,
-                b + 1
-            ),
-            Self::AxesCannotBePlaced {
-                distance,
-                too_close,
-            } => write!(
-                f,
-                "distance {}: the two axes it joins on one carrier are too {} to stand \
-                 at their distances from the carrier's axis",
-                distance + 1,
-                if *too_close { "close" } else { "far apart" }
-            ),
-            Self::AxesLoopOpen { distance } => write!(
-                f,
-                "distance {}: it closes a loop of distances among the axes one carrier \
-                 carries, and no placement of the axes about the carrier's axis stands at \
-                 every distance in it",
-                distance + 1
-            ),
-            Self::Malformed(Invariant::CarriedByNothing(axis)) => write!(
-                f,
-                "axis {}: carried_by names no body on another axis",
-                axis + 1
-            ),
-            Self::Malformed(Invariant::CarriedInACycle(axis)) => write!(
-                f,
-                "axis {}: carried_by carries it round, through its carriers, by itself",
-                axis + 1
-            ),
-            Self::Malformed(e) => write!(f, "the train's graph is not well formed: {e:?}"),
-            Self::LoadPort { case } => write!(
-                f,
-                "load case {}: enters by a shaft no load can be put on — ground, a held \
-                 shaft, or one that is not a port",
-                case + 1
-            ),
-            Self::DutyPort { case, body } => write!(
-                f,
-                "load case {}: its sweep is measured at {}, which is not an open port",
-                case + 1,
-                place(*body)
-            ),
-            Self::DuplicateEntry { case, body } => {
-                write!(f, "load case {}: two entries at {}", case + 1, place(*body))
-            }
-            Self::InPart { part, cause } => write!(f, "part {}: {cause}", part + 1),
-        }
+        write!(f, "{}", crate::note::Explain::note(self))
     }
 }
 
@@ -3361,16 +3269,16 @@ impl LoadCase {
     }
 
     /// The first load's given torque, N·m — the case's own, on a case with
-    /// one load.
+    /// one load; `None` on a case with none.
     #[must_use]
-    pub fn torque(&self) -> f64 {
-        self.loads.first().map_or(0.0, |l| l.torque.manual)
+    pub fn torque(&self) -> Option<f64> {
+        self.loads.first().map(|l| l.torque.manual)
     }
 
-    /// The first load's given speed, rpm.
+    /// The first load's given speed, rpm; `None` on a case with no load.
     #[must_use]
-    pub fn speed(&self) -> f64 {
-        self.loads.first().map_or(0.0, |l| l.speed.manual)
+    pub fn speed(&self) -> Option<f64> {
+        self.loads.first().map(|l| l.speed.manual)
     }
 
     /// Give the first load this torque.
@@ -3558,8 +3466,8 @@ impl Train {
 /// is one part, which a law holds every preset to — read as that part in
 /// its own numbering, and the path its first case walks: ratio,
 /// efficiency, backlash, the power through its teeth, one more tooth. Each
-/// figure is `None` where the train reports no path: holds that leave the
-/// motion a family.
+/// figure is `None` where the train reports no path — holds that leave the
+/// motion a family — or where the path's figure was not computed either way.
 ///
 /// It dereferences to the part's result, so what a caller reads of the
 /// members, the meshes and the distances reads as the shape numbers them.
@@ -3615,9 +3523,9 @@ pub fn solve_alone(train: &Train, lib: &MaterialLibrary) -> Result<Alone, TrainE
     Ok(Alone {
         part: own.remove(0),
         ratio: path.as_ref().map(|p| p.ratio),
-        efficiency: path.as_ref().map(|p| p.efficiency),
-        backlash: path.as_ref().map(|p| p.backlash),
-        circulation: path.as_ref().map(|p| p.circulation),
+        efficiency: path.as_ref().and_then(|p| p.efficiency.both()),
+        backlash: path.as_ref().and_then(|p| p.backlash.both()),
+        circulation: path.as_ref().and_then(|p| p.circulation.both()),
         ratio_per_tooth: path.map(|p| p.per_tooth),
     })
 }
@@ -3729,6 +3637,45 @@ pub fn loaded_cycles(turns: Turns) -> Cycles {
     }
 }
 
+/// **Why a case's flow left the load's division open**: a loop of meshes
+/// carrying torque round that reaches no body (`train.mesh_loop`, the
+/// meshes named by the graph's numbers) where the known torques leave no
+/// port's torque free, and otherwise a load held at both ends
+/// (`train.load_shared`). Read on the lossless rows, which are exact.
+fn undetermined_note(
+    parts: &[graph::Part],
+    system: &crate::kinematics::System,
+    asked: &flow::Asked,
+    mesh_of_part: &[Vec<usize>],
+) -> Note {
+    let applied: Vec<Option<crate::ratio::Ratio>> = asked
+        .known
+        .iter()
+        .map(|k| k.map(|_| crate::ratio::Ratio::ZERO))
+        .collect();
+    let ports_free = system
+        .torques(&applied)
+        .map_or(true, |s| !s.residual.is_empty());
+    let looped = system.circulating().unwrap_or_default();
+    if ports_free || looped.is_empty() {
+        return Note::new(key::TRAIN_LOAD_SHARED);
+    }
+    // The system's meshes are the flow's, part by part: back to the graph's.
+    let mut meshes: Vec<usize> = parts
+        .iter()
+        .zip(mesh_of_part)
+        .flat_map(|(part, mine)| {
+            mine.iter()
+                .enumerate()
+                .filter(|(_, at)| looped.contains(at))
+                .map(|(j, _)| part.meshes[j])
+        })
+        .collect();
+    meshes.sort_unstable();
+    let named: Vec<String> = meshes.iter().map(|m| (m + 1).to_string()).collect();
+    Note::new(key::TRAIN_MESH_LOOP).text("meshes", named.join(", "))
+}
+
 /// **The train's figures, one row per path** — see [`PathReport`]: every
 /// path an enabled case uses, from each of its loads to each of its
 /// reactions, once each and a direction each, in case order — so the
@@ -3811,22 +3758,25 @@ fn paths_of(
         .collect();
     // The flow driving `from` against `to` through `meshes`: its
     // efficiency, and the power its meshes pass over the power in.
-    let flowing = |meshes: &[flow::MeshFlow], from: Body, to: Body, speed: &[f64]| -> (f64, f64) {
-        flow::solve(
-            shafts,
-            meshes,
-            speed,
-            &flow::Asked::through(shafts, from, speed[from].signum(), to, &held),
-        )
-        .map_or((0.0, 0.0), |f| {
-            (
-                f.efficiency,
-                f.mesh_powers[..with_teeth.min(f.mesh_powers.len())]
-                    .iter()
-                    .sum(),
+    // `None` where the flow is refused: not a figure of nought.
+    let flowing =
+        |meshes: &[flow::MeshFlow], from: Body, to: Body, speed: &[f64]| -> Option<(f64, f64)> {
+            flow::solve(
+                shafts,
+                meshes,
+                speed,
+                &flow::Asked::through(shafts, from, speed[from].signum(), to, &held),
             )
-        })
-    };
+            .ok()
+            .map(|f| {
+                (
+                    f.efficiency,
+                    f.mesh_powers[..with_teeth.min(f.mesh_powers.len())]
+                        .iter()
+                        .sum(),
+                )
+            })
+        };
     // **One more tooth on each gear**, by the graph's index for it: the
     // same motion asked of the system with that one count raised.
     let per_tooth = |from: Body, to: Body| -> Vec<Option<f64>> {
@@ -3861,23 +3811,24 @@ fn paths_of(
         out
     };
     // Play at `read` per unit of play in mesh `k`, with `from` and the held
-    // bodies standing still — one construction, on the whole graph.
-    let coefficient = |k: usize, read: Body, from: Body| -> f64 {
+    // bodies standing still — one construction, on the whole graph. `None`
+    // where a unit play in the mesh admits no motion: a mesh in a loop.
+    let coefficient = |k: usize, read: Body, from: Body| -> Option<f64> {
         let mut c: Vec<Condition> = base.to_vec();
         c[from] = Condition::Ground;
         system
             .play(k, &c)
             .and_then(Result::ok)
-            .map_or(0.0, |s| s.values[read].to_f64().abs())
+            .map(|s| s.values[read].to_f64().abs())
     };
     // **The band, one source per distance**: the meshes on one distance
     // move together as it runs at its minus end, its running point or its
     // plus end, and distances apart are independent, so each reaches its
     // own extreme at once. A mesh with no distance is a source of its own.
-    let backlash_at = |read: Body, from: Body| -> Backlash {
+    let backlash_at = |read: Body, from: Body| -> Option<Backlash> {
         let mut sources: Vec<(Result<usize, usize>, [f64; 3])> = Vec::new();
         for (k, play) in row_play.iter().enumerate() {
-            let c = coefficient(k, read, from);
+            let c = coefficient(k, read, from)?;
             let source = distance_of.get(k).copied().flatten().ok_or(k);
             let at = match sources.iter().position(|(s, _)| *s == source) {
                 Some(i) => i,
@@ -3890,11 +3841,11 @@ fn paths_of(
                 *sum += c * p;
             }
         }
-        Backlash::of_sources(
+        Some(Backlash::of_sources(
             sources
                 .into_iter()
                 .map(|(_, ends)| ends.map(f64::to_degrees)),
-        )
+        ))
     };
     let mut out = Vec::new();
     for (from, to) in wanted {
@@ -3916,8 +3867,8 @@ fn paths_of(
         // friction, the whole path at once: a drive that cannot start
         // delivers nothing, whatever it would do once turning.
         let at_rest = Directional {
-            forward: flowing(resting, a, b, &forward).0,
-            backward: flowing(resting, b, a, &backward).0,
+            forward: flowing(resting, a, b, &forward).map(|f| f.0),
+            backward: flowing(resting, b, a, &backward).map(|f| f.0),
         };
         out.push(PathReport {
             from,
@@ -3925,8 +3876,8 @@ fn paths_of(
             ratio: forward[a] / forward[b],
             reads: RatioReading::of(forward[a] / forward[b]),
             efficiency: Directional {
-                forward: ahead.0,
-                backward: astern.0,
+                forward: ahead.map(|f| f.0),
+                backward: astern.map(|f| f.0),
             }
             .once_moving(&at_rest),
             backlash: Directional {
@@ -3934,8 +3885,8 @@ fn paths_of(
                 backward: backlash_at(a, b),
             },
             circulation: Directional {
-                forward: ahead.1,
-                backward: astern.1,
+                forward: ahead.map(|f| f.1),
+                backward: astern.map(|f| f.1),
             },
             per_tooth: per_tooth(a, b),
         });
@@ -4030,9 +3981,15 @@ impl Train {
                 other => other,
             })
             .collect();
-        Ok(system
+        system
             .motion_in(&conditions, &[])
-            .map_or(0, |s| s.residual.len()))
+            .map(|s| s.residual.len())
+            .map_err(|e| match e {
+                crate::kinematics::Refusal::Conflicts(i) => MotionError::Conflicts(i),
+                crate::kinematics::Refusal::NoMotion | crate::kinematics::Refusal::Overflow => {
+                    MotionError::Overflow
+                }
+            })
     }
 
     /// **One load case relieved**: of its loads' speeds exactly the
@@ -4074,8 +4031,9 @@ impl Train {
                     if l.torque.auto {
                         l.torque.manual = (s.torque * 1e4).round() / 1e4;
                     }
-                    if l.speed.auto {
-                        l.speed.manual = (s.speed.unwrap_or(0.0) * 1e4).round() / 1e4;
+                    // A body that does not turn has no speed to seed from.
+                    if let (true, Some(speed)) = (l.speed.auto, s.speed) {
+                        l.speed.manual = (speed * 1e4).round() / 1e4;
                     }
                 }
             }
@@ -4312,19 +4270,24 @@ pub struct PathReport {
     /// away** is the same flow against every mesh's static friction — each
     /// mesh's efficiency at rest, off its cut ([`Directional::once_moving`]):
     /// a path that cannot start delivers nothing, and one that can runs on
-    /// sliding friction.
-    pub efficiency: Directional<f64>,
+    /// sliding friction. **`None` where the flow was not solved** — a load
+    /// held at both ends, or a loop of meshes, which the case's note names —
+    /// so nought keeps its one meaning: the path locks.
+    pub efficiency: Directional<Option<f64>>,
     /// Angular play at `to` driving from `from`, degrees, and at `from`
     /// driving from `to`: every mesh's play through the kinematics' own
-    /// coefficients, so a mesh the path does not cross adds nothing.
-    pub backlash: Directional<Backlash>,
+    /// coefficients, so a mesh the path does not cross adds nothing. `None`
+    /// where a mesh's play has no single reading at the path's end — a mesh
+    /// in a loop, whose play the loop's other branch takes up.
+    pub backlash: Directional<Option<Backlash>>,
     /// **The power crossing the teeth, over the power in**, each way — the
     /// sum over the meshes the path loads of what each passes: one across a
     /// pair, under one where a carrier takes part of it bodily, many times
     /// one where power circulates, which is where such a path's efficiency
     /// goes ([`flow::Flow::mesh_powers`]). An offset coupling passes power
-    /// and has no teeth, so it counts for nothing here.
-    pub circulation: Directional<f64>,
+    /// and has no teeth, so it counts for nothing here. `None` where the flow
+    /// was not solved, as for [`Self::efficiency`].
+    pub circulation: Directional<Option<f64>>,
     /// **The ratio one more tooth on each gear would give**, each gear by
     /// the graph's index for it — the graph's exact answer at `z_i + 1`, which is
     /// what a designer choosing counts wants beside the ratio: where a tooth
@@ -4901,57 +4864,81 @@ fn solve_parts(
                 .map(|(_, l)| l.torque.manual)
                 .sum()
         };
-        let mut speeds = vec![0.0; shafts];
+        // **Every given port driven at its own speed, at once and exactly**:
+        // the holds first, then the given ports in the case's order, so a
+        // speed the ones before it contradict is the one named. Judged by
+        // rank, not by count: two speeds on one rigid chain that agree are
+        // one condition said twice, and solve.
+        let mut c = conditions.clone();
+        let mut asked_speeds = Vec::new();
+        for &(g, s) in &given_speeds {
+            let Some(exact) = crate::ratio::Ratio::of_double(s) else {
+                asked_speeds.clear();
+                break;
+            };
+            c[g] = Condition::Drive(exact);
+            asked_speeds.push(g);
+        }
+        let order: Vec<Body> = (0..shafts)
+            .filter(|&b| conditions[b] == Condition::Ground)
+            .chain(asked_speeds.iter().copied())
+            .collect();
+        let motion = if asked_speeds.len() == given_speeds.len() {
+            system.motion_in(&c, &order)
+        } else {
+            Err(crate::kinematics::Refusal::Overflow)
+        };
+        let speeds: Vec<f64> = match motion {
+            Ok(sol) if sol.is_unique() => sol.values.iter().map(|r| r.to_f64()).collect(),
+            Ok(sol) => {
+                notes.push(
+                    Note::new(key::TRAIN_CASE_UNDERDETERMINED).tally("short", sol.residual.len()),
+                );
+                nothing(notes, &mut cases, &mut per_part);
+                continue;
+            }
+            Err(crate::kinematics::Refusal::Conflicts(at)) => {
+                notes.push(located(key::TRAIN_CASE_OVERDETERMINED, at));
+                nothing(notes, &mut cases, &mut per_part);
+                continue;
+            }
+            // A given speed whose exact value no `i128` holds, or a solve
+            // that overflowed one: the case cannot be read exactly.
+            Err(_) => {
+                notes.push(Note::new(key::ERROR_TRAIN_OVERFLOW));
+                nothing(notes, &mut cases, &mut per_part);
+                continue;
+            }
+        };
+        // **A port held still has an impending motion** — its own turn, the
+        // other given ports still — signed so the given torques do positive
+        // work on it, and nought where they do none or where the other given
+        // ports leave it none.
         let mut still = vec![0.0; shafts];
-        let mut determined = true;
-        for &(driver, s) in &given_speeds {
+        for &(driver, _) in given_speeds.iter().filter(|(_, s)| *s == 0.0) {
             let mut c = conditions.clone();
             for &(other, _) in &given_speeds {
                 c[other] = Condition::Ground;
             }
             c[driver] = Condition::Drive(crate::ratio::Ratio::ONE);
-            match system.motion_in(&c, &[driver]) {
-                Ok(sol) if sol.is_unique() => {
-                    let v: Vec<f64> = sol.values.iter().map(|r| r.to_f64()).collect();
-                    for (i, v) in v.iter().enumerate() {
-                        speeds[i] += s * v;
-                    }
-                    if s == 0.0 {
-                        let work: f64 = (0..shafts).map(|b| given_torque(b) * v[b]).sum();
-                        let sign = if work > 0.0 {
-                            1.0
-                        } else if work < 0.0 {
-                            -1.0
-                        } else {
-                            0.0
-                        };
-                        for (i, v) in v.iter().enumerate() {
-                            still[i] += sign * v;
-                        }
-                    }
-                }
-                _ => determined = false,
+            let Ok(sol) = system.motion_in(&c, &[driver]) else {
+                continue;
+            };
+            if !sol.is_unique() {
+                continue;
             }
-        }
-        // Short of a speed: with every given port driven, something still
-        // moves on its own. `motion_in` with them all driven at one turn is
-        // the count.
-        let short = {
-            let mut c = conditions.clone();
-            for &(g, _) in &given_speeds {
-                c[g] = Condition::Drive(crate::ratio::Ratio::ONE);
+            let v: Vec<f64> = sol.values.iter().map(|r| r.to_f64()).collect();
+            let work: f64 = (0..shafts).map(|b| given_torque(b) * v[b]).sum();
+            let sign = if work > 0.0 {
+                1.0
+            } else if work < 0.0 {
+                -1.0
+            } else {
+                0.0
+            };
+            for (i, v) in v.iter().enumerate() {
+                still[i] += sign * v;
             }
-            system
-                .motion_in(&c, &[])
-                .map_or(usize::MAX, |sol| sol.residual.len())
-        };
-        if !determined || short > 0 {
-            notes.push(
-                Note::new(key::TRAIN_CASE_UNDERDETERMINED)
-                    .count("short", u32::try_from(short).unwrap_or(u32::MAX)),
-            );
-            nothing(notes, &mut cases, &mut per_part);
-            continue;
         }
         // ---- the flow: the given torques known; the derived loads, the
         // reacted ports, the fixed bodies and ground to be found.
@@ -4990,8 +4977,15 @@ fn solve_parts(
             // at both is a question the case says it cannot answer, rather
             // than an end chosen for the designer. The boundary of the
             // model, not of the mechanism, and the case's to say.
+            //
+            // **A loop of meshes is the other way to it**: twin countershafts,
+            // or a pair doubled, carry a torque round that reaches no body,
+            // and how they share is the same division by stiffness, with no
+            // hold to blame. Told apart on the lossless rows, exactly: where
+            // the known torques leave no port's torque free, what is free is
+            // the loop's.
             Err(flow::Refused::Undetermined) => {
-                notes.push(Note::new(key::TRAIN_LOAD_SHARED));
+                notes.push(undetermined_note(parts, &system, &asked, &mesh_of_part));
                 nothing(notes, &mut cases, &mut per_part);
                 continue;
             }
@@ -5006,8 +5000,8 @@ fn solve_parts(
             Err(flow::Refused::TooManyMeshes { meshes }) => {
                 notes.push(
                     Note::new(key::TRAIN_FLOW_TOO_MANY_MESHES)
-                        .count("meshes", u32::try_from(meshes).unwrap_or(u32::MAX))
-                        .count("most", u32::try_from(flow::MOST_MESHES).unwrap_or(u32::MAX)),
+                        .tally("meshes", meshes)
+                        .tally("most", flow::MOST_MESHES),
                 );
                 nothing(notes, &mut cases, &mut per_part);
                 continue;
@@ -7603,16 +7597,19 @@ mod tests {
         }
         let r = solve_train(&t, &lib).expect("...and can follow one");
         let (first, second) = (across(&t, 0, &lib), across(&t, 1, &lib));
-        let want =
-            first.backlash.forward.nominal / second.ratio.abs() + second.backlash.forward.nominal;
+        let want = first.backlash.forward.unwrap().nominal / second.ratio.abs()
+            + second.backlash.forward.unwrap().nominal;
         assert!(
-            (r.total().unwrap().backlash.forward.nominal - want).abs() < 1e-12,
+            (r.total().unwrap().backlash.forward.unwrap().nominal - want).abs() < 1e-12,
             "play accumulates: {} vs {want}",
-            r.total().unwrap().backlash.forward.nominal
+            r.total().unwrap().backlash.forward.unwrap().nominal
         );
         // ...and it is strictly more than the last stage alone, which is what
         // "subtracting" would have taken it below.
-        assert!(r.total().unwrap().backlash.forward.nominal > second.backlash.forward.nominal);
+        assert!(
+            r.total().unwrap().backlash.forward.unwrap().nominal
+                > second.backlash.forward.unwrap().nominal
+        );
     }
 
     /// **One body, one speed** — a stage's output member and the next stage's
@@ -8088,7 +8085,7 @@ mod tests {
         assert_eq!(t.load_cases[0].loads[0].at, 1, "parked where it was");
         assert_eq!(t.load_cases[0].loads[1].at, 2);
         assert!(
-            (t.load_cases[0].torque() - 0.7).abs() < 1e-12,
+            (t.load_cases[0].torque().unwrap() - 0.7).abs() < 1e-12,
             "the figures are kept"
         );
         t.chain_on(arr::planetary(12, 30, 72, 3));
@@ -8169,7 +8166,7 @@ mod tests {
             s.iter().map(|x| x.ratio.unwrap()).product::<f64>()
         ));
         assert!(near(
-            r.paths[0].efficiency.forward,
+            r.paths[0].efficiency.forward.unwrap(),
             s.iter()
                 .map(|x| x.efficiency.unwrap().forward)
                 .product::<f64>()
@@ -8181,19 +8178,19 @@ mod tests {
             .expect("first gear to the first take-off");
         assert!(near(one.ratio, s[0].ratio.unwrap()));
         assert!(near(
-            one.efficiency.forward,
+            one.efficiency.forward.unwrap(),
             s[0].efficiency.unwrap().forward
         ));
         assert!(near(
-            one.efficiency.backward,
+            one.efficiency.backward.unwrap(),
             s[0].efficiency.unwrap().backward
         ));
         assert!(near(
-            one.backlash.forward.nominal,
+            one.backlash.forward.unwrap().nominal,
             s[0].backlash.unwrap().forward.nominal
         ));
         assert!(near(
-            one.backlash.backward.nominal,
+            one.backlash.backward.unwrap().nominal,
             s[0].backlash.unwrap().backward.nominal
         ));
         let mid = r
@@ -8203,11 +8200,11 @@ mod tests {
             .expect("between the take-offs");
         assert!(near(mid.ratio, s[1].ratio.unwrap()));
         assert!(near(
-            mid.efficiency.forward,
+            mid.efficiency.forward.unwrap(),
             s[1].efficiency.unwrap().forward
         ));
         assert!(near(
-            mid.backlash.forward.nominal,
+            mid.backlash.forward.unwrap().nominal,
             s[1].backlash.unwrap().forward.nominal
         ));
         // A differential has no path.
@@ -9751,7 +9748,7 @@ mod tests {
         };
 
         for (k, stage) in r.by_part.iter().enumerate() {
-            let d = across(&train, k, &lib).backlash;
+            let d = across(&train, k, &lib).backlash.both().unwrap();
             let opens = stage.layouts.is_empty();
             check(&format!("stage {k} forward"), &d.forward, opens);
             check(&format!("stage {k} backward"), &d.backward, opens);
@@ -10030,12 +10027,12 @@ mod tests {
         let r = solve_train(&two_pairs(), &library()).unwrap();
         for (forward, backward) in [
             (
-                r.total().unwrap().backlash.forward.nominal,
-                r.total().unwrap().backlash.backward.nominal,
+                r.total().unwrap().backlash.forward.unwrap().nominal,
+                r.total().unwrap().backlash.backward.unwrap().nominal,
             ),
             (
-                r.total().unwrap().backlash.forward.maximum,
-                r.total().unwrap().backlash.backward.maximum,
+                r.total().unwrap().backlash.forward.unwrap().maximum,
+                r.total().unwrap().backlash.backward.unwrap().maximum,
             ),
         ] {
             assert!(forward > 0.0);
@@ -10047,8 +10044,8 @@ mod tests {
         }
         // ...and the input end is the looser one, because it turns faster.
         assert!(
-            r.total().unwrap().backlash.backward.nominal
-                > r.total().unwrap().backlash.forward.nominal
+            r.total().unwrap().backlash.backward.unwrap().nominal
+                > r.total().unwrap().backlash.forward.unwrap().nominal
         );
     }
 
@@ -10061,11 +10058,13 @@ mod tests {
         // To the last bits: the two directions are two solves of the flow
         // with the driver on the other row, and differ by rounding alone.
         assert!(
-            (r.total().unwrap().efficiency.forward - r.total().unwrap().efficiency.backward).abs()
+            (r.total().unwrap().efficiency.forward.unwrap()
+                - r.total().unwrap().efficiency.backward.unwrap())
+            .abs()
                 < 1e-14,
             "{} vs {}",
-            r.total().unwrap().efficiency.forward,
-            r.total().unwrap().efficiency.backward
+            r.total().unwrap().efficiency.forward.unwrap(),
+            r.total().unwrap().efficiency.backward.unwrap()
         );
         assert!(!r.total().unwrap().efficiency.locked().backward);
     }
@@ -10084,7 +10083,7 @@ mod tests {
         let ideal = solve_train(&lossless, &lib).unwrap();
         let real = solve_train(&two_pairs(), &lib).unwrap();
 
-        assert!((ideal.total().unwrap().efficiency.forward - 1.0).abs() < 1e-12);
+        assert!((ideal.total().unwrap().efficiency.forward.unwrap() - 1.0).abs() < 1e-12);
         let t = two_pairs();
         let (real_out, ideal_out) = (
             at_port(&real, &t, PEAK, end_of(&t)).torque.abs(),
@@ -10092,7 +10091,9 @@ mod tests {
         );
         assert!(real_out < ideal_out);
         // ...and the shortfall is exactly the product of the stage efficiencies.
-        assert!((real_out - ideal_out * real.total().unwrap().efficiency.forward).abs() < 1e-9);
+        assert!(
+            (real_out - ideal_out * real.total().unwrap().efficiency.forward.unwrap()).abs() < 1e-9
+        );
     }
 
     /// **An automatic profile shift asks about the depth the tooth actually
@@ -10253,6 +10254,7 @@ mod tests {
                 .unwrap()
                 .backlash
                 .forward
+                .unwrap()
                 .nominal
         };
 
@@ -10262,6 +10264,7 @@ mod tests {
             .unwrap()
             .backlash
             .forward
+            .unwrap()
             .nominal;
         let first = loosen(0) - reference;
         let last = loosen(1) - reference;
@@ -11383,7 +11386,8 @@ mod tests {
         // carry the number.
         use crate::note::Explain;
         assert_eq!(e.note().key, cause.note().key);
-        assert!(e.to_string().starts_with("part 2: "), "{e}");
+        // ...and carries the part, numbered as the panel numbers it.
+        assert_eq!(e.note().values["part"], "2", "{e}");
     }
 
     /// Both shifts given leaves the optimiser nothing to choose, and it says so
@@ -11669,7 +11673,7 @@ mod tests {
             let ratios: Vec<f64> = r.by_part.iter().map(reduction).collect();
             for (k, s) in r.by_part.iter().enumerate() {
                 let upstream: f64 = ratios[..k].iter().product();
-                let speed_in = case.speed() / upstream;
+                let speed_in = case.speed().unwrap() / upstream;
                 let speeds = [speed_in, speed_in / ratios[k]];
                 let expected = [0usize, 1].map(|i| {
                     let to_output: f64 = if i == 0 {
@@ -12291,7 +12295,7 @@ mod tests {
             .paths
             .iter()
             .flat_map(|p| [p.backlash.forward, p.backlash.backward])
-            .map(|b| [b.nominal, b.minimum, b.maximum])
+            .map(|b| [b.unwrap().nominal, b.unwrap().minimum, b.unwrap().maximum])
             .collect()
     }
 
@@ -12414,7 +12418,7 @@ mod tests {
             &test_library(),
         )
         .unwrap();
-        let got = deg(&meshed.paths[0].backlash.forward);
+        let got = deg(&meshed.paths[0].backlash.forward.unwrap());
         assert!(
             (got[0] - 0.0).abs() < 5e-7 && (got[1] - 0.139_563).abs() < 5e-7,
             "{got:?}"
@@ -12431,7 +12435,7 @@ mod tests {
         case.enabled = true;
         t.load_cases.push(case);
         let r = solve_train(&t, &test_library()).unwrap();
-        let got = deg(&r.paths[0].backlash.forward);
+        let got = deg(&r.paths[0].backlash.forward.unwrap());
         assert!(
             (got[0] - 0.0).abs() < 5e-7 && (got[1] - 0.197_206).abs() < 5e-7,
             "{got:?}"
@@ -12444,7 +12448,7 @@ mod tests {
             set.distances[0].tolerance_minus = tol;
             let r = solve_train(&Train::alone(&set, 2.0, 3000.0), &test_library()).unwrap();
             let b = r.paths[0].backlash.forward;
-            for v in [b.nominal, b.minimum, b.maximum] {
+            for v in [b.unwrap().nominal, b.unwrap().minimum, b.unwrap().maximum] {
                 assert!((v - 0.041_724).abs() < 5e-7, "planetary at ±{tol}: {b:?}");
             }
         }
@@ -12699,7 +12703,7 @@ mod a_path_is_what_it_crosses {
             "{name}: ratio {} vs {ratio}",
             path.ratio
         );
-        let (e, pe) = (alone.efficiency.unwrap(), path.efficiency);
+        let (e, pe) = (alone.efficiency.unwrap(), path.efficiency.both().unwrap());
         assert!(
             close(pe.forward, e.forward) && close(pe.backward, e.backward),
             "{name}: efficiency {pe:?} vs {e:?}"
@@ -12707,11 +12711,11 @@ mod a_path_is_what_it_crosses {
         assert_eq!(pe.locked(), e.locked(), "{name}: locked");
         let (b, pb) = (alone.backlash.unwrap(), path.backlash);
         assert!(
-            close(pb.forward.nominal, b.forward.nominal)
-                && close(pb.backward.nominal, b.backward.nominal),
+            close(pb.forward.unwrap().nominal, b.forward.nominal)
+                && close(pb.backward.unwrap().nominal, b.backward.nominal),
             "{name}: backlash {pb:?} vs {b:?}"
         );
-        let (c, pc) = (alone.circulation.unwrap(), path.circulation);
+        let (c, pc) = (alone.circulation.unwrap(), path.circulation.both().unwrap());
         assert!(
             close(pc.forward, c.forward) && close(pc.backward, c.backward),
             "{name}: circulation {pc:?} vs {c:?}"

@@ -709,29 +709,9 @@ impl Refused {
 }
 
 impl std::fmt::Display for Refused {
+    /// The note — its key and values, no words ([`crate::note::Explain`]).
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.reason {
-            Reason::NotFinite => write!(f, "{} is not a finite number", self.field),
-            Reason::Outside(b) => write!(
-                f,
-                "{} is {}, outside {}",
-                self.field,
-                figure(self.value),
-                interval(&b)
-            ),
-            Reason::PastBudget { size, budget } => write!(
-                f,
-                "{} is {}: the output would be {size} bytes, past its budget of {budget}",
-                self.field,
-                figure(self.value)
-            ),
-            Reason::PastMemory => write!(
-                f,
-                "{} is {}: more than this machine's memory holds",
-                self.field,
-                figure(self.value)
-            ),
-        }
+        write!(f, "{}", crate::note::Explain::note(self))
     }
 }
 

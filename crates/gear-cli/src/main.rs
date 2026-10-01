@@ -295,6 +295,19 @@ fn words() -> gear_io::strings::Catalogue {
     gear_io::strings::Catalogue::english()
 }
 
+/// Why something was refused, in the catalogue's English: the core says it
+/// as a key and values ([`gear_core::note::Explain`]), never as words.
+pub(crate) fn in_words(e: &dyn gear_core::note::Explain) -> String {
+    let note = e.note();
+    let text = words().render(&note);
+    // A refusal in one part of a train carries the part; the harness says
+    // it first, as the panel numbers parts.
+    match note.values.get("part") {
+        Some(part) => format!("part {part}: {text}"),
+        None => text,
+    }
+}
+
 /// A mesh efficiency in both directions, with any direction it refuses to be
 /// driven in **named**.
 ///
@@ -303,6 +316,25 @@ fn words() -> gear_io::strings::Catalogue {
 /// able to say the other thing — a pair that cannot be driven *forward* showed
 /// only `0.000 %` in the forward column, which reads as arithmetic rather than
 /// as a statement about the mechanism. See `Directional::locked`.
+/// A figure to `decimals` places, or `—` where it was not computed.
+pub(crate) fn figure(x: Option<f64>, decimals: usize) -> String {
+    x.map_or_else(|| "—".to_owned(), |x| format!("{x:.decimals$}"))
+}
+
+/// A path's efficiency both ways, where either may not have been computed.
+fn path_ways(e: gear_core::contact::Directional<Option<f64>>) -> String {
+    e.both().map_or_else(
+        || {
+            format!(
+                "{} % forward / {} % backward  (the flow was not solved)",
+                figure(e.forward.map(|x| 100.0 * x), 3),
+                figure(e.backward.map(|x| 100.0 * x), 3)
+            )
+        },
+        both_ways,
+    )
+}
+
 fn both_ways(e: gear_core::contact::Directional<f64>) -> String {
     let locked = e.locked();
     let said = match (locked.forward, locked.backward) {
@@ -385,6 +417,11 @@ fn refuse(why: &dyn std::fmt::Display) -> ! {
     std::process::exit(2)
 }
 
+/// [`refuse`], for a reason the core gave, in the catalogue's English.
+fn refuse_for(e: &dyn gear_core::note::Explain) -> ! {
+    refuse(&in_words(e))
+}
+
 /// Where the harness is told its output budget, in bytes.
 const BUDGET_VARIABLE: &str = "GEARCALC_OUTPUT_BUDGET";
 
@@ -409,7 +446,7 @@ fn budget() -> Budget {
 fn num(args: &[String], n: usize, default: f64, field: &str, bound: gear_core::auto::Bound) -> f64 {
     let v = arg(args, n, default);
     if let Err(e) = gear_core::input::scalar(field, v, bound) {
-        refuse(&e);
+        refuse_for(&e);
     }
     v
 }
@@ -418,7 +455,7 @@ fn num(args: &[String], n: usize, default: f64, field: &str, bound: gear_core::a
 fn count(args: &[String], n: usize, default: u32, field: &str) -> u32 {
     let v: u32 = arg(args, n, default);
     if let Err(e) = gear_core::input::scalar(field, f64::from(v), gear_core::input::COUNT) {
-        refuse(&e);
+        refuse_for(&e);
     }
     v
 }
@@ -427,7 +464,7 @@ fn count(args: &[String], n: usize, default: u32, field: &str) -> u32 {
 /// reads it through (`gear_core::input::GEAR`): refused naming the field.
 fn asked(p: GearParams) -> GearParams {
     if let Err(e) = p.check() {
-        refuse(&e);
+        refuse_for(&e);
     }
     p
 }
@@ -869,7 +906,7 @@ fn hula_report(n: u32, clearance: f64, m_outer: f64, m_inner: f64, cutter_teeth:
     let solved = match solve_hula(&stage, 2.0, 1000.0, &lib) {
         Ok(r) => r,
         Err(e) => {
-            eprintln!("that stage has no geometry: {e}");
+            eprintln!("that stage has no geometry: {}", in_words(&e));
             return;
         }
     };
@@ -1419,7 +1456,7 @@ fn hula_sweep(n: u32, clearance: f64, mesh_index: usize) {
     let solved = match solve_hula(&stage, 2.0, 1000.0, &lib) {
         Ok(r) => r,
         Err(e) => {
-            eprintln!("that stage has no geometry: {e}");
+            eprintln!("that stage has no geometry: {}", in_words(&e));
             return;
         }
     };
@@ -1583,16 +1620,19 @@ fn train_file_report(path: Option<&str>) {
                     .map_or((0.0, 0.0), |s| (s.speed.unwrap_or(0.0), s.torque))
             };
             let (a_end, b_end) = (at_end(&a), at_end(&b));
-            let total = |r: &gear_core::train::TrainResult| -> (f64, f64, f64) {
-                r.total().map_or((f64::NAN, f64::NAN, f64::NAN), |p| {
-                    (p.ratio, p.efficiency.forward, p.backlash.forward.nominal)
-                })
+            let total = |r: &gear_core::train::TrainResult| {
+                let p = r.total();
+                (
+                    p.map(|p| p.ratio),
+                    p.and_then(|p| p.efficiency.forward),
+                    p.and_then(|p| p.backlash.forward.map(|b| b.nominal)),
+                )
             };
             let (ta, tb) = (total(&a), total(&b));
-            let rows: [(&str, f64, f64); 5] = [
+            let rows: [(&str, Option<f64>, Option<f64>); 5] = [
                 ("total ratio", ta.0, tb.0),
-                ("output speed rpm", a_end.0, b_end.0),
-                ("output torque Nm", a_end.1, b_end.1),
+                ("output speed rpm", Some(a_end.0), Some(b_end.0)),
+                ("output torque Nm", Some(a_end.1), Some(b_end.1)),
                 ("efficiency forward", ta.1, tb.1),
                 ("backlash out deg", ta.2, tb.2),
             ];
@@ -1601,10 +1641,12 @@ fn train_file_report(path: Option<&str>) {
                 // Bit-identical or not at all: these come from the same
                 // arithmetic on numbers that either survived the file or did
                 // not. A tolerance here would hide exactly what is being asked.
-                let same = x.to_bits() == y.to_bits();
+                let same = x.map(f64::to_bits) == y.map(f64::to_bits);
                 all &= same;
                 println!(
-                    "  {name:<22} {x:>16.9} {y:>16.9}   {}",
+                    "  {name:<22} {:>16} {:>16}   {}",
+                    figure(x, 9),
+                    figure(y, 9),
                     if same { "yes" } else { "NO" }
                 );
             }
@@ -1680,24 +1722,29 @@ fn convert_report(path: Option<&str>) {
                     .shaft(end)
                     .map_or((0.0, 0.0), |s| (s.speed.unwrap_or(0.0), s.torque))
             };
-            let total = |r: &gear_core::train::TrainResult| -> (f64, f64, f64) {
-                r.total().map_or((f64::NAN, f64::NAN, f64::NAN), |p| {
-                    (p.ratio, p.efficiency.forward, p.backlash.forward.nominal)
-                })
+            let total = |r: &gear_core::train::TrainResult| {
+                let p = r.total();
+                (
+                    p.map(|p| p.ratio),
+                    p.and_then(|p| p.efficiency.forward),
+                    p.and_then(|p| p.backlash.forward.map(|b| b.nominal)),
+                )
             };
             let ((ta, tb), (ea, eb)) = ((total(&a), total(&b)), (at_end(&a), at_end(&b)));
             let mut all = true;
             for (name, x, y) in [
                 ("total ratio", ta.0, tb.0),
-                ("output speed rpm", ea.0, eb.0),
-                ("output torque Nm", ea.1, eb.1),
+                ("output speed rpm", Some(ea.0), Some(eb.0)),
+                ("output torque Nm", Some(ea.1), Some(eb.1)),
                 ("efficiency forward", ta.1, tb.1),
                 ("backlash out deg", ta.2, tb.2),
             ] {
-                let same = x.to_bits() == y.to_bits();
+                let same = x.map(f64::to_bits) == y.map(f64::to_bits);
                 all &= same;
                 println!(
-                    "  {name:<22} {x:>16.9} {y:>16.9}   {}",
+                    "  {name:<22} {:>16} {:>16}   {}",
+                    figure(x, 9),
+                    figure(y, 9),
                     if same { "yes" } else { "NO" }
                 );
             }
@@ -1836,7 +1883,7 @@ fn shifts_report(z1: u32, z2: u32) {
                 row(&format!("{a:.4}"), &p);
                 said(&p);
             }
-            Err(e) => println!("{a:.4}: {e}"),
+            Err(e) => println!("{a:.4}: {}", in_words(&e)),
         }
     }
 
@@ -1864,7 +1911,7 @@ fn shifts_report(z1: u32, z2: u32) {
                 row(&format!("{a:.4}"), &p);
                 said(&p);
             }
-            Err(e) => println!("{a:.4}: {e}"),
+            Err(e) => println!("{a:.4}: {}", in_words(&e)),
         }
     }
 }
@@ -1903,7 +1950,7 @@ fn epicyclic_shifts_report() {
         );
         hula.set_search(true);
         match solve_hula(&hula, 2.0, 1000.0, &lib) {
-            Err(e) => println!("{d:<12} {e}"),
+            Err(e) => println!("{d:<12} {}", in_words(&e)),
             Ok(r) => {
                 let v = hula_view(&hula, &r).expect("a hula stage");
                 println!(
@@ -1948,7 +1995,7 @@ fn epicyclic_shifts_report() {
                     members.iter().all(|g| g.clamps.is_empty())
                 );
             }
-            Err(e) => println!("{sun}/{planet}: {e}"),
+            Err(e) => println!("{sun}/{planet}: {}", in_words(&e)),
         }
     }
 
@@ -1973,7 +2020,7 @@ fn epicyclic_shifts_report() {
                     members.iter().all(|g| g.clamps.is_empty())
                 );
             }
-            Err(e) => println!("{n}: {e}"),
+            Err(e) => println!("{n}: {}", in_words(&e)),
         }
     }
 }
@@ -2135,7 +2182,7 @@ fn train_report(mode: Option<&str>) {
     let r = match solve_train(&train, &lib) {
         Ok(r) => r,
         Err(e) => {
-            eprintln!("train did not solve: {e}");
+            eprintln!("train did not solve: {}", in_words(&e));
             return;
         }
     };
@@ -2147,18 +2194,25 @@ fn train_report(mode: Option<&str>) {
             kinematics::port(p.from),
             kinematics::port(p.to),
             p.ratio,
-            both_ways(p.efficiency)
+            path_ways(p.efficiency)
         );
+        let band = |b: Option<gear_core::train::Backlash>| {
+            b.map_or_else(
+                || "— deg  (min —, max —)".to_owned(),
+                |b| {
+                    format!(
+                        "{:.5} deg  (min {:.5}, max {:.5})",
+                        b.nominal, b.minimum, b.maximum
+                    )
+                },
+            )
+        };
         println!(
-            "       backlash at {:<4} {:.5} deg  (min {:.5}, max {:.5})   at {:<4} {:.5} deg  (min {:.5}, max {:.5})",
+            "       backlash at {:<4} {}   at {:<4} {}",
             kinematics::port(p.to),
-            p.backlash.forward.nominal,
-            p.backlash.forward.minimum,
-            p.backlash.forward.maximum,
+            band(p.backlash.forward),
             kinematics::port(p.from),
-            p.backlash.backward.nominal,
-            p.backlash.backward.minimum,
-            p.backlash.backward.maximum
+            band(p.backlash.backward)
         );
     }
     print_train_cases(&train, &r);
@@ -2902,7 +2956,7 @@ fn show(p: GearParams) {
         gear_core::gear::Gear::try_new(g.params, budget()).and_then(|g| g.profile(400, budget()));
     match drawn {
         Ok(pts) => println!("  profile points {:12}", pts.len()),
-        Err(e) => refuse(&e),
+        Err(e) => refuse_for(&e),
     }
 }
 
@@ -2979,9 +3033,11 @@ fn dump() {
                             thickness_mod: 1.0,
                         });
                         println!(
-                            "S\t{:.17e}\t{:.17e}\t{:.17e}\t{:.17e}\t{:.17e}\t{:.17e}\t{:.17e}\t{:.17e}\t{:.17e}\t{:.17e}\t{:.17e}\t{:.17e}\t{:.17e}\t{:.17e}\t{:.17e}\t{}\t{}\t{}",
+                            "S\t{:.17e}\t{:.17e}\t{:.17e}\t{:.17e}\t{:.17e}\t{:.17e}\t{:.17e}\t{:.17e}\t{:.17e}\t{}\t{:.17e}\t{:.17e}\t{:.17e}\t{:.17e}\t{:.17e}\t{}\t{}\t{}",
                             g.r, g.rb, g.ra, g.rf, g.st, g.rho, g.bc, g.ac, g.l,
-                            g.u_j, g.s_j, g.r_j, g.theta0, g.theta_a, g.psi_b,
+                            // A tooth with no flank prints `NaN`, as this record always has.
+                            g.flank.map_or_else(|| "NaN".to_owned(), |f| format!("{:.17e}", f.junction)),
+                            g.s_j, g.r_j, g.theta0, g.theta_a, g.psi_b,
                             u8::from(g.undercut), u8::from(g.severed), g.clamps.notes.len()
                         );
                         let (r, th) = g.half_profile(200);
@@ -3067,7 +3123,7 @@ fn dxf(teeth: u32, x: f64, tol: f64, angular_shift: f64) {
         }),
         budget(),
     )
-    .unwrap_or_else(|e| refuse(&e));
+    .unwrap_or_else(|e| refuse_for(&e));
     chord(tol);
     let text = gear_io::gear_to_dxf(
         &g,
@@ -3077,7 +3133,7 @@ fn dxf(teeth: u32, x: f64, tol: f64, angular_shift: f64) {
             budget: budget(),
         },
     );
-    print!("{}", text.unwrap_or_else(|e| refuse(&e)));
+    print!("{}", text.unwrap_or_else(|e| refuse_for(&e)));
 }
 
 /// A ring's bore, cut by the default shaper, as a DXF on stdout.
@@ -3099,13 +3155,13 @@ fn dxf_ring(teeth: u32, x: f64, tol: f64) {
             budget: budget(),
         },
     );
-    print!("{}", text.unwrap_or_else(|e| refuse(&e)));
+    print!("{}", text.unwrap_or_else(|e| refuse_for(&e)));
 }
 
 /// A drawing's chord tolerance, read against its row.
 fn chord(tol: f64) {
     if let Err(e) = gear_core::input::asked(&gear_core::input::CHORD_TOLERANCE, Some(tol), "") {
-        refuse(&e);
+        refuse_for(&e);
     }
 }
 
@@ -3655,7 +3711,7 @@ fn worm_stage_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, torque: 
     let solved = match solve(&stage, torque, 0.0, &lib) {
         Ok(r) => r,
         Err(e) => {
-            eprintln!("cannot solve that stage: {e}");
+            eprintln!("cannot solve that stage: {}", in_words(&e));
             return;
         }
     };
@@ -3770,7 +3826,7 @@ fn planetary_report(sun: u32, planet: u32, planets: u32, sun_shift: f64, ring_sh
         return;
     }
     if let Some((ring, e)) = below {
-        println!("\nwhy it starts: z_ring {ring}: {e}");
+        println!("\nwhy it starts: z_ring {ring}: {}", in_words(&e));
     }
 
     println!(
@@ -3806,7 +3862,7 @@ fn planetary_report(sun: u32, planet: u32, planets: u32, sun_shift: f64, ring_sh
 
     // Why the list stops where it does, in the part's own words.
     match refused {
-        Some((ring, e)) => println!("\nwhy it stops: z_ring {ring}: {e}"),
+        Some((ring, e)) => println!("\nwhy it stops: z_ring {ring}: {}", in_words(&e)),
         None => println!("\nwhy it stops: the sweep's own limit, four times the ideal ring"),
     }
 }
@@ -3854,7 +3910,12 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
                     .arranged_as(Arrangement { input, fixed }),
                 &lib,
             ) {
-                Err(e) => println!("  {:>7} in, {:>7} held: {e}", name(input), name(fixed)),
+                Err(e) => println!(
+                    "  {:>7} in, {:>7} held: {}",
+                    name(input),
+                    name(fixed),
+                    in_words(&e)
+                ),
                 Ok(solved) => {
                     let r = set_view(&solved).expect("a set");
                     if !shown {
@@ -3978,7 +4039,7 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
             let mut stage = base.clone();
             stage.distances[0].distance = gear_core::Auto::fixed(asked);
             match solve(&stage, 2.0, 3000.0, &lib) {
-                Err(e) => println!("{asked:<12.4} {e}"),
+                Err(e) => println!("{asked:<12.4} {}", in_words(&e)),
                 Ok(solved) => {
                     let r = set_view(&solved).expect("a set");
                     println!(
@@ -4038,8 +4099,9 @@ fn crossed_report(z1: u32, z2: u32, shaft_angle: f64) {
         };
         match solve(&stage, 2.0, 0.0, &lib) {
             Err(e) => println!(
-                "{beta1:>7.1} {:>7.1}  {e}",
-                g.wheel_helix_angle_rad.to_degrees()
+                "{beta1:>7.1} {:>7.1}  {}",
+                g.wheel_helix_angle_rad.to_degrees(),
+                in_words(&e)
             ),
             Ok(solved) => {
                 let r = pair(&solved, solved.ratio).expect("a pair");
@@ -4135,7 +4197,7 @@ fn crossed_report(z1: u32, z2: u32, shaft_angle: f64) {
                 eps,
                 100.0 * eta
             ),
-            Err(e) => println!("{name:<34} {e}"),
+            Err(e) => println!("{name:<34} {}", in_words(&e)),
         }
     }
 }

@@ -125,7 +125,7 @@ is the expression above rather than the plausible `w_tip/(2 cos α_t)`.
 **A tooth that ends at its tip.** Where the fillet and the involute cross
 above the tip — deep in the undercut band, on a stub addendum, or with the tip
 under the base circle where there is no involute — the tooth is its fillets up
-to the tip. The junction is the fillet at `r_a`, `u_j = u_tip` (an empty
+to the tip. The junction is the fillet at `r_a`, the flank's two rolls equal (an empty
 flank), the tip land is the fillet's angle there, and `clamp.tip_below_form`
 says so. A tooth with no flank takes no bending rating. The fillet's travel at
 a radius is bracketed on `[−r, 0]`, since `r(s) ≥ |s|` and `r(0) = r_f`; the
@@ -133,8 +133,8 @@ crossing is bracketed between the fillet at the base circle and at the tip.
 
 **Severed teeth.** Where the fillet reaches the centreline the cutter has removed
 the whole tooth. The profile is truncated there so it stays a simple closed
-curve, `severed` is set, and `u_j` and `u_tip` become NaN — any code touching the
-flank must check `severed` first.
+curve, `severed` is set, and the tooth has no flank (`Tooth::flank` is `None`):
+nothing reads a roll it does not have.
 
 **Homogeneity.** Every length is homogeneous of degree one in the module and
 every angle is invariant. This is exact and is asserted over the parameter grid.

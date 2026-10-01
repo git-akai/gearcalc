@@ -66,10 +66,6 @@ pub(super) fn unchanged(before: &Train, after: &Train) -> bool {
     format!("{before:?}") == format!("{after:?}")
 }
 
-fn whole(n: usize) -> u32 {
-    u32::try_from(n).unwrap_or(u32::MAX)
-}
-
 /// **What an edit would do**: `after` — the train it would leave, or why
 /// it would not be made — against `before`, both solved against `lib`.
 ///
@@ -98,11 +94,7 @@ pub fn preview(
         .iter()
         .zip(counts(before).into_iter().zip(counts(after)))
         .filter(|(_, (was, now))| was != now)
-        .map(|(k, (was, now))| {
-            Note::new(k)
-                .count("before", whole(was))
-                .count("after", whole(now))
-        })
+        .map(|(k, (was, now))| Note::new(k).tally("before", was).tally("after", now))
         .collect();
     if changes.is_empty() && unchanged(before, after) {
         changes.push(Note::new(key::PREVIEW_NOTHING));
@@ -118,8 +110,7 @@ pub fn preview(
     let first = |r: &Result<TrainResult, TrainError>| {
         r.as_ref().ok().and_then(|r| r.paths.first().cloned())
     };
-    let ends =
-        |note: Note, p: &PathReport| note.count("from", whole(p.from)).count("to", whole(p.to));
+    let ends = |note: Note, p: &PathReport| note.tally("from", p.from).tally("to", p.to);
     // A ratio is two sides, read as the path's row reads it (`reads`): the
     // one a count, so it prints as one, and the other its figure.
     let figures = |note: Note, p: &PathReport, ratio: &str, efficiency: &str| {
@@ -129,11 +120,12 @@ pub fn preview(
         } else {
             (to, from)
         };
-        note.count(&one, 1).number(&turns, p.reads.turns, 4).number(
-            efficiency,
-            100.0 * p.efficiency.forward,
-            2,
-        )
+        let note = note.count(&one, 1).number(&turns, p.reads.turns, 4);
+        // A flow that was not solved has no efficiency to quote.
+        match p.efficiency.forward {
+            Some(e) => note.number(efficiency, 100.0 * e, 2),
+            None => note.text(efficiency, "—"),
+        }
     };
     let gone = |p: &PathReport| ends(Note::new(key::PREVIEW_PATH_GONE), p);
     let appears = |p: &PathReport| {

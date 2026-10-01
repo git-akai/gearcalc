@@ -83,6 +83,50 @@ impl Ratio {
         Some(Self { num, den })
     }
 
+    /// **A double's exact value**: every finite double is `m·2^e` with `m` a
+    /// 53-bit integer, so it is a rational, and this is that rational with no
+    /// rounding. `None` where it is not finite, or where its numerator or
+    /// denominator needs more than an `i128` holds: any number from `2¹²⁷`,
+    /// and one below about `2⁻⁷⁴` whose mantissa uses all its bits.
+    ///
+    /// For a figure a designer gave, read where the question is exact — two
+    /// speeds given on one rigid chain agree or they do not.
+    #[must_use]
+    pub fn of_double(x: f64) -> Option<Self> {
+        if !x.is_finite() {
+            return None;
+        }
+        if x == 0.0 {
+            return Some(Self::ZERO);
+        }
+        // `x = mantissa · 2^exponent`, the mantissa an odd integer once its
+        // trailing zeros are taken into the exponent.
+        let bits = x.to_bits();
+        let biased = i32::try_from((bits >> 52) & 0x7ff).ok()?;
+        let fraction = i128::from(bits & ((1_u64 << 52) - 1));
+        let (mut mantissa, mut exponent) = if biased == 0 {
+            (fraction, -1074)
+        } else {
+            (fraction | (1_i128 << 52), biased - 1075)
+        };
+        let zeros = mantissa.trailing_zeros();
+        mantissa >>= zeros;
+        exponent += i32::try_from(zeros).ok()?;
+        if x < 0.0 {
+            mantissa = -mantissa;
+        }
+        let power = |e: i32| -> Option<i128> {
+            1_i128
+                .checked_shl(u32::try_from(e).ok()?)
+                .filter(|p| *p > 0)
+        };
+        if exponent >= 0 {
+            Self::new(mantissa.checked_mul(power(exponent)?)?, 1)
+        } else {
+            Self::new(mantissa, power(-exponent)?)
+        }
+    }
+
     /// A whole number.
     #[must_use]
     pub const fn whole(n: i64) -> Self {
@@ -163,8 +207,8 @@ impl Ratio {
         self.checked_mul(other.recip()?)
     }
 
-    /// What a reader sees. **Lossy on purpose and one-way**: nothing here reads
-    /// a float back.
+    /// What a reader sees. **Lossy on purpose**: the one way a float comes
+    /// back is [`Self::of_double`], which reads a designer's figure exactly.
     #[must_use]
     pub fn to_f64(self) -> f64 {
         self.num as f64 / self.den as f64
@@ -220,6 +264,38 @@ mod tests {
 
     fn r(n: i128, d: i128) -> Ratio {
         Ratio::new(n, d).unwrap()
+    }
+
+    /// **A double read exactly**: its value as a rational, with no rounding —
+    /// so it reads back to the same double — and `None` where the rational
+    /// does not fit or the double is not a number.
+    #[test]
+    fn a_double_is_read_as_the_rational_it_is() {
+        assert_eq!(Ratio::of_double(4300.0), Some(Ratio::whole(4300)));
+        assert_eq!(Ratio::of_double(-1700.0), Some(Ratio::whole(-1700)));
+        assert_eq!(Ratio::of_double(0.0), Some(Ratio::ZERO));
+        assert_eq!(Ratio::of_double(-0.375), Some(r(-3, 8)));
+        // 0.1 is not a tenth: it is the nearest double, exactly.
+        assert_eq!(
+            Ratio::of_double(0.1),
+            Some(r(3_602_879_701_896_397, 36_028_797_018_963_968))
+        );
+        let mut read = 0;
+        for x in [1.0, 1e-20, 123.456, 2e30, -7.0 / 3.0, f64::EPSILON, 1e37] {
+            let q = Ratio::of_double(x).unwrap();
+            assert_eq!(q.to_f64().to_bits(), x.to_bits(), "{x}");
+            read += 1;
+        }
+        assert_eq!(read, 7);
+        // Past what an i128 holds either way, and not numbers at all.
+        for x in [1e39, 1e-30, 5e-324, f64::MAX, f64::NAN, f64::INFINITY] {
+            assert_eq!(Ratio::of_double(x), None, "{x}");
+        }
+        // The edges: 2¹²⁶ fits, 2¹²⁷ does not; 2⁻¹²⁶ fits, 2⁻¹²⁷ does not.
+        assert!(Ratio::of_double(2f64.powi(126)).is_some());
+        assert_eq!(Ratio::of_double(2f64.powi(127)), None);
+        assert!(Ratio::of_double(2f64.powi(-126)).is_some());
+        assert_eq!(Ratio::of_double(2f64.powi(-127)), None);
     }
 
     /// **Equal numbers are the same value.** Normalising on construction is

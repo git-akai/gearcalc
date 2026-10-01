@@ -93,19 +93,19 @@ fn report(name: &str, train: &Train, r: &TrainResult) {
     println!("== {name} ==");
     for p in &r.paths {
         println!(
-            "  path b{} -> b{}  ratio {:.6}  efficiency {:.6} / {:.6} %  backlash {:.6} / {:.6} deg",
+            "  path b{} -> b{}  ratio {:.6}  efficiency {} / {} %  backlash {} / {} deg",
             p.from,
             p.to,
             p.ratio,
-            100.0 * p.efficiency.forward,
-            100.0 * p.efficiency.backward,
-            p.backlash.forward.nominal,
-            p.backlash.backward.nominal,
+            crate::figure(p.efficiency.forward.map(|e| 100.0 * e), 6),
+            crate::figure(p.efficiency.backward.map(|e| 100.0 * e), 6),
+            crate::figure(p.backlash.forward.map(|b| b.nominal), 6),
+            crate::figure(p.backlash.backward.map(|b| b.nominal), 6),
         );
         println!(
-            "    power through the teeth {:.6} / {:.6}   one more tooth: {}",
-            p.circulation.forward,
-            p.circulation.backward,
+            "    power through the teeth {} / {}   one more tooth: {}",
+            crate::figure(p.circulation.forward, 6),
+            crate::figure(p.circulation.backward, 6),
             p.per_tooth
                 .iter()
                 .map(|r| opt(*r, 6))

@@ -47,7 +47,7 @@ pub struct Never;
 
 impl std::fmt::Display for Never {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("never")
+        std::fmt::Debug::fmt(self, f)
     }
 }
 

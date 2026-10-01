@@ -214,9 +214,10 @@ impl<T: Copy> Auto<T> {
 ///
 /// These encode no physics. They stop input that cannot describe a real gear
 /// from producing a NaN or a self-intersecting outline. Every guard that fires
-/// appends a human-readable note, so a clamped result is never returned
-/// silently — check [`Clamps::any`] when a number looks wrong, because the
-/// geometry may not be the geometry that was asked for.
+/// appends a note — a key and its values, whose words are the catalogue's —
+/// so a clamped result is never returned silently: check [`Clamps::any`] when
+/// a number looks wrong, because the geometry may not be the geometry that
+/// was asked for.
 #[derive(Clone, Debug, Default)]
 pub struct Clamps {
     pub notes: Vec<crate::note::Note>,

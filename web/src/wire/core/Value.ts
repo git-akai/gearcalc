@@ -6,7 +6,9 @@ import type { Basis } from "./Basis";
  */
 export type Value = { value: number, basis: Basis, 
 /**
- * Why this number is what it is, where that is not obvious. Always present
- * on anything that is not a plain datasheet reading.
+ * Why this number is what it is, where that is not obvious. On a
+ * library's entry, present on anything that is not a plain datasheet
+ * reading; a designer's own replacement ([`Basis::Overridden`]) needs
+ * none, its basis being the designer.
  */
 note?: string | null, };

@@ -562,6 +562,35 @@ impl System {
         })
     }
 
+    /// **The meshes a torque can go round without reaching any body**: those
+    /// whose rows take part in a dependency among the rows — `Aᵀ c = 0` with
+    /// `c ≠ 0`, a set of multipliers that put no torque on any body — by
+    /// mesh index, as [`Self::play`] numbers them. A twin countershaft's
+    /// four meshes, a doubled mesh's two; empty where the rows are
+    /// independent. A coupling in such a loop is a row and not a mesh, and
+    /// is not listed. Exact, so a loop is one or is not.
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::Overflow`].
+    pub fn circulating(&self) -> Result<Vec<usize>, Refusal> {
+        let n = self.rows.len();
+        let mut reduced = Reduced::new(n);
+        for i in 0..self.bodies {
+            let mut row: Vec<Ratio> = self.rows.iter().map(|r| r[i]).collect();
+            row.push(Ratio::ZERO);
+            reduced.absorb(row)?;
+        }
+        let free = reduced.solution(n).residual;
+        Ok(self
+            .mesh_rows
+            .iter()
+            .enumerate()
+            .filter(|(_, &row)| free.iter().any(|r| !r.direction[row].is_zero()))
+            .map(|(k, _)| k)
+            .collect())
+    }
+
     /// The structural rows with this right-hand side, then the conditions, one
     /// at a time so that the one that conflicts can be named.
     fn solve(

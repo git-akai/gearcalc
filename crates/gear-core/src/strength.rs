@@ -203,7 +203,7 @@ pub struct RootSection {
     ///
     /// A property of the whole fillet rather than of a point on it, so it is
     /// defined wherever the critical section ended up and needs no fallback when
-    /// that is on the flank. It is read at [`ToothOutline::fillet_root`], the
+    /// that is on the flank. It is read at [`FilletEnds::root`], the
     /// deepest point, where the cut is tightest — gated by
     /// `the_fillet_is_tightest_at_its_root`, which sweeps the whole fillet and
     /// checks nothing is smaller.
@@ -441,25 +441,12 @@ pub trait ToothOutline {
     /// otherwise know what it is running on. Before it existed the search took
     /// 30° from a constant and was simply wrong on a ring.
     fn tangent_angle_deg(&self) -> f64;
-    /// Fillet parameter bracket, ordered `(lo, hi)`.
-    fn fillet_bracket(&self) -> (f64, f64);
-    /// The fillet parameter at its **deepest** point, where it meets the root.
-    ///
-    /// The other end of [`Self::fillet_junction`]'s bracket, and the point the
-    /// fillet is tightest at — so it is where `ρ_f`, the *minimum* radius of
-    /// curvature of the fillet curve, is read. Named rather than taken as an
-    /// endpoint of [`Self::fillet_bracket`] because which endpoint that is
-    /// differs between a rack-cut tooth and a ring, and a caller that guessed
-    /// would be right on one of them.
-    fn fillet_root(&self) -> f64;
-    /// The fillet parameter where the fillet meets the involute flank.
-    ///
-    /// The notch does not stop existing when the critical section climbs above
-    /// it, so this is the fillet point nearest a flank tangency — see
-    /// [`RootSection::notch_parameter`].
-    fn fillet_junction(&self) -> f64;
-    /// Flank roll-parameter bracket, ordered `(lo, hi)`.
-    fn flank_bracket(&self) -> (f64, f64);
+    /// The fillet's two ends, as parameters of [`Self::fillet_at`]; `None`
+    /// where the cut left no fillet.
+    fn fillet(&self) -> Option<FilletEnds>;
+    /// Flank roll-parameter bracket, ordered `(lo, hi)`; `None` where the
+    /// member has no flank.
+    fn flank_bracket(&self) -> Option<(f64, f64)>;
     /// Fillet point and tangent at `s`, in the frame above.
     fn fillet_at(&self, s: f64) -> ([f64; 2], [f64; 2]);
     /// Flank point and tangent at roll `u`, in the frame above.
@@ -512,6 +499,34 @@ pub trait ToothOutline {
     fn rim_support(&self, thickness: f64) -> RimSupport;
 }
 
+/// A fillet's two ends, as parameters of [`ToothOutline::fillet_at`].
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FilletEnds {
+    /// Where the fillet meets the involute flank.
+    ///
+    /// The notch does not stop existing when the critical section climbs above
+    /// it, so this is the fillet point nearest a flank tangency — see
+    /// [`RootSection::notch_parameter`].
+    pub junction: f64,
+    /// Its **deepest** point, where it meets the root: the point the fillet is
+    /// tightest at, so where `ρ_f`, the *minimum* radius of curvature of the
+    /// fillet curve, is read. Named rather than taken as an end of
+    /// [`Self::bracket`] because which end that is differs between a
+    /// rack-cut tooth and a ring.
+    pub root: f64,
+    /// The bracket a search along the fillet runs over, `(lo, hi)`: the
+    /// member's own, which is `(junction, root)` on a rack-cut tooth.
+    pub bracket: (f64, f64),
+}
+
+impl FilletEnds {
+    /// The bracket a search along the fillet runs over.
+    #[must_use]
+    pub fn bracket(&self) -> (f64, f64) {
+        self.bracket
+    }
+}
+
 impl ToothOutline for Tooth {
     fn transverse_module(&self) -> f64 {
         self.mt
@@ -522,23 +537,21 @@ impl ToothOutline for Tooth {
     fn is_usable(&self) -> bool {
         // A tooth with no flank — severed, or ended at its tip on the fillet —
         // has nowhere to take a load.
-        !self.severed && self.u_j < self.u_tip
+        self.flank.is_some_and(|f| f.junction < f.tip)
     }
     fn tangent_angle_deg(&self) -> f64 {
         TANGENT_ANGLE_DEG
     }
-    fn fillet_bracket(&self) -> (f64, f64) {
-        (self.s_j, 0.0)
-    }
-    fn fillet_junction(&self) -> f64 {
-        self.s_j
-    }
-    fn fillet_root(&self) -> f64 {
+    fn fillet(&self) -> Option<FilletEnds> {
         // Rack travel zero is the tooth centreline: the deepest the corner cut.
-        0.0
+        Some(FilletEnds {
+            junction: self.s_j,
+            root: 0.0,
+            bracket: (self.s_j, 0.0),
+        })
     }
-    fn flank_bracket(&self) -> (f64, f64) {
-        (self.u_j, self.u_tip)
+    fn flank_bracket(&self) -> Option<(f64, f64)> {
+        self.flank.map(|f| (f.junction, f.tip))
     }
     fn fillet_at(&self, s: f64) -> ([f64; 2], [f64; 2]) {
         fillet_point_and_tangent(self, s)
@@ -603,19 +616,15 @@ impl ToothOutline for crate::ring::Ring {
     fn tangent_angle_deg(&self) -> f64 {
         TANGENT_ANGLE_INTERNAL_DEG
     }
-    fn fillet_bracket(&self) -> (f64, f64) {
-        self.fillet.map_or((0.0, 0.0), |f| {
-            (f.phi_root.min(f.phi_j), f.phi_root.max(f.phi_j))
+    fn fillet(&self) -> Option<FilletEnds> {
+        self.fillet.map(|f| FilletEnds {
+            junction: f.phi_j,
+            root: f.phi_root,
+            bracket: (f.phi_root.min(f.phi_j), f.phi_root.max(f.phi_j)),
         })
     }
-    fn fillet_junction(&self) -> f64 {
-        self.fillet.map_or(0.0, |f| f.phi_j)
-    }
-    fn fillet_root(&self) -> f64 {
-        self.fillet.map_or(0.0, |f| f.phi_root)
-    }
-    fn flank_bracket(&self) -> (f64, f64) {
-        (self.u_tip, self.u_j)
+    fn flank_bracket(&self) -> Option<(f64, f64)> {
+        Some((self.u_tip, self.u_j))
     }
     fn fillet_at(&self, s: f64) -> ([f64; 2], [f64; 2]) {
         flip_y(crate::ring::Ring::fillet_point_and_tangent(self, s))
@@ -739,7 +748,10 @@ pub fn root_sections<T: ToothOutline + ?Sized>(
     let crossing = [0.0, load_point[1] + (-load_point[0] / dir[0]) * dir[1]];
     let vertex = crossing[1];
 
-    let (fillet_lo, fillet_hi) = g.fillet_bracket();
+    let Some(fillet) = g.fillet() else {
+        return Vec::new();
+    };
+    let (fillet_lo, fillet_hi) = fillet.bracket();
     let s = match method {
         // Along the fillet the tangent angle to the centreline sweeps from near
         // zero at the junction to 90° at the root circle, so this is monotone
@@ -771,7 +783,9 @@ pub fn root_sections<T: ToothOutline + ?Sized>(
         // teeth touch the fillet, larger ones the flank.
         CriticalSection::LewisParabola => {
             let condition = |q: [f64; 2], t: [f64; 2]| q[0] * t[1] + 2.0 * t[0] * (vertex - q[1]);
-            let (flank_lo, flank_hi) = g.flank_bracket();
+            let Some((flank_lo, flank_hi)) = g.flank_bracket() else {
+                return Vec::new();
+            };
             // **Each curve offers its least `x²/(y_v − y)`**, the Lewis
             // measure, over the whole curve below the vertex: at an interior
             // tangency, or at one of the curve's ends. Savage, Rubadeux & Coe
@@ -963,10 +977,11 @@ fn finish<T: ToothOutline + ?Sized>(
     // (the junction) for a section on the flank: reported as the notch nearest
     // the section, and read by a fit only where the section is in the fillet
     // (`RootSection::stress_correction`).
-    let fillet_radius = g.fillet_curvature(if on_flank { g.fillet_junction() } else { s });
+    let fillet = g.fillet()?;
+    let fillet_radius = g.fillet_curvature(if on_flank { fillet.junction } else { s });
     // ...and `ρ_f`, which is not a point on the section at all but the tightest
     // the fillet ever gets. See `RootSection::min_fillet_curvature`.
-    let min_fillet_radius = g.fillet_curvature(g.fillet_root());
+    let min_fillet_radius = g.fillet_curvature(fillet.root);
 
     let m = g.transverse_module();
     let alpha_n = g.normal_pressure_angle();
@@ -1610,8 +1625,9 @@ pub fn bending_stress(
     rim: Option<RimSupport>,
 ) -> Option<f64> {
     let factor = section.bending_factor(model)?;
-    let y_b = rim.map_or(1.0, |r| r.factor());
-    Some(tangential_force / (face_width * section.module) * factor * y_b)
+    let stress = tangential_force / (face_width * section.module) * factor;
+    // A gear with no rim stated is solid, and nothing corrects it.
+    Some(rim.map_or(stress, |r| stress * r.factor()))
 }
 
 /// The critical section to rate a gear's bending on, loaded at the highest
@@ -1680,8 +1696,9 @@ struct LoadPoint<'a, T: ToothOutline + ?Sized> {
     sense: f64,
     /// The construction the section is found by.
     method: CriticalSection,
-    // The flank the roll must land on is read from `v` rather than stored: it is
-    // `flank_bracket`, and it is the same question for both kinds of member.
+    /// The flank the roll must land on, `(lo, hi)`: `flank_bracket`, the same
+    /// question for both kinds of member.
+    flank: (f64, f64),
 }
 
 impl<T: ToothOutline + ?Sized> LoadPoint<'_, T> {
@@ -1700,7 +1717,7 @@ impl<T: ToothOutline + ?Sized> LoadPoint<'_, T> {
     /// the load angle's magnitude turns — a corner in the rated factor.
     /// Either may be off the cycle; the caller clips.
     fn corners(&self) -> (f64, f64, Option<f64>) {
-        let (lo, hi) = self.v.flank_bracket();
+        let (lo, hi) = self.flank;
         let far = if self.sense < 0.0 { lo } else { hi };
         let level = brent(|u| self.v.flank_tilt(u), lo, hi, Tol::default());
         (far, self.back_to(far), level.map(|u| self.back_to(u)))
@@ -1716,7 +1733,7 @@ impl<T: ToothOutline + ?Sized> LoadPoint<'_, T> {
         // separate `generated` range carried for the ring alone, on the reading
         // that only a shaper-cut flank stops early. Both stop; they stop at the
         // two ends of the same bracket.
-        let (lo, hi) = self.v.flank_bracket();
+        let (lo, hi) = self.flank;
         (roll >= lo.min(hi) && roll <= lo.max(hi)).then_some(roll)
     }
 }
@@ -2001,7 +2018,7 @@ fn load_point<'a, T: ToothOutline>(
     let eps_n = transverse_contact_ratio / (cos_bb * cos_bb);
     // The tip, the direction of travel and the limit are one fact read three
     // ways; see `ToothOutline::tip_at_high_roll`.
-    let (lo, hi) = v.flank_bracket();
+    let (lo, hi) = v.flank_bracket()?;
     let (u_tip, sense) = if v.tip_at_high_roll() {
         (hi, -1.0)
     } else {
@@ -2019,6 +2036,7 @@ fn load_point<'a, T: ToothOutline>(
             rb,
             sense,
             method,
+            flank: (lo, hi),
             v,
         },
         eps_n,
@@ -2343,7 +2361,7 @@ mod tests {
                                     .and_then(|x| x.bending_factor(RootStressModel::DolanBroghamer))
                                     .map(|f| f * crate::contact::load_share(d, en, model))
                             };
-                            let (lo, hi) = v.flank_bracket();
+                            let (lo, hi) = v.flank_bracket().unwrap();
                             let far = (hi - lo) * v.rb
                                 / crate::plane::base_pitch(v.transverse_module(), v.alpha_t)
                                 - short / (cos_bb * cos_bb);
@@ -2492,7 +2510,7 @@ mod tests {
                         // A path a mesh could put on this tooth lies on its
                         // flank end to end: no longer than the flank, in base
                         // pitches.
-                        let (lo, hi) = g.flank_bracket();
+                        let (lo, hi) = g.flank_bracket().unwrap();
                         let flank = (hi - lo) * g.base_radius()
                             / crate::plane::base_pitch(
                                 g.transverse_module(),
@@ -2647,7 +2665,8 @@ mod tests {
             },
         ] {
             let g = Tooth::new(p);
-            let sec = root_section_with(&g, g.u_tip, CriticalSection::TangentAngle).unwrap();
+            let sec =
+                root_section_with(&g, g.flank.unwrap().tip, CriticalSection::TangentAngle).unwrap();
             let (_, t) = fillet_point_and_tangent(&g, sec.s);
             let angle = (t[0].abs()).atan2(t[1].abs()).to_degrees();
             assert!(
@@ -2665,7 +2684,7 @@ mod tests {
                 teeth,
                 ..Default::default()
             });
-            let sec = root_section(&g, g.u_tip).unwrap();
+            let sec = root_section(&g, g.flank.unwrap().tip).unwrap();
             assert!(
                 sec.s <= 0.0 && sec.s >= g.s_j,
                 "s={} outside [{}, 0]",
@@ -2685,7 +2704,7 @@ mod tests {
             teeth: 23,
             ..Default::default()
         });
-        let (p, d) = flank_point_and_load_direction(&g, g.u_tip);
+        let (p, d) = flank_point_and_load_direction(&g, g.flank.unwrap().tip);
         // distance from the gear centre to the load line
         let dist = (p[0] * d[1] - p[1] * d[0]).abs();
         assert!(
@@ -2703,7 +2722,7 @@ mod tests {
                 teeth,
                 ..Default::default()
             });
-            let y = root_section(&g, g.u_tip).unwrap().form_factor;
+            let y = root_section(&g, g.flank.unwrap().tip).unwrap().form_factor;
             assert!(y < last, "z={teeth}: Y_F {y} did not fall below {last}");
             last = y;
         }
@@ -2719,7 +2738,7 @@ mod tests {
                 profile_shift: f64::from(xi) * 0.1,
                 ..Default::default()
             });
-            let sec = root_section(&g, g.u_tip).unwrap();
+            let sec = root_section(&g, g.flank.unwrap().tip).unwrap();
             assert!(
                 sec.root_chord > last_chord,
                 "x={xi}: root chord did not grow"
@@ -2749,7 +2768,8 @@ mod tests {
             },
         ] {
             let g = Tooth::new(p);
-            let sec = root_section_with(&g, g.u_tip, CriticalSection::TangentAngle).unwrap();
+            let sec =
+                root_section_with(&g, g.flank.unwrap().tip, CriticalSection::TangentAngle).unwrap();
             let d = sec.tangent_direction;
             assert!(
                 d[1] > 0.0,
@@ -2774,7 +2794,7 @@ mod tests {
     #[test]
     fn stress_correction_can_be_switched_off_for_comparison() {
         let g = Tooth::new(GearParams::default());
-        let sec = root_section(&g, g.u_tip).unwrap();
+        let sec = root_section(&g, g.flank.unwrap().tip).unwrap();
         assert!(
             (sec.stress_correction(RootStressModel::FormFactorOnly)
                 .unwrap()
@@ -2799,7 +2819,8 @@ mod tests {
                 root_radius,
                 ..Default::default()
             });
-            let sec = root_section_with(&g, g.u_tip, CriticalSection::TangentAngle).unwrap();
+            let sec =
+                root_section_with(&g, g.flank.unwrap().tip, CriticalSection::TangentAngle).unwrap();
             let ys = sec.stress_correction(RootStressModel::Iso6336).unwrap();
             assert!(
                 ys > last,
@@ -2813,7 +2834,8 @@ mod tests {
     #[test]
     fn notch_parameter_is_the_ratio_the_iso_fit_expects() {
         let g = Tooth::new(GearParams::default());
-        let sec = root_section_with(&g, g.u_tip, CriticalSection::TangentAngle).unwrap();
+        let sec =
+            root_section_with(&g, g.flank.unwrap().tip, CriticalSection::TangentAngle).unwrap();
         let want = sec.root_chord / (2.0 * sec.fillet_curvature);
         assert!((sec.notch_parameter - want).abs() < 1e-12);
         assert!(
@@ -2846,7 +2868,8 @@ mod tests {
             },
         ] {
             let g = Tooth::new(p);
-            let sec = root_section_with(&g, g.u_tip, CriticalSection::LewisParabola).unwrap();
+            let sec = root_section_with(&g, g.flank.unwrap().tip, CriticalSection::LewisParabola)
+                .unwrap();
             let pp = sec.parabola_p.unwrap();
             let vertex = sec.load_line_crossing[1];
             let (q, t) = fillet_point_and_tangent(&g, sec.s);
@@ -2880,8 +2903,10 @@ mod tests {
                 teeth,
                 ..Default::default()
             });
-            let a = root_section_with(&g, g.u_tip, CriticalSection::TangentAngle).unwrap();
-            let b = root_section_with(&g, g.u_tip, CriticalSection::LewisParabola).unwrap();
+            let a =
+                root_section_with(&g, g.flank.unwrap().tip, CriticalSection::TangentAngle).unwrap();
+            let b = root_section_with(&g, g.flank.unwrap().tip, CriticalSection::LewisParabola)
+                .unwrap();
             assert!(
                 b.root_chord < a.root_chord,
                 "z={teeth}: parabola section not narrower"
@@ -2905,7 +2930,7 @@ mod tests {
         let parabola = |g: &Tooth| {
             root_section_rated(
                 g,
-                g.u_tip,
+                g.flank.unwrap().tip,
                 CriticalSection::LewisParabola,
                 RootStressModel::FormFactorOnly,
             )
@@ -2929,9 +2954,13 @@ mod tests {
             "z=1000 should touch the flank"
         );
         assert!(
-            !root_section_with(&large, large.u_tip, CriticalSection::LewisParabola)
-                .unwrap()
-                .tangency_on_flank,
+            !root_section_with(
+                &large,
+                large.flank.unwrap().tip,
+                CriticalSection::LewisParabola
+            )
+            .unwrap()
+            .tangency_on_flank,
             "z=1000 rates at its fillet, whose notch outweighs the flank's larger Y_F"
         );
     }
@@ -2944,15 +2973,17 @@ mod tests {
             teeth: 20,
             ..Default::default()
         });
-        let low = g.u_tip * 0.6;
-        let a1 = root_section_with(&g, g.u_tip, CriticalSection::TangentAngle).unwrap();
+        let low = g.flank.unwrap().tip * 0.6;
+        let a1 =
+            root_section_with(&g, g.flank.unwrap().tip, CriticalSection::TangentAngle).unwrap();
         let a2 = root_section_with(&g, low, CriticalSection::TangentAngle).unwrap();
         assert!(
             (a1.s - a2.s).abs() < 1e-12,
             "the 30 degree section must not move"
         );
 
-        let b1 = root_section_with(&g, g.u_tip, CriticalSection::LewisParabola).unwrap();
+        let b1 =
+            root_section_with(&g, g.flank.unwrap().tip, CriticalSection::LewisParabola).unwrap();
         let b2 = root_section_with(&g, low, CriticalSection::LewisParabola).unwrap();
         assert!(
             (b1.s - b2.s).abs() > 1e-6,
@@ -2968,7 +2999,7 @@ mod tests {
     #[test]
     fn notch_parameter_is_clamped_for_the_fit_but_reported_raw() {
         let g = Tooth::new(GearParams::default());
-        let base = root_section(&g, g.u_tip).unwrap();
+        let base = root_section(&g, g.flank.unwrap().tip).unwrap();
 
         let mut sharp = base;
         sharp.notch_parameter = 50.0; // far past the stated range
@@ -3009,7 +3040,9 @@ mod tests {
                     root_radius,
                     ..Default::default()
                 });
-                let sec = root_section_with(&g, g.u_tip, CriticalSection::TangentAngle).unwrap();
+                let sec =
+                    root_section_with(&g, g.flank.unwrap().tip, CriticalSection::TangentAngle)
+                        .unwrap();
                 assert!(
                     sec.notch_parameter_in_range(),
                     "z={teeth} rho={root_radius}: q_s = {} left the stated range",
@@ -3032,7 +3065,8 @@ mod tests {
             root_radius: 0.05,
             ..Default::default()
         });
-        let sec = root_section_with(&g, g.u_tip, CriticalSection::TangentAngle).unwrap();
+        let sec =
+            root_section_with(&g, g.flank.unwrap().tip, CriticalSection::TangentAngle).unwrap();
         assert!(
             sec.notch_parameter > NOTCH_PARAMETER_RANGE.end,
             "expected q_s past the range, got {}",
@@ -3070,7 +3104,7 @@ mod tests {
                 let g = tooth(z);
                 let parabola = root_section_rated(
                     &g,
-                    g.u_tip,
+                    g.flank.unwrap().tip,
                     CriticalSection::LewisParabola,
                     RootStressModel::FormFactorOnly,
                 )
@@ -3080,9 +3114,14 @@ mod tests {
                 } else {
                     seen_both.0 = true;
                 }
-                let rated = root_section_rated(&g, g.u_tip, CriticalSection::LewisParabola, model)
-                    .and_then(|s| s.bending_factor(model))
-                    .unwrap();
+                let rated = root_section_rated(
+                    &g,
+                    g.flank.unwrap().tip,
+                    CriticalSection::LewisParabola,
+                    model,
+                )
+                .and_then(|s| s.bending_factor(model))
+                .unwrap();
                 if let Some(p) = previous {
                     let step = ((rated - p) / p).abs();
                     assert!(step < 0.01, "{model:?} z={z}: the rating stepped by {step}");
@@ -3110,7 +3149,7 @@ mod tests {
         });
         let sec = root_section_rated(
             &g,
-            g.u_tip,
+            g.flank.unwrap().tip,
             CriticalSection::LewisParabola,
             RootStressModel::FormFactorOnly,
         )
@@ -3118,7 +3157,7 @@ mod tests {
         assert!(sec.tangency_on_flank, "a 1000-tooth gear touches its flank");
 
         // The fillet's own curvature at its junction with the flank.
-        let junction = g.fillet_curvature(g.fillet_junction());
+        let junction = g.fillet_curvature(g.fillet().expect("a cut fillet").junction);
         assert!((sec.fillet_curvature - junction).abs() < 1e-12);
         assert!(
             (sec.notch_parameter - sec.root_chord / (2.0 * junction)).abs() < 1e-12,
@@ -3155,7 +3194,7 @@ mod tests {
             ..Default::default()
         });
         assert!(g.clamps.fired(crate::note::key::CLAMP_TIP_CAPPED_POINTED));
-        let (apex, _) = ToothOutline::flank_at(&g, g.u_tip);
+        let (apex, _) = ToothOutline::flank_at(&g, g.flank.unwrap().tip);
         let scale = apex[0].hypot(apex[1]);
         assert!(
             !beyond_rounding(apex[0], scale),
@@ -3167,12 +3206,16 @@ mod tests {
         assert!(scale > 2.0, "a radius that tells a product from a quotient");
         assert!(!beyond_rounding(0.5 * COORDINATE_ROUNDING * scale, scale));
         assert!(beyond_rounding(10.0 * COORDINATE_ROUNDING * scale, scale));
-        let found = root_sections(&g, g.u_tip, CriticalSection::LewisParabola);
+        let found = root_sections(&g, g.flank.unwrap().tip, CriticalSection::LewisParabola);
         assert_eq!(found.len(), 2, "{found:?}");
         let flank = found.iter().find(|s| s.tangency_on_flank).unwrap();
-        assert_eq!(flank.s, g.u_j, "the flank offers its end at the fillet");
+        assert_eq!(
+            flank.s,
+            g.flank.unwrap().junction,
+            "the flank offers its end at the fillet"
+        );
         assert!(found.iter().all(|s| beyond_rounding(s.root_chord, scale)));
-        let rated = root_section_with(&g, g.u_tip, CriticalSection::LewisParabola)
+        let rated = root_section_with(&g, g.flank.unwrap().tip, CriticalSection::LewisParabola)
             .and_then(|s| s.bending_factor(RootStressModel::DolanBroghamer))
             .unwrap();
         assert!(
@@ -3329,7 +3372,7 @@ mod tests {
             teeth: 25,
             ..Default::default()
         });
-        let sec = root_section(&g, g.u_tip).unwrap();
+        let sec = root_section(&g, g.flank.unwrap().tip).unwrap();
         let s = |t: f64, b: f64| {
             let load = Load::new(t, b);
             bending_stress(
@@ -3568,7 +3611,7 @@ mod tests {
         // Loaded at the same place, the two must agree exactly.
         let eps = 1.6;
         let pb = crate::plane::base_pitch(g.mt, g.alpha_t);
-        let a = root_section(&g, g.u_tip - (eps - 1.0) * pb / g.rb).unwrap();
+        let a = root_section(&g, g.flank.unwrap().tip - (eps - 1.0) * pb / g.rb).unwrap();
         let b = bending_section(&g, eps).unwrap();
         assert!((a.form_factor - b.form_factor).abs() < 1e-15);
     }
@@ -3646,8 +3689,11 @@ mod tests {
             let cos_bb = g.base_helix_angle().cos();
             let pbn = crate::plane::base_pitch(v.mt, v.alpha_t);
 
-            let want =
-                root_section(&v, v.u_tip - (eps / (cos_bb * cos_bb) - 1.0) * pbn / v.rb).unwrap();
+            let want = root_section(
+                &v,
+                v.flank.unwrap().tip - (eps / (cos_bb * cos_bb) - 1.0) * pbn / v.rb,
+            )
+            .unwrap();
             let got = bending_section(&g, eps).unwrap();
             assert!(
                 (got.form_factor - want.form_factor).abs() < 1e-15,
@@ -3656,7 +3702,8 @@ mod tests {
 
             // At beta = 0 the virtual contact ratio IS the transverse one.
             if beta == 0.0 {
-                let plain = root_section(&g, g.u_tip - (eps - 1.0) * pbn / g.rb).unwrap();
+                let plain =
+                    root_section(&g, g.flank.unwrap().tip - (eps - 1.0) * pbn / g.rb).unwrap();
                 assert!((got.form_factor - plain.form_factor).abs() < 1e-15);
             }
         }

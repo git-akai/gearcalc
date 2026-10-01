@@ -2722,7 +2722,7 @@
     ! gear.contact_above_allowable
     case 1  T 72.711304  n 51.0000  vs frame 51.0000  sF 1562.229  sH 3418.927  cycles -  widths 11.444898 / 19.778711
     case 2  T 0.348837  n 0.0000  vs frame 0.0000  sF 7.397  sH 235.251  cycles -  widths 0.054187 / 0.093644
-    case 3  T 72.711304  n 40.8000  vs frame 40.8000  sF 1562.229  sH 3418.927  cycles 2.448001e6 / 2.448001e6  widths 20.829715 / 163.443432
+    case 3  T 72.711304  n 40.8000  vs frame 40.8000  sF 1562.229  sH 3418.927  cycles 2.448000e6 / 2.448000e6  widths 20.829715 / 163.443432
   member 5  z 43  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 43.000000
     ! gear.contact_above_allowable
     case 1  T 122.667756  n -29.6512  vs frame -29.6512  sF 1330.927  sH 2716.242  cycles -  widths 9.750384 / 12.484046
@@ -6438,7 +6438,7 @@
     ! gear.contact_above_allowable
     case 1  T 28.575275  n 204.0000  vs frame 204.0000  sF 613.950  sH 2143.305  cycles -  widths 4.497803 / 7.772961
     case 2  T 0.348837  n 0.0000  vs frame 0.0000  sF 7.397  sH 235.251  cycles -  widths 0.054187 / 0.093644
-    case 3  T 28.575275  n 163.2000  vs frame 163.2000  sF 613.950  sH 2143.305  cycles 9.792001e6 / 9.792001e6  widths 8.186001 / 64.232667
+    case 3  T 28.575275  n 163.2000  vs frame 163.2000  sF 613.950  sH 2143.305  cycles 9.792000e6 / 9.792000e6  widths 8.186001 / 64.232667
   member 5  z 43  m 1  alpha 20  x 0.000000  b 10.000000  beta 0.000000  d 43.000000
     ! gear.contact_above_allowable
     case 1  T 48.207976  n -118.6047  vs frame -118.6047  sF 523.050  sH 1702.796  cycles -  widths 3.831865 / 4.906184

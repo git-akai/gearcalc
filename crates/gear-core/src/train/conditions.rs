@@ -164,7 +164,7 @@ pub struct TrainMotion {
 impl TrainMotion {
     /// **`x` at one body, read at another**: a speed, a sweep or a
     /// revolution count stated at `per`, as `of` sees it through the ratios —
-    /// and zero where `per` does not turn, which is a body nothing drives.
+    /// `None` where `per` does not turn, which is a body nothing drives.
     ///
     /// **Divided exactly, and the float multiplied in last.** Both speeds
     /// are quotients of tooth counts; the quotient is taken exactly and
@@ -173,10 +173,10 @@ impl TrainMotion {
     /// a recorded speed one ULP from the correctly rounded value — measured
     /// here, on `30000 · 17/43`, when this was first written that way.
     #[must_use]
-    pub fn read(&self, x: f64, of: usize, per: usize) -> f64 {
+    pub fn read(&self, x: f64, of: usize, per: usize) -> Option<f64> {
         self.solution.values[of]
             .checked_div(self.solution.values[per])
-            .map_or(0.0, |r| r.scale(x))
+            .map(|r| r.scale(x))
     }
 }
 
