@@ -53,6 +53,7 @@
 
 use std::f64::consts::PI;
 
+use crate::involute::inv_inverse;
 use crate::solve::{brent, Tol};
 
 /// Samples per piece of a region (knot to knot), cosine-graded towards both ends where the
@@ -186,34 +187,152 @@ impl Profile {
             .fold((k, k), |(lo, hi), k| (lo.min(k), hi.max(k)))
     }
 
-    /// `[c_lo, c_hi]`, a bracket of the strip's half-width at load `q`, by construction. Where
-    /// `h″ ≥ κ > 0` on `[m − c, m + c]`, `I₁ ≥ κ c π/2`, so the load at half-width `c` is at
-    /// least Hertz's at curvature `κ`; and `|m| ≤ c`, so the window lies in `[−2c, 2c]`. So
-    /// `c_hi`, Hertz's width at the least curvature within `2 c_hi` of the origin, carries at
-    /// least `q`: it is sought band by band between the knots' distances from the origin, the
-    /// first whose own Hertz width fits in it. Below it every curvature is at most `K`, the
-    /// greatest within `2 c_hi`, so Hertz's width at `K` carries at most `q`. `None` where no
-    /// band holds its width: the section is not convex across any window that would carry `q`.
-    fn width_bracket(&self, q: f64, modulus: f64) -> Option<(f64, f64)> {
-        let hertz = |k: f64| (4.0 * q / (PI * modulus * k)).sqrt();
-        let mut reach: Vec<f64> = self.knots.iter().map(|t| t.abs()).collect();
+    /// `σ(t) = h′(t)/t`, `t ≠ 0`: the mean curvature from the origin to `t`, positive across the
+    /// section's valley (where `h′` has the sign of `t`) and nowhere else.
+    fn secant(&self, t: f64) -> f64 {
+        self.slope_at(t) / t
+    }
+
+    /// The least and greatest of `σ` over `[−r, r]`, `None` for `r` the whole line. On each
+    /// interval `h′ = α + k t`, so `σ = k + α/t` is monotone there and both are at a knot, at
+    /// `±r`, or at the line's ends (where `σ` tends to the outer intervals' curvatures).
+    fn secant_within(&self, r: Option<f64>) -> (f64, f64) {
+        let ends = r.map_or([self.curvature[0], self.curvature[self.knots.len()]], |r| {
+            [self.secant(-r), self.secant(r)]
+        });
+        self.knots
+            .iter()
+            .filter(|&&t| t != 0.0 && r.is_none_or(|r| t.abs() <= r))
+            .map(|&t| self.secant(t))
+            .fold(
+                (ends[0].min(ends[1]), ends[0].max(ends[1])),
+                |(lo, hi), s| (lo.min(s), hi.max(s)),
+            )
+    }
+
+    /// `h′ = α + k t` on the interval holding `t`: `(α, k)`.
+    fn line_through(&self, t: f64) -> (f64, f64) {
+        let i = self.knots.partition_point(|&k| k < t);
+        let (tr, a) = self.line_of(i);
+        let k = self.curvature[i];
+        (a - k * tr, k)
+    }
+
+    /// A bracket of the strip's half-width at load `q`, by construction, with the bound on its
+    /// centre that holds across it ([`WidthBracket`]).
+    ///
+    /// At a root of `I₀`, `I₁ = ∫ h′(t) (t/c) dφ` (`t = m + c cos φ`; `I₀ = 0` adds `m/c` to
+    /// `cos φ`), so the load is `(E*/2) ∫ σ(t) t² dφ`: where `σ ≥ σ₋` on the window it is at least
+    /// `(πE*/4) σ₋ c²` (`∫ t² dφ = π (m² + c²/2)`), Hertz's at curvature `σ₋`, convex or not.
+    /// And `m/c = −⟨cos φ⟩` weighted by `σ` (from `I₀ = ∫ σ t dφ = 0`), so where `σ` spans a
+    /// ratio `ρ` on the window, `|m| ≤ μ c` ([`skew`]). So within a region `[−s, s]` of the
+    /// valley, every half-width `c ≤ s/(1 + μ)` has its windows inside it, its centre in
+    /// `[−μc, μc]` (`I₀` of the root's sign at both ends) and a load of at least
+    /// `(πE*/4) σ₋ c²`, `σ₋` the least `σ` on `[−s, s]`. The least `s` whose `c = s/(1 + μ)`
+    /// carries `q` so is `c_hi`: sought band by band between the knots' distances from the
+    /// origin, `μ` from `σ` over the band's whole region, in closed form within each band
+    /// (`s² σ(±s) = k s² ± α s`, a quadratic). Below it every window lies in `[−s, s]`, where
+    /// the load is at most Hertz's at `K`, the greatest curvature there (`I₁ = c ∫ h″ sin² φ
+    /// dφ`), so `c_lo` is Hertz's width at `K`.
+    ///
+    /// `None` where no region of the valley carries `q` by the bound: the gap's slope turns
+    /// back before any half-width would. A contact carried mostly where `σ` has fallen far
+    /// below its value at the origin can exist beyond that reach.
+    fn width_bracket(&self, q: f64, modulus: f64) -> Option<WidthBracket> {
+        // `c² σ₋` that carries `q`.
+        let load = 4.0 * q / (PI * modulus);
+        let mut reach: Vec<f64> = self
+            .knots
+            .iter()
+            .filter(|&&t| t != 0.0)
+            .map(|t| t.abs())
+            .collect();
         reach.sort_by(f64::total_cmp);
         reach.dedup();
-        let bands = reach
-            .into_iter()
-            .filter(|&r| r > 0.0)
-            .map(Some)
-            .chain(std::iter::once(None));
-        let hi = bands
-            .filter_map(|r| {
-                let (least, _) = self.curvature_within(r);
-                let c = (least > 0.0).then(|| hertz(least))?;
-                r.is_none_or(|r| 2.0 * c <= r).then_some(c)
+        let starts = std::iter::once(0.0).chain(reach.iter().copied());
+        let ends = reach.iter().copied().map(Some).chain(std::iter::once(None));
+        let band = |from: f64, to: Option<f64>| -> Option<WidthBracket> {
+            // `σ` over the knots passed; not positive there, the band lies past the valley.
+            let passed = (from > 0.0).then(|| self.secant_within(Some(from)).0);
+            if passed.is_some_and(|s| s <= 0.0) {
+                return None;
+            }
+            let (least, greatest) = self.secant_within(to);
+            // Where `σ` is not positive over the band's whole region, `|m| ≤ c` (the sign of
+            // `h′` alone) holds for every region inside the valley.
+            let skew = if least > 0.0 {
+                skew(greatest / least)
+            } else {
+                1.0
+            };
+            let need = (1.0 + skew) * (1.0 + skew) * load;
+            // The reach `s` in the band with `s² σ ≥ need` at the knots passed and at `±s`.
+            let mid = to.map_or(from + 1.0, |to| 0.5 * (from + to));
+            let (a_right, k_right) = self.line_through(mid);
+            let (a_left, k_left) = self.line_through(-mid);
+            let (right_from, right_to) = reaches(k_right, a_right, need)?;
+            let (left_from, left_to) = reaches(k_left, -a_left, need)?;
+            let s = passed
+                .map_or(from, |p| from.max((need / p).sqrt()))
+                .max(right_from)
+                .max(left_from);
+            let fits = [to, right_to, left_to]
+                .into_iter()
+                .flatten()
+                .all(|end| s <= end);
+            fits.then(|| WidthBracket {
+                lo: (load / self.curvature_within(Some(s)).1).sqrt(),
+                hi: s / (1.0 + skew),
+                skew,
             })
-            .next()?;
-        let (_, greatest) = self.curvature_within(Some(2.0 * hi));
-        Some((hertz(greatest), hi))
+        };
+        starts.zip(ends).find_map(|(from, to)| band(from, to))
     }
+}
+
+/// A bracket of a strip's half-width ([`Profile::width_bracket`]).
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct WidthBracket {
+    /// `c` at which the load is at most `q`, mm.
+    lo: f64,
+    /// `c` at which it is at least `q`, mm.
+    hi: f64,
+    /// `μ`: at every half-width `c` up to `hi`, the centre lies in `[−μc, μc]`.
+    skew: f64,
+}
+
+/// `μ`, the bound on `|m|/c` where `σ` spans a ratio `ρ = σ₊/σ₋` on the window. `|⟨cos φ⟩|`
+/// over `[0, π]` with weights within that ratio is greatest with the greater weight on
+/// `[0, S]`: `max_S (ρ − 1) sin S/(π + (ρ − 1) S) = cos S*`, `tan S* − S* = π/(ρ − 1)` (the
+/// involute's inverse, [`inv_inverse`]); and never above `(ρ − 1)/π`, its limit as `ρ → 1`,
+/// where the inverse runs out of range. `0` for `ρ = 1`, `1` as `ρ → ∞`.
+fn skew(ratio: f64) -> f64 {
+    let v = PI / (ratio - 1.0);
+    let limit = 1.0 / v;
+    inv_inverse(v).map_or(limit, f64::cos).min(limit).min(1.0)
+}
+
+/// The `s ≥ 0` where `k s² + β s ≥ need` (`need > 0`): `(from, to)`, `to` `None` where it runs
+/// on; `None` where there is none. Each root in the form without a difference of near equals.
+fn reaches(k: f64, beta: f64, need: f64) -> Option<(f64, Option<f64>)> {
+    if k > 0.0 {
+        let d = (beta * beta + 4.0 * k * need).sqrt();
+        let from = if beta >= 0.0 {
+            2.0 * need / (beta + d)
+        } else {
+            (d - beta) / (2.0 * k)
+        };
+        return Some((from, None));
+    }
+    let disc = beta * beta + 4.0 * k * need;
+    if beta <= 0.0 || disc < 0.0 {
+        return None;
+    }
+    let d = disc.sqrt();
+    Some((
+        2.0 * need / (beta + d),
+        (k < 0.0).then(|| (beta + d) / (-2.0 * k)),
+    ))
 }
 
 /// One `φ`-piece of `[0, π]` on which `h′(m + c cos φ) = a + b cos φ`.
@@ -382,12 +501,23 @@ impl Strip {
     /// The strip of `profile` under line load `q` (N/mm) with plane-strain modulus `modulus`
     /// (`E*`, MPa). Hertz's closed form where the curvature at the origin holds across Hertz's
     /// width (no knot inside it: then the equations' root is Hertz's, exactly); else the root of
-    /// the two equations, each bracketed by construction ([`Profile::width_bracket`]; for `m`,
-    /// `I₀(−c) ≤ 0 ≤ I₀(c)` where `h″ > 0` on `[−2c, 2c]`, which the bracket ensures).
+    /// the two equations, each bracketed by construction ([`Profile::width_bracket`]: `c`
+    /// between two Hertz widths, and `m` in `[−μc, μc]`, where `I₀` has the root's sign at
+    /// both ends).
     ///
-    /// `None` where `q` or `modulus` is not a finite number `> 0`, or no window holds the load
-    /// convexly ([`Profile::width_bracket`]).
+    /// `None` where `q` or `modulus` is not a finite number `> 0`, or no region of the
+    /// section's valley carries the load by the bracket's bound ([`Profile::width_bracket`]).
     pub fn new(profile: &Profile, q: f64, modulus: f64) -> Option<Self> {
+        Self::new_by(profile, q, modulus, Profile::width_bracket)
+    }
+
+    /// [`Strip::new`] with the half-width bracketed by `bracket` (a plant's seam).
+    fn new_by(
+        profile: &Profile,
+        q: f64,
+        modulus: f64,
+        bracket: fn(&Profile, f64, f64) -> Option<WidthBracket>,
+    ) -> Option<Self> {
         let positive = |v: f64| v.is_finite() && v > 0.0;
         if !(positive(q) && positive(modulus)) {
             return None;
@@ -399,29 +529,42 @@ impl Strip {
                 return Some(Self::from_root(profile, modulus, 0.0, c));
             }
         }
-        Self::general(profile, q, modulus)
+        Self::solved(profile, q, modulus, ROOT_RESOLUTION, bracket)
     }
 
     /// The root of the two equations, whatever the knots: [`Strip::new`] without Hertz's closed
     /// form (which this equals where it applies).
+    #[cfg(test)]
     pub(crate) fn general(profile: &Profile, q: f64, modulus: f64) -> Option<Self> {
         Self::general_to(profile, q, modulus, ROOT_RESOLUTION)
     }
 
     /// [`Strip::general`] with the root finders' resolution, in units of `ε` of the bracket's
     /// scale.
+    #[cfg(test)]
     pub(crate) fn general_to(
         profile: &Profile,
         q: f64,
         modulus: f64,
         resolution: f64,
     ) -> Option<Self> {
+        Self::solved(profile, q, modulus, resolution, Profile::width_bracket)
+    }
+
+    /// The root of the two equations in `bracket`'s bracket, to `resolution`.
+    fn solved(
+        profile: &Profile,
+        q: f64,
+        modulus: f64,
+        resolution: f64,
+        bracket: fn(&Profile, f64, f64) -> Option<WidthBracket>,
+    ) -> Option<Self> {
         let positive = |v: f64| v.is_finite() && v > 0.0;
         if !(positive(q) && positive(modulus)) {
             return None;
         }
-        let (lo, hi) = profile.width_bracket(q, modulus)?;
-        let centre = |c: f64| centre_of(profile, c, resolution);
+        let WidthBracket { lo, hi, skew } = bracket(profile, q, modulus)?;
+        let centre = |c: f64| centre_of(profile, c, skew, resolution);
         let excess = |c: f64| match centre(c) {
             Some(m) => 0.5 * modulus * c * moments(&segments(profile, m, c)).1 - q,
             None => f64::NAN, // absence: no centre is no value, which `brent` refuses
@@ -676,17 +819,19 @@ fn tol(x_tol: f64) -> Tol {
     }
 }
 
-/// `m` at half-width `c`: the root of `I₀` on `[−c, c]`. `I₀(−c) ≤ 0 ≤ I₀(c)` where `h″ ≥ 0` on
-/// `[−2c, 2c]`, so an end of the other sign is that end to rounding.
-fn centre_of(profile: &Profile, c: f64, resolution: f64) -> Option<f64> {
+/// `m` at half-width `c`: the root of `I₀` on `[−μc, μc]`, `μ` the bracket's `skew`, where
+/// `I₀(−μc) ≤ 0 ≤ I₀(μc)` ([`Profile::width_bracket`]), so an end of the other sign is that
+/// end to rounding.
+fn centre_of(profile: &Profile, c: f64, skew: f64, resolution: f64) -> Option<f64> {
     let f = |m: f64| moments(&segments(profile, m, c)).0;
-    let (at_lo, at_hi) = (f(-c), f(c));
+    let (lo, hi) = (-skew * c, skew * c);
+    let (at_lo, at_hi) = (f(lo), f(hi));
     if at_lo >= 0.0 {
-        Some(-c)
+        Some(lo)
     } else if at_hi <= 0.0 {
-        Some(c)
+        Some(hi)
     } else {
-        brent(f, -c, c, tol(resolution * f64::EPSILON * c))
+        brent(f, lo, hi, tol(resolution * f64::EPSILON * c))
     }
 }
 
@@ -837,11 +982,18 @@ struct Foot {
     w2: f64,
     r1: f64,
     r2: f64,
+    /// Whether the offset's terms are taken: `|h| > floor·|B|`.
+    offset: bool,
 }
 
+/// The relative offset `|h|/|B|` at or below which a panel's offset terms are dropped: none,
+/// they are kept down to `h = 0`, where they vanish with `|h|`. A plant raises it.
+const OFFSET_FLOOR: f64 = 0.0;
+
 impl Foot {
-    /// `None` for `B = 0`: the sliding is uniform over the panel.
-    fn of(a: Vec3, b: Vec3) -> Option<Self> {
+    /// `None` for `B = 0`: the sliding is uniform over the panel. `floor` is the offset's
+    /// ([`OFFSET_FLOOR`]).
+    fn of(a: Vec3, b: Vec3, floor: f64) -> Option<Self> {
         let b2 = dot(b, b);
         (b2 != 0.0).then(|| {
             let bn = b2.sqrt();
@@ -858,6 +1010,7 @@ impl Foot {
                 w2,
                 r1: (bn * w1).hypot(hn),
                 r2: (bn * w2).hypot(hn),
+                offset: hn > floor * bn,
             }
         })
     }
@@ -873,7 +1026,7 @@ impl Foot {
         let (b, w1, w2, hn) = (self.b, self.w1, self.w2, self.hn);
         if self.one_sided() {
             (b * (w1 + w2) / (w2 * self.r1 + w1 * self.r2)).asinh()
-        } else if hn > 0.0 {
+        } else if self.offset {
             (b * w2 / hn).asinh() - (b * w1 / hn).asinh()
         } else {
             0.0
@@ -900,7 +1053,12 @@ impl Foot {
 /// the zero (`|B| ≪ |A|`) loses nothing. Where nothing slides (`A = B = 0`) the direction is
 /// zero: the limit of creep's traction, which Coulomb's set-valued law admits there.
 pub fn panel_slide(a: Vec3, b: Vec3) -> Slide {
-    let Some(foot) = Foot::of(a, b) else {
+    panel_slide_to(a, b, OFFSET_FLOOR)
+}
+
+/// [`panel_slide`] with the offset's floor `floor` (a plant's seam).
+fn panel_slide_to(a: Vec3, b: Vec3, floor: f64) -> Slide {
+    let Some(foot) = Foot::of(a, b, floor) else {
         let na = norm(a);
         let direction = if na > 0.0 {
             scale(a, 1.0 / na)
@@ -916,7 +1074,7 @@ pub fn panel_slide(a: Vec3, b: Vec3) -> Slide {
     // B (R₂ − R₁)/|B|², with R₂ − R₁ = |B|² (w₂ − w₁)(w₂ + w₁)/(R₁ + R₂).
     let mut direction = scale(b, (w1 + w2) / (r1 + r2));
     let mut speed = 0.5 * foot.d_wr();
-    if foot.hn > 0.0 {
+    if foot.offset {
         let da = foot.d_asinh();
         direction = add(direction, foot.h, da / foot.b);
         speed += foot.hn * foot.hn * da / (2.0 * foot.b);
@@ -929,8 +1087,8 @@ pub fn panel_slide(a: Vec3, b: Vec3) -> Slide {
 /// `∫R³ = [wR³]/4 + 3|h|²[wR]/8 + 3|h|⁴ Δasinh/(8|B|)`; where `w₁`, `w₂` have one sign,
 /// `[R³]/(3|B|²) = (w₁ + w₂)(R₁² + R₁R₂ + R₂²)/(3(R₁ + R₂))` and `[wR³] = [wR] R₂² + w₁ R₁ |B|²
 /// (w₁ + w₂)`; with the zero inside, `|w| ≤ 1` and the direct differences lose nothing.
-fn slide_moments(v: Vec3, b: Vec3) -> (Vec3, f64) {
-    let Some(foot) = Foot::of(v, b) else {
+fn slide_moments(v: Vec3, b: Vec3, floor: f64) -> (Vec3, f64) {
+    let Some(foot) = Foot::of(v, b, floor) else {
         let r = norm(v);
         return (scale(v, r), r * r * r);
     };
@@ -948,7 +1106,7 @@ fn slide_moments(v: Vec3, b: Vec3) -> (Vec3, f64) {
             w2 * r2 * r2 * r2 - w1 * r1 * r1 * r1,
         )
     };
-    let (ir, ir3) = if foot.hn > 0.0 {
+    let (ir, ir3) = if foot.offset {
         let da = foot.d_asinh();
         (
             0.5 * dwr + h2 * da / (2.0 * foot.b),
@@ -969,6 +1127,11 @@ fn slide_moments(v: Vec3, b: Vec3) -> (Vec3, f64) {
 /// [`panel_slide`], inside it `v(2/s* − |v|/s*²)` and `2|v|²/s* − |v|³/s*²` through the
 /// moments. A panel the window misses is [`panel_slide`].
 pub fn carter_slide(a: Vec3, b: Vec3, sstar: f64) -> Slide {
+    carter_slide_to(a, b, sstar, OFFSET_FLOOR)
+}
+
+/// [`carter_slide`] with the offset's floor `floor` (a plant's seam).
+fn carter_slide_to(a: Vec3, b: Vec3, sstar: f64, floor: f64) -> Slide {
     let b2 = dot(b, b);
     let na = norm(a);
     if b2 == 0.0 {
@@ -993,14 +1156,14 @@ pub fn carter_slide(a: Vec3, b: Vec3, sstar: f64) -> Slide {
     let ax = cross(a, b);
     let disc = b2 * sstar * sstar - dot(ax, ax);
     if disc <= 0.0 || !disc.is_finite() {
-        return panel_slide(a, b);
+        return panel_slide_to(a, b, floor);
     }
     let sq = disc.sqrt();
     let qq = -(ab + sq.copysign(ab));
     let (r1, r2) = (qq / b2, (na - sstar) * (na + sstar) / qq);
     let (ua, ub) = (r1.min(r2), r1.max(r2));
     if ub <= -0.5 || ua >= 0.5 {
-        return panel_slide(a, b);
+        return panel_slide_to(a, b, floor);
     }
     let mut direction = [0.0; 3];
     let mut speed = 0.0;
@@ -1017,13 +1180,13 @@ pub fn carter_slide(a: Vec3, b: Vec3, sstar: f64) -> Slide {
         let v = add(a, b, 0.5 * (lo + hi));
         let bp = scale(b, d);
         let (e, s) = if inside {
-            let (m1, m3) = slide_moments(v, bp);
+            let (m1, m3) = slide_moments(v, bp, floor);
             (
                 add(scale(v, 2.0 / sstar), m1, -1.0 / (sstar * sstar)),
                 2.0 * (dot(v, v) + dot(bp, bp) / 12.0) / sstar - m3 / (sstar * sstar),
             )
         } else {
-            let s = panel_slide(v, bp);
+            let s = panel_slide_to(v, bp, floor);
             (s.direction, s.speed)
         };
         direction = add(direction, e, d);
@@ -1617,9 +1780,11 @@ mod tests {
 
     /// **The strip solves its equations**, read by a method that shares no code with it: `I₀ =
     /// 0` and `(E*/2) c I₁ = q` by Gauss–Legendre over `φ` of `h′` summed from the steps
-    /// directly, to `1e-13` of each one's scale, on the 491 random strips, the oracle's 43 and
-    /// a section concave beyond its round. Its plant: the prototype's own `(c, m)` (the
-    /// records), whose ends `acos` cut a `√ε` sliver from: nine of the 43 miss by up to `2e-9`.
+    /// directly, to `1e-13` of each one's scale, on the 491 random strips, the oracle's 43, the
+    /// ring's section concave beyond its round (at 100 N/mm, and at 1700 and 2000, where the
+    /// contact runs past the round onto the concave flank) and the near miss of a run with a
+    /// knot inside it ([`near_miss`]). Its plant: the prototype's own `(c, m)` (the records),
+    /// whose ends `acos` cut a `√ε` sliver from: nine of the 43 miss by up to `2e-9`.
     #[test]
     fn the_strip_solves_its_equations() {
         let mut worst = 0.0_f64;
@@ -1632,9 +1797,14 @@ mod tests {
         for (case, strip) in random_strips() {
             check(&case, strip.centre(), strip.half_width());
         }
-        let ring = ring_case();
-        let strip = ring.strip();
-        check(&ring, strip.centre(), strip.half_width());
+        let sections = [100.0, 1700.0, 2000.0]
+            .map(ring_at)
+            .into_iter()
+            .chain(NEAR_MISS_LOADS.map(near_miss));
+        for case in sections {
+            let strip = case.strip();
+            check(&case, strip.centre(), strip.half_width());
+        }
         let file = oracle_file();
         let mut prototype_misses = 0;
         let mut prototype_worst = 0.0_f64;
@@ -1659,16 +1829,16 @@ mod tests {
             "{count} strips: worst residual {worst:.2e}; the prototype's (c, m): {prototype_misses} \
              of 43 miss, worst {prototype_worst:.2e}"
         );
-        assert_eq!(count, 491 + 1 + 43);
+        assert_eq!(count, 491 + 3 + 3 + 43);
         assert!(worst <= RESIDUAL, "{worst:e}");
         assert!(prototype_misses > 0 && prototype_worst > 10.0 * RESIDUAL);
     }
 
-    /// The ring's section (`gap.json`'s ring, pair 0, valley point 3): concave (`k₀ < 0`)
-    /// beyond a round that holds the contact.
-    fn ring_case() -> Case {
+    /// The ring's section (`gap.json`'s ring, pair 0, valley point 3) at line load `q`: concave
+    /// (`k₀ < 0`) beyond a round (its run, [`RING_RUN`]) that holds the contact to 1640 N/mm.
+    fn ring_at(q: f64) -> Case {
         Case {
-            q: 100.0,
+            q,
             k0: -0.048_367_718_543_815_094,
             steps: vec![CurvatureStep {
                 from: Some(-0.061_147_195_323_074_58),
@@ -1682,85 +1852,303 @@ mod tests {
         }
     }
 
+    /// The ring's run: its round, where the curvature is positive.
+    const RING_RUN: (f64, f64) = (-0.061_147_195_323_074_58, 0.111_499_084_453_049_85);
+
+    /// The near miss (the checker's): a run `(−0.03, 0.05)` of curvature `4.95` with a second
+    /// step on `(0.01, 0.05)`, concave (`−0.05`) beyond, at line load `q`. Its contact sits
+    /// inside the run to 300 N/mm, within `2c` of its nearer end from 100 N/mm: what refuses
+    /// a bracket that asks the curvature to be positive over `[−2c, 2c]`.
+    fn near_miss(q: f64) -> Case {
+        let step = |from: f64, to: f64, dk: f64| CurvatureStep {
+            from: Some(from),
+            to: Some(to),
+            dk,
+        };
+        Case {
+            q,
+            k0: -0.05,
+            steps: vec![step(-0.03, 0.05, 5.0), step(0.01, 0.05, 2.0)],
+            flank: Some(FlankPart {
+                lo: Some(-0.03),
+                hi: Some(0.01),
+            }),
+        }
+    }
+
+    /// The near miss's run.
+    const NEAR_MISS_RUN: (f64, f64) = (-0.03, 0.05);
+
+    /// The loads the checker found the near miss refused at, N/mm.
+    const NEAR_MISS_LOADS: [f64; 3] = [100.0, 176.0, 250.0];
+
+    /// Loads at which the near miss's bracket reads `σ` past its run (its band reaches `0.05`,
+    /// so `|m| ≤ μc` is the section's own and not its twin's) while its contact stays inside.
+    const NEAR_EDGE_LOADS: [f64; 4] = [350.0, 360.0, 370.0, 380.0];
+
+    /// `case`'s convex twin on its run `(lo, hi)`: the same section there, the tails' curvature
+    /// `k₀` raised to `−k₀` by a step beyond each end (the run's knots, curvature and slopes are
+    /// the section's to the bit).
+    fn twin(case: &Case, run: (f64, f64)) -> Case {
+        let mut steps = case.steps.clone();
+        steps.extend([
+            CurvatureStep {
+                from: None,
+                to: Some(run.0),
+                dk: -2.0 * case.k0,
+            },
+            CurvatureStep {
+                from: Some(run.1),
+                to: None,
+                dk: -2.0 * case.k0,
+            },
+        ]);
+        Case {
+            steps,
+            ..case.clone()
+        }
+    }
+
+    /// The previous bracket (the plant): Hertz's width at the least curvature within `2c` of
+    /// the origin, band by band, the first that fits; the centre anywhere in `[−c, c]`.
+    fn convex_over_twice_the_width(p: &Profile, q: f64, modulus: f64) -> Option<WidthBracket> {
+        let hertz = |k: f64| (4.0 * q / (PI * modulus * k)).sqrt();
+        let mut reach: Vec<f64> = p.knots.iter().map(|t| t.abs()).collect();
+        reach.sort_by(f64::total_cmp);
+        reach.dedup();
+        let hi = reach
+            .into_iter()
+            .filter(|&r| r > 0.0)
+            .map(Some)
+            .chain(std::iter::once(None))
+            .filter_map(|r| {
+                let (least, _) = p.curvature_within(r);
+                let c = (least > 0.0).then(|| hertz(least))?;
+                r.is_none_or(|r| 2.0 * c <= r).then_some(c)
+            })
+            .next()?;
+        let (_, greatest) = p.curvature_within(Some(2.0 * hi));
+        Some(WidthBracket {
+            lo: hertz(greatest),
+            hi,
+            skew: 1.0,
+        })
+    }
+
+    /// The twin law's tolerance on `c`, `m` (over `c`) and the peak pressure, relative: two
+    /// roots of one pair of equations, found from different brackets. Each `c` lies within its
+    /// finder's `ε c` of where its load crosses `q`; that crossing moves by half the load's
+    /// relative error (`c dF/dc ≈ 2F`): its rounding over at most eight terms (`8ε`) and the
+    /// centre's own `ε c` read through `∂I₁/∂m ≤ K π` against `I₁ ≥ κ c π/2` (`2(K/κ) ε`,
+    /// `K/κ < 1.5` on these sections), `≤ 5.5ε`; the peak, `m` and `c` with it. Both: `≤ 13ε`.
+    const TWIN: f64 = 16.0 * EPS;
+
+    /// What [`twin_law`] saw.
+    #[derive(Default)]
+    struct TwinSeen {
+        /// Loads where the twin's contact stays inside the run: the strips compared.
+        inside: usize,
+        /// Of those, the strips with a knot inside the contact (the general solve).
+        general: usize,
+        /// Loads where it leaves the run: the strip's own equations read instead.
+        beyond: usize,
+        /// The worst miss of the twin, in [`TWIN`]s, and where.
+        worst: Worst,
+        /// The worst residual of a strip beyond its run.
+        residual: f64,
+        /// The strips refused: section and load.
+        refused: Vec<(&'static str, f64)>,
+    }
+
+    /// The twin law over the ring's section (1 to 10⁴ N/mm, eight loads a decade) and the near
+    /// miss (1 to 1778 N/mm, and [`NEAR_MISS_LOADS`]), each strip solved with `bracket`;
+    /// `perturb` moves the strip's `c`, `m` and peak by a share of [`TWIN`] (the tolerance's
+    /// laws).
+    fn twin_law(
+        bracket: fn(&Profile, f64, f64) -> Option<WidthBracket>,
+        perturb: impl Fn(f64) -> f64,
+    ) -> TwinSeen {
+        let decade = |top: i32| (0..=top).map(|k| 10f64.powf(f64::from(k) / 8.0));
+        let ring = decade(32).map(|q| ("ring", ring_at(q), RING_RUN));
+        let near = decade(26)
+            .chain(NEAR_MISS_LOADS)
+            .chain(NEAR_EDGE_LOADS)
+            .map(|q| ("near miss", near_miss(q), NEAR_MISS_RUN));
+        let mut seen = TwinSeen::default();
+        for (name, case, run) in ring.chain(near) {
+            let solve = |c: &Case| {
+                let profile = Profile::new(c.k0, &c.steps).expect("a profile");
+                Strip::new_by(&profile, c.q, STEEL, bracket)
+            };
+            let (Some(strip), Some(twin)) = (solve(&case), solve(&twin(&case, run))) else {
+                seen.refused.push((name, case.q));
+                continue;
+            };
+            let (c, m) = (twin.half_width(), twin.centre());
+            if run.0 < m - c && m + c < run.1 {
+                seen.inside += 1;
+                seen.general += usize::from(!strip.knots.is_empty());
+                let p = twin.peak().pressure;
+                let miss = (perturb(strip.half_width()) - c)
+                    .abs()
+                    .max((perturb(strip.centre()) - m).abs())
+                    / c;
+                let miss = miss.max((perturb(strip.peak().pressure) - p).abs() / p) / TWIN;
+                seen.worst
+                    .see(miss, || format!("{name} at {} N/mm", case.q));
+            } else {
+                seen.beyond += 1;
+                let (r0, r1) = residuals(&case, strip.centre(), strip.half_width());
+                seen.residual = seen.residual.max(r0.abs()).max(r1.abs());
+            }
+        }
+        seen
+    }
+
+    /// **A section concave beyond its run is its convex twin's strip wherever the twin's
+    /// contact stays inside the run**: the equations read `h′` only on the contact, where the
+    /// two are one section. Swept over the ring's section (inside its round to 1640 N/mm; on
+    /// the concave flank beyond, to 10⁴ N/mm, where the strip must still solve its own
+    /// equations, to `1e-13`) and over the near miss (inside its run to 380 N/mm, with a knot
+    /// inside the contact from 44 N/mm, and its bracket reading `σ` past the run from 350):
+    /// `c`, `m` and the peak equal the twin's within [`TWIN`], and nothing is refused. Plant: the previous bracket, convex over `[−2c, 2c]`, which holds
+    /// every load of the ring inside its round (a gate on the ring alone passes it: there the
+    /// strip is Hertz's) and refuses the near miss from 100 N/mm and the ring beyond its round.
+    #[test]
+    fn a_section_concave_beyond_its_run_is_its_convex_twins_strip() {
+        let seen = twin_law(Profile::width_bracket, |x| x);
+        eprintln!(
+            "twin: {} inside ({} general), worst {:.3} of the tolerance ({}); {} beyond, worst \
+             residual {:.2e}; refused {:?}",
+            seen.inside,
+            seen.general,
+            seen.worst.ratio,
+            seen.worst.at,
+            seen.beyond,
+            seen.residual,
+            seen.refused
+        );
+        assert!(seen.refused.is_empty(), "{:?}", seen.refused);
+        assert_eq!(
+            (seen.inside, seen.general, seen.beyond),
+            (26 + 28, 14, 7 + 6)
+        );
+        assert_eq!(seen.worst.count, seen.inside);
+        assert!(seen.worst.ratio <= 1.0 && seen.residual <= RESIDUAL);
+        // The plant: the previous bracket.
+        let plant = twin_law(convex_over_twice_the_width, |x| x);
+        let ring_inside = |q: f64| q < 1640.0;
+        assert!(plant.refused.iter().all(
+            |&(name, q)| name == "near miss" && q >= 99.0 || name == "ring" && !ring_inside(q)
+        ));
+        for q in NEAR_MISS_LOADS {
+            assert!(plant.refused.contains(&("near miss", q)), "{q}");
+        }
+        assert_eq!(plant.refused.len(), 11 + 3 + 4 + 7);
+    }
+
+    /// The twin law's tolerance: a few roundings off passes, and ten times it off misses at
+    /// every strip compared.
+    #[test]
+    fn the_twin_tolerance_passes_rounding_and_fails_ten_times_itself() {
+        let rounded = twin_law(Profile::width_bracket, |x| x * (1.0 + 4.0 * EPS));
+        assert!(rounded.worst.ratio <= 1.0, "{}", rounded.worst.ratio);
+        let tenfold = twin_law(Profile::width_bracket, |x| x * (1.0 + 10.0 * TWIN));
+        assert_eq!(tenfold.worst.missed, tenfold.inside);
+    }
+
     /// **Hertz off a step.** With every knot at or beyond Hertz's edge the general solve is
     /// Hertz: `c`, `m = 0`, the pressure at 64 angles, the peak, and the load to 16 angles, each
     /// to `1e-12` of Hertz's own scale; and moving the knot across the edge by `1e-9 c` (Hertz's
     /// closed form on one side, the general solve on the other) moves nothing by more. Plant:
-    /// the root finders stopped at `1e5 ε` of the bracket (`2e-11`), which misses.
+    /// the centre sought across `[−c, c]` (the bound the sign of `h′` alone gives) by root
+    /// finders stopped at `1e5 ε` of the bracket (`2e-11`), which misses; with the bracket's
+    /// own bound on the centre, which closes on Hertz's `m = 0` wherever `σ` is one value
+    /// across the bracket's region, the coarse finders miss nothing.
     #[test]
     fn hertz_off_a_step() {
-        let worst_of = |resolution: f64| {
-            let mut worst = 0.0_f64;
-            for (q, k0, dk) in [(300.0, 0.4, 3.0), (60.0, 0.8, 20.0), (20.0, 1.5, 2.2)] {
-                let ch = (4.0 * q / (PI * STEEL * k0)).sqrt();
-                let (p0, c_h) = ((q * STEEL * k0 / PI).sqrt(), ch);
-                for (side, at) in [(1.0, 1.0), (-1.0, 1.0), (1.0, 1.5), (-1.0, 1.0 + 1e-9)] {
-                    let s = side * at * ch;
-                    let steps = if side > 0.0 {
-                        [CurvatureStep {
-                            from: Some(s),
-                            to: None,
-                            dk,
-                        }]
-                    } else {
-                        [CurvatureStep {
-                            from: None,
-                            to: Some(s),
-                            dk,
-                        }]
-                    };
-                    let profile = Profile::new(k0, &steps).expect("a profile");
-                    let g = Strip::general_to(&profile, q, STEEL, resolution).expect("a strip");
-                    worst = worst
-                        .max((g.half_width() - c_h).abs() / c_h)
-                        .max(g.centre().abs() / c_h);
-                    for k in 0..=64 {
-                        let th = PI * f64::from(k) / 64.0;
-                        let hertz = p0 * th.sin();
-                        worst = worst.max((g.pressure(th) - hertz).abs() / p0);
-                    }
-                    worst = worst.max((g.peak().pressure - p0).abs() / p0);
-                    for k in 0..=16 {
-                        let th = PI * f64::from(k) / 16.0;
-                        let hertz = q * (th - th.sin() * th.cos()) / PI;
-                        worst = worst.max((g.load_to(th) - hertz).abs() / q);
-                    }
-                }
-                // The knot across the edge: the closed form outside, the general solve inside.
-                for side in [1.0, -1.0] {
-                    let strip_at = |at: f64| {
+        let anywhere = |p: &Profile, q: f64, e: f64| {
+            let b = p.width_bracket(q, e)?;
+            Some(WidthBracket { skew: 1.0, ..b })
+        };
+        let worst_of =
+            |resolution: f64, bracket: fn(&Profile, f64, f64) -> Option<WidthBracket>| {
+                let mut worst = 0.0_f64;
+                for (q, k0, dk) in [(300.0, 0.4, 3.0), (60.0, 0.8, 20.0), (20.0, 1.5, 2.2)] {
+                    let ch = (4.0 * q / (PI * STEEL * k0)).sqrt();
+                    let (p0, c_h) = ((q * STEEL * k0 / PI).sqrt(), ch);
+                    for (side, at) in [(1.0, 1.0), (-1.0, 1.0), (1.0, 1.5), (-1.0, 1.0 + 1e-9)] {
                         let s = side * at * ch;
-                        let step = if side > 0.0 {
-                            CurvatureStep {
+                        let steps = if side > 0.0 {
+                            [CurvatureStep {
                                 from: Some(s),
                                 to: None,
                                 dk,
-                            }
+                            }]
                         } else {
-                            CurvatureStep {
+                            [CurvatureStep {
                                 from: None,
                                 to: Some(s),
                                 dk,
-                            }
+                            }]
                         };
-                        let profile = Profile::new(k0, &[step]).expect("a profile");
-                        let strip = Strip::new(&profile, q, STEEL).expect("a strip");
-                        (strip.knots.len(), strip.peak().pressure, strip.half_width())
-                    };
-                    let (outside, inside) = (strip_at(1.0 + 1e-9), strip_at(1.0 - 1e-9));
-                    assert_eq!((outside.0, inside.0), (0, 1));
-                    worst = worst
-                        .max((outside.1 - inside.1).abs() / p0)
-                        .max((outside.2 - inside.2).abs() / c_h);
+                        let profile = Profile::new(k0, &steps).expect("a profile");
+                        let g = Strip::solved(&profile, q, STEEL, resolution, bracket)
+                            .expect("a strip");
+                        worst = worst
+                            .max((g.half_width() - c_h).abs() / c_h)
+                            .max(g.centre().abs() / c_h);
+                        for k in 0..=64 {
+                            let th = PI * f64::from(k) / 64.0;
+                            let hertz = p0 * th.sin();
+                            worst = worst.max((g.pressure(th) - hertz).abs() / p0);
+                        }
+                        worst = worst.max((g.peak().pressure - p0).abs() / p0);
+                        for k in 0..=16 {
+                            let th = PI * f64::from(k) / 16.0;
+                            let hertz = q * (th - th.sin() * th.cos()) / PI;
+                            worst = worst.max((g.load_to(th) - hertz).abs() / q);
+                        }
+                    }
+                    // The knot across the edge: the closed form outside, the general solve inside.
+                    for side in [1.0, -1.0] {
+                        let strip_at = |at: f64| {
+                            let s = side * at * ch;
+                            let step = if side > 0.0 {
+                                CurvatureStep {
+                                    from: Some(s),
+                                    to: None,
+                                    dk,
+                                }
+                            } else {
+                                CurvatureStep {
+                                    from: None,
+                                    to: Some(s),
+                                    dk,
+                                }
+                            };
+                            let profile = Profile::new(k0, &[step]).expect("a profile");
+                            let strip = Strip::new(&profile, q, STEEL).expect("a strip");
+                            (strip.knots.len(), strip.peak().pressure, strip.half_width())
+                        };
+                        let (outside, inside) = (strip_at(1.0 + 1e-9), strip_at(1.0 - 1e-9));
+                        assert_eq!((outside.0, inside.0), (0, 1));
+                        worst = worst
+                            .max((outside.1 - inside.1).abs() / p0)
+                            .max((outside.2 - inside.2).abs() / c_h);
+                    }
                 }
-            }
-            worst
-        };
-        let worst = worst_of(ROOT_RESOLUTION);
-        let coarse = worst_of(1e5);
-        eprintln!("Hertz off a step: worst {worst:.2e}; at 1e5 ε roots {coarse:.2e}");
-        assert!(worst <= 1e-12, "{worst:e}");
-        assert!(coarse > 1e-12, "{coarse:e}");
+                worst
+            };
+        let worst = worst_of(ROOT_RESOLUTION, Profile::width_bracket);
+        let coarse = worst_of(1e5, Profile::width_bracket);
+        let plant = worst_of(1e5, anywhere);
+        eprintln!(
+            "Hertz off a step: worst {worst:.2e}; at 1e5 ε roots {coarse:.2e}, the centre \
+             across [−c, c] {plant:.2e}"
+        );
+        assert!(worst <= 1e-12 && coarse <= 1e-12, "{worst:e} {coarse:e}");
+        assert!(plant > 1e-12, "{plant:e}");
     }
 
     /// **The load is the pressure's integral.** [`Strip::load_to`], a closed form, equals the
@@ -2224,9 +2612,54 @@ mod tests {
             .collect()
     }
 
-    /// Both laws' means by quadrature: Gauss–Legendre 64 on 8 equal parts of each piece of
-    /// `[−½, ½]` split at the window's ends and at the foot of the zero of sliding.
+    /// The halvings a graded piece takes toward each of its ends: its innermost interval is
+    /// `2^−60 ≈ 1e-18` of it, where a bounded integrand holds less than `1e-18`, and every
+    /// interval but that one lies at least its own length from the end, so the transition of
+    /// width `|h|/|B|` at the foot is resolved at any offset.
+    const GRADES: i32 = 60;
+
+    /// `[p, q]` in intervals graded geometrically toward both ends: each half split at `2^−j`
+    /// of its length from its end, `j ≤` [`GRADES`].
+    fn graded(p: f64, q: f64) -> Vec<(f64, f64)> {
+        let half = 0.5 * (q - p);
+        [(p, 1.0), (q, -1.0)]
+            .into_iter()
+            .flat_map(|(end, dir)| {
+                let at = move |j: i32| end + dir * half * 0.5f64.powi(j);
+                (0..GRADES)
+                    .map(move |j| (at(j + 1), at(j)))
+                    .chain(std::iter::once((at(GRADES), end)))
+                    .map(|(x, y)| (x.min(y), x.max(y)))
+            })
+            .collect()
+    }
+
+    /// `[p, q]` in eight equal parts: the previous reference (with Gauss–Legendre 64), which
+    /// misses the panels near the foot by up to `1e-8`.
+    fn in_eight(p: f64, q: f64) -> Vec<(f64, f64)> {
+        (0..8)
+            .map(|k| {
+                let at = |k: i32| p + (q - p) * f64::from(k) / 8.0;
+                (at(k), at(k + 1))
+            })
+            .collect()
+    }
+
+    /// Both laws' means by quadrature: Gauss–Legendre 30 on each piece of `[−½, ½]` split at
+    /// the window's ends and at the foot of the zero of sliding, [`graded`] toward both ends.
     fn slides_by_quadrature(a: Vec3, b: Vec3, s: f64) -> (Slide, Slide) {
+        slides_on(a, b, s, graded, 30)
+    }
+
+    /// Both laws' means by Gauss–Legendre `nodes` on the intervals `parts` makes of each piece
+    /// of `[−½, ½]` between the window's ends and the foot of the zero of sliding.
+    fn slides_on(
+        a: Vec3,
+        b: Vec3,
+        s: f64,
+        parts: fn(f64, f64) -> Vec<(f64, f64)>,
+        nodes: usize,
+    ) -> (Slide, Slide) {
         let mut cuts = vec![-0.5, 0.5];
         let b2 = dot(b, b);
         if b2 > 0.0 {
@@ -2240,35 +2673,49 @@ mod tests {
         }
         cuts.retain(|&u| (-0.5..=0.5).contains(&u));
         cuts.sort_by(f64::total_cmp);
-        let rule = gauss_legendre_rule(64);
-        let (mut cd, mut cs, mut kd, mut ks) = ([0.0; 3], 0.0, [0.0; 3], 0.0);
-        for w in cuts.windows(2) {
-            for part in 0..8 {
-                let lo = w[0] + (w[1] - w[0]) * f64::from(part) / 8.0;
-                let hi = w[0] + (w[1] - w[0]) * f64::from(part + 1) / 8.0;
-                let (h, mid) = (0.5 * (hi - lo), 0.5 * (lo + hi));
-                for &(x, wt) in &rule {
-                    let v = add(a, b, mid + h * x);
-                    let r = norm(v);
-                    if r == 0.0 {
-                        continue;
-                    }
-                    let f = carter(r / s);
-                    cd = add(cd, v, h * wt / r);
-                    cs += h * wt * r;
-                    kd = add(kd, v, h * wt * f / r);
-                    ks += h * wt * f * r;
+        let rule = gauss_legendre_rule(nodes);
+        // `[Coulomb's direction, speed, Carter's direction, speed]`, summed node by node into
+        // each interval, interval by interval into each piece, and piece by piece: the
+        // rounding grows with the longest of the three sums, not with their product.
+        type Sums = [f64; 8];
+        let plus = |x: Sums, y: Sums| -> Sums { std::array::from_fn(|i| x[i] + y[i]) };
+        let interval = |lo: f64, hi: f64| -> Sums {
+            let (h, mid) = (0.5 * (hi - lo), 0.5 * (lo + hi));
+            rule.iter().fold([0.0; 8], |sum, &(x, wt)| {
+                let v = add(a, b, mid + h * x);
+                let r = norm(v);
+                if r == 0.0 {
+                    return sum;
                 }
-            }
-        }
+                let f = carter(r / s);
+                let (d, k) = (h * wt / r, h * wt * f / r);
+                let node = [
+                    v[0] * d,
+                    v[1] * d,
+                    v[2] * d,
+                    h * wt * r,
+                    v[0] * k,
+                    v[1] * k,
+                    v[2] * k,
+                    h * wt * f * r,
+                ];
+                plus(sum, node)
+            })
+        };
+        let t = cuts.windows(2).fold([0.0; 8], |total, w| {
+            let piece = parts(w[0], w[1])
+                .into_iter()
+                .fold([0.0; 8], |sum, (lo, hi)| plus(sum, interval(lo, hi)));
+            plus(total, piece)
+        });
         (
             Slide {
-                direction: cd,
-                speed: cs,
+                direction: [t[0], t[1], t[2]],
+                speed: t[3],
             },
             Slide {
-                direction: kd,
-                speed: ks,
+                direction: [t[4], t[5], t[6]],
+                speed: t[7],
             },
         )
     }
@@ -2276,7 +2723,7 @@ mod tests {
     /// Round six's moments: the window's differences taken directly wherever the zero of
     /// sliding is, about its foot (the cancellation round seven removed).
     fn carter_slide_direct(a: Vec3, b: Vec3, sstar: f64) -> Slide {
-        let foot = Foot::of(a, b).expect("B ≠ 0");
+        let foot = Foot::of(a, b, OFFSET_FLOOR).expect("B ≠ 0");
         let (w1, w2, r1, r2, b2) = (foot.w1, foot.w2, foot.r1, foot.r2, foot.b2);
         let h2 = foot.hn * foot.hn;
         let da = if foot.hn > 0.0 {
@@ -2307,20 +2754,63 @@ mod tests {
             .fold((p.speed - q.speed).abs(), f64::max)
     }
 
-    /// **Both slides are their quadrature**, split at the window and the zero of sliding, to
-    /// `1e-13` on 3000 panels, a thousand of them a spur line's. Plant: round six's window
-    /// integrals, taken about the foot of the origin: it holds every panel but the spur lines'.
+    /// Panels with the zero of sliding on them a small offset off the origin, where the offset's
+    /// `asinh` terms carry the means: `B` random, the foot `u₀` on the panel, `A = −u₀ B + δ |B|
+    /// e` (`e ⊥ B` a unit vector) with `δ = |h|/|B|` log-uniform on `[1e-16, 1e-3]`; every fourth
+    /// with `h = 0` exactly (`B` and `u₀` dyadic, so `A`, the foot and the offset are exact);
+    /// `s*` log-uniform on `[1e-3, 2] |B|`.
+    fn near_foot_panels() -> Vec<(Vec3, Vec3, f64)> {
+        let mut d = Draw(11);
+        (0..800)
+            .map(|i| {
+                let (a, b) = if i % 4 == 0 {
+                    let mut eighths = || (d.uniform(-16.0, 16.0)).round() / 8.0;
+                    let b: Vec3 = [1.0 + eighths().abs(), eighths(), eighths()];
+                    let u0 = d.uniform(-28.0, 28.0).round() / 64.0;
+                    (b.map(|x| -u0 * x), b)
+                } else {
+                    let mut unit = || d.uniform(-2.0, 2.0);
+                    let b: Vec3 = [unit(), unit(), unit()];
+                    let e = cross(b, [unit(), unit(), unit()]);
+                    let e = scale(e, 1.0 / norm(e));
+                    let u0 = d.uniform(-0.45, 0.45);
+                    let delta = 10f64.powf(d.uniform(-16.0, -3.0));
+                    (add(scale(b, -u0), e, delta * norm(b)), b)
+                };
+                let s = norm(b) * 10f64.powf(d.uniform(-3.0, 0.3));
+                (a, b, s)
+            })
+            .collect()
+    }
+
+    /// The checker's plant on the offset's terms: dropped at `|h| ≤ 1e-8 |B|`.
+    const PLANT_FLOOR: f64 = 1e-8;
+
+    /// **Both slides are their quadrature**, split at the window and the zero of sliding and
+    /// graded toward each cut ([`graded`]), to `1e-13`: on 3000 panels, a thousand of them a
+    /// spur line's, and 800 with the zero of sliding on the panel at `|h|/|B|` from `1e-16` to
+    /// `1e-3` (200 at `h = 0` exactly). Plants: round six's window integrals, taken about the
+    /// foot of the origin, which hold every panel but the spur lines'; and the offset's terms
+    /// dropped at `|h| ≤ 1e-8 |B|` ([`PLANT_FLOOR`]), which holds all 3000 (a gate on them alone
+    /// passes it) and misses near the foot. The reference's own: the previous one, eight equal
+    /// parts a piece, misses near the foot, where the graded one resolves the transition.
     #[test]
     fn both_slides_are_their_quadrature() {
         let (mut worst, mut direct_spur, mut direct_other) = (0.0_f64, 0.0_f64, 0.0_f64);
+        let mut floor_far = 0.0_f64;
         let mut windows = 0;
+        let both = |a: Vec3, b: Vec3, s: f64, floor: f64| {
+            (panel_slide_to(a, b, floor), carter_slide_to(a, b, s, floor))
+        };
+        let miss =
+            |(p, q): (Slide, Slide), (c, k): (Slide, Slide)| slide_miss(p, c).max(slide_miss(q, k));
         let all = panels();
         assert_eq!(all.len(), 3000);
         for (a, b, s, spur) in all {
-            let (coulomb, creep) = slides_by_quadrature(a, b, s);
-            worst = worst
-                .max(slide_miss(panel_slide(a, b), coulomb))
-                .max(slide_miss(carter_slide(a, b, s), creep));
+            let reference = slides_by_quadrature(a, b, s);
+            worst = worst.max(miss((panel_slide(a, b), carter_slide(a, b, s)), reference));
+            floor_far = floor_far.max(miss(both(a, b, s, PLANT_FLOOR), reference));
+            let (_, creep) = reference;
             let whole_window = norm(a) < s && norm(add(a, b, 0.5)) < s && norm(add(a, b, -0.5)) < s;
             if whole_window {
                 windows += 1;
@@ -2332,13 +2822,33 @@ mod tests {
                 }
             }
         }
+        let (mut near, mut floor_near, mut in_parts) = (0.0_f64, 0.0_f64, 0.0_f64);
+        let (mut on_panel, mut exact) = (0, 0);
+        for (a, b, s) in near_foot_panels() {
+            let foot = Foot::of(a, b, OFFSET_FLOOR).expect("B ≠ 0");
+            on_panel += usize::from(!foot.one_sided());
+            exact += usize::from(foot.hn == 0.0);
+            let reference = slides_by_quadrature(a, b, s);
+            let port = both(a, b, s, OFFSET_FLOOR);
+            near = near.max(miss(port, reference));
+            floor_near = floor_near.max(miss(both(a, b, s, PLANT_FLOOR), reference));
+            in_parts = in_parts.max(miss(port, slides_on(a, b, s, in_eight, 64)));
+        }
         eprintln!(
-            "slides: worst {worst:.2e}; {windows} panels inside the window: round six's \
-             {direct_other:.2e} off spur lines, {direct_spur:.2e} on them"
+            "slides: worst {worst:.2e}, near the foot {near:.2e}; {windows} panels inside the \
+             window: round six's {direct_other:.2e} off spur lines, {direct_spur:.2e} on them; \
+             offset floor {floor_far:.2e}, near the foot {floor_near:.2e}; eight parts near the \
+             foot {in_parts:.2e}"
         );
+        assert_eq!((on_panel, exact), (800, 200));
         assert!(windows > 100, "{windows}");
-        assert!(worst <= SLIDE_ABS, "{worst:e}");
+        assert!(
+            worst <= SLIDE_ABS && near <= SLIDE_ABS,
+            "{worst:e} {near:e}"
+        );
         assert!(direct_other <= SLIDE_ABS && direct_spur > SLIDE_ABS);
+        assert!(floor_far <= SLIDE_ABS && floor_near > 10.0 * SLIDE_ABS);
+        assert!(in_parts > 10.0 * SLIDE_ABS);
     }
 
     // ------------------------------------------------------------------ homogeneity
@@ -2439,8 +2949,9 @@ mod tests {
     }
 
     /// What is no strip is refused: a load or modulus that is not a finite number `> 0`, a
-    /// step that runs backwards or holds no number, and a section concave across every window
-    /// that would carry the load.
+    /// step that runs backwards or holds no number, a section concave at its origin, and one
+    /// whose valley (where the gap's slope has the sign of `t`) ends before any window carries
+    /// the load.
     #[test]
     fn what_is_no_strip_is_refused() {
         let p = Profile::new(0.5, &[]).expect("a profile");
@@ -2453,7 +2964,7 @@ mod tests {
         assert!(Profile::new(f64::INFINITY, &[]).is_none());
         let concave = Profile::new(-0.5, &[]).expect("a profile");
         assert!(Strip::new(&concave, 10.0, STEEL).is_none());
-        // Convex only within 1e-4 of the origin, under a load that needs more.
+        // Convex only within 1e-4 of the origin: its valley ends at 2e-3, short of 100 N/mm.
         let narrow = Profile::new(-0.5, &[step(Some(-1e-4), Some(1e-4), 10.0)]).expect("a profile");
         assert!(Strip::new(&narrow, 100.0, STEEL).is_none());
         assert!(Strip::new(&narrow, 1e-6, STEEL).is_some());
