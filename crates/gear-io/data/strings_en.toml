@@ -202,6 +202,7 @@ path_new = "Body {from} to Body {to}: a path, ratio {ratio_from} : {ratio_to}, e
 # the last English in a crate whose rule is that it holds none, and the messages
 # a user meets when something has gone wrong, which are the ones that most need
 # translating.
+gear_no_tooth = "the tip (radius {tip} mm) reaches the root (radius {root} mm): no tooth is left"
 mesh_incompatible = "the gears cannot mesh: module, pressure angle or helix differ"
 mesh_ring_too_small = "an internal mesh needs more teeth on the ring than the pinion"
 mesh_outside_involute_domain = "profile shifts leave no operating pressure angle"
@@ -217,6 +218,7 @@ screw_first_member_opposite_hand = "the first member's helix is negative, an opp
 screw_axes_are_parallel = "a worm stage needs non-parallel shafts"
 train_no_contact = "the teeth never contact"
 train_no_common_distance = "no profile shift brings the meshes to one axis distance; these tooth counts cannot be assembled"
+train_no_tooth = "gear {member}: its tip reaches its root, and no tooth is left"
 train_wiring = "these gears describe no mechanism: a member with no teeth, or two gears whose axes cannot stay a fixed distance apart"
 train_unknown_material = "no material named {name} in the library"
 train_flank_interference = "a tip reaches so far past its mate's usable flank that no involute contact is left to rate; shorten the tip or shift the pair"

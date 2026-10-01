@@ -1760,6 +1760,11 @@ pub enum TrainError {
     /// ([`shape::Distance::tip_clearance`]). Zero-based, as the meshes are
     /// indexed; the front end numbers from 1.
     TipsUnclearable { mesh: usize },
+    /// **A gear whose tip reaches its root**: the clamps that hold each end
+    /// to a limit have met and no tooth is left ([`crate::NoTooth`]), for
+    /// either kind. Zero-based, as the part's members are indexed; the front
+    /// end numbers from 1.
+    NoTooth { member: usize },
     /// **Two axes on one carrier cannot stand where their distances put
     /// them**: the distance between them is longer than their two
     /// distances from the carrier's axis together, or shorter than their
@@ -1855,6 +1860,8 @@ impl crate::note::Explain for TrainError {
             // than restating it.
             Self::TipsUnclearable { mesh } => Note::new(key::ERROR_TRAIN_TIPS_UNCLEARABLE)
                 .count("mesh", u32::try_from(*mesh + 1).unwrap_or(1)),
+            Self::NoTooth { member } => Note::new(key::ERROR_TRAIN_NO_TOOTH)
+                .count("member", u32::try_from(*member + 1).unwrap_or(u32::MAX)),
             Self::Screw(e) => e.note(),
             Self::NoContact => Note::new(key::ERROR_TRAIN_NO_CONTACT),
             Self::NoCommonDistance => Note::new(key::ERROR_TRAIN_NO_COMMON_DISTANCE),
@@ -1941,6 +1948,9 @@ impl std::fmt::Display for TrainError {
             Self::Mesh(e) => write!(f, "{e}"),
             Self::TipsUnclearable { mesh } => {
                 write!(f, "mesh {}: no distance clears the teeth", mesh + 1)
+            }
+            Self::NoTooth { member } => {
+                write!(f, "gear {}: its tip reaches its root", member + 1)
             }
             Self::Screw(e) => match e {
                 crate::screw::ScrewError::NotPositive => {
@@ -9009,6 +9019,44 @@ mod tests {
             new.is_empty() && cleared.is_empty(),
             "of {checked} given inputs ({freed} freed), not honoured and not listed: {new:?}; listed and now honoured: {cleared:?}"
         );
+    }
+
+    /// **A gear with no tooth is refused by name, in a train** (T05.5): a
+    /// set whose 60-tooth ring is given x 5 (tip 34.000 inside a root held
+    /// at 33.150), and a pair whose 3-tooth pinion is given x −2 at a
+    /// half-module addendum (tip at its root), each refused `NoTooth` naming
+    /// the gear; the same set at the ring's x 3 and the pinion at x −1.8 are
+    /// not refused for it.
+    #[test]
+    fn a_gear_with_no_tooth_is_refused_by_name() {
+        let with_ring_at = |x: f64| {
+            let mut s = arr::planetary(12, 24, 60, 3);
+            s.members[2].gear.profile_shift = Auto::fixed(x);
+            try_alone(&s)
+        };
+        assert_eq!(
+            with_ring_at(5.0).err(),
+            Some(TrainError::NoTooth { member: 2 })
+        );
+        assert!(!matches!(
+            with_ring_at(3.0),
+            Err(TrainError::NoTooth { .. })
+        ));
+        let with_pinion_at = |x: f64| {
+            let mut s = arr::pair([3, 43]);
+            s.members[0].gear.profile_shift = Auto::fixed(x);
+            s.members[0].gear.no_undercut = false;
+            s.members[0].gear.addendum = 0.5;
+            try_alone(&s)
+        };
+        assert_eq!(
+            with_pinion_at(-2.0).err(),
+            Some(TrainError::NoTooth { member: 0 })
+        );
+        assert!(!matches!(
+            with_pinion_at(-1.8),
+            Err(TrainError::NoTooth { .. })
+        ));
     }
 
     /// **"Loses contact" is said on the ratio that governs continuity, `ε_γ`**,

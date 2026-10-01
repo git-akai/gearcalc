@@ -115,6 +115,7 @@ path_gone = "Corpo {from} a Corpo {to}: deixa de ser um caminho"
 path_new = "Corpo {from} a Corpo {to}: um caminho, relação {ratio_from} : {ratio_to}, rendimento {efficiency} %"
 
 [error]
+gear_no_tooth = "a cabeça (raio {tip} mm) chega ao pé (raio {root} mm): não resta dente"
 mesh_incompatible = "as engrenagens não podem engrenar: módulo, ângulo de pressão ou hélice diferem"
 mesh_ring_too_small = "um engrenamento interno precisa de mais dentes na anular do que no pinhão"
 mesh_outside_involute_domain = "as correções de perfil não deixam nenhum ângulo de pressão de funcionamento"
@@ -130,6 +131,7 @@ screw_first_member_opposite_hand = "o ângulo de hélice do primeiro elemento é
 screw_axes_are_parallel = "eixos paralelos: um estágio de sem-fim precisa de eixos cruzados, e um par paralelo é um estágio de dentes retos"
 train_no_contact = "os dentes nunca entram em contato"
 train_no_common_distance = "nenhum deslocamento de perfil leva os engrenamentos a uma distância entre eixos comum; estes números de dentes não podem ser montados"
+train_no_tooth = "engrenagem {member}: a cabeça chega ao pé, e não resta dente"
 train_wiring = "estas engrenagens não descrevem um mecanismo: um membro sem dentes, ou duas engrenagens cujos eixos não podem manter distância fixa"
 train_unknown_material = "não há material chamado {name} na biblioteca"
 train_flank_interference = "uma cabeça ultrapassa tanto o flanco útil do par que não resta contacto evolvente para avaliar; encurte a cabeça ou desloque o par"

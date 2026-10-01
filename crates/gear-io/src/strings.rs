@@ -1531,6 +1531,31 @@ mod tests {
                     err(e.note());
                 }
             }
+            // **A tooth of no height**: a 60-tooth ring at x 5, whose tip
+            // meets its root, alone and as a set's ring.
+            {
+                let ring = gear_core::ring::Ring::cut_by(
+                    &gear_core::GearParams {
+                        teeth: 60,
+                        profile_shift: 5.0,
+                        ..d
+                    },
+                    &gear_core::ring::Cutter::default(),
+                );
+                if let Err(e) = ring.has_a_tooth() {
+                    err(e.note());
+                }
+                let mut set = arr::planetary(12, 24, 60, 3);
+                set.members[2].gear.profile_shift = gear_core::params::Auto::fixed(5.0);
+                let out = gear_core::train::solve_alone(
+                    &gear_core::train::Train::alone(&set, 1.0, 0.0),
+                    &lib,
+                );
+                assert!(matches!(out, Err(TrainError::NoTooth { member: 2 })));
+                if let Err(e) = out {
+                    err(e.note());
+                }
+            }
             err(TrainError::UnknownMaterial("nothing by that name".into()).note());
             // **A graph that describes no train**: an axis carried by a body
             // on itself, and two axes each carried by the other's body, both

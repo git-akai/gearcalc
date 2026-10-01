@@ -172,6 +172,25 @@ pub struct Ring {
 }
 
 impl Ring {
+    /// **The tooth's height**, mm: root radius less tip radius, measured
+    /// inward toward the tip, as a ring's tooth points. Nought or less where
+    /// the tip, raised to its point or the base circle, has met a root
+    /// held where the space closes (audit T05.5: z 60 at x 5 put the tip at
+    /// 34.000 and the root at 33.150).
+    #[must_use]
+    pub fn tooth_height(&self) -> f64 {
+        self.rf - self.ra
+    }
+
+    /// **Whether there is a tooth at all** ([`crate::tooth::NoTooth`]).
+    ///
+    /// # Errors
+    ///
+    /// [`crate::tooth::NoTooth`] where the tip reaches the root.
+    pub fn has_a_tooth(&self) -> Result<(), crate::tooth::NoTooth> {
+        crate::tooth::NoTooth::check(self.tooth_height(), self.ra, self.rf)
+    }
+
     /// Where this ring's usable flank begins and ends — see
     /// [`crate::mesh::FlankEnds`].
     ///
@@ -3355,6 +3374,74 @@ mod tests {
                 "{teeth:?} at {a}: rolled {rolled}, called clear"
             );
         }
+    }
+
+    /// **A tooth of no height is refused, for either kind** (T05.5): where a
+    /// ring's tip, raised to its point or the base circle, meets a root held
+    /// where its space closes — and where an external tooth's tip, capped at
+    /// its point, comes down to its root. Over the audit's grid of rings
+    /// (z 20, 30, 60, 100; x −3 to 6) every ring kept has its tip inside its
+    /// root and the audit's two (z 60 at x 5: tip 34.000, root 33.150; z 30
+    /// at x 4) are refused; then each side of the crossing, found by
+    /// bisection on the shift: 1e-6 below it a ring is kept, 1e-6 above it
+    /// refused. The same of an external 3-tooth gear at a half-module
+    /// addendum, kept at x −1.8 and refused at −2.
+    #[test]
+    fn a_tooth_of_no_height_is_refused_for_either_kind() {
+        let ring = |z: u32, x: f64| {
+            Ring::cut_by(
+                &GearParams {
+                    teeth: z,
+                    profile_shift: x,
+                    ..Default::default()
+                },
+                &Cutter::default(),
+            )
+        };
+        let (mut kept, mut refused) = (0, 0);
+        for z in [20_u32, 30, 60, 100] {
+            for i in -30..=60 {
+                let g = ring(z, f64::from(i) * 0.1);
+                match g.has_a_tooth() {
+                    Ok(()) => {
+                        kept += 1;
+                        assert!(g.ra < g.rf, "z {z} step {i}: kept with no height");
+                    }
+                    Err(e) => {
+                        refused += 1;
+                        assert_eq!((e.tip, e.root), (g.ra, g.rf));
+                        assert!(g.ra >= g.rf);
+                    }
+                }
+            }
+        }
+        assert!(kept > 250 && refused > 50, "{kept} kept, {refused} refused");
+        for (z, x) in [(60, 5.0), (30, 4.0)] {
+            assert!(ring(z, x).has_a_tooth().is_err(), "z {z} at x {x}");
+        }
+        // Each side of the crossing: the height is continuous in the shift
+        // there, so a bisection lands on it.
+        let crossing = crate::solve::brent(
+            |x| ring(60, x).tooth_height(),
+            3.0,
+            5.0,
+            crate::solve::Tol::default(),
+        )
+        .expect("the height changes sign between x 3 and 5");
+        assert!(ring(60, crossing - 1e-6).has_a_tooth().is_ok());
+        assert!(ring(60, crossing + 1e-6).has_a_tooth().is_err());
+
+        let external = |x: f64| {
+            Tooth::new(GearParams {
+                teeth: 3,
+                profile_shift: x,
+                addendum: 0.5,
+                ..Default::default()
+            })
+        };
+        assert!(external(-1.8).has_a_tooth().is_ok());
+        let e = external(-2.0).has_a_tooth().unwrap_err();
+        assert!(e.tip <= e.root, "{e:?}");
     }
 
     /// **The tip window reads each tooth's own tip land** (T03.5): a pointed

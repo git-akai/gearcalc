@@ -242,6 +242,10 @@ pub mod key {
     // `gear-core` — the last place the no-words rule was broken, and broken
     // in the messages a user sees when something has gone wrong, which are
     // the ones that most need translating (`docs/corrections.md`).
+    /// `error.gear_no_tooth`
+    pub const ERROR_GEAR_NO_TOOTH: &str = "error.gear_no_tooth";
+    /// `error.train_no_tooth`
+    pub const ERROR_TRAIN_NO_TOOTH: &str = "error.train_no_tooth";
     /// `error.mesh_incompatible`
     pub const ERROR_MESH_INCOMPATIBLE: &str = "error.mesh_incompatible";
     /// `error.mesh_ring_too_small`
@@ -419,6 +423,8 @@ pub mod key {
         TRAIN_APPLICATION_FACTOR_HELD,
         TRAIN_DUTY_AT_STILL,
         TRAIN_DUTY_UNSET,
+        ERROR_GEAR_NO_TOOTH,
+        ERROR_TRAIN_NO_TOOTH,
         ERROR_MESH_INCOMPATIBLE,
         ERROR_MESH_RING_TOO_SMALL,
         ERROR_MESH_OUTSIDE_INVOLUTE_DOMAIN,

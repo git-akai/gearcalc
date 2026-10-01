@@ -114,6 +114,7 @@ path_gone = "Körper {from} zu Körper {to}: kein Pfad mehr"
 path_new = "Körper {from} zu Körper {to}: ein Pfad, Übersetzung {ratio_from} : {ratio_to}, Wirkungsgrad {efficiency} %"
 
 [error]
+gear_no_tooth = "der Kopf (Radius {tip} mm) reicht bis zum Fuß (Radius {root} mm): es bleibt kein Zahn"
 mesh_incompatible = "die Räder können nicht kämmen: Modul, Eingriffswinkel oder Schrägungswinkel unterscheiden sich"
 mesh_ring_too_small = "eine Innenverzahnung braucht mehr Zähne am Hohlrad als am Ritzel"
 mesh_outside_involute_domain = "Profilverschiebungen lassen keinen Betriebseingriffswinkel zu"
@@ -129,6 +130,7 @@ screw_first_member_opposite_hand = "der Schrägungswinkel des ersten Glieds ist 
 screw_axes_are_parallel = "parallele Achsen: eine Schneckenstufe braucht gekreuzte Wellen, ein paralleles Paar ist eine Stirnradstufe"
 train_no_contact = "die Zähne kommen nie in Berührung"
 train_no_common_distance = "keine Profilverschiebung bringt die Eingriffe auf einen Achsabstand; diese Zähnezahlen lassen sich nicht zusammenbauen"
+train_no_tooth = "Rad {member}: der Kopf reicht bis zum Fuß, es bleibt kein Zahn"
 train_wiring = "diese Räder beschreiben kein Getriebe: ein Glied ohne Zähne, oder zwei Räder, deren Achsen keinen festen Abstand halten können"
 train_unknown_material = "kein Werkstoff namens {name} in der Bibliothek"
 train_flank_interference = "ein Kopf reicht so weit über die nutzbare Gegenflanke hinaus, dass kein Evolventeneingriff zum Bewerten bleibt; den Kopf kürzen oder das Paar verschieben"

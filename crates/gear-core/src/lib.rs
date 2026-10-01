@@ -55,4 +55,4 @@ pub use material::{Material, MaterialLibrary};
 pub use mesh::{Mesh, MeshError, MeshKind};
 pub use outline::Vertex;
 pub use params::{Auto, Clamps, GearParams};
-pub use tooth::{Section, Tooth};
+pub use tooth::{NoTooth, Section, Tooth};

@@ -615,8 +615,23 @@ pub struct RingSummary {
     pub clamps: Vec<gear_core::note::Note>,
 }
 
-fn ring_of(req: &RingRequest) -> gear_core::ring::Ring {
-    gear_core::ring::Ring::cut_by(&req.params, &req.cutter.to_cutter())
+/// The ring asked for, or its refusal where its tip reaches its root
+/// ([`gear_core::NoTooth`]): a shape with no tooth has no outline to draw,
+/// export or measure.
+fn ring_of(req: &RingRequest) -> Result<gear_core::ring::Ring, String> {
+    let g = gear_core::ring::Ring::cut_by(&req.params, &req.cutter.to_cutter());
+    g.has_a_tooth().map_err(|e| refusal(&gear_core::note::Explain::note(&e)))?;
+    Ok(g)
+}
+
+/// The gear asked for, or its refusal where any of its teeth has no height
+/// ([`gear_core::NoTooth`]), as [`ring_of`] refuses a ring.
+fn gear_of(params: GearParams) -> Result<gear_core::gear::Gear, String> {
+    let g = gear_core::gear::Gear::try_new(params, Budget::DEFAULT).map_err(params_refusal)?;
+    for t in g.distinct() {
+        t.has_a_tooth().map_err(|e| refusal(&gear_core::note::Explain::note(&e)))?;
+    }
+    Ok(g)
 }
 
 fn parse_ring(input: &str) -> Result<RingRequest, String> {
@@ -637,13 +652,14 @@ fn parse_ring(input: &str) -> Result<RingRequest, String> {
 
 fn solve_ring_impl(input: &str) -> Result<String, String> {
     let req = parse_ring(input)?;
-    serde_json::to_string(&ring_summary(&req)).map_err(|e| format!("could not encode result: {e}"))
+    serde_json::to_string(&ring_summary(&req)?)
+        .map_err(|e| format!("could not encode result: {e}"))
 }
 
-/// What the ring a request holds comes to.
-fn ring_summary(req: &RingRequest) -> RingSummary {
-    let g = ring_of(req);
-    RingSummary {
+/// What the ring a request holds comes to, or its refusal ([`ring_of`]).
+fn ring_summary(req: &RingRequest) -> Result<RingSummary, String> {
+    let g = ring_of(req)?;
+    Ok(RingSummary {
         teeth: g.teeth,
         transverse_module: g.mt,
         transverse_pressure_angle: g.alpha_t.to_degrees(),
@@ -675,13 +691,13 @@ fn ring_summary(req: &RingRequest) -> RingSummary {
         pin_diameter_range: metrology::pin_diameter_range(&metrology::Space::of_ring(&g))
             .map(metrology::pin_bound),
         clamps: g.clamps.clone(),
-    }
+    })
 }
 
 fn ring_profile_impl(input: &str, points_per_tooth: u32) -> Result<Vec<f64>, String> {
     let req = parse_ring(input)?;
     let n = points(points_per_tooth)?;
-    let drawn = ring_of(&req)
+    let drawn = ring_of(&req)?
         .profile(n, Budget::DEFAULT)
         .map_err(params_refusal)?;
     flat(&drawn, req.params.teeth)
@@ -709,7 +725,7 @@ fn flat(points: &[[f64; 2]], teeth: u32) -> Result<Vec<f64>, String> {
 fn export_ring_dxf_impl(input: &str) -> Result<String, String> {
     let req = parse_ring(input)?;
     gear_io::ring_to_dxf(
-        &ring_of(&req),
+        &ring_of(&req)?,
         &gear_io::DxfOptions {
             chord_tolerance: req
                 .chord_tolerance
@@ -819,7 +835,7 @@ fn solve_gear_impl(input: &str) -> Result<String, String> {
     // degenerate of the eccentric assembly, and its `mean` is `Tooth::new`
     // verbatim. Building it here means every scalar the summary quotes is a
     // tooth the gear actually has.
-    let ecc = gear_core::gear::Gear::try_new(params, Budget::DEFAULT).map_err(params_refusal)?;
+    let ecc = gear_of(params)?;
     serde_json::to_string(&summarise(&ecc, &req, params))
         .map_err(|e| format!("could not encode result: {e}"))
 }
@@ -837,7 +853,7 @@ fn gear_profile_impl(input: &str, points_per_tooth: u32) -> Result<Vec<f64>, Str
 /// ([`gear_core::gear::Gear::try_new`]), past memory refused naming
 /// `params.teeth`.
 fn built(req: &GearRequest) -> Result<gear_core::gear::Gear, String> {
-    gear_core::gear::Gear::try_new(resolved_params(req)?, Budget::DEFAULT).map_err(params_refusal)
+    gear_of(resolved_params(req)?)
 }
 
 fn export_dxf_impl(input: &str) -> Result<String, String> {
@@ -3047,7 +3063,7 @@ mod tests {
                     refused += 1;
                     continue;
                 };
-                let bad = non_finite(&ring_summary(&req));
+                let bad = non_finite(&ring_summary(&req).unwrap());
                 if !bad.is_empty() {
                     faults.push(format!("ring {under}.{} = {x:e}: {bad:?}", f.path));
                 }
@@ -3591,6 +3607,52 @@ mod tests {
         assert_eq!(con["undercut"].as_bool(), Some(false));
     }
 
+    /// **A gear or ring with no tooth is refused at every entry that would
+    /// draw, export or measure it** (T05.5), by the core's note: the audit's
+    /// rings at z 60 x 5 and z 30 x 4 each wrote a DXF of a shape with no
+    /// tooth (29,755 and 9,627 bytes); a 3-tooth gear at x −2 and a
+    /// half-module addendum likewise. The same ring at x 3 and the gear at
+    /// x −1.8 are drawn.
+    #[test]
+    fn a_shape_with_no_tooth_is_refused_where_it_would_be_drawn() {
+        let d: serde_json::Value = serde_json::from_str(&defaults_impl().unwrap()).unwrap();
+        let cutter = &d["gear"]["cutter"];
+        let ring = |z: u32, x: f64| {
+            format!(
+                r#"{{"params":{{"teeth":{z},"module":1.0,"pressure_angle":20.0,
+                   "helix_angle":0.0,"profile_shift":{x},"addendum":1.0,"dedendum":1.25,
+                   "root_radius":0.38,"thickness_mod":1.0}},"cutter":{cutter}}}"#
+            )
+        };
+        let gear = |x: f64| {
+            format!(
+                r#"{{"params":{{"module":1.0,"pressure_angle":20.0,"teeth":3,
+                   "profile_shift":{x},"helix_angle":0.0,"addendum":0.5,"dedendum":1.25,
+                   "root_radius":0.38,"thickness_mod":1.0}}}}"#
+            )
+        };
+        let refusal = |out: Result<String, String>| -> Option<String> {
+            let e = out.err()?;
+            let n: gear_core::note::Note = serde_json::from_str(&e).expect("a note crosses");
+            Some(n.key)
+        };
+        let no_tooth = Some(gear_core::note::key::ERROR_GEAR_NO_TOOTH.to_string());
+        for (z, x) in [(60, 5.0), (30, 4.0)] {
+            let r = ring(z, x);
+            assert_eq!(refusal(solve_ring_impl(&r)), no_tooth, "z {z} x {x}");
+            assert_eq!(refusal(export_ring_dxf_impl(&r)), no_tooth, "z {z} x {x}");
+            assert!(ring_profile_impl(&r, 4).is_err(), "z {z} x {x}");
+        }
+        let r = ring(60, 3.0);
+        assert!(solve_ring_impl(&r).is_ok() && export_ring_dxf_impl(&r).is_ok());
+        let g = gear(-2.0);
+        assert_eq!(refusal(solve_gear_impl(&g)), no_tooth);
+        assert_eq!(refusal(export_dxf_impl(&g)), no_tooth);
+        assert!(gear_profile_impl(&g, 4).is_err());
+        let g = gear(-1.8);
+        assert!(solve_gear_impl(&g).is_ok() && export_dxf_impl(&g).is_ok());
+    }
+
     #[test]
     fn a_ring_crosses_the_boundary() {
         let req = r#"{"params":{"teeth":60,"module":1.0,"pressure_angle":20.0,
@@ -3646,10 +3708,12 @@ mod tests {
         // The pin centre radius comes from the crate rather than the wire: it is
         // where the measurement is derived, and the wire carries the nominal
         // alone now.
-        let centre =
-            gear_core::metrology::between_pins(&ring_of(&parse_ring(&with_pin).unwrap()), 1.8)
-                .unwrap()
-                .pin_centre_radius;
+        let centre = gear_core::metrology::between_pins(
+            &ring_of(&parse_ring(&with_pin).unwrap()).unwrap(),
+            1.8,
+        )
+        .unwrap()
+        .pin_centre_radius;
         assert!((nominal - (2.0 * centre - 1.8)).abs() < 1e-9);
         assert!(nominal < 2.0 * centre);
         // ...and without a pin diameter it says so rather than inventing one.

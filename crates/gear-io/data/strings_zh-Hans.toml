@@ -110,6 +110,7 @@ path_gone = "体 {from} 至体 {to}：不再是一条路径"
 path_new = "体 {from} 至体 {to}：一条路径，传动比 {ratio_from} : {ratio_to}，效率 {efficiency} %"
 
 [error]
+gear_no_tooth = "齿顶（半径 {tip} mm）达到齿根（半径 {root} mm）：已无轮齿"
 mesh_incompatible = "这两个齿轮无法啮合：模数、压力角或螺旋角不一致"
 mesh_ring_too_small = "内啮合要求内齿圈的齿数多于小齿轮"
 mesh_outside_involute_domain = "变位系数得不到啮合角"
@@ -125,6 +126,7 @@ screw_first_member_opposite_hand = "第一个构件的螺旋角为负，是本�
 screw_axes_are_parallel = "轴线平行：蜗杆级需要交错轴，平行的一对属于直齿级"
 train_no_contact = "轮齿始终未进入接触"
 train_no_common_distance = "没有任何变位系数能使各啮合达到同一轴间距；该齿数组合无法装配"
+train_no_tooth = "齿轮 {member}：齿顶达到齿根，已无轮齿"
 train_wiring = "这些齿轮不构成机构：某个构件没有齿，或两轮的轴心无法保持固定距离"
 train_unknown_material = "材料库中没有名为 {name} 的材料"
 train_flank_interference = "齿顶越过配对齿面可用范围过多，已无可评估的渐开线接触；请缩短齿顶或对齿对变位"

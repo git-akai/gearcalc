@@ -110,6 +110,7 @@ path_gone = "體 {from} 至體 {to}：不再是一條路徑"
 path_new = "體 {from} 至體 {to}：一條路徑，傳動比 {ratio_from} : {ratio_to}，效率 {efficiency} %"
 
 [error]
+gear_no_tooth = "齒頂（半徑 {tip} mm）達到齒根（半徑 {root} mm）：已無輪齒"
 mesh_incompatible = "這兩個齒輪無法嚙合：模數、壓力角或螺旋角不一致"
 mesh_ring_too_small = "內嚙合要求內齒輪的齒數多於小齒輪"
 mesh_outside_involute_domain = "變位係數得不到嚙合角"
@@ -125,6 +126,7 @@ screw_first_member_opposite_hand = "第一個構件的螺旋角為負，是本�
 screw_axes_are_parallel = "軸線平行：蝸桿級需要交錯軸，平行的一對属於直齒級"
 train_no_contact = "輪齒始終未進入接觸"
 train_no_common_distance = "沒有任何變位係數能使各嚙合達到同一軸間距；該齒數組合無法裝配"
+train_no_tooth = "齒輪 {member}：齒頂達到齒根，已無輪齒"
 train_wiring = "這些齒輪不構成機構：某個構件沒有齒，或兩輪的軸心無法保持固定距離"
 train_unknown_material = "材料庫中沒有名為 {name} 的材料"
 train_flank_interference = "齒頂越過配對齒面可用範圍過多，已無可評估的漸開線接觸；請縮短齒頂或對齒對變位"

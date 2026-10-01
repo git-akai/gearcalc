@@ -2527,6 +2527,14 @@ impl BuiltMember {
         }
     }
 
+    /// Whether its tip stops short of its root ([`crate::NoTooth`]).
+    fn has_a_tooth(&self) -> bool {
+        match self {
+            Self::Rack { tooth } => tooth.has_a_tooth().is_ok(),
+            Self::Ring { ring, .. } => ring.has_a_tooth().is_ok(),
+        }
+    }
+
     /// The root radius, as the cutter left it.
     #[cfg(test)]
     pub(crate) fn root_radius(&self) -> f64 {
@@ -3019,6 +3027,16 @@ impl Indexed<'_> {
         };
         let mut members: Vec<std::rc::Rc<BuiltMember>> =
             (0..self.members.len()).map(|i| cut(i, None)).collect();
+        // A gear whose tip reaches its root is no gear, whichever kind:
+        // refused as cut, before a mesh is placed on it, and again once the
+        // tips are held.
+        let toothless = |members: &[std::rc::Rc<BuiltMember>]| {
+            members
+                .iter()
+                .position(|m| !m.has_a_tooth())
+                .map_or(Ok(()), |member| Err(TrainError::NoTooth { member }))
+        };
+        toothless(&members)?;
         let (running, placed) = self.place_meshes(&members, x, helix, held)?;
         let hold = self.tip_holds(&members, &placed);
         for (i, bound) in hold.bound.iter().enumerate() {
@@ -3026,6 +3044,7 @@ impl Indexed<'_> {
                 members[i] = cut(i, Some(c));
             }
         }
+        toothless(&members)?;
         let mut meshes = Vec::with_capacity(self.meshes.len());
         for (k, (m, (kind, at, zero))) in self.meshes.iter().zip(placed).enumerate() {
             // Tagged only where the cut put the tip on its bound: a cut that

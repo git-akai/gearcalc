@@ -126,6 +126,40 @@ enum Junction {
     AtTip { s: f64 },
 }
 
+/// **A tooth of no height is no tooth**: its tip reaches its root, so the
+/// clamps that held each end to a limit have met and left nothing between
+/// them. Refused rather than clamped (rule 5: it describes no shape), and
+/// the same for either kind — an external tooth's tip is outside its root,
+/// a ring's inside — so its height is measured toward its own tip
+/// ([`Tooth::tooth_height`], [`crate::ring::Ring::tooth_height`]).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct NoTooth {
+    /// The tip radius, mm.
+    pub tip: f64,
+    /// The root radius, mm.
+    pub root: f64,
+}
+
+impl NoTooth {
+    /// `Err` where a tooth whose tip and root are these, its height measured
+    /// toward its tip, has none.
+    pub(crate) fn check(height: f64, tip: f64, root: f64) -> Result<(), Self> {
+        if height > 0.0 {
+            Ok(())
+        } else {
+            Err(Self { tip, root })
+        }
+    }
+}
+
+impl crate::note::Explain for NoTooth {
+    fn note(&self) -> Note {
+        Note::new(key::ERROR_GEAR_NO_TOOTH)
+            .number("tip", self.tip, 4)
+            .number("root", self.root, 4)
+    }
+}
+
 /// A generated gear cross-section.
 ///
 /// Every field is in millimetres or radians. Construction never fails: degenerate
@@ -289,6 +323,22 @@ pub(crate) fn allocate_by_arc_length(
 }
 
 impl Tooth {
+    /// **The tooth's height**, mm: tip radius less root radius, measured
+    /// outward toward the tip. Nought where the tip is held at the root.
+    #[must_use]
+    pub fn tooth_height(&self) -> f64 {
+        self.ra - self.rf
+    }
+
+    /// **Whether there is a tooth at all** ([`NoTooth`]).
+    ///
+    /// # Errors
+    ///
+    /// [`NoTooth`] where the tip reaches the root.
+    pub fn has_a_tooth(&self) -> Result<(), NoTooth> {
+        NoTooth::check(self.tooth_height(), self.ra, self.rf)
+    }
+
     /// Where this tooth's usable flank begins and ends — see
     /// [`crate::mesh::FlankEnds`].
     ///
