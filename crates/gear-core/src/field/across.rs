@@ -239,6 +239,17 @@ impl Profile {
     /// back before any half-width would. A contact carried mostly where `σ` has fallen far
     /// below its value at the origin can exist beyond that reach.
     fn width_bracket(&self, q: f64, modulus: f64) -> Option<WidthBracket> {
+        self.width_bracket_by(q, modulus, Self::secant_within)
+    }
+
+    /// [`Profile::width_bracket`] with `σ`'s span over a band's region read by `region` (a
+    /// plant's seam).
+    fn width_bracket_by(
+        &self,
+        q: f64,
+        modulus: f64,
+        region: fn(&Self, Option<f64>) -> (f64, f64),
+    ) -> Option<WidthBracket> {
         // `c² σ₋` that carries `q`.
         let load = 4.0 * q / (PI * modulus);
         let mut reach: Vec<f64> = self
@@ -252,12 +263,19 @@ impl Profile {
         let starts = std::iter::once(0.0).chain(reach.iter().copied());
         let ends = reach.iter().copied().map(Some).chain(std::iter::once(None));
         let band = |from: f64, to: Option<f64>| -> Option<WidthBracket> {
-            // `σ` over the knots passed; not positive there, the band lies past the valley.
-            let passed = (from > 0.0).then(|| self.secant_within(Some(from)).0);
+            // The least `σ` at the knots passed (`None` before the first): not positive, the
+            // band lies past the valley. Where `σ` falls from a passed knot to `±s` the band's
+            // own line reads it; where it rises, its least is at that knot.
+            let passed = self
+                .knots
+                .iter()
+                .filter(|&&t| t != 0.0 && t.abs() <= from)
+                .map(|&t| self.secant(t))
+                .reduce(f64::min);
             if passed.is_some_and(|s| s <= 0.0) {
                 return None;
             }
-            let (least, greatest) = self.secant_within(to);
+            let (least, greatest) = region(self, to);
             // Where `σ` is not positive over the band's whole region, `|m| ≤ c` (the sign of
             // `h′` alone) holds for every region inside the valley.
             let skew = if least > 0.0 {
@@ -1162,9 +1180,7 @@ fn carter_slide_to(a: Vec3, b: Vec3, sstar: f64, floor: f64) -> Slide {
     let qq = -(ab + sq.copysign(ab));
     let (r1, r2) = (qq / b2, (na - sstar) * (na + sstar) / qq);
     let (ua, ub) = (r1.min(r2), r1.max(r2));
-    if ub <= -0.5 || ua >= 0.5 {
-        return panel_slide_to(a, b, floor);
-    }
+    // A window off the panel leaves one piece, the whole panel outside it: `panel_slide`.
     let mut direction = [0.0; 3];
     let mut speed = 0.0;
     let pieces = [
@@ -1999,7 +2015,7 @@ mod tests {
             } else {
                 seen.beyond += 1;
                 let (r0, r1) = residuals(&case, strip.centre(), strip.half_width());
-                seen.residual = seen.residual.max(r0.abs()).max(r1.abs());
+                seen.residual = worse(worse(seen.residual, r0.abs()), r1.abs());
             }
         }
         seen
@@ -2748,10 +2764,19 @@ mod tests {
         }
     }
 
+    /// The greater of two misses, a miss that is not a number kept (`f64::max` drops it).
+    fn worse(a: f64, b: f64) -> f64 {
+        if b > a || b.is_nan() {
+            b
+        } else {
+            a
+        }
+    }
+
     fn slide_miss(p: Slide, q: Slide) -> f64 {
         (0..3)
             .map(|k| (p.direction[k] - q.direction[k]).abs())
-            .fold((p.speed - q.speed).abs(), f64::max)
+            .fold((p.speed - q.speed).abs(), worse)
     }
 
     /// Panels with the zero of sliding on them a small offset off the origin, where the offset's
@@ -2802,23 +2827,27 @@ mod tests {
         let both = |a: Vec3, b: Vec3, s: f64, floor: f64| {
             (panel_slide_to(a, b, floor), carter_slide_to(a, b, s, floor))
         };
-        let miss =
-            |(p, q): (Slide, Slide), (c, k): (Slide, Slide)| slide_miss(p, c).max(slide_miss(q, k));
+        let miss = |(p, q): (Slide, Slide), (c, k): (Slide, Slide)| {
+            worse(slide_miss(p, c), slide_miss(q, k))
+        };
         let all = panels();
         assert_eq!(all.len(), 3000);
         for (a, b, s, spur) in all {
             let reference = slides_by_quadrature(a, b, s);
-            worst = worst.max(miss((panel_slide(a, b), carter_slide(a, b, s)), reference));
-            floor_far = floor_far.max(miss(both(a, b, s, PLANT_FLOOR), reference));
+            worst = worse(
+                worst,
+                miss((panel_slide(a, b), carter_slide(a, b, s)), reference),
+            );
+            floor_far = worse(floor_far, miss(both(a, b, s, PLANT_FLOOR), reference));
             let (_, creep) = reference;
             let whole_window = norm(a) < s && norm(add(a, b, 0.5)) < s && norm(add(a, b, -0.5)) < s;
             if whole_window {
                 windows += 1;
                 let d = slide_miss(carter_slide_direct(a, b, s), creep);
                 if spur {
-                    direct_spur = direct_spur.max(d);
+                    direct_spur = worse(direct_spur, d);
                 } else {
-                    direct_other = direct_other.max(d);
+                    direct_other = worse(direct_other, d);
                 }
             }
         }
@@ -2830,9 +2859,9 @@ mod tests {
             exact += usize::from(foot.hn == 0.0);
             let reference = slides_by_quadrature(a, b, s);
             let port = both(a, b, s, OFFSET_FLOOR);
-            near = near.max(miss(port, reference));
-            floor_near = floor_near.max(miss(both(a, b, s, PLANT_FLOOR), reference));
-            in_parts = in_parts.max(miss(port, slides_on(a, b, s, in_eight, 64)));
+            near = worse(near, miss(port, reference));
+            floor_near = worse(floor_near, miss(both(a, b, s, PLANT_FLOOR), reference));
+            in_parts = worse(in_parts, miss(port, slides_on(a, b, s, in_eight, 64)));
         }
         eprintln!(
             "slides: worst {worst:.2e}, near the foot {near:.2e}; {windows} panels inside the \
@@ -2946,6 +2975,160 @@ mod tests {
         assert_eq!((still.direction, still.speed), ([0.0; 3], 0.0));
         let still = carter_slide([0.0; 3], [0.0; 3], 1.0);
         assert_eq!((still.direction, still.speed), ([0.0; 3], 0.0));
+    }
+
+    /// **The strip reads its section only within its bracket's region**: a step far beyond it
+    /// (at 5 to 6 mm, stiffening by `50/mm`, or turning the gap's slope back by `−50/mm`) leaves
+    /// `c` and `m` the same to the bit, on the near miss at the loads it was refused at and
+    /// where its bracket reads past its run, and on the ring beyond its round (1700 and 2000
+    /// N/mm). Plant: `σ`'s span read at every knot of the section as well as over the band's
+    /// region (a valid, looser bound: the twin and the equations pass it), which moves on
+    /// every one.
+    #[test]
+    fn the_strip_reads_its_section_only_within_its_brackets_region() {
+        let whole: fn(&Profile, f64, f64) -> Option<WidthBracket> = |p, q, e| {
+            p.width_bracket_by(q, e, |p, r| {
+                p.knots
+                    .iter()
+                    .filter(|&&t| t != 0.0)
+                    .map(|&t| p.secant(t))
+                    .fold(p.secant_within(r), |(lo, hi), s| (lo.min(s), hi.max(s)))
+            })
+        };
+        let cases: Vec<Case> = NEAR_MISS_LOADS
+            .into_iter()
+            .chain(NEAR_EDGE_LOADS)
+            .map(near_miss)
+            .chain([1700.0, 2000.0].map(ring_at))
+            .collect();
+        let moved = |bracket: fn(&Profile, f64, f64) -> Option<WidthBracket>| {
+            let mut moved = 0;
+            let mut ran = 0;
+            for case in &cases {
+                let solve = |c: &Case| {
+                    let p = Profile::new(c.k0, &c.steps).expect("a profile");
+                    let s = Strip::new_by(&p, c.q, STEEL, bracket).expect("a strip");
+                    (s.half_width().to_bits(), s.centre().to_bits())
+                };
+                let base = solve(case);
+                for dk in [50.0, -50.0] {
+                    let mut far = case.clone();
+                    far.steps.push(CurvatureStep {
+                        from: Some(5.0),
+                        to: Some(6.0),
+                        dk,
+                    });
+                    moved += usize::from(solve(&far) != base);
+                    ran += 1;
+                }
+            }
+            (moved, ran)
+        };
+        assert_eq!(moved(Profile::width_bracket), (0, 18));
+        assert_eq!(moved(whole), (18, 18));
+    }
+
+    /// **`reaches` is its quadratic's solution set**: on a grid of `k` (both signs and zero),
+    /// `β` (both signs, to `10⁸` against `need`) and `need`, each end of the interval solves
+    /// `k s² + β s = need` to rounding of its terms, the quadratic is at least `need` at the
+    /// interval's midpoint (or past its start where it runs on) and below it just short of its
+    /// start, and `None` comes only where the quadratic stays below `need` for every `s ≥ 0`;
+    /// a double root (`β² = −4 k need`) is its one point. Plant: the textbook root
+    /// `(−β + √(β² + 4k need))/(2k)`, which loses every digit at `β ≫ √(k need)`.
+    #[test]
+    fn reaches_is_its_quadratics_solution_set() {
+        let f = |k: f64, b: f64, s: f64| k * s * s + b * s;
+        let scale = |k: f64, b: f64, s: f64, need: f64| (k * s * s).abs() + (b * s).abs() + need;
+        let (mut ran, mut nones) = (0, 0);
+        for k in [-3.0, -1e-3, 0.0, 1e-3, 2.0, 7e4] {
+            for b in [-1e8, -5.0, -1e-3, 0.0, 1e-3, 0.5, 5.0, 1e8] {
+                for need in [1e-9, 1.0, 40.0] {
+                    ran += 1;
+                    let Some((from, to)) = reaches(k, b, need) else {
+                        nones += 1;
+                        // None: the quadratic's greatest over `s ≥ 0` is short of `need`.
+                        let top = if k < 0.0 && b > 0.0 {
+                            -b * b / (4.0 * k)
+                        } else {
+                            0.0
+                        };
+                        assert!(k <= 0.0 && top < need, "{k} {b} {need}");
+                        continue;
+                    };
+                    for end in std::iter::once(from).chain(to) {
+                        let r = (f(k, b, end) - need).abs() / scale(k, b, end, need);
+                        assert!(r <= 8.0 * EPS, "{k} {b} {need}: {end} {r:e}");
+                    }
+                    let inside = to.map_or(from * 2.0 + 1.0, |to| 0.5 * (from + to));
+                    assert!(f(k, b, inside) >= need, "{k} {b} {need}");
+                    assert!(f(k, b, from * (1.0 - 1e-6)) < need, "{k} {b} {need}");
+                }
+            }
+        }
+        assert_eq!((ran, nones), (144, 43));
+        assert_eq!(reaches(-1.0, 2.0, 1.0), Some((1.0, Some(1.0))));
+        // The plant: the textbook root at k = 1, β = 1e8, need = 1 (the root is 1e-8).
+        let textbook = (-1e8 + (1e16_f64 + 4.0).sqrt()) / 2.0;
+        let (root, _) = reaches(1.0, 1e8, 1.0).expect("a root");
+        assert!((root * 1e8 - 1.0).abs() <= 4.0 * EPS);
+        assert!((textbook * 1e8 - 1.0).abs() > 0.1, "{textbook:e}");
+    }
+
+    /// **`skew` bounds the centre, and closely**: it is the greatest `|⟨cos φ⟩|` over `[0, π]`
+    /// with weights within a ratio `ρ`, attained by the weight `ρ` on `[0, S*]` and `1` beyond,
+    /// so it is at least that step's mean (to rounding) and at least the mean of 2000 random
+    /// weights within `ρ`, and no more than the greatest of the step means over 4000 `S`;
+    /// `0` at `ρ = 1`, `1` as `ρ → ∞`, monotone between. Plant: the weight split at `cos φ = 0`
+    /// (`(2/π)(ρ − 1)/(ρ + 1)`), a bound the step's mean exceeds wherever `ρ − 1` is felt (six
+    /// of the eight).
+    #[test]
+    fn skew_bounds_the_centre() {
+        // The step weight's mean of cos φ: ρ on [0, S], 1 beyond.
+        let step = |rho: f64, s: f64| (rho - 1.0) * s.sin() / (PI + (rho - 1.0) * s);
+        let mut d = Draw(17);
+        let (mut ran, mut below_split) = (0, 0);
+        let mut last = 0.0;
+        for rho in [1.0 + 1e-14, 1.0 + 1e-9, 1.01, 1.269, 2.0, 10.0, 1e3, 1e8] {
+            let mu = skew(rho);
+            assert!(mu >= last && mu <= 1.0, "{rho}");
+            last = mu;
+            let best = (0..=4000)
+                .map(|i| step(rho, PI * f64::from(i) / 4000.0))
+                .fold(0.0, f64::max);
+            assert!(
+                mu >= best - 4.0 * EPS && mu <= best + 1e-6 * best + EPS,
+                "{rho}: {mu} {best}"
+            );
+            // S* from its equation, and the step there.
+            let s_star = mu.acos();
+            assert!(
+                (step(rho, s_star) - mu).abs() <= 1e-9 * mu + 4.0 * EPS,
+                "{rho}"
+            );
+            for _ in 0..2000 {
+                // A random weight within ρ, piecewise constant on 16 parts of [0, π].
+                let w: Vec<f64> = (0..16).map(|_| 1.0 + (rho - 1.0) * d.next()).collect();
+                let part = |j: usize| {
+                    #[expect(clippy::cast_precision_loss, reason = "a part index")]
+                    let j = j as f64;
+                    PI * j / 16.0
+                };
+                let (mut num, mut den) = (0.0, 0.0);
+                for (j, wj) in w.iter().enumerate() {
+                    num += wj * (part(j + 1).sin() - part(j).sin());
+                    den += wj * PI / 16.0;
+                }
+                assert!((num / den).abs() <= mu + 4.0 * EPS, "{rho}");
+                ran += 1;
+            }
+            let split = 2.0 / PI * (rho - 1.0) / (rho + 1.0);
+            below_split += usize::from(split < best - 1e-12);
+        }
+        assert_eq!(ran, 8 * 2000);
+        assert_eq!(skew(1.0), 0.0);
+        assert_eq!(skew(f64::INFINITY), 1.0);
+        // The plant: the split at cos φ = 0 is below the step's mean wherever ρ > 1 is felt.
+        assert_eq!(below_split, 6);
     }
 
     /// What is no strip is refused: a load or modulus that is not a finite number `> 0`, a
