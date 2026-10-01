@@ -667,13 +667,21 @@ whose size is unmeasured is a debt still owed, and is marked as one.
   absence is no figure rather than a wrong one — it was 0 % and 0°, or a
   play 69 % low on a doubled mesh — and redesign F (the flow by blocks)
   computes both.
-- **A tolerance band reaching inside the base circles' limit reads no
-  extremes.** Where a distance's minus end is below `a_ref cos α_t` the
+- **A tolerance band reaching inside the base circles' limit reads one
+  extreme.** Where a distance's minus end is below `a_ref cos α_t` the
   teeth have no operating angle there: the mesh says so
-  (`mesh.tolerance_below_base`, its end and the limit), the band's least
-  and greatest play are absent and the rest of the solve stands. A search
-  never lands there: a candidate whose band would reach past the limit is
-  no candidate.
+  (`mesh.tolerance_below_base`, its end and the limit), and the extreme
+  that end would set is absent — the least on an external pair, the
+  greatest on an internal one, since one mesh's play moves one way with
+  its distance; a path summing several meshes on one distance reads both
+  absent. The rest of the solve stands. A search ranks a candidate whose
+  band reads whole above every one whose band does not, and where none
+  does takes the most efficient, saying so.
+- **A cycle count past `2^53` is the double's.** Counts are exact — the
+  ceiling of the exact rational the speed and the duty's figures make, in
+  integers of any size — up to `2^53`, every whole number the report's
+  double holds; past it the double's own ceiling, whose rounding is below
+  what the report can print.
 - **Bending past `ε_αn = 2` is taken where the tooth never carries the whole
   load**, `ε_n − 1` base pitches from the tip, and ISO's `Y_DT` is declined.
   Against ISO the figure is **high** by `1/Y_DT`, up to 1.43× past

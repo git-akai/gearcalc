@@ -155,15 +155,38 @@ pub struct Backlash {
 
 /// **One source's play at its tolerance's ends**: at the minus end, the
 /// running point and the plus end. An end inside the base circles' limit
-/// has none (`None`); the running point always has one.
+/// has none (`None`); the running point always has one. `monotone` where
+/// the play moves one way with the distance — one mesh's does, line or
+/// point contact — so an end that has none sets the extreme on its own
+/// side and only that one.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Ends {
     pub minus: Option<f64>,
     pub running: f64,
     pub plus: Option<f64>,
+    pub monotone: bool,
 }
 
 impl Ends {
+    /// **This source's least and greatest play**, where it can be read.
+    fn extremes(&self) -> (Option<f64>, Option<f64>) {
+        let r = self.running;
+        match (self.minus, self.plus) {
+            (Some(lo), Some(hi)) => (Some(lo.min(r).min(hi)), Some(lo.max(r).max(hi))),
+            // One end missing: the play rises toward the end that is there
+            // or falls toward it, and the missing end is beyond the running
+            // point the other way.
+            (None, Some(x)) | (Some(x), None) if self.monotone => {
+                if x >= r {
+                    (None, Some(x))
+                } else {
+                    (Some(x), None)
+                }
+            }
+            _ => (None, None),
+        }
+    }
+
     /// Each end mapped.
     #[must_use]
     pub fn map(self, f: impl Fn(f64) -> f64) -> Self {
@@ -171,6 +194,7 @@ impl Ends {
             minus: self.minus.map(&f),
             running: f(self.running),
             plus: self.plus.map(&f),
+            monotone: self.monotone,
         }
     }
 }
@@ -192,9 +216,10 @@ impl Backlash {
     /// **Independent sources stacked**, each given at its minus end, its
     /// running point and its plus end: the nominal is the sum of the
     /// running points, and each extreme the sum of every source's own —
-    /// sources that do not move together reach their worst case at once. A
-    /// source with an end that has no play leaves both extremes absent: that
-    /// end might have set either.
+    /// sources that do not move together reach their worst case at once. An
+    /// end that has no play leaves absent the extreme it would have set: on
+    /// a monotone source, the one on its own side, read off the way the
+    /// other end moves; on one that is not, both.
     #[must_use]
     pub fn of_sources(sources: impl IntoIterator<Item = Ends>) -> Self {
         sources.into_iter().fold(
@@ -204,17 +229,11 @@ impl Backlash {
                 maximum: Some(0.0),
             },
             |b, e| {
-                let ends = e.minus.zip(e.plus);
+                let (least, most) = e.extremes();
                 Self {
                     nominal: b.nominal + e.running,
-                    minimum: b
-                        .minimum
-                        .zip(ends)
-                        .map(|(m, (lo, hi))| m + lo.min(e.running).min(hi)),
-                    maximum: b
-                        .maximum
-                        .zip(ends)
-                        .map(|(m, (lo, hi))| m + lo.max(e.running).max(hi)),
+                    minimum: b.minimum.zip(least).map(|(m, x)| m + x),
+                    maximum: b.maximum.zip(most).map(|(m, x)| m + x),
                 }
             },
         )
@@ -3293,7 +3312,7 @@ impl LoadCase {
 }
 
 /// How often the body a member takes its load on comes round in one case.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Turns {
     /// Revolutions over the whole duty.
     pub revolutions: Revolutions,
@@ -3609,7 +3628,7 @@ pub(crate) const fn gcd(mut a: u32, mut b: u32) -> u32 {
 pub fn loaded_cycles(turns: Turns) -> Cycles {
     match turns.reversing_actuations {
         Some(actuations) => {
-            let bending = turns.revolutions.per(actuations).ceil() * f64::from(actuations);
+            let bending = turns.revolutions.ceil_over(actuations) * f64::from(actuations);
             Cycles {
                 bending,
                 contact: bending / 2.0,
@@ -3625,126 +3644,161 @@ pub fn loaded_cycles(turns: Turns) -> Cycles {
     }
 }
 
-/// **A count of revolutions**, exact where an `i128` holds it — a quotient
-/// of tooth counts times the duty's own figures, read exactly — and its
-/// double beside, which is all there is past that.
-#[derive(Clone, Copy, Debug, PartialEq)]
+/// **A count of revolutions, exactly**: `|rate − against| · times · scale`,
+/// the rates a body's speed (or its share of a sweep) as the exact solve
+/// gives it, and the scale the duty's own figures — a duration or a sweep,
+/// each a double and so a dyadic rational `m · 2^e`, with the small
+/// integers beside it (sixty minutes, a 360th, the actuations, a port's
+/// speed). Nothing in it is rounded; [`Self::ceil`] counts it in integers
+/// of any size. `read` is the same count as a double, for a reader.
+#[derive(Clone, Debug, PartialEq)]
 pub struct Revolutions {
-    pub exact: Option<crate::ratio::Ratio>,
+    rate: crate::ratio::Ratio,
+    against: crate::ratio::Ratio,
+    times: u128,
+    scale: Scale,
     pub read: f64,
 }
 
-/// The roundings a count read as doubles carries: a speed's quotient, the
-/// sixty or the sweep's 360th, the duration, a difference against the
-/// frame and the paths — five, each at most `ε/2` of the value, with
-/// margin to eight.
-const COUNT_ROUNDINGS: f64 = 8.0;
+/// The duty's part of a count: `∏ nums · m · 2^e / ∏ dens`.
+#[derive(Clone, Debug, PartialEq)]
+struct Scale {
+    nums: Vec<u128>,
+    dens: Vec<u128>,
+    mantissa: u64,
+    exponent: i32,
+}
 
 impl Revolutions {
-    fn exactly(r: crate::ratio::Ratio) -> Self {
-        Self {
-            exact: Some(r),
-            read: r.to_f64(),
-        }
-    }
-
     /// Turns against another body's, as a magnitude.
     #[must_use]
-    pub fn against(self, frame: Self) -> Self {
+    pub fn against(&self, frame: &Self) -> Self {
         Self {
-            exact: self
-                .exact
-                .zip(frame.exact)
-                .and_then(|(a, b)| a.checked_sub(b)?.checked_abs()),
+            against: frame.rate,
             read: (self.read - frame.read).abs(),
+            ..self.clone()
         }
     }
 
     /// `n` times as many.
     #[must_use]
-    pub fn times(self, n: u32) -> Self {
+    pub fn times(&self, n: u32) -> Self {
         Self {
-            exact: self
-                .exact
-                .and_then(|a| a.checked_mul(crate::ratio::Ratio::whole(i64::from(n)))),
+            times: self.times * u128::from(n),
             read: self.read * f64::from(n),
+            ..self.clone()
         }
     }
 
-    /// One `n`th as many.
-    #[must_use]
-    pub fn per(self, n: u32) -> Self {
-        Self {
-            exact: self
-                .exact
-                .and_then(|a| a.checked_div(crate::ratio::Ratio::whole(i64::from(n)))),
-            read: self.read / f64::from(n),
+    /// `(numerator, denominator)` of the count over `per`, in integers of
+    /// any size.
+    fn quotient(&self, per: u32) -> (crate::ratio::Natural, crate::ratio::Natural) {
+        use crate::ratio::Natural;
+        let (a, b) = (self.rate.numerator(), self.rate.denominator());
+        let (c, d) = (self.against.numerator(), self.against.denominator());
+        // `|a/b − c/d| = |a·d − c·b| / (b·d)`, the denominators positive.
+        let (ad, cb) = (
+            Natural::of(a.unsigned_abs()).times(d.unsigned_abs()),
+            Natural::of(c.unsigned_abs()).times(b.unsigned_abs()),
+        );
+        let mut num = if (a < 0) == (c < 0) {
+            ad.distance(&cb)
+        } else {
+            ad.plus(&cb)
+        }
+        .times(self.times)
+        .times(u128::from(self.scale.mantissa));
+        let mut den = Natural::of(b.unsigned_abs())
+            .times(d.unsigned_abs())
+            .times(u128::from(per));
+        for &n in &self.scale.nums {
+            num = num.times(n);
+        }
+        for &n in &self.scale.dens {
+            den = den.times(n);
+        }
+        let e = self.scale.exponent;
+        if e >= 0 {
+            num = num.shifted(e.unsigned_abs());
+        } else {
+            den = den.shifted(e.unsigned_abs());
+        }
+        (num, den)
+    }
+
+    /// **The whole number of revolutions that covers this many, over
+    /// `per`**: the ceiling of the exact count, so a whole count reads whole
+    /// and one a part past it reads one more. Exact below `2^53`, every
+    /// whole number the report's double holds; from there on the double's
+    /// own ceiling, whose rounding is below the report's resolution — it
+    /// cannot print the difference.
+    fn ceil_over(&self, per: u32) -> f64 {
+        let (num, den) = self.quotient(per);
+        match num.ceil_over(&den) {
+            Some(n) => n as f64,
+            None => (self.read / f64::from(per)).ceil(),
         }
     }
 
-    /// **The whole number of revolutions that covers this many**: the
-    /// ceiling of the exact count, so a whole count reads whole. Past an
-    /// `i128`, the double's, a count within its own roundings
-    /// ([`COUNT_ROUNDINGS`]) of a whole number read as that number.
+    /// [`Self::ceil_over`] one.
     #[must_use]
-    pub fn ceil(self) -> f64 {
-        match self.exact {
-            Some(r) => r.ceil() as f64,
-            None => {
-                let whole = self.read.round();
-                if (self.read - whole).abs() <= COUNT_ROUNDINGS * f64::EPSILON * self.read.abs() {
-                    whole
-                } else {
-                    self.read.ceil()
-                }
-            }
-        }
+    pub fn ceil(&self) -> f64 {
+        self.ceil_over(1)
     }
 }
 
 /// **Each body's turns over a continuous duty**: its speed in rpm times
-/// sixty times the hours, exactly where it fits.
-fn continuous_turns(speeds: &[crate::ratio::Ratio], runtime_hours: f64) -> Vec<Revolutions> {
-    use crate::ratio::Ratio;
-    let minutes = Ratio::of_double(runtime_hours).and_then(|h| h.checked_mul(Ratio::whole(60)));
-    speeds
+/// sixty times the hours.
+fn continuous_turns(
+    speeds: &[crate::ratio::Ratio],
+    runtime_hours: f64,
+) -> Option<Vec<Revolutions>> {
+    let (mantissa, exponent) = crate::ratio::dyadic(runtime_hours)?;
+    let turns = speeds
         .iter()
-        .map(|v| match minutes.and_then(|m| v.checked_mul(m)) {
-            Some(r) => Revolutions::exactly(r),
-            None => Revolutions {
-                exact: None,
-                read: v.to_f64() * 60.0 * runtime_hours,
+        .map(|&v| Revolutions {
+            rate: v,
+            against: crate::ratio::Ratio::ZERO,
+            times: 1,
+            scale: Scale {
+                nums: vec![60],
+                dens: Vec::new(),
+                mantissa,
+                exponent,
             },
+            read: v.to_f64() * 60.0 * runtime_hours,
         })
-        .collect()
+        .collect();
+    Some(turns)
 }
 
 /// **Each body's turns over an intermittent duty**: its share of the sweep
 /// stated at `port`, `per[s] / per[port] · range / 360`, times the
-/// actuations, exactly where it fits.
+/// actuations.
 fn swept_turns(
     per: &[crate::ratio::Ratio],
     port: Body,
     range_degrees: f64,
     actuations: u32,
-) -> Vec<Revolutions> {
-    use crate::ratio::Ratio;
-    let sweep = Ratio::of_double(range_degrees)
-        .and_then(|r| r.checked_div(Ratio::whole(360)))
-        .and_then(|r| r.checked_mul(Ratio::whole(i64::from(actuations))));
-    per.iter()
-        .map(
-            |v| match sweep.and_then(|s| v.checked_div(per[port])?.checked_mul(s)) {
-                Some(r) => Revolutions::exactly(r),
-                None => Revolutions {
-                    exact: None,
-                    read: v.to_f64() / per[port].to_f64()
-                        * (range_degrees / 360.0)
-                        * f64::from(actuations),
-                },
+) -> Option<Vec<Revolutions>> {
+    let (mantissa, exponent) = crate::ratio::dyadic(range_degrees)?;
+    let at = per[port];
+    let turns = per
+        .iter()
+        .map(|&v| Revolutions {
+            rate: v,
+            against: crate::ratio::Ratio::ZERO,
+            times: 1,
+            scale: Scale {
+                nums: vec![u128::from(actuations), at.denominator().unsigned_abs()],
+                dens: vec![360, at.numerator().unsigned_abs()],
+                mantissa,
+                exponent,
             },
-        )
-        .collect()
+            read: v.to_f64() / at.to_f64() * (range_degrees / 360.0) * f64::from(actuations),
+        })
+        .collect();
+    Some(turns)
 }
 
 /// **One unit in the last place of a double**: the gap to the next one out,
@@ -4019,11 +4073,12 @@ fn paths_of(
     // plus end, and distances apart are independent, so each reaches its
     // own extreme at once. A mesh with no distance is a source of its own.
     let backlash_at = |read: Body, from: Body| -> Option<Backlash> {
-        let mut sources: Vec<(Result<usize, usize>, Ends)> = Vec::new();
+        // Each source with how many meshes move it: one moves it one way.
+        let mut sources: Vec<(Result<usize, usize>, Ends, usize)> = Vec::new();
         for (k, play) in row_play.iter().enumerate() {
             let c = coefficient(k, read, from)?;
             let source = distance_of.get(k).copied().flatten().ok_or(k);
-            let at = match sources.iter().position(|(s, _)| *s == source) {
+            let at = match sources.iter().position(|(s, _, _)| *s == source) {
                 Some(i) => i,
                 None => {
                     sources.push((
@@ -4032,22 +4087,30 @@ fn paths_of(
                             minus: Some(0.0),
                             running: 0.0,
                             plus: Some(0.0),
+                            monotone: true,
                         },
+                        0,
                     ));
                     sources.len() - 1
                 }
             };
-            let sum = &mut sources[at].1;
-            *sum = Ends {
+            if c == 0.0 {
+                continue;
+            }
+            let entry = &mut sources[at];
+            entry.2 += 1;
+            let sum = entry.1;
+            entry.1 = Ends {
                 minus: sum.minus.zip(play.minus).map(|(s, p)| s + c * p),
                 running: sum.running + c * play.running,
                 plus: sum.plus.zip(play.plus).map(|(s, p)| s + c * p),
+                monotone: entry.2 == 1 && play.monotone,
             };
         }
         Some(Backlash::of_sources(
             sources
                 .into_iter()
-                .map(|(_, ends)| ends.map(f64::to_degrees)),
+                .map(|(_, ends, _)| ends.map(f64::to_degrees)),
         ))
     };
     let mut out = Vec::new();
@@ -5192,9 +5255,9 @@ fn solve_parts(
         // says rather than counting nought.
         let turns: Option<Vec<Revolutions>> = match case.counted() {
             None => None,
-            Some(&Duty::Continuous { runtime_hours }) => {
-                Some(continuous_turns(&motion, runtime_hours))
-            }
+            // A duty that is not a number, which the input table refuses,
+            // counts nothing.
+            Some(&Duty::Continuous { runtime_hours }) => continuous_turns(&motion, runtime_hours),
             Some(&Duty::Intermittent { at: None, .. }) => {
                 notes.push(Note::new(key::TRAIN_DUTY_UNSET));
                 None
@@ -5220,7 +5283,7 @@ fn solve_parts(
                     notes.push(located(key::TRAIN_DUTY_AT_STILL, port));
                     None
                 } else {
-                    Some(swept_turns(per, port, range_degrees, actuations))
+                    swept_turns(per, port, range_degrees, actuations)
                 }
             }
         };
@@ -5278,7 +5341,7 @@ fn solve_parts(
                 on_members,
                 turns: turns
                     .as_ref()
-                    .map(|t| (0..w.slots.len()).map(|l| t[port(k, l)]).collect()),
+                    .map(|t| (0..w.slots.len()).map(|l| t[port(k, l)].clone()).collect()),
                 reversing_actuations,
                 application_factor: case.applied_factor(),
             });

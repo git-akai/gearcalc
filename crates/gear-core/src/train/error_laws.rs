@@ -400,6 +400,14 @@ fn a_given_speed_agrees_to_its_own_precision() {
 /// whole number.
 #[test]
 fn a_whole_count_of_cycles_reads_whole() {
+    let counts = meshed_planets_counted(1000.0);
+    assert!(counts.contains(&48_000_000.0), "{counts:?}");
+    assert!(!counts.contains(&48_000_001.0), "{counts:?}");
+}
+
+/// Every member's bending count, two meshed-planet sets in a chain driven
+/// at 2400 rpm for `hours`, each a whole number.
+fn meshed_planets_counted(hours: f64) -> Vec<f64> {
     let lib = test_library();
     let mut t = Train::chained(
         vec![Preset::MeshedPlanets.build(), Preset::MeshedPlanets.build()],
@@ -407,7 +415,7 @@ fn a_whole_count_of_cycles_reads_whole() {
     );
     let mut case = LoadCase {
         duty: super::Duty::Continuous {
-            runtime_hours: 1000.0,
+            runtime_hours: hours,
         },
         ..t.fresh_case(super::CaseKind::Fatigue, 2.0, 2400.0)
     };
@@ -417,12 +425,34 @@ fn a_whole_count_of_cycles_reads_whole() {
     let mut counts = Vec::new();
     for g in &r.members {
         for c in &g.cases {
-            if let Some(n) = c.cycles {
-                assert_eq!(n.bending, n.bending.round(), "{n:?}");
-                counts.push(n.bending);
-            }
+            let n = c.cycles.unwrap();
+            assert!(
+                n.bending.is_finite() && n.bending == n.bending.round(),
+                "{n:?}"
+            );
+            counts.push(n.bending);
         }
     }
-    assert!(counts.contains(&48_000_000.0), "{counts:?}");
-    assert!(!counts.contains(&48_000_001.0), "{counts:?}");
+    assert_eq!(counts.len(), r.members.len());
+    counts
+}
+
+/// **The ceiling is the exact count's** (the near miss a double's ceiling
+/// passes): a hair past 1000 hours, `1000.0.next_up()`, the planet's exact
+/// count is a part past 48,000,000 and reads 48,000,001 — where the
+/// double's product rounds back to 48,000,000 and its ceiling says that.
+/// At the table's extremes: `2^126` hours counts past `2^53`, where the
+/// report's double is the count to its own resolution; `1e-30` hours turns
+/// every body that moves a part of a revolution, which is one.
+#[test]
+fn the_count_is_the_exact_counts_ceiling() {
+    let past = meshed_planets_counted(1000.0_f64.next_up());
+    assert!(past.contains(&48_000_001.0), "{past:?}");
+    assert!(!past.contains(&48_000_000.0), "{past:?}");
+
+    let vast = meshed_planets_counted(2f64.powi(126));
+    assert!(vast.iter().all(|&n| n > 2f64.powi(53)), "{vast:?}");
+
+    let brief = meshed_planets_counted(1e-30);
+    assert!(brief.iter().all(|&n| n == 1.0), "{brief:?}");
 }

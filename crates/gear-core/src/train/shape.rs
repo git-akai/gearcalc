@@ -2296,19 +2296,19 @@ impl Indexed<'_> {
                 }
             }
         };
-        // **A candidate's tolerance band stays outside the base circles'
-        // limit**: a shift that puts a band end where the teeth have no
-        // operating angle is no candidate, so the search lands where every
-        // band reads whole.
+        // **Candidates are ranked by whether their bands read whole, then
+        // by efficiency**: a shift that puts a band end where the teeth have
+        // no operating angle ranks below every one that does not — the
+        // solve would say that band has no extremes — and where none does,
+        // the most efficient is taken and the mesh says so
+        // (`mesh.tolerance_below_base`). One condition, read one way by the
+        // search and the solve.
         let band_reads = built.meshes.iter().all(|bm| match &bm.contact {
             BuiltContact::Line(l) => {
-                bm.running - self.distances[bm.distance].tolerance_minus > l.base_limit()
+                bm.running - self.distances[bm.distance].tolerance_minus >= l.base_limit()
             }
             BuiltContact::Point(_) => true,
         });
-        if !band_reads {
-            return None;
-        }
         let mut product = 1.0;
         for (k, bm) in built.meshes.iter().enumerate() {
             // A component's search scores its own meshes; the rest are a
@@ -2341,7 +2341,11 @@ impl Indexed<'_> {
                 .efficiency()?,
             };
         }
-        Some(product)
+        Some(if band_reads {
+            product
+        } else {
+            product - BAND_PAST_LIMIT
+        })
     }
 }
 
@@ -4452,10 +4456,12 @@ pub fn rate(
                         .number("limit", l.base_limit(), 4),
                 );
             }
+            // One mesh's play moves one way with its distance.
             Ok(super::Ends {
                 minus,
                 running: mid,
                 plus,
+                monotone: true,
             })
         })
         .collect::<Result<_, TrainError>>()?;
@@ -4735,7 +4741,7 @@ pub fn rate(
                     // those are the same body.
                     let cycles = c.turns.as_ref().map(|t| {
                         super::loaded_cycles(super::Turns {
-                            revolutions: t[shaft].against(t[frame]).times(wiring.paths_seen(i)),
+                            revolutions: t[shaft].against(&t[frame]).times(wiring.paths_seen(i)),
                             reversing_actuations: c.reversing_actuations,
                         })
                     });
@@ -5203,6 +5209,12 @@ impl Indexed<'_> {
     }
 }
 
+/// **What a candidate whose band reaches past the base circles' limit is
+/// ranked down by**: an efficiency is a fraction in `[0, 1]`, so lowered by
+/// two it ranks below every candidate whose band reads whole, and among
+/// its own kind by efficiency still.
+const BAND_PAST_LIMIT: f64 = 2.0;
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
@@ -5280,6 +5292,37 @@ mod tests {
         assert!(read > 60, "only {read} band points read");
     }
 
+    /// **The search and the solve read one condition one way** (T02.8): a
+    /// hula at a module of a sixth, whose every candidate's tolerance band
+    /// reaches past the base circles' limit, still has its shifts chosen —
+    /// the most efficient, where none reads whole — and its mesh says
+    /// where the band ends; at a module of a third, where some candidate's
+    /// band reads whole, the one chosen does and nothing is said.
+    #[test]
+    fn a_search_ranks_whole_bands_first_and_chooses_where_none_is() {
+        let hula = |d: u32| {
+            let n = 18 * d;
+            let mut s = arr::hula([n, n + d, n + d, n + 2 * d], [1.0 / f64::from(d); 2]);
+            s.distances[0].tip_clearance = 0.30 / f64::from(d);
+            s.set_search(true);
+            try_alone_at(&s, 2.0, 1000.0).unwrap()
+        };
+        let said = |r: &crate::train::Alone, k: &str| {
+            r.notes.iter().any(|n| n.is(k))
+                || r.meshes.iter().any(|m| m.notes.iter().any(|n| n.is(k)))
+        };
+        let none_whole = hula(6);
+        assert!(
+            !said(&none_whole, key::PART_OPTIMISER_FOUND_NOTHING),
+            "{:?}",
+            none_whole.notes
+        );
+        assert!(said(&none_whole, key::MESH_TOLERANCE_BELOW_BASE));
+        let some_whole = hula(3);
+        assert!(!said(&some_whole, key::PART_OPTIMISER_FOUND_NOTHING));
+        assert!(!said(&some_whole, key::MESH_TOLERANCE_BELOW_BASE));
+    }
+
     /// **The band's least play falls as its minus tolerance widens, and a
     /// band end past the base circles' limit has none** (T02.8): on the
     /// 17/43 pair from ±0.25 mm to ±5 mm, each band no tighter than the one
@@ -5300,7 +5343,8 @@ mod tests {
                 .notes
                 .iter()
                 .any(|n| n.is(key::MESH_TOLERANCE_BELOW_BASE));
-            match r.paths[0].backlash.forward.unwrap().minimum {
+            let band = r.paths[0].backlash.forward.unwrap();
+            match band.minimum {
                 Some(least) => {
                     assert!(beyond == 0 && !said, "±{tol}: a band read past the limit");
                     if let Some(before) = last {
@@ -5311,6 +5355,10 @@ mod tests {
                 }
                 None => {
                     assert!(said, "±{tol}: absent with no note");
+                    // Play rises with the distance on an external pair, so
+                    // the end inside the limit is the least, and the
+                    // greatest — the plus end's — still reads.
+                    assert!(band.maximum.is_some(), "±{tol}: {band:?}");
                     beyond += 1;
                 }
             }
