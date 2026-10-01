@@ -5717,7 +5717,7 @@ mod tests {
             )
             .expect("the sun mesh has contact");
 
-            let got = r.members[0].cases[0].contact_stress;
+            let got = r.members[0].cases[0].contact_stress.unwrap();
             assert!(
                 (got - direct.governing(0)).abs() < 1e-9 * direct.governing(0),
                 "face {face}: the sun reports {got} MPa where a direct evaluation \
@@ -5769,8 +5769,8 @@ mod tests {
                 )
                 .unwrap();
             let planets = f64::from(stage.axes[1].count);
-            let sp_width = r.members[1].face_width.min(r.members[0].face_width);
-            let pr_width = r.members[1].face_width.min(r.members[2].face_width);
+            let sp_width = r.members[1].face_width.unwrap().min(r.members[0].face_width.unwrap());
+            let pr_width = r.members[1].face_width.unwrap().min(r.members[2].face_width.unwrap());
             let planet = built.members[1].as_gear();
             let each = |contact_ratio: f64, torque: f64, b: f64| {
                 let section = crate::strength::bending_section(planet, contact_ratio).unwrap();
@@ -5861,7 +5861,7 @@ mod tests {
             );
             for (name, gear) in [("sun", &r.members[0]), ("ring", &r.members[2])] {
                 assert!(
-                    gear.cases[0].contact_stress > 0.0,
+                    gear.cases[0].contact_stress.unwrap() > 0.0,
                     "k={k}: {name} lost its contact stress"
                 );
             }
@@ -6268,8 +6268,8 @@ mod tests {
                 res.meshes[0].line.unwrap().contact_ratios.transverse
             );
             assert!(
-                res.meshes[1].cases[0].contact.curvature_across
-                    < res.meshes[0].cases[0].contact.curvature_across,
+                res.meshes[1].cases[0].contact.unwrap().curvature_across
+                    < res.meshes[0].cases[0].contact.unwrap().curvature_across,
                 "z={s}/{p}/{r}: internal relative radius should be the larger"
             );
             // ...and a ring's tooth is the stronger, so it carries the less
@@ -6567,7 +6567,7 @@ mod tests {
                 "helix={helix}: ring"
             );
             assert!(
-                r.meshes[0].line.unwrap().contact_ratios.overlap > 0.0,
+                r.meshes[0].line.unwrap().contact_ratios.overlap.unwrap() > 0.0,
                 "helix={helix}"
             );
             assert!(residual(&r) < 1e-12);
@@ -6772,8 +6772,8 @@ mod overlap_per_group {
         assert!((r.members[0].helix_angle.abs() - want(0.8)).abs() < 1e-9);
         assert!((r.members[2].helix_angle.abs() - want(1.2)).abs() < 1e-9);
         assert!(
-            (r.meshes[0].line.unwrap().contact_ratios.overlap - 0.8).abs() < 1e-6
-                && (r.meshes[1].line.unwrap().contact_ratios.overlap - 1.2).abs() < 1e-6
+            (r.meshes[0].line.unwrap().contact_ratios.overlap.unwrap() - 0.8).abs() < 1e-6
+                && (r.meshes[1].line.unwrap().contact_ratios.overlap.unwrap() - 1.2).abs() < 1e-6
         );
     }
 
@@ -6789,9 +6789,9 @@ mod overlap_per_group {
         shape.meshes[1].overlap = Auto::fixed(2.0);
         let r = solve(&shape);
         let floor = super::super::width_for_overlap(&Auto::fixed(2.0), 15.0, 1.0).unwrap();
-        assert!(r.members[2].face_width >= floor - 1e-9 && r.members[3].face_width >= floor - 1e-9);
+        assert!(r.members[2].face_width.unwrap() >= floor - 1e-9 && r.members[3].face_width.unwrap() >= floor - 1e-9);
         assert!(
-            r.members[0].face_width < floor,
+            r.members[0].face_width.unwrap() < floor,
             "the first pair asked no floor"
         );
     }
@@ -6908,7 +6908,7 @@ mod hula_recorded {
         {
             let m = &r.meshes[k];
             close(aw, m.line.unwrap().operating_pressure_angle, 5e-4, "α_w");
-            close(eps, m.contact_ratio, 5e-5, "ε");
+            close(eps, m.contact_ratio.unwrap(), 5e-5, "ε");
             let tips = m.tips.unwrap();
             close(far, tips.far_gap, 5e-5, "far-side gap");
             close(tip, tips.tip_margin.unwrap(), 5e-5, "tip margin");

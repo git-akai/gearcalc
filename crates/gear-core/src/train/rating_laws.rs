@@ -71,7 +71,11 @@ fn an_application_factor_scales_bending_by_itself_and_contact_by_its_root() {
                         rated += 1;
                     }
                 }
-                if let Some(c) = ratio(ca.contact_stress, cb.contact_stress) {
+                if let Some(c) = ca
+                    .contact_stress
+                    .zip(cb.contact_stress)
+                    .and_then(|(x, y)| ratio(x, y))
+                {
                     assert!(
                         relative(c, K.sqrt()) < TOL || relative(c, K.cbrt()) < TOL,
                         "{p:?}: contact ×{c}"
@@ -176,7 +180,7 @@ fn a_mate_loaded_low_on_its_flank_is_not_rated_negative() {
             .iter()
             .any(|n| n.is(crate::note::key::MESH_LOAD_SHARING_OUT_OF_BAND)),
         "no band note at ε {}",
-        r.meshes[0].contact_ratio
+        r.meshes[0].contact_ratio.unwrap()
     );
 }
 
@@ -448,10 +452,10 @@ fn with_contact_sizing_on_every_flank_holds_its_allowable() {
                 }
                 let a = allowable(&g.material, Rating::Contact { aspect: 0.0 }, case.kind).unwrap();
                 assert!(
-                    c.contact_stress <= a * (1.0 + 1e-9),
+                    c.contact_stress.unwrap() <= a * (1.0 + 1e-9),
                     "{p:?}: {} MPa against {a} at {} mm",
-                    c.contact_stress,
-                    g.face_width
+                    c.contact_stress.unwrap(),
+                    g.face_width.unwrap()
                 );
                 judged += 1;
             }
@@ -746,7 +750,7 @@ fn a_steep_flank_is_rated_or_refused_by_name() {
                 for c in &g.cases {
                     let at = format!("{name} {alpha}° member {i} case {}", c.case);
                     assert!(
-                        c.contact_stress.is_finite() && c.contact_stress >= 0.0,
+                        c.contact_stress.is_some_and(|s| s.is_finite() && s >= 0.0),
                         "{at}"
                     );
                     match c.bending_stress {

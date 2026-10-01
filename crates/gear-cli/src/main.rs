@@ -973,14 +973,14 @@ fn hula_report(n: u32, clearance: f64, m_outer: f64, m_inner: f64, cutter_teeth:
         );
         for (gear, _) in members {
             println!(
-                "    z{:<4} T {:>10.4} Nm  b {:>7.3} mm  sigma_F {:>8}  sigma_H {:>7.1} MPa",
+                "    z{:<4} T {:>10.4} Nm  b {:>7} mm  sigma_F {:>8}  sigma_H {:>7} MPa",
                 gear.params.teeth,
                 gear.cases[0].torque,
-                gear.face_width,
+                shown(gear.face_width, 3),
                 gear.cases[0]
                     .bending_stress
                     .map_or_else(|| "—".to_string(), |s| format!("{s:.1}")),
-                gear.cases[0].contact_stress,
+                shown(gear.cases[0].contact_stress, 1),
             );
             for note in gear.clamps.iter().chain(&gear.notes) {
                 println!("    ! z{}: {}", gear.params.teeth, words().render(note));
@@ -3919,8 +3919,8 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
                         }
                         println!(
                             "sigma_H at pitch  sun-planet {} MPa   planet-ring {} MPa",
-                            shown(r.sun_planet.cases[0].contact.map(|p| p.at_pitch_point), 1),
-                            shown(r.planet_ring.cases[0].contact.map(|p| p.at_pitch_point), 1)
+                            crate::shown(r.sun_planet.cases[0].contact.map(|p| p.at_pitch_point), 1),
+                            crate::shown(r.planet_ring.cases[0].contact.map(|p| p.at_pitch_point), 1)
                         );
                         println!(
                             "sigma_F  sun {}   planet {}   ring {}",

@@ -1110,7 +1110,7 @@ mod tests {
         );
         assert!(r.members[1].cases[0].bending_stress.is_none());
         assert!(r.members[2].cases[0].bending_stress.is_some());
-        assert!(r.members[1].cases[0].contact_stress > 0.0);
+        assert!(r.members[1].cases[0].contact_stress.unwrap() > 0.0);
         // The wheel and the pinion turn as one: the same body.
         assert_eq!(r.members[1].cases[0].speed, r.members[2].cases[0].speed);
     }

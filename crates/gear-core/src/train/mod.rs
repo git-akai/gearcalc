@@ -6527,7 +6527,10 @@ mod tests {
                             b / a
                         );
                     }
-                    let (a, b) = (start.contact_stress, end.contact_stress);
+                    let (a, b) = (
+                        start.contact_stress.unwrap(),
+                        end.contact_stress.unwrap(),
+                    );
                     assert!(
                         (b / a - want.sqrt()).abs() < tol * want.sqrt(),
                         "stage {k} member {i}: contact {b} against {a} is {}, \
@@ -6585,7 +6588,7 @@ mod tests {
             // Whichever end the torque is put on, its case is the one read.
             let case = if back > 0.0 { BACK } else { PEAK };
             (
-                m.cases[case].contact.max_pressure,
+                m.cases[case].contact.unwrap().max_pressure,
                 reduction(w),
                 m.efficiency.forward,
             )
@@ -6644,9 +6647,9 @@ mod tests {
             "this split is meant to be the forward-locked one"
         );
         assert!(
-            r_point.cases[0].contact.max_pressure > 100.0,
+            r_point.cases[0].contact.unwrap().max_pressure > 100.0,
             "a locked pair's flanks are pressed by whatever holds them: {} MPa",
-            r_point.cases[0].contact.max_pressure
+            r_point.cases[0].contact.unwrap().max_pressure
         );
         // Not merely non-zero: the same 2 N·m through a split that *does* drive
         // presses about as hard, because the flank load comes from the input
@@ -6654,12 +6657,12 @@ mod tests {
         let driving = locked.clone().with_first_helix(18.0);
         let d = try_alone(&driving).expect("and this one");
         let d_point = &d.meshes[0];
-        let ratio = r_point.cases[0].contact.max_pressure / d_point.cases[0].contact.max_pressure;
+        let ratio = r_point.cases[0].contact.unwrap().max_pressure / d_point.cases[0].contact.unwrap().max_pressure;
         assert!(
             (0.5..2.0).contains(&ratio),
             "the locked split rates at {} MPa against the driving split's {}",
-            r_point.cases[0].contact.max_pressure,
-            d_point.cases[0].contact.max_pressure
+            r_point.cases[0].contact.unwrap().max_pressure,
+            d_point.cases[0].contact.unwrap().max_pressure
         );
     }
 
@@ -6691,12 +6694,12 @@ mod tests {
             // A worm's members are not gears, so the walk below is empty there
             // and the claim is the stage's own — which is the one that failed.
             if let Some(m) = r.by_part[0].meshes.first().filter(|m| m.point.is_some()) {
-                assert_eq!(m.cases[1].contact.max_pressure, 0.0);
-                assert!(m.cases[0].contact.max_pressure > 0.0);
+                assert_eq!(m.cases[1].contact.unwrap().max_pressure, 0.0);
+                assert!(m.cases[0].contact.unwrap().max_pressure > 0.0);
             }
             for (i, g) in r.by_part[0].members.iter().enumerate() {
                 assert_eq!(
-                    g.cases[1].contact_stress, 0.0,
+                    g.cases[1].contact_stress.unwrap(), 0.0,
                     "member {i} carries nothing and reports a stress"
                 );
                 assert!(
@@ -6705,7 +6708,7 @@ mod tests {
                     g.cases[1].bending_stress
                 );
                 assert!(
-                    g.cases[0].contact_stress > 0.0,
+                    g.cases[0].contact_stress.unwrap() > 0.0,
                     "member {i} still has a peak to survive"
                 );
             }
@@ -6787,7 +6790,10 @@ mod tests {
         let (line, point) = (mesh(0.0, 0.0), mesh(0.01, 0.0));
         assert!(line.line.is_some() && line.point.is_none());
         assert!(point.point.is_some() && point.line.is_none());
-        let (l, p) = (line.cases[0].contact, point.cases[0].contact);
+        let (l, p) = (
+            line.cases[0].contact.unwrap(),
+            point.cases[0].contact.unwrap(),
+        );
         close(
             "pressure at the pitch point, μ = 0",
             l.at_pitch_point,
@@ -6828,12 +6834,12 @@ mod tests {
             "the lengthwise sliding closes on the line's zero: {}",
             point.sliding_ratio
         );
-        assert!(line.contact_ratio > 1.0 && point.contact_ratio > 1.0);
+        assert!(line.contact_ratio.unwrap() > 1.0 && point.contact_ratio.unwrap() > 1.0);
 
         // With friction, the flank load is the seam: 1.5 % at the pitch point.
         let (line, point) = (mesh(0.0, mu), mesh(0.01, mu));
-        let gap = (line.cases[0].contact.at_pitch_point - point.cases[0].contact.at_pitch_point)
-            / line.cases[0].contact.at_pitch_point;
+        let gap = (line.cases[0].contact.unwrap().at_pitch_point - point.cases[0].contact.unwrap().at_pitch_point)
+            / line.cases[0].contact.unwrap().at_pitch_point;
         assert!(
             (100.0 * gap - pitch_friction_percent).abs() <= 0.05,
             "the friction seam at the pitch point is {:.3} %, and it is the flank load \
@@ -6921,11 +6927,11 @@ mod tests {
                     (
                         x1,
                         [
-                            mesh.contact_ratio,
+                            mesh.contact_ratio.unwrap(),
                             mesh.efficiency.forward,
                             bending(0),
                             bending(1),
-                            mesh.cases[0].contact.max_pressure,
+                            mesh.cases[0].contact.unwrap().max_pressure,
                         ],
                     )
                 })
@@ -8046,7 +8052,7 @@ mod tests {
         assert!(!r.cases[0].solved);
         for s in &r.by_part {
             for g in &s.members {
-                assert_eq!(g.face_width, 7.0);
+                assert_eq!(g.face_width.unwrap(), 7.0);
             }
         }
     }
@@ -9163,18 +9169,18 @@ mod tests {
         let figure = |x: f64| Some(format!("{x:.3}"));
 
         let (r, lost, iso) = solved(30.0, 0.55, 60.0);
-        assert!(r.transverse < 1.0 && r.total >= 1.0, "{r:?}");
-        assert_eq!(lost, None, "ε_γ {} keeps contact", r.total);
+        assert!(r.transverse < 1.0 && r.total.unwrap() >= 1.0, "{r:?}");
+        assert_eq!(lost, None, "ε_γ {} keeps contact", r.total.unwrap());
         assert_eq!(iso, figure(r.transverse));
 
         let (r, lost, iso) = solved(30.0, 0.55, 1.0);
-        assert!(r.total < 1.0 && r.overlap > 0.0, "{r:?}");
-        assert_eq!(lost, figure(r.total));
+        assert!(r.total.unwrap() < 1.0 && r.overlap.unwrap() > 0.0, "{r:?}");
+        assert_eq!(lost, figure(r.total.unwrap()));
         assert_eq!(iso, None, "one note for one shortfall");
 
         let (r, lost, iso) = solved(0.0, 0.55, 60.0);
-        assert!(r.total < 1.0 && r.overlap == 0.0, "{r:?}");
-        assert_eq!(lost, figure(r.total));
+        assert!(r.total.unwrap() < 1.0 && r.overlap.unwrap() == 0.0, "{r:?}");
+        assert_eq!(lost, figure(r.total.unwrap()));
         assert_eq!(iso, None);
 
         let (r, lost, iso) = solved(30.0, 1.0, 60.0);
@@ -9279,7 +9285,8 @@ mod tests {
             .as_ref()
             .expect("a line contact")
             .contact_ratios
-            .overlap;
+            .overlap
+            .unwrap();
         assert!(
             (ratio - 1.2).abs() < 1e-9,
             "the floor should buy exactly the ratio: {ratio}"
@@ -10184,9 +10191,9 @@ mod tests {
                 s.meshes[0].efficiency.forward, s.meshes[0].efficiency.backward,
                 "a parallel-axis stage is as efficient driven either way"
             );
-            assert!(s.meshes[0].cases[0].contact.at_pitch_point > 0.0);
+            assert!(s.meshes[0].cases[0].contact.unwrap().at_pitch_point > 0.0);
             for g in &s.members {
-                assert!(g.face_width > 0.0);
+                assert!(g.face_width.unwrap() > 0.0);
                 assert!(g.cases[0].bending_stress.unwrap() > 0.0);
             }
         }
@@ -10389,23 +10396,26 @@ mod tests {
         let spur = try_alone(&arr::pair([17, 43])).unwrap();
         assert_eq!(
             spur.meshes[0].line.unwrap().contact_ratios.overlap,
-            0.0,
+            Some(0.0),
             "must be exactly zero"
         );
         assert_eq!(
             spur.meshes[0].line.unwrap().contact_ratios.total,
-            spur.meshes[0].line.unwrap().contact_ratios.transverse
+            Some(spur.meshes[0].line.unwrap().contact_ratios.transverse)
         );
-        assert!(!spur.meshes[0]
-            .line
-            .unwrap()
-            .contact_ratios
-            .has_full_axial_overlap());
+        assert_eq!(
+            spur.meshes[0]
+                .line
+                .unwrap()
+                .contact_ratios
+                .has_full_axial_overlap(),
+            Some(false)
+        );
 
         let helical = try_alone(&arr::pair([17, 43]).with_additional_helix(20.0)).unwrap();
-        assert!(helical.meshes[0].line.unwrap().contact_ratios.overlap > 0.0);
+        assert!(helical.meshes[0].line.unwrap().contact_ratios.overlap.unwrap() > 0.0);
         assert!(
-            helical.meshes[0].line.unwrap().contact_ratios.total
+            helical.meshes[0].line.unwrap().contact_ratios.total.unwrap()
                 > helical.meshes[0].line.unwrap().contact_ratios.transverse
         );
     }
@@ -10472,7 +10482,7 @@ mod tests {
                 g.face_width = Auto::automatic(DEFAULT_FACE_WIDTH);
                 g.face_sources = sources;
             }
-            try_alone(&s).unwrap().members[0].face_width
+            try_alone(&s).unwrap().members[0].face_width.unwrap()
         };
         // One source at a time, then every combination of them: the width is the
         // largest of whatever is enabled, and that is the whole rule.
@@ -10564,7 +10574,7 @@ mod tests {
         for g in s.members.iter_mut().map(|m| &mut m.gear) {
             g.face_width = Auto::automatic(7.0);
         }
-        assert_eq!(try_alone(&s).unwrap().members[0].face_width, 7.0);
+        assert_eq!(try_alone(&s).unwrap().members[0].face_width.unwrap(), 7.0);
     }
 
     /// An intermittent duty measured at the end port makes upstream gears turn
@@ -10852,20 +10862,21 @@ mod tests {
         }
     }
 
-    /// **An automatic width with nothing to size it is said, not divided by.**
+    /// **An automatic width with nothing to size it is said, not divided by
+    /// — and is not the number in its box.**
     ///
     /// The note has promised exactly that since it was written, and the stage
     /// then resolved the width to zero and divided by it: every stress came out
-    /// infinite and every minimum width a NaN. Both cross the boundary as JSON
-    /// `null` and draw as blanks, so the browser was honest by accident — while
-    /// the CLI printed `inf`, and the generated TypeScript said `number` of a
-    /// field that could arrive `null`.
+    /// infinite and every minimum width a NaN. It then stood at its box; a box
+    /// is no width a rating asked for, so it is not sized now: the width is
+    /// absent, every figure read at a width absent with it, and the widths
+    /// the ratings ask are still given (they read no width).
     ///
     /// Asked of all three presets that have the control, because it is one
     /// rule and this is the shape of a bound reaching the search it was written
     /// in and no other.
     #[test]
-    fn a_width_with_no_rating_to_size_it_stands_where_it_was() {
+    fn a_width_with_no_rating_to_size_it_is_not_sized() {
         let lib = library();
         let off = FaceSources {
             bending: ByKind {
@@ -10921,25 +10932,18 @@ mod tests {
             .collect();
         assert_eq!(members.len(), 9);
         for g in members {
+            assert_eq!(g.face_width, None, "not sized, not the box's {GIVEN}");
+            // ...no figure read at a width, and every width asked a number.
+            assert_eq!(g.cases[0].contact_stress, None);
+            assert_eq!(g.cases[0].bending_stress, None);
             assert!(
-                (g.face_width - GIVEN).abs() < 1e-12,
-                "a width nothing sizes stands at the number in its box, not {}",
-                g.face_width
+                g.cases[0]
+                    .min_face_width
+                    .contact
+                    .is_some_and(f64::is_finite),
+                "{:?}",
+                g.cases[0].min_face_width
             );
-            // ...and with a width, every figure taken at one is a number.
-            assert!(
-                g.cases[0].contact_stress.is_finite()
-                    && g.cases[0]
-                        .min_face_width
-                        .contact
-                        .is_some_and(f64::is_finite),
-                "contact: {} and {:?}",
-                g.cases[0].contact_stress,
-                g.cases[0].min_face_width.contact
-            );
-            if let Some(s) = g.cases[0].bending_stress {
-                assert!(s.is_finite(), "bending: {s}");
-            }
         }
         // The note still fires — the point is that it is now the *only* thing
         // that happens, not that it stopped happening — and it fires on the
@@ -10952,7 +10956,8 @@ mod tests {
             .collect();
         for (i, g) in members.iter().enumerate() {
             assert!(
-                g.notes.iter().any(|n| n.is(key::GEAR_FACE_WIDTH_NO_SOURCE)),
+                g.notes.iter().any(|n| n.is(key::GEAR_FACE_WIDTH_NO_SOURCE))
+                    && g.notes.iter().any(|n| n.is(key::GEAR_FACE_WIDTH_NOT_SIZED)),
                 "member {i} should say no rating sizes its width: {:?}",
                 g.notes
             );
@@ -11691,8 +11696,8 @@ mod tests {
                 },
             };
 
-            let width = |sources, o| auto_width(sources, o).members[0].face_width;
-            let ratio = base.members[0].face_width / width(contact_only(case), over);
+            let width = |sources, o| auto_width(sources, o).members[0].face_width.unwrap();
+            let ratio = base.members[0].face_width.unwrap() / width(contact_only(case), over);
             assert!(
                 (ratio - 4.0).abs() < 1e-9,
                 "{case:?}: doubling the allowable should quarter the width: ratio {ratio}"
@@ -11739,6 +11744,7 @@ mod tests {
             }
             try_alone(&s).unwrap().meshes[0].cases[0]
                 .contact
+                .unwrap()
                 .at_pitch_point
         };
         let base = at(None);
@@ -11942,7 +11948,7 @@ mod tests {
                 };
             }
             let r = try_alone(&stage).unwrap();
-            let effective = r.members[0].face_width.min(r.members[1].face_width);
+            let effective = r.members[0].face_width.unwrap().min(r.members[1].face_width.unwrap());
             assert!(effective > 0.0);
 
             for (i, g) in r.members.iter().enumerate() {
@@ -12008,7 +12014,7 @@ mod tests {
         let base = solved(false, [Overrides::default(), Overrides::default()]);
         let soft_first = solved(false, [modulus(70_000.0), Overrides::default()]);
         let soft_second = solved(false, [Overrides::default(), modulus(70_000.0)]);
-        let pitch = |r: &shape::ShapeResult| r.meshes[0].cases[0].contact.at_pitch_point;
+        let pitch = |r: &shape::ShapeResult| r.meshes[0].cases[0].contact.unwrap().at_pitch_point;
         for (r, which) in [(&soft_first, "gear 1"), (&soft_second, "gear 2")] {
             assert!(
                 pitch(r) < pitch(&base),
@@ -12026,19 +12032,19 @@ mod tests {
         // the shared figure — a gear is rated at the worse of the pitch point
         // and its own end of the path, never below it.
         let (a, b) = (
-            base.members[0].cases[0].contact_stress,
-            base.members[1].cases[0].contact_stress,
+            base.members[0].cases[0].contact_stress.unwrap(),
+            base.members[1].cases[0].contact_stress.unwrap(),
         );
         assert!(
             a != b,
             "17/43 is not symmetric, so its two gears are not rated alike: {a} and {b}"
         );
         for g in &base.members {
-            assert!(g.cases[0].contact_stress >= pitch(&base));
+            assert!(g.cases[0].contact_stress.unwrap() >= pitch(&base));
         }
         // ...and the envelope is the worse of them, which is what the *mesh*
         // would be rated on with no member named.
-        assert!((a.max(b) - base.members[0].cases[0].contact_stress.max(b)).abs() < 1e-12);
+        assert!((a.max(b) - base.members[0].cases[0].contact_stress.unwrap().max(b)).abs() < 1e-12);
 
         // --- the allowable. At a fixed width again, and for a reason worth
         // stating: with an *automatic* width the allowable does reach the stress,
@@ -12061,8 +12067,8 @@ mod tests {
         );
         let derated = solved(false, [Overrides::default(), half]);
         assert_eq!(
-            derated.meshes[0].cases[0].contact.at_pitch_point,
-            wide.meshes[0].cases[0].contact.at_pitch_point,
+            derated.meshes[0].cases[0].contact.unwrap().at_pitch_point,
+            wide.meshes[0].cases[0].contact.unwrap().at_pitch_point,
             "an allowable is not a stress and must not move one"
         );
         let contact_width = |r: &shape::ShapeResult| {
@@ -12356,7 +12362,10 @@ mod tests {
                     checked += 1;
                     assert!(
                         near(want.torque, got.torque)
-                            && near(want.contact_stress, got.contact_stress)
+                            && match (want.contact_stress, got.contact_stress) {
+                                (Some(x), Some(y)) => near(x, y),
+                                (x, y) => x == y,
+                            }
                             && want.cycles == got.cycles
                             && match (want.bending_stress, got.bending_stress) {
                                 (Some(x), Some(y)) => near(x, y),
@@ -12452,7 +12461,7 @@ mod tests {
                 }
             }
             for g in &spur(&r.by_part[0]).members {
-                assert_eq!(g.face_width, 7.0);
+                assert_eq!(g.face_width.unwrap(), 7.0);
             }
         }
     }

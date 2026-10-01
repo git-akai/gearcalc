@@ -381,7 +381,7 @@ mod tests {
             ];
             let line_length = (0..2)
                 .map(|i| {
-                    r.members[i].face_width
+                    r.members[i].face_width.unwrap()
                         / crate::plane::base_helix_angle(betas[i], s.normal_pressure_angle_rad)
                             .cos()
                 })
@@ -401,15 +401,15 @@ mod tests {
             // ...and the rating is the larger of the two, whichever that is.
             let want = line.max(ellipse);
             assert!(
-                (point(&r).cases[0].contact.at_pitch_point - want).abs() < 1e-9 * want,
+                (point(&r).cases[0].contact.unwrap().at_pitch_point - want).abs() < 1e-9 * want,
                 "{name}: rated at {} where the governing model gives {want}",
-                point(&r).cases[0].contact.at_pitch_point
+                point(&r).cases[0].contact.unwrap().at_pitch_point
             );
             // A patch cannot be longer than the teeth it sits on.
             assert!(
-                point(&r).cases[0].contact.patch_length <= line_length * (1.0 + 1e-12),
+                point(&r).cases[0].contact.unwrap().patch_length <= line_length * (1.0 + 1e-12),
                 "{name}: a {} mm patch on a {line_length} mm line",
-                point(&r).cases[0].contact.patch_length
+                point(&r).cases[0].contact.unwrap().patch_length
             );
         }
     }
@@ -503,18 +503,18 @@ mod tests {
             "back-driving is the worse direction"
         );
         assert!(
-            point(&r).cases[0].contact.max_pressure > 0.0
-                && point(&r).cases[0].contact.max_pressure.is_finite()
+            point(&r).cases[0].contact.unwrap().max_pressure > 0.0
+                && point(&r).cases[0].contact.unwrap().max_pressure.is_finite()
         );
         assert!(
-            point(&r).cases[0].contact.curvature_along > 0.0,
+            point(&r).cases[0].contact.unwrap().curvature_along > 0.0,
             "crossed shafts make a point contact, not a line"
         );
         assert!(
-            point(&r).cases[0].contact.patch_length > point(&r).cases[0].contact.patch_width,
+            point(&r).cases[0].contact.unwrap().patch_length > point(&r).cases[0].contact.unwrap().patch_width,
             "an ellipse: {} by {}",
-            point(&r).cases[0].contact.patch_length,
-            point(&r).cases[0].contact.patch_width
+            point(&r).cases[0].contact.unwrap().patch_length,
+            point(&r).cases[0].contact.unwrap().patch_width
         );
         // **A member's torque is the torque its teeth carry** — the driver's
         // read across the mesh, which is what every stress on the member is
@@ -554,8 +554,8 @@ mod tests {
             g.face_width = Auto::fixed(40.0);
         }));
         assert_eq!(
-            point(&narrow).cases[0].contact.max_pressure,
-            point(&wide).cases[0].contact.max_pressure,
+            point(&narrow).cases[0].contact.unwrap().max_pressure,
+            point(&wide).cases[0].contact.unwrap().max_pressure,
             "a ten-fold face width must change nothing about a point contact"
         );
     }
@@ -622,12 +622,12 @@ mod tests {
     fn automatic_takes_the_recommendation_and_manual_is_left_alone() {
         let auto = alone(&arr::worm(1, 40));
         assert_eq!(
-            Some(auto.members[0].face_width),
+            auto.members[0].face_width,
             auto.members[0].recommended_face_width,
             "an automatic worm length is the recommendation"
         );
         assert_eq!(
-            Some(auto.members[1].face_width),
+            auto.members[1].face_width,
             auto.members[1].recommended_face_width,
             "an automatic wheel face width is the recommendation"
         );
@@ -635,7 +635,7 @@ mod tests {
         let manual = alone(&member(arr::worm(1, 40), 0, |g| {
             g.face_width = Auto::fixed(3.5);
         }));
-        assert!((manual.members[0].face_width - 3.5).abs() < 1e-12);
+        assert!((manual.members[0].face_width.unwrap() - 3.5).abs() < 1e-12);
         assert_eq!(
             manual.members[0].recommended_face_width, auto.members[0].recommended_face_width,
             "the recommendation is reported whether or not it is in use"
@@ -668,7 +668,7 @@ mod tests {
         // beside it as a figure.
         for (i, gear) in as_gears.members.iter().enumerate() {
             assert_eq!(
-                gear.face_width, stage.members[i].gear.face_width.manual,
+                gear.face_width.unwrap(), stage.members[i].gear.face_width.manual,
                 "member {i}"
             );
             assert!(gear
@@ -728,9 +728,9 @@ mod tests {
         let auto = solve_crossed(&stage_at(sized)).unwrap();
         let m = point(&auto);
         assert!(
-            (m.contact_ratio - 1.0).abs() < 1e-9,
+            (m.contact_ratio.unwrap() - 1.0).abs() < 1e-9,
             "the reported width should buy exactly continuous contact, got {}",
-            m.contact_ratio
+            m.contact_ratio.unwrap()
         );
         assert_eq!(m.point.expect("a path").limited_by, ZoneLimit::Face);
 
@@ -743,9 +743,9 @@ mod tests {
         let narrow = solve_crossed(&stage(Auto::fixed(sized[0] / 2.0))).unwrap();
         let n = point(&narrow);
         assert!(
-            n.contact_ratio < 0.5 && n.contact_ratio > 0.45,
+            n.contact_ratio.unwrap() < 0.5 && n.contact_ratio.unwrap() > 0.45,
             "half the face should leave a little under half the contact: {}",
-            n.contact_ratio
+            n.contact_ratio.unwrap()
         );
 
         // ...and it is *exactly* half once the clearance is taken away, which
@@ -763,7 +763,7 @@ mod tests {
             .expect("a width for continuity");
         let halved = solve_crossed(&tight(Auto::fixed(width[0] / 2.0))).unwrap();
         assert!(
-            (point(&halved).contact_ratio - 0.5).abs() < 1e-9,
+            (point(&halved).contact_ratio.unwrap() - 0.5).abs() < 1e-9,
             "with the contact centred, half the face is exactly half the contact"
         );
         assert!(
@@ -781,7 +781,7 @@ mod tests {
         assert_eq!(w.point.unwrap().limited_by, ZoneLimit::Tips);
         assert!(w.contact_ratio > m.contact_ratio);
         let wider = solve_crossed(&stage(Auto::fixed(120.0))).unwrap();
-        assert!((point(&wider).contact_ratio - w.contact_ratio).abs() < 1e-12);
+        assert!((point(&wider).contact_ratio.unwrap() - w.contact_ratio.unwrap()).abs() < 1e-12);
     }
 
     /// **A worm stage reports the same path, from its own teeth, and keeps its
@@ -801,7 +801,7 @@ mod tests {
     fn a_worm_drive_reports_the_path_from_its_own_teeth_and_keeps_its_proportions() {
         let r = alone(&arr::worm(1, 40));
         let m = point(&r);
-        assert!(m.contact_ratio > 0.0);
+        assert!(m.contact_ratio.unwrap() > 0.0);
         // The proportions still size the face; continuity is reported beside
         // them rather than instead of them.
         assert!(r.members[0].recommended_face_width.is_some());
@@ -810,10 +810,10 @@ mod tests {
         // The tips are the teeth's: a taller worm thread lengthens the zone.
         let taller = alone(&member(arr::worm(1, 40), 0, |g| g.addendum = 1.2));
         assert!(
-            point(&taller).contact_ratio > m.contact_ratio,
+            point(&taller).contact_ratio.unwrap() > m.contact_ratio.unwrap(),
             "a taller addendum must reach further: {} against {}",
-            point(&taller).contact_ratio,
-            m.contact_ratio
+            point(&taller).contact_ratio.unwrap(),
+            m.contact_ratio.unwrap()
         );
     }
 
@@ -853,22 +853,22 @@ mod tests {
         // rating sits just above the pitch-point figure.
         let wide = solve_crossed(&crossed(20.0)).unwrap();
         assert!(
-            point(&wide).cases[0].contact.max_pressure
-                >= point(&wide).cases[0].contact.at_pitch_point,
+            point(&wide).cases[0].contact.unwrap().max_pressure
+                >= point(&wide).cases[0].contact.unwrap().at_pitch_point,
             "the path cannot be kinder than its gentlest point"
         );
-        assert!(point(&wide).contact_ratio > 1.0);
+        assert!(point(&wide).contact_ratio.unwrap() > 1.0);
 
         // Squeeze it: ε falls below 1, load sharing goes, and the same mesh at
         // the same torque rates higher.
         let narrow = solve_crossed(&crossed(0.8)).unwrap();
-        assert!(point(&narrow).contact_ratio < 1.0);
+        assert!(point(&narrow).contact_ratio.unwrap() < 1.0);
         assert!(
-            point(&narrow).cases[0].contact.max_pressure
-                > point(&wide).cases[0].contact.max_pressure,
+            point(&narrow).cases[0].contact.unwrap().max_pressure
+                > point(&wide).cases[0].contact.unwrap().max_pressure,
             "losing contact continuity should cost stress, not save it: {} against {}",
-            point(&narrow).cases[0].contact.max_pressure,
-            point(&wide).cases[0].contact.max_pressure
+            point(&narrow).cases[0].contact.unwrap().max_pressure,
+            point(&wide).cases[0].contact.unwrap().max_pressure
         );
         // ...and it is the *place* being rated that did it, not the load. The
         // load moved too — a narrower face engages only the middle of the zone,
@@ -876,7 +876,7 @@ mod tests {
         // are compared as a ratio, which divides the load out: the same mesh
         // rated at its worst against rated at its pitch point.
         let severity = |r: &ShapeResult| {
-            point(r).cases[0].contact.max_pressure / point(r).cases[0].contact.at_pitch_point
+            point(r).cases[0].contact.unwrap().max_pressure / point(r).cases[0].contact.unwrap().at_pitch_point
         };
         // The margin is small, and the reason is worth knowing: a narrow face
         // cuts the zone's *ends* off, and those ends are what made the path
@@ -1245,8 +1245,8 @@ mod tests {
             ),
             (
                 "contact",
-                point(&a).cases[0].contact.max_pressure,
-                point(&b).cases[0].contact.max_pressure,
+                point(&a).cases[0].contact.unwrap().max_pressure,
+                point(&b).cases[0].contact.unwrap().max_pressure,
             ),
             (
                 "backlash",
@@ -1490,9 +1490,9 @@ mod tests {
         let best = solve_crossed(&optimised(crossed(5.0))).unwrap();
         assert_eq!(best.meshes[0].flank_interference, [false, false]);
         assert!(
-            best.meshes[0].contact_ratio >= super::super::DEFAULT_MIN_CONTACT_RATIO - 1e-9,
+            best.meshes[0].contact_ratio.unwrap() >= super::super::DEFAULT_MIN_CONTACT_RATIO - 1e-9,
             "the floor is the crossed count: {}",
-            best.meshes[0].contact_ratio
+            best.meshes[0].contact_ratio.unwrap()
         );
         assert!(
             best.meshes[0].efficiency.forward > floor.meshes[0].efficiency.forward + 1e-3,
@@ -1748,7 +1748,7 @@ mod tests {
         let mut previous: Option<(f64, f64)> = None;
         for clearance in [0.0_f64, 0.02, 0.1, 0.3] {
             let r = alone(&stage(clearance));
-            let eps = point(&r).contact_ratio;
+            let eps = point(&r).contact_ratio.unwrap();
             let eta = r.meshes[0].efficiency.forward;
             if let Some((was_eps, was_eta)) = previous {
                 assert!(
@@ -1814,7 +1814,7 @@ mod tests {
         // At a right angle the same clearance costs almost nothing...
         let square = mesh(90.0, 0.02);
         assert_eq!(square.point.unwrap().limited_by, ZoneLimit::Tips);
-        assert!(square.contact_ratio > 1.5);
+        assert!(square.contact_ratio.unwrap() > 1.5);
 
         // ...and near the parallel limit it takes the mesh apart.
         let near = mesh(0.5, 0.02);
@@ -1824,9 +1824,9 @@ mod tests {
             "the contact should have slid past the face"
         );
         assert!(
-            near.contact_ratio < 1.0,
+            near.contact_ratio.unwrap() < 1.0,
             "a pair whose contact has left the face cannot be continuous: {}",
-            near.contact_ratio
+            near.contact_ratio.unwrap()
         );
 
         // The clearance is the whole of it: take it away and the same teeth on
@@ -1834,17 +1834,17 @@ mod tests {
         let centred = mesh(0.5, 0.0);
         assert_eq!(centred.point.unwrap().limited_by, ZoneLimit::Tips);
         assert!(
-            centred.contact_ratio > 1.5 * near.contact_ratio,
+            centred.contact_ratio.unwrap() > 1.5 * near.contact_ratio.unwrap(),
             "{} against {}",
-            centred.contact_ratio,
-            near.contact_ratio
+            centred.contact_ratio.unwrap(),
+            near.contact_ratio.unwrap()
         );
 
         // And it is monotone in the shaft angle, which is the `1/sin Σ` showing
         // through without a number being written down.
         let mut previous = 0.0;
         for sigma in [0.5f64, 1.0, 5.0, 30.0, 90.0] {
-            let eps = mesh(sigma, 0.02).contact_ratio;
+            let eps = mesh(sigma, 0.02).contact_ratio.unwrap();
             assert!(
                 eps > previous,
                 "Σ={sigma}°: straightening the shafts must cost more contact, \
@@ -1863,7 +1863,7 @@ mod tests {
         // Negative for the same reason a worm's is: an external mesh reverses.
         assert!((r.ratio.unwrap() + 23.0 / 17.0).abs() < 1e-12);
         assert!(r.meshes[0].efficiency.forward > 0.0 && r.meshes[0].efficiency.forward < 1.0);
-        assert!(point(&r).cases[0].contact.max_pressure > 0.0);
+        assert!(point(&r).cases[0].contact.unwrap().max_pressure > 0.0);
         assert!(!r.meshes[0].efficiency.locked().backward);
 
         // **Where a crossed pair sits, stated as comparisons rather than a
@@ -2000,7 +2000,10 @@ mod tests {
                                 let held =
                                     [screw.worm_helix_angle_rad, screw.wheel_helix_angle_rad]
                                         .into_iter()
-                                        .zip([r.members[0].face_width, r.members[1].face_width])
+                                        .zip([
+                                            r.members[0].face_width.unwrap(),
+                                            r.members[1].face_width.unwrap(),
+                                        ])
                                         .map(|(beta, face)| {
                                             let rate = crate::plane::base_helix_angle(
                                                 beta,
@@ -2015,12 +2018,12 @@ mod tests {
                                     "Σ {shaft_angle} z {teeth:?} c {clearance} x {shifts:?} \
                                      face {narrowed} {b} mm"
                                 );
+                                let eps = m.contact_ratio.unwrap();
                                 assert!(
-                                    m.contact_ratio <= held * (1.0 + 1e-9),
-                                    "{at}: ε {} where the faces hold {held}",
-                                    m.contact_ratio
+                                    eps <= held * (1.0 + 1e-9),
+                                    "{at}: ε {eps} where the faces hold {held}"
                                 );
-                                if m.contact_ratio >= held * (1.0 - 1e-9) {
+                                if eps >= held * (1.0 - 1e-9) {
                                     bound_by_face += 1;
                                 }
                                 let said = |k: &str| m.notes.iter().any(|n| n.is(k));
@@ -2028,9 +2031,9 @@ mod tests {
                                 // faces' figure, off them or on them.
                                 assert_eq!(
                                     said(key::MESH_CONTACT_RATIO_BELOW_ONE),
-                                    m.contact_ratio < 1.0,
+                                    m.contact_ratio.unwrap() < 1.0,
                                     "{at}: ε {}",
-                                    m.contact_ratio
+                                    m.contact_ratio.unwrap()
                                 );
                                 if said(key::MESH_CONTACT_OFF_FACE) {
                                     off_face += 1;

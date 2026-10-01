@@ -110,12 +110,12 @@ fn mirror_differences(r: &TrainResult, m: &TrainResult) -> Vec<String> {
                 x.speed_against_carrier,
                 -y.speed_against_carrier,
             );
-            differ(
-                &mut out,
-                format!("{at} contact"),
-                x.contact_stress,
-                y.contact_stress,
-            );
+            if x.contact_stress.is_some() != y.contact_stress.is_some() {
+                out.push(format!("{at} contact: one sized, one not"));
+            }
+            if let (Some(a), Some(b)) = (x.contact_stress, y.contact_stress) {
+                differ(&mut out, format!("{at} contact"), a, b);
+            }
             match (x.bending_stress, y.bending_stress) {
                 (Some(u), Some(v)) => differ(&mut out, format!("{at} bending"), u, v),
                 (u, v) if u.is_some() != v.is_some() => {
