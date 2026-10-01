@@ -1,6 +1,6 @@
 # Restart manifest (soft pause at a session limit, 2026-10-01)
 
-Branch `audit-ablation` @ de1fba0, in sync with origin. Nothing is merged to `main`.
+Branch `audit-ablation`, in sync with origin. Merges into `audit-ablation` are allowed; into `main` or `train-as-graph`, never (owner, 2026-10-01).
 
 ## Integrated
 - **Stage 0 and Stage 1:** complete (see `stage1-exit.md`).
@@ -10,13 +10,13 @@ Branch `audit-ablation` @ de1fba0, in sync with origin. Nothing is merged to `ma
   - The surface notes for Y_RrelT and Z_R.
 - **Bending round 3** written up in `bending-mechanics.md` §11 and `bending-options.md` (616530a).
 - **Face-width call** recorded in `plan.md` §5 (de1fba0).
+- **Q3** (error model): checker PASS, merged as ad7a385. Optional, not blocking: bound duration and sweep in `input.rs` to what a duty can mean, which would let `ratio::Natural` give way to i128.
 
 ## In flight — every branch pushed to origin
 | Branch | State | To resume |
 |---|---|---|
-| `work/s2-q3` (Q3, error model) | 33eaf38 answers the checker's second FAIL: exact cycle counts (`ratio::Natural`), one ranking of candidates for both search and solve, the one-sided band extreme. The final re-check was cut short by the pause; see below for its verdict. Worker a84cd21d387940331, checker a48902005e6b3e1a6 | Finish the re-check. Questions open on it: is `Natural` needed or would a smaller exact route do, its arithmetic at limb boundaries, and no jump at the 2^53 cut-over. Then integrate: `check_all.sh --fast` and push |
 | `work/s2-q6` (Q6, domain edges) | Paused at WIP 203cd6b. **Tests red:** 19 of 908 failed at the last run, a run that predates the newest laws. Items done: 1 (the converter law is pinned), 4 (ties in matrix.txt within `solve::SQRT_EPSILON`), 5 (the move from dc77eb8 is in corrections.md: 29 trains, six walks). Items 2 and 3 (face width unsized where nothing asks; a capped stress landing on its allowable by construction) are written but not green. Worker a780394c859a0e3e7, checker a29c982794e9f01ac | Run `cargo nextest run --workspace --no-fail-fast` in the worktree. Fix the 19: laws still on the old rule, the relief freedoms, the hula corpus, entries in wasm's absent list, the strings sweep. Then run bindings, wasm and golden `--write` and classify every moved line; then `check_all --fast` and npm check/test. Then a checker. Have it question whether √ε is the right derived tolerance for a tie, or just a convention (WORKER rule 2) |
-| `work/field` (contact model, Rust port) | P1 and P2 passed; P3 at 1654551. The workflow is stopped after its step `check:P3:1` | Resume the workflow: `scriptPath …/workflows/scripts/contact-field-rust-port-wf_a57d209f-d46.js`, `resumeFromRunId` = the latest run id (see below). Completed agents are served from the cache |
+| `work/field` (contact model, Rust port) | P1 and P2 passed; P3 at 1654551. Run wf_7bac2b43-fb1 was stopped right after `check:P3:1` returned **FAIL** (journal: agent a1aad37a7b5427886), as `fix:P3:1` started. That fix may have left partial edits uncommitted in the worktree. The failures: (1) a region maximum missed by about 1.5e-4 on 2–3 of about 100k random strips, where a weak curvature step near the Hertz peak hides an interior maximum between cosine samples; the fix is to bracket every sign change of p′ by construction, and add the two strips and an adversarial family as fixtures; (2) no test checks the creep curve's values on a non-Hertz strip, since a planted Carter formula passes; the code itself is right | Check `git status` in the field worktree and drop or commit any partial edits. Then resume: `scriptPath …/workflows/scripts/contact-field-rust-port-wf_a57d209f-d46.js` with `resumeFromRunId wf_7bac2b43-fb1`. Everything up to `check:P3:1` is cached; `fix:P3:1` reruns |
 
 The workflow scripts live under `~/.claude/projects/-home-user-gearcalc/97717eac-…/workflows/scripts/`.
 

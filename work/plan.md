@@ -367,3 +367,5 @@ caught, test workspace included) and the 130-constant perturbation.
   - The core's 10 mm seed goes.
   - Format-1 files with an automatic box of 0 are read without a format bump.
   - The owner may override.
+- 2026-10-01 — owner: merges into `audit-ablation` are allowed; merges into `main` or
+  `train-as-graph` are not.
