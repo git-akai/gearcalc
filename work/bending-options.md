@@ -95,6 +95,8 @@ concerns the range of e, not its median. The same rule is applied to every row:
 | **LWW, κ = 1** (P1) | fast | **9.4 µs per section** [R]; ≈ 1.5 ms under LinearRamp as built | none | c = 2x; κ = 1; the frame of the local symmetric wedge; the exponent 1 − λ(α_n) used as a power law | the wedge's Flamant and Carothers edge stresses; λ (Williams) |
 | **LWW, κ = 0.910** | fast | as above | κ, on half the record (holdout worst −7.9 [R]) | as above | as above |
 | **Neck components (hybrid)** ʲ | fast | **98–101 µs per section, 10.7× LWW in the same build** [X, ed]; the prototype's bisection 50× | none, but chosen among 13 variants on the record (so its record figures are in-sample) | reference point Q; the corner map's exponent 2(1 − λ) and pivot q0 = 1; notch length x (N, M) and c = 2x (V); κ = 1 (V) | Neuber's neck in N, V and M, fitted to each fillet point |
+| **Components, round 2: R2d** ᵐ | fast at one load; **≈ 16–19 ms per section under the ramp** (extrapolated [rev]) | ≈ QW's: 10.1–10.2× LWW per load in the same build [X, round 2]; 98–117 µs vs 11–12.6 µs reproduced [rev]; a numerical θ root find per station | none | as the neck model, less Q: the corner map's 2(1 − λ) and q0 = 1 (the reference point's arbitrariness moved here: median +0.3 … +7.9 over q0); V's c = 2x; the 90° guard | none exact: N and M the neck + a named map; V semi-empirical (LWW); the load's moment taken about the mapped neck's centre, so no reference point |
+| **Components, round 2: R2f** ᵐ | as R2d | as R2d; 9.3–9.8× LWW per load with a Newton θ solve | **V's exponent e_V = 0.38**, α-free, on the development set (153 teeth), one fitted pair with q0 = 1; level ≈ 1.5 points per 0.01 | as R2d | as R2d |
 | **P2, fast BEM at L2** | **expensive only** (item 4: no cache in the live mode) | 32 ms per sector; 0.8 s for a whole z 17 | none | the body (3 teeth on a 10 m rim, or the whole gear); a 0.15 m window at the load; level L2 | the field equations |
 | **D. Computed K_t** | **expensive only** | 0.1–1 s per member (the decision file's estimate) | none | any exact solver and its body | the field equations |
 
@@ -109,6 +111,8 @@ concerns the range of e, not its median. The same rule is applied to every row:
 | LWW, κ = 1 | +10.1 (+0.3 … +19.1) | +7.0 … +12.3 (5.3) | 0 % | +9.6 · +13.0 · +12.3 · +5.8 · +8.7 |
 | LWW, κ = 0.910 | +0.2 (−8.8 … +8.4) | −2.6 … +2.2 (4.8) | 48 % | −0.3 · +2.9 · +2.2 · −3.7 · −1.1 |
 | Neck components | +3.1 (−0.7 … +14.4), in-sample | +2.0 … +5.5 (3.5) | 3 % | +2.0 · +5.4 · +5.5 · +3.5 · +1.5 |
+| R2d ᵐ | +3.6 (+0.1 … +14.4) | +2.4 … +5.6 (3.2) | 0 % | +2.7 · +5.5 · +5.6 · +3.5 · +2.2 |
+| R2f ᵐ | −0.7 (−7.0 … +4.1); holdout 75 −0.7 (−7.0 … +4.1); fresh 70 −0.7 (−12.0 … +1.9) | −1.3 … +0.3 (1.6) | 67 % | −0.7 · +0.5 · −2.8 · −0.8 · −0.3 |
 | P2 at L2 | +0.1 (**−40.5** … +0.6) ⁱ; the 223 away from the tip corner −0.2 … +0.6 | 0.0 … +0.2 (0.2) | 21 % | +0.0 · +0.1 · +0.3 · +0.1 · +0.0 |
 | D. Computed K_t | 0 by construction (the baseline's own solver); ≤ 0.6 against the true field | — | — | rings up to 0.55 high (the body) |
 
@@ -128,6 +132,8 @@ choice as arbitrary as LWW's κ, not a gain of mechanics.
 | LWW, κ = 1 | 3.8 / 9.6 **S** | 2.2 / 10.9 **S** | 1.3 / 4.0 *(m, thr)* · 3.4 / 10.7 **S** |
 | LWW, κ = 0.910 | 3.5 / 8.7 **S** | 2.0 / 9.9 **S** | 1.2 / 3.6 *(m)* · 3.1 / 9.7 **S** |
 | Neck components | 1.5 / 5.0 **S** *(thr; 5.01)* | 1.1 / 5.0 **S** *(thr; 5.05)* | 1.8 / 4.5 *(m, thr)* · 4.4 / 11.7 **S**; worse than LWW at every span, and on 160 of 228 teeth at ±6° |
+| R2d ᵐ | fresh set: externals 2.8 / 16.4, rings 11.5 / 20.4 **S** (QW on the same: 2.6 / 15.6, 11.4 / 20.4) | 1.1 / 5.0 **S** *(thr)* | 1.6 / 4.4 *(m, thr)* · 4.0 / 11.6 **S** |
+| R2f ᵐ | fresh set: externals 4.1 / 17.4, rings 12.7 / 21.1 **S** (rings and the lowest point include the 90° guard's rise; discontinuous in position there [rev]) | 1.1 / 5.1 **S** *(thr)* | 0.8 / 3.1 *(m)* · 1.9 / 8.4 **S** |
 | P2 | 0.0 / 0.2 n, but **S at the tip corner** (−30 … −40.5) ⁱ | not measured | 0.04 / 0.14 n (12 teeth) · not run |
 | D | n | n | n |
 
@@ -142,6 +148,8 @@ choice as arbitrary as LWW's κ, not a gain of mechanics.
 | LWW, κ = 1 | 13.0 · 9.9 · 10.0 [2.6 / 7.2; 14/85] **S** | 7.0 [3.9 / 7.5; 11/30] **S** | 3.5 · 2.1 · 1.5 *(m)* | 0.6 · 4.9 [3.0 / 8.1; 18/60] **S** | 7.0 · 3.7 · 1.8 [4.9 / 8.7; 17/35]; 8.2 **S** | −7.1 · −7.2 · −5.1 / −3.7 **S** |
 | LWW, κ = 0.910 | 11.8 · 9.0 · 9.1 [2.4 / 6.6; 9/85] **S** | 6.3 [3.5 / 6.8; 6/30] **S** | 3.2 · 1.9 · 1.3 *(m)* | 0.5 · 4.5 [2.7 / 7.4; 15/60] **S** | 6.4 · 3.4 · 1.6 [4.4 / 8.0; 13/35]; 7.5 **S** | −6.5 · −6.5 · −4.7 / −3.4 **S** |
 | Neck components | 3.5 · 3.7 · **8.1** [0.7 / 10.6; 5/85] **S** | 3.4 [3.2 / 9.9; 9/30] **S** | 0.9 · 2.7 · 0.8 *(m)* | 1.2 · 3.3 [2.8 / 8.1; 16/60] **S** | **10.8** · 7.6 · 3.8 [5.1 / 12.1; 18/35]; 6.1 **S** | 0.0 · +0.7 · +0.7 / +1.5 **n** |
+| R2d ᵐ | 4.0 · 3.7 · **7.9** [0.7 / 10.1; 5/85] **S** | z 12–40: 2.5 [3.1 / 9.4; 8/30] **S** | 0.7 · 2.6 · 0.9 *(m)* | 1.3 · 3.7 [2.9 / 8.1; 16/60] **S** | **10.1** · 7.0 · 3.3 [4.2 / 11.3; 16/35]; 5.5 **S** | −0.5 · +0.4 · +0.6 / +0.8 **n** |
+| R2f ᵐ | 1.3 · 4.4 · 5.6 [0.5 / 3.7; 0/85] **S** *(thr)* | z 12–40: 0.2 [2.7 / **11.1**; 10/30] **S** (ρ_fP 0.01, α 14.5–20°; 3.1 at 28°) | 1.2 · 1.0 · 1.3 n | 0.8 · 1.8 [1.3 / 2.9; 0/60]; continuous series [rev]: ring 22.5 → 28° **8.6**, external 17.5 → 32° **7.3**, from α ≈ 26–27° **S** | 4.8 · 3.0 · 1.2 [2.9 / 5.6; 3/35]; 3.0 **S** *(thr)* | −0.0 · +1.2 · +2.4 / −0.0 *(m)* |
 | P2 | 0.2 · — · — [0.1 / 0.3; 0/85] n | 0.4 [0.2 / 0.5; 0/30] n | not run | 0.5 · — [0.1 / 0.4; 0/60] n | — · 0.1 · — [0.2 / 0.5; 0/35]; 0.3 n | −0.2 / +0.1 n |
 
 P2's sweep figures are L2 against its own level F, which measures self-convergence rather than error against the
@@ -156,6 +164,8 @@ baseline. Only its brackets and Table 2 are against the record.
 | C, C′ | S | — | S | S | S | S | S | S | S | 8 of 8 |
 | LWW, κ = 1 or 0.910 | S | S | S at ±14° (m at ±6°) | S | S | m | S (groups) | S | S | 8 of 9 |
 | Neck components | S *(thr)* | S *(thr)* | S at ±14° (m at ±6°) | S (tight tool, 14.5°) | S (groups) | m | S (groups) | S | **n** | 7 of 9, two at the threshold |
+| R2d ᵐ | S (fresh) | S *(thr)* | S at ±14° (m at ±6°) | S (tight tool, 14.5°) | S (groups) | m | S (groups; fresh 28° rings) | S | n | 7 of 9, one at the threshold |
+| R2f ᵐ | S (fresh) | S *(thr)* | S at ±14° (m at ±6°) | S *(thr)* | **S** (groups, ρ_fP 0.01, α 14.5–20°) | n | **S** over α ≳ 26–27° on both kinds (the fillet radius falling at the tool limit) [rev]; m below | S *(thr)* | m | 7 of 9, three at the threshold; fails continuity near a = 90° [rev] |
 | P2 | n; **S at the tip corner** | — | n (±6°, 12 teeth) | n | n | — | n | n | n | the tip corner only |
 | D | n | n | n | n | n | n | n | n | n | none |
 
@@ -172,6 +182,8 @@ Record pairs, without the five teeth loaded at the tip corner. The **misstatemen
 | C′ | 4 (1 %) | 2,003 (9.0 %) | 12.2 · 26.9 · 38.3 · 57.7 |
 | LWW, κ = 1 or 0.910 (a scale cancels) | 0 | 66 (0.3 %) | 3.5 · 8.4 · 13.1 · 18.8 |
 | Neck components | 0 | 30 (0.1 %) | 2.4 · 6.8 · 10.9 · 13.2 |
+| R2d ᵐ | 0 | 25 (0.1 %) | 2.2 · 6.5 · 10.4 · 13.1 |
+| R2f ᵐ | 0 | 1 (0.004 %); holdout pairs 0 of 2,402; fresh 10 of 1,886 with duplicate teeth counted once (QW 14) [rev] | 1.4 · 3.9 · 7.0 · 11.9 |
 | P2 at L2 | 0 | 0 | 0.1 · 0.3 · 0.5 · 0.9 |
 
 The neck model's worst reversal [X, rev] sets external z 12, 20°, x 0, ρ_fP 0.01 (exact 5.419, error +0.2) against
@@ -190,6 +202,8 @@ below 0 has the wrong sign. This is where a structure turns into a bias for or a
 | C′ | **−17** | 201 | 90 | 119 | 55 | 63 | 74 · 72 · 62 |
 | LWW, either κ | 54 | 128 | 85 | 110 | 101 | 59 | 107 · 104 · 98 |
 | Neck components | 87 | 104 | 92 | 98 | 104 | 71 | 111 · 108 · 105 |
+| R2d ᵐ | 86 | 104 | z 12 → 40: 96 | 99 | 105 | 67 | 110 · 107 · 104 |
+| R2f ᵐ | 95 | 89 | z 12 → 40: 100 | 104 | 97 | 84 | 105 · 103 · 102 |
 
 Several sweeps are not monotone: shift, teeth, and α 25–31°. For those the ends understate what happens between
 them. Shift at 14.5° with a tight tool is left out, because its exact peak falls 17 % and then rises 38 %.
@@ -308,6 +322,44 @@ them. Shift at 14.5° with a tight tool is left out, because its exact peak fall
 - ˡ **Mate z** [X, rev; options rated X, ed]:
   - External z 30, 20°, x 0, ρ_fP 0.25 and 0.03, mate 12 … 1000, 12 points.
   - Ring z 60, 20°, ρ_fP 0.2, mate 12 … 40, 8 points.
+
+- ᵐ **Components, round 2** (`bending-mechanics.md` §10; scripts `~/.cache/gearcalc-work/bending-comp2/`) [X]:
+  - **What it is.** The neck model with its reference point removed: the along force and the moment from the fitted
+    neck at the corner map, as ʲ; the across force's pure shear about the neck's own centre from the tangent wedge ×
+    (2x/ρ)^e_V, its lever through the neck's M. The answer is the same about every reference.
+  - **R2d** takes e_V = 1 − λ(α_n) and matches the neck model within a point everywhere. **R2f** takes e_V = 0.38,
+    α-free, fitted on a fixed development split of the record (153 teeth; 75 held out) and scored on the 75 and on
+    70 fresh teeth off every record level (new z, α, shift, tool radius, mate; rings at 22.5° and 28°), solved on the
+    record's own solver and body. Its record figures are therefore in-sample on 153 teeth; the holdouts and the sweeps
+    are not.
+  - **Held out** (re-scored independently, every figure reproduced [rev]): R2f's worst α, x and ρ groups read 2.8 /
+    3.6 / 5.6 on the record holdout and 2.6 / 3.4 / 2.3 on the fresh externals (the neck model: 8.0 / 8.2 / 11.2 and
+    8.4 / 5.8 / 3.7). Its worst z group is 11.1 on the record holdout (14.5°, shift 0.5, ρ_fP 0.01, z 12 → 1000);
+    tight-tool z was measured at 14.5–20° only. e_V = 0.38 is best on both external holdouts but not on the fresh
+    rings (≥ 0.44). Ring ρ has no group on the record holdout and only the 22.5° teeth on the fresh set.
+  - **α at the cutting limit** [rev]: a continuous series puts R2f's α structure at ≥ 5 from α ≈ 26–27° on rings and
+    externals (ring z 50: −1.1 at 22.5° → −9.7 at 28°; external z 20: +1.8 at 17.5° → −5.5 at 32°) as the cutter's clamp
+    shrinks the fillet radius; the fresh 28° rings are its end, half a degree from where a ring stops building.
+  - **What no variant carries** (fresh set, every model here and LWW): the α trend above; with the single-pair zone
+    near the root (28°, shift 0.75, rings) the load-position range reaches 15–17 on externals and 20–21 on rings; the
+    lowest point reads −35 … −48. The position column here is the fresh set's, on root+fillet, not ᵃ's 11 teeth.
+  - **The 90° guard** [rev]: near tangent angle 90° R2 (and QW) rises with unbounded slope and the maximum sits on the
+    rise: jumps of 7.3–7.6 % between adjacent load points on a ring, a peak that moves 1.0–2.1 % with the station
+    count, no convergence as z → ∞ at the space centre (+1.6 % per decade); 24 of 3,102 fresh tooth-loads rated on it.
+    The L0 rows are unaffected; the ring and lowest-point position figures are not clean.
+  - **Near field: withdrawn** [rev] (Flamant's field used outside its half-plane, the load counted twice, the fillet
+    left loaded); its first figures say nothing either way.
+  - **Pivot.** q0 = 0.25 … 4 moves R2f's median −4.1 … +3.7 and R2d's +0.3 … +7.9 on the development set; e_V and q0
+    are one fitted pair.
+  - **Bias** (rule 6): R2f's median −0.7 on every set, unconservative on 61–77 % of teeth.
+  - **Cost.** Per load, measured in Rust on the 228 in one build with LWW and the neck model: the neck model's cost
+    (wasm32 10.1–10.2× LWW with Brent, 9.3–9.8× with a safeguarded Newton; reproduced 7.8–11.4× [rev]). Per section
+    under the ramp's ≈ 160 loads: ≈ 16–19 ms in wasm (extrapolated), against LWW's ≈ 1.5 ms. Rust = Python to 8.4e-7
+    at L0 only.
+  - **Open issues** (`bending-mechanics.md` §10.8): the 90° guard and the re-score it requires; a derived V law (the
+    mixed-mode decomposition at the inclined corner, Zappalorto–Lazzarin's mode II rounded-notch fields, untried); V's
+    blunt limit (→ 0, not 1, as ρ → ∞); α at the cutting limit; z at tight tools; the root end; a self-equilibrated
+    near field; R2d's groups against q0; the cost under the ramp and the per-station root find; direction at ±14°.
 
 ## What the table says (it does not choose)
 

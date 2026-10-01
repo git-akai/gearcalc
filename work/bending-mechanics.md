@@ -679,3 +679,350 @@ tight tool, in the tight-fillet record groups and in direction.
    - pointed teeth loaded at the apex;
    - shaper-cut, asymmetric and thin-rim teeth;
    - the ring tip-side reference (F was verified near the corner on externals only).
+
+## 10. Component model, round 2 (2026-09-30; three reviews applied)
+
+For the owner's direction on §9: research the across force's (shear) closed form and the other extensions on this
+route; avoid structured errors of substantial size; no hidden fitted constant (derived, or a named visible option
+with its source); continuity in every input; common material properties only; the fast mode µs per tooth, with no
+per-geometry numerical solve and no cache.
+- **Baseline and rule:** as §9 and `work/bending-options.md`: the exact σ_tt peak over root land and fillet; a
+  structure is a range in points; S ≥ 5 anywhere measured, *thr* 4–6, m 2–5, n < 2.
+- **Marks:** [X] this round; [R] read from the record, `bending-options.md` or §9; [C] recalled. No source was read in
+  this round beyond the research round's copy of Berto 2015 (Frattura ed Integrità Strutturale 34:11–26: Eqs. 10 and
+  13 and r0 = ρ(π − 2α)/(2π − 2α) read [read]). The literature the round leans on (Neuber, Williams, Filippi–Lazzarin–
+  Tovo, Lazzarin–Zappalorto–Berto, Dini–Hills) is [C] or abstract-only, as the research round recorded it.
+- **Scripts:** `~/.cache/gearcalc-work/bending-comp2/` (README there). Nothing in the crate changed.
+- **Reviews applied** [rev]: three reviews re-scored the holdouts, swept every input finely, and rebuilt the cost. Their
+  scripts are in the session scratchpad (`rv/`, `nf.py`, `lim.py`, `w.py`, `sw/`, `w/`). What they changed is marked
+  [rev] below; what they left open is §10.8. They read no source beyond search abstracts (Zappalorto–Lazzarin, below).
+
+**Short answer.**
+- **Protocol.** The record was split before any model was built: 153 development teeth, 75 record-holdout teeth (a
+  fixed rule, §10.1). A fresh holdout of 70 teeth the record does not contain was solved on the record's own solver
+  and body. Every choice below was made on the development set only.
+- **A reference-free model exists, and it changes nothing.** R2d takes the across force's pure shear about
+  the osculating neck's own centre (where Neuber's shear carries no moment) from the tangent wedge × W, and routes its
+  lever through the neck's own M. No reference point is chosen; the answer is the same for every one. Its figures are
+  QW's within a point on all three sets (worst external group 11.3 / 10.3 / 8.4 on development / record holdout /
+  fresh, against QW's 12.1 / 11.2 / 8.4). **It is not "derived"** [rev]: the reference point's arbitrariness moved to
+  the map's pivot q0, which moves R2d's median +0.3 … +7.9 (7.6 points, more than the 4.4 the reference point did);
+  it rests on three named choices (the map's exponent 2(1 − λ), q0, c = 2x); and none of its three terms is an exact
+  solution applied within its assumptions (§10.2).
+- **No derived shear law was found, but the route most likely to give one was not tried** [rev]. Every construction
+  tried on the development set (§10.3) was worse than QW. The structure is removed only by giving V's notch factor an
+  α-free exponent below the corner's 1 − λ(α_n). §10.3 argued the shear route on mode II, which is not singular at the
+  rack corner for any α in the sets; V's sharpness sensitivity must come through the inclined corner's mode I, and a
+  two-term law (mode I at 1 − λ1, 0.427 · 0.414 · 0.391 at 14.5° · 20° · 28°, plus a bounded remainder) predicts an
+  effective slope just below 1 − λ1, which 0.38 is. That decomposition, and the published mode II rounded-notch
+  solutions, are untried (§10.8).
+- **With that exponent as a named fitted constant (R2f, e_V = 0.38 from the development set):**
+  - it holds out of sample (re-scored independently [rev], every figure reproduced): worst α, x and ρ groups 2.8 /
+    3.6 / 5.6 on the record holdout and 2.6 / 3.4 / 2.3 on the fresh externals, against QW's 8.0 / 8.2 / 11.2 and
+    8.4 / 5.8 / 3.7; e_V = 0.38 is also the best value on both of those holdouts, but not on the fresh rings (best
+    ≥ 0.44, where the worst α group is still 9.0; the development rings regress at 0.401);
+  - reversals of pairs ≥ 5 % apart: 0 of 9,931 (development), 0 of 2,402 (record holdout), **10 of 1,886** on the
+    fresh set with its four duplicate 28° ring teeth counted once [rev] (20 of 2,111 as first reported, which counted
+    each duplicate against every other tooth twice); QW 17, 5 and 14 of 1,886;
+  - it is still substantial on **z at tight tools** (8.8 and 11.1 on the record's two sets, at ρ_fP 0.01 across
+    z 12 → 1000; measured at α 14.5–20° only: at 28°, ρ_fP 0.01, z 20 / 100 / 1000 reads −0.5 / −2.3 / −3.6, a range
+    of 3.1 [rev]), on **direction at ±14°** (8.4 / 7.6 / 5.6), on **α above about 26–27° on both kinds** [rev, below],
+    and at the threshold on ρ (5.1 / 5.6) and the tight-tool shift sweep at 14.5° (5.6);
+  - **its level is a signed bias** (rule 6): median −0.7 on every set, unconservative on 61–77 % of teeth; it moves
+    −4.1 … +3.7 with the map's pivot q0 = 0.25 … 4 (§10.5) and about 1.5 points per 0.01 of e_V [rev].
+- **α at the tool limit** [rev]. α structure of 5 points or more returns on rings and on externals once α passes
+  about 26–27°, and on rings it begins inside the record's range: on ring z 50, shift 0.25, ρ_fP 0.05, mate 21, R2f
+  reads −1.1 · −1.8 · −2.4 · −3.5 · −5.4 · −6.2 · −7.1 · −8.3 · −9.7 at α 22.5 · 24 · 25 · 26 · 27 · 27.25 · 27.5 ·
+  27.75 · 28° (QW +4.7 → −7.1); on external z 20, shift 0.25, ρ_fP 0.05, +1.8 · +1.0 · −0.8 · −2.2 · −5.5 at 17.5 ·
+  22.5 · 28 · 30 · 32° (range 7.3, 4.7 of it from 28° to 32°). Above about 27° the cutter's clamp shrinks the fillet
+  (ring ρ_f 0.110 → 0.072; external 0.132 → 0.097) and the exact peak climbs; past about 28.1–28.5° a ring does not
+  build at all. So the fresh 28° rings are the end of a smooth trend near the cutting limit, not a separate structure,
+  and the options sweep "α 25 → 31°, 1.8" misses it because it is one tooth line. No model here follows it.
+- **The load near the root** (fresh set; every wrench model): with the single-pair zone near the root (28°, shift
+  0.75; rings) load-position ranges reach 15–17 on externals and 20–21 on rings, and the lowest point −35 … −48. On the
+  rings part of R2's figure there is an artefact of the 90° guard (next bullet), so these are not yet clean.
+- **The 90° guard** [rev]. Near a tangent angle of 90° (ring root lands, a ring's lowest loads, the space centre at
+  large z) R2's per-station stress rises with unbounded slope to about LWW's value at 90°, and the maximum sits on that
+  rise. Consequences: jumps of 7.3–7.6 % between load points 6e-5 of the flank apart (ring 120 / 22.5° / 0.6 / 0.15);
+  a peak that depends on the station count (1.0–2.1 % between 2,001 and 200,001 stations at the fresh rings' lowest
+  point); a rating that does not converge as z → ∞ (+1.6 % per decade of z at the space centre, external 28° / 0.75 /
+  0.18 at the lowest load, where LWW converges); and 24 of 3,102 fresh tooth-loads (18 rings, 6 externals, 22 at the
+  lowest point) rated on it, lifting the ring ratings 14–23 % above the best value below 88°. This fails the continuity
+  rule; QW shares it, LWW does not. The L0 tables are unaffected (their maxima lie inside the fillet).
+- **The near-field term is withdrawn** [rev]. Flamant's field was used outside its domain (the hot spot lies outside
+  the flank's tangent half-plane at the lowest load on all 70 teeth, and every ring station at every load), it counts
+  the load twice on top of the wrench response, and it leaves the fillet loaded. Its figures (lowest point −22.7 →
+  −19.3, direction 8.4 → 12.1) say nothing either way; a self-equilibrated version is untested (§10.8).
+- **Cost:** per section at one load R2 is QW's cost, 9.3–10.2× LWW (wasm32 125–136 µs; reproduced at 98–117 µs
+  against LWW's 11–12.6 µs [rev]). **The crate rates a section at about 160 loads under LinearRamp**, which extrapolates
+  to about 16–19 ms per section in wasm [rev, not measured], against LWW's ≈ 1.5 ms and today's 0.9–3.9 ms per preset
+  solve: tens of milliseconds for a spur pair, doubled on a hover's dry run. That misses "µs per tooth" unless each
+  station's response is reused across loads, which needs a fixed station set and so the 90° guard fixed first. Each
+  station's θ is a numerical root find, which the owner may rule on against "no per-geometry numerical solve". Rust
+  reproduces the Python to 8.4e-7 **at L0 only**; at the fresh rings' lowest point they differ 1.0–2.1 % (the guard).
+
+### 10.1 Protocol [X]
+
+- **The split, made before any model** (`split.py`): within each fillet class (ordinary, middle, tight, ring), the
+  record's teeth sorted by (kind, z, α, x, −ρ_fP); every third (index mod 3 = 2) is the record holdout (28 · 22 · 9 ·
+  16 = 75), the rest development (153).
+- **What is not clean.** The research round that preceded this one regressed per-component factors on all 228 teeth,
+  and its finding (an α-free V exponent near 0.37) suggested R2f's form. The record holdout is therefore clean for the
+  value 0.38 (scanned on development only) but not for the idea. The fresh holdout is clean for both.
+- **The fresh holdout** (`gen_fresh.py`): 70 teeth off every record level.
+  - External z 20, 45, 300 × α 17.5°, 22.5°, 28° × shift −0.2, 0.25, 0.75 × ρ_fP 0.05, 0.18, mate 25 (54).
+  - Ring z 50, 120 × α 22.5°, 28° × shift 0.25, 0.6 × ρ_fP 0.05, 0.15, mate 21 (16). At 28° the two ring tool radii
+    cut the same fillet, so four pairs are identical teeth. A twin never pairs ≥ 5 % apart with its twin, but each
+    duplicate counts again against every other tooth: the pair counts below are taken with each counted once (66
+    distinct teeth), and the duplicates also padded the fresh ring ρ groups (first read 0 of 35) [rev].
+  - Each tooth solved as the record is: `fillet_bem.solve_tooth`'s three passes (last-pass change median 0.010 %,
+    max 0.052 %), body by the record's rule (18 whole gears, 52 sectors). Then one multi-load solve on the same class
+    (`frame-critique/bemx`, pass-B mesh at that peak): the record run's seven loads, and the path: five points LPSTC →
+    HPSTC and the lowest point (d = ε − 0.03), each along the involute normal at the crate's own load points (`optrs`).
+    The sampled L0 peak is within 0.05 % of the three-pass peak on all 70.
+- **The evaluator** (`ev.py`, `summ.py`): every model rated on the exact outline's root+fillet stations, **less those
+  at tangent angle a ≥ 90°** (`ev.sigma`'s mask, an evaluation guard the baseline does not have [rev]); exact from the
+  record or the fresh solve; turned loads by superposition of the unit loads at the load point. Through it, QW
+  reproduces its options-table row exactly (median +3.1, 30 reversals of 22,346, groups 9.9 / 8.1 / 10.6 / 12.1, the
+  sweeps 3.5 · 3.7 · 8.1 and 10.8 · 7.6 · 3.8).
+- **Group definitions** below count both kinds (groups of teeth differing in one variable alone, ≥ 2 members, the five
+  tip-corner teeth left out), so N differs from the options table's external-only brackets; its brackets for R2 are
+  given in that file.
+
+### 10.2 The model built: R2 [X]
+
+At each fillet station, with the osculating neck at the corner-mapped sharpness (§9.4: q_eff = q0 (q/q0)^(2(1−λ)),
+q = x/ρ, q0 = 1) of centre O, dy_c above the station:
+
+    σ = F_V · V · s_V,pure^wedge(O) + N · t_N^neck + M_O · t_M^neck
+    s_V,pure^wedge(O) = s_V^wedge(Q) + dy_c · s_M^wedge(Q)        (the tangent wedge's across response about O)
+    F_V = (2x/ρ)^e_V
+
+- **No reference point.** The load enters as (V, N, M_O), M_O its moment about O, and O is a property of the station's
+  fitted neck (where Neuber's shear solution carries no moment, §9.2). Any other reference gives the same σ exactly:
+  the lever between it and O is carried by the neck's own t_M, so the §9.4 dependence (+2.9 … +7.3 at the median) is
+  gone — **traded for the pivot q0** [rev]: O's height dy_c comes from the *mapped* neck, so it depends on the map's
+  exponent and on q0, and R2d's median moves +0.3 … +7.9 over q0 = 0.25 … 4, a larger spread than the reference point's
+  4.4. This is the "neck-centre consistent hybrid" of the research round, built. (The algebra and the sign of dy_c
+  were checked against `hyp.comps_their` [rev].)
+- **What each term is** [rev]. None is an exact solution within its assumptions. N and M: Neuber's deep neck fitted at
+  a curvature that is not the station's own (the corner map), an interpolation device. V: LWW's semi-empirical factor
+  (2x/ρ)^e_V on Carothers' wedge, c = 2x named. **Their blunt limits disagree**: as ρ → ∞ the neck tends to the
+  notch-free wedge (factor 1) but V's factor tends to 0, so the V term vanishes on a flat root land or a convex station.
+  At every fresh hot spot 2x/ρ is 3.4–62, so the peaks are not affected; continuity is.
+- **R2d:** e_V = 1 − λ(α_n), LWW's own exponent. Reference-free, with three named choices (the map's exponent, q0 = 1,
+  c = 2x for V); not "derived".
+- **R2f:** e_V = 0.38, α-free. **A fitted constant**, named here with its source: the value minimising the sum of the
+  four worst record groups on the development set (`scan_ev.py`, 0.30 … 0.45 in steps of 0.01; 0.38 → 19.8, 0.37 →
+  22.6, 0.39 → 21.3). The research round's at-peak regression on all 228 gave 0.37; on development alone, V about the
+  neck's centre regresses at 0.369 (externals) and 0.401 (rings). **e_V and q0 are one fitted pair** (fitted at q0 = 1,
+  c = 2x and the λ-map); the objective is a sum of maxima with a sharp minimum, so the value is noisy at ±0.01, and the
+  level moves about 1.5 points per 0.01 [rev]. On the holdouts (sum of the four worst groups at e_V 0.35 / 0.38 / 0.41 /
+  0.44): record 29.3 / **23.0** / 27.5 / 37.0, fresh externals 18.3 / **12.6** / 13.9 / 25.1, fresh rings 25.2 / 20.2 /
+  17.4 / **15.8** [rev]: the value carries to externals, not to rings.
+- **Continuity.** e_V is one number and the map is continuous in α. **Not continuous in load position or z near
+  a = 90°** [rev]: the guard at a ≥ 90° (§9.4's) rates up to 90° and drops past it, and R2 rises with unbounded slope
+  toward 90° (§10.4, the 90° guard). §9.5's "no maximum lies near one" is false on the fresh rings.
+- **Implementation.** `r2rs/src/lib.rs` (`r2_at`, `r2_peak`): QW's scan with M_O and the pure-shear term; θ by
+  gear-core's Brent or a safeguarded Newton (`neck_theta_fast`, equal to Brent within 9.3e-13; its comment says it
+  starts from the flat limit, the code starts at the bracket's midpoint [rev]).
+
+### 10.3 What was tried on the development set, and dropped [X]
+
+Each scored on the 153 (worst groups z / α / x / ρ, median):
+- **One α-free exponent for everything** (the wedge × (2x/ρ)^0.456, the square corner's 1 − λ, which is what the
+  per-component slopes of M and N regress to): +20.9, ρ groups 23.3. The M and N regressions have non-zero intercepts
+  at c = 2x (−0.12 and +0.11 in ln), so the exponent alone does not carry them.
+- **V about the tangent wedge's apex** (Carothers' force at the apex, whose factor has the tightest law at the peak:
+  slope 0.40, sd 0.021 in ln), its lever through the neck's M: diverges to +18,000 % at the top of the fillet, where
+  the apex runs off to infinity and any difference between V's and M's factors is multiplied by x cot a.
+- **The neck for all three components** (one body, reference-free): +78 %, maximum at the root end. At the exact peak
+  its V has the right sharpness law (log-slope of neck/exact on ln(2x/ρ) +0.004; level 0.87 … 0.92 by class), but
+  along the fillet neck/exact V grows with the station's place past Neuber's shear peak, s = sinh ξ / cos θ: ≈ 0.9 at
+  s = −1, 1.4–2.1 at −4, 2.1–2.5 at −6 … −9, 5.8 at −33. There the osculating neck is a crack whose tip nearly
+  reaches the station, and its mode-II field is singular where the rack corner's is not (λ2 > 1, research round).
+- **A per-tooth V factor read at the intrinsic station s = −1:** −9.8, tight −17.8.
+- **V exponents above LWW's** (the square corner's 0.456 or the crack's ½, on the pure shear about O): worse at every
+  step (ρ groups 15.9 and 30.2).
+- **The mode argued** [rev]. The "crack's mode II is singular where the rack corner's is not" reasoning above is
+  right, but it was used to set aside the shear route as a whole, which it does not do: no Williams mode II root
+  λ2 < 1 exists for void openings 104.5–118° (α 14.5–28°), so V's measured sharpness sensitivity (0.37–0.40) must
+  come from V's projection onto the inclined corner's **mode I** (1 − λ1 = 0.427 · 0.414 · 0.391 at 14.5° · 20° · 28°).
+  A two-term law w_I(α)(2x/ρ)^(1−λ1) plus a bounded remainder has an effective slope below 1 − λ1 that varies with
+  geometry, which is what the fitted 0.38 looks like. Only single exponents and the neck were tried, so "no derived
+  shear law exists" is not shown.
+- **A lead not built.** Neuber's own deep-notch factors, as recalled [C], have transitional log-slopes in q = a/ρ over
+  q 5 … 100 of 0.47–0.50 (tension), 0.41–0.49 (bending) and 0.23–0.42 (shear): the shear law is the shallower one, as
+  the exact V is (0.37 against 0.45). It was not usable as V's factor because its nominal, V/(2a), makes the blunt
+  limit diverge (K → 3/(2t)); a nominal that makes it tend to 1 was not found.
+
+### 10.4 Results on the three sets [X]
+
+Figures: median (min … max) of L0; worst record group per variable, in points, [groups ≥ 5 of N]; direction and
+height as median / max; pairs = reversals of pairs ≥ 5 % apart and the misstatement's p90. "R2d" and "R2f" are without
+the near-field term. The fresh rows' pair counts and ring ρ groups were taken with the four duplicate teeth counted
+twice: corrected counts R2f 10, QW 14 of 1,886 [rev]; the others were not recounted. Ring ρ is not tested at all on the
+record holdout (it has no ring ρ group) and on the fresh set only by the 22.5° teeth.
+
+| Set | Model | L0 | Classes ord · mid · tight · ring | z | α | x | ρ | Direction ±6° · ±14° | Height | Pairs: reversed · p90 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Dev (153) | LWW | +10.0 (+1.9 … +18.6) | +9.3 · +13.0 · +11.7 · +6.2 | 7.5 [5/38] | 7.6 [6/60] | 7.1 [7/55] | 8.0 [13/51] | 1.3/4.0 · 3.3/10.7 | 2.3/10.9 | 16 of 9,931 · 8.0 |
+| | QW | +3.1 (−0.7 … +14.4) | +2.1 · +5.3 · +5.6 · +3.4 | 9.9 [5/38] | 7.8 [6/60] | 9.0 [2/55] | 12.1 [17/51] | 1.8/4.5 · 4.5/11.7 | 1.1/4.6 | 17 · 6.9 |
+| | R2d | +3.5 (+0.1 … +14.4) | +2.7 · +5.5 · +5.7 · +3.4 | 9.4 [5/38] | 7.8 [6/60] | 8.6 [2/55] | 11.3 [15/51] | 1.7/4.4 · 4.1/11.6 | 1.1/4.6 | 13 · 6.6 |
+| | R2f | −0.7 (−5.9 … +3.3) | −0.7 · +0.4 · −2.6 · −0.8 | 8.8 [7/38] | 2.6 [0/60] | 3.3 [0/55] | 5.1 [2/51] | 0.8/3.1 · 2.2/8.4 | 1.1/4.8 | 0 · 3.9 |
+| Record holdout (75) | LWW | +10.4 (+0.3 … +19.1) | +10.1 · +12.8 · +15.4 · +4.4 | 6.9 [3/24] | 6.9 [4/20] | 7.2 [1/18] | 8.5 [3/21] | 1.3/3.5 · 3.4/9.5 | 1.9/10.9 | 14 of 2,402 · 9.3 |
+| | QW | +3.5 (−0.5 … +13.3) | +1.9 · +5.4 · +5.5 · +4.9 | 6.6 [1/24] | 8.0 [6/20] | 8.2 [1/18] | 11.2 [6/21] | 1.7/4.3 · 4.2/10.9 | 1.0/5.0 | 5 · 6.7 |
+| | R2d | +3.9 (+0.1 … +13.3) | +2.6 · +5.5 · +5.6 · +4.8 | 6.5 [1/24] | 8.0 [6/20] | 7.7 [1/18] | 10.3 [5/21] | 1.6/4.2 · 3.7/10.9 | 1.0/5.0 | 5 · 6.3 |
+| | R2f | −0.7 (−7.0 … +4.1) | −0.8 · +0.8 · −2.9 · −0.6 | **11.1** [2/24] | 2.8 [0/20] | 3.6 [0/18] | 5.6 [1/21] | 0.7/2.8 · 1.6/7.6 | 0.9/5.1 | 0 · 4.1 |
+| Fresh (70) | LWW | +9.9 (−10.7 … +17.9) | +7.7 · +13.2 · +12.8 · +0.2 | 7.0 [5/26] | 19.2 [16/26]; ext 7.9 | 10.1 [10/26] | 3.1 [0/35] | 1.3/2.8 · 3.5/7.6 | 2.4/8.8 | 65 of 2,111 · 19.2 |
+| | QW | +3.3 (−9.3 … +8.2) | +1.7 · +3.9 · +0.7 · +0.1 | 5.4 [3/26] | 14.7 [16/26]; ext 8.4 | 5.8 [1/26] | 3.7 [0/35] | 1.7/3.7 · 4.4/9.9 | 0.9/3.2 | 25 · 9.4 |
+| | R2d | +3.5 (−9.3 … +8.3) | +2.2 · +4.3 · +0.9 · −0.0 | 5.3 [2/26] | 14.7 [16/26]; ext 8.4 | 5.4 [1/26] | 3.3 [0/35] | 1.6/3.7 · 4.1/9.8 | 0.9/3.1 | 24 · 9.9 |
+| | R2f | −0.7 (−12.0 … +1.9) | −0.1 · −0.6 · −2.1 · −3.3 | 5.9 [2/26]; ext 4.3 | 11.6 [7/26]; ext 2.6 | 3.4 [0/26] | 2.3 [0/35] | 1.0/2.1 · 2.5/5.6 | 0.9/2.7 | 20 · 8.4 |
+
+**The path, fresh set only** (range over the five single-pair points LPSTC → HPSTC, median / max; the lowest point
+min / median / max):
+
+| Model | Externals (54) | Rings (16) | Lowest point, externals | Lowest point, rings |
+|---|---|---|---|---|
+| LWW | 8.1 / 26.4 | 10.9 / 13.9 | −34.5 / −16.4 / +4.9 | −44.1 / −35.6 / −23.8 |
+| QW | 2.6 / 15.6 | 11.4 / 20.4 | −40.7 / −17.9 / +2.6 | −45.2 / −36.6 / −27.1 |
+| R2d | 2.8 / 16.4 | 11.5 / 20.4 | −40.9 / −18.0 / +2.4 | −45.2 / −36.6 / −27.1 |
+| R2f | 4.1 / 17.4 | 12.7 / 21.1 | −43.2 / −25.0 / −1.2 | −47.6 / −39.9 / −33.9 |
+
+The near-field rows first printed here are withdrawn [rev]: the term was Flamant's field outside its half-plane,
+added on top of the same force's wrench response, and not traction-free on the fillet (§10.8). **The ring columns and
+the lowest point include the 90° guard's rise** [rev]: R2f's maximum sits at a > 88° on 24 of 3,102 fresh tooth-loads
+(18 rings, 22 at the lowest point), lifting the ring ratings 14–23 % above the best value below 88° (LWW's lift ≤ 1.7 %),
+and the 16-sample load scan reads up to 6.5 % below the model's own dense maximum on ring 120 / 22.5° / 0.6 / 0.15.
+These rows are to be re-scored once the guard is fixed.
+
+- **Where the worst sit.**
+  - R2f's z groups: tight tools (ρ_fP 0.01), shift 0.5, z 12 → 1000 (the record holdout's 11.1 at 14.5°, the
+    development set's 8.8 at 20°). Its error runs about +3 at z 30 and −5 at z 1000: the exact peak's rise at large z
+    with a sharp tool, which no local law here follows.
+  - QW's and R2d's worst ρ, x and α groups: 14.5° with tight tools, as in §9.5.
+  - On the fresh set every model's worst α and position groups are the 28° rings. Their exact peak rises 13–33 % from
+    22.5° to 28° (z 50, shift 0.25, ρ_fP 0.05: 2.68 → 3.03) while every model's error drops to −7 … −12. The peak
+    moves to tangent angle 70–78° (2x/ρ 22–62), near the root end, where the mapped neck's θ goes to 90°, the crack-like
+    limit §10.3 finds wrong for V: a kernel used out of range. A continuous α series [rev] shows this is the end of a
+    trend that starts by 26–27° on both kinds as the cutter's clamp shrinks the fillet (the short answer's series).
+  - The externals' worst load-position ranges (15–17) are 28°, shift 0.75: the LPSTC sits 0.6–0.8 module from the
+    fillet's top and the exact peak rises toward it; no wrench model follows that.
+- **All pairs over the whole record** (for the options table's column): R2f 1 reversal of 22,346, p90 3.9; R2d 25,
+  p90 6.5; QW 30, p90 6.8.
+- **Fine sweeps that survive** [rev]: 69 sweeps (externals ρ_fP 0.002–0.45, x −0.6 … 1.0 through the undercut onset at
+  z 12 and 17, α 10–35°; rings α 12–32°, ρ_fP, x) show no jump from the model at the crate's load (second-difference
+  excess ≤ 0.25 %; 16-sample scan = 4,001-point scan within 1e-4 %). The kinks seen are the crate's geometry and every
+  model shares them: the rack's tip width reaching zero at α 32.14° (+10 % in every model), the ring cutter's clamp at
+  24.9° and 27.5°, external x ≈ 0.99 (≈ 0.2 %, cause not checked). Mate on the 28° ring (15 / 21 / 30 / 40) ranges 0.6;
+  shift −0.5 at 17.5° reads +1.6 and +0.0. At the fillet–root-land junction every wrench model, LWW too, drops 58–77 %
+  between adjacent stations (ρ finite → ∞); it is never the maximum in the three sets.
+
+### 10.5 Sweeps, constants, and the pivot [X]
+
+**The options table's sweeps** (out of sample for every choice in this round; range in points, and the share of the
+exact change between the ends the model credits):
+
+| Sweep | Exact | QW | R2d | R2f |
+|---|---|---|---|---|
+| Shift, ρ_fP 0.25, 20° | −21.5 % | 3.5 (87 %) | 4.0 (86 %) | 1.3 (95 %) |
+| Shift, ρ_fP 0.03, 20° | +47.3 % | 3.7 (104 %) | 3.7 (104 %) | 4.4 (89 %) |
+| Shift, ρ_fP 0.03, 14.5° | +14.2 % | 8.1 (142 %) | 7.9 (140 %) | 5.6 (69 %) |
+| Teeth z 12 → 40, ρ_fP 0.25 (29 points) | −36.2 % | 2.6 (95 %) | 2.5 (96 %) | 0.2 (100 %) |
+| Mate: ρ_fP 0.25 · 0.03 · ring | | 0.9 · 2.7 · 0.8 | 0.7 · 2.6 · 0.9 | 1.2 · 1.0 · 1.3 |
+| α 14.5 → 25° · 25 → 31° | −20.9 % · +12.5 % | 1.2 · 3.3 | 1.3 · 3.7 | 0.8 · 1.8 |
+| Notch at 14.5° · 20° · 25° | −46.2 · −46.5 · −41.3 % | 10.8 · 7.6 · 3.8 | 10.1 · 7.0 · 3.3 | 4.8 · 3.0 · 1.2 |
+| Ring vs external across the rack, ρ_fP 0.2 · 0.1 · 0.03 | | +0.1 · +0.7 · +0.7 | −0.5 · +0.4 · +0.6 | −0.0 · +1.2 · +2.4 |
+
+**Constants.**
+
+| Constant | R2d | R2f | Status |
+|---|---|---|---|
+| Neuber's neck in N and M, fitted at the corner-mapped curvature | yes | yes | neck + named map (not the elastic solution for this geometry) [rev] |
+| V's factor (2x/ρ)^e_V on Carothers' wedge | yes | yes | semi-empirical (LWW); tends to 0, not 1, as ρ → ∞ [rev] |
+| The wedge's Flamant and Carothers kernels; λ (Williams) | yes | yes | derived |
+| O, the reference for the load's moment | the mapped neck's centre | the same | follows from the map and q0 (the point where Neuber's shear carries no moment) |
+| The corner map's exponent 2(1 − λ(α_n)) and pivot q0 = 1 | yes | yes | named choices (§9.4) |
+| V's notch length c = 2x | yes | yes | named choice (LWW's) |
+| V's exponent | 1 − λ(α_n) | **0.38** | LWW's · **fitted** on the development set (`scan_ev.py`), as one pair with q0 = 1 |
+| The 90° guard (stations at a ≥ 90° dropped) | yes | yes | an unstated evaluation choice; R2 discontinuous at it [rev] |
+| E, ν | — | — | none: a traction problem on a simply connected body |
+
+**The pivot, R2f on the development set** (`q0dev.py`): q0 = 0.25 / 0.5 / 1 / 2 / 4 reads −4.1 / −2.5 / −0.7 / +1.5 /
++3.7 at the median, with worst ρ groups 6.8 / 5.9 / 5.1 / 5.9 / 6.6 and z 8.7–9.1. e_V was fitted at q0 = 1, so the
+two are not independent: a different q0 would have fitted a different e_V. R2d: +0.3 / +3.5 / +7.9 at q0 = 0.25 / 1 / 4
+(a 7.6-point swing, larger than the reference point's it replaced); **R2d's group structure against q0 was not
+measured** (§10.8).
+
+### 10.6 Calls, by the one rule
+
+| | Position | Height | Direction | Shift | Teeth | Mate | α | Notch | Ring vs external |
+|---|---|---|---|---|---|---|---|---|---|
+| R2d | **S** (fresh 16.4; rings 20.4) | *thr* (5.0) | S at ±14° (11.6), m at ±6° | S (7.9 at 14.5°; groups 10.1) | S (groups 9.4) | m | S (groups 8.1; fresh rings 14.7) | S (10.1) | n |
+| R2f | **S** (fresh 17.4; rings 21.1, guard-affected) | *thr* (5.1) | S at ±14° (8.4), m at ±6° (3.1) | *thr* (5.6 at 14.5°); groups m (3.7) | **S** (groups 11.1; ρ_fP 0.01 at α 14.5–20° only; 3.1 at 28°) | n (1.3) | **S** over α ≳ 26–27° on both kinds (ring 22.5 → 28°: 8.6; external 17.5 → 32°: 7.3), following the fillet radius's fall at the tool limit [rev]; m below 26° on the record groups (2.6–2.8) | *thr* (4.8 at 14.5°; groups 5.6) | m (2.4) |
+
+Both rows also fail continuity in load position and z near tangent angle 90° (§10.4) [rev]. R2f takes the α and x
+structure QW keeps at 14.5° with tight tools below the threshold, and the shift and notch structure there to it (5.6,
+4.8). It keeps the z structure at tight tools (measured at 14.5–20°), direction at ±14°, α near the cutting limit on
+both kinds, and the load near the root, which every wrench model here shares.
+
+### 10.7 Cost [X]
+
+Measured on the 228 in one build (`r2wasm/`, a copy of the editor's `neckwasm` with round 2 added), best of 7, at one
+load; the machine was loaded by other builds, so compare ratios, not the editor's absolute figures:
+
+| Build | LWW | QW | R2 (Brent) | R2 (safeguarded Newton) |
+|---|---|---|---|---|
+| wasm32 under node | 13.0–13.5 µs | 134 µs (10.0–10.4×) | 132–136 µs (10.1–10.2×) | 125–127 µs (9.3–9.8×) |
+| native | 9.3–10.1 µs | 101–107 µs | 108–113 µs | 95–96 µs |
+
+- Rust = Python to 8.4e-7 on all 228 (R2d and R2f) **at L0**; at the fresh rings' lowest-point loads Python (2,001
+  stations), a 200,001-station scan and Rust differ by 1.0–2.1 % (e.g. ring 50 / 28° / 0.6 / 0.05: 1.6831 · 1.7150 ·
+  1.7183), the 90° guard's rise [rev]. Newton = Brent to 9.3e-13.
+- **Reproduced and re-based** [rev]: wasm32 at opt-level 3, "z" and "z" + `wasm-opt -Oz`: R2 98–117 µs per section
+  against LWW's 11–12.6 µs (7.8–11.4×); native 80–92 µs against 8.3 µs. These are **per load**. The crate rates a
+  section at about 160 loads under LinearRamp (§6.4): about 16–19 ms per section in wasm (extrapolated, not
+  measured), against LWW's ≈ 1.5 ms and today's 0.9–3.9 ms per preset solve. That misses the brief's "µs per tooth".
+- The θ solve dominates, and it is a numerical root find at every station — for the owner to rule on against "no
+  per-geometry numerical solve". A start from a fixed table in (a, ln q), a closed form's inverse rather than a
+  per-geometry cache, would cut it to one or two Newton steps; not built. Reusing each station's linear response across
+  the ramp's loads would remove the ×160, but needs a fixed station set, on which the 90° guard makes the answer depend
+  on the grid; the two fixes go together.
+
+### 10.8 Open issues, for this route
+
+1. **The 90° guard** [rev]. Derive the neck's limit as a → 90°, or rate up to a stated angle with a continuous blend;
+   then make the peak search find the endpoint limit and every local maximum, add laws that the rating moves
+   continuously along fine load sweeps (turns 0° and ±14°, rings included) and that the scan equals a dense maximum,
+   test z → ∞ at low loads (converge to the rack, or state the bias's size and sign), and re-score the fresh path table,
+   the ring α groups and the reversals, saying how much each moved.
+2. **A derived V law.** R2f's α-free 0.38 is the only thing that removes the α, x and shift structure, and it is
+   fitted (with q0, as one pair). Untried leads [rev]: the mixed-mode decomposition of V at the inclined rack corner
+   (mode I singular at 1 − λ1, mode II non-singular for α > 12.6°: w_I(α)(2x/ρ)^(1−λ1) plus a bounded remainder); the
+   published mode II rounded-notch fields (Zappalorto & Lazzarin 2011, Int J Fract, V-notches with end holes,
+   doi 10.1007/s10704-010-9567-5, and GSIFs for rounded notches under in-plane shear, doi 10.1007/s10704-011-9613-y;
+   Procedia Eng. 2011, S1877705811003729 — abstracts only, whose exponents combine Williams' mode I and II eigenvalues);
+   Neuber's shear factor with a nominal whose blunt limit is 1 (§10.3).
+3. **V's blunt limit** [rev]. V's factor tends to 0 as ρ → ∞ while N's and M's tend to 1; fix it to tend to 1 so the
+   model is continuous onto a flat root land and convex stations.
+4. **α at the cutting limit** [rev]. Structure ≥ 5 from α ≈ 26–27° on both kinds, following the clamped fillet radius;
+   add a sweep continuous in α up to where the cutter stops producing a tooth, per kind, and find a term that follows
+   the clamped fillet. On rings the best e_V is ≥ 0.44 at the fresh teeth, in line with the 0.401 regression.
+5. **z at tight tools.** R2f's worst groups (8.8, 11.1): the exact peak rises from z 150 to 1000 with ρ_fP 0.01; no
+   local law here follows it. Measured at α 14.5–20° only (3.1 at 28°). The research round saw the same in V's residual
+   (−4 … +4 over z 12 → 1000).
+6. **The root end.** Rings near the cutting limit and every load near the root put the exact peak low on the fillet
+   (a 70–78°), where the mapped neck runs to its crack limit and the exact pole stays bounded (research round). A
+   bounded body for those stations is the next piece of mechanics this model lacks.
+7. **The near field** [rev]. The first term is withdrawn. If kept, rebuild it self-equilibrated (Flamant's field, or the
+   wedge whose apex angle is the flank's local curvature, minus the response to its own resultant), applied only to
+   stations inside its domain, then re-test the lowest point and direction. The load within a module of the fillet
+   remains −35 … −48 for every wrench model; how to fix it is untested.
+8. **The pivot.** q0 moves R2f's level ±4 points and R2d's 7.6; R2d's group structure against q0 was not measured. The
+   derived pivot through Filippi–Lazzarin–Tovo's tip relation needs ω̃1 from the paper, which was not read.
+9. **Cost.** Under the ramp R2 is ≈ 16–19 ms per section in wasm (extrapolated); measure it, and either build the
+   linear reuse with item 1 or carry the ≈ 10× slower solve in the options table. The per-station θ root find awaits
+   the owner's ruling.
+10. **Direction at ±14°** stays substantial for every variant (5.6–12.1).
+11. **Bias record.** R2f's median −0.7 and its 61–77 % unconservative share belong in `docs/state.md` under rule 6 if
+   it is adopted.
