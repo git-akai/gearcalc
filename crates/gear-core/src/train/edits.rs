@@ -584,14 +584,13 @@ impl Shape {
     /// helix automatic, so the mesh it joins gives it the group's and the
     /// hand its mesh needs; its shift and thickness automatic, so a second
     /// central at one carrier radius is closed by its shift; and its face
-    /// width automatic, as every gear the panel lays in is, seeded at the
-    /// width every gear is born with ([`super::DEFAULT_FACE_WIDTH`]). It
-    /// reads nothing of its mate but the seed of its automatic module box: a
-    /// gear never copies another's width, given helix, form or material.
+    /// width automatic at the box every gear is born with
+    /// ([`super::DEFAULT_FACE_WIDTH`]), as every gear is. It reads nothing of
+    /// its mate but the seed of its automatic module box: a gear never copies
+    /// another's width, given helix, form or material.
     fn push_follower(&mut self, mate: usize, body: usize, teeth: u32, ring: bool) {
         let module = self.members[mate].normal_module();
         let new = self.push_member(body, teeth, module, ring.then(Default::default));
-        self.members[new].gear.face_width = Auto::automatic(super::DEFAULT_FACE_WIDTH);
         self.push_mesh(new, mate);
     }
 

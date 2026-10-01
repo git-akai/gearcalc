@@ -1390,30 +1390,12 @@ pub struct GearTabDefaults {
 fn defaults_impl() -> Result<String, String> {
     use gear_core::train::{CaseKind, LoadCase, Train};
 
-    // The tab starts with an automatic face width, where the core's own
-    // default is given. Both are right for their caller: the CLI and the
-    // tests want a fixed number they can reason about, and a designer
-    // opening the panel wants to see the width the rating asks for. Seeded at
-    // the width every gear is born with (`DEFAULT_FACE_WIDTH`), so what the
-    // box falls back to — the toggle turned off, or a mesh no case loads — is
-    // the core's width, not the panel's own.
-    //
-    // **Every preset the panel offers**, which it was not: the rule reached the
-    // parallel pair and the epicyclic set, and a hula stage opened at a *fixed*
-    // 10 mm while a worm's members were automatic but seeded at ten. So the same
-    // panel answered the same question three ways depending on which stage a
-    // designer had picked. Nothing could see it — `defaults()` is the boundary's
-    // own, and no golden case reaches it. See the test below. Now one walk
-    // over every member of every preset's shape, so a preset added to the
-    // core's list is seeded by being on it.
-    let ui = |mut shape: gear_core::train::shape::Shape| {
-        for m in &mut shape.members {
-            m.gear.face_width =
-                gear_core::params::Auto::automatic(gear_core::train::DEFAULT_FACE_WIDTH);
-        }
-        shape
-    };
-    let spur = ui(Preset::Spur.build());
+    // **Every preset is laid in as the core builds it**: every gear
+    // automatic, born at the core's box (`DEFAULT_FACE_WIDTH`), so the panel
+    // shows the width the rating asks for — and where nothing asks, says it
+    // is not sized. The panel once seeded its own 5 mm over the core's given
+    // 10, one gear two widths by where it was born; it reads the core's now.
+    let spur = Preset::Spur.build();
 
     let defaults = Defaults {
         gear: GearTabDefaults {
@@ -1458,7 +1440,7 @@ fn defaults_impl() -> Result<String, String> {
                 preset,
                 family: preset.family(),
                 label: preset.label().to_string(),
-                shape: ui(preset.build()),
+                shape: preset.build(),
             })
             .collect(),
         families: PresetFamily::ALL

@@ -350,16 +350,19 @@ pub const MEMBER: &[Row<Member>] = &[
         NOT_NEGATIVE
     ),
     given!("gear.helix_angle.manual", gear.helix_angle, HELIX_ANGLE),
-    // A width wherever it is read: given, or the box an automatic width
-    // stands at where nothing sizes it — no source, no case, or a mesh no
-    // case loads (`FaceSources::width_for`), the last of which no field of
-    // the gear's tells apart. A box of nought there was a face of nothing,
-    // refused `NoContact` as if the teeth missed (stage1-exit item 3).
-    row!(
-        "gear.face_width.manual",
-        |m| Some(m.gear.face_width.manual),
-        POSITIVE
-    ),
+    // A width where it is read: given. An automatic width's box is read
+    // only on a point contact, where it is the width when no proportion
+    // gives one — which the member alone cannot say, so that bound is
+    // [`shape_of`]'s; on a line contact nothing reads it, and nothing sized
+    // is said as not sized (`FaceSources::width_for`).
+    Row {
+        field: "gear.face_width.manual",
+        kind: Kind::Figure,
+        get: |m| Some(m.gear.face_width.manual),
+        bound: |_, m| (!m.gear.face_width.auto).then_some(POSITIVE),
+        held: None,
+    },
+
     row!("gear.rim_thickness", |m| m.gear.rim_thickness, POSITIVE),
 ];
 
@@ -1077,6 +1080,19 @@ fn shape_of(kind: Option<Kind>, s: &Shape, visit: Visit<'_>) -> Result<(), Refus
     for (i, m) in s.members.iter().enumerate() {
         let at = format!("members.{i}");
         check_of(kind, MEMBER, &l, m, &at, &mut *visit)?;
+        // **An automatic width's box on a point contact is its width**, read
+        // where no proportion gives one, so a width: positive. Indices are
+        // read before figures, so the graph can be walked here.
+        if kind.is_none_or(|k| k == Kind::Figure)
+            && m.gear.face_width.auto
+            && on_a_point_contact(s, i)
+        {
+            visit(
+                &|| join(&at, "gear.face_width.manual"),
+                m.gear.face_width.manual,
+                Some(POSITIVE),
+            )?;
+        }
         if let Some(c) = &m.ring {
             check_of(kind, CUTTER, &l, c, &join(&at, "ring"), &mut *visit)?;
         }
@@ -1092,6 +1108,24 @@ fn shape_of(kind: Option<Kind>, s: &Shape, visit: Visit<'_>) -> Result<(), Refus
     each(kind, MESH, &l, &s.meshes, "meshes", &mut *visit)?;
     each(kind, DISTANCE, &l, &s.distances, "distances", &mut *visit)?;
     each(kind, COUPLING, &l, &s.couplings, "couplings", visit)
+}
+
+/// Whether member `i` meshes across a distance at an angle — a point
+/// contact. Reads the graph defensively: a figure pass may meet a graph whose
+/// indices it has not been told are good, and then says no.
+fn on_a_point_contact(s: &Shape, i: usize) -> bool {
+    let axis = |member: usize| {
+        let body = s.members.get(member)?.body;
+        s.bodies.iter().find(|b| b.body == body).map(|b| b.axis)
+    };
+    s.meshes.iter().filter(|m| m.a == i || m.b == i).any(|m| {
+        let (Some(p), Some(q)) = (axis(m.a), axis(m.b)) else {
+            return false;
+        };
+        s.distances
+            .iter()
+            .any(|d| (d.axes == [p, q] || d.axes == [q, p]) && d.angle != 0.0)
+    })
 }
 
 /// **A train's every number**, each at its path from the train: its

@@ -1452,13 +1452,15 @@ impl MemberGear {
     }
 }
 
-/// **The width every gear is born with, mm**, wherever it is born — the
-/// core's default, a preset the panel lays in, a gear an edit adds: the box
-/// an automatic width stands at where nothing sizes it, and the given width
-/// of a gear laid in fixed. Ten millimetres is the width the crate has laid
-/// gears in at from the start, and the corpus is recorded at it; the panel
-/// seeded its presets at 5 and an added gear at its mate's box, so one gear
-/// was three widths by where it came from (`work/stage2.md`, Q5 to Q6).
+/// **The box every gear is born with, mm**, wherever it is born — the
+/// core's default, a preset the panel lays in, a gear an edit adds. Every
+/// gear is born **automatic**: on a line contact its width is what its
+/// ratings and a given axial contact ratio ask, or not sized where nothing
+/// asks, and the box is not read; on a point contact the box is its width,
+/// where no proportion gives one. Ten millimetres is the width the crate
+/// laid gears in at, given, until every gear was automatic; the panel seeded
+/// its presets at 5 and an added gear at its mate's box, so one gear was
+/// three widths by where it came from (`work/stage2.md`, Q5 to Q6).
 pub const DEFAULT_FACE_WIDTH: f64 = 10.0;
 
 impl Default for MemberGear {
@@ -1475,7 +1477,7 @@ impl Default for MemberGear {
             dedendum: 1.25,
             root_radius: 0.38,
             helix_angle: Auto::automatic(0.0),
-            face_width: Auto::fixed(DEFAULT_FACE_WIDTH),
+            face_width: Auto::automatic(DEFAULT_FACE_WIDTH),
             face_sources: FaceSources::default(),
             // A rim nobody described: `Y_B` is 1, and the gear cannot be told
             // its rim is thin because it has not said what its rim is.
