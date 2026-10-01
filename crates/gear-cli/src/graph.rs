@@ -142,12 +142,12 @@ fn report(name: &str, train: &Train, r: &TrainResult) {
         for g in &s.members {
             member += 1;
             println!(
-                "  member {member}  z {}  m {}  alpha {}  x {:.6}  b {:.6}  beta {:.6}  d {:.6}",
+                "  member {member}  z {}  m {}  alpha {}  x {:.6}  b {}  beta {:.6}  d {:.6}",
                 g.params.teeth,
                 g.params.module,
                 g.params.pressure_angle,
                 g.profile_shift,
-                g.face_width,
+                opt(g.face_width, 6),
                 g.helix_angle,
                 g.pitch_diameter,
             );
@@ -156,13 +156,13 @@ fn report(name: &str, train: &Train, r: &TrainResult) {
             }
             for c in &g.cases {
                 println!(
-                    "    case {}  T {:.6}  n {:.4}  vs frame {:.4}  sF {}  sH {:.3}  cycles {}  widths {} / {}",
+                    "    case {}  T {:.6}  n {:.4}  vs frame {:.4}  sF {}  sH {}  cycles {}  widths {} / {}",
                     c.case + 1,
                     c.torque,
                     c.speed,
                     c.speed_against_carrier,
                     opt(c.bending_stress, 3),
-                    c.contact_stress,
+                    opt(c.contact_stress, 3),
                     c.cycles.map_or_else(
                         || "-".to_string(),
                         |n| format!("{:.6e} / {:.6e}", n.bending, n.contact)
@@ -180,11 +180,11 @@ fn report(name: &str, train: &Train, r: &TrainResult) {
                 || "point contact".to_string(),
                 |l| {
                     format!(
-                        "alpha_w {:.6}  eps {:.6} / {:.6} / {:.6}",
+                        "alpha_w {:.6}  eps {:.6} / {} / {}",
                         l.operating_pressure_angle,
                         l.contact_ratios.transverse,
-                        l.contact_ratios.overlap,
-                        l.contact_ratios.total
+                        opt(l.contact_ratios.overlap, 6),
+                        opt(l.contact_ratios.total, 6)
                     )
                 },
             );

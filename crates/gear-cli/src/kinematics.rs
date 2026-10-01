@@ -533,11 +533,12 @@ fn report(name: &str, train: &Train, r: &TrainResult) {
         }
         for (j, m) in s.meshes.iter().enumerate() {
             println!(
-                "    mesh {}  efficiency {:>10.6} / {:<10.6} %  contact ratio {:>8.4}  {}",
+                "    mesh {}  efficiency {:>10.6} / {:<10.6} %  contact ratio {:>8}  {}",
                 j + 1,
                 100.0 * m.efficiency.forward,
                 100.0 * m.efficiency.backward,
-                m.contact_ratio,
+                m.contact_ratio
+                    .map_or_else(|| "-".to_string(), |e| format!("{e:.4}")),
                 if m.coprime {
                     "coprime"
                 } else {

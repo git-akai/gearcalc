@@ -370,6 +370,12 @@ fn arg<T: std::str::FromStr>(args: &[String], n: usize, default: T) -> T {
 
 /// ...and one that is genuinely optional, where absent is not a default value
 /// but a different question.
+/// **A figure that may be absent**, at `digits` places, or `-`: a face
+/// width nothing sized, and every figure read at one.
+fn shown(v: Option<f64>, digits: usize) -> String {
+    v.map_or_else(|| "-".to_string(), |v| format!("{v:.digits$}"))
+}
+
 fn opt<T: std::str::FromStr>(args: &[String], n: usize) -> Option<T> {
     args.get(n).map(|s| {
         s.parse().unwrap_or_else(|_| {
@@ -961,9 +967,9 @@ fn hula_report(n: u32, clearance: f64, m_outer: f64, m_inner: f64, cutter_teeth:
         // the geometry: the reduction multiplies the mesh loss, and it multiplies
         // the torque on the way as well — the output pair carries the whole of it.
         println!(
-            "    sigma_H {:.1} MPa at the pitch point   rho {:.4} mm",
-            mesh.cases[0].contact.at_pitch_point,
-            1.0 / mesh.cases[0].contact.curvature_across
+            "    sigma_H {} MPa at the pitch point   rho {} mm",
+            shown(mesh.cases[0].contact.map(|c| c.at_pitch_point), 1),
+            shown(mesh.cases[0].contact.map(|c| 1.0 / c.curvature_across), 4)
         );
         for (gear, _) in members {
             println!(
@@ -2251,13 +2257,13 @@ fn print_train_cases(train: &gear_core::train::Train, r: &gear_core::train::Trai
 fn print_gear_cases(cases: &[gear_core::train::GearCase]) {
     for c in cases {
         println!(
-            "      case {}  T {:>10.4} Nm  {:>9.1} rpm  sigma_F {:>8}  sigma_H {:>8.1} MPa  cycles {}",
+            "      case {}  T {:>10.4} Nm  {:>9.1} rpm  sigma_F {:>8}  sigma_H {:>8} MPa  cycles {}",
             c.case + 1,
             c.torque,
             c.speed,
             c.bending_stress
                 .map_or_else(|| "-".to_string(), |s| format!("{s:.1}")),
-            c.contact_stress,
+            shown(c.contact_stress, 1),
             c.cycles.map_or_else(
                 || "-".to_string(),
                 |n| format!("{:.3e} / {:.3e}", n.bending, n.contact)
@@ -2289,11 +2295,11 @@ fn print_line_pair(k: usize, kind: &str, s: &Pair, line: &gear_core::train::Line
         if mesh.coprime { "  coprime" } else { "" }
     );
     println!(
-        "  contact ratio  transverse {:.4}   overlap {:.4}   total {:.4}{}",
+        "  contact ratio  transverse {:.4}   overlap {}   total {}{}",
         ratios.transverse,
-        ratios.overlap,
-        ratios.total,
-        if helix != 0.0 && !ratios.has_full_axial_overlap() {
+        shown(ratios.overlap, 4),
+        shown(ratios.total, 4),
+        if helix != 0.0 && ratios.has_full_axial_overlap() == Some(false) {
             "   <- no full axial overlap"
         } else {
             ""
@@ -2311,18 +2317,18 @@ fn print_line_pair(k: usize, kind: &str, s: &Pair, line: &gear_core::train::Line
         "  contact at the pitch point  sigma_H {} MPa by case   rho {:.3} mm",
         mesh.cases
             .iter()
-            .map(|c| format!("{:.1}", c.contact.at_pitch_point))
+            .map(|c| shown(c.contact.map(|p| p.at_pitch_point), 1))
             .collect::<Vec<_>>()
             .join(" / "),
-        1.0 / mesh.cases[0].contact.curvature_across
+        shown(mesh.cases[0].contact.map(|c| 1.0 / c.curvature_across), 3)
     );
     println!("  {:<6} {:>8} {:>8}", "gear", "x", "b mm");
     for (i, g) in s.gears.iter().enumerate() {
         println!(
-            "  {:<6} {:>8.4} {:>8.3}",
+            "  {:<6} {:>8.4} {:>8}",
             i + 1,
             g.profile_shift,
-            g.face_width
+            shown(g.face_width, 3)
         );
         print_gear_cases(&g.cases);
     }
@@ -2355,14 +2361,14 @@ fn print_point_pair(k: usize, kind: &str, s: &Pair, m: &gear_core::train::MeshRe
     );
     println!("  efficiency  {}", both_ways(m.efficiency));
     println!(
-        "  contact  {} MPa by case   patch {:.4} x {:.4} mm   sliding {} mm/s by case",
+        "  contact  {} MPa by case   patch {} x {} mm   sliding {} mm/s by case",
         m.cases
             .iter()
-            .map(|c| format!("{:.1}", c.contact.max_pressure))
+            .map(|c| shown(c.contact.map(|p| p.max_pressure), 1))
             .collect::<Vec<_>>()
             .join(" / "),
-        m.cases[0].contact.patch_length,
-        m.cases[0].contact.patch_width,
+        shown(m.cases[0].contact.map(|p| p.patch_length), 4),
+        shown(m.cases[0].contact.map(|p| p.patch_width), 4),
         m.cases
             .iter()
             .map(|c| format!("{:.1}", c.sliding_velocity))
@@ -2375,7 +2381,7 @@ fn print_point_pair(k: usize, kind: &str, s: &Pair, m: &gear_core::train::MeshRe
         _ => ["1", "2"],
     };
     for (name, g) in names.iter().zip(&s.gears) {
-        println!("  {name:<6} {:>8.3}   {}", g.face_width, g.material.name);
+        println!("  {name:<6} {:>8}   {}", shown(g.face_width, 3), g.material.name);
         print_gear_cases(&g.cases);
     }
     println!("  bending not reported, flank type ZI - see docs/reference.md#crossed-axes");
@@ -3681,17 +3687,20 @@ fn worm_stage_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, torque: 
     println!("  member      torque Nm   face mm   d mm      material");
     for (name, m) in ["worm", "wheel"].iter().zip(&r.gears) {
         println!(
-            "  {name:<10} {:9.4} {:9.3} {:9.4}   {}",
-            m.cases[0].torque, m.face_width, m.pitch_diameter, m.material.name
+            "  {name:<10} {:9.4} {:>9} {:9.4}   {}",
+            m.cases[0].torque,
+            shown(m.face_width, 3),
+            m.pitch_diameter,
+            m.material.name
         );
     }
     println!();
     println!("  efficiency   {}", both_ways(m.efficiency));
     println!(
-        "  contact      {:.1} MPa   patch {:.4} x {:.4} mm",
-        m.cases[0].contact.max_pressure,
-        m.cases[0].contact.patch_length,
-        m.cases[0].contact.patch_width
+        "  contact      {} MPa   patch {} x {} mm",
+        shown(m.cases[0].contact.map(|p| p.max_pressure), 1),
+        shown(m.cases[0].contact.map(|p| p.patch_length), 4),
+        shown(m.cases[0].contact.map(|p| p.patch_width), 4)
     );
     println!(
         "  backlash     at the wheel {:.5} deg (min {:.5}, max {:.5})   at the worm {:.5} deg",
@@ -3909,9 +3918,9 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
                             );
                         }
                         println!(
-                            "sigma_H at pitch  sun-planet {:.1} MPa   planet-ring {:.1} MPa",
-                            r.sun_planet.cases[0].contact.at_pitch_point,
-                            r.planet_ring.cases[0].contact.at_pitch_point
+                            "sigma_H at pitch  sun-planet {} MPa   planet-ring {} MPa",
+                            shown(r.sun_planet.cases[0].contact.map(|p| p.at_pitch_point), 1),
+                            shown(r.planet_ring.cases[0].contact.map(|p| p.at_pitch_point), 1)
                         );
                         println!(
                             "sigma_F  sun {}   planet {}   ring {}",
@@ -4067,17 +4076,16 @@ fn crossed_report(z1: u32, z2: u32, shaft_angle: f64) {
                     format!("{:>10.3} %", m.efficiency.forward * 100.0)
                 };
                 println!(
-                    "{beta1:>7.1} {:>7.1} {:>9.4} {:>9.4} {:>10.4} {:>10.4} {eta} {:>9.1} {:>13}",
+                    "{beta1:>7.1} {:>7.1} {:>9.4} {:>9.4} {:>10.4} {:>10.4} {eta} {:>9} {:>13}",
                     g.wheel_helix_angle_rad.to_degrees(),
                     g.worm_pitch_diameter,
                     g.wheel_pitch_diameter,
                     g.centre_distance,
                     g.sliding_ratio,
-                    m.cases[0].contact.max_pressure,
-                    if m.point.is_some() && m.contact_ratio > 0.0 {
-                        format!("{:.9}", m.contact_ratio)
-                    } else {
-                        "—".to_string()
+                    shown(m.cases[0].contact.map(|p| p.max_pressure), 1),
+                    match m.contact_ratio.filter(|&e| m.point.is_some() && e > 0.0) {
+                        Some(e) => format!("{e:.9}"),
+                        None => "—".to_string(),
                     }
                 );
                 for n in m.notes.iter().filter(|n| {
@@ -4131,11 +4139,11 @@ fn crossed_report(z1: u32, z2: u32, shaft_angle: f64) {
             )
         }) {
             Ok((x1, x2, a, eps, eta)) => println!(
-                "{name:<34} {:>9.4} {:>9.4} {:>9.4} {:>9.4} {:>9.3} %",
+                "{name:<34} {:>9.4} {:>9.4} {:>9.4} {:>9} {:>9.3} %",
                 x1,
                 x2,
                 a,
-                eps,
+                shown(eps, 4),
                 100.0 * eta
             ),
             Err(e) => println!("{name:<34} {e}"),
