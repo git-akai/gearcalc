@@ -1026,3 +1026,447 @@ load; the machine was loaded by other builds, so compare ratios, not the editor'
 10. **Direction at ±14°** stays substantial for every variant (5.6–12.1).
 11. **Bias record.** R2f's median −0.7 and its 61–77 % unconservative share belong in `docs/state.md` under rule 6 if
    it is adopted.
+
+## 11. Round 3: two prototypes, scored as round 2 (2026-10-01; three reviews applied)
+
+For the owner's direction on §10: continue the component method where it was left; optimise it by conventional means,
+with an internal benchmark of where its time goes; look for solutions outside notch mechanics. Three tracks ran
+(`~/.cache/gearcalc-work/bending-r3/`: `method/r4/`, `profile/`, `other-fields/`, READMEs there), each with a
+skeptic's review. This round took the two most promising candidates and built each:
+- **A. R4+NF**, the component method as the method track left it, with the profile track's optimisations, in Rust.
+- **B. A shipped table**, from the other-fields track: a tensor Chebyshev interpolant of the exact peak over the
+  design box, built offline on the record's own solver, used as a correction on a mechanics model (a control variate).
+
+Both are scored exactly as round 2, with `bending-comp2/summ.py` on the fixed split: dev 153, record holdout 75, fresh
+holdout 70. The record teeth carry the path loads re-solved in `method/r4` (`recpath.jsonl`), so the record holdout
+has position and lowest-point figures too. Scripts: `~/.cache/gearcalc-work/bending-r3/proto/` (README there). The
+repository was not edited.
+- **Reviews.** Three reviews followed (§11.4 has what each measured and where its scripts are). They confirm the
+  scores below where the scoring sets sample. They refute four of this round's claims as first written: that the
+  table removes every structured error, that direction is exact, that the rating is continuous, and that the z 27 → 30
+  step is ≤ 1 %. Each claim below is corrected in place, marked [rev].
+- **Marks:** [X] computed in this round; [R] read from the method, profile or other-fields tracks or their reviews;
+  [C] recalled.
+- **Sources:** none was read in this round. The tracks' sources are as they recorded them: Papkovich–Fadle roots
+  computed, not read; Brent 1973 ch. 5 recalled; the Chebyshev and multifidelity literature read as abstracts
+  (Barthelmann–Novak–Ritter 2000; Chkifa–Cohen–Schwab 2014; Hashemi–Trefethen 2017; Peherstorfer–Willcox–Gunzburger
+  2018).
+
+**Short answer.**
+- **A, R4+NF, holds out as the method track reported, now in Rust, continuous, and fast.**
+  - **Agreement and search.** Rust equals the Python model to 4.5e-5 at every one of 4,446 scoring loads. Its 16-station
+    search equals a 4,001-station dense maximum to 1.6e-10 on all of them. On a 160-load ramp over 228 teeth, 2 of
+    9,120 loads differ, by up to −2.4e-4; at 24 stations none does. The profile track found 1,091 misses of up to
+    −7.5 %; with the guard gone and the 90° crossing made a candidate, they are gone.
+  - **Cost.** wasm32: 4.4–4.9 µs per section at one load, against LWW's 8.3–9.0 µs in the same module, and
+    214–222 µs per section under the ramp.
+  - **What it keeps.** On the scoring sets it is still substantial in six places: the load's position (7.8–12.8), z at
+    tight tools (8.6 / 10.9), α at the cutting limit (fresh 11.8), direction at ±14° (7.7–8.4), ρ at the threshold
+    (5.2 / 5.4), and the lowest point's spread (−12 … +18). It reverses 20 of 2,111 fresh pairs.
+  - **Off the scoring sets it is worse** [rev]. Ring α sweeps range 14.6 points at L0 and 27.7 at the lowest point; ρ
+    ranges 7.3 at the lowest point (beyond the threshold, not at it); near the root end (t ≈ 0.07) over the table's
+    nodes its error has p90 13 / 29 / 43 % and max 48 / 51 / 119 % (whole / sector / ring). This matters because it is
+    the table's fallback.
+- **B, the table on R4+NF (Tab(R4)), removes every structured error the scoring sets measure, and not every one
+  there is** [rev]. It uses degree 4: 625 BEM solves per patch, three patches.
+  - **Level.** L0 is −1.7 … +0.9 on every set, median −0.0.
+  - **Groups.** Every z, α, x and ρ group is ≤ 2.2.
+  - **The load.** Direction ≤ 2.7, height ≤ 3.6, position ≤ 5.0 (one dev ring, at the threshold) and the lowest
+    point −4.1 … +5.5.
+  - **Pairs.** No reversal in any set, with a worst misstatement of 2.5.
+  - **Cost.** About 55 µs per geometry in wasm (unoptimised) plus 0.44 µs per load, on top of R4+NF.
+  - **What it is.** A shipped 2.9 MB (f64) interpolant of the named baseline. It carries an empirical, not a
+    certified, error bound. It holds no model constant, but it explains nothing, and it builds in the baseline's
+    body, rack (dedendum 1.25, no thickness change), ring cutter and ν = 0.3 [rev].
+  - **What the reviews found off the scoring sets** [rev]:
+    - **Between direction nodes** the error reaches 17–33 % near the root end (t < 0.1) and 15–21 % mid-flank at
+      ψ 45–53°: the exact peak is a maximum over fillet locations with kinks in ψ, which a degree-14 polynomial cannot
+      follow. Substantial in direction and in position under the one rule.
+    - **Near the root on rings** t is not converged (leave-one-out at the t nodes 26–63 %); an off-node ring α sweep
+      ranges 5.3 at the lowest point, and one off-node ring reads −8.3 there.
+    - **It is not continuous as a rating.** Leaving the box, or z 28–29 between the external patches, steps the
+      rating by the table's whole correction: up to 13.7 points at L0 on a 28° ring, p90 8–20 on the faces.
+  - **What carries the result.** The control variate does. The same table on the exact peak alone (Tab(ex)) is
+    substantial on α, ρ and z (9–12), because the crate's clamp and undercut kinks sit inside the box. On LWW instead of
+    R4+NF it is nearly as good (Tab(LWW): L0 −1.9 … +0.7, groups ≤ 2.2).
+
+### 11.1 A: R4+NF in Rust [X]
+
+**The model.** At each fillet station (half-width x, tangent angle a, radius of curvature ρ, q = x/ρ), as §10.2 with
+the method track's round-4 changes (`proto/r4rs/src/lib.rs`):
+
+    σ = F_V f_x (k_V/x − dy_c k_M/x²) + t_N f_y + t_M (p_x f_y − (p_y − y_O) f_x)
+        − f_x (F_V/x) exp(−β |p_y − y| / x̄)                     (the near field; x̄ = (x + |p_x|)/2)
+    F_V = max(1, (2x/ρ)^e_V)
+
+- **N and M** come from Neuber's neck at the corner-mapped sharpness, with θ in closed form:
+  tan²θ = tan²a + q_eff/cos³a. As a → 90° they take the exact limit (t_N, t_M, dy_c → 0). Past 90° they take the
+  tangent wedge's Flamant and Carothers terms.
+- **β = 3.748838**, the real part of the first antisymmetric Papkovich–Fadle root (sin 2k − 2k = 0), per half-width.
+- **The search.** N stations on the fillet parameter, both ends included (the root-side end is the fillet's closing
+  point). Every local maximum of the scan is refined by Brent's maximiser, seeded with its neighbours.
+- **The 90° crossing.** The neck's limit at a = 90° is a √ cusp, a maximum narrower than any scan. Where the tangent
+  angle crosses 90° between two stations, the crossing is a candidate in its own right. It is found once per tooth by
+  bisection on cos a, a geometric root load-independent. Without it one ring's lowest-point load read −1.7 % low at
+  16 stations.
+
+**Agreement** (`r4/score.py`, `bench2.txt`):
+- **Rust = Python.** R4 and R4+NF in Rust equal the Python model (`method/r4/final2.pkl`; 2,001 stations per piece plus
+  the closing point) within 4.5e-5 at every load.
+- **Root land.** The root land is not searched in Rust. No load peaks there (§10, item 3 of the method track), and the
+  agreement confirms it.
+- **Search against the dense maximum** (4,001 stations, every local maximum refined to 1e-9·h, the crossing included):
+
+  | Loads | 16 stations, 1e-4·h | 16 stations, 1e-2·h | 8 stations, 1e-2·h | 24 stations, 1e-4·h |
+  |---|---|---|---|---|
+  | The three sets' 4,446 scoring loads | within 1.6e-10 | 80 loads beyond 1e-6, worst −2.0e-6 | within 1.7e-5 | within 5.4e-11 |
+  | Every 4th ramp load, 9,120 | 2 loads beyond 1e-6, worst −2.4e-4 | 184 loads, worst −2.4e-4 | 2,868 loads, worst −2.6e-3 | none beyond 6.1e-11 |
+
+**Scores** (the Rust values; figures as §10.4):
+
+| Set | e_V | L0 | Classes ord · mid · tight · ring | z | α | x | ρ | Dir ±6 · ±14 | Height | Position · lowest point | Pairs |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Dev | 0.38 | −0.3 (−5.6 … +3.7) | −0.4 · +0.6 · −2.3 · −0.4 | 8.6 [7/38] | 2.8 | 3.2 | 5.2 [1/51] | 3.1 · 8.4 | 4.3 | 1.2 / 12.8 · −12.3 / −2.9 / +9.4 | 0 of 9,931 · p90 3.8 |
+| Record holdout | 0.38 | −0.4 (−6.5 … +4.4) | −0.5 · +0.8 · −2.5 · −0.2 | 10.9 [2/24] | 3.1 | 3.6 | 5.4 [1/21] | 2.8 · 7.7 | 4.3 | 1.2 / 7.8 · −12.2 / −1.3 / +18.1 | 0 of 2,402 · 3.9 |
+| Fresh | 0.38 | −0.5 (−11.8 … +2.1) | −0.0 · −0.5 · −1.9 · −3.0 | 5.8 [2/26] | **11.8** [7/26] | 3.4 | 2.3 | 2.1 · 5.6 | 2.4 | 2.1 / 10.5 · −9.5 / −2.6 / +14.2 | 20 of 2,111 · 8.3 |
+| Record holdout | 0.39 | +1.2 (−3.8 … +6.2) | +0.4 · +2.4 · −0.2 · +1.7 | 10.1 | 2.9 | 4.8 | 6.3 | 3.3 · 8.8 | 3.9 | 1.2 / 6.6 · −9.7 / +0.6 / +23.0 | 0 · 3.8 |
+| Fresh | 0.39 | +1.0 (−9.2 … +3.4) | +0.9 · +1.3 · +0.4 · −1.1 | 5.3 | 11.0 | 2.7 | 1.9 | 2.5 · 6.6 | 2.0 | 1.7 / 9.7 · −6.8 / +0.2 / +18.3 | 20 · 7.5 |
+
+- **Every figure equals the method track's Python scoring (`method/r4/final2.log`) at print precision**, except one
+  that moves by 0.1 (the fresh lowest-point minimum at 0.39, −6.9 → −6.8). The Rust model is that model.
+- **The whole record (228 teeth, five tip-corner teeth out), at e_V 0.38:**
+  - 1 reversal of 22,346 pairs 5 % or more apart;
+  - misstatement median 1.3, p90 3.9, p99 6.7, max 11.6.
+- **Pair counting.** The fresh pair counts take each duplicate 28° ring twice, as §10.4 first did.
+- **Bias** (rule 6): at e_V 0.38, median −0.3 … −0.5, and unconservative on 56–67 % of teeth.
+
+**Continuity** (`r4rs/examples/sweep.rs`, `r4/sweep.txt`) [X]:
+- **The sweeps.** Each has 1,201 steps, at a unit involute-normal load near the root end, mid-flank and near the tip
+  (t = 0.03, 0.5, 0.97 of the flank's roll bracket):
+  - ring z 50 and 120, α 14.5 → 28.2° (through the cutter's clamp at 24.9° and 27.5°, and to where a ring stops
+    building);
+  - ring ρ_fP 0.005 → 0.45;
+  - ring x −0.3 → 0.9;
+  - external α 14.5 → 32°;
+  - external ρ_fP 0.003 → 0.5;
+  - external x −0.6 → 1.0 at z 17 (through undercut onset);
+  - external z 12 → 400 and ring z 40 → 600, each tooth count.
+- **The result.** The largest step that stands out from its neighbours' is 0.005 %, on z at ρ_fP 0.01. The largest
+  plain steps are the smooth slope over one sweep step: 0.2–0.4 % in α at the ring's limit, and 0.7–1.3 % per tooth at
+  z 12–25.
+- **The fast search equals the dense maximum on every step of every sweep.**
+- **What this clears.** R4+NF passes the continuity rule in every input swept, including through 90° crossings.
+  §10's 7.3–7.6 % jumps are gone; this is the geometry sweep the method track's review asked for.
+
+**Cost** (`r4/bench2.txt`, `bench_table.txt`; the 228-tooth set and 160-load ramp of `profile/r2wasm`). The machine
+was shared with other builds, so read the ratios to LWW in the same run [X].
+
+| Build | LWW (16 + golden) | R4+NF, 16 stations, 1e-4·h | 16, 1e-2·h | 8, 1e-2·h | 24, 1e-4·h | Ramp, 160 loads, 16 stations, 1e-4·h |
+|---|---|---|---|---|---|---|
+| native | 6.1–7.1 µs | 3.5–3.6 µs | 3.2 µs | 2.5 µs | 4.3 µs | 163–179 µs (1.0–1.1 µs per load) |
+| wasm32 (node), three runs | 8.3–9.0 µs | 4.4–4.9 µs | 4.0–4.6 µs | 3.0–3.4 µs | 5.4–5.9 µs | 214–222 µs (1.34–1.39 µs per load); 1e-2·h 156–160 µs |
+
+- **Per section.** These are per section at one load, everything from scratch.
+- **Under the ramp.** The stations, the 90° crossing and their load-independent parts are computed once per tooth.
+  Each load then pays 16 dot products and 16 exponentials for the near field, plus the refinements.
+- **The crossing's cost.** Before it was hoisted out of the load loop, the ramp took 390–405 µs.
+- **Where the time goes** [R, profile track]. A station costs about 87 ns native: atan2, atan, sin/cos, one ln, two exp
+  and about four square roots. The near field adds one exp per station per load. No per-geometry numerical solve
+  remains. The 90° crossing is a geometric bisection on the outline's tangent, as the crate's own section searches
+  are.
+- **Against LWW.** LWW here still uses its unoptimised search, 16 stations plus golden section. R4+NF's ratio to LWW is
+  not like for like in that sense; the profile track estimated LWW would gain about as much from the same changes.
+
+**Constants and choices.**
+
+| Item | Status |
+|---|---|
+| e_V = 0.38 | **fitted** on the dev split (§10.2). 0.39 is the method track's rack calibration, off every scoring set; it trades +1.3 points of level for 1–2 points of x, ρ and direction structure |
+| β = 3.748838 | derived: the Papkovich–Fadle antisymmetric root, computed. Taking the antisymmetric mode for a one-sided load is an argument, not a derivation [R, review] |
+| Near-field amplitude V/x × F_V; x̄ = mean half-width; the floor max(1, ·) at 2x = ρ (LWW's pivot) | **values informed by a fit**: chosen after the dev fit gave amplitude 1.018 and exponent 0.381 [R]. Rounding a fitted value is still choosing it on the data [rev] |
+| `qe.max(1e-9)` | a numerical floor; the result is unchanged to 1e-6 between 1e-6 and 1e-9 [rev] |
+| A non-finite `neck_closed` | the station silently takes N = M = 0 (`r4rs/src/lib.rs:72`). The floor keeps it from firing, but if it fired it would under-rate silently; it should be an error [rev] |
+| Corner map 2(1 − λ), pivot q0 = 1; V's c = 2x | named choices, as §10 |
+| Stations 16, tolerance 1e-4·h | numerical choices, shown above not to move any figure |
+
+**Load sweeps** [rev] (`r3rev/r4c/examples/sweep_load.rs`, `sweep_abs.rs`). Seven teeth (three rings, four externals,
+including z 13 at 28°, x 0.6 and the 50-tooth ring at 27.5° with a 0.006 tool), t 0 → 1 and direction ±40° from the
+involute normal at t = 0.02, 0.1, 0.5, 0.95, 4,001 steps each:
+- no isolated step above 0.0001 %; the fast search equals the dense one to ≤ 4.6e-10;
+- under steeply turned loads the peak can pass through zero (z 13, 28°, x 0.6: −0.075 … 4.4), continuously, which a
+  table holding ln(·) cannot represent;
+- a ring takes 27–29 evaluations per load, an external 6–18; the bench's 228-tooth mean understates a ring-heavy
+  train.
+
+**A ruling the documents need** [rev]. R4+NF bisects for the 90° crossing once per tooth and runs Brent's maximiser
+at every load. Whether a geometric bisection and a peak search are "a per-geometry numerical solve at run time" is the
+owner's call. The crate's own section searches are of the same kind.
+
+**What it keeps** (by the one rule):
+- **S, the load's position:** dev 12.8, record holdout 7.8, fresh 10.5. These are the rings and the single-pair zone
+  near the root.
+- **S, z at tight tools:** 8.6 and 10.9, at ρ_fP 0.01.
+- **S, α at the cutting limit:** fresh 11.8, the 28° rings.
+- **S, direction at ±14°:** 7.7 and 8.4.
+- **At the threshold, ρ:** 5.2 and 5.4.
+- **The lowest point:** spread −12 … +18, with an unconservative tail.
+- **Off the scoring sets** [rev] (`fresh2`/`fresh3`, 139 off-node teeth, `ev2.txt`, `ev3.txt`; `real2.py`):
+  - L0 down to −13.5 (ring, 28°); lowest point up to +19.6; ring sp4 −15.5 (28°);
+  - ring α sweep (z 90, x 0.45, ρ 0.1): range 14.6 at L0, 27.7 at the lowest point;
+  - external ρ sweep at the lowest point: range 7.3, so ρ is **S**, not at the threshold;
+  - over the table's nodes at realistic directions:
+
+    | Body | t ≈ 0.07, p90 | t ≈ 0.07, max | t ≈ 0.25–0.37, p90 |
+    |---|---|---|---|
+    | Whole gears | 13 % | 48 % | 6–7 % |
+    | Sectors | 29 % | 51 % | 8–11 % |
+    | Rings | 43 % | 119 % | 15 % |
+
+    On the scoring loads the same figure is p90 9.1 % at t < 0.1. Over all directions the ψ = −10° and 55° faces
+    reach a factor of 10.
+- **Diagnosed, not fixed** [R]. The method track traced each to a body error: N and M's corner map at extreme
+  sharpness; N's tooth-to-tooth spread; the neck's crack-like limit near a = 90°, which wants a body that turns
+  through 90° with finite curvature.
+
+### 11.2 B: the shipped table (Tab) [X]
+
+**What it is** (`proto/table/`). Per patch, a tensor Chebyshev–Lobatto interpolant of ln(exact / control) over six
+coordinates:
+- **w = 1/z.**
+- **α**, 14.5–28°.
+- **x.**
+- **s = ln(ρ_fP / ρ_clamp(α)).** ρ_clamp is the crate's largest tool radius at α. Beyond it the tooth does not change
+  (rule 5's clamp). It depends on α alone: for externals it is 0.95 × the full-round rack tip, and for rings the shaper
+  clamp, which falls from 0.47 at 14.5° to 0.0073 at 28°. It is found here by bisection on the crate's printed ρ_f; a
+  shipped table would read it from the crate's own cutter limit.
+- **The load's position t** on the flank's radial span, 0 at its root end and 1 at the tip.
+- **The load's direction ψ** = atan2(N, V), −10 … 55°.
+
+The rating is control × exp(table). The control is R4+NF (Tab(R4)) or LWW (Tab(LWW)). Tab(ex) interpolates ln(exact)
+per unit load, with no control.
+
+**The patches.** They follow the baseline's own discontinuities:
+
+| Patch | Range | Body | x |
+|---|---|---|---|
+| ext-whole | z 12–27 | the whole gear on its shaft | −0.25 … 0.8 |
+| ext-sector | z 30–1000 | a sector | −0.25 … 0.8 |
+| ring | z 40–1000 | a sector | −0.1 … 0.7 |
+
+- **z 28–29** falls between the external patches, and no scoring tooth sits there. As first written this said a crate
+  would pick the patch by the record's r_f rule. In fact [rev]:
+  - `evaluate.py`'s `patch_of` picks by z ≤ 27, not by r_f; neither rule was exercised.
+  - The record's body rule (r_f − 10 ≥ 0.25 r_f, i.e. r_f ≥ 13.33) falls at x ≈ 0.08 for z 29 and x ≈ 0.58 for z 28,
+    so the switch is a step in x, α and ρ as well as z.
+  - At the same tooth the two extrapolated patches disagree by median 0.6 %, p90 5.1 %, max 14.0 % (z 28) and 15.5 %
+    (z 29). The correction steps z 27 → 30 by p90 6.2 %, max 19 %, against p90 1.0 / 0.6 % for the neighbouring steps
+    (`r3rev/patch.py`).
+  - Under the stated fallback, z 28 at α 23.6 reads −3.4 at the lowest point under R4+NF against −0.3 from the table.
+- **The tip centre.** Its across load (the height column's TV) has its own 4D table.
+
+**The nodes.**
+- **Geometry.** Five Chebyshev–Lobatto nodes per geometric axis, which nests the degree-2 subgrid. z is an integer,
+  so the w nodes are the nearest integers' 1/z, and the interpolant is solved on the actual nodes.
+- **Load grid.** 13 nodes in t and 15 in ψ. Every node is one solve on the record's own solver and body (`fillet_bem`
+  through `bemx`):
+  - pass A (ρ_ref/16, growth 0.07) for the hot spot under the mid-flank across load;
+  - pass B (ρ_ref/32, 0.05) with 27 loads: a unit across and a unit along load at each of the 13 flank points, and the
+    tip centre's across load.
+- **Direction at the node.** It is exact at the 15 ψ nodes only, read by superposition, the peak being the sampled
+  maximum over root land and fillet. **Between them it is not** [rev]; see the error bound below.
+- **The node solve reproduces the record.** At five record teeth, read at their L0 load through the node's own t
+  interpolation, it is within +0.02 … +0.23 % of the record's sampled L0.
+- **The build.** 1,875 solves, with a median of 2.5–2.6 s on sectors and rings and 5.9 s on whole gears. About 2.5 h
+  wall at a pool of 2, on a shared machine.
+- **Twenty failed nodes.** All are ext-whole nodes at the pointed-tip corner (z 12–13, α ≥ 26°, x ≥ 0.65), where the
+  crate's tooth has a tip of length 0. The BEM returns NaN on 13 and runs over 240 s on 7. They are filled by the
+  polynomial along x through that line's other nodes, a stated extrapolation, and then used as interpolation data:
+  there the table is not an interpolant of the baseline, and its error is unmeasured [rev]. The fresh z 20, 28°,
+  x 0.75 teeth draw on that corner. The rectangular box takes in teeth the crate cannot build.
+- **Undefined lines** [rev]. 13 of 3,120 ψ-lines give NaN where the peak nears zero, so ln(exact/R4) is undefined there.
+
+**Scores** (every scoring tooth is out of sample; nothing was chosen on any set, and the box, degree, coordinates and
+load grid were fixed before the build):
+
+| Set | Option | L0 | Classes ord · mid · tight · ring | z · α · x · ρ (worst group) | Dir ±6 · ±14 | Height | Position · lowest point | Pairs: reversed · max misstatement |
+|---|---|---|---|---|---|---|---|---|
+| Dev | Tab(R4) | +0.0 (−1.6 … +0.9) | +0.0 · +0.0 · −0.0 · −0.8 | 1.1 · 2.2 · 1.2 · 1.0 | 2.7 · 2.7 | 3.6 | 0.4 / 5.0 · −3.5 / +0.2 / +5.5 | 0 · 2.5 |
+| | Tab(LWW) | −0.0 (−1.9 … +0.7) | −0.1 · +0.0 · +0.1 · −0.9 | 1.1 · 2.2 · 1.3 · 1.9 | 2.4 · 2.7 | 3.6 | 0.3 / 4.7 · −3.4 / +0.1 / +5.6 | 0 · 2.6 |
+| | Tab(ex) | +0.3 (−3.4 … +11.1) | +1.1 · +0.5 · +0.3 · −1.1 | 9.3 · **11.9** [22/60] · 3.5 · 8.2 | 2.4 · 2.7 | 3.5 | 0.3 / 4.9 · −2.5 / +1.5 / +12.8 | 57 · 15.0 |
+| | Tab(R4), degree 2 | +0.1 (−2.1 … +4.5) | | 4.0 · **6.3** [2/60] · 3.2 · 1.8 | 1.9 · 2.5 | 3.6 | 0.4 / 4.4 · −9.0 / +0.8 / +7.8 | 1 · 6.4 |
+| Record holdout | Tab(R4) | −0.0 (−1.6 … +0.9) | +0.0 · −0.1 · −0.0 · −1.2 | 1.4 · 1.8 · 1.4 · 0.8 | 2.1 · 2.1 | 3.6 | 0.5 / 4.1 · −4.1 / +0.2 / +3.8 | 0 · 2.5 |
+| | Tab(LWW) | −0.0 (−1.9 … +0.5) | | 1.4 · 1.8 · 1.4 · 2.2 | 1.9 · 2.4 | 3.5 | 0.4 / 3.5 · −5.5 / +0.1 / +4.1 | 0 · 2.4 |
+| | Tab(ex) | +0.3 (−1.6 … +11.5) | | 9.1 · **12.0** · 3.0 · 9.7 | 1.9 · 2.1 | 3.5 | 0.4 / 3.5 · −3.0 / +0.9 / +12.4 | 20 · 13.3 |
+| Fresh | Tab(R4) | −0.0 (−1.7 … +0.4) | +0.0 · +0.0 · −0.0 · −0.5 | 0.6 · 2.0 · 0.7 · 0.6 | 1.4 · 2.0 | 2.8 | 0.4 / 4.5 · −1.3 / −0.1 / +4.4 | 0 of 2,111 · 2.2 |
+| | Tab(LWW) | −0.1 (−1.7 … +0.3) | | 1.0 · 2.0 · 1.0 · 0.6 | 1.2 · 1.9 | 2.8 | 0.5 / 4.0 · −2.1 / −0.0 / +4.0 | 0 · 2.0 |
+| | Tab(ex) | −0.0 (−1.9 … +6.2) | | 4.0 · 6.9 [7/26] · 3.0 · 1.9 | 1.2 · 1.9 | 2.8 | 0.4 / 4.0 · −3.3 / +0.2 / +7.5 | 1 · 8.2 |
+
+- **The whole record, Tab(R4)** (`table/pairs_all.log`): 0 reversals of 22,346; misstatement median 0.4, p90 1.3,
+  p99 1.9, max 2.5. Tab(LWW): 0, max 2.6. Tab(ex): 172, max 15.4.
+- **Per load against the baseline, over all 4,446 scoring loads** (Tab(R4), degree 4):
+  - L0: max 1.74 %;
+  - path: 3.41 %;
+  - turned: 2.27 %;
+  - across and tip loads: 1.98 %;
+  - lowest point: 5.50 %;
+  - overall p99 2.48 %.
+- **Where the worst sit.**
+  - The lowest-point loads on rings (t ≈ 0.09–0.11, +4 … +5.5).
+  - The rings' L0 level, −0.9 at the median. Five record teeth show this is the interpolant's and not the node solve's.
+  - The ring patch spans z 40–1000 with the record's rings at its steep end.
+- **Bias** (rule 6): median −0.0, unconservative on 50–56 %. The rings read −0.5 … −1.2 at the median, unconservative.
+- **The scoring sets sit on the nodes** [rev] (`onnode.py`). The table was not fitted to them, but 59 % of the 298
+  scoring teeth have a coordinate on a Chebyshev node (α 14.5, 28; z 12, 17, 40, 1000). Teeth with none score worse:
+  worst-load error p90 3.1, median 1.4 (122 teeth), against 2.1, 0.9 with two coordinates on nodes (52 teeth). Only 135
+  of the 4,446 scoring loads have t < 0.1.
+- **An off-node holdout** [rev] (`fresh2`, `fresh3`: 139 BEM solves on the record's solver, every tooth off the nodes;
+  fine α sweeps of externals at z 45 and 33 and rings at z 90 and 45, sweeps of z 10–400 across the patch seam, x
+  −0.25 … 1.0, ρ 0.003–0.38 and the mate 12–400, and 25 seeded interior teeth). On the 124 inside the box, Tab(R4):
+  all loads max |e| 8.3, p99 2.3; L0 −1.7 … +1.0; lowest point −8.3 … +5.5. Two exceptions to the scores above:
+  - the ring α sweep (z 90, x 0.45, ρ 0.1) at the lowest point reads +0.4, +1.0, +3.5, +5.5, +4.6, +2.1, +0.7, +1.8,
+    +1.6, +0.2: a range of **5.3** across one variable, peaking between α nodes (interpolation ripple, not mechanics);
+  - ring (600, 16.87°, x 0.037, ρ 0.273) reads **−8.3** at the lowest point (R4+NF −8.8), outside −4.1 … +5.5.
+  - Degree 4 is not always better than degree 2: the external α sweep at ρ 0.25 ranges 4.7 at the lowest point at
+    degree 4 against 2.2 at degree 2, as interpolating a maximum with kinks would.
+
+**The error bound.** The a-posteriori estimate is |degree 4 − nested degree 2|:
+- **Over the sup** it is conservative: 16.2 % at most against a true 5.5 %. On L0 alone, 5.7 % against 1.7 %.
+- **Pointwise** it bounds the degree-4 error at only 61 % of loads.
+- **It is blind to the load grid** [rev]. It differences degree 4 and degree 2 over the four geometric axes only; the
+  t (13 nodes) and ψ (15 nodes) interpolation is never estimated. At node geometries, where the geometric part is
+  exact, the exact peak between ψ nodes (by superposition) shows:
+  - at ψ midpoints, 120 nodes, 21,840 loads (`psi.py`): up to 16.9 % (whole), 21.6 % (sector), 26.2 % (ring), worst at
+    t < 0.1 and ψ 0–40°, p90 there 1.8 / 3.8 / 6.5 %; at t ≥ 0.5 at most 2 %;
+  - on 261 directions at 240 nodes (`r3rev/psi_between2.py`), the range across ψ −7 … 40° is median 13.7 and max 39.9
+    at t = 0 (191 of 239 lines ≥ 5), median 7.3 and max 24.2 at t = 0.017 (138 of 239), 7.4–11.0 at most at t
+    0.07–0.37 (6–21 lines per node), 2.4 at t = 0.5; pointwise up to 32.8 % at t = 0, and 15–21 % mid-flank at ψ
+    45–53°, where the exact peak's location jumps.
+- **Nor along the geometric axes** [rev]. Leave-one-out at degree 3 (`loo.py`, mid-flank, ψ −7 … 48°): maxima 13–19 %
+  along w, 16 % along α for whole gears, 12 % along α for rings (p99 6.8 %). No holdout tooth sits there. In t, for
+  rings: the Chebyshev tail (Σ|a₁₀..₁₂|, ψ 15–36°) has p90 12.7 %, max 21 %, and leave-one-out at the t nodes gives
+  26–63 % (`loo_t.py`, `cheb_t.py`).
+- So it is neither a certificate nor a reliable sup estimate. A rigorous bound would need an analyticity
+  (Bernstein-ellipse) bound the BEM data cannot give, and data that are a maximum with kinks do not have one.
+- Measured on the scoring sets the error is ≤ 1.7 % at L0 and ≤ 5.5 % at any scoring load; on the off-node holdout
+  ≤ 8.3 %. That fails the other-fields track's own kill criterion (holdout max > 1 %). The owner's rule (no range ≥ 5)
+  holds on the scoring sets and **fails** off them: direction and position near the root between nodes, and the ring
+  lowest point across α (5.3).
+
+**Cost** [X] (`r4rs/src/table.rs`, `bench_table.txt`; contraction timed on a table of the right shape):
+- **Per geometry**, the 5⁴ × 195 contraction to a 13 × 15 slice: 20.8 µs native, 52–55 µs wasm32. This is unoptimised:
+  an f32 table or blocking would cut it.
+- **Per load:** 0.23 µs native, 0.44 µs wasm.
+- **One load per section in wasm:** about 4.6 µs (R4+NF) + 54 µs, roughly 7× LWW.
+- **The 160-load ramp in wasm:** about 218 + 124 µs per section.
+- **Size:** 3 × 121,875 values, plus 1,875 for the tip table. It does not compress [rev] (`r3rev/size.py`): f64
+  2.94 MB raw / 2.82 MB gzip, f32 1.38 MB gzip, f16 0.68 MB gzip (≤ 0.10 % rating change). The shipped
+  `gear_wasm_bg.wasm` is 1.79 MB raw / 0.67 MB gzip today, so f64 makes the download about 5× and f16 about 2×.
+  Low rank does not help enough: rank 40 errs 1.6–4.5 %, and 0.2 % needs rank 80 (`lowrank.py`).
+- **Scaling** [rev]. Bending is rated per (member, line mesh) in every `cut`, so every solve, dry run and "one more
+  tooth" re-solve pays the per-geometry contraction: ≈ 7× LWW and ≈ 13× R4+NF per section at one load.
+- **Build:** 1,875 solves, about 2.5 h on two workers. The other-fields track's Rust BEM would cut it about 100×. Any
+  change to the crate's tooth form invalidates every solve, and nothing fingerprints the table to the geometry it was
+  built on, as `tools/fillet_bem.txt` is [rev].
+
+**Continuity.** Not met as a rating [rev].
+- **Within a patch** the table is C∞ in all six coordinates; the clamp face is continuous (u = min(ρ/ρ_clamp, 1)), t
+  and ψ are continuous, and the control is continuous (11.1).
+- **At the box's faces the rating steps** by the table's whole correction, exp(T) − 1, because outside the box it
+  falls back to R4+NF (`face.py`, `faces*.py`, `r3rev/faces.py`):
+  - measured across the α = 28° face: ring z 45, x 0.65, ρ 0.03, L0 13.7 points (Tab +0.2, R4+NF −13.5); ring z 90,
+    L0 6.5; external z 45, ρ 0.25, lowest point 7.4;
+  - from node values on the faces (t ≥ 0.06, ψ 15–40°): p90 8–12 points on external faces, 18–20 on ring faces; over
+    all faces and loads p90 7–160 %, and single t = 0 nodes 17× (largest stored ln 2.86);
+  - on the 4,446 scoring loads, the correction the fallback would drop: median 1.3 %, p90 4.6 %, p99 13.2 %, max
+    26.8 % (L0: median 0.8 %, max 13.6 %);
+  - mid-flank at ψ 22.5° the face correction is at most 5 % on externals, but 27 % on rings at z 40, 28°, x 0.7
+    (`mid.py`).
+- **Inputs the crate accepts land outside the box:** external α above 28° (the crate admits α to 90°, `input.rs`), z
+  above 1000 (face step p90 12.9) or below 12, x outside −0.25 … 0.8 (rings −0.1 … 0.7), ρ/ρ_clamp below 0.012, and
+  every addendum, dedendum, thickness_mod, cutter or rim other than the record's.
+- **z 27 → 30 is not ≤ 1 %** as first written: see the patches above (step at the z = 27 face p90 7.5, max 52 against
+  the fallback).
+- **Extrapolating instead of falling back is not safe either:** at z = 10 the lowest-point error is −17.4.
+
+**Against the owner's principles.**
+- **Structured errors:** none substantial on the scoring sets (position at the threshold, 5.0). Off them, substantial
+  in direction and position near the root between nodes, and 5.3 across α at a ring's lowest point [rev].
+- **Grounded mechanics:** by proxy only. The table is the exact elastic solution interpolated, and the control model
+  carries the mechanics. Tab(LWW) does almost as well as Tab(R4), so the table, not the component model, removes the
+  structure.
+- **No hidden fitted constant:** no model constant is fitted. What it has instead:
+  - 366k tabulated numbers, regenerable by `table/plan.py`, `run.sh` and `nodemodels.py` from `tools/fillet_bem.py`;
+  - named choices: the box, the patches, degree 4, the coordinates, the t and ψ grids, the pass A/B meshes;
+  - one stated extrapolation, the 20 corner nodes.
+
+  Whether that counts as a hidden fitted constant is the owner's call. It is visible, sourced and regenerable, but it
+  is not a formula.
+- **Constants of the baseline, built in** [rev]. ln(exact/R4) absorbs everything the BEM fixes: the body (rim depth
+  `RIM`, `BORE`, the held cuts, the whole/sector switch), the rack's dedendum 1.25, no tooth-thickness change, the
+  ring cutter, ν = 0.3. The crate takes `addendum`, `dedendum`, `thickness_mod` and `root_radius` as inputs
+  (`params.rs`); `gear-cli fillet` cannot vary them, so neither prototype was tested on them, and for any non-standard
+  rack the table applies a correction it has no node for, silently. Unless each is an axis or a refusal, these are
+  hidden constants in the owner's sense.
+- **Common material properties only:** ν = 0.3 plane strain is baked in. The body has fixed-displacement boundaries
+  (`fillet_bem.py:286`), so the peak depends on ν, probably weakly; two solves per node at ν 0.25 and 0.35 would show
+  whether it needs an axis. Not run [rev].
+- **Fast mode** (µs–ms, no per-geometry solve, no cache): met. The live mode evaluates a polynomial; the offline build
+  is the solve. The owner's condition on a shipped approximation, a **certified** error bound, is **not** met [rev].
+- **Outside the box:** every crate input the table does not carry must be refused, or rated by R4+NF with a note
+  (rule 5). That covers z < 12, α > 28°, h_fP, protuberance, the shaper cutter's own z0 and addendum, rim, ν, and loads
+  off the flank except the tip centre's across load. A fallback with a note does not repair the step at the face
+  [rev]; only a refusal, a domain covering every admissible input, or a stated blend does.
+
+### 11.3 What the two prototypes say (they choose nothing)
+
+- **Structured error.** No fast option measured is free of substantial structure everywhere.
+  - Tab(R4) and Tab(LWW) have none on the scoring sets (groups ≤ 2.2, direction ≤ 2.7, position ≤ 5.0, 0 reversals),
+    but off them they are substantial in direction and position near the root, and 5.3 across α at a ring's lowest
+    point [rev].
+  - Its cost: 2.9 MB f64 (0.68 MB gzip at f16, against a 0.67 MB gzip wasm today), ≈ 54 µs per geometry, a 2.5 h
+    offline build per change of the baseline or the box, and a bound that is neither certified nor reliable as an
+    estimate.
+  - As built it is not continuous: the box faces and the z 28–29 gap step by up to 13.7 points.
+- **R4+NF** is the fastest mechanics option measured (about half LWW's cost as prototyped) and continuous in every input
+  and load swept. It keeps five substantial structures on the scoring sets and more across the box (ring α 14.6 / 27.7,
+  ρ 7.3, near-root errors to 119 % on rings), each traced to a body the model lacks.
+- **The two are not alternatives.** R4+NF is the table's control and, as built, its fallback, so the fallback's errors
+  are what the face steps measure.
+- **Open:** §11.4.
+
+### 11.4 Reviews applied, and open issues [rev]
+
+**The three reviews.** All re-ran the round's artefacts with the record's own solver; none used the web or edited the
+repository. Scripts: `/tmp/claude-1000/-home-user-gearcalc/97717eac-5178-43f8-9259-847b3e7646bd/scratchpad/` (`gen2.py`, `gen3.py`, `fresh2.jsonl`, `fresh3.jsonl`, `ev2.py`, `ev2.txt`, `ev3.txt`,
+`sweepsum.py`, `faces*.py`, `hole.py`, `loo_t.py`, `cheb_t.py`, `onnode.py`, `psi.py`, `loo.py`, `face.py`, `mid.py`,
+`real.py`, `real2.py`, `box.py`, `neck.py`) and its `r3rev/` (`faces.py`, `patch.py`, `psi_between2.py`, `size.py`,
+`lowrank.py`, `r4c/examples/sweep_load.rs`, `sweep_abs.rs`).
+- **Off-node holdout** (139 teeth): confirms the scores in the box's interior; finds the ring α ripple (5.3) and a −8.3
+  lowest point; the face steps; the z 28–29 gap; R4+NF worse across the box; the baseline's constants in the table.
+- **Error bound and box**: the estimator is blind to t and ψ; errors between ψ nodes to 26 %; leave-one-out to 19 %;
+  the fallback a jump; the 20 corner nodes extrapolated; R4+NF's near-root errors over the box; fitted-then-rounded
+  choices; the silent non-finite branch.
+- **Cost and continuity**: R4+NF continuous under load sweeps; the bisection and Brent ruling; Tab's face and patch
+  steps, ψ between nodes (to 32.8 %), the size against today's download.
+- The reviews' figures for the error between ψ nodes differ (16.9–26.2 % at ψ midpoints; 32.8 % on 261 directions)
+  because they sampled differently; both are kept.
+
+**Open issues.**
+1. **Continuity of the table as a rating.** Cover the crate's whole admissible domain, refuse what is outside it, or
+   blend the correction to zero across a stated margin. Map w to 0 so z → ∞ is inside. Join the external patches
+   (overlap, or the body switch as a coordinate, or drop the record's fixed body). Shape the box to the buildable-tooth
+   limit and solve or drop the 20 extrapolated corner nodes.
+2. **Direction and position.** Store influence functions, not peaks: ln(S_V/control) and ln(S_N/control) at fixed
+   fillet stations, maximised at run time, which makes direction exact everywhere and removes the ψ kink. Cluster t
+   nodes at the root end (or use a coordinate that removes the near field), then re-measure off the grid.
+3. **Honest scoring.** A validation set spread over the whole box in all six coordinates, off every node, including
+   t < 0.15, the face corners and z 40 rings at 28°, reported with how it was sampled, the off-node subset separately.
+   Stop calling the estimate a bound. If the owner's rule needs a certified bound, the table does not meet it.
+4. **The baseline's built-in constants.** Name body, rack form, ν and thickness as visible options, or extend the BEM
+   harness to sweep addendum, dedendum and thickness_mod and test them; run the ν = 0.25 / 0.35 check.
+5. **R4+NF's own figures** across the box next to the scoring figures, since it is the fallback; its non-finite
+   `neck_closed` branch made an error; the amplitude and floor labelled as fit-informed (done above).
+6. **The ruling** on a per-tooth geometric bisection and a per-load Brent search under "no per-geometry numerical
+   solve".
+7. **Shipping detail** if the table goes on: f16 or f32, a CI fingerprint of the geometry, Table 5's sweeps (not run),
+   the f32 or blocked contraction, a Rust BEM for the build.

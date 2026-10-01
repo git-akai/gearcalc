@@ -97,6 +97,8 @@ concerns the range of e, not its median. The same rule is applied to every row:
 | **Neck components (hybrid)** ʲ | fast | **98–101 µs per section, 10.7× LWW in the same build** [X, ed]; the prototype's bisection 50× | none, but chosen among 13 variants on the record (so its record figures are in-sample) | reference point Q; the corner map's exponent 2(1 − λ) and pivot q0 = 1; notch length x (N, M) and c = 2x (V); κ = 1 (V) | Neuber's neck in N, V and M, fitted to each fillet point |
 | **Components, round 2: R2d** ᵐ | fast at one load; **≈ 16–19 ms per section under the ramp** (extrapolated [rev]) | ≈ QW's: 10.1–10.2× LWW per load in the same build [X, round 2]; 98–117 µs vs 11–12.6 µs reproduced [rev]; a numerical θ root find per station | none | as the neck model, less Q: the corner map's 2(1 − λ) and q0 = 1 (the reference point's arbitrariness moved here: median +0.3 … +7.9 over q0); V's c = 2x; the 90° guard | none exact: N and M the neck + a named map; V semi-empirical (LWW); the load's moment taken about the mapped neck's centre, so no reference point |
 | **Components, round 2: R2f** ᵐ | as R2d | as R2d; 9.3–9.8× LWW per load with a Newton θ solve | **V's exponent e_V = 0.38**, α-free, on the development set (153 teeth), one fitted pair with q0 = 1; level ≈ 1.5 points per 0.01 | as R2d | as R2d |
+| **R4+NF** (components, round 4, Rust) ⁿ | fast | **4.4–4.9 µs per section** (LWW 8.3–9.0 in the same module); **214–222 µs under the 160-load ramp** [X, round 3]; no root find for θ, but a per-tooth bisection for the 90° crossing and a per-load Brent search (whether these are "a per-geometry numerical solve" is the owner's ruling [rev]); rings 27–29 evaluations per load, externals 6–18 | e_V = 0.38 (dev split); 0.39 from the rack is the off-sample alternative. The near field's amplitude 1 and V's floor are values informed by a fit (dev fit 1.018, 0.381) [rev] | as R2f, plus: the decay length x̄ | θ in closed form; the a → 90° limit; β = 3.749 (Papkovich–Fadle) |
+| **Table on R4+NF, Tab(R4)** ⁿ | fast (shipped, built offline) | R4+NF + **≈ 54 µs per geometry + 0.44 µs per load** (wasm, unoptimised contraction), ≈ 13× R4+NF and paid in every `cut`; 2.94 MB f64 (2.82 gzip), f16 0.68 MB gzip, against today's 0.67 MB gzip wasm [rev] | none in the model sense: 366k tabulated values of the named baseline, regenerable by script; error bound **not certified** and blind to the t and ψ grids [rev] | the box, three patches (z 28–29 in neither), degree 4, coordinates, t and ψ grids, the node meshes; 20 corner nodes extrapolated; **built in, unnamed** [rev]: the record's body (RIM, BORE, whole/sector switch), dedendum 1.25, no thickness change, the ring cutter, ν = 0.3 | the baseline's own solver at every node |
 | **P2, fast BEM at L2** | **expensive only** (item 4: no cache in the live mode) | 32 ms per sector; 0.8 s for a whole z 17 | none | the body (3 teeth on a 10 m rim, or the whole gear); a 0.15 m window at the load; level L2 | the field equations |
 | **D. Computed K_t** | **expensive only** | 0.1–1 s per member (the decision file's estimate) | none | any exact solver and its body | the field equations |
 
@@ -113,6 +115,9 @@ concerns the range of e, not its median. The same rule is applied to every row:
 | Neck components | +3.1 (−0.7 … +14.4), in-sample | +2.0 … +5.5 (3.5) | 3 % | +2.0 · +5.4 · +5.5 · +3.5 · +1.5 |
 | R2d ᵐ | +3.6 (+0.1 … +14.4) | +2.4 … +5.6 (3.2) | 0 % | +2.7 · +5.5 · +5.6 · +3.5 · +2.2 |
 | R2f ᵐ | −0.7 (−7.0 … +4.1); holdout 75 −0.7 (−7.0 … +4.1); fresh 70 −0.7 (−12.0 … +1.9) | −1.3 … +0.3 (1.6) | 67 % | −0.7 · +0.5 · −2.8 · −0.8 · −0.3 |
+| R4+NF ⁿ | −0.4 (−6.5 … +4.4); fresh 70 −0.5 (−11.8 … +2.1) | −1.0 … +0.5 (1.5) | 59 % | −0.4 · +0.7 · −2.4 · −0.4 · — |
+| Tab(R4) ⁿ | −0.0 (−1.6 … +0.9); fresh 70 −0.0 (−1.7 … +0.4); off-node 124 L0 −1.7 … +1.0 [rev] | −0.3 … +0.1 (0.4) | 52 % | +0.0 · −0.0 · −0.0 · −0.9 · — |
+| Tab(LWW) ⁿ | −0.0 (−1.9 … +0.7); fresh −0.1 (−1.7 … +0.3) | −0.5 … +0.1 (0.6) | 52 % | −0.1 · +0.0 · +0.1 · −1.0 · — |
 | P2 at L2 | +0.1 (**−40.5** … +0.6) ⁱ; the 223 away from the tip corner −0.2 … +0.6 | 0.0 … +0.2 (0.2) | 21 % | +0.0 · +0.1 · +0.3 · +0.1 · +0.0 |
 | D. Computed K_t | 0 by construction (the baseline's own solver); ≤ 0.6 against the true field | — | — | rings up to 0.55 high (the body) |
 
@@ -134,6 +139,8 @@ choice as arbitrary as LWW's κ, not a gain of mechanics.
 | Neck components | 1.5 / 5.0 **S** *(thr; 5.01)* | 1.1 / 5.0 **S** *(thr; 5.05)* | 1.8 / 4.5 *(m, thr)* · 4.4 / 11.7 **S**; worse than LWW at every span, and on 160 of 228 teeth at ±6° |
 | R2d ᵐ | fresh set: externals 2.8 / 16.4, rings 11.5 / 20.4 **S** (QW on the same: 2.6 / 15.6, 11.4 / 20.4) | 1.1 / 5.0 **S** *(thr)* | 1.6 / 4.4 *(m, thr)* · 4.0 / 11.6 **S** |
 | R2f ᵐ | fresh set: externals 4.1 / 17.4, rings 12.7 / 21.1 **S** (rings and the lowest point include the 90° guard's rise; discontinuous in position there [rev]) | 1.1 / 5.1 **S** *(thr)* | 0.8 / 3.1 *(m)* · 1.9 / 8.4 **S** |
+| R4+NF ⁿ | path, all teeth: dev 1.2 / 12.8, record holdout 1.2 / 7.8, fresh 2.1 / 10.5 **S**; lowest point −12 … +18 (off-node to +19.6); over the table's box near the root (t ≈ 0.07) p90 13 / 29 / 43 %, max 48 / 51 / 119 % (whole / sector / ring) [rev] | 1.0 / 4.3 *(m, thr)* | 0.9 / 3.1 *(m)* · 2.3 / 8.4 **S** |
+| Tab(R4) ⁿ | scoring sets 0.4 / 5.0 (dev), 0.5 / 4.1, 0.4 / 4.5 *(thr; one ring)*; lowest point −4.1 … +5.5; off-node −8.3 … +5.5; between ψ nodes at t < 0.1 to 17–33 %, ring t not converged (leave-one-out 26–63 %) **S** [rev] | 0.7 / 3.6 *(m)* | scoring sets 0.3 / 2.7 · 0.4 / 2.7 *(m)*; between ψ nodes: range median 13.7 at t = 0, 7.3 at t = 0.017, 15–21 % mid-flank at ψ 45–53° **S** [rev] |
 | P2 | 0.0 / 0.2 n, but **S at the tip corner** (−30 … −40.5) ⁱ | not measured | 0.04 / 0.14 n (12 teeth) · not run |
 | D | n | n | n |
 
@@ -150,6 +157,8 @@ choice as arbitrary as LWW's κ, not a gain of mechanics.
 | Neck components | 3.5 · 3.7 · **8.1** [0.7 / 10.6; 5/85] **S** | 3.4 [3.2 / 9.9; 9/30] **S** | 0.9 · 2.7 · 0.8 *(m)* | 1.2 · 3.3 [2.8 / 8.1; 16/60] **S** | **10.8** · 7.6 · 3.8 [5.1 / 12.1; 18/35]; 6.1 **S** | 0.0 · +0.7 · +0.7 / +1.5 **n** |
 | R2d ᵐ | 4.0 · 3.7 · **7.9** [0.7 / 10.1; 5/85] **S** | z 12–40: 2.5 [3.1 / 9.4; 8/30] **S** | 0.7 · 2.6 · 0.9 *(m)* | 1.3 · 3.7 [2.9 / 8.1; 16/60] **S** | **10.1** · 7.0 · 3.3 [4.2 / 11.3; 16/35]; 5.5 **S** | −0.5 · +0.4 · +0.6 / +0.8 **n** |
 | R2f ᵐ | 1.3 · 4.4 · 5.6 [0.5 / 3.7; 0/85] **S** *(thr)* | z 12–40: 0.2 [2.7 / **11.1**; 10/30] **S** (ρ_fP 0.01, α 14.5–20°; 3.1 at 28°) | 1.2 · 1.0 · 1.3 n | 0.8 · 1.8 [1.3 / 2.9; 0/60]; continuous series [rev]: ring 22.5 → 28° **8.6**, external 17.5 → 32° **7.3**, from α ≈ 26–27° **S** | 4.8 · 3.0 · 1.2 [2.9 / 5.6; 3/35]; 3.0 **S** *(thr)* | −0.0 · +1.2 · +2.4 / −0.0 *(m)* |
+| R4+NF ⁿ | — · — · — [groups 3.2 / 3.6 / 3.4] *(m)* | — [8.6 / 10.9 / 5.8] **S** | — | — [2.8 / 3.1; fresh **11.8**] **S**; ring α sweep 14.6 (L0) / **27.7** (lowest point) [rev] | — [5.2 / 5.4 / 2.3]; ρ sweep at the lowest point 7.3 **S** [rev] | ring medians −0.4 · −0.2 · −3.0 |
+| Tab(R4) ⁿ | — [1.2 / 1.4 / 0.7] n | — [1.1 / 1.4 / 0.6] n; z 28–29 in neither patch, and the z 27 → 30 correction steps p90 6.2 %, max 19 % [rev] | — | — [2.2 / 1.8 / 2.0] *(m)*; ring α sweep at the lowest point 5.3 **S** *(thr)*, ripple between nodes [rev] | — [1.0 / 0.8 / 0.6] n | ring medians −0.8 · −1.2 · −0.5 |
 | P2 | 0.2 · — · — [0.1 / 0.3; 0/85] n | 0.4 [0.2 / 0.5; 0/30] n | not run | 0.5 · — [0.1 / 0.4; 0/60] n | — · 0.1 · — [0.2 / 0.5; 0/35]; 0.3 n | −0.2 / +0.1 n |
 
 P2's sweep figures are L2 against its own level F, which measures self-convergence rather than error against the
@@ -166,6 +175,8 @@ baseline. Only its brackets and Table 2 are against the record.
 | Neck components | S *(thr)* | S *(thr)* | S at ±14° (m at ±6°) | S (tight tool, 14.5°) | S (groups) | m | S (groups) | S | **n** | 7 of 9, two at the threshold |
 | R2d ᵐ | S (fresh) | S *(thr)* | S at ±14° (m at ±6°) | S (tight tool, 14.5°) | S (groups) | m | S (groups; fresh 28° rings) | S | n | 7 of 9, one at the threshold |
 | R2f ᵐ | S (fresh) | S *(thr)* | S at ±14° (m at ±6°) | S *(thr)* | **S** (groups, ρ_fP 0.01, α 14.5–20°) | n | **S** over α ≳ 26–27° on both kinds (the fillet radius falling at the tool limit) [rev]; m below | S *(thr)* | m | 7 of 9, three at the threshold; fails continuity near a = 90° [rev] |
+| R4+NF ⁿ | S | m *(thr)* | S at ±14° (m at ±6°) | m (groups) | S (tight tools) | — | S (fresh 28° rings; ring sweep 14.6 / 27.7) | **S** (ρ sweep 7.3) [rev] | m | 5 of 8 measured; continuous in every input and load swept |
+| Tab(R4) ⁿ | scoring sets *thr* (5.0); **S** off-node near the root [rev] | m | scoring sets m; **S** between ψ nodes [rev] | n | n | — | m; **S** *(thr, 5.3)* at a ring's lowest point [rev] | n | — | none on the scoring sets; off them 3, near the root and between nodes [rev]; **not continuous**: box faces and z 28–29 step by up to 13.7 points [rev]; sweeps not run |
 | P2 | n; **S at the tip corner** | — | n (±6°, 12 teeth) | n | n | — | n | n | n | the tip corner only |
 | D | n | n | n | n | n | n | n | n | n | none |
 
@@ -184,6 +195,9 @@ Record pairs, without the five teeth loaded at the tip corner. The **misstatemen
 | Neck components | 0 | 30 (0.1 %) | 2.4 · 6.8 · 10.9 · 13.2 |
 | R2d ᵐ | 0 | 25 (0.1 %) | 2.2 · 6.5 · 10.4 · 13.1 |
 | R2f ᵐ | 0 | 1 (0.004 %); holdout pairs 0 of 2,402; fresh 10 of 1,886 with duplicate teeth counted once (QW 14) [rev] | 1.4 · 3.9 · 7.0 · 11.9 |
+| R4+NF ⁿ | 0 (of 335 by `proto/r4/pairs_all.py`'s one-level rule) | 1 (0.004 %); holdout 0 of 2,402; fresh 20 of 2,111 (duplicates twice) | 1.3 · 3.9 · 6.7 · 11.6 |
+| Tab(R4) ⁿ | 0 | **0**; holdout 0; fresh 0 of 2,111 | 0.4 · 1.3 · 1.9 · 2.5 |
+| Tab(LWW) ⁿ | 0 | 0 | 0.4 · 1.6 · 2.1 · 2.6 |
 | P2 at L2 | 0 | 0 | 0.1 · 0.3 · 0.5 · 0.9 |
 
 The neck model's worst reversal [X, rev] sets external z 12, 20°, x 0, ρ_fP 0.01 (exact 5.419, error +0.2) against
@@ -204,6 +218,7 @@ below 0 has the wrong sign. This is where a structure turns into a bias for or a
 | Neck components | 87 | 104 | 92 | 98 | 104 | 71 | 111 · 108 · 105 |
 | R2d ᵐ | 86 | 104 | z 12 → 40: 96 | 99 | 105 | 67 | 110 · 107 · 104 |
 | R2f ᵐ | 95 | 89 | z 12 → 40: 100 | 104 | 97 | 84 | 105 · 103 · 102 |
+| R4+NF, Tab(R4) ⁿ | not run | | | | | | |
 
 Several sweeps are not monotone: shift, teeth, and α 25–31°. For those the ends understate what happens between
 them. Shift at 14.5° with a tight tool is left out, because its exact peak falls 17 % and then rises 38 %.
@@ -360,6 +375,27 @@ them. Shift at 14.5° with a tight tool is left out, because its exact peak fall
     mixed-mode decomposition at the inclined corner, Zappalorto–Lazzarin's mode II rounded-notch fields, untried); V's
     blunt limit (→ 0, not 1, as ρ → ∞); α at the cutting limit; z at tight tools; the root end; a self-equilibrated
     near field; R2d's groups against q0; the cost under the ramp and the per-station root find; direction at ±14°.
+- ⁿ **Round 3 prototypes** (`bending-mechanics.md` §11; scripts `~/.cache/gearcalc-work/bending-r3/proto/`) [X]:
+  - **R4+NF** is R2f made guard-free and given a near-field term: θ in closed form, the exact a → 90° limit, the
+    tangent wedge past 90°, V's floor max(1, (2x/ρ)^0.38), and a Saint-Venant term with the Papkovich–Fadle
+    antisymmetric root. It is written in Rust and equals the Python model to 4.5e-5. Its 16-station search equals a
+    dense maximum to 1.6e-10 on the 4,446 scoring loads, with the 90° crossing a candidate. It is continuous in α, ρ, x
+    and z in 1,201-step sweeps (largest isolated step 0.005 %).
+  - **Tab(R4)** is a tensor Chebyshev–Lobatto interpolant of ln(exact / R4+NF), at degree 4 over (1/z, α, x,
+    ln ρ/ρ_clamp), 13 load positions and 15 directions. It comes in three patches split by the baseline's body rule and
+    kind, built on the record's own solver (1,875 solves). Every scoring tooth is out of sample.
+    - Its error bound is the |degree 4 − degree 2| estimate: 16 % at most against a true 5.5 %, bounding only 61 % of
+      loads pointwise. It is not certified.
+    - Without a control model (the exact peak alone), the same table is substantial on α, ρ and z (9–12): the crate's
+      clamp and undercut kinks.
+  - **Reviews** [rev] (`bending-mechanics.md` §11.4): an off-node holdout of 139 BEM teeth, the table's ψ and t grids
+    probed between nodes, the box faces and the patch seam measured, R4+NF swept in load. They confirm the scoring-set
+    figures and add, for Tab(R4): structure between ψ nodes and near the root (17–33 %), a ring lowest-point α ripple
+    of 5.3, steps of up to 13.7 points at the box faces under the R4+NF fallback, z 28–29 in neither patch, an
+    estimator blind to t and ψ, and the record's body, rack, ring cutter and ν built in unnamed. For R4+NF: 20 fresh
+    reversals, ring α ranges 14.6 / 27.7, ρ 7.3, and near-root errors over the box to 119 % on rings.
+  - **Brackets** are the worst record groups on dev / record holdout / fresh, both kinds, as §10.4; "—" not measured.
+  - **Undercut class:** not split here.
 
 ## What the table says (it does not choose)
 
