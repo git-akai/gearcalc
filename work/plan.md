@@ -355,3 +355,15 @@ caught, test workspace included) and the 130-constant perturbation.
   - `geartrain-refactor-*.md` deleted; `handoff_inbound/` kept.
   - One efficiency model taken; contact-geometry spike S-C added.
   - Principles 9–11 (graph, gears as entities, units) added.
+
+- 2026-10-04 — orchestrator's call on face width, made on the owner's preference for automatic
+  width everywhere and on the reader survey of `s2-q6`:
+  - An automatic width on a line mesh is sized by what asks for it: the ratings and the overlap floor.
+    When nothing asks, it is typed absence ("not sized"), never the box. This removes a jump: as the
+    load went to 0 the width went to 0, then snapped to the box at exactly 0.
+  - Nothing that runs without a load case reads a spur width (geometry, outline/DXF, ε_α, efficiency,
+    play, assembly, the search), so a train with no load case still solves.
+  - A point or crossed member's box is its width, so it stays a given input.
+  - The core's 10 mm seed goes.
+  - Format-1 files with an automatic box of 0 are read without a format bump.
+  - The owner may override.
