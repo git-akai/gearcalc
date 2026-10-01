@@ -3631,23 +3631,23 @@
    "ok": [
     [
      "en",
-     578
+     589
     ],
     [
      "de",
-     578
+     589
     ],
     [
      "pt",
-     578
+     589
     ],
     [
      "zh-Hans",
-     578
+     589
     ],
     [
      "zh-Hant",
-     578
+     589
     ]
    ]
   },
@@ -13648,9 +13648,7 @@
        ],
        "couplings": []
       },
-      "held": [
-       4
-      ]
+      "held": []
      }
     ],
     [
@@ -14252,9 +14250,7 @@
        ],
        "couplings": []
       },
-      "held": [
-       4
-      ]
+      "held": []
      }
     ],
     [
@@ -14934,9 +14930,7 @@
        ],
        "couplings": []
       },
-      "held": [
-       4
-      ]
+      "held": []
      }
     ],
     [
@@ -15613,9 +15607,7 @@
        ],
        "couplings": []
       },
-      "held": [
-       4
-      ]
+      "held": []
      }
     ],
     [
@@ -17783,8 +17775,8 @@
          "search": false
         },
         {
-         "a": 12,
-         "b": 13,
+         "a": 13,
+         "b": 12,
          "sliding_friction": "0.080000000000000002",
          "static_friction": "0.16000000000000000",
          "overlap": {
@@ -19224,12 +19216,24 @@
            "auto": false,
            "manual": 30000
           }
+         },
+         {
+          "at": 7,
+          "role": "reacted",
+          "torque": {
+           "auto": true,
+           "manual": 0
+          },
+          "speed": {
+           "auto": true,
+           "manual": 0
+          }
          }
         ],
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 1,
+          "at": 7,
           "actuations": 1000,
           "reversing": false
          }
@@ -19240,6 +19244,18 @@
         "kind": "ultimate",
         "enabled": true,
         "loads": [
+         {
+          "at": 7,
+          "role": "load",
+          "torque": {
+           "auto": false,
+           "manual": 3
+          },
+          "speed": {
+           "auto": false,
+           "manual": 0
+          }
+         },
          {
           "at": 1,
           "role": "reacted",
@@ -19256,7 +19272,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 1,
+          "at": 7,
           "actuations": 1000,
           "reversing": false
          }
@@ -19278,12 +19294,24 @@
            "auto": false,
            "manual": 30000
           }
+         },
+         {
+          "at": 7,
+          "role": "reacted",
+          "torque": {
+           "auto": true,
+           "manual": 0
+          },
+          "speed": {
+           "auto": true,
+           "manual": 0
+          }
          }
         ],
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 1,
+          "at": 7,
           "actuations": 1000,
           "reversing": false
          }
@@ -19305,12 +19333,24 @@
            "auto": false,
            "manual": 30000
           }
+         },
+         {
+          "at": 7,
+          "role": "reacted",
+          "torque": {
+           "auto": true,
+           "manual": 0
+          },
+          "speed": {
+           "auto": true,
+           "manual": 0
+          }
          }
         ],
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 1,
+          "at": 7,
           "actuations": 1000,
           "reversing": false
          }
@@ -19331,6 +19371,18 @@
           "speed": {
            "auto": false,
            "manual": 30000
+          }
+         },
+         {
+          "at": 7,
+          "role": "reacted",
+          "torque": {
+           "auto": true,
+           "manual": 0
+          },
+          "speed": {
+           "auto": true,
+           "manual": 0
           }
          }
         ],
@@ -19366,7 +19418,7 @@
          "min_planet_clearance": "0.29999999999999999"
         },
         {
-         "carried_by": 7,
+         "carried_by": 1,
          "count": 1,
          "min_planet_clearance": "0.29999999999999999"
         }
@@ -19410,7 +19462,7 @@
         },
         {
          "body": 10,
-         "axis": 1
+         "axis": 0
         },
         {
          "body": 11,
@@ -20631,7 +20683,7 @@
         },
         {
          "axes": [
-          1,
+          0,
           4
          ],
          "angle": 0,
@@ -20676,12 +20728,24 @@
            "auto": false,
            "manual": 30000
           }
+         },
+         {
+          "at": 7,
+          "role": "reacted",
+          "torque": {
+           "auto": true,
+           "manual": 0
+          },
+          "speed": {
+           "auto": true,
+           "manual": 0
+          }
          }
         ],
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 1,
+          "at": 7,
           "actuations": 1000,
           "reversing": false
          }
@@ -20692,6 +20756,18 @@
         "kind": "ultimate",
         "enabled": true,
         "loads": [
+         {
+          "at": 7,
+          "role": "load",
+          "torque": {
+           "auto": false,
+           "manual": 3
+          },
+          "speed": {
+           "auto": false,
+           "manual": 0
+          }
+         },
          {
           "at": 1,
           "role": "reacted",
@@ -20708,7 +20784,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 1,
+          "at": 7,
           "actuations": 1000,
           "reversing": false
          }
@@ -20730,12 +20806,24 @@
            "auto": false,
            "manual": 30000
           }
+         },
+         {
+          "at": 7,
+          "role": "reacted",
+          "torque": {
+           "auto": true,
+           "manual": 0
+          },
+          "speed": {
+           "auto": true,
+           "manual": 0
+          }
          }
         ],
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 1,
+          "at": 7,
           "actuations": 1000,
           "reversing": false
          }
@@ -20757,12 +20845,24 @@
            "auto": false,
            "manual": 30000
           }
+         },
+         {
+          "at": 7,
+          "role": "reacted",
+          "torque": {
+           "auto": true,
+           "manual": 0
+          },
+          "speed": {
+           "auto": true,
+           "manual": 0
+          }
          }
         ],
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 1,
+          "at": 7,
           "actuations": 1000,
           "reversing": false
          }
@@ -20783,6 +20883,18 @@
           "speed": {
            "auto": false,
            "manual": 30000
+          }
+         },
+         {
+          "at": 7,
+          "role": "reacted",
+          "torque": {
+           "auto": true,
+           "manual": 0
+          },
+          "speed": {
+           "auto": true,
+           "manual": 0
           }
          }
         ],
@@ -20818,7 +20930,7 @@
          "min_planet_clearance": "0.29999999999999999"
         },
         {
-         "carried_by": 7,
+         "carried_by": 1,
          "count": 1,
          "min_planet_clearance": "0.29999999999999999"
         }
@@ -20862,7 +20974,7 @@
         },
         {
          "body": 10,
-         "axis": 1
+         "axis": 0
         },
         {
          "body": 11,
@@ -20870,7 +20982,7 @@
         },
         {
          "body": 12,
-         "axis": 1
+         "axis": 0
         }
        ],
        "members": [
@@ -22087,7 +22199,7 @@
         },
         {
          "axes": [
-          1,
+          0,
           4
          ],
          "angle": 0,
@@ -22137,12 +22249,24 @@
            "auto": false,
            "manual": 30000
           }
+         },
+         {
+          "at": 7,
+          "role": "reacted",
+          "torque": {
+           "auto": true,
+           "manual": 0
+          },
+          "speed": {
+           "auto": true,
+           "manual": 0
+          }
          }
         ],
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 1,
+          "at": 7,
           "actuations": 1000,
           "reversing": false
          }
@@ -22153,6 +22277,18 @@
         "kind": "ultimate",
         "enabled": true,
         "loads": [
+         {
+          "at": 7,
+          "role": "load",
+          "torque": {
+           "auto": false,
+           "manual": 3
+          },
+          "speed": {
+           "auto": false,
+           "manual": 0
+          }
+         },
          {
           "at": 1,
           "role": "reacted",
@@ -22169,7 +22305,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 1,
+          "at": 7,
           "actuations": 1000,
           "reversing": false
          }
@@ -22191,12 +22327,24 @@
            "auto": false,
            "manual": 30000
           }
+         },
+         {
+          "at": 7,
+          "role": "reacted",
+          "torque": {
+           "auto": true,
+           "manual": 0
+          },
+          "speed": {
+           "auto": true,
+           "manual": 0
+          }
          }
         ],
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 1,
+          "at": 7,
           "actuations": 1000,
           "reversing": false
          }
@@ -22218,12 +22366,24 @@
            "auto": false,
            "manual": 30000
           }
+         },
+         {
+          "at": 7,
+          "role": "reacted",
+          "torque": {
+           "auto": true,
+           "manual": 0
+          },
+          "speed": {
+           "auto": true,
+           "manual": 0
+          }
          }
         ],
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 1,
+          "at": 7,
           "actuations": 1000,
           "reversing": false
          }
@@ -22244,6 +22404,18 @@
           "speed": {
            "auto": false,
            "manual": 30000
+          }
+         },
+         {
+          "at": 7,
+          "role": "reacted",
+          "torque": {
+           "auto": true,
+           "manual": 0
+          },
+          "speed": {
+           "auto": true,
+           "manual": 0
           }
          }
         ],
@@ -22279,7 +22451,7 @@
          "min_planet_clearance": "0.29999999999999999"
         },
         {
-         "carried_by": 7,
+         "carried_by": 1,
          "count": 1,
          "min_planet_clearance": "0.29999999999999999"
         },
@@ -22328,7 +22500,7 @@
         },
         {
          "body": 10,
-         "axis": 1
+         "axis": 0
         },
         {
          "body": 11,
@@ -22336,7 +22508,7 @@
         },
         {
          "body": 12,
-         "axis": 1
+         "axis": 0
         },
         {
          "body": 13,
@@ -23439,21 +23611,21 @@
           }
          },
          "module": {
-          "auto": false,
+          "auto": true,
           "manual": 1
          },
          "pressure_angle": {
-          "auto": false,
+          "auto": true,
           "manual": 20
          },
          "thickness_mod": {
-          "auto": false,
+          "auto": true,
           "manual": 1
          },
          "ring": null,
          "pitch_diameter": {
           "auto": true,
-          "manual": 17
+          "manual": 0
          }
         }
        ],
@@ -23563,8 +23735,8 @@
          "search": false
         },
         {
-         "a": 0,
-         "b": 15,
+         "a": 15,
+         "b": 0,
          "sliding_friction": "0.080000000000000002",
          "static_friction": "0.16000000000000000",
          "overlap": {
@@ -23639,7 +23811,7 @@
         },
         {
          "axes": [
-          1,
+          0,
           4
          ],
          "angle": 0,
@@ -23709,12 +23881,24 @@
            "auto": false,
            "manual": 30000
           }
+         },
+         {
+          "at": 7,
+          "role": "reacted",
+          "torque": {
+           "auto": true,
+           "manual": 0
+          },
+          "speed": {
+           "auto": true,
+           "manual": 0
+          }
          }
         ],
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 1,
+          "at": 7,
           "actuations": 1000,
           "reversing": false
          }
@@ -23725,6 +23909,18 @@
         "kind": "ultimate",
         "enabled": true,
         "loads": [
+         {
+          "at": 7,
+          "role": "load",
+          "torque": {
+           "auto": false,
+           "manual": 3
+          },
+          "speed": {
+           "auto": false,
+           "manual": 0
+          }
+         },
          {
           "at": 1,
           "role": "reacted",
@@ -23741,7 +23937,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 1,
+          "at": 7,
           "actuations": 1000,
           "reversing": false
          }
@@ -23763,12 +23959,24 @@
            "auto": false,
            "manual": 30000
           }
+         },
+         {
+          "at": 7,
+          "role": "reacted",
+          "torque": {
+           "auto": true,
+           "manual": 0
+          },
+          "speed": {
+           "auto": true,
+           "manual": 0
+          }
          }
         ],
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 1,
+          "at": 7,
           "actuations": 1000,
           "reversing": false
          }
@@ -23790,12 +23998,24 @@
            "auto": false,
            "manual": 30000
           }
+         },
+         {
+          "at": 7,
+          "role": "reacted",
+          "torque": {
+           "auto": true,
+           "manual": 0
+          },
+          "speed": {
+           "auto": true,
+           "manual": 0
+          }
          }
         ],
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 1,
+          "at": 7,
           "actuations": 1000,
           "reversing": false
          }
@@ -23816,6 +24036,18 @@
           "speed": {
            "auto": false,
            "manual": 30000
+          }
+         },
+         {
+          "at": 7,
+          "role": "reacted",
+          "torque": {
+           "auto": true,
+           "manual": 0
+          },
+          "speed": {
+           "auto": true,
+           "manual": 0
           }
          }
         ],
@@ -23851,7 +24083,7 @@
          "min_planet_clearance": "0.29999999999999999"
         },
         {
-         "carried_by": 7,
+         "carried_by": 1,
          "count": 1,
          "min_planet_clearance": "0.29999999999999999"
         }
@@ -23895,7 +24127,7 @@
         },
         {
          "body": 10,
-         "axis": 1
+         "axis": 0
         },
         {
          "body": 11,
@@ -23903,7 +24135,7 @@
         },
         {
          "body": 12,
-         "axis": 1
+         "axis": 0
         }
        ],
        "members": [
@@ -25120,7 +25352,7 @@
         },
         {
          "axes": [
-          1,
+          0,
           4
          ],
          "angle": 0,
@@ -25170,12 +25402,24 @@
            "auto": false,
            "manual": 30000
           }
+         },
+         {
+          "at": 7,
+          "role": "reacted",
+          "torque": {
+           "auto": true,
+           "manual": 0
+          },
+          "speed": {
+           "auto": true,
+           "manual": 0
+          }
          }
         ],
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 1,
+          "at": 7,
           "actuations": 1000,
           "reversing": false
          }
@@ -25186,6 +25430,18 @@
         "kind": "ultimate",
         "enabled": true,
         "loads": [
+         {
+          "at": 7,
+          "role": "load",
+          "torque": {
+           "auto": false,
+           "manual": 3
+          },
+          "speed": {
+           "auto": false,
+           "manual": 0
+          }
+         },
          {
           "at": 1,
           "role": "reacted",
@@ -25202,7 +25458,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 1,
+          "at": 7,
           "actuations": 1000,
           "reversing": false
          }
@@ -25224,12 +25480,24 @@
            "auto": false,
            "manual": 30000
           }
+         },
+         {
+          "at": 7,
+          "role": "reacted",
+          "torque": {
+           "auto": true,
+           "manual": 0
+          },
+          "speed": {
+           "auto": true,
+           "manual": 0
+          }
          }
         ],
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 1,
+          "at": 7,
           "actuations": 1000,
           "reversing": false
          }
@@ -25251,12 +25519,24 @@
            "auto": false,
            "manual": 30000
           }
+         },
+         {
+          "at": 7,
+          "role": "reacted",
+          "torque": {
+           "auto": true,
+           "manual": 0
+          },
+          "speed": {
+           "auto": true,
+           "manual": 0
+          }
          }
         ],
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 1,
+          "at": 7,
           "actuations": 1000,
           "reversing": false
          }
@@ -25277,6 +25557,18 @@
           "speed": {
            "auto": false,
            "manual": 30000
+          }
+         },
+         {
+          "at": 7,
+          "role": "reacted",
+          "torque": {
+           "auto": true,
+           "manual": 0
+          },
+          "speed": {
+           "auto": true,
+           "manual": 0
           }
          }
         ],
@@ -25312,7 +25604,7 @@
          "min_planet_clearance": "0.29999999999999999"
         },
         {
-         "carried_by": 7,
+         "carried_by": 1,
          "count": 1,
          "min_planet_clearance": "0.29999999999999999"
         }
@@ -25356,7 +25648,7 @@
         },
         {
          "body": 10,
-         "axis": 1
+         "axis": 0
         },
         {
          "body": 11,
@@ -25364,7 +25656,7 @@
         },
         {
          "body": 12,
-         "axis": 1
+         "axis": 0
         },
         {
          "body": 13,
@@ -26736,7 +27028,7 @@
         },
         {
          "axes": [
-          1,
+          0,
           4
          ],
          "angle": 0,
@@ -26786,12 +27078,24 @@
            "auto": false,
            "manual": 30000
           }
+         },
+         {
+          "at": 7,
+          "role": "reacted",
+          "torque": {
+           "auto": true,
+           "manual": 0
+          },
+          "speed": {
+           "auto": true,
+           "manual": 0
+          }
          }
         ],
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 1,
+          "at": 7,
           "actuations": 1000,
           "reversing": false
          }
@@ -26802,6 +27106,18 @@
         "kind": "ultimate",
         "enabled": true,
         "loads": [
+         {
+          "at": 7,
+          "role": "load",
+          "torque": {
+           "auto": false,
+           "manual": 3
+          },
+          "speed": {
+           "auto": false,
+           "manual": 0
+          }
+         },
          {
           "at": 1,
           "role": "reacted",
@@ -26818,7 +27134,7 @@
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 1,
+          "at": 7,
           "actuations": 1000,
           "reversing": false
          }
@@ -26840,12 +27156,24 @@
            "auto": false,
            "manual": 30000
           }
+         },
+         {
+          "at": 7,
+          "role": "reacted",
+          "torque": {
+           "auto": true,
+           "manual": 0
+          },
+          "speed": {
+           "auto": true,
+           "manual": 0
+          }
          }
         ],
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 1,
+          "at": 7,
           "actuations": 1000,
           "reversing": false
          }
@@ -26867,12 +27195,24 @@
            "auto": false,
            "manual": 30000
           }
+         },
+         {
+          "at": 7,
+          "role": "reacted",
+          "torque": {
+           "auto": true,
+           "manual": 0
+          },
+          "speed": {
+           "auto": true,
+           "manual": 0
+          }
          }
         ],
         "duty": {
          "intermittent": {
           "range_degrees": 25,
-          "at": 1,
+          "at": 7,
           "actuations": 1000,
           "reversing": false
          }
@@ -26893,6 +27233,18 @@
           "speed": {
            "auto": false,
            "manual": 30000
+          }
+         },
+         {
+          "at": 7,
+          "role": "reacted",
+          "torque": {
+           "auto": true,
+           "manual": 0
+          },
+          "speed": {
+           "auto": true,
+           "manual": 0
           }
          }
         ],
@@ -26928,7 +27280,7 @@
          "min_planet_clearance": "0.29999999999999999"
         },
         {
-         "carried_by": 7,
+         "carried_by": 1,
          "count": 1,
          "min_planet_clearance": "0.29999999999999999"
         },
@@ -26977,7 +27329,7 @@
         },
         {
          "body": 10,
-         "axis": 1
+         "axis": 0
         },
         {
          "body": 11,
@@ -26985,7 +27337,7 @@
         },
         {
          "body": 12,
-         "axis": 1
+         "axis": 0
         },
         {
          "body": 13,
@@ -28606,7 +28958,7 @@
         },
         {
          "axes": [
-          1,
+          0,
           4
          ],
          "angle": 0,
@@ -28663,7 +29015,9 @@
      [
       "ui.train_edit_refused_geared",
       "ui.train_edit_refused_no_distance",
-      "ui.train_edit_refused_no_such"
+      "ui.train_edit_refused_no_such",
+      "ui.train_edit_refused_loaded",
+      "ui.train_edit_refused_locks"
      ]
     ]
    ]
@@ -28980,7 +29334,7 @@
          "ring": true
         }
        },
-       "refused": null
+       "refused": "ui.train_edit_refused_locks"
       },
       {
        "edit": {
@@ -29052,7 +29406,7 @@
          "ring": true
         }
        },
-       "refused": null
+       "refused": "ui.train_edit_refused_locks"
       },
       {
        "edit": {

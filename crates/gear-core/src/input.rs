@@ -480,7 +480,7 @@ pub const DUTY: &[Row<Duty>] = &[
         field: "intermittent.at",
         kind: Kind::Index,
         get: |d| match *d {
-            Duty::Intermittent { at, .. } => Some(at as f64),
+            Duty::Intermittent { at, .. } => at.map(|a| a as f64),
             Duty::Continuous { .. } => None,
         },
         bound: |l, _| Some(case_body(l)),

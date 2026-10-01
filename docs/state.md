@@ -1589,7 +1589,10 @@ Not a queue with a head; this is what a next session would pick from.
     natively (a bisection a space, sought whole: a space's verdict flips
     over an ulp or two beside its ends, so no end can be skipped exactly),
     a throw's inversion 2.2 s (a hundred trials over every tooth), and
-    its span, centre distance and the rest under 0.3 s;
+    its span, centre distance and the rest under 0.3 s. In the browser
+    the same gear is some eight times slower: a gear report of an
+    eccentric 600 000 teeth, within the budget, takes about 23 s in wasm
+    against about 3 s natively (re-check, 2026-09-30);
   - **an eccentric gear's span is set from its mean tooth** and carried
     round to the nearest count that measures everywhere
     (`metrology::best_span_around`), where it was the count whose worst
@@ -1598,7 +1601,7 @@ Not a queue with a head; this is what a next session would pick from.
     steepest pressure angle. Over 5 184 eccentric gears swept (count,
     amplitude, indexing, angle, helix, shift), 5 070 keep their count, 75
     have no span either way and none gains or loses one; on the other 39
-    the count kept has its worst contact **at most 0.34 m farther** from
+    the count kept has its worst contact **at most 0.34 module farther** from
     the pitch circle than the old rule's — never nearer. An evenly cut
     gear's is the same, bit for bit. After a trap of any other kind the stack is put back
     and the panic's words said (`core.ts`'s `guarded`); the module is not

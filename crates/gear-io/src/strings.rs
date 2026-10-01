@@ -1681,7 +1681,8 @@ mod tests {
                 }
             }
             // **A fatigue case that names a body twice, measures its sweep
-            // at ground, at no body, or at a body its case holds still** —
+            // at ground, at no body, at a body the train holds, or at a body
+            // its case holds still** —
             // each fired from the model on a pair loaded at 1 and reacted at
             // 2, and a set whose released ring its case gives no speed.
             {
@@ -1707,6 +1708,19 @@ mod tests {
                         Err(e) => err(e.note()),
                         Ok(r) => r.every_note().into_iter().for_each(&mut err),
                     }
+                }
+                // Ground is no body a case names, and the input table
+                // refuses it first: the sweep at no open port is the set's
+                // ring, which the set holds.
+                let held = Train::chained(vec![arr::planetary(12, 30, 72, 3)], |_| {
+                    vec![LoadCase {
+                        duty: Duty::intermittent(Some(3)),
+                        ..LoadCase::fatigue(1, 2, 2.0, 3000.0)
+                    }]
+                });
+                match gear_core::train::solve_train(&held, &lib) {
+                    Err(e) => err(e.note()),
+                    Ok(r) => r.every_note().into_iter().for_each(&mut err),
                 }
                 let mut set = Train::chained(vec![arr::planetary(12, 30, 72, 3)], |_| Vec::new());
                 set.edit(Edit::Release(3)).expect("the set's ring is held");

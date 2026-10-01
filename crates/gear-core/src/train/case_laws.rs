@@ -416,7 +416,9 @@ fn ring_held_by_its_case() -> Train {
 /// its fatigue sweep put at every body — ground and one past the last
 /// included: the solve refuses the case by the key that names a sweep at
 /// no open port, or the case says its sweep stands still, or every member
-/// counts cycles. It never panics, and each of the three is met.
+/// counts cycles. It never panics, and each of the three is met. Ground and
+/// one past the last are no body a case can name, and the input table
+/// refuses them first, by the field (`input::DUTY`).
 #[test]
 fn a_sweep_at_any_body_counts_refuses_or_says_why() {
     use super::arrangements::Preset;
@@ -441,9 +443,10 @@ fn a_sweep_at_any_body_counts_refuses_or_says_why() {
                 Err(_) => failures.push(format!("{context}: panicked")),
                 Ok(Err(e)) => {
                     let key = crate::note::Explain::note(&e).key;
-                    if key == "error.train_duty_port" {
+                    let outside = at == 0 || at > base.max_body();
+                    if key == "error.train_duty_port" && !outside {
                         refused += 1;
-                    } else {
+                    } else if !(outside && key == "error.input_out_of_range") {
                         failures.push(format!("{context}: refused as {key}"));
                     }
                 }
@@ -527,21 +530,26 @@ fn two_entries_of_one_case_at_one_body_are_refused() {
 }
 
 /// **A case switched off fails alone** (audit T13.5): an entry at a body
-/// no load can enter by — ground — in a case that is off leaves it
-/// unsolved with the refusal as its note, and the train and its other
-/// case solve as they did; switched on, it refuses the train by name.
+/// no load can enter by — a body of the train that is no open port, a
+/// planet — in a case that is off leaves it unsolved with the refusal as
+/// its note, and the train and its other case solve as they did; switched
+/// on, it refuses the train by name.
 #[test]
 fn a_switched_off_case_at_no_port_fails_alone() {
     use super::arrangements::Preset;
     use super::testing::cased;
     use super::Load;
     let lib = test_library();
-    let t = cased(vec![Preset::Spur.build()]);
+    let t = cased(vec![Preset::Planetary.build()]);
+    let ports: Vec<usize> = t.open_ports().iter().map(|p| p.body).collect();
+    let no_port = (1..=t.max_body())
+        .find(|b| !ports.contains(b))
+        .expect("a planetary set has a body that is no port");
     let alone = solve_train(&t, &lib).unwrap();
     let mut u = t.clone();
     u.load_cases.push(LoadCase {
         enabled: false,
-        loads: vec![Load::given(crate::kinematics::GROUND, TORQUE_NM, SPEED_RPM)],
+        loads: vec![Load::given(no_port, TORQUE_NM, SPEED_RPM)],
         ..LoadCase::ultimate(1, 2, TORQUE_NM, SPEED_RPM)
     });
     let r = solve_train(&u, &lib).unwrap_or_else(|e| panic!("the train refused: {e}"));
