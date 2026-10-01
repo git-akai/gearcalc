@@ -3622,8 +3622,8 @@ pub(crate) const fn gcd(mut a: u32, mut b: u32) -> u32 {
 ///
 /// **Rounded exactly**: the revolutions are a rational and the ceiling is
 /// taken of it, so a count that is whole is that whole number — not one
-/// more for a rounding above it. `None` where the count is past what an
-/// `i128` holds.
+/// more for a rounding above it ([`Revolutions::ceil`] says where that
+/// holds).
 #[must_use]
 pub fn loaded_cycles(turns: Turns) -> Cycles {
     match turns.reversing_actuations {
@@ -3728,10 +3728,10 @@ impl Revolutions {
 
     /// **The whole number of revolutions that covers this many, over
     /// `per`**: the ceiling of the exact count, so a whole count reads whole
-    /// and one a part past it reads one more. Exact below `2^53`, every
-    /// whole number the report's double holds; from there on the double's
-    /// own ceiling, whose rounding is below the report's resolution — it
-    /// cannot print the difference.
+    /// and one a part past it reads one more. Exact to `2^53`, every
+    /// whole number the report's double holds; past it the double's own
+    /// ceiling, within one ulp of the exact one — the report's resolution
+    /// there (relative `2^-52`).
     fn ceil_over(&self, per: u32) -> f64 {
         let (num, den) = self.quotient(per);
         match num.ceil_over(&den) {

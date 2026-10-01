@@ -392,10 +392,11 @@ impl Natural {
         Self(out).trimmed()
     }
 
-    /// **`⌈self / by⌉`, where it is below `2^53`** — every whole number a
-    /// double holds exactly, which is the most a report printed as one can
-    /// say. `None` where the quotient is that large or more, or `by` is
-    /// nought.
+    /// **`⌈self / by⌉`, where the quotient is below `2^53`** — every whole
+    /// number a double holds exactly, which is the most a report printed as
+    /// one can say (a quotient just under it rounds up to `2^53` itself,
+    /// which a double still holds). `None` where the quotient is `2^53` or
+    /// more, or `by` is nought.
     #[must_use]
     pub fn ceil_over(&self, by: &Self) -> Option<u64> {
         const EXACT_BITS: u32 = f64::MANTISSA_DIGITS;
