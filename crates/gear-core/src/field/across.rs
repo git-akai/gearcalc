@@ -210,12 +210,21 @@ impl Profile {
             )
     }
 
-    /// `h′ = α + k t` on the interval holding `t`: `(α, k)`.
-    fn line_through(&self, t: f64) -> (f64, f64) {
-        let i = self.knots.partition_point(|&k| k < t);
+    /// `h′ = α + k t` on interval `i`: `(α, k)`.
+    fn line_on(&self, i: usize) -> (f64, f64) {
         let (tr, a) = self.line_of(i);
         let k = self.curvature[i];
         (a - k * tr, k)
+    }
+
+    /// The lines `(α, k)` of `h′` just beyond `from` and just short of `−from` (`from ≥ 0`, a
+    /// knot's distance from the origin or `0`): on the band from `from` to the next knot's
+    /// distance, at `t` and at `−t`.
+    fn band_lines(&self, from: f64) -> [(f64, f64); 2] {
+        [
+            self.line_on(self.knots.partition_point(|&k| k <= from)),
+            self.line_on(self.knots.partition_point(|&k| k < -from)),
+        ]
     }
 
     /// A bracket of the strip's half-width at load `q`, by construction, with the bound on its
@@ -284,10 +293,9 @@ impl Profile {
                 1.0
             };
             let need = (1.0 + skew) * (1.0 + skew) * load;
-            // The reach `s` in the band with `s² σ ≥ need` at the knots passed and at `±s`.
-            let mid = to.map_or(from + 1.0, |to| 0.5 * (from + to));
-            let (a_right, k_right) = self.line_through(mid);
-            let (a_left, k_left) = self.line_through(-mid);
+            // The reach `s` in the band with `s² σ ≥ need` at the knots passed and at `±s`, on
+            // the intervals just beyond `±from` (no knot lies within the band).
+            let [(a_right, k_right), (a_left, k_left)] = self.band_lines(from);
             let (right_from, right_to) = reaches(k_right, a_right, need)?;
             let (left_from, left_to) = reaches(k_left, -a_left, need)?;
             let s = passed
@@ -1895,6 +1903,30 @@ mod tests {
     /// The near miss's run.
     const NEAR_MISS_RUN: (f64, f64) = (-0.03, 0.05);
 
+    /// The near miss turned over, with a soft step `(0.04, 0.06)` past its run's nearer end: its
+    /// contact leans right, its farthest knot is on the right, and beyond it the right side is
+    /// the one that carries the bound (a section that reads each band's lines on both sides).
+    fn soft_right(q: f64) -> Case {
+        let step = |from: f64, to: f64, dk: f64| CurvatureStep {
+            from: Some(from),
+            to: Some(to),
+            dk,
+        };
+        Case {
+            q,
+            k0: -0.05,
+            steps: vec![
+                step(-0.05, 0.03, 5.0),
+                step(-0.05, -0.01, 2.0),
+                step(0.04, 0.06, 0.5),
+            ],
+            flank: None,
+        }
+    }
+
+    /// The run of [`soft_right`].
+    const SOFT_RIGHT_RUN: (f64, f64) = (-0.05, 0.03);
+
     /// The loads the checker found the near miss refused at, N/mm.
     const NEAR_MISS_LOADS: [f64; 3] = [100.0, 176.0, 250.0];
 
@@ -1976,8 +2008,9 @@ mod tests {
         refused: Vec<(&'static str, f64)>,
     }
 
-    /// The twin law over the ring's section (1 to 10⁴ N/mm, eight loads a decade) and the near
-    /// miss (1 to 1778 N/mm, and [`NEAR_MISS_LOADS`]), each strip solved with `bracket`;
+    /// The twin law over the ring's section (1 to 10⁴ N/mm, eight loads a decade), the near
+    /// miss (1 to 1778 N/mm, [`NEAR_MISS_LOADS`] and [`NEAR_EDGE_LOADS`]) and [`soft_right`] (1
+    /// to 1778 N/mm), each strip solved with `bracket`;
     /// `perturb` moves the strip's `c`, `m` and peak by a share of [`TWIN`] (the tolerance's
     /// laws).
     fn twin_law(
@@ -1990,8 +2023,9 @@ mod tests {
             .chain(NEAR_MISS_LOADS)
             .chain(NEAR_EDGE_LOADS)
             .map(|q| ("near miss", near_miss(q), NEAR_MISS_RUN));
+        let soft = decade(26).map(|q| ("soft right", soft_right(q), SOFT_RIGHT_RUN));
         let mut seen = TwinSeen::default();
-        for (name, case, run) in ring.chain(near) {
+        for (name, case, run) in ring.chain(near).chain(soft) {
             let solve = |c: &Case| {
                 let profile = Profile::new(c.k0, &c.steps).expect("a profile");
                 Strip::new_by(&profile, c.q, STEEL, bracket)
@@ -2026,10 +2060,12 @@ mod tests {
     /// two are one section. Swept over the ring's section (inside its round to 1640 N/mm; on
     /// the concave flank beyond, to 10⁴ N/mm, where the strip must still solve its own
     /// equations, to `1e-13`) and over the near miss (inside its run to 380 N/mm, with a knot
-    /// inside the contact from 44 N/mm, and its bracket reading `σ` past the run from 350):
-    /// `c`, `m` and the peak equal the twin's within [`TWIN`], and nothing is refused. Plant: the previous bracket, convex over `[−2c, 2c]`, which holds
+    /// inside the contact from 44 N/mm, and its bracket reading `σ` past the run from 350), and
+    /// over the near miss turned over with a soft step past its run ([`soft_right`]): `c`, `m`
+    /// and the peak equal the twin's within [`TWIN`], and nothing is refused. Plant: the previous bracket, convex over `[−2c, 2c]`, which holds
     /// every load of the ring inside its round (a gate on the ring alone passes it: there the
-    /// strip is Hertz's) and refuses the near miss from 100 N/mm and the ring beyond its round.
+    /// strip is Hertz's) and refuses the near miss and its turned-over twin from 100 N/mm and
+    /// the ring beyond its round.
     #[test]
     fn a_section_concave_beyond_its_run_is_its_convex_twins_strip() {
         let seen = twin_law(Profile::width_bracket, |x| x);
@@ -2047,20 +2083,20 @@ mod tests {
         assert!(seen.refused.is_empty(), "{:?}", seen.refused);
         assert_eq!(
             (seen.inside, seen.general, seen.beyond),
-            (26 + 28, 14, 7 + 6)
+            (26 + 28 + 21, 14 + 7, 7 + 6 + 6)
         );
         assert_eq!(seen.worst.count, seen.inside);
         assert!(seen.worst.ratio <= 1.0 && seen.residual <= RESIDUAL);
         // The plant: the previous bracket.
         let plant = twin_law(convex_over_twice_the_width, |x| x);
         let ring_inside = |q: f64| q < 1640.0;
-        assert!(plant.refused.iter().all(
-            |&(name, q)| name == "near miss" && q >= 99.0 || name == "ring" && !ring_inside(q)
-        ));
+        assert!(plant.refused.iter().all(|&(name, q)| {
+            name == "ring" && !ring_inside(q) || name != "ring" && q >= 99.0
+        }));
         for q in NEAR_MISS_LOADS {
             assert!(plant.refused.contains(&("near miss", q)), "{q}");
         }
-        assert_eq!(plant.refused.len(), 11 + 3 + 4 + 7);
+        assert_eq!(plant.refused.len(), 7 + (11 + 3 + 4) + 11);
     }
 
     /// The twin law's tolerance: a few roundings off passes, and ten times it off misses at
@@ -3026,6 +3062,67 @@ mod tests {
         };
         assert_eq!(moved(Profile::width_bracket), (0, 18));
         assert_eq!(moved(whole), (18, 18));
+    }
+
+    /// **Each band's lines are the section's slope there**: for every band of the near miss,
+    /// [`soft_right`], the ring's section and the 491 random strips, `α + k t` is `h′(t)` and
+    /// `α′ + k′(−t)` is `h′(−t)` at 16 points `t` across the band (to the slope's rounding),
+    /// the open outermost band included. Plant: the interval holding `from` itself, which is the
+    /// one below it where `from` is a knot on the right: right on every band but the one past a
+    /// right knot, so a check that skips the outermost band, or the left side, passes it.
+    #[test]
+    fn each_bands_lines_are_its_slope() {
+        let inner = |p: &Profile, from: f64| {
+            [
+                p.line_on(p.knots.partition_point(|&k| k < from)),
+                p.line_on(p.knots.partition_point(|&k| k < -from)),
+            ]
+        };
+        let sections: Vec<Case> = [near_miss(1.0), soft_right(1.0), ring_at(1.0)]
+            .into_iter()
+            .chain(random_strips().into_iter().map(|(c, _)| c))
+            .collect();
+        let (mut ran, mut worst, mut plant_misses) = (0, 0.0_f64, 0);
+        for case in &sections {
+            let p = Profile::new(case.k0, &case.steps).expect("a profile");
+            let mut reach: Vec<f64> = p
+                .knots
+                .iter()
+                .filter(|&&t| t != 0.0)
+                .map(|t| t.abs())
+                .collect();
+            reach.sort_by(f64::total_cmp);
+            reach.dedup();
+            let far = reach.last().copied().unwrap_or_default();
+            let starts = std::iter::once(0.0).chain(reach.iter().copied());
+            let ends = reach.iter().copied().map(Some).chain(std::iter::once(None));
+            for (from, to) in starts.zip(ends) {
+                // The open band read over one unit past its start.
+                let width = to.map_or(1.0, |to| to - from);
+                // Each side's miss over its terms' size: a line is anchored at a knot, so its
+                // rounding is the knot's (`far`, the farthest), not `t`'s.
+                let side = |(a, k): (f64, f64), t: f64| {
+                    let h = p.slope_at(t);
+                    (a + k * t - h).abs() / (a.abs() + k.abs() * (t.abs() + far) + h.abs())
+                };
+                let off =
+                    |[right, left]: [(f64, f64); 2], t: f64| worse(side(right, t), side(left, -t));
+                let mut plant_off = 0.0_f64;
+                for j in 1..=16 {
+                    let t = from + width * f64::from(j) / 17.0;
+                    worst = worse(worst, off(p.band_lines(from), t));
+                    plant_off = worse(plant_off, off(inner(&p, from), t));
+                    ran += 1;
+                }
+                plant_misses += usize::from(plant_off > 1e-12);
+            }
+        }
+        eprintln!(
+            "band lines: {ran} points, worst {worst:.2e}; the plant misses {plant_misses} bands"
+        );
+        assert!(ran > 491 * 16);
+        assert!(worst <= 8.0 * EPS, "{worst:e}");
+        assert!(plant_misses > 0);
     }
 
     /// **`reaches` is its quadratic's solution set**: on a grid of `k` (both signs and zero),
