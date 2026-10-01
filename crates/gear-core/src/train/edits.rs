@@ -1786,7 +1786,7 @@ mod tests {
                 let mut seen: Vec<String> = Vec::new();
                 for at in super::super::sweep::targets(&t) {
                     for o in t.offers(at) {
-                        let Edit::AddGear { mate, .. } = o.edit else {
+                        let Edit::AddGear { .. } = o.edit else {
                             continue;
                         };
                         let named = format!("{:?}", o.edit);

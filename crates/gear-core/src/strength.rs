@@ -278,6 +278,25 @@ pub struct RootSection {
     pub load_point: [f64; 2],
     /// Where the load line crosses the centreline, for drawing.
     pub load_line_crossing: [f64; 2],
+    /// **The load's direction**, a unit vector along the line of action
+    /// through [`Self::load_point`], pointing toward and across the
+    /// centreline — as the flank pushes the tooth. Carried rather than read
+    /// off the point and the crossing: at a pointed tip loaded at its apex
+    /// the two coincide on the centreline, and the direction rebuilt from
+    /// them came out as `(±1, 0)` or NaN by rounding.
+    pub load_direction: [f64; 2],
+}
+
+/// The line of action `dir` oriented as the load presses the tooth: toward
+/// the centreline from the `+x` flank (its `x` negative). `dir`'s `x` is
+/// never nought where a section is built (a vertical line of action never
+/// crosses the centreline), so the orientation is decided by construction.
+fn toward_centreline(dir: [f64; 2]) -> [f64; 2] {
+    if dir[0] > 0.0 {
+        [-dir[0], -dir[1]]
+    } else {
+        dir
+    }
 }
 
 /// A point on the fillet and the curve's tangent there, in tooth coordinates.
@@ -993,6 +1012,7 @@ fn finish<T: ToothOutline + ?Sized>(
         tangent_direction,
         load_point,
         load_line_crossing: crossing,
+        load_direction: toward_centreline(load_dir),
     })
 }
 
@@ -1043,6 +1063,7 @@ impl RootSection {
             axial_compression,
             load_point,
             load_line_crossing: crossing,
+            load_direction: toward_centreline(dir),
             ..*self
         })
     }
@@ -2676,6 +2697,83 @@ mod tests {
             let r = f64::hypot(sec.tangency[0], sec.tangency[1]);
             assert!(r >= g.rf - 1e-9 && r <= g.r_j + 1e-9, "tangency at r={r}");
         }
+    }
+
+    /// **A pointed tooth loaded at its apex has a load direction**, decided
+    /// by construction (the line of action oriented toward the centreline),
+    /// not rebuilt from the load point and the centreline crossing, which
+    /// coincide there: `gear-cli fillet external 8 25 1.2 0.38 8` printed
+    /// NaN for it. Over z 6–14, x 0.6–1.4, 20° and 25° at ε 0.9 (the tip
+    /// loaded), every tooth whose tip is a point is rated and its direction
+    /// is a unit vector pointing across the centreline; and swept through
+    /// the shift at which a 25° 8-tooth tip comes to a point, the direction
+    /// moves no more across the point than twice its neighbouring steps.
+    #[test]
+    fn a_pointed_tooth_loaded_at_its_apex_has_a_load_direction() {
+        let tooth = |z: u32, alpha: f64, x: f64| {
+            Tooth::new(GearParams {
+                teeth: z,
+                pressure_angle: alpha,
+                profile_shift: x,
+                ..Default::default()
+            })
+        };
+        let pointed = |g: &Tooth| {
+            g.clamps
+                .notes
+                .iter()
+                .any(|n| n.is(crate::note::key::CLAMP_TIP_CAPPED_POINTED))
+        };
+        let direction = |g: &Tooth| {
+            bending_section_on_path(g, 0.9, 0.0, LoadSharing::None)
+                .expect("a pointed tooth is rated")
+                .0
+        };
+        let mut apex = 0;
+        for z in 6..=14 {
+            for alpha in [20.0, 25.0] {
+                for i in 0..=8 {
+                    let g = tooth(z, alpha, 0.6 + 0.1 * f64::from(i));
+                    if !pointed(&g) {
+                        continue;
+                    }
+                    let s = direction(&g);
+                    let [dx, dy] = s.load_direction;
+                    assert!(
+                        (dx.hypot(dy) - 1.0).abs() < 1e-12 && dx < 0.0,
+                        "z {z} {alpha}° step {i}: {:?}",
+                        s.load_direction
+                    );
+                    apex += usize::from(s.load_point[0] == 0.0);
+                }
+            }
+        }
+        assert!(apex > 10, "{apex} apex-loaded teeth");
+
+        let read: Vec<(bool, [f64; 2])> = (0..=60)
+            .map(|i| {
+                let g = tooth(8, 25.0, 0.01 * f64::from(i));
+                (pointed(&g), direction(&g).load_direction)
+            })
+            .collect();
+        let first = read
+            .iter()
+            .position(|r| r.0)
+            .expect("the sweep reaches a point");
+        assert!(
+            first > 1 && first + 1 < read.len(),
+            "{first}: {:?}",
+            read.iter().map(|r| r.0).collect::<Vec<_>>()
+        );
+        let step = |i: usize| {
+            let (a, b) = (read[i - 1].1, read[i].1);
+            (a[0] - b[0]).hypot(a[1] - b[1])
+        };
+        let (across, beside) = (step(first), step(first - 1).max(step(first + 1)));
+        assert!(
+            across <= 2.0 * beside,
+            "{across} across the point, {beside} beside it"
+        );
     }
 
     /// The load line must actually pass through the contact point and the

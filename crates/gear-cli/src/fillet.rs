@@ -269,14 +269,11 @@ fn member<T: ToothOutline>(
     // single-pair contact, or the tip below a contact ratio of one.
     if let Some(s) = db.as_ref().ok().or(iso.as_ref()) {
         let [px, py] = s.load_point;
-        let [cx, cy] = s.load_line_crossing;
-        let (dx, dy) = (cx - px, cy - py);
-        let len = dx.hypot(dy);
+        let [dx, dy] = s.load_direction;
         println!(
-            "load x {px:.16e} y {:.16e} dx {:.16e} dy {:.16e}",
+            "load x {px:.16e} y {:.16e} dx {dx:.16e} dy {:.16e}",
             flip * py,
-            dx / len,
-            flip * dy / len
+            flip * dy
         );
     }
     if outline && g.is_usable() {
