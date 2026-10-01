@@ -1375,6 +1375,11 @@ impl Train {
         let made = self.make(edit).and_then(|map| {
             self.keeps_its_loads(&before)?;
             self.locks_nothing(&before, &map)?;
+            // A join that puts a ring's mesh across crossed axes leaves it
+            // no kind: refused, as adding a ring there is.
+            if let Err(super::edits::Invariant::RingCrossed(_)) = self.shape.invariants() {
+                return Err(super::EditRefused::RingCrossed);
+            }
             Ok(map)
         });
         if made.is_err() {

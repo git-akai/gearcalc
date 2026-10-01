@@ -706,6 +706,25 @@ mod tests {
         );
     }
 
+    /// **A join never lines a ring's mesh up across crossed axes** (Q6): of
+    /// the 36 walks of 0..3600 at depth 8 that ended in a join breaking the
+    /// graph's invariant that a ring meshes on parallel axes (`RingCrossed`) —
+    /// a ring added on a new axis, then two bodies joined so its distance is
+    /// the crossed one. Before the invariant read a mesh's kind, the join was
+    /// made and the ring wired as an external gear. The join is refused now,
+    /// under the key adding a ring there is refused by.
+    #[test]
+    fn a_join_never_crosses_a_ring() {
+        // Eight of them, the shortest; `a_deeper_walk_keeps_the_train_whole`
+        // over 0..3600 walks the rest.
+        const CROSSED: [usize; 8] = [583, 669, 711, 714, 1254, 1371, 1772, 2213];
+        let failures: Vec<String> = CROSSED
+            .iter()
+            .flat_map(|&w| walk_failures(w..w + 1, 8))
+            .collect();
+        assert!(failures.is_empty(), "{}", failures.join("\n"));
+    }
+
     /// **The walk, deeper and wider**, by hand: `WALK_SEEDS=from..to` and
     /// `WALK_DEPTH=n` (depth 8 where unset) — what a checker runs to look
     /// past the default walk's reach, e.g. `WALK_SEEDS=0..3600 cargo
