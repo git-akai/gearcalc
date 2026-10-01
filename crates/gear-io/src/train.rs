@@ -649,25 +649,40 @@ mod tests {
     #[test]
     fn a_staged_files_automatic_box_of_nought_reads_as_the_default() {
         let old = include_str!("../tests/data/elevation_drive_staged.toml");
-        let given = "auto = false\nmanual = 10.0";
-        assert!(old.contains("auto = true\nmanual = 0.0") && old.contains(given));
+        let given = "face_width]\nauto = false\nmanual = 10.0";
+        let zero = "face_width]\nauto = true\nmanual = 0.0";
+        assert_eq!(old.matches(zero).count(), 1, "one box of nought");
+        assert!(old.contains(given));
         let converted = convert(old).unwrap();
-        assert!(converted.adjusted, "a box read as a width is an adjustment");
-        let widths: Vec<_> = converted
-            .document
-            .train
-            .shape
-            .members
-            .iter()
-            .map(|m| m.gear.face_width)
-            .collect();
-        assert!(widths.iter().all(|w| w.manual > 0.0), "{widths:?}");
-        assert!(widths.contains(&Auto::automatic(10.0)));
+        // The member whose box was nought: the one that moves when that box
+        // is written otherwise, all else alike.
+        let seven =
+            convert(&old.replacen(zero, "face_width]\nauto = true\nmanual = 7.0", 1)).unwrap();
         assert!(
-            widths.contains(&Auto::fixed(10.0)),
+            !seven.adjusted,
+            "with no box of nought, nothing is adjusted"
+        );
+        let widths = |d: &Imported| -> Vec<Auto<f64>> {
+            let m = &d.document.train.shape.members;
+            m.iter().map(|m| m.gear.face_width).collect()
+        };
+        let moved: Vec<usize> = (0..widths(&converted).len())
+            .filter(|&i| widths(&converted)[i] != widths(&seven)[i])
+            .collect();
+        assert_eq!(moved.len(), 1, "{moved:?}");
+        assert_eq!(widths(&seven)[moved[0]], Auto::automatic(7.0));
+        // ...reads exactly the frozen literal, whatever the core's default
+        // is, and says it was adjusted.
+        assert_eq!(
+            widths(&converted)[moved[0]],
+            Auto::automatic(unversioned::BOX_OF_NOUGHT_READ_AS)
+        );
+        assert!(converted.adjusted, "a box read as a width is an adjustment");
+        assert!(
+            widths(&converted).contains(&Auto::fixed(10.0)),
             "a given width is as written"
         );
-        let nought = old.replacen(given, "auto = false\nmanual = 0.0", 1);
+        let nought = old.replacen(given, "face_width]\nauto = false\nmanual = 0.0", 1);
         match convert(&nought) {
             Err(DocumentError::Malformed(e)) => {
                 use gear_core::note::Explain;

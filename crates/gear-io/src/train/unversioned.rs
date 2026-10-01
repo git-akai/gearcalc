@@ -24,7 +24,7 @@ use serde::Deserialize;
 /// width the format's gears were born with when it was numbered. Frozen, as
 /// every value this reading supplies: a literal, so moving the core's default
 /// changes nothing an old file means (`docs/reference.md#geartrain-file-formats`).
-const BOX_OF_NOUGHT_READ_AS: f64 = 10.0;
+pub(super) const BOX_OF_NOUGHT_READ_AS: f64 = 10.0;
 
 trait Boxed {
     /// An automatic figure whose box is nought.
